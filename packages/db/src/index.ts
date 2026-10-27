@@ -48,10 +48,14 @@ export {
   type LockRedis,
   type LockReleaseResult,
   maxSafeHeartbeatMs,
+  singleFlightLock,
 } from './lock';
 // Redis client and cache utilities
 export {
+  CACHE_STATES,
   type CacheCheck,
+  type CacheOptions,
+  type CacheState,
   COMMAND_TIMEOUT_MS,
   cache,
   cacheKey,
@@ -83,7 +87,6 @@ export {
   type RollingCacheValue,
   type RollingCacheWrite,
   redisNamespace,
-  singleFlightLock,
   unregisterRollingCache,
   upsertCache,
 } from './redis';

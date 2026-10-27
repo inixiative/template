@@ -5,14 +5,13 @@
  * @partOf primitive:caching, infrastructure:redis
  * @uses infrastructure:prisma, infrastructure:observability
  */
-import {
-  type CacheCheck,
-  checkCache,
-  singleFlightLock,
-  upsertCache,
-} from '@template/db/redis/cache';
-import { resolveRollingCacheTargets } from '@template/db/redis/resolveRollingCacheTargets';
-import { registerRollingCache } from '@template/db/redis/rollingCacheRegistry';
+import { singleFlightLock } from '@template/db/lock/singleFlight/singleFlightLock';
+import type { CacheCheck } from '@template/db/redis/cache/cacheStates';
+import { checkCache } from '@template/db/redis/cache/checkCache';
+import { clearCacheQueued } from '@template/db/redis/cache/queued/clearCacheQueued';
+import { markCacheQueued } from '@template/db/redis/cache/queued/markCacheQueued';
+import { resolveRollingCacheTargets } from '@template/db/redis/cache/rollingCache/resolveRollingCacheTargets';
+import { registerRollingCache } from '@template/db/redis/cache/rollingCache/rollingCacheRegistry';
 import {
   type AnyRollingCacheTargets,
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
@@ -27,7 +26,8 @@ import {
   type RollingCacheTarget,
   type RollingCacheTargets,
   type RollingCacheValue,
-} from '@template/db/redis/rollingCacheTypes';
+} from '@template/db/redis/cache/rollingCache/rollingCacheTypes';
+import { upsertCache } from '@template/db/redis/cache/upsertCache';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { recordDuration } from '@template/shared/telemetry';
 
@@ -84,7 +84,12 @@ const selectedFields = (selector: AnyRollingCacheTargets | undefined): string[] 
 //   write lands, so every result reads "computing", never "empty", meanwhile. It waits up to
 //   `timeoutSeconds` for the lock (the usual holder is a superseded refresh that is stopping) and
 //   reports false rather than computing unlocked beside another. Writes overwrite (`force`); a write
-//   after `signal` aborted is dropped, and a write that fails throws so the leaf retries.
+//   after `signal` aborted is dropped, and a write that fails throws so the leaf retries. An abort
+//   releases the lock at once rather than when `compute` returns, so the refresh that superseded it
+//   is not left waiting on a compute whose writes will be dropped.
+// - `markQueued(target)` / `clearQueued(target)` are the target's queued marker: `checkRollingCache`
+//   sets it so only one cold reader enqueues the leaf, and a refresh that wrote clears it. An aborted
+//   refresh leaves it, because its retry is still queued.
 // - Each target's refresh is timed into `rollingCache.target`, tagged with the cache name only.
 export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => {
   const {
@@ -159,12 +164,19 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
       computedUnder: targetKey(targetOf(params)),
     });
 
+  const markQueued = (target: unknown): Promise<boolean> =>
+    markCacheQueued(targetKey(target), freshForSeconds);
+
+  const clearQueued = (target: unknown): Promise<void> => clearCacheQueued(targetKey(target));
+
   const refresh = async (
     target: unknown,
     { signal }: RollingCacheRefreshOptions = {},
   ): Promise<boolean> => {
     const lock = singleFlightLock(targetKey(target));
     if (!(await lock.acquire({ waitMs: timeoutSeconds * 1000 }))) return false;
+    const releaseOnAbort = (): void => void lock.release();
+    signal?.addEventListener('abort', releaseOnAbort, { once: true });
     try {
       const startedAt = performance.now();
       const write = async (key: string, value: RollingCacheValue): Promise<void> => {
@@ -174,11 +186,13 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
         }
       };
       await compute(target, { results, write, signal });
+      if (!signal?.aborted) await clearQueued(target);
       recordDuration('rollingCache.target', (performance.now() - startedAt) / 1000, {
         rollingCache: name,
       });
       return !signal?.aborted;
     } finally {
+      signal?.removeEventListener('abort', releaseOnAbort);
       await lock.release();
     }
   };
@@ -195,6 +209,8 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
     targetOf,
     results,
     read,
+    markQueued,
+    clearQueued,
     refresh,
   };
   registerRollingCache(rollingCache);

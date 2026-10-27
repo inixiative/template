@@ -64,6 +64,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   let hasAcquired = false;
   let hasLostLease = false;
   let leaseValidUntil = 0;
+  let releasePromise: Promise<LockReleaseResult> | null = null;
 
   const stopHeartbeat = () => {
     stop?.();
@@ -126,10 +127,20 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     declareLost('token_mismatch');
   };
 
+  // A lock is single-use: once released it never acquires again. A release that lands while the SET
+  // is in flight deletes the key that SET wrote, so the acquire it raced cannot leave a lease nobody
+  // holds or a heartbeat nobody stops.
   const tryAcquire = async (): Promise<boolean> => {
+    if (hasReleased) {
+      throw new Error('createLock: this lock was released; create a new lock to acquire again');
+    }
     const sentAt = performance.now();
     const result = await redis.set(key, processId, 'PX', ttlMs, 'NX');
     if (result !== 'OK') return false;
+    if (hasReleased) {
+      await compareAndDelete();
+      return false;
+    }
     hasAcquired = true;
     leaseValidUntil = sentAt + ttlMs;
     stop = heartbeat(tick, heartbeatMs, {
@@ -178,12 +189,14 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     if (!isWithinLease()) throw new LockLostError(key);
   };
 
-  // Always attempts the fenced delete, once, after the critical section — the only place the
-  // key is ever deleted.
-  const release = async (): Promise<LockReleaseResult> => {
+  // The fenced delete, sent once: a second release (an abort listener and a `finally` both
+  // releasing) shares the first one's result rather than deleting a successor's key.
+  const release = (): Promise<LockReleaseResult> => {
+    if (releasePromise) return releasePromise;
     hasReleased = true;
     stopHeartbeat();
-    return compareAndDelete();
+    releasePromise = compareAndDelete();
+    return releasePromise;
   };
 
   return { acquire, verify, release, isWithinLease, assertHeld };

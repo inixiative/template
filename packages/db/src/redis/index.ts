@@ -1,27 +1,14 @@
-export {
-  type CacheCheck,
-  cache,
-  cacheKey,
-  checkCache,
-  clearKey,
-  singleFlightLock,
-  upsertCache,
-} from './cache';
-export {
-  COMMAND_TIMEOUT_MS,
-  createRedisConnection,
-  flushRedis,
-  getRedisClient,
-  getRedisPub,
-  getRedisSub,
-} from './client';
-export { makeRollingCache } from './makeRollingCache';
-export { type RedisNamespace, redisNamespace } from './namespaces';
+export { type CacheOptions, cache } from './cache/cache';
+export { cacheKey } from './cache/cacheKey';
+export { CACHE_STATES, type CacheCheck, type CacheState } from './cache/cacheStates';
+export { checkCache } from './cache/checkCache';
+export { clearKey } from './cache/clearKey';
+export { makeRollingCache } from './cache/rollingCache/makeRollingCache';
 export {
   getRollingCache,
   listRollingCaches,
   unregisterRollingCache,
-} from './rollingCacheRegistry';
+} from './cache/rollingCache/rollingCacheRegistry';
 export {
   MAX_ROLLING_CACHE_TARGETS,
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
@@ -38,5 +25,15 @@ export {
   type RollingCacheTargets,
   type RollingCacheValue,
   type RollingCacheWrite,
-} from './rollingCacheTypes';
+} from './cache/rollingCache/rollingCacheTypes';
+export { upsertCache } from './cache/upsertCache';
+export {
+  COMMAND_TIMEOUT_MS,
+  createRedisConnection,
+  flushRedis,
+  getRedisClient,
+  getRedisPub,
+  getRedisSub,
+} from './client';
+export { type RedisNamespace, redisNamespace } from './namespaces';
 export type { RedisEval } from './types';

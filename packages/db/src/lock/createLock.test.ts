@@ -597,4 +597,82 @@ describe('createLock', () => {
       expect(await getRedisClient().get(keyFor(id))).toBeNull();
     });
   });
+  describe('release', () => {
+    it('a released lock cannot acquire again', async () => {
+      const lock = createLock({ service: 's', identifier: newId() });
+
+      expect(await lock.acquire()).toBe(true);
+      expect(await lock.release()).toBe('released');
+      await expect(lock.acquire()).rejects.toThrow(/released.*new lock/i);
+    });
+
+    it('a release during a pending SET deletes the key that SET wrote and never starts a heartbeat', async () => {
+      let finishSet: () => void = () => {};
+      const setPending = new Promise<void>((resolve) => {
+        finishSet = resolve;
+      });
+      let currentToken: string | null = null;
+      const evalCalls: unknown[][] = [];
+      const redis = {
+        set: async (...args: unknown[]) => {
+          await setPending;
+          currentToken = String(args[1]);
+          return 'OK';
+        },
+        get: async () => currentToken,
+        eval: async (...args: unknown[]) => {
+          evalCalls.push(args);
+          if (currentToken !== args[3]) return 0;
+          currentToken = null;
+          return 1;
+        },
+      } as unknown as LockRedis;
+      const lock = createLock({
+        key: `lock:test:${newId()}`,
+        redis,
+        ttlMs: 1_000,
+        heartbeatMs: 10,
+      });
+
+      const acquiring = lock.acquire();
+      expect(await lock.release()).toBe('notHeld');
+      finishSet();
+      expect(await acquiring).toBe(false);
+      expect(currentToken).toBeNull();
+      await sleep(40);
+      expect(evalCalls.filter(isRefresh)).toHaveLength(0);
+    });
+
+    it('a repeated release shares the first result and sends one fenced delete', async () => {
+      let deletes = 0;
+      const lock = createLock({
+        key: `lock:test:${newId()}`,
+        redis: stubRedis(async () => {
+          deletes += 1;
+          return 1;
+        }),
+      });
+
+      expect(await lock.acquire()).toBe(true);
+      const first = lock.release();
+      const second = lock.release();
+      expect(second).toBe(first);
+      expect(await second).toBe('released');
+      expect(await lock.release()).toBe('released');
+      expect(deletes).toBe(1);
+    });
+
+    it('a second release never deletes the key of the holder that took it after the first', async () => {
+      const identifier = newId();
+      const first = createLock({ service: 's', identifier });
+      expect(await first.acquire()).toBe(true);
+      expect(await first.release()).toBe('released');
+
+      const successor = createLock({ service: 's', identifier });
+      expect(await successor.acquire()).toBe(true);
+      expect(await first.release()).toBe('released');
+      expect(await getRedisClient().exists(keyFor(identifier))).toBe(1);
+      await successor.release();
+    });
+  });
 });
