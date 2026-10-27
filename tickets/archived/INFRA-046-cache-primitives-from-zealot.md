@@ -39,18 +39,12 @@ SET deletes the key that SET wrote. Single-flight is a lock, so it moved to
 **Layout.** `packages/db/src/redis/cache/`, one file per behaviour, with `generation/`, `queued/`,
 `queries/` (every Lua script a typed function over `RedisEval`), `telemetry/` and `rollingCache/`.
 
-**Refresh errors are not a loss (Zealot ZLT-4600).** `maxMissed` and `LockLostReason` are gone: a
-thrown refresh warns and the heartbeat keeps refreshing; only a token mismatch declares the lock lost.
-A run that loses its lock is never cancelled, so the missed-beat budget only decided how loudly to log
-(Aron, 2026-10-27).
+**Refresh errors are warnings (as Zealot ZLT-4600).** A thrown refresh warns and the heartbeat keeps
+refreshing; only a token mismatch declares the lock lost.
 
 **Telemetry.** A `cache <accessor>` span per call, `cache.read` by accessor and result,
 `cache.lock.wait`, `cache.publish.skipped`. Large writes keep the template's `log.warn` record, now
 tagged by accessor.
-
-**Not ported.** Zealot's `cache()` options from #2735 (ZLT-5337) stay out. `shouldBypassInTxn`: caching
-inside a transaction is the open design in INFRA-047. `shouldKeepExisting` and evict-only clears: generations already make a write-through win,
-and a bad value is dropped by checking it before clearing (Aron, 2026-10-27).
 
 **Warm on boot.** The worker enqueues every registered cache's branch when it starts
 (`warmRollingCaches`).
