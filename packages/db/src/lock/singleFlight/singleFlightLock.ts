@@ -18,7 +18,6 @@ export const singleFlightLock = (key: string) =>
     identifier: key,
     ttlMs: SINGLE_FLIGHT_LOCK_TTL_MS,
     heartbeatMs: SINGLE_FLIGHT_HEARTBEAT_MS,
-    maxMissed: 1,
   });
 
 export const singleFlightLockKey = (key: string): string =>

@@ -10,7 +10,6 @@ export type {
   ClaimOptions,
   ClaimResult,
   Lock,
-  LockLostReason,
   LockOptions,
   LockRedis,
   LockReleaseResult,
