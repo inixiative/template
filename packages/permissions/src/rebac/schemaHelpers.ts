@@ -94,21 +94,6 @@ export const actorIsItsUser = (at = ''): ActionRule => ({
   ],
 });
 
-export const roleIsHigh: ActionRule = {
-  rule: { field: 'role', operator: Operator.in, value: highRoles },
-};
-
-export const roleIsLowOrUnset: ActionRule = {
-  any: [
-    { rule: { field: 'role', operator: Operator.in, value: lowRoles } },
-    { rule: { field: 'role', operator: Operator.equals, value: null } },
-  ],
-};
-
-export const roleAssignment: ActionRule = {
-  any: [{ all: [roleIsHigh, 'assignHigh'] }, 'assignLow'],
-};
-
 const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   any: [
     { all: [{ rule: { field: 'role', operator: Operator.equals, value: null } }, heldAt('read')] },
@@ -152,25 +137,9 @@ export const integrationAdministering = {
 export const integrationAccess = {
   operate: actionOnOwner('operate'),
   read: actionOnOwner('read'),
-  assignHigh: {
-    any: [
-      actionOnOwner('own', '', organizationOrSpace),
-      { all: [actorIsItsUser(), roleIsHigh, roleHeldAtOwner()] },
-    ],
-  },
-  assignLow: {
-    all: [
-      roleIsLowOrUnset,
-      {
-        any: [
-          actionOnOwner('manage', '', organizationOrSpace),
-          { all: [actorIsItsUser(), roleHeldAtOwner()] },
-          'assignHigh',
-        ],
-      },
-    ],
-  },
 } satisfies Record<string, ActionRule>;
+
+export const integrationRoleWrite: ActionRule = { all: ['manage', roleHeldAtOwner()] };
 
 export const tokenAccessIsYours: ActionRule = {
   any: [
