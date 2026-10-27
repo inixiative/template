@@ -215,3 +215,61 @@ describe("a member token keeps its member's entitlement's resource and anchor, n
     expect(await holds(key, 'space', space.id, 'operate')).toBe(false);
   });
 });
+
+describe('what an integration entitlement from the organization reaches (2026-10-26)', () => {
+  const fullMemberToken = async (role: Role, entitlements?: Entry[]) => {
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role, entitlements },
+      { organization },
+    );
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', full: true, role: null },
+      { organizationUser },
+    );
+    return rawKey;
+  };
+
+  const spaceIntegration = async () =>
+    (
+      await createIntegration({
+        ownerModel: 'Space',
+        organizationId: organization.id,
+        spaceId: space.id,
+        role: 'viewer',
+      })
+    ).entity;
+
+  const organizationIntegration = async () =>
+    (
+      await createIntegration({
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        role: 'viewer',
+      })
+    ).entity;
+
+  const fromOrganization = () =>
+    fullMemberToken('viewer', [
+      entry('db:integration', ['db:organization', organization.id], ['manage']),
+    ]);
+
+  it('manage on integrations from the organization reaches its own integrations', async () => {
+    const integration = await organizationIntegration();
+    expect(await holds(await fromOrganization(), 'integration', integration.id, 'manage')).toBe(
+      true,
+    );
+  });
+
+  it("it does not reach a space's integrations: an anchor acts at its direct children (R55)", async () => {
+    const integration = await spaceIntegration();
+    expect(await holds(await fromOrganization(), 'integration', integration.id, 'manage')).toBe(
+      false,
+    );
+  });
+
+  it('an org admin does not manage a space-owned integration', async () => {
+    const key = await fullMemberToken('admin');
+    const integration = await spaceIntegration();
+    expect(await holds(key, 'integration', integration.id, 'manage')).toBe(false);
+  });
+});

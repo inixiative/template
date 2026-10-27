@@ -145,6 +145,7 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+export { directOwner } from './utils/directOwner';
 export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';

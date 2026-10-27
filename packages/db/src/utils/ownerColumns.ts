@@ -12,14 +12,13 @@ export const ownerColumns = (
   child: AccessorName,
   ownerAccessor: AccessorName,
   owner: Record<string, unknown>,
-): Record<string, string> => {
+): Record<string, string> | null => {
   const ownerModel = toModelName(ownerAccessor);
   const relations = getAccessorRelations(child).filter(
     (relation) => relation.targetAccessor === ownerAccessor && relation.foreignKey,
   );
   const [relation] = relations;
-  if (relations.length !== 1 || !relation?.foreignKey)
-    throw new Error(`${child} has no single relation to its owner ${ownerAccessor}`);
+  if (relations.length !== 1 || !relation?.foreignKey) return null;
   const { foreignKey } = relation;
   const keys: Record<string, string> =
     typeof foreignKey === 'string'
@@ -34,6 +33,6 @@ export const ownerColumns = (
   const config = getPolymorphismConfig(toModelName(child));
   if (!config) return keys;
   const axis = config.axes.find((candidate) => candidate.fkMap[ownerModel]);
-  if (!axis) throw new Error(`${child} cannot be owned by ${ownerModel}`);
+  if (!axis) return null;
   return { [axis.field]: ownerModel, ...keys };
 };
