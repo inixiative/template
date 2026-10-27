@@ -496,19 +496,6 @@ describe('cache invalidation during a read', () => {
     expect(await readRaw(key)).toBe('fresh');
   });
 
-  it('publishes a value read during an evict-only clear, so overlapping clears share one recompute', async () => {
-    const key = cacheKey('race', 'evict-only');
-    const paused = pausedProducer('minted');
-
-    const inFlight = cache(key, paused.produce, 60);
-    await paused.hasRead;
-    await clearKey(key, { cancelInFlight: false });
-    paused.resume();
-
-    expect(await inFlight).toBe('minted');
-    expect(await readRaw(key)).toBe('minted');
-  });
-
   it('does not let a generation that expired and was set again match the value captured before it', async () => {
     const key = cacheKey('race', 'generation-reset');
     await clearKey(key);
@@ -608,19 +595,6 @@ describe('cache invalidation during a read', () => {
 
     expect(await inFlight).toBe('old');
     expect(await getRedisClient().get(key)).toBeNull();
-  });
-
-  it('shouldKeepExisting keeps a value another writer set while the producer read', async () => {
-    const key = cacheKey('race', 'keep-existing');
-    const paused = pausedProducer('old');
-
-    const inFlight = cache(key, paused.produce, 60, { shouldKeepExisting: true });
-    await paused.hasRead;
-    await getRedisClient().setex(key, 60, superjson.stringify('other'));
-    paused.resume();
-
-    expect(await inFlight).toBe('old');
-    expect(await readRaw(key)).toBe('other');
   });
 
   it('shouldBypassInTxn serves the cache outside a transaction and skips it inside one', async () => {

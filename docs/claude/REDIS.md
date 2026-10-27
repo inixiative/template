@@ -271,16 +271,8 @@ Behavior:
   `upsertCache` is returned to its caller but never lands in the cache. Without the lock or the
   generation (Redis failing) the value is returned unpublished.
 
-Options (fourth argument):
-
-```typescript
-await cache(key, fn, ttl, { shouldKeepExisting: true });  // publish only if the key is still empty
-await cache(key, fn, ttl, { shouldBypassInTxn: true });   // inside db.txn(), skip the cache and run fn
-```
-
-- `shouldKeepExisting`: the publish is `SET NX`, so a computed value never overwrites a fresher
-  value another writer set while `fn` read (a token cache that is also written through on refresh).
-- `shouldBypassInTxn`: a read of uncommitted rows must never be published to other callers.
+`{ shouldBypassInTxn: true }` (fourth argument): inside `db.txn()`, skip the cache and run `fn`, so a
+read of uncommitted rows is never published to other callers.
 
 Telemetry: each call opens a `cache <accessor>` span labelled with its result, and reads count into
 `cache.read` by accessor and result (`hit`, `miss`, `error`). A single-flight wait is timed into
@@ -318,17 +310,14 @@ await clearKey('cache:User:id:123');
 
 // Wildcard pattern (uses SCAN, non-blocking)
 await clearKey('cache:User:*');
-await clearKey('cache:Session:userId:abc:*');
-
-// Evict only: a compute already in flight still publishes
-await clearKey(key, { cancelInFlight: false });
 ```
 
 A clear also cancels computes in flight. An exact clear deletes the value and its write time and moves
 the key's generation in one Lua call; a pattern clear moves the cache-wide epoch before it scans.
 Either way a `cache()` compute that read before the clear skips its publish, and the next caller
-recomputes. `cancelInFlight: false` only evicts, so overlapping clears of a hot key share one
-recompute. A failed exact clear logs and returns 0; a failed pattern clear throws, because the caller
+recomputes. To drop one value you know is bad (a token the vendor rejected), read it with `checkCache`
+and clear only if it is still that value: if a recompute is already running the key is empty, so the
+clear is skipped and the caller's next `cache()` waits on the running one. A failed exact clear logs and returns 0; a failed pattern clear throws, because the caller
 cannot tell which of its keys survived.
 
 ### Automatic Invalidation

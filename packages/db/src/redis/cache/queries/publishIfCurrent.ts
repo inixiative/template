@@ -10,19 +10,10 @@ const PUBLISH_IF_CURRENT = `
 local generation = redis.call('get', KEYS[2]) or '0'
 local epoch = redis.call('get', KEYS[3]) or '0'
 if generation ~= ARGV[1] or epoch ~= ARGV[2] then return 0 end
-if ARGV[5] == '1' then
-  if redis.call('set', KEYS[1], ARGV[4], 'EX', ARGV[3], 'NX') then
-    redis.call('setex', KEYS[4], ARGV[3], ARGV[6])
-    return 1
-  end
-  return 2
-end
 redis.call('setex', KEYS[1], ARGV[3], ARGV[4])
-redis.call('setex', KEYS[4], ARGV[3], ARGV[6])
+redis.call('setex', KEYS[4], ARGV[3], ARGV[5])
 return 1
 `;
-
-export type PublishResult = 0 | 1 | 2;
 
 export const publishIfCurrent = async (
   redis: RedisEval,
@@ -30,8 +21,7 @@ export const publishIfCurrent = async (
   captured: { generation: string; epoch: string },
   ttlSeconds: number,
   payload: string,
-  keepExisting: boolean,
-): Promise<PublishResult> =>
+): Promise<boolean> =>
   Number(
     await redis.eval(
       PUBLISH_IF_CURRENT,
@@ -44,7 +34,6 @@ export const publishIfCurrent = async (
       captured.epoch,
       String(ttlSeconds),
       payload,
-      keepExisting ? '1' : '0',
       String(Date.now()),
     ),
-  ) as PublishResult;
+  ) === 1;

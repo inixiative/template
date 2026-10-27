@@ -19,7 +19,6 @@ export const cacheRead = async <T>(
   key: string,
   fn: () => Promise<T>,
   ttl: number | ((value: T) => number),
-  shouldKeepExisting: boolean,
   setResult: (result: CacheResult) => void,
 ): Promise<T> => {
   const redis = getRedisClient();
@@ -40,14 +39,7 @@ export const cacheRead = async <T>(
 
     if (effectiveTtl > 0 && generation) {
       const payload = superjson.stringify(value);
-      const write = publishComputed(
-        redis,
-        key,
-        generation,
-        effectiveTtl,
-        payload,
-        shouldKeepExisting,
-      );
+      const write = publishComputed(redis, key, generation, effectiveTtl, payload);
       if (holdsLock) await write;
     }
 

@@ -10,17 +10,13 @@ import {
   GENERATION_TTL_SECONDS,
   newGeneration,
 } from '@template/db/redis/cache/generation/newGeneration';
-import { clearCacheEntry } from '@template/db/redis/cache/queries/clearCacheEntry';
 import { clearExact } from '@template/db/redis/cache/queries/clearExact';
 import { validateKey } from '@template/db/redis/cache/validateKey';
 import { writtenKey } from '@template/db/redis/cache/writtenKey';
 import { getRedisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 
-export const clearKey = async (
-  pattern: string,
-  { cancelInFlight = true }: { cancelInFlight?: boolean } = {},
-): Promise<number> => {
+export const clearKey = async (pattern: string): Promise<number> => {
   validateKey(pattern);
   const isPattern = pattern.includes('*');
 
@@ -28,22 +24,17 @@ export const clearKey = async (
     const redis = getRedisClient();
 
     if (!isPattern) {
-      const keys = { key: pattern, writtenKey: writtenKey(pattern) };
-      const deleted = cancelInFlight
-        ? await clearExact(
-            redis,
-            { ...keys, generationKey: generationKey(pattern) },
-            newGeneration(),
-            GENERATION_TTL_SECONDS,
-          )
-        : await clearCacheEntry(redis, keys);
+      const deleted = await clearExact(
+        redis,
+        { key: pattern, generationKey: generationKey(pattern), writtenKey: writtenKey(pattern) },
+        newGeneration(),
+        GENERATION_TTL_SECONDS,
+      );
       if (deleted) log.debug(`Cleared cache key: ${pattern}`);
       return deleted;
     }
 
-    if (cancelInFlight) {
-      await redis.set(epochKey(), newGeneration(), 'EX', GENERATION_TTL_SECONDS);
-    }
+    await redis.set(epochKey(), newGeneration(), 'EX', GENERATION_TTL_SECONDS);
     let deleted = 0;
     const stream = redis.scanStream({ match: pattern, count: 100 });
 

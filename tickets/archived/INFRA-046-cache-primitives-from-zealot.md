@@ -20,7 +20,7 @@ epoch after it takes the single-flight lock and before the producer runs, and pu
 Lua call that writes only if neither moved (`queries/publishIfCurrent`). An exact `clearKey` deletes
 the value and its write time and moves the generation in one call (`queries/clearExact`); a pattern
 clear moves the epoch before it scans and now throws when it fails. `upsertCache` writes through with
-a fresh generation (`queries/writeThrough`). `clearKey(key, { cancelInFlight: false })` only evicts.
+a fresh generation (`queries/writeThrough`).
 Without the lock or the generation the value is returned unpublished. INFRA-044 step 3 depends on
 this.
 
@@ -48,8 +48,9 @@ A run that loses its lock is never cancelled, so the missed-beat budget only dec
 `cache.lock.wait`, `cache.publish.skipped`. Large writes keep the template's `log.warn` record, now
 tagged by accessor.
 
-**Options.** `cache(key, fn, ttl, { shouldKeepExisting, shouldBypassInTxn })`, from Zealot #2735
-(ZLT-5337).
+**Options.** `cache(key, fn, ttl, { shouldBypassInTxn })`, from Zealot #2735 (ZLT-5337). Zealot's
+`shouldKeepExisting` and evict-only clears are not ported: generations already make a write-through win,
+and a bad value is dropped by checking it before clearing (Aron, 2026-10-27).
 
 **Warm on boot.** The worker enqueues every registered cache's branch when it starts
 (`warmRollingCaches`).

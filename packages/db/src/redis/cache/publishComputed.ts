@@ -21,7 +21,6 @@ export const publishComputed = async (
   captured: Generation,
   ttlSeconds: number,
   payload: string,
-  shouldKeepExisting: boolean,
 ): Promise<void> => {
   try {
     const published = await publishIfCurrent(
@@ -30,12 +29,9 @@ export const publishComputed = async (
       captured,
       ttlSeconds,
       payload,
-      shouldKeepExisting,
     );
-    if (published === 1) meterLargeWrite(key, payload, ttlSeconds, 'cache');
-    else if (published === 0) {
-      incrementCounter('cache.publish.skipped', 1, { accessor: cacheAccessor(key) });
-    }
+    if (published) meterLargeWrite(key, payload, ttlSeconds, 'cache');
+    else incrementCounter('cache.publish.skipped', 1, { accessor: cacheAccessor(key) });
   } catch (error) {
     log.error(`Cache write error for key ${key}:`, error);
   }
