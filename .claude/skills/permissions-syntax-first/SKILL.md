@@ -7,6 +7,17 @@ description: Use whenever work touches permissions, auth, tokens, integrations, 
 
 The permission system is the schema plus the library's check. Its syntax reads any path on the hydrated record and on the actor, so almost every question ("is this yours?", "which owner is this?", "may you set this role?") is a condition in a rule. Most mistakes in this area come from building outside it: a new action, a helper, a hook, a validator, a controller 403, a substitution in code. **If you are not using the system, you are allowed zero checks** — anything outside it is justified to the user and an adversary, or it doesn't get written.
 
+## 0. Scope: build the ruling, nothing next to it
+
+The goal of a unit is the ruling's sentence, and the change ends there. When this work has gone wrong it has gone wrong the same way: a ruling left a "how" open, the gap was filled with a new mechanism, and that mechanism was then defended and extended instead of asking.
+
+- **Every new function, option, callback, type, list or library export is named by a ruling.** A plan line, a review finding or my own reading is not a ruling. If the ruling leaves the how open, ask with the existing primitive you would use; never invent one to close the gap.
+- **No hard-coded model lists.** Where a record sits comes from the polymorphism registry and the relations (`ownerColumns`, `hydrate`), never from a list of models in code.
+- **A problem gets the smallest fix inside what exists.** Before adding a layer, check whether `check`, `ownerColumns`, `hydrate`, a json-rules option or a body refinement already answers it. A review finding is fixed at its own size; any new concept it suggests goes to the user as a question.
+- **Library changes are the ruling's change only.** No new schema objects, refinements or exports beyond the ask. Validation of request bodies lives in `bodyRefinement` / `queryRefinement` / `paramsRefinement` (`docs/claude/API_ROUTES.md`), never as a `.refine` / `z.custom` on a schema object.
+- **When the user asks "how did we rule on this", the answer is in `tmp/permissions-rulings.md`.** Read it before proposing; a question that a ruling already settles is never put back to the user.
+- **Circling is the signal to stop.** If the same area comes back a second time with a new mechanism, stop building, quote the ruling and the existing primitive, and ask one question.
+
 ## 1. Read before you edit
 
 - The running rulings doc (`tmp/permissions-rulings.md`; create it if missing — the user requires one). Process rule: every edit names the ruling it implements; no ruling → ask, don't edit.
@@ -47,7 +58,7 @@ An action rule (`ActionRule`) is one of:
 - `null`: terminal — only a held grant passes;
 - `{ rel: 'organization', action: 'own' }`: walk a hydrated to-one relation (dotted paths walk further: `'sourceSpace.organization'`) and ask an action there;
 - `{ any: [...] }` / `{ all: [...] }`;
-- `{ rule: <json-rules condition> }`: evaluated over `{ ...record, __actor }`. A condition reads any hydrated path (`field: 'integration.userId'`), compares to another path (`path: '__actor.record.id'`), and uses operators (`in`, `notIn`, `equals`, `isEmpty`, …).
+- `{ rule: <json-rules condition> }`: evaluated over `{ ...record, __actor }`. A condition reads any hydrated path (`field: 'integration.userId'`), compares to another path (`path: '__actor.record.id'`), and uses positive operators only (`equals`, `in`, comparisons; "no value" is `equals null`). Negations, `isEmpty`, `notExists`, `if`/`then`/`else`, array and aggregate rules are refused (json-rules `validateRule(…, { positive: true })`).
 
 The actor is `{ model: 'User' | 'Token', record }` (sanitized row). Rules read it by path; there are no binds and no other actor machinery.
 
@@ -95,6 +106,10 @@ An action on something that does not exist yet, or on a collection, is checked o
 | a library clause special-casing "conditional" actions | removed in 0.8: the owner walk already re-runs the rule's conditions |
 | `greaterRole` folded into one role check | two checks: `roleAssignment` on the row as it is and as it will be |
 | members' extra actions stored flat on the role table | entitlements `{ resource, anchor, actions }` like delegates (queue item 15) |
+| a second traversal returning conditions ("proofs") to carry into a grant | the ordinary check on a pseudo record pinned by the `where`'s exact `equals` values; missing fields read as unknown (json-rules `absent: 'unknown'`) |
+| splitting a `where` into branches, one pseudo record each | one pseudo record; anything not pinned exactly stays unknown, so a filtered writer is refused |
+| `directOwner` with a hard-coded tenant list and a library callback | not in any ruling; anchor matching uses what exists (`ownerColumns`, the polymorphism registry) — being removed |
+| `z.custom` / `.refine` on a schema object for rule validation | shape-only schemas; validation in a reusable body refinement |
 
 ## 4a. Principles, in the user's words
 
