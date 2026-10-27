@@ -9,7 +9,8 @@ import {
 
 const API_ROOT = join(import.meta.dir, '..', '..');
 const REDIS_IMAGE = 'redis:7-alpine';
-const READY_TIMEOUT_MS = 15_000;
+const REDIS_READY_TIMEOUT_MS = 15_000;
+const OWNER_LABEL = 'template.ws-cluster.owner-pid';
 
 export type WSInstance = {
   send: (command: WSInstanceCommand) => Promise<unknown>;
@@ -44,7 +45,7 @@ const runDocker = async (docker: string, args: string[]): Promise<string> => {
 };
 
 const waitForRedis = async (docker: string, container: string): Promise<void> => {
-  const deadline = Date.now() + READY_TIMEOUT_MS;
+  const deadline = Date.now() + REDIS_READY_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const ping = await runDocker(docker, ['exec', container, 'redis-cli', 'ping']).catch(() => '');
     if (ping === 'PONG') return;
@@ -74,7 +75,8 @@ const spawnInstance = async (
   name: string,
   redisUrl: string,
   subscribes: boolean,
-): Promise<{ instance: WSInstance; kill: () => void }> => {
+  track: (kill: () => void) => void,
+): Promise<WSInstance> => {
   const proc = Bun.spawn([process.execPath, join(import.meta.dir, 'instance.ts')], {
     cwd: API_ROOT,
     env: {
@@ -90,12 +92,14 @@ const spawnInstance = async (
     stdout: 'pipe',
     stderr: 'pipe',
   });
+  track(() => proc.kill());
 
   const pending = new Map<
     number,
     { resolve: (value: unknown) => void; reject: (err: Error) => void }
   >();
   let nextId = 0;
+  let exitError: Error | undefined;
   const ready = Promise.withResolvers<void>();
 
   void readReplies(proc.stdout, (reply) => {
@@ -106,13 +110,17 @@ const spawnInstance = async (
     else waiter?.resolve(reply.result);
   });
   const stderr = new Response(proc.stderr).text();
-  void proc.exited.then(async (code) =>
-    ready.reject(new Error(`${name} exited (${code}) before it was ready:\n${await stderr}`)),
-  );
+  void proc.exited.then(async (code) => {
+    exitError = new Error(`${name} exited (${code}):\n${await stderr}`);
+    ready.reject(exitError);
+    for (const waiter of pending.values()) waiter.reject(exitError);
+    pending.clear();
+  });
 
   await ready.promise;
 
   const send = (command: WSInstanceCommand): Promise<unknown> => {
+    if (exitError) return Promise.reject(exitError);
     const id = nextId++;
     const result = new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
     proc.stdin.write(`${JSON.stringify({ id, command })}\n`);
@@ -121,21 +129,48 @@ const spawnInstance = async (
   };
 
   return {
-    instance: {
-      send,
-      frames: (connectionId) =>
-        send({ op: 'frames', connectionId }) as Promise<Record<string, unknown>[]>,
-    },
-    kill: () => proc.kill(),
+    send,
+    frames: (connectionId) =>
+      send({ op: 'frames', connectionId }) as Promise<Record<string, unknown>[]>,
   };
+};
+
+const isAlive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+};
+
+const removeOrphanedContainers = async (docker: string): Promise<void> => {
+  const listed = await runDocker(docker, [
+    'ps',
+    '-a',
+    '--filter',
+    `label=${OWNER_LABEL}`,
+    '--format',
+    `{{.ID}} {{.Label "${OWNER_LABEL}"}}`,
+  ]);
+  const orphans = listed
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.split(' '))
+    .filter(([, owner]) => !isAlive(Number(owner)))
+    .map(([id]) => id as string);
+  if (orphans.length > 0) await runDocker(docker, ['rm', '-f', ...orphans]);
 };
 
 export const startWsCluster = async (): Promise<WSCluster> => {
   const docker = resolveDocker();
+  await removeOrphanedContainers(docker);
   const container = await runDocker(docker, [
     'run',
     '-d',
     '--rm',
+    '--label',
+    `${OWNER_LABEL}=${process.pid}`,
     '-p',
     '127.0.0.1::6379',
     REDIS_IMAGE,
@@ -156,11 +191,8 @@ export const startWsCluster = async (): Promise<WSCluster> => {
     const redisUrl = `redis://127.0.0.1:${hostPort}`;
 
     return {
-      instance: async (name, { subscribes = true } = {}) => {
-        const spawned = await spawnInstance(name, redisUrl, subscribes);
-        kills.push(spawned.kill);
-        return spawned.instance;
-      },
+      instance: (name, { subscribes = true } = {}) =>
+        spawnInstance(name, redisUrl, subscribes, (kill) => kills.push(kill)),
       stop,
     };
   } catch (err) {

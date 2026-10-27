@@ -23,14 +23,18 @@ const append = ({ stream, ids, userIds }: Extract<WSInstanceCommand, { op: 'appe
     ids.map((id) => appendToStream(stream, { type: 'upsert', payload: { id } }, userIds)),
   );
 
+let subscriberBack: Promise<void> = Promise.resolve();
+
 const dropSubscriber = async (downMs: number) => {
   const sub = getRedisSub();
   const retryStrategy = sub.options.retryStrategy;
   sub.options.retryStrategy = () => downMs;
-  const reconnected = new Promise((resolve) => sub.once('ready', resolve));
+  const closed = new Promise((resolve) => sub.once('close', resolve));
+  subscriberBack = new Promise<void>((resolve) => sub.once('ready', resolve)).then(() => {
+    sub.options.retryStrategy = retryStrategy;
+  });
   sub.disconnect(true);
-  await reconnected;
-  sub.options.retryStrategy = retryStrategy;
+  await closed;
 };
 
 const failAppends = (count: number) => {
@@ -53,6 +57,8 @@ const run = async (command: WSInstanceCommand): Promise<unknown> => {
       return (sockets.get(command.connectionId)?.sent ?? []).map((frame) => JSON.parse(frame));
     case 'dropSubscriber':
       return dropSubscriber(command.downMs);
+    case 'awaitSubscriber':
+      return subscriberBack;
     case 'failAppends':
       return failAppends(command.count);
   }
