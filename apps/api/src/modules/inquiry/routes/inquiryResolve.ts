@@ -28,6 +28,7 @@ export const inquiryResolveRoute = actionRoute({
   method: 'post',
   bodySchema,
   responseSchema: inquiryReceivedResponseSchema,
-  description: 'Resolves an inquiry: approve, deny, or request changes from the source.',
+  description:
+    "Resolves an inquiry: approve, deny, or request changes from the source. Other body fields are the type's resolution input; see GET /api/v1/inquiry/info (`types.<type>.resolutionInput`).",
   middleware: [validatePermission('resolve')],
 });

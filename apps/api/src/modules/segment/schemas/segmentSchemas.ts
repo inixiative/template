@@ -27,6 +27,10 @@ export const segmentCreateBodySchema = SegmentScalarInputSchema.omit({
   organizationId: true,
   spaceId: true,
   deletedAt: true,
+}).extend({
+  conditions: z
+    .unknown()
+    .describe('A json-rules condition over CustomerRef; see GET /api/v1/segment/info.'),
 });
 
 export const segmentUpdateBodySchema = segmentCreateBodySchema.partial();

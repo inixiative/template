@@ -13,7 +13,12 @@ import { inquiryVersionSchema } from '#/modules/inquiry/schemas/inquiryVersionSc
 import { Modules } from '#/modules/modules';
 
 const bodySchema = z
-  .object({ content: z.unknown(), status: z.enum([InquiryStatus.draft, InquiryStatus.sent]) })
+  .object({
+    content: z
+      .unknown()
+      .describe('Shape depends on `type`; see GET /api/v1/inquiry/info (`types.<type>.content`).'),
+    status: z.enum([InquiryStatus.draft, InquiryStatus.sent]),
+  })
   .partial()
   .extend(inquiryVersionSchema.shape);
 

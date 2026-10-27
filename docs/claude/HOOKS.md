@@ -550,7 +550,7 @@ Update paths shadow-merge the partial update with `previous` so type-aware valid
 2. Add the type literal to the `ContactType` enum in `packages/db/prisma/schema/contact.prisma` and regenerate.
 3. Register the def in `ContactRegistry` (`packages/shared/src/contact/registry.ts`).
 
-No controller, route, or hook change needed — the hook discovers new types through the registry.
+No controller, route, or hook change needed — the hook discovers new types through the registry, and `GET /api/v1/contact/info` lists the new type's `input` / `value` JSON Schema and subtype rule.
 
 ---
 
