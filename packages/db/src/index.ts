@@ -17,10 +17,10 @@ export {
 } from './extensions/hookRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
+// Enum schemas (from prisma-zod-generator); object/input schemas live at @template/db/zod/*
+export * from './generated/zod/enums.gen';
 // Scalar schemas (model schemas without relations)
 export * from './generated/zod/scalarSchemas.gen';
-// Enum schemas and other zod types (from prisma-zod-generator)
-export * from './generated/zod/schemas';
 export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 // Hydration
 export { fetchOne, hydrate } from './hydrate';

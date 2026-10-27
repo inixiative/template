@@ -1,6 +1,7 @@
 {
   "extends": "@inixiative/config/tsconfig/base.json",
   "compilerOptions": {
+    "incremental": true,
     "paths": {
       "@template/permissions": ["./src/index.ts"],
       "@template/permissions/*": ["./src/*"],

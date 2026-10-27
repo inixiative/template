@@ -1,6 +1,7 @@
 {
   "extends": "@inixiative/config/tsconfig/base.json",
   "compilerOptions": {
+    "incremental": true,
     "paths": {
       "@template/email/*": ["./src/*"],
       "@template/db/*": ["../db/src/*"],

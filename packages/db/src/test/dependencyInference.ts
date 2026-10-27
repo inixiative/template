@@ -4,15 +4,17 @@
  * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import * as zodSchemasNs from '@template/db/generated/zod/schemas/objects';
+import { join } from 'node:path';
 import type { DependencyConfig, ModelName } from '@template/db/test/factoryTypes';
 import { getModelRelations } from '@template/db/utils/prismaMapRelations';
 import type { ZodObject, ZodTypeAny } from 'zod';
 
-const zodSchemas = zodSchemasNs as unknown as Record<
-  string,
-  ZodObject<Record<string, ZodTypeAny>> | undefined
->;
+// Looked up by runtime name only, so the ~4,300 generated object schemas stay out
+// of every type-checked program that reaches the factories: a computed path is not
+// followed by tsc, a static import is.
+const zodSchemas: Record<string, ZodObject<Record<string, ZodTypeAny>> | undefined> = require(
+  join(import.meta.dir, '../generated/zod/schemas/objects/index.ts'),
+);
 
 export const getCreateInputSchema = (
   modelName: ModelName,

@@ -29,8 +29,8 @@ const nativeOptions = {
 };
 export const pinoLogger = pino({ ...nativeOptions, level: process.env.LOG_LEVEL ?? 'info' });
 const nativeChild = pinoLogger.child;
-pinoLogger.child = function (this: import('pino').Logger, bindings, options) {
-  return nativeChild.call(this, redactLogValue(bindings) as Record<string, unknown>, options);
+pinoLogger.child = function (this: typeof pinoLogger, bindings, options) {
+  return Reflect.apply(nativeChild, this, [redactLogValue(bindings), options]);
 } as typeof pinoLogger.child;
 const pinoSink = pino({ level: 'trace' });
 

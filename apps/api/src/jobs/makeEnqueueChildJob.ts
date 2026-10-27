@@ -20,7 +20,7 @@ export const makeEnqueueChildJob =
     { job }: WorkerContext,
     { childrenMustSupersede }: { childrenMustSupersede: boolean },
   ): EnqueueChildJob =>
-  async (handlerName, payload, { delay } = {}) => {
+  async (handlerName, payload, { delay }: { delay?: number } = {}) => {
     if (childrenMustSupersede) await validateChildJobHandler(handlerName);
     const parent = job.token && job.id ? { id: job.id, queue: job.queueQualifiedName } : undefined;
     const options = {

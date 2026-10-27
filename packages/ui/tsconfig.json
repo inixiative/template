@@ -1,6 +1,7 @@
 {
   "extends": "@inixiative/config/tsconfig/react.json",
   "compilerOptions": {
+    "incremental": true,
     "paths": {
       "@template/db": ["../db/src/index.ts"],
       "@template/db/*": ["../db/src/*"],
