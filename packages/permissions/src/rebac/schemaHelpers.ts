@@ -65,7 +65,7 @@ export const actionOnOwner = (
 
 export const actorIsItsUser = (at = ''): ActionRule => ({
   all: [
-    { rule: { field: `${at}userId`, operator: Operator.notEmpty, value: true } },
+    { rule: { field: `${at}userId`, operator: Operator.notEmpty } },
     {
       any: [
         {

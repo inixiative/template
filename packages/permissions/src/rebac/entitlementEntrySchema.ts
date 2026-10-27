@@ -17,9 +17,12 @@ const entitlementEntrySchema = z
     anchor: z.object({ resource: z.enum(resources), id: z.string().min(1) }).strict(),
     actions: z.record(z.string(), z.boolean()),
     where: (
-      z.record(z.string(), z.unknown()).refine((where) => validateRule(where).ok, {
-        message: 'where is a json-rules condition: omit it for none',
-      }) as unknown as z.ZodType<Condition>
+      z
+        .record(z.string(), z.unknown())
+        .refine((where) => validateRule(where, { positive: true }).ok, {
+          message:
+            'where is a positive json-rules condition (no negation, isEmpty, notExists, if, array or aggregate): omit it for none',
+        }) as unknown as z.ZodType<Condition>
     ).optional(),
   })
   .strict();
