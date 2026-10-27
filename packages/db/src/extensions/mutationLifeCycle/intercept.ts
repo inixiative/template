@@ -50,11 +50,6 @@ type Interception = {
   ) => Promise<unknown>;
 };
 
-const columnsOf = (model: Prisma.ModelName, result: unknown) =>
-  Array.isArray(result)
-    ? result.map((row) => pickColumns(model, row))
-    : pickColumns(model, result as Record<string, unknown>);
-
 export const intercept =
   (action: DbAction, { loadPrevious }: Interception = {}) =>
   async (params: MutationParams) => {
@@ -68,9 +63,10 @@ export const intercept =
       hookOptions.previous = (await loadPrevious(openTransaction, model, where)) as never;
     await runHooks(openTransaction, HookTiming.before, hookOptions);
     const result = await query(args);
-    hookOptions.result = (
-      action === DbAction.deleteMany ? hookOptions.previous : columnsOf(model, result)
-    ) as never;
+    if (action === DbAction.deleteMany) hookOptions.result = hookOptions.previous as never;
+    else if (Array.isArray(result))
+      hookOptions.result = result.map((row) => pickColumns(model, row)) as never;
+    else hookOptions.result = pickColumns(model, result as Record<string, unknown>) as never;
     await runHooks(openTransaction, HookTiming.after, hookOptions);
     return result;
   };
