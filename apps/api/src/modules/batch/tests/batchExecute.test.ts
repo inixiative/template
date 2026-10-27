@@ -442,6 +442,29 @@ describe('POST /api/v1/batch/execute', () => {
   });
 
   describe('Security validations', () => {
+    const refused = async (path: string) => {
+      const response = await fetch(
+        post('/api/v1/batch/execute', {
+          requests: [[{ method: 'GET', path: '/api/v1/me' }], [{ method: 'POST', path }]],
+          strategy: 'allowFailures',
+        }),
+      );
+      return response.status;
+    };
+
+    it('refuses the whole batch when it calls Better Auth', async () => {
+      expect(await refused('/api/auth/sign-in/email')).toBe(400);
+      expect(await refused('/api/%61uth/sign-in/email')).toBe(400);
+    });
+
+    it('refuses the whole batch when it rotates JWTs', async () => {
+      expect(await refused('/api/v1/me/rotateJwts')).toBe(400);
+    });
+
+    it('refuses an interpolated segment that could resolve to Better Auth', async () => {
+      expect(await refused('/api/<<0.0.body.data.id>>/sign-in/email')).toBe(400);
+    });
+
     it('rejects malformed interpolation syntax', async () => {
       const response = await fetch(
         post('/api/v1/batch/execute', {

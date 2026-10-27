@@ -37,6 +37,7 @@ export const UserAction = {
   ...StandardAction,
   redactUser: 'user.redact',
   rotateUserJwts: 'user.rotateJwts',
+  changePassword: 'user.changePassword',
 } as const;
 export type UserAction = (typeof UserAction)[keyof typeof UserAction];
 

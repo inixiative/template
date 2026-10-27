@@ -27,7 +27,7 @@
   - [paginate() Utility](#paginate-utility)
   - [Search & Filtering](#search--filtering)
   - [Route declaration (lens narrowing)](#route-declaration-lens-narrowing)
-  - [Dynamic per-request scope — `scopeNarrowing` middleware](#dynamic-per-request-scope--scopenarrowing-middleware)
+  - [Per-request scope — bind tokens](#per-request-scope--bind-tokens)
   - [Admin routes](#admin-routes)
   - [Controller — `paginate()` integration](#controller--paginate-integration)
   - [How it works](#how-it-works)
@@ -148,7 +148,7 @@ readRoute({ model: 'user', many: true, admin: true, responseSchema })
 
 A lens narrowing can declare a `where` in three places, and they assert three different things.
 
-**Root where** (`root.where`, plus any stacked `scopeNarrowing` layers) — a predicate on the root rows themselves: through this lens, the only rows that exist are the ones matching. Its rule may traverse relations (`tokens.isActive`-style fields), but the traversal qualifies *roots*: "give me Users such that…". It answers **which rows are in the result set**.
+**Root where** (`root.where`, plus any parent layer's) — a predicate on the root rows themselves: through this lens, the only rows that exist are the ones matching. Its rule may traverse relations (`tokens.isActive`-style fields), but the traversal qualifies *roots*: "give me Users such that…". It answers **which rows are in the result set**.
 
 **Relation-node where** (`root.relations.<rel>.where`) — a standing condition on that edge: whenever a query traverses this relation, the related rows are scoped by this condition. It says nothing about which roots qualify — a User with zero matching tokens is still in the set. It answers **what the related collection looks like when you traverse to it**. Declared per *path*, not per model: two edges reaching the same model can carry different wheres.
 
@@ -596,7 +596,7 @@ root: {
 
 **Server-enforced filtering — `root.where`:**
 
-For static (route-wide) filters use `root.where`. For per-request / context-dependent filters use the `scopeNarrowing` middleware (see below). Both go through `toPrisma` and AND-merge into the final Prisma where.
+Filters go in `root.where`. A per-request value is a `bind` token in it (see below). The where goes through `toPrisma` and AND-merges into the final Prisma where.
 
 ```typescript
 filterLens: {
@@ -616,46 +616,22 @@ filterLens: {
 
 **Defense in depth — `enumOmits` + `where`:** `enumOmits` hides values from the SDK type surface (consumer types can't even express the omitted enum value). `where` enforces the same filter server-side. **Both are needed**: type narrowing prevents accidental misuse, server `where` enforces under raw API calls.
 
-### Dynamic per-request scope — `scopeNarrowing` middleware
+### Per-request scope — bind tokens
 
-For ctx-aware where conditions (tenant scope, user ownership, etc.), use the `scopeNarrowing` middleware. It merges into the narrowing already on context. Supports both sync and async callbacks:
+A lens is static: nothing narrows it per request. A ctx-aware condition (tenant scope, user ownership) is a `bind` token in the route's static `filterLens`, and the controller supplies its value to `paginate`, which refuses a lens whose required tokens are missing:
 
 ```typescript
-import { scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
-
-readRoute({
-  model: Modules.organization,
-  submodel: Modules.inquiry,
-  action: 'received',
-  many: true,
-  paginate: true,
-  filterLens: inquiryReceivedNarrowing,  // static part
-  responseSchema,
-  middleware: [
-    validatePermission('manage'),
-    scopeNarrowing((c) => ({
-      root: {
-        where: { field: 'targetOrganizationId', operator: 'equals', value: getResource<'organization'>(c).id },
-      },
-    })),
-  ],
-});
-```
-
-Async (e.g., integration-source lookup):
-```typescript
-scopeNarrowing(async (c) => {
-  const tenantId = await resolveTenant(c);
-  return { root: { where: { field: 'tenantId', operator: 'equals', value: tenantId } } };
-}),
-```
-
-`WhereScope` mirrors the narrowing shape:
-```typescript
-type WhereScope = {
-  root?: { where?: Condition; relations?: Record<string, /* recursive */> };
-  mapDefaults?: Record<string, { models?: Record<string, { where?: Condition }> }>;
+const inquiryReceivedNarrowing: LensNarrowing = {
+  parent: lensFor('Inquiry'),
+  root: {
+    picks: inquiryPicks,
+    where: { field: 'targetOrganizationId', operator: 'equals', bind: 'organizationId' },
+  },
 };
+
+const { data, pagination } = await paginate(c, db.inquiry, {
+  bindings: { organizationId: getResource<'organization'>(c).id },
+});
 ```
 
 ### Admin routes
@@ -697,9 +673,8 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 1. `prepareRequest` middleware parses bracket notation (`?searchFields[name]=value`) into nested objects
 2. `prepareMiddleware` injects an inline middleware that sets `filterLens` on context from the route's static `filterLens`
-3. `scopeNarrowing` middleware(s) merge ctx-aware wheres into the narrowing
-4. `paginate()` reads the final narrowing + bracket-query searchFields, calls `buildWhereClause`
-5. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), translates the lens's wheres via `toPrisma`, AND-merges everything
+3. `paginate()` binds the narrowing's tokens from its `bindings`, reads bracket-query searchFields, calls `buildWhereClause`
+4. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), translates the lens's wheres via `toPrisma`, AND-merges everything
 
 ### Security
 
@@ -707,7 +682,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 - **Superadmin bypass:** users with `platformRole: 'superadmin'` skip the whitelist (`skipFieldValidation: true`). Path notation validation still applies.
 - Path notation: camelCase enforced, rejects snake_case, prevents injection
 - Supports Prisma meta-fields (`_count`, `_max`, `_min`, `_avg`, `_sum`)
-- Relations must be turned on by the route's `filterLens` (non-superadmin); a `scopeNarrowing` layer can only narrow them
+- Relations must be turned on by the route's `filterLens` (non-superadmin)
 - Max 10 levels of nesting in the bracket query
 - Routes without a `filterLens` skip search entirely (`paginate` no-ops the search path)
 - `root.where` is AND-merged into the prisma where — server enforces even when the SDK type would allow a value through
@@ -793,7 +768,7 @@ filterLens: {
 // Superadmin: all valid fields allowed regardless of the lens (skipFieldValidation bypass)
 ```
 
-A `scopeNarrowing` layer stacked on top can only narrow: it may hide a relation (`omits`) or restate one the route turned on to add a `where`, and its wheres may read only what the route's lens shows. Turn on everything a route crosses in its `filterLens`.
+A narrowing layered on another can only narrow: it may hide a relation (`omits`) or restate one its parent turned on to add a `where`, and its wheres may read only what the parent shows. Turn on everything a route crosses in its `filterLens`.
 
 **Validation:**
 - The full path must be shown by the lens (non-superadmin users)
@@ -1161,6 +1136,21 @@ adminUserRouter.openapi(adminUserReadManyRoute, adminUserReadManyController);
 
 export { userRouter, adminUserRouter };
 ```
+
+### Info routes
+
+A body field stored in a Prisma `Json` column (inquiry `content`, contact `value`, segment `conditions`) reaches the OpenAPI spec as a generic JSON value, because its shape depends on another field. Request bodies stay plain (no discriminated unions); validation stays where it is. A public `GET /api/v1/<module>/info` route lists every type and its shape instead, generated from the registry that validates it, never hand-listed:
+
+| Route | Generated from | Lists |
+|-------|---------------|-------|
+| `/webhookSubscription/info` | `webhookOwnerAllowedModels` | `models` per owner, `signature` key |
+| `/inquiry/info` | `inquiryHandlers` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
+| `/contact/info` | `ContactRegistry` | per type: `input` and stored `value` JSON Schema, `subtype` rule, `uniqueness`, label and icon |
+| `/segment/info` | `customerRefLens` | every readable field with its kind; `conditions` is tagged `rule` and points at json-rules |
+
+Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `schemaGuide(responseSchema)` (`lib/jsonSchema/schemaGuide.ts`) reads those descriptions back through `z.toJSONSchema`. `schemaGuide.test.ts` fails on any key left undescribed.
+
+An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand ahead of `autoRegisterRoutes` (see `modules/inquiry/index.ts`). It checks no action, so it answers without a session. Zod schemas become JSON Schema through `toJsonSchema` (`lib/jsonSchema/toJsonSchema.ts`, zod 4 `z.toJSONSchema`): `input` for what a caller sends, `output` for what is stored. The body field points at its route with `z.unknown().describe('… see GET /api/v1/<module>/info')`; `transformJsonFields` keeps that description on the JSON value it substitutes.
 
 ---
 

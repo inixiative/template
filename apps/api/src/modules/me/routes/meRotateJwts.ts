@@ -20,4 +20,5 @@ export const meRotateJwtsRoute = actionRoute({
     'Rotates your JWT version: every JWT this API has signed for you, on every device, stops working. ' +
     'Sign in again afterwards. Signing out of one browser needs no call; that browser drops its JWT.',
   tags: [Tags.me, Tags.user],
+  'x-batch': false,
 });

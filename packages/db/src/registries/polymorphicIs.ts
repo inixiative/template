@@ -46,7 +46,7 @@ export const polymorphicBindings = (
   [POLYMORPHIC_BINDS[ownerModel]]: ownerId,
 });
 
-const isOwnerKind = (value: string): value is PolymorphicKind => value in POLYMORPHIC_BINDS;
+export const isOwnerKind = (value: string): value is PolymorphicKind => value in POLYMORPHIC_BINDS;
 
 /**
  * "This row's false-polymorphic axis points at the bound row": one arm per key column, each pairing

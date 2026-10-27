@@ -1,14 +1,20 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { db } from '@template/db';
+import { db, snapshotHookRegistry } from '@template/db';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { clearRulesCache, RulesRegistry, setRulesCache } from '#/hooks/rules/registry';
 
-RulesRegistry.User = true;
-registerRulesHook();
+let restoreHooks: () => void;
+
+beforeAll(() => {
+  RulesRegistry.User = true;
+  restoreHooks = snapshotHookRegistry();
+  registerRulesHook();
+});
 
 afterAll(async () => {
+  restoreHooks();
   await cleanupTouchedTables(db);
   delete RulesRegistry.User;
 });

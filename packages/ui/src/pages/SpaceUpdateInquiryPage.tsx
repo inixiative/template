@@ -10,6 +10,7 @@ import {
   spaceSentManyInquiries,
   spaceSentManyInquiriesQueryKey,
 } from '@template/sdk';
+import type { UpdateSpaceContent } from '@template/shared/inquiry';
 import {
   Badge,
   Button,
@@ -64,7 +65,7 @@ export const SpaceUpdateInquiryPage = () => {
   );
 
   const handleSubmit = () => {
-    const content: { name?: string; slug?: string } = {};
+    const content: UpdateSpaceContent = {};
     if (name.trim()) content.name = name.trim();
     if (slug.trim()) content.slug = slug.trim();
 
@@ -95,10 +96,7 @@ export const SpaceUpdateInquiryPage = () => {
     setSlug('');
   };
 
-  const activeContent = activeInquiry?.content as
-    | { name?: string; slug?: string }
-    | null
-    | undefined;
+  const activeContent = activeInquiry?.content as UpdateSpaceContent | null | undefined;
 
   return (
     <Page

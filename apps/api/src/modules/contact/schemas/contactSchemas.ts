@@ -46,6 +46,9 @@ export const contactCreateBodySchema = ContactScalarInputSchema.omit({
   permissionRules: true,
   acceptedKinds: true,
 }).extend({
+  value: z
+    .unknown()
+    .describe('Shape depends on `type`; see GET /api/v1/contact/info (`types.<type>.input`).'),
   permissionRules: buildPermissionRulesSchema('contact', ['read']),
   // Optional override of the DB default ['platform', 'activity']; otherwise applied at insert.
   acceptedKinds: z.array(CommunicationKindSchema).optional(),

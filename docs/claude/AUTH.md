@@ -15,6 +15,9 @@
   - [jwtAuthMiddleware](#jwtauthmiddleware)
   - [Revocation and sign-out](#revocation-and-sign-out)
   - [Spoofing and WebSockets](#spoofing-and-websockets)
+- [Account changes through BetterAuth (withThrowawaySession)](#account-changes-through-betterauth-withthrowawaysession)
+  - [Change password](#change-password)
+  - [The same pattern for the next account changes](#the-same-pattern-for-the-next-account-changes)
 - [OAuth + One-Time Token](#oauth--one-time-token)
   - [OAuth Flow](#oauth-flow)
   - [One-Time Token Handoff](#one-time-token-handoff)
@@ -122,7 +125,7 @@ The plugin list lives in `apps/api/src/lib/auth/authPlugins.ts`. Its order matte
 { "token": "<jwt>", "expiresAt": "<ISO time>", "user": { "...": "..." } }
 ```
 
-That covers `POST /api/auth/sign-in/email`, `POST /api/auth/one-time-token/verify`, and `POST /api/auth/sign-up/email` when verification is not required.
+That covers `POST /api/auth/sign-in/email`, `POST /api/auth/one-time-token/verify`, `POST /api/auth/sign-up/email` when verification is not required, and BetterAuth's `/change-password` called server-side by [change password](#change-password), where it first calls `rotateUserJwts`.
 
 ### Auth Routes
 
@@ -138,7 +141,7 @@ POST /api/auth/one-time-token/verify   # OAuth handoff exchange → { token, exp
 GET  /api/auth/jwks                    # public signing keys
 ```
 
-`disabledPaths` turns every endpoint that acts on a live session into a 404: `/token` (it would mint a JWT from a session), `/get-session`, `/update-session`, `/list-sessions`, `/revoke-session`, `/revoke-sessions`, `/revoke-other-sessions`, `/sign-out`, `/update-user`, `/change-email`, `/change-password`, `/verify-password`, `/delete-user`, `/delete-user/callback`, `/link-social`, `/unlink-account`, `/list-accounts`, `/account-info`, `/get-access-token`, `/refresh-token`, `/one-time-token/generate`. Changing a password or linking a social account needs a JWT-authenticated route of our own; neither exists yet.
+`disabledPaths` turns every endpoint that acts on a live session into a 404: `/token` (it would mint a JWT from a session), `/get-session`, `/update-session`, `/list-sessions`, `/revoke-session`, `/revoke-sessions`, `/revoke-other-sessions`, `/sign-out`, `/update-user`, `/change-email`, `/change-password`, `/verify-password`, `/delete-user`, `/delete-user/callback`, `/link-social`, `/unlink-account`, `/list-accounts`, `/account-info`, `/get-access-token`, `/refresh-token`, `/one-time-token/generate`. They stay 404 over HTTP. Account changes that need one of them (a password change today) are JWT routes of our own that call BetterAuth's server API through `withThrowawaySession` ([below](#account-changes-through-betterauth-withthrowawaysession)); `disabledPaths` gates only BetterAuth's HTTP router, not `auth.api.*`.
 
 ---
 
@@ -163,7 +166,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 ### Revocation and sign-out
 
-`rotateUserJwts(userId)` (`apps/api/src/modules/user/services/rotateUserJwts.ts`) is the one writer of `User.jwtVersion`: it increments it through the scoped db client, inside the caller's transaction. Every caller below goes through it; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store (Aron, 2026-10-18: "the token just carries the version on the user… we just rotate that"). Permissions are not on the JWT, so a role or member change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours, so the version check does not apply to it: rotating here (`/me/rotateJwts`, the admin rotation, password reset) does not end it. It ends when it expires (30 days at most), when the user is deleted here, when the issuer stops publishing its key, or, for a `grant` JWT, when the grant inquiry is revoked (read live). Signing out at the issuer is the issuer's job. The cached user row (`findUserWithRelations`, 10 minutes) is dropped by the cache hooks on the version bump; if that clear fails (the hook logs Redis errors), an old JWT can work until the cache entry expires, the same bound a role change has.
+`rotateUserJwts(userId)` (`apps/api/src/modules/user/services/rotateUserJwts.ts`) is the one writer of `User.jwtVersion`: it increments it through the scoped db client, inside the caller's transaction. Every caller below goes through it; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store (Aron, 2026-10-18: "the token just carries the version on the user… we just rotate that"). Permissions are not on the JWT, so a role or member change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours, so the version check does not apply to it: rotating here (`/me/rotateJwts`, the admin rotation, password reset or change) does not end it. It ends when it expires (30 days at most), when the user is deleted here, when the issuer stops publishing its key, or, for a `grant` JWT, when the grant inquiry is revoked (read live). Signing out at the issuer is the issuer's job. The cached user row (`findUserWithRelations`, 10 minutes) is dropped by the cache hooks on the version bump; if that clear fails (the hook logs Redis errors), an old JWT can work until the cache entry expires, the same bound a role change has.
 
 | What | Revokes |
 |---|---|
@@ -172,6 +175,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 | `POST /api/admin/user/:id/rotateJwts` | Every JWT this API signed for that user (superadmin) |
 | `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account (`rotateUserJwts`; the soft-deleted user is refused too) |
 | Password reset (BetterAuth `onPasswordReset`) | Every JWT this API signed for that user |
+| `POST /api/v1/me/changePassword` | Every JWT this API signed for the caller before the change (jwtHandoff rotates on `/change-password`); the response carries the new one, or nulls on a spoof |
 
 `jwtVersion` is never returned: every user response schema is `userResponseSchema` (`apps/api/src/modules/user/schemas/userResponseSchema.ts`, `UserScalarSchema.omit({ jwtVersion: true }).strip()`), `jwtHandoff` omits it from the sign-in `user`, and BetterAuth declares it `returned: false`, so none of its own responses carry it (a sign-up still waiting for email verification answers with BetterAuth's raw `user`). Nothing accepts it as input: BetterAuth declares it `input: false`, and no route takes a user body.
 
@@ -185,6 +189,47 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 ### Spoofing and WebSockets
 
 A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/identify` with it (any credential identifies; a token is a token, with no user), and the reauthorize sweep drops an identity whose JWT was revoked or expired.
+
+
+---
+
+## Account changes through BetterAuth (withThrowawaySession)
+
+BetterAuth already implements the account changes a person makes: changing a password, changing an email, deleting the account, linking a provider. Its endpoints for them act on a live session, and a person here never holds one. So the API keeps those endpoints off HTTP (`disabledPaths`) and calls them server-side, as the person, from a JWT route of its own.
+
+`withThrowawaySession(userId, call)` (`apps/api/src/lib/auth/withThrowawaySession.ts`) is the one way to do that:
+
+1. creates a BetterAuth session for the user with BetterAuth's own `internalAdapter.createSession`, living 60 seconds (Redis TTL), so a crash before cleanup leaves nothing that outlives a minute;
+2. builds the request headers BetterAuth's server API reads: the signed session cookie, made exactly as BetterAuth's bearer plugin makes it (`makeSignature` from `better-auth/crypto`, `setRequestCookie` from `better-auth/cookies`). No crypto of our own;
+3. runs `call(headers)`, typically `auth.api.<endpoint>({ body, headers })`. Server calls run BetterAuth's hooks, so `jwtHandoff` still swaps any new session for a JWT;
+4. deletes the session in `finally`, whether the call succeeded or threw.
+
+The session token never leaves the helper except inside those headers, and the helper logs nothing. A BetterAuth `APIError` comes out as an `AppError` (`makeError`): a 4xx keeps its status and message; a 5xx becomes a plain 500; a 401 becomes a 409 "try again", because a 401 inside the call means a concurrent account change revoked the throwaway session, not that the caller's JWT is bad. Every call gets its own session, so concurrent calls never share or reuse one.
+
+Why not let the browser hold a short-lived session for one call (the first design): web and API are cross-site on the template's pr and staging hosts (`*.vercel.app`, `*.render.com`), where a SameSite=Lax cookie is never sent and third-party cookies are blocked, and a kept session was reachable through the one-time-token header. A server-side session never reaches a browser at all. The `bearer-only-auth` fence enforces that this file is the only one that builds a session credential: importing or re-exporting a cookie signer (`makeSignature`, `setRequestCookie`, `createHMAC`, …) from better-auth, `@better-auth/*` or better-call, a namespace import of a signer module, or any reference to `createSession`, anywhere else fails CI. The same fence names who may call the helper: importing `withThrowawaySession` (import, re-export, dynamic `import()`, `require`) outside `THROWAWAY_SESSION_CALLERS` in `scripts/ci/rules/lib/bearerOnlyAuth.ts` (today `meChangePassword`) fails CI, so each new caller is a one-line addition a reviewer sees.
+
+### Change password
+
+`POST /api/v1/me/changePassword` (`modules/me/routes/meChangePassword.ts`), body `{ currentPassword, newPassword }`, response `{ token, expiresAt }`:
+
+- **Who:** a user. `validatePermission(UserAction.changePassword)` on the user, `actorIsUser` in the schema: an API token cannot change its user's password, whatever it holds. A superadmin passes on any credential. A superadmin spoofing a user can change that user's password like any other action (no spoof guard; Aron, 2026-10-20: "Superadmin can do anything, always"); the response is then `{ token: null, expiresAt: null }`, so the spoofed user's new JWT never leaves the API, and the UI keeps its own JWT while spoofing or when the answer has no JWT (Aron, 2026-10-26: both). A superadmin cannot be spoofed ([Spoof Middleware](#spoof-middleware)), so a superadmin never changes their own password through a spoof.
+- **Not in a batch:** the route is `'x-batch': false`; a batch that reaches it is refused before anything runs ([BATCH.md](./BATCH.md#routes-that-cannot-batch)).
+- **Limits:** `newPassword` length comes from `passwordLength` (`packages/shared/src/auth/passwordLength.ts`, also used by the web form), the same constants `auth.ts` gives BetterAuth as `minPasswordLength`/`maxPasswordLength`; outside them is a 422 before BetterAuth runs. Rate limits: the `/api/auth` IP bucket (`authRateLimit`, 60 a minute) first, and a per-user bucket (`credentialChangeRateLimit`, 5 a minute) after the permission checks, so a stolen JWT can't guess the current password from rotating IPs and a refused token can't use up its person's attempts.
+- **What runs:** `withThrowawaySession(user.id, (headers) => auth.api.changePassword({ body: { currentPassword, newPassword, revokeOtherSessions: true }, headers }))`. BetterAuth verifies the current password and hashes the new one; a wrong current password is its 400 `Invalid password`, and nothing changes. `revokeOtherSessions` deletes every BetterAuth session of the user and creates a new one; `jwtHandoff` sees `/change-password`, calls `rotateUserJwts` before signing (every older JWT is a 401 from now on), signs the new JWT through the same path sign-in uses, stamps `lastLoginAt` (the person just proved the password) and deletes that session.
+- **Response check:** the controller checks BetterAuth's answer is a JWT handoff (`safeParse`); if the hook ever did not run, BetterAuth's own body (which carries a session token) fails that check and the request is a plain 500, never a leak.
+- **One transaction:** the controller runs the whole call in `db.txn`. BetterAuth writes through `prismaAdapter(db)`, so the password and `rotateUserJwts` share it: if the rotation or the signing throws, the call is a 500 and the old password stands. Sessions live in Redis (`secondaryStorage`), outside the transaction; the throwaway session and BetterAuth's new one are both deleted in a `finally`, so a failed call leaves no session behind.
+- An account with no password (Google only) gets BetterAuth's 400 `Credential account not found`.
+
+### The same pattern for the next account changes
+
+Not built; each is a JWT route plus one `withThrowawaySession` call, keeping BetterAuth's endpoint in `disabledPaths`:
+
+| Change | BetterAuth server call | Notes |
+|---|---|---|
+| Change email | `auth.api.changeEmail({ body: { newEmail, callbackURL }, headers })` | BetterAuth mails the verification link; the link's `/verify-email` finishes the change with no session. Rotate JWTs only if email is an identity claim somewhere |
+| Delete account | `auth.api.verifyPassword({ body: { password }, headers })`, then our `redactUser` | BetterAuth only checks the password; deletion stays ours (soft delete, audit, `rotateUserJwts`) |
+| Link Google | `auth.api.linkSocialAccount({ body: { provider: 'google', callbackURL }, headers })` returns the provider URL | The OAuth callback needs the session after the redirect, so this one must not delete it in `finally`: it needs a variant that lets the session live to the callback (as the sign-in OAuth session does) |
+| Set a first password (Google-only user) | `auth.api.setPassword({ body: { newPassword }, headers })` (server-only in BetterAuth) | Same shape as change password |
 
 ---
 
@@ -511,6 +556,7 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const spoofEmail = normalizeEmail(rawEmail);
   const spoofedBasic = await findUserByEmail(spoofEmail);
   if (!spoofedBasic) return next();
+  if (isSuperadminUser(spoofedBasic)) throw makeError({ status: 403, message: 'A superadmin cannot be spoofed' });
   const spoofedUser = await findUserWithRelations(spoofedBasic.id);
   if (!spoofedUser) return next();
 
@@ -535,6 +581,7 @@ curl -H "Authorization: Bearer <jwt>" \
 
 - Caller must be authenticated as superadmin
 - Target user must exist
+- Target must not be a superadmin, the caller included (403)
 - Original admin tracked in `spoofedBy` for audit
 
 ---

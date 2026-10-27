@@ -67,6 +67,12 @@ Paths below are relative to `/api/v1`:
 | Create a segment | `/me/segments`, `/organization/:id/segments`, `/space/:id/segments` |
 | Estimate rule reach without saving | `POST /me/segments/reach`, `/organization/:id/segments/reach`, `/space/:id/segments/reach` |
 
+`GET /segment/info` (public) describes what `conditions` may read: every field `customerRefLens`
+exposes (dotted path from `CustomerRef`, kind, enum values, list relations, and `sourced` fields that
+take the id of a row the owner may name), built with `projectLens` (`lensFields` in
+`@template/shared/rules`). `conditions` is tagged `rule`: its grammar is `@inixiative/json-rules` and
+is not restated. Its `guide` says what each key means.
+
 Reach accepts `{ conditions }` and returns `{ count }`, using the same rule and reference
 admission checks as saving. Existing route permissions govern each owner context.
 
@@ -108,7 +114,8 @@ can inspect. See [COMMUNICATIONS.md](COMMUNICATIONS.md#the-email-lens).
 ## Source map
 
 - `packages/db/prisma/schema/segment.prisma`, `segmentMember.prisma`: data model.
-- `apps/api/src/modules/customerRef/lib/customerRefLens.ts`: vocabulary and ownership scope.
+- `apps/api/src/modules/customerRef/lib/lenses/`: the static lenses, `customerRefLens` (vocabulary
+  and ownership scope) and `customerRefsByIdLens` (the rows a reconcile hydrates).
 - `apps/api/src/modules/segment/`: routes, services, trigger registry and tests.
 - `apps/api/src/jobs/handlers/`: reconciliation and sweep jobs.
 - `apps/web/app/config/nav/features/segments.ts`, `apps/web/app/routes/_authenticated/segments/`:

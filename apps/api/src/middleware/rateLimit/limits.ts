@@ -7,13 +7,14 @@
 import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 
-export type RateLimitTier = 'user' | 'space' | 'organization' | 'auth';
+export type RateLimitTier = 'user' | 'space' | 'organization' | 'auth' | 'credentialChange';
 
 const DEFAULT_MAX: Record<RateLimitTier, number> = {
   user: 20,
   space: 30,
   organization: 60,
   auth: 60,
+  credentialChange: 5,
 };
 
 // Seam for subscriptions / feature flags (INFRA-027): limits are entitlements, never columns on Token, Organization or Space.

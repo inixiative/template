@@ -13,6 +13,7 @@ type MakeErrorOptions = {
   message?: string;
   guidance?: Guidance;
   fieldErrors?: Record<string, string[]>;
+  details?: Record<string, unknown>[];
   headers?: Record<string, string>;
 };
 
@@ -46,6 +47,7 @@ export const makeError = (options: MakeErrorOptions): AppError => {
       message: options.message ?? meta.name,
       guidance: options.guidance ?? meta.guidance,
       fieldErrors: options.fieldErrors,
+      details: options.details,
     },
     options.headers,
   );

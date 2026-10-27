@@ -91,7 +91,7 @@ describe('lensWhere — root wheres (path "")', () => {
     expect(await lensWhere(lens, {})).toEqual(role);
   });
 
-  it('composes every stacked scopeNarrowing layer, ANDed', async () => {
+  it('composes every layer of a narrowing chain, ANDed', async () => {
     const lens: LensNarrowing = {
       parent: {
         parent: lensFor('User'),

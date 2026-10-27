@@ -36,7 +36,7 @@ export type RuleHealth = {
   /** The rows the rule names, extracted by the caller's rules module — it knows which sources are ids. */
   references: RuleReference[];
   /** Reference keys confirmed usable by the caller's own read. Absent means none were confirmed. */
-  live?: ReadonlySet<string>;
+  existingTargets?: ReadonlySet<string>;
   /** The bindings the caller evaluates with. A required name outside this map is an issue. */
   bindings?: Record<string, RuleValue>;
 };
@@ -54,7 +54,13 @@ export const ruleVocabularyIssues = (lens: RuleLens | RuleVocabulary, rule: Cond
     ? lens.vocabularyIssues(rule)
     : validateRuleInLens(rule, lens).errors.map((error) => `${error.path}: ${error.message}`);
 
-export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealth): RuleIssue[] => {
+export const ruleIssues = ({
+  lens,
+  rule,
+  references,
+  existingTargets,
+  bindings,
+}: RuleHealth): RuleIssue[] => {
   const issues: RuleIssue[] = [];
   for (const name of listBindings(rule, { required: true })) {
     if (bindings && Object.hasOwn(bindings, name)) continue;
@@ -68,7 +74,7 @@ export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealt
     issues.push({ kind: 'vocabulary', detail: `rule is outside the lens vocabulary — ${issue}` });
   }
   for (const reference of references) {
-    if (live?.has(referenceKey(reference))) continue;
+    if (existingTargets?.has(referenceKey(reference))) continue;
     issues.push({
       kind: 'reference',
       reference,
@@ -81,7 +87,7 @@ export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealt
 /**
  * Evaluate a stored rule through one fork: `degraded` when it cannot be evaluated correctly,
  * `sound` when it can. Two questions: is every binding the rule requires supplied, and is the
- * rule still valid — admitted by the current lens, every row it names still live.
+ * rule still valid — valid in the current lens, every row it references among the existing targets.
  */
 export const withRule = <T>(health: RuleHealth, arms: RuleArms<T>): T => {
   const issues = ruleIssues(health);
