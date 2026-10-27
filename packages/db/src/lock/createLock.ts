@@ -127,9 +127,6 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     declareLost('token_mismatch');
   };
 
-  // A lock is single-use: once released it never acquires again. A release that lands while the SET
-  // is in flight deletes the key that SET wrote, so the acquire it raced cannot leave a lease nobody
-  // holds or a heartbeat nobody stops.
   const tryAcquire = async (): Promise<boolean> => {
     if (hasReleased) {
       throw new Error('createLock: this lock was released; create a new lock to acquire again');
@@ -189,8 +186,6 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     if (!isWithinLease()) throw new LockLostError(key);
   };
 
-  // The fenced delete, sent once: a second release (an abort listener and a `finally` both
-  // releasing) shares the first one's result rather than deleting a successor's key.
   const release = (): Promise<LockReleaseResult> => {
     if (releasePromise) return releasePromise;
     hasReleased = true;

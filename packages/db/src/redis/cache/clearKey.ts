@@ -17,11 +17,6 @@ import { writtenKey } from '@template/db/redis/cache/writtenKey';
 import { getRedisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 
-// A clear also cancels computes in flight: an exact clear moves the key's generation, a pattern clear
-// moves the cache-wide epoch before it scans, and a compute that read before either skips its
-// publish. `cancelInFlight: false` only evicts, so overlapping clears of a hot key share one
-// recompute. A failed exact clear logs and returns 0; a failed pattern clear throws, because the
-// caller cannot tell which of its keys survived.
 export const clearKey = async (
   pattern: string,
   { cancelInFlight = true }: { cancelInFlight?: boolean } = {},
@@ -49,7 +44,6 @@ export const clearKey = async (
     if (cancelInFlight) {
       await redis.set(epochKey(), newGeneration(), 'EX', GENERATION_TTL_SECONDS);
     }
-    // SCAN, not KEYS: non-blocking.
     let deleted = 0;
     const stream = redis.scanStream({ match: pattern, count: 100 });
 

@@ -7,6 +7,7 @@
 import { getRollingCache } from '@template/db';
 import { settleWithin } from '@template/shared/utils';
 import { emitAppEvent } from '#/appEvents/emit';
+import { isFinalAttempt } from '#/jobs/isFinalAttempt';
 import { makeJob } from '#/jobs/makeJob';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { JobLane } from '#/jobs/types';
@@ -31,7 +32,7 @@ export type RefreshRollingCacheTargetPayload = { name: string; key: string; targ
 export const refreshRollingCacheTarget = makeSupersedingJob<RefreshRollingCacheTargetPayload>(
   makeJob<RefreshRollingCacheTargetPayload>(
     async ({ job, signal }, { name, key, target }) => {
-      const { refresh, timeoutSeconds, channel } = getRollingCache(name);
+      const { refresh, timeoutSeconds, channel, clearQueued } = getRollingCache(name);
       const deadline = AbortSignal.timeout(timeoutSeconds * 1000);
       const refreshSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
       const isRefreshed = await settleWithin(
@@ -49,7 +50,10 @@ export const refreshRollingCacheTarget = makeSupersedingJob<RefreshRollingCacheT
             `Rolling cache "${name}" did not refresh ${key} within ${timeoutSeconds}s`,
           );
         },
-      );
+      ).catch(async (error: unknown) => {
+        if (isFinalAttempt(job)) await clearQueued(target);
+        throw error;
+      });
       if (isRefreshed) {
         await emitAppEvent('rollingCache.refreshed', {
           rollingCache: name,

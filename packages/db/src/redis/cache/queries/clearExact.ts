@@ -6,8 +6,6 @@
  */
 import type { RedisEval } from '@template/db/redis/types';
 
-// Deletes the value and its write time and moves the key's generation in one step, so a compute that
-// read before the clear can never publish after it. Returns how many values were deleted.
 const CLEAR_EXACT = `
 local deleted = redis.call('del', KEYS[1])
 redis.call('del', KEYS[3])

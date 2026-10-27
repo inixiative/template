@@ -15,9 +15,6 @@ import { getRedisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import superjson from 'superjson';
 
-// The generation is captured after the lock and before the producer, so a clear that lands while
-// the producer reads cancels its publish. Without the lock or the generation the value is returned
-// unpublished: nothing can prove a clear did not run meanwhile.
 export const cacheRead = async <T>(
   key: string,
   fn: () => Promise<T>,
@@ -51,8 +48,6 @@ export const cacheRead = async <T>(
         payload,
         shouldKeepExisting,
       );
-      // Awaited only while holding the lock: waiters poll the value key, so releasing before the
-      // write lands would send every one of them off to recompute.
       if (holdsLock) await write;
     }
 

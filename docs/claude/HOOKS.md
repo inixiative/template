@@ -347,9 +347,11 @@ On mutation, all matching cache keys are deleted.
 ### Wildcard Keys
 
 ```typescript
-// Delete all sessions for a user
-cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
+cacheKey('user', userId, [], true)  // → cache:user:id:abc:*
 ```
+
+A wildcard clear moves the cache-wide epoch, so it cancels every `cache()` compute in
+flight, not only the keys it matches. Prefer exact keys in the reference map.
 
 ---
 

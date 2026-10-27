@@ -18,8 +18,6 @@ import { writtenKey } from '@template/db/redis/cache/writtenKey';
 import { getRedisClient } from '@template/db/redis/client';
 import superjson from 'superjson';
 
-// Set-if-absent by default, overwrite under `force`. The write moves the key's generation, so a
-// compute that read before it cannot publish an older value over it.
 export const upsertCache = async <T>(
   key: string,
   value: T,

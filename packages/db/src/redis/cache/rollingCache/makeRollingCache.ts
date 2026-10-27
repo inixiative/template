@@ -84,12 +84,7 @@ const selectedFields = (selector: AnyRollingCacheTargets | undefined): string[] 
 //   write lands, so every result reads "computing", never "empty", meanwhile. It waits up to
 //   `timeoutSeconds` for the lock (the usual holder is a superseded refresh that is stopping) and
 //   reports false rather than computing unlocked beside another. Writes overwrite (`force`); a write
-//   after `signal` aborted is dropped, and a write that fails throws so the leaf retries. An abort
-//   releases the lock at once rather than when `compute` returns, so the refresh that superseded it
-//   is not left waiting on a compute whose writes will be dropped.
-// - `markQueued(target)` / `clearQueued(target)` are the target's queued marker: `checkRollingCache`
-//   sets it so only one cold reader enqueues the leaf, and a refresh that wrote clears it. An aborted
-//   refresh leaves it, because its retry is still queued.
+//   after `signal` aborted is dropped, and a write that fails throws so the leaf retries.
 // - Each target's refresh is timed into `rollingCache.target`, tagged with the cache name only.
 export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => {
   const {
@@ -175,6 +170,10 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
   ): Promise<boolean> => {
     const lock = singleFlightLock(targetKey(target));
     if (!(await lock.acquire({ waitMs: timeoutSeconds * 1000 }))) return false;
+    if (signal?.aborted) {
+      await lock.release();
+      return false;
+    }
     const releaseOnAbort = (): void => void lock.release();
     signal?.addEventListener('abort', releaseOnAbort, { once: true });
     try {

@@ -10,9 +10,6 @@ import superjson from 'superjson';
 
 type CacheRead<T> = { result: 'hit'; value: T } | { result: 'miss' | 'error' };
 
-// superjson round-trips Date/BigInt/Map/Set; entries written before superjson (plain JSON)
-// deserialize to undefined and read as a miss. A Redis failure reads as `error`, and the caller
-// computes without the cache.
 export const readCached = async <T>(
   redis: ReturnType<typeof getRedisClient>,
   key: string,

@@ -13,11 +13,6 @@ import { writtenKey } from '@template/db/redis/cache/writtenKey';
 import { getRedisClient } from '@template/db/redis/client';
 import superjson from 'superjson';
 
-// Reads a key without computing it: the value, its write time, whether a compute holds the
-// single-flight lock of `computedUnder` (default: the key itself) and whether a refresh of it is
-// queued, in one MGET. With `freshForSeconds`, a value older than the window, or with no write time,
-// is stale; without it any value is fresh. A Redis failure throws rather than reading as empty: a
-// caller that queues work on a miss would otherwise pile work onto an outage.
 export const checkCache = async <T>(
   key: string,
   {

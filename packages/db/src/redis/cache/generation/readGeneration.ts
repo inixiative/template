@@ -11,8 +11,6 @@ import { log } from '@template/shared/logger';
 
 export type Generation = { generation: string; epoch: string };
 
-// Captured before the producer runs. Null when Redis cannot answer: the caller then computes and
-// returns the value without publishing it, because it cannot prove no clear ran meanwhile.
 export const readGeneration = async (
   redis: ReturnType<typeof getRedisClient>,
   key: string,

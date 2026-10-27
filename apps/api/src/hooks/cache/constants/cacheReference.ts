@@ -16,8 +16,6 @@ export const cacheReference: CacheReference = {
     cacheKey('user', r.id, ['relations']),
   ],
 
-  Session: (r) => [cacheKey('session', r.id), cacheKey('session', { userId: r.userId }, [], true)],
-
   Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
 
   Integration: (r) => [cacheKey('integration', r.id)],

@@ -15,8 +15,6 @@ import type { RedisEval } from '@template/db/redis/types';
 import { log } from '@template/shared/logger';
 import { incrementCounter } from '@template/shared/telemetry';
 
-// Publishes a computed value unless a clear ran while it was computed. A skipped publish is counted by accessor; a failed one is logged. Neither throws: the caller already
-// has its value.
 export const publishComputed = async (
   redis: RedisEval,
   key: string,

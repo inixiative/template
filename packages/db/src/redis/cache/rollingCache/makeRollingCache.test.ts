@@ -432,4 +432,35 @@ describe('makeRollingCache', () => {
     expect(await stuck).toBe(false);
     expect(await rollingCache.read('value', undefined)).toMatchObject({ state: 'fresh', value: 2 });
   });
+  it('a refresh whose signal aborted while it waited for the lock releases it without computing', async () => {
+    const name = uniqueName('abortWhileWaiting');
+    let runs = 0;
+    let finishHolder: () => void = () => {};
+    const rollingCache = makeRollingCache({
+      name,
+      intervalSeconds: 300,
+      timeoutSeconds: 5,
+      results: { value: () => cacheKey(name, 'all') },
+      compute: async (_target, { results, write }) => {
+        runs += 1;
+        if (runs === 1) await new Promise<void>((resolve) => (finishHolder = resolve));
+        await write(results.value(), runs);
+      },
+    });
+
+    const holder = rollingCache.refresh();
+    await Bun.sleep(20);
+    const controller = new AbortController();
+    const waiting = rollingCache.refresh(undefined, { signal: controller.signal });
+    controller.abort();
+    finishHolder();
+
+    expect(await holder).toBe(true);
+    expect(await waiting).toBe(false);
+    expect(runs).toBe(1);
+    expect(await rollingCache.read('value', undefined)).toMatchObject({
+      state: 'fresh',
+      isComputing: false,
+    });
+  });
 });

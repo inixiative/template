@@ -6,8 +6,6 @@
  */
 import type { RedisEval } from '@template/db/redis/types';
 
-// A write that is itself the fresh value: it lands with its write time under one TTL, and moves the
-// key's generation so a compute that read before it cannot overwrite it with an older value.
 const WRITE_THROUGH = `
 redis.call('set', KEYS[2], ARGV[1], 'EX', ARGV[2])
 redis.call('setex', KEYS[3], ARGV[3], ARGV[5])

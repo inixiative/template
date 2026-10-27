@@ -126,6 +126,30 @@ describe('refreshRollingCacheTarget', () => {
     expect(await getRedisClient().exists(rollingCache.results.value())).toBe(0);
   });
 
+  it('a leaf that fails its last attempt clears the queued marker, so the next reader can queue again', async () => {
+    const name = `failingCache${Bun.randomUUIDv7().slice(-8)}`;
+    registered.push(name);
+    const rollingCache = makeRollingCache({
+      name,
+      intervalSeconds: 300,
+      results: { value: () => cacheKey(name, 'only') },
+      compute: async () => {
+        throw new Error('compute failed');
+      },
+    });
+    await rollingCache.markQueued(undefined);
+
+    await expect(
+      enqueueJob('refreshRollingCacheTarget', {
+        name,
+        key: rollingCache.targetKey(),
+        target: null,
+      }),
+    ).rejects.toThrow('compute failed');
+
+    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'empty' });
+  });
+
   it('throws when no definition registered the name', async () => {
     const name = `removedCache${Bun.randomUUIDv7().slice(-8)}`;
     const key = cacheKey(name, 'organization');

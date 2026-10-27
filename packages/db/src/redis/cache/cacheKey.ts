@@ -15,9 +15,6 @@ import { compact } from 'lodash-es';
 
 type Identifier = string | Record<string, string>;
 
-// The domain is a model or accessor name; normalize it to the accessor so a write
-// keyed 'User' and a clear keyed 'user' agree (Redis is case-sensitive). Tags are
-// opaque grouping labels — used verbatim, never model-normalized.
 type CacheDomain = AccessorName | ModelName | (string & {});
 
 const toAccessorName = (domain: CacheDomain): string =>
@@ -34,7 +31,6 @@ export const cacheKey = (
   if (typeof identifier === 'string') {
     idParts.push('id', identifier);
   } else {
-    // Sort alphabetically by field name for consistent composite keys
     const pairs = Object.entries(identifier).sort(([a], [b]) => a.localeCompare(b));
     for (const [field, value] of pairs) {
       idParts.push(field, value);

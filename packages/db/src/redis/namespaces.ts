@@ -8,10 +8,7 @@ export const redisNamespace = {
   cache: 'cache',
   // When the value under a cache key was written (epoch ms), set and cleared with the value itself.
   cacheWritten: 'cachewritten',
-  // A cache key's generation and the cache-wide epoch. A clear moves them; a compute publishes only if
-  // neither moved while it ran.
   cacheGeneration: 'cachegen',
-  // A rolling-cache target whose refresh has been enqueued and has not yet taken its lock.
   cacheQueued: 'cachequeued',
   job: 'job',
   ws: 'ws',

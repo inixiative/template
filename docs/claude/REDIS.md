@@ -420,8 +420,10 @@ const check = await checkRollingCache(spaceStats, 'total', { id: organizationId 
   `compute` once, and holds the lock until the last write lands. `write` is `upsertCache` with
   `force` and the cache's TTL; a write after `signal` aborted is dropped, and a failed write throws so
   the leaf retries. `compute` gets the signal: check it between batches. An abort releases the lock
-  at once, so the refresh that superseded it does not wait on a compute whose writes are dropped. A
-  refresh that wrote clears the target's queued marker; an aborted one leaves it for its retry.
+  at once, and a refresh whose signal aborted while it waited for the lock releases it without
+  computing, so the refresh that superseded it does not wait on a compute whose writes are dropped. A
+  refresh that wrote clears the target's queued marker; an aborted one leaves it for its retry, and a
+  leaf that fails its last attempt clears it so the next reader can queue again.
 - **Warm on boot.** The worker enqueues every registered cache's branch when it starts
   (`apps/api/src/jobs/warmRollingCaches.ts`), so a deploy that changed result keys is not cold until
   the next interval.

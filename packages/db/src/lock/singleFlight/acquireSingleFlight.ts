@@ -13,7 +13,6 @@ import { log } from '@template/shared/logger';
 import { recordDuration } from '@template/shared/telemetry';
 
 const SINGLE_FLIGHT_POLL_MS = 50;
-// Longer than the slowest known producer, so a waiter almost never duplicates the work.
 const SINGLE_FLIGHT_MAX_WAIT_MS = 20_000;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -22,12 +21,6 @@ type SingleFlight<T> =
   | { result: 'hit'; value: T }
   | { result: 'settled'; holdsLock: boolean; lockUnavailable: boolean };
 
-// The first miss takes the key's lock and computes; the rest poll for the value it will write. The
-// poll reads the cache between attempts, which `acquire({ waitMs })` cannot, so the loop is here.
-// When the lease lapses with no value written, a waiter re-acquires so exactly one recomputes rather
-// than every waiter stampeding the producer. Every failure falls through to computing: a lock we
-// cannot take, a holder that dies, or a producer slower than the wait. The wait is timed into
-// `cache.lock.wait` by accessor.
 export const acquireSingleFlight = async <T>(
   redis: ReturnType<typeof getRedisClient>,
   key: string,

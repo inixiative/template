@@ -9,8 +9,6 @@ import { incrementCounter, withSpan } from '@template/shared/telemetry';
 
 export type CacheResult = 'hit' | 'miss' | 'error';
 
-// One `cache <accessor>` span per call, labelled with how the read went. Reads also count into
-// `cache.read` by accessor and result; a write passes `shouldCount: false` and only gets the span.
 export const withCacheSpan = async <T>(
   key: string,
   shouldCount: boolean,
