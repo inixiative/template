@@ -47,7 +47,7 @@ model Contact {
   permissionRules Json?
 
   verifiedAt DateTime?
-  source     String?
+  source     ContactSource?
 
   // Bouncer reachability verdict, cached to skip re-verifying every send (distinct from verifiedAt = ownership).
   deliverability          DeliverabilityStatus?
@@ -111,4 +111,8 @@ enum ContactType {
   wechat
   viber
   skype
+}
+
+enum ContactSource {
+  userCreation
 }

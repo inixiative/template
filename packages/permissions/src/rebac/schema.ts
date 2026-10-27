@@ -5,7 +5,7 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { InquiryType } from '@template/db/generated/client/enums';
+import { ContactSource, InquiryType } from '@template/db/generated/client/enums';
 import {
   actionOnOwner,
   actorIsDelegateOfUser,
@@ -21,6 +21,7 @@ import {
   tokenAccessIsYours,
 } from '@template/permissions/rebac/schemaHelpers';
 import type { RebacSchema } from '@template/permissions/rebac/types';
+import { omit } from 'lodash-es';
 
 export const rebacSchema: RebacSchema = {
   bridges: [],
@@ -58,7 +59,7 @@ export const rebacSchema: RebacSchema = {
 
     // Owner-polymorphic models: per-row permissionRules are merged additively
     // over the standard owner-walk by check() — see packages/permissions/src/rebac/schemaHelpers.ts.
-    // Contact: the email mirroring the user's login (valueKey === user.email) is
+    // Contact: the email made at user creation to mirror the login (source userCreation) is
     // locked against manage (update/delete both gate on manage) — it stays in sync
     // with auth, never edited directly. Every other contact takes the owner walk.
     'db:contact': {
@@ -66,7 +67,18 @@ export const rebacSchema: RebacSchema = {
         ...ownerActions(),
         manage: {
           all: [
-            { rule: { field: 'valueKey', operator: Operator.notEquals, path: 'user.email' } },
+            {
+              any: [
+                { rule: { field: 'source', operator: Operator.equals, value: null } },
+                {
+                  rule: {
+                    field: 'source',
+                    operator: Operator.in,
+                    value: Object.values(omit(ContactSource, ContactSource.userCreation)),
+                  },
+                },
+              ],
+            },
             ownerActions().manage,
           ],
         },
@@ -235,9 +247,7 @@ export const rebacSchema: RebacSchema = {
                       rule: {
                         field: 'type',
                         operator: Operator.in,
-                        value: Object.values(InquiryType).filter(
-                          (type) => type !== 'transferSpace',
-                        ),
+                        value: Object.values(omit(InquiryType, InquiryType.transferSpace)),
                       },
                     },
                     { rel: 'targetOrganization', action: 'manage' },
