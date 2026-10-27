@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "bun test --max-concurrency=1",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bun check"
   },
   "exports": {
     ".": "./src/index.ts",

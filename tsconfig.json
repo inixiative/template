@@ -1,7 +1,4 @@
 {
   "extends": "@inixiative/config/tsconfig/react.json",
-  "compilerOptions": {
-    "incremental": true
-  },
   "exclude": ["node_modules", "dist", "tmp", ".turbo", ".worktrees"]
 }

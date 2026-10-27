@@ -15,7 +15,6 @@
     "./lib/encryption/*": "./src/lib/encryption/*",
     "./test": "./src/test/index.ts",
     "./test/*": "./src/test/*",
-    "./zod": "./src/generated/zod/schemas/index.ts",
     "./zod/models": "./src/generated/zod/schemas/variants/pure/index.ts",
     "./zod/*": "./src/generated/zod/schemas/*.ts",
     "./generated/prismaMap": "./src/generated/prismaMap.gen.ts",
@@ -36,7 +35,7 @@
     "db:studio": "prisma studio",
     "db:seed": "bun run --cwd ../../apps/api db:seed",
     "db:truncate:webhooks": "bun run scripts/truncateWebhookSubscriptions.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bun check"
   },
   "dependencies": {
     "@inixiative/json-rules": "^3.6.0",

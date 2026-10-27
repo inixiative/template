@@ -1,7 +1,6 @@
 {
   "extends": "@inixiative/config/tsconfig/react.json",
   "compilerOptions": {
-    "incremental": true,
     "paths": {
       "@template/sdk": ["./src/index.ts"],
       "@template/sdk/openapi.gen.json": ["./openapi.gen.json"],

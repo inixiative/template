@@ -7,7 +7,7 @@
 
 import { redactLogValue } from '@template/shared/logger/redact';
 import type { LoggerAdapter } from '@template/shared/logger/types';
-import { pino } from 'pino';
+import { type Bindings, pino } from 'pino';
 
 const nativeOptions = {
   formatters: {
@@ -30,7 +30,7 @@ const nativeOptions = {
 export const pinoLogger = pino({ ...nativeOptions, level: process.env.LOG_LEVEL ?? 'info' });
 const nativeChild = pinoLogger.child;
 pinoLogger.child = function (this: typeof pinoLogger, bindings, options) {
-  return Reflect.apply(nativeChild, this, [redactLogValue(bindings), options]);
+  return Reflect.apply(nativeChild, this, [redactLogValue(bindings) as Bindings, options]);
 } as typeof pinoLogger.child;
 const pinoSink = pino({ level: 'trace' });
 

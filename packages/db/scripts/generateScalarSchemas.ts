@@ -103,9 +103,7 @@ ${schemaBuilds}
 
 writeFileSync(outFile, output);
 
-// The package barrel re-exports enum schemas only. The full generated index pulls
-// ~5,300 object/input files into every program that imports `@template/db`;
-// callers that need those import `@template/db/zod/*` directly.
+// Enums only for the barrel: the full generated index puts ~5,300 files in every program importing @template/db.
 const enumsDir = join(import.meta.dir, '../src/generated/zod/schemas/enums');
 const enumExports = readdirSync(enumsDir)
   .filter((f) => f.endsWith('.schema.ts'))

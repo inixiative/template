@@ -1,7 +1,6 @@
 {
   "extends": "@inixiative/config/tsconfig/base.json",
   "compilerOptions": {
-    "incremental": true,
     "paths": {
       "@template/db/*": ["./src/*"],
       "@template/db/test": ["./src/test/index.ts"],
