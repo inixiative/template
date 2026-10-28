@@ -10,9 +10,12 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
+import { tokenRouter } from '#/modules/token';
+import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import type { Entry } from '#tests/utils/entitlementEntry';
+import { del } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
 
@@ -95,5 +98,28 @@ describe("integrations under an organization: the owner reaches every kind, an a
       OrganizationUser: [],
       SpaceUser: [],
     });
+  });
+});
+
+describe('tokens of integrations under an organization follow their integration (R83)', () => {
+  const deletes = async (role: Role, kind: Kind) => {
+    const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
+    const { entity: token } = await createKeyedToken(
+      { ownerModel: 'Integration', role: 'viewer' },
+      { integration: integrations[kind] },
+    );
+    const { app } = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [seat],
+      mount: [(hono) => hono.route('/api/v1/token', tokenRouter)],
+    });
+    return (await app.fetch(del(`/api/v1/token/${token.id}`))).status;
+  };
+
+  it("the owner deletes any of them; an admin only the organization's own integration's tokens", async () => {
+    for (const kind of kinds) {
+      expect(await deletes('owner', kind)).toBe(204);
+      expect(await deletes('admin', kind)).toBe(kind === 'Organization' ? 204 : 403);
+    }
   });
 });

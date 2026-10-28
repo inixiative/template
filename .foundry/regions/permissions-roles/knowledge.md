@@ -390,6 +390,11 @@ Each pseudo record is built from the anchor down the path: the foreign keys the 
 
 A token's role is checked by `create` on `db:token`; an integration's role by `integrationRoleWrite` on `db:integration` (`validateIntegrationGrant`). Situations: `entitlementGrants.test.ts`, `integrationDelegate.test.ts`, `memberTokenGrants.test.ts`, `packages/permissions/src/rebac/schemaMap.test.ts`.
 
+<!-- unit doc:docs/claude/PERMISSIONS.md#permission-checks -->
+**Source:** `docs/claude/PERMISSIONS.md` § Permission Checks (in "Permissions")
+
+#### Permission Checks
+
 ##### In Controllers
 
 A check that depends on the body runs in the controller or its service with the same `check`, on a hydrated record, or on a pseudo record (`ownerColumns`) when the row does not exist yet. `validateFullGrant` (`apps/api/src/lib/permissions/validateFullGrant.ts`):

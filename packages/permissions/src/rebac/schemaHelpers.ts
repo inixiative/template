@@ -165,7 +165,7 @@ export const tokenAccessIsYours: ActionRule = {
 export const managedUpTheChain: ActionRule = {
   any: [
     actionOnOwner('manage', '', notIntegration),
-    { all: [ownedBy(['Integration']), actionOnOwner('manage', 'integration.')] },
+    { all: [ownedBy(['Integration']), { rel: 'integration', action: 'manage' }] },
   ],
 };
 
