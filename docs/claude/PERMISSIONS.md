@@ -31,6 +31,7 @@
     - [Resource Lookup Runs Before Authorization](#resource-lookup-runs-before-authorization)
 - [Entitlements](#entitlements)
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
+  - [Changing Entitlements](#changing-entitlements)
 - [REBAC](#rebac)
   - [Schema](#schema)
   - [ActionRule Types](#actionrule-types)
@@ -56,6 +57,7 @@
   - [Role Assignment Rules](#role-assignment-rules)
 - [Token Permissions](#token-permissions)
   - [Token Creation](#token-creation)
+  - [Token Update](#token-update)
   - [Token Deletion](#token-deletion)
 - [Frontend Checks](#frontend-checks)
 - [Future Work](#future-work)
@@ -252,7 +254,7 @@ A delegate holds its permissions, capped live by its owner. `installPermissionsF
 A role and named entitlements expand through `delegateEntries` (`packages/permissions/src/roles/delegatePermissions.ts`):
 
 - `role` applies at every anchor the owner has (`narrowing(resource, anchor, role)` per anchor and path), so a User token's role reaches each of the user's organizations, capped by the member row there; an integration's role reaches whatever its owner reaches.
-- `entitlements` are entries `{ resource, anchor, actions }`, held as written. "Only the user's own things" is no role plus one entry anchored on `db:user`.
+- `entitlements` are entries `{ resource, anchor: { resource, id, path? }, where?, actions }`, held as written. "Only the user's own things" is no role plus one entry anchored on `db:user`.
 - `full` is inheritance, not a permission: a `full` delegate skips to its owner — `delegateTable` (`apps/api/src/lib/permissions/ownerTable.ts`) installs the owner's table unchanged, for tokens and for integration owners. The schema never reads `full` (CI rule `no-full-in-rebac-schema`). Setting `full` takes `own` on the delegate's owner. A token that is not `full` has a role, entitlements or both; `full` takes neither. `full` may be set on tokens owned by a User, OrganizationUser, SpaceUser or Integration, and on integrations owned by a User, OrganizationUser or SpaceUser (`delegatePermissionRules.ts`).
 
 Nothing is inherited: a token holds only its own permissions. They are installed with the owner's table as owner, so at check time each action holds only if the owner still allows it on that record through the normal walk. Demote the member and its tokens lose it on the next request.
@@ -343,6 +345,15 @@ Grants beyond a role, stored as library entries `{ resource, anchor: { resource,
 - **its owner still allows the action** on that record through the normal walk, so a grant never outlives or outreaches its grantor's tenant.
 
 The action is checked on the record, never asked of the anchor.
+
+### Changing Entitlements
+
+Entitlements change only through their own endpoint, never through a record update: `PATCH /organizationUser/:id/entitlements`, `/spaceUser/:id/entitlements`, `/integration/:id/entitlements` and `/token/:id/entitlements`, with body `{ add?, remove? }` (`changeEntitlements`, `apps/api/src/lib/permissions/changeEntitlements.ts`).
+
+- The writer must be able to change the holder: `memberRoleWrite` on a member row, `validateIntegrationRole` on an integration, `validateTokenWrite` on a token.
+- Every entry in `add` and in `remove` goes through the same grant check: you remove only what you could grant, so an admin cannot strip what only an owner gives.
+- A malformed entry is refused (422) before anything is saved; a removal that matches nothing stored is ignored.
+- Record updates (`PATCH /organizationUser/:id`, `/spaceUser/:id`, `/integration/:id`, `/token/:id`) do not take `entitlements`.
 
 ### The Path Names One Branch
 
@@ -639,7 +650,11 @@ Removing a member checks `memberRemoval(tenant)` (`leave`, or `memberRoleWrite` 
 
 ### Token Creation
 
-Every create-token route calls `createToken`, which checks `create` on a pseudo record of the token: the actor is a user (`actorIsUser`), holds the role at the token's direct owner (for an integration-owned token, at the integration's owner — its access, never its administering), and the owner is theirs (`userId == __actor.record.id`) or an organization or space they are on. Setting `full` takes `own` on the token's direct owner (`validateFullGrant`). Named entitlements go through `validateEntitlementGrants`. The permissions' shape is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`).
+Every create-token route calls `createToken`, which checks `create` on a pseudo record of the token: the actor is a user (`actorIsUser`), holds the role at the token's direct owner (for an integration-owned token, at the integration's owner — its access, never its administering), and the owner is theirs (`userId == __actor.record.id`) or an organization or space they are on. Setting `full` takes `own` on the token's direct owner (`validateFullGrant`). Named entitlements go through `validateEntitlementGrants`. The row rules in `RulesRegistry` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`) cover only `full` (no role or entitlements beside it; the owners it may sit on) and that a token which is not `full` has a role or entitlements.
+
+### Token Update
+
+`PATCH /token/:id` changes a token's `name`, `role` and `full`. The token is checked as it is and as it will be (`validateTokenWrite`): `create` on the hydrated token (a user acting, holding the role at the token's owner) and, when `full`, `own` on that owner. A token never changes itself.
 
 ### Token Deletion
 
