@@ -132,8 +132,8 @@ describe('makeAppEvent', () => {
           received = data;
           return [
             {
-              kind: 'users',
-              target: { userIds: ['user-1'] },
+              kind: 'channels',
+              target: { channels: ['test'] },
               message: { data: { category: 'query', action: 'refetch', key: { _id: 'test' } } },
             },
           ];

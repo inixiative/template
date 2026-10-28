@@ -37,7 +37,7 @@
     "./lib/browserTelemetry": "./src/lib/browserTelemetry.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "test": "NODE_ENV=test bun test src/",
     "generate:msw": "bun scripts/generateMswHandlers.ts"
   },

@@ -16,6 +16,7 @@ import { frameError } from '#/ws/frameError';
 import { overFrameLimit } from '#/ws/frameRateLimit';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
+import { isMeChannel, meChannel } from '#/ws/meChannel';
 import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
 import { addConnection, byId, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
@@ -75,6 +76,11 @@ const takeLatestStreamFrame = (ws: WSSocket, msg: StreamFrame): boolean => {
   return true;
 };
 
+const filedUnder = (ws: WSSocket, channel: string): string | null => {
+  if (!isMeChannel(channel)) return channel;
+  return ws.data.userId ? meChannel(channel, ws.data.userId) : null;
+};
+
 const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
   switch (msg.action) {
     case 'authenticate': {
@@ -107,16 +113,18 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
     case 'subscribe': {
       const granted = await canSubscribe(ws.data.headers, msg.channel);
       if (!byId.has(ws.data.connectionId)) return;
-      if (!granted) {
+      const indexed = filedUnder(ws, msg.channel);
+      if (!granted || !indexed) {
         sendTo(ws, { type: 'subscribeRejected', channel: msg.channel });
         return;
       }
-      subscribeToChannel(ws, msg.channel);
+      subscribeToChannel(ws, indexed);
       sendTo(ws, { type: 'subscribed', channel: msg.channel });
       return;
     }
     case 'unsubscribe': {
-      unsubscribeFromChannel(ws, msg.channel);
+      const indexed = filedUnder(ws, msg.channel);
+      if (indexed) unsubscribeFromChannel(ws, indexed);
       sendTo(ws, { type: 'unsubscribed', channel: msg.channel });
       return;
     }

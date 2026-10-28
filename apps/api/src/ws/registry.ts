@@ -7,7 +7,6 @@
 import type { WSSocket } from '#/ws/types';
 
 export const byId = new Map<string, WSSocket>();
-export const byUser = new Map<string, Set<string>>();
 export const byChannel = new Map<string, Set<string>>();
 export const byStream = new Map<string, Set<string>>();
 
@@ -36,15 +35,12 @@ export const deindexFrom = (
 };
 
 export const addConnection = (ws: WSSocket): void => {
-  const { connectionId, userId } = ws.data;
-  byId.set(connectionId, ws);
-  if (userId) indexInto(byUser, userId, connectionId);
+  byId.set(ws.data.connectionId, ws);
 };
 
 export const removeConnection = (ws: WSSocket): void => {
-  const { connectionId, userId, channels, streams, heldAppends } = ws.data;
+  const { connectionId, channels, streams, heldAppends } = ws.data;
   byId.delete(connectionId);
-  if (userId) deindexFrom(byUser, userId, connectionId);
   for (const channel of channels) deindexFrom(byChannel, channel, connectionId);
   for (const stream of streams) deindexFrom(byStream, stream, connectionId);
   heldAppends.clear();
@@ -52,7 +48,6 @@ export const removeConnection = (ws: WSSocket): void => {
 
 export const clearRegistry = (): void => {
   byId.clear();
-  byUser.clear();
   byChannel.clear();
   byStream.clear();
 };
