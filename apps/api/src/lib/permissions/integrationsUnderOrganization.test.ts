@@ -10,12 +10,13 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
+import { organizationRouter } from '#/modules/organization';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import type { Entry } from '#tests/utils/entitlementEntry';
-import { del } from '#tests/utils/request';
+import { del, post } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
 
@@ -156,5 +157,34 @@ describe("a member's own tokens reach that member's integrations, as far as thei
     const { integration } = await ownToken('member');
     const { rawKey } = await ownToken('member');
     expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(false);
+  });
+});
+
+describe("the organization's own integrations: an admin adds them, a member uses them", () => {
+  const adds = async (role: Role) => {
+    const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
+    const { app } = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [seat],
+      mount: [(hono) => hono.route('/api/v1/organization', organizationRouter)],
+    });
+    return (
+      await app.fetch(
+        post(`/api/v1/organization/${organization.id}/integrations`, {
+          name: `i-${crypto.randomUUID()}`,
+          provider: 'slack',
+          role: 'viewer',
+        }),
+      )
+    ).status;
+  };
+
+  it('an admin adds one; a member does not', async () => {
+    expect(await adds('admin')).toBe(201);
+    expect(await adds('member')).toBe(403);
+  });
+
+  it('a member reads and operates them, and manages nothing', async () => {
+    expect((await reach(await seatKey('member'))).Organization).toEqual(['read', 'operate']);
   });
 });
