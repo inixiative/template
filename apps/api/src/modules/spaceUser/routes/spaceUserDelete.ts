@@ -12,5 +12,5 @@ import { Modules } from '#/modules/modules';
 
 export const spaceUserDeleteRoute = deleteRoute({
   model: Modules.spaceUser,
-  middleware: [validatePermission(memberRemoval)],
+  middleware: [validatePermission(memberRemoval('space'))],
 });

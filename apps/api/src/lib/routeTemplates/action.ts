@@ -47,13 +47,7 @@ export const actionRoute = <const T extends RouteArgs>(args: T) => {
     tags: routeTags,
     security: securityForRoute(args),
     description: description ?? `Performs ${action} on a ${resourceName}.`,
-    middleware: prepareMiddleware({
-      model,
-      middleware,
-      skipId: skipId,
-      includeDeleted: args.includeDeleted,
-      route: (): RouteConfig => route,
-    }),
+    middleware: prepareMiddleware(args, { skipId: skipId, route: (): RouteConfig => route }),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });

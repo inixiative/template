@@ -12,5 +12,5 @@ import { Modules } from '#/modules/modules';
 
 export const organizationUserDeleteRoute = deleteRoute({
   model: Modules.organizationUser,
-  middleware: [validatePermission(memberRemoval)],
+  middleware: [validatePermission(memberRemoval('organization'))],
 });

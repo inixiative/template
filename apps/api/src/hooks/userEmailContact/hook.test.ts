@@ -23,7 +23,7 @@ describe('userEmailContact hook', () => {
     expect(contacts).toHaveLength(1);
     expect((contacts[0].value as { address: string }).address).toBe(user.email.toLowerCase());
     expect(contacts[0].valueKey).toBe(user.email.toLowerCase());
-    expect(contacts[0].source).toBe('user-creation');
+    expect(contacts[0].source).toBe('userCreation');
   });
 
   it('leaves the contact unverified — channel-ownership verification is COMM-004, not auth', async () => {

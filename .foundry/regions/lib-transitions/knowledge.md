@@ -336,7 +336,7 @@ but not (`isSerializable(transition)` tells you which).
 
 `validateTransition(t, { lens?, requireSerializable? })` validates predicates (via json-rules
 `validateRule`, plus `validateRuleInLens` when a `lens` scopes referenceable fields), merge
-strategy, and permission shape (via `@inixiative/permissions`' zod `actionRuleSchema`) — run it on
+strategy, and permission shape (via `@inixiative/permissions`' `validateActionRule`) — run it on
 save before persisting a tenant config. It returns json-rules' `ValidationResult` —
 `{ ok, errors: { path, message, code }[] }` — and never throws, even on malformed input. json-rules'
 issues keep their codes; transitions adds `missing_side`, `missing_predicate`, `invalid_permission`,

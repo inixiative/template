@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, feature:auth
  */
 
-import { createRoute } from '#/lib/routeTemplates';
+import { createRoute, permissionsBodyRefinement } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import {
   tokenCreateBodySchema,
@@ -15,6 +15,7 @@ import {
 export const organizationCreateTokenRoute = createRoute({
   model: Modules.organization,
   submodel: Modules.token,
+  bodyRefinement: permissionsBodyRefinement,
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
 });

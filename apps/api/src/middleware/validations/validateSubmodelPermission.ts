@@ -22,7 +22,9 @@ export const validateSubmodelPermission =
         `validateSubmodelPermission needs a route with a model submodel and a loaded owner (got submodel ${submodel}, owner ${ownerType})`,
       );
 
-    const pseudo = await hydrate(submodel, { id: '', ...ownerColumns(submodel, ownerType, owner) });
+    const placed = ownerColumns(submodel, ownerType, owner);
+    if (!placed) throw new Error(`${submodel} cannot be placed under ${ownerType}`);
+    const pseudo = await hydrate(submodel, { id: '', ...placed });
     if (!check(c.get('permix'), rebacSchema, submodel, pseudo, action))
       throw makeError({ status: 403, message: 'Access denied' });
 

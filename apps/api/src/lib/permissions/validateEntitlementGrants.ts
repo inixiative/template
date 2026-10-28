@@ -4,25 +4,33 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { type AccessorName, fetchOne, hydrate } from '@template/db';
+import { type AccessorName, fetchOne, type HydratedRecord, hydrate } from '@template/db';
 import type { EntitlementEntry, Permix } from '@template/permissions';
-import { canGrantEntitlement } from '@template/permissions/rebac';
+import { canGrantEntitlement, placeEntitlement } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 
+const modelOf = (resource: string) => resource.slice('db:'.length) as AccessorName;
+
 const anchorRecord = async ({ resource, id }: EntitlementEntry['anchor']) => {
-  const model = resource.slice('db:'.length) as AccessorName;
+  const model = modelOf(resource);
   const row = await fetchOne<{ id: string }>(model, id);
   return row ? hydrate(model, row) : null;
 };
 
-const grantable = async (writer: Permix, entry: EntitlementEntry): Promise<boolean> => {
+const placedRecord = async (entry: EntitlementEntry) => {
   const anchor = await anchorRecord(entry.anchor);
   if (!anchor)
     throw makeError({
       status: 422,
       message: `No ${entry.anchor.resource} ${entry.anchor.id} to grant from`,
     });
-  return canGrantEntitlement(writer, entry, anchor);
+  const placed = placeEntitlement(entry, anchor);
+  if (!placed)
+    throw makeError({
+      status: 422,
+      message: `${entry.resource} does not reach ${entry.anchor.resource} by ${entry.anchor.path ?? 'no path'}: anchor on its tree`,
+    });
+  return placed as HydratedRecord;
 };
 
 export const validateEntitlementGrants = async (
@@ -30,6 +38,6 @@ export const validateEntitlementGrants = async (
   entries: EntitlementEntry[],
 ): Promise<void> => {
   for (const entry of entries)
-    if (!(await grantable(writer, entry)))
+    if (!canGrantEntitlement(writer, entry, await placedRecord(entry)))
       throw makeError({ status: 403, message: 'A delegate holds your permissions or less' });
 };

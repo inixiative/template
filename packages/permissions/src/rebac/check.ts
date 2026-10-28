@@ -4,28 +4,24 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { createRebacCheck, type ResolveRelation } from '@inixiative/permissions';
+import type { FieldMap } from '@inixiative/json-rules';
+import { createRebacCheck, type SchemaMap } from '@inixiative/permissions';
 import type { AccessorName, HydratedRecord } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import type { Permix } from '@template/permissions/client';
 import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
-import { lowerFirst, upperFirst } from 'lodash-es';
+import { lowerFirst } from 'lodash-es';
 
-export const resolveRelation: ResolveRelation = (resource, relationName) => {
-  const accessor = resource.split(':')[1] ?? resource;
-  const modelEntry = prismaMap.models[upperFirst(accessor) as keyof typeof prismaMap.models];
-  if (!modelEntry) return null;
-
-  const field = (modelEntry.fields as Record<string, { kind: string; type?: string }>)[
-    relationName
-  ];
-  if (field?.kind !== 'object') return null;
-  if (!field.type) return null;
-
-  return `db:${lowerFirst(field.type)}`;
+export const schemaMap: SchemaMap = {
+  resources: Object.fromEntries(
+    Object.keys(prismaMap.models).map((model) => [`db:${lowerFirst(model)}`, model]),
+  ),
+  fieldMap: prismaMap as unknown as FieldMap,
+  polymorphism: PolymorphismRegistry,
 };
 
-const rebacCheck = createRebacCheck(resolveRelation);
+const rebacCheck = createRebacCheck(schemaMap);
 
 export const check = (
   permix: Permix,

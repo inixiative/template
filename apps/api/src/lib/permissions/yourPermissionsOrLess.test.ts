@@ -210,9 +210,9 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
   });
 
   describe('writing an integration, like a member', () => {
-    it('an admin creates a member or viewer integration, never admin or owner', async () => {
+    it('an admin creates a member, viewer or admin integration, never owner', async () => {
       expect((await createOrgIntegration(admin, { role: 'owner' })).status).toBe(403);
-      expect((await createOrgIntegration(admin, { role: 'admin' })).status).toBe(403);
+      expect((await createOrgIntegration(admin, { role: 'admin' })).status).toBe(201);
       const created = await createOrgIntegration(admin, { role: 'member' });
       expect(created.status).toBe(201);
       expect(((await created.json()) as { data: Integration }).data.role).toBe('member');
@@ -222,12 +222,13 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect((await createOrgIntegration(owner, { role: 'owner' })).status).toBe(201);
     });
 
-    it('an admin cannot raise an integration to admin, owner or full', async () => {
+    it('an admin raises an integration to admin, never to owner or full', async () => {
       const integration = await orgIntegration('member');
-      expect((await update(admin, integration, { role: 'admin' })).status).toBe(403);
       expect((await update(admin, integration, { role: 'owner' })).status).toBe(403);
+      expect((await update(admin, integration, { role: null, full: true })).status).toBe(403);
+      expect((await update(admin, integration, { role: 'admin' })).status).toBe(200);
       const stored = await db.integration.findUniqueOrThrow({ where: { id: integration.id } });
-      expect(stored.role).toBe('member');
+      expect(stored.role).toBe('admin');
     });
 
     it("only its user makes a member's integration full, and only when that member holds own", async () => {
@@ -282,7 +283,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
 
     it('an admin cannot give an organization integration the power to assign roles: its token could then make owners', async () => {
       const assignMembers = [
-        entry('db:organizationUser', ['db:organization', organization.id], ['assignHigh']),
+        entry('db:organization', ['db:organization', organization.id], ['own']),
       ];
       const integration = await orgIntegration('member');
       expect((await update(admin, integration, { entitlements: assignMembers })).status).toBe(403);

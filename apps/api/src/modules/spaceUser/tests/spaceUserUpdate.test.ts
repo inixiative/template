@@ -1,78 +1,73 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import type {
-  Organization,
-  OrganizationUser,
-  Space,
-  SpaceUser,
-  User,
-} from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
+import type { Organization, Role, Space, SpaceUser } from '@template/db/generated/client/client';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSpace,
+  createSpaceUser,
+} from '@template/db/test';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
+import { entry } from '#tests/utils/entitlementEntry';
 import { json, patch } from '#tests/utils/request';
 
 describe('PATCH /api/v1/spaceUser/:id', () => {
-  let fetch: ReturnType<typeof createTestApp>['fetch'];
-  let testDb: ReturnType<typeof createTestApp>['db'];
-  let user: User;
   let org: Organization;
-  let orgUser: OrganizationUser;
   let space: Space;
-  let spaceUser: SpaceUser;
 
   beforeAll(async () => {
-    const { entity: ou, context } = await createOrganizationUser({ role: 'owner' });
-    orgUser = ou;
-    user = context.user;
-    org = context.organization;
-
-    const { entity: s } = await createSpace({}, { organization: org });
-    space = s;
-
-    spaceUser = await db.spaceUser.create({
-      data: {
-        role: 'owner',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: user.id,
-      },
-    });
-
-    const harness = createTestApp({
-      mockUser: user,
-      mockOrganizationUsers: [orgUser],
-      mockSpaceUsers: [spaceUser],
-      mount: [(app) => app.route('/api/v1/spaceUser', spaceUserRouter)],
-    });
-    fetch = harness.fetch;
-    testDb = harness.db;
+    ({ entity: org } = await createOrganizationUser({ role: 'owner' }).then(({ context }) => ({
+      entity: context.organization,
+    })));
+    ({ entity: space } = await createSpace({}, { organization: org }));
   });
 
   afterAll(async () => {
-    await cleanupTouchedTables(testDb);
+    await cleanupTouchedTables(db);
   });
 
+  const spaceMember = async (role: Role) => {
+    const { context } = await createOrganizationUser({ role: 'member' }, { organization: org });
+    return createSpaceUser({ role }, { ...context, space });
+  };
+
+  const writer = async (role: Role) => {
+    const { entity, context } = await spaceMember(role);
+    return createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [context.organizationUser],
+      mockSpaceUsers: [entity],
+      mount: [(app) => app.route('/api/v1/spaceUser', spaceUserRouter)],
+    }).fetch;
+  };
+
+  const onSpace = (...actions: string[]) => [entry('db:space', ['db:space', space.id], actions)];
+
+  const write = async (by: Role, target: SpaceUser, body: object) =>
+    (await writer(by))(patch(`/api/v1/spaceUser/${target.id}`, body));
+
   it('updates the role', async () => {
-    const { entity: _memberOrgUser, context: memberCtx } = await createOrganizationUser(
-      { role: 'member' },
-      { organization: org },
-    );
-    const memberSpaceUser = await db.spaceUser.create({
-      data: {
-        role: 'member',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: memberCtx.user.id,
-      },
-    });
-
-    const response = await fetch(
-      patch(`/api/v1/spaceUser/${memberSpaceUser.id}`, { role: 'viewer' }),
-    );
+    const { entity: target } = await spaceMember('member');
+    const response = await write('owner', target, { role: 'viewer' });
     expect(response.status).toBe(200);
+    expect((await json<SpaceUser>(response)).data.role).toBe('viewer');
+  });
 
-    const { data } = await json<SpaceUser>(response);
-    expect(data.role).toBe('viewer');
+  it("a space admin grants a space member's entitlements it could take itself", async () => {
+    const { entity: target } = await spaceMember('member');
+    expect((await write('admin', target, { entitlements: onSpace('operate') })).status).toBe(200);
+    const stored = await db.spaceUser.findUniqueOrThrow({ where: { id: target.id } });
+    expect(stored.entitlements).toEqual(onSpace('operate'));
+  });
+
+  it('a space admin cannot grant own', async () => {
+    const { entity: target } = await spaceMember('member');
+    expect((await write('admin', target, { entitlements: onSpace('own') })).status).toBe(403);
+  });
+
+  it('a flat map of actions is not an entitlement', async () => {
+    const { entity: target } = await spaceMember('member');
+    expect((await write('owner', target, { entitlements: { operate: true } })).status).toBe(422);
   });
 });

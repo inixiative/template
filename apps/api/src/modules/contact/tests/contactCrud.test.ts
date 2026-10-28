@@ -228,15 +228,31 @@ describe('Contact CRUD', () => {
       expect(data.position).toBe(1);
     });
 
-    it('locks the email mirroring the user login against update (403)', async () => {
+    it('locks the contact made to mirror the user login against update (403)', async () => {
       const { entity: contact } = await createContact({
         userId: user.id,
         ownerModel: 'User',
         type: 'email',
-        value: { address: user.email as string },
+        value: { address: `mirror${getNextSeq()}@example.com` },
+        source: 'userCreation',
       });
       const response = await fetch(patch(`/api/v1/contact/${contact.id}`, { label: 'Changed' }));
       expect(response.status).toBe(403);
+    });
+
+    it('a permission rule that can hold on a missing value is malformed (422)', async () => {
+      const { entity: contact } = await createContact({
+        userId: user.id,
+        ownerModel: 'User',
+        type: 'website',
+        value: { url: `https://rules${getNextSeq()}.example.com` },
+      });
+      const response = await fetch(
+        patch(`/api/v1/contact/${contact.id}`, {
+          permissionRules: { read: { rule: { field: 'label', operator: 'isEmpty' } } },
+        }),
+      );
+      expect(response.status).toBe(422);
     });
 
     it('rejects updating another user contact (403)', async () => {
@@ -292,6 +308,7 @@ describe('Contact CRUD', () => {
           ownerModel: 'User',
           type: 'email',
           value: { address: user.email as string },
+          source: 'userCreation',
         },
       );
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));

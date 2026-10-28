@@ -4,17 +4,23 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { createCanGrantEntitlement, type EntitlementEntry } from '@inixiative/permissions';
+import {
+  createCanGrantEntitlement,
+  type EntitlementEntry,
+  placeEntitlement as place,
+} from '@inixiative/permissions';
 import type { HydratedRecord } from '@template/db';
 import type { Permix } from '@template/permissions/client';
-import { resolveRelation } from '@template/permissions/rebac/check';
+import { schemaMap } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 
-const canGrant = createCanGrantEntitlement(resolveRelation);
+const canGrant = createCanGrantEntitlement(schemaMap);
 
-/** A grant is an action: the writer could take every action `entry` names, from its anchor. */
 export const canGrantEntitlement = (
   permix: Permix,
   entry: EntitlementEntry,
-  anchor: HydratedRecord,
-): boolean => canGrant(permix, rebacSchema, entry, anchor);
+  placed: HydratedRecord,
+): boolean => canGrant(permix, rebacSchema, entry, placed);
+
+export const placeEntitlement = (entry: EntitlementEntry, anchor: HydratedRecord) =>
+  place(schemaMap, entry, anchor);

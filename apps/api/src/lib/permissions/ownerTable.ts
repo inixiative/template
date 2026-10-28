@@ -4,7 +4,6 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import type { OrganizationId, SpaceId } from '@template/db';
 import type {
   IntegrationOwnerModel,
   OrganizationUser,
@@ -16,11 +15,11 @@ import {
   type DelegatePermissions,
   delegateEntries,
   type Grant,
-  getOrgPermissions,
-  getSpacePermissions,
+  organizationOwnerGrants,
+  spaceOwnerGrants,
   userGrants,
 } from '@template/permissions';
-import { entitlementEntriesSchema } from '@template/permissions/rebac';
+import { parseEntitlements } from '@template/permissions/rebac';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
 export type OwnerTable = Grant[];
@@ -40,10 +39,7 @@ type Delegated = {
 export const delegatePermissionsOf = (row: PermissionsRow): DelegatePermissions => ({
   role: row.role ?? null,
   full: row.full ?? false,
-  entitlements:
-    row.entitlements === null || row.entitlements === undefined
-      ? null
-      : (entitlementEntriesSchema.parse(row.entitlements) as DelegatePermissions['entitlements']),
+  entitlements: parseEntitlements(row.entitlements) as DelegatePermissions['entitlements'],
 });
 
 const nobody: OwnerTable = [];
@@ -73,11 +69,9 @@ export const ownerTable = async (delegated: Delegated): Promise<OwnerTable> => {
     case 'SpaceUser':
       return spaceUser ? userGrants(null, [], [spaceUser]) : nobody;
     case 'Organization':
-      return organizationId
-        ? [{ entries: [getOrgPermissions('owner', organizationId as OrganizationId)] }]
-        : nobody;
+      return organizationId ? organizationOwnerGrants(organizationId) : nobody;
     case 'Space':
-      return spaceId ? [{ entries: [getSpacePermissions('owner', spaceId as SpaceId)] }] : nobody;
+      return spaceId ? spaceOwnerGrants(spaceId) : nobody;
     case 'Integration':
       return integration ? delegateTable(integration, await ownerTable(integration)) : nobody;
   }
