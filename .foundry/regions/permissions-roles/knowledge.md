@@ -378,24 +378,17 @@ An integration has a nullable `role`, `full` and `entitlements`, capped live by 
 
 ##### Granting an Entitlement
 
-A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds the pseudo record the entry reaches, and `canGrantEntitlement` runs the writer's ordinary check on it, with fields the record does not carry read as unknown. There is no other path to granting: no "owner of the tenant" shortcut.
+A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` runs the writer's ordinary check on every one, with fields the record does not carry read as unknown. There is no other path to granting: no "owner of the tenant" shortcut.
 
-The pseudo record is built from the anchor down the path: at each step the foreign keys the parent knows and the kind the relation names, ids below the anchor unknown, plus the `where`'s exact `equals` values. So:
+Each pseudo record is built from the anchor down the path: the foreign keys the parent knows, one record per kind the step admits (narrowed by the kinds the `where` pins), each with its owner placed under the anchor, ids below the anchor unknown, plus the `where`'s exact `equals` values. So, for an owner and an admin of O:
 
-- `{ integration, anchor O via organization, manage }`: an organization-owned integration of O. An admin of O grants it (managing O's own integrations is `manage` on O).
-- `{ integration, anchor O via space.organization, manage }`: a space-owned integration under a space of O. Only O's owner grants it (a space's integrations need `own` on O).
-- `{ integration, anchor O via organizationUser.organization, manage }`: a member's own integration. Nobody but its user manages those, so nobody grants it.
-- `{ token, anchor O via organization, create, where role = member }`: the role is pinned, so an admin grants minting O's member tokens; with no role pinned the role is unknown and the grant is refused.
+- `{ integration, anchor O via organization, manage }`: every kind of integration under O (the organization's, its spaces', its members'). The owner grants it; an admin does not.
+- the same with `where ownerModel = Organization`: the organization's own integrations. An admin grants it (managing those is `manage` on O).
+- `{ integration, anchor O via space.organization, manage }`: the integrations of O's spaces and space members. Only the owner grants it.
+- `{ token, anchor O via organization, create, where role = member, ownerModel = Organization }`: an admin grants minting O's own member tokens; with no role pinned the role is unknown and the grant is refused.
 - A path that does not end at the anchor's model, through a list, or with no path on another model: 422.
 
 A token's role is checked by `create` on `db:token`; an integration's role by `integrationRoleWrite` on `db:integration` (`validateIntegrationGrant`). Situations: `entitlementGrants.test.ts`, `integrationDelegate.test.ts`, `memberTokenGrants.test.ts`, `packages/permissions/src/rebac/schemaMap.test.ts`.
-
----
-
-<!-- unit doc:docs/claude/PERMISSIONS.md#permission-checks -->
-**Source:** `docs/claude/PERMISSIONS.md` § Permission Checks (in "Permissions")
-
-#### Permission Checks
 
 ##### In Controllers
 
@@ -470,23 +463,29 @@ Entitlements change only through their own endpoint, never through a record upda
 - A malformed entry is refused (422) before anything is saved; a removal that matches nothing stored is ignored.
 - Record updates (`PATCH /organizationUser/:id`, `/spaceUser/:id`, `/integration/:id`, `/token/:id`) do not take `entitlements`.
 
-##### The Path Names One Branch
+##### The Path Names the Anchor and the Axis; the Where Narrows
 
-A polymorphic record carries the ids of everything above it: a space's integration has `organizationId` too, and a member's integration has `organizationId` and `userId`. **Carrying an id is not ownership.** The path names the relation, the polymorphism registry (`packages/db/src/registries/falsePolymorphism.ts`, passed to the library in `schemaMap`, `packages/permissions/src/rebac/check.ts`) says which kind that relation means, and the library checks that kind at grant time and at read time:
+A polymorphic record carries the ids of everything above it: a space's integration has `organizationId`, a member's has `organizationId` and `userId`. The path names the anchor and the polymorphic axis; the polymorphism registry (`packages/db/src/registries/falsePolymorphism.ts`, passed to the library in `schemaMap`, `packages/permissions/src/rebac/check.ts`) says which kinds on that axis carry the relation's keys, and an entitlement reaches every one of them. The `where` narrows the kinds: that is how a scope is given.
 
-| Path from an integration | Kind | Reaches |
+| Path from an integration | Kinds reached |
+|---|---|
+| `organization` | the organization's, its spaces', its members', its space members' |
+| `space.organization` | its spaces' and space members' |
+| `organizationUser.organization` | its members' (including as space members) |
+| `user` | the user's, and the user's members' (narrow with `where ownerModel = User`) |
+
+Sides are separate axes: `targetOrganization` reaches what O (or its members) received, never what it sent. The grant is judged on one pseudo record per kind, so a broad entitlement needs a writer who could act on every kind it reaches: the owner can grant `organization` unfiltered; an admin grants `where ownerModel = Organization`. A self anchor (the entitled record itself) has no path. Only the anchor's id is fixed: a record that moves within the anchor stays reached, one that moves out stops.
+
+##### Who Reaches Integrations Under an Organization
+
+| Integration owned by | Owner of O | Admin of O |
 |---|---|---|
-| `organization` | `ownerModel = Organization` | the organization's own integrations |
-| `space.organization` | `ownerModel = Space` | the integrations of its spaces |
-| `organizationUser.organization` | `ownerModel = OrganizationUser` | its members' integrations |
-| `user` | `ownerModel = User` | the user's personal integrations, not their member-owned ones |
+| the organization | every action | read, operate, manage, delete |
+| a space | every action | nothing |
+| a member (OrganizationUser) | every action | nothing |
+| a space member (SpaceUser) | every action | nothing |
 
-Inquiries name a side the same way: `targetOrganization` is `targetModel = Organization`, `sourceSpace.organization` is `sourceModel = Space`. "Everything under O" is one entry per branch. A self anchor (the entitled record itself) has no path. Only the anchor's id is fixed: a record that moves within the anchor stays reached, one that moves out stops.
-
----
-
-<!-- unit doc:docs/claude/PERMISSIONS.md#validation-middleware -->
-**Source:** `docs/claude/PERMISSIONS.md` § Validation Middleware (in "Permissions")
+An owner reaches members' integrations so they can be seen and turned off; they are reached by id, not listed (`integrationsUnderOrganization.test.ts`).
 
 #### Validation Middleware
 

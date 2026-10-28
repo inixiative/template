@@ -89,7 +89,7 @@ An action on something that does not exist yet, or on a collection, is checked o
   The rule for creating a token lives on `db:token`, never on its owner (`token.create` on organization/space/user was the bug behind a bypass: stored actions on a member's organization entry satisfied it).
 - **Collections are pseudo records too** (user, 10-26): `validateSubmodelPermission(action)` checks the action on a pseudo record of the route's submodel under the loaded owner (`ownerColumns`, from the polymorphism registry); it never reads the body. Lists that are really "which of these can I see" (spaces of an organization, member-shaped lists, customers, segment memberships, inquiries) stay a model check on the real owner until AUTH-008.
 - **Role writes** (members, integrations) need the body, so they run in the controller: `memberRoleWrite` / `integrationRoleWrite` on the row as it is and on the row as it will be.
-- **Grants:** the library's `placeEntitlement` builds the pseudo record from the hydrated anchor down the path (each step's foreign keys and the kind its relation names), and `canGrantEntitlement` checks each action on it. Each polymorphic step names one branch: carrying an ancestor's id is not ownership (`organization` = the org's own, `space.organization` = its spaces').
+- **Grants:** the library's `placeEntitlement` builds one pseudo record per kind the entry reaches, from the hydrated anchor down the path (each step's known foreign keys, each owner placed under the anchor), and `canGrantEntitlement` checks each action on every one. A polymorphic step reaches every kind that carries its keys (`organization` on an integration = the org's, its spaces', its members'); the `where` narrows the kinds.
 
 ## 4. Rules from this branch (what went wrong and the syntax answer)
 
@@ -108,7 +108,7 @@ An action on something that does not exist yet, or on a collection, is checked o
 | members' extra actions stored flat on the role table | entitlements `{ resource, anchor, actions }` like delegates (queue item 15) |
 | a second traversal returning conditions ("proofs") to carry into a grant | the ordinary check on a pseudo record pinned by the `where`'s exact `equals` values; missing fields read as unknown (json-rules `absent: 'unknown'`) |
 | splitting a `where` into branches, one pseudo record each | one pseudo record; anything not pinned exactly stays unknown, so a filtered writer is refused |
-| guessing which side of the tree an anchor means (direct owner, anywhere on the path, asking the anchor) | the anchor names its `path`; the registry says which kind each step is; grant and read check that same kind |
+| narrowing what an entitlement reaches to patch a grant-check hole (direct owner, one branch per path) | the path names the anchor and axis, every kind on it is reached, the `where` narrows; the grant judges every kind it reaches |
 | an "own the tenant/anchor" escape hatch beside the grant check | the normal check on the placed pseudo record, nothing else |
 | `z.custom` / `.refine` on a schema object for rule validation | shape-only schemas; validation in a reusable body refinement |
 
