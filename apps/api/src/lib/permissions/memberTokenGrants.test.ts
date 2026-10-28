@@ -314,6 +314,21 @@ describe('what an integration entitlement from the organization reaches (2026-10
     ).toBe(false);
   });
 
+  it('a role token keeps every branch its member holds: one entry per path is not collapsed', async () => {
+    const { rawKey } = await memberKey('viewer', { role: 'owner' }, [
+      entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
+      entry(
+        'db:integration',
+        ['db:organization', organization.id, 'space.organization'],
+        ['manage'],
+      ),
+    ]);
+    expect(await holds(rawKey, 'integration', (await organizationIntegration()).id, 'manage')).toBe(
+      true,
+    );
+    expect(await holds(rawKey, 'integration', (await spaceIntegration()).id, 'manage')).toBe(true);
+  });
+
   it('an org admin does not manage a space-owned integration', async () => {
     const key = await fullMemberToken('admin');
     const integration = await spaceIntegration();

@@ -108,7 +108,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     ).toBe(422);
   });
 
-  it("owning another organization grants nothing here: the side named is X's, the row is this organization's", async () => {
+  it('send is not grantable from the target side: every way to send reads the source, which the path leaves unknown', async () => {
     const { entity: other } = await createOrganization();
     const { entity: wSeat, context } = await createOrganizationUser(
       { role: 'admin' },
