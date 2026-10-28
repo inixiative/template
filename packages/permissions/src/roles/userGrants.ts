@@ -12,7 +12,6 @@ import {
   type PermissionEntry,
   type Permix,
 } from '@template/permissions/client';
-import { parseEntitlements } from '@template/permissions/rebac/entitlementEntrySchema';
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
@@ -23,7 +22,7 @@ type OrganizationMember = { role: Role; organizationId: string; entitlements?: u
 type SpaceMember = { role: Role; spaceId: string; entitlements?: unknown };
 
 const entitlementsOf = (member: { entitlements?: unknown }): EntitlementEntry[] =>
-  (parseEntitlements(member.entitlements) ?? []) as EntitlementEntry[];
+  (member.entitlements ?? []) as EntitlementEntry[];
 
 export const organizationOwnerGrants = (organizationId: string): Grant[] => [
   { entries: [getOrgPermissions('owner', organizationId as OrganizationId)] },

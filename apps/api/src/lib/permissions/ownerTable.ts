@@ -19,7 +19,6 @@ import {
   spaceOwnerGrants,
   userGrants,
 } from '@template/permissions';
-import { parseEntitlements } from '@template/permissions/rebac';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
 export type OwnerTable = Grant[];
@@ -39,7 +38,7 @@ type Delegated = {
 export const delegatePermissionsOf = (row: PermissionsRow): DelegatePermissions => ({
   role: row.role ?? null,
   full: row.full ?? false,
-  entitlements: parseEntitlements(row.entitlements) as DelegatePermissions['entitlements'],
+  entitlements: (row.entitlements ?? null) as DelegatePermissions['entitlements'],
 });
 
 const nobody: OwnerTable = [];
