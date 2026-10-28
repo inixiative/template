@@ -40,8 +40,10 @@ const writer = async (role: Role) => {
   });
 };
 
-const ownIntegrations = (actions: string[]) =>
-  entry('db:integration', ['db:organization', organization.id, 'organization'], actions);
+const ownIntegrations = (actions: string[]) => ({
+  ...entry('db:integration', ['db:organization', organization.id, 'organization'], actions),
+  where: { field: 'ownerModel', operator: 'equals', value: 'Organization' },
+});
 const spaceIntegrations = (actions: string[]) =>
   entry('db:integration', ['db:organization', organization.id, 'space.organization'], actions);
 
