@@ -12,7 +12,7 @@ The permission system is the schema plus the library's check. Its syntax reads a
 The goal of a unit is the ruling's sentence, and the change ends there. When this work has gone wrong it has gone wrong the same way: a ruling left a "how" open, the gap was filled with a new mechanism, and that mechanism was then defended and extended instead of asking.
 
 - **Every new function, option, callback, type, list or library export is named by a ruling.** A plan line, a review finding or my own reading is not a ruling. If the ruling leaves the how open, ask with the existing primitive you would use; never invent one to close the gap.
-- **No hard-coded model lists.** Where a record sits comes from the polymorphism registry and the relations (`ownerColumns`, `hydrate`), never from a list of models in code.
+- **No hard-coded model lists.** Where a record sits comes from the polymorphism registry and the relations (`schemaMap`, `ownerColumns`, `hydrate`), never from a list of models in code.
 - **A problem gets the smallest fix inside what exists.** Before adding a layer, check whether `check`, `ownerColumns`, `hydrate`, a json-rules option or a body refinement already answers it. A review finding is fixed at its own size; any new concept it suggests goes to the user as a question.
 - **Library changes are the ruling's change only.** No new schema objects, refinements or exports beyond the ask. Validation of request bodies lives in `bodyRefinement` / `queryRefinement` / `paramsRefinement` (`docs/claude/API_ROUTES.md`), never as a `.refine` / `z.custom` on a schema object.
 - **When the user asks "how did we rule on this", the answer is in `tmp/permissions-rulings.md`.** Read it before proposing; a question that a ruling already settles is never put back to the user.
@@ -35,7 +35,7 @@ Permissions questions tangle because one sentence mixes several parties and seve
 - **delegate**: something that acts for its owner: a token or an integration.
 - **owner**: the immediate thing a delegate belongs to (owners all the way down).
 - **permissions**: a delegate's `{ role, full, entitlements }`.
-- **entitlement**: a named grant `{ resource, anchor, actions }`; **anchor**: where it acts from.
+- **entitlement**: a named grant `{ resource, anchor: { resource, id, path? }, where?, actions }`; **anchor**: the record it acts from, reached from the entitled record along `path` (relation names; none for a self anchor).
 - **pseudo record**: the would-be row checked for a create or a collection action.
 
 **Step 2 — put every requirement in exactly one bucket**, for the thing X it is about:
@@ -66,13 +66,13 @@ Shared pieces already in `schema.ts` — reuse, don't re-derive:
 - `actorIsUser` (`__actor.model == User`), `actorIsDelegateOfUser` (`__actor.record.ownerModel == User`);
 - `actionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
 - `roleHeldAtOwner`: the role on the row is one the actor holds at the direct owner (owner→own, admin→manage, member→operate, viewer→read via `roleToStandardAction`);
-- `assignActions(own, manage)`: `assignHigh` (= own at the tenant) and `assignLow` (role low or unset, and manage or `assignHigh`) — the role-write actions for members and integrations; `roleAssignment` and `memberRemoval` are the rules routes and controllers check, never named actions;
+- `memberRoleWrite(tenant)` / `integrationRoleWrite`: manage the row's tenant (the integration itself) and hold there the role being set; `memberRemoval(tenant)` = `leave` or `memberRoleWrite`. Rules routes and controllers check, never named actions;
 - `actorIsItsUser(at)`: `${at}userId` is set and is the acting user (or a User-owned token of that user), narrowed by `manage` on that user;
 - `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `actorIsItsUser(at)`;
 - `ownedBy(owners, at)` and `actionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
 
 Other parts of the system (use them, don't parallel them):
-- `canGrantEntitlement` — the only check for writing entitlements;
+- `placeEntitlement` + `canGrantEntitlement` (library, over `schemaMap`) — the only check for writing entitlements;
 - `RulesRegistry` json-rules write rules, enforced by the rules hook — row shape (e.g. `full` takes no role or entitlements; where `full` may be set). Don't call `validateRules` from controllers;
 - hydration / the lens — relations come from hydrating, never from copying keys;
 - the one `full` skip at install (`delegateTable`).
@@ -88,8 +88,8 @@ An action on something that does not exist yet, or on a collection, is checked o
   ```
   The rule for creating a token lives on `db:token`, never on its owner (`token.create` on organization/space/user was the bug behind a bypass: stored actions on a member's organization entry satisfied it).
 - **Collections are pseudo records too** (user, 10-26): `validateSubmodelPermission(action)` checks the action on a pseudo record of the route's submodel under the loaded owner (`ownerColumns`, from the polymorphism registry); it never reads the body. Lists that are really "which of these can I see" (spaces of an organization, member-shaped lists, customers, segment memberships, inquiries) stay a model check on the real owner until AUTH-008.
-- **Role writes** (members, integrations) need the body, so they run in the controller: `roleAssignment` on the row as it is and on the row as it will be.
-- **Grants:** `canGrantEntitlement` itself checks each action on a pseudo record of the entry's resource under the anchor.
+- **Role writes** (members, integrations) need the body, so they run in the controller: `memberRoleWrite` / `integrationRoleWrite` on the row as it is and on the row as it will be.
+- **Grants:** the library's `placeEntitlement` builds the pseudo record from the hydrated anchor down the path (each step's foreign keys and the kind its relation names), and `canGrantEntitlement` checks each action on it. Each polymorphic step names one branch: carrying an ancestor's id is not ownership (`organization` = the org's own, `space.organization` = its spaces').
 
 ## 4. Rules from this branch (what went wrong and the syntax answer)
 
@@ -100,15 +100,16 @@ An action on something that does not exist yet, or on a collection, is checked o
 | a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpace('integration.')` |
 | `leave` as an alternative that skipped the role check | the role check always runs; "yours" is an extra requirement |
 | `full` arms in the schema | `full` is inheritance: skipped at install (`delegateTable`); setting it takes `own` on the owner. CI rule `no-full-in-rebac-schema` |
-| write-time "ceiling" with a trim in `validateDelegateGrant` | `roleHeldAtOwner` + `assignActions` + `canGrantEntitlement` |
+| write-time "ceiling" with a trim in `validateDelegateGrant` | `roleHeldAtOwner` + `memberRoleWrite`/`integrationRoleWrite` + `canGrantEntitlement` |
 | copying delegated keys onto a pseudo record | hydrate the relation and read it |
 | explicit `validateRules` in controllers | the rules hook |
 | a library clause special-casing "conditional" actions | removed in 0.8: the owner walk already re-runs the rule's conditions |
-| `greaterRole` folded into one role check | two checks: `roleAssignment` on the row as it is and as it will be |
+| `greaterRole` folded into one role check | two checks: the role-write rule on the row as it is and as it will be |
 | members' extra actions stored flat on the role table | entitlements `{ resource, anchor, actions }` like delegates (queue item 15) |
 | a second traversal returning conditions ("proofs") to carry into a grant | the ordinary check on a pseudo record pinned by the `where`'s exact `equals` values; missing fields read as unknown (json-rules `absent: 'unknown'`) |
 | splitting a `where` into branches, one pseudo record each | one pseudo record; anything not pinned exactly stays unknown, so a filtered writer is refused |
-| `directOwner` with a hard-coded tenant list and a library callback | not in any ruling; anchor matching uses what exists (`ownerColumns`, the polymorphism registry) — being removed |
+| guessing which side of the tree an anchor means (direct owner, anywhere on the path, asking the anchor) | the anchor names its `path`; the registry says which kind each step is; grant and read check that same kind |
+| an "own the tenant/anchor" escape hatch beside the grant check | the normal check on the placed pseudo record, nothing else |
 | `z.custom` / `.refine` on a schema object for rule validation | shape-only schemas; validation in a reusable body refinement |
 
 ## 4a. Principles, in the user's words
