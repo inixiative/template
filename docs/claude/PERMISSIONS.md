@@ -379,7 +379,7 @@ Sides are separate axes: `targetOrganization` reaches what O (or its members) re
 | a member (OrganizationUser) | every action | nothing |
 | a space member (SpaceUser) | every action | nothing |
 
-An owner reaches members' integrations so they can be seen and turned off; they are reached by id, not listed (`integrationsUnderOrganization.test.ts`).
+An owner reaches members' integrations so they can be seen and turned off; they are reached by id, not listed. A member's own tokens read and operate that member's integrations as far as their role allows (`integrationsUnderOrganization.test.ts`).
 
 ---
 

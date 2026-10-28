@@ -142,9 +142,25 @@ export const integrationAdministering = {
   delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
 } satisfies Record<string, ActionRule>;
 
+const membersOwnDelegate = (action: string): ActionRule => ({
+  all: [
+    ownedBy(members),
+    { rule: { field: 'userId', operator: Operator.equals, path: '__actor.record.userId' } },
+    actionOnOwner(action, '', members),
+  ],
+});
+
 export const integrationAccess = {
-  operate: { any: [actionOnOwner('operate', '', notMembers), membersIntegration] },
-  read: { any: [actionOnOwner('read', '', notMembers), membersIntegration] },
+  operate: {
+    any: [
+      actionOnOwner('operate', '', notMembers),
+      membersIntegration,
+      membersOwnDelegate('operate'),
+    ],
+  },
+  read: {
+    any: [actionOnOwner('read', '', notMembers), membersIntegration, membersOwnDelegate('read')],
+  },
 } satisfies Record<string, ActionRule>;
 
 export const integrationRoleWrite: ActionRule = { all: ['manage', roleHeldAtOwner()] };

@@ -123,3 +123,38 @@ describe('tokens of integrations under an organization follow their integration 
     }
   });
 });
+
+describe("a member's own tokens reach that member's integrations, as far as their delegation goes (F2)", () => {
+  const ownToken = async (role: Role) => {
+    const { entity: seat } = await createOrganizationUser({ role: 'member' }, { organization });
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: seat.userId,
+      role: 'viewer',
+    });
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', role },
+      { organizationUser: seat },
+    );
+    return { rawKey, integration };
+  };
+
+  it('a member-role token of the member reads and operates its integration', async () => {
+    const { rawKey, integration } = await ownToken('member');
+    expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(true);
+    expect(await holds(rawKey, 'integration', integration.id, 'operate')).toBe(true);
+  });
+
+  it('a viewer-role token of the member reads it and does not operate it', async () => {
+    const { rawKey, integration } = await ownToken('viewer');
+    expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(true);
+    expect(await holds(rawKey, 'integration', integration.id, 'operate')).toBe(false);
+  });
+
+  it("another member's token reaches nothing of it", async () => {
+    const { integration } = await ownToken('member');
+    const { rawKey } = await ownToken('member');
+    expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(false);
+  });
+});
