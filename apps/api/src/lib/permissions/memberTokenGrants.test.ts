@@ -260,10 +260,10 @@ describe('what an integration entitlement from the organization reaches (2026-10
     );
   });
 
-  it("via organization it does not reach a space's integration: the path names the organization's own", async () => {
+  it("via organization it reaches a space's integration too: every kind under the organization (R81)", async () => {
     const integration = await spaceIntegration();
     expect(await holds(await fromOrganization(), 'integration', integration.id, 'manage')).toBe(
-      false,
+      true,
     );
   });
 

@@ -17,7 +17,7 @@ const anchorRecord = async ({ resource, id }: EntitlementEntry['anchor']) => {
   return row ? hydrate(model, row) : null;
 };
 
-const placedRecord = async (entry: EntitlementEntry) => {
+const placedRecords = async (entry: EntitlementEntry) => {
   const anchor = await anchorRecord(entry.anchor);
   if (!anchor)
     throw makeError({
@@ -30,7 +30,7 @@ const placedRecord = async (entry: EntitlementEntry) => {
       status: 422,
       message: `${entry.resource} does not reach ${entry.anchor.resource} by ${entry.anchor.path ?? 'no path'}: anchor on its tree`,
     });
-  return placed as HydratedRecord;
+  return placed as HydratedRecord[];
 };
 
 export const validateEntitlementGrants = async (
@@ -38,6 +38,7 @@ export const validateEntitlementGrants = async (
   entries: EntitlementEntry[],
 ): Promise<void> => {
   for (const entry of entries)
-    if (!canGrantEntitlement(writer, entry, await placedRecord(entry)))
-      throw makeError({ status: 403, message: 'A delegate holds your permissions or less' });
+    for (const placed of await placedRecords(entry))
+      if (!canGrantEntitlement(writer, entry, placed))
+        throw makeError({ status: 403, message: 'A delegate holds your permissions or less' });
 };

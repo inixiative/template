@@ -4,9 +4,9 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma, primitive:errors
  */
-import { hydrate, isAccessorName, ownerColumns } from '@template/db';
+import { type HydratedRecord, hydrate, isAccessorName, toModelName } from '@template/db';
 import type { Action } from '@template/permissions/client';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, placeUnder, rebacSchema, schemaMap } from '@template/permissions/rebac';
 import type { MiddlewareHandler } from 'hono';
 import { makeError } from '#/lib/errors';
 import type { AppEnv } from '#/types/appEnv';
@@ -22,9 +22,11 @@ export const validateSubmodelPermission =
         `validateSubmodelPermission needs a route with a model submodel and a loaded owner (got submodel ${submodel}, owner ${ownerType})`,
       );
 
-    const placed = ownerColumns(submodel, ownerType, owner);
+    const [placed] = placeUnder(schemaMap, `db:${submodel}`, ownerType, `db:${ownerType}`, owner, {
+      ownerModel: toModelName(ownerType),
+    });
     if (!placed) throw new Error(`${submodel} cannot be placed under ${ownerType}`);
-    const pseudo = await hydrate(submodel, { id: '', ...placed });
+    const pseudo = await hydrate(submodel, { id: '', ...placed } as HydratedRecord);
     if (!check(c.get('permix'), rebacSchema, submodel, pseudo, action))
       throw makeError({ status: 403, message: 'Access denied' });
 

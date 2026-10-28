@@ -4,7 +4,7 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:integrations
  */
-import { ownerColumns, Prisma } from '@template/db';
+import { Prisma } from '@template/db';
 import { me } from '#/lib/context/me';
 import { makeController } from '#/lib/utils/makeController';
 import { validateIntegrationGrant } from '#/modules/integration/validations/validateIntegrationGrant';
@@ -19,7 +19,8 @@ export const meCreateIntegrationController = makeController(
 
     const row = {
       ...body,
-      ...ownerColumns('integration', 'user', user),
+      ownerModel: 'User' as const,
+      userId: user.id,
     };
     await validateIntegrationGrant(c.get('permix'), row);
 

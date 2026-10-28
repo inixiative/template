@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses feature:integrations
  */
-import { ownerColumns, Prisma } from '@template/db';
+import { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { validateIntegrationGrant } from '#/modules/integration/validations/validateIntegrationGrant';
@@ -14,12 +14,13 @@ export const organizationUserCreateIntegrationController = makeController(
   organizationUserCreateIntegrationRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const owner = ownerColumns(
-      'integration',
-      'organizationUser',
-      getResource<'organizationUser'>(c),
-    );
-    const row = { ...c.req.valid('json'), ...owner };
+    const member = getResource<'organizationUser'>(c);
+    const row = {
+      ...c.req.valid('json'),
+      ownerModel: 'OrganizationUser' as const,
+      organizationId: member.organizationId,
+      userId: member.userId,
+    };
     await validateIntegrationGrant(c.get('permix'), row);
 
     const integration = await db.integration.create({

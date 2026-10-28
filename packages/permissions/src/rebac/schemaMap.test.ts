@@ -1,93 +1,83 @@
 import { describe, expect, it } from 'bun:test';
-import { type EntitlementEntry, placeEntitlement as place } from '@inixiative/permissions';
+import { type EntitlementEntry, placeEntitlement } from '@inixiative/permissions';
 import { schemaMap } from '@template/permissions/rebac/check';
 
-const placeEntitlement = (entry: EntitlementEntry, anchor: Record<string, unknown>) =>
-  place(schemaMap, entry, anchor);
+const anchor = { id: 'a1', organizationId: 'o1' };
 
-const organization = { id: 'o1' };
-const space = { id: 's1', organizationId: 'o1' };
-const integration = { id: 'i1' };
+const kinds = (resource: string, anchorResource: string, path: string, field = 'ownerModel') =>
+  placeEntitlement(
+    schemaMap,
+    {
+      resource: `db:${resource}`,
+      anchor: { resource: `db:${anchorResource}`, id: 'a1', path },
+      actions: { read: true },
+    } as EntitlementEntry,
+    anchor,
+  )?.map((record) => record[field]);
 
-const entry = (resource: string, anchor: string, id: string, path: string): EntitlementEntry => ({
-  resource: `db:${resource}`,
-  anchor: { resource: `db:${anchor}`, id, path },
-  actions: { read: true },
-});
-
-describe('the real schema map: each polymorphic step of a path names one kind', () => {
-  it("an integration via organization is the organization's own", () => {
-    expect(
-      placeEntitlement(entry('integration', 'organization', 'o1', 'organization'), organization),
-    ).toEqual({
-      ownerModel: 'Organization',
-      organizationId: 'o1',
-      organization,
-    });
+describe('the real schema map: a path admits every kind that carries its keys (R81)', () => {
+  it('an integration via organization: every kind under the organization', () => {
+    expect(kinds('integration', 'organization', 'organization')).toEqual([
+      'OrganizationUser',
+      'Organization',
+      'Space',
+      'SpaceUser',
+    ]);
   });
 
-  it("an integration via space.organization is a space's, under a space of the organization", () => {
-    expect(
-      placeEntitlement(
-        entry('integration', 'organization', 'o1', 'space.organization'),
-        organization,
-      ),
-    ).toEqual({
-      ownerModel: 'Space',
-      organizationId: 'o1',
-      space: { organizationId: 'o1', organization },
-    });
+  it('via space.organization: a space and its members', () => {
+    expect(kinds('integration', 'organization', 'space.organization')).toEqual([
+      'Space',
+      'SpaceUser',
+    ]);
   });
 
-  it("an integration via organizationUser.organization is a member's", () => {
-    expect(
-      placeEntitlement(
-        entry('integration', 'organization', 'o1', 'organizationUser.organization'),
-        organization,
-      ),
-    ).toMatchObject({ ownerModel: 'OrganizationUser', organizationId: 'o1' });
+  it("via organizationUser.organization: a member's, including as a space member", () => {
+    expect(kinds('integration', 'organization', 'organizationUser.organization')).toEqual([
+      'OrganizationUser',
+      'SpaceUser',
+    ]);
   });
 
-  it('an inquiry names a side and a kind', () => {
-    expect(
-      placeEntitlement(entry('inquiry', 'organization', 'o1', 'targetOrganization'), organization),
-    ).toEqual({
-      targetModel: 'Organization',
-      targetOrganizationId: 'o1',
-      targetOrganization: organization,
-    });
-    expect(placeEntitlement(entry('inquiry', 'space', 's1', 'sourceSpace'), space)).toEqual({
-      sourceModel: 'Space',
-      sourceSpaceId: 's1',
-      sourceSpace: space,
-    });
+  it("via user: the user's own and the user's members' integrations", () => {
+    expect(kinds('integration', 'user', 'user')).toEqual(['User', 'OrganizationUser', 'SpaceUser']);
   });
 
-  it("an email template's space, by spaceId alone, is ownerModel Space", () => {
-    expect(placeEntitlement(entry('emailTemplate', 'space', 's1', 'space'), space)).toMatchObject({
-      ownerModel: 'Space',
-      spaceId: 's1',
-    });
+  it('an inquiry names a side: what the organization or its members received', () => {
+    expect(kinds('inquiry', 'organization', 'targetOrganization', 'targetModel')).toEqual([
+      'OrganizationUser',
+      'Organization',
+      'SpaceUser',
+    ]);
+    expect(kinds('inquiry', 'space', 'sourceSpace', 'sourceModel')).toEqual(['Space', 'SpaceUser']);
   });
 
-  it('a token owned by an integration owned by a space: a kind at each step', () => {
+  it('a token owned by an integration: a kind at each step', () => {
+    const placed = placeEntitlement(
+      schemaMap,
+      {
+        resource: 'db:token',
+        anchor: { resource: 'db:organization', id: 'a1', path: 'integration.space.organization' },
+        actions: { read: true },
+      } as EntitlementEntry,
+      anchor,
+    );
     expect(
-      placeEntitlement(
-        entry('token', 'organization', 'o1', 'integration.space.organization'),
-        organization,
-      ),
-    ).toMatchObject({ ownerModel: 'Integration', integration: { ownerModel: 'Space' } });
+      placed?.map((token) => [
+        token.ownerModel,
+        (token.integration as { ownerModel: string }).ownerModel,
+      ]),
+    ).toEqual([
+      ['Integration', 'Space'],
+      ['Integration', 'SpaceUser'],
+    ]);
   });
 
   it('a plain foreign key names no kind', () => {
-    const placed = placeEntitlement(
-      entry('webhookSubscription', 'integration', 'i1', 'integration'),
-      integration,
-    );
-    expect(placed).toEqual({ integrationId: 'i1', integration });
+    expect(kinds('webhookSubscription', 'integration', 'integration')).toEqual([undefined]);
   });
 
-  it('a path that does not end at the anchor model is null', () => {
-    expect(placeEntitlement(entry('integration', 'space', 's1', 'organization'), space)).toBeNull();
+  it('a path that does not end at the anchor model places nothing', () => {
+    expect(kinds('integration', 'space', 'organization')).toBeUndefined();
   });
 });

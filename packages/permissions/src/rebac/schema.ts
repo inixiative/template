@@ -143,7 +143,7 @@ export const rebacSchema: RebacSchema = {
         own: actionOnOwner('own'),
         read: 'own',
         create: { all: [actorIsUser, tokenAccessIsYours] },
-        delete: { all: [actorIsUser, { any: ['leave', managedUpTheChain] }] },
+        delete: { any: ['leave', managedUpTheChain] },
       },
     },
 

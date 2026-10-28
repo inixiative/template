@@ -320,7 +320,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       ).toBe(200);
     });
 
-    it('its user revokes it; an admin up the chain revokes any token on it, even a full one; another member does not', async () => {
+    it("its user and the organization's owner revoke its tokens; an admin or another member does not (R83)", async () => {
       const { user, organizationUser } = await asMember('owner');
       const integration = await memberIntegration(organizationUser, { full: true });
       const member = await mintOn(integration, user, [organizationUser], { role: 'member' });
@@ -331,8 +331,9 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
         userApp(by, organizationUsers).fetch(del(`/api/v1/token/${id}`));
       const { user: other, organizationUser: otherMember } = await asMember('member');
       expect((await revoke(other, [otherMember], member.id!)).status).toBe(403);
-      expect((await revoke(admin, [adminMember], member.id!)).status).toBe(204);
-      expect((await revoke(admin, [adminMember], full.id!)).status).toBe(204);
+      expect((await revoke(admin, [adminMember], member.id!)).status).toBe(403);
+      const { user: orgOwner, organizationUser: ownerSeat } = await asMember('owner');
+      expect((await revoke(orgOwner, [ownerSeat], full.id!)).status).toBe(204);
       expect((await revoke(user, [organizationUser], mine.id!)).status).toBe(204);
     });
   });
@@ -580,8 +581,16 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
         post(`/api/v1/organizationUser/${row.id}/integrations`, { name: 'i', ...body }),
       );
 
-    it('its user creates one at or below their role, owned by the member row', async () => {
-      const { user, organizationUser } = await asMember('member');
+    it('its user creates one at or below their role as an admin, owned by the member row; a member does not (R85)', async () => {
+      const plain = await asMember('member');
+      expect(
+        (
+          await create(plain.user, [plain.organizationUser], plain.organizationUser, {
+            role: 'member',
+          })
+        ).status,
+      ).toBe(403);
+      const { user, organizationUser } = await asMember('admin');
       const response = await create(user, [organizationUser], organizationUser, { role: 'member' });
       expect(response.status).toBe(201);
       const { data } = (await response.json()) as { data: Integration };
@@ -599,7 +608,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       ).toBe(403);
     });
 
-    it("an admin up the chain deletes a member's integration; another member does not", async () => {
+    it("the organization's owner deletes a member's integration; an admin or another member does not (R82, R83)", async () => {
       const { organizationUser } = await asMember('member');
       const integration = await memberIntegration(organizationUser, { role: 'viewer' });
       const remove = (user: User, organizationUsers: OrganizationUser[]) =>
@@ -607,7 +616,9 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       const { user: other, organizationUser: otherMember } = await asMember('member');
       expect((await remove(other, [otherMember])).status).toBe(403);
       const { user: admin, organizationUser: adminMember } = await asMember('admin');
-      expect((await remove(admin, [adminMember])).status).toBe(204);
+      expect((await remove(admin, [adminMember])).status).toBe(403);
+      const { user: owner, organizationUser: ownerMember } = await asMember('owner');
+      expect((await remove(owner, [ownerMember])).status).toBe(204);
     });
 
     it("an owner of the organization cannot create one on another member's row", async () => {

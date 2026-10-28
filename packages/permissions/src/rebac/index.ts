@@ -1,4 +1,4 @@
-export { placeEntitlement, validateActionRule } from '@inixiative/permissions';
+export { placeEntitlement, placeUnder, validateActionRule } from '@inixiative/permissions';
 export { canGrantEntitlement } from './canGrantEntitlement';
 export { check, schemaMap } from './check';
 export { entitlementEntriesSchema } from './entitlementEntrySchema';

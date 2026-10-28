@@ -12,8 +12,8 @@ The permission system is the schema plus the library's check. Its syntax reads a
 The goal of a unit is the ruling's sentence, and the change ends there. When this work has gone wrong it has gone wrong the same way: a ruling left a "how" open, the gap was filled with a new mechanism, and that mechanism was then defended and extended instead of asking.
 
 - **Every new function, option, callback, type, list or library export is named by a ruling.** A plan line, a review finding or my own reading is not a ruling. If the ruling leaves the how open, ask with the existing primitive you would use; never invent one to close the gap.
-- **No hard-coded model lists.** Where a record sits comes from the polymorphism registry and the relations (`schemaMap`, `ownerColumns`, `hydrate`), never from a list of models in code.
-- **A problem gets the smallest fix inside what exists.** Before adding a layer, check whether `check`, `ownerColumns`, `hydrate`, a json-rules option or a body refinement already answers it. A review finding is fixed at its own size; any new concept it suggests goes to the user as a question.
+- **No hard-coded model lists.** Where a record sits comes from the polymorphism registry and the relations (`schemaMap`, `hydrate`), never from a list of models in code.
+- **A problem gets the smallest fix inside what exists.** Before adding a layer, check whether `check`, `hydrate`, a json-rules option or a body refinement already answers it. A review finding is fixed at its own size; any new concept it suggests goes to the user as a question.
 - **Library changes are the ruling's change only.** No new schema objects, refinements or exports beyond the ask. Validation of request bodies lives in `bodyRefinement` / `queryRefinement` / `paramsRefinement` (`docs/claude/API_ROUTES.md`), never as a `.refine` / `z.custom` on a schema object.
 - **When the user asks "how did we rule on this", the answer is in `tmp/permissions-rulings.md`.** Read it before proposing; a question that a ruling already settles is never put back to the user.
 - **Circling is the signal to stop.** If the same area comes back a second time with a new mechanism, stop building, quote the ruling and the existing primitive, and ask one question.
@@ -87,9 +87,9 @@ An action on something that does not exist yet, or on a collection, is checked o
   check(permix, rebacSchema, 'token', standIn, TokenAction.create);
   ```
   The rule for creating a token lives on `db:token`, never on its owner (`token.create` on organization/space/user was the bug behind a bypass: stored actions on a member's organization entry satisfied it).
-- **Collections are pseudo records too** (user, 10-26): `validateSubmodelPermission(action)` checks the action on a pseudo record of the route's submodel under the loaded owner (`ownerColumns`, from the polymorphism registry); it never reads the body. Lists that are really "which of these can I see" (spaces of an organization, member-shaped lists, customers, segment memberships, inquiries) stay a model check on the real owner until AUTH-008.
+- **Collections are pseudo records too** (user, 10-26): `validateSubmodelPermission(action)` checks the action on a pseudo record of the route's submodel under the loaded owner (from the polymorphism registry); it never reads the body. Lists that are really "which of these can I see" (spaces of an organization, member-shaped lists, customers, segment memberships, inquiries) stay a model check on the real owner until AUTH-008.
 - **Role writes** (members, integrations) need the body, so they run in the controller: `memberRoleWrite` / `integrationRoleWrite` on the row as it is and on the row as it will be.
-- **Grants:** the library's `placeEntitlement` builds the pseudo record from the hydrated anchor down the path (each step's foreign keys and the kind its relation names), and `canGrantEntitlement` checks each action on it. Each polymorphic step names one branch: carrying an ancestor's id is not ownership (`organization` = the org's own, `space.organization` = its spaces').
+- **Grants:** the library's `placeEntitlement` builds one pseudo record per kind the entry reaches, from the hydrated anchor down the path (each step's known foreign keys, each owner placed under the anchor), and `canGrantEntitlement` checks each action on every one. A polymorphic step reaches every kind that carries its keys (`organization` on an integration = the org's, its spaces', its members'); the `where` narrows the kinds.
 
 ## 4. Rules from this branch (what went wrong and the syntax answer)
 
@@ -108,7 +108,7 @@ An action on something that does not exist yet, or on a collection, is checked o
 | members' extra actions stored flat on the role table | entitlements `{ resource, anchor, actions }` like delegates (queue item 15) |
 | a second traversal returning conditions ("proofs") to carry into a grant | the ordinary check on a pseudo record pinned by the `where`'s exact `equals` values; missing fields read as unknown (json-rules `absent: 'unknown'`) |
 | splitting a `where` into branches, one pseudo record each | one pseudo record; anything not pinned exactly stays unknown, so a filtered writer is refused |
-| guessing which side of the tree an anchor means (direct owner, anywhere on the path, asking the anchor) | the anchor names its `path`; the registry says which kind each step is; grant and read check that same kind |
+| narrowing what an entitlement reaches to patch a grant-check hole (direct owner, one branch per path) | the path names the anchor and axis, every kind on it is reached, the `where` narrows; the grant judges every kind it reaches |
 | an "own the tenant/anchor" escape hatch beside the grant check | the normal check on the placed pseudo record, nothing else |
 | `z.custom` / `.refine` on a schema object for rule validation | shape-only schemas; validation in a reusable body refinement |
 

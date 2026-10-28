@@ -51,10 +51,20 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     );
   });
 
-  it('and by an admin: managing them is manage on the organization', async () => {
+  it("an admin grants them narrowed to the organization's own: managing those is manage on the organization (R81)", async () => {
     expect((await grant('admin', integrations('organization', ['manage'], slack))).status).toBe(
-      200,
+      403,
     );
+    expect(
+      (
+        await grant(
+          'admin',
+          integrations('organization', ['manage'], {
+            all: [slack, { field: 'ownerModel', operator: 'equals', value: 'Organization' }],
+          }),
+        )
+      ).status,
+    ).toBe(200);
   });
 
   it('a member does not', async () => {
@@ -68,9 +78,12 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     expect((await grant('admin', integrations('space.organization', ['manage']))).status).toBe(403);
   });
 
-  it("via organizationUser.organization: members' own integrations, which only their user manages", async () => {
+  it("via organizationUser.organization: members' integrations, which the owner manages and an admin does not (R82)", async () => {
     expect(
       (await grant('owner', integrations('organizationUser.organization', ['manage']))).status,
+    ).toBe(200);
+    expect(
+      (await grant('admin', integrations('organizationUser.organization', ['manage']))).status,
     ).toBe(403);
   });
 
@@ -160,9 +173,19 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       expect((await grantTokens()).status).toBe(403);
     });
 
-    it("an admin grants minting the organization's member tokens: the where pins the role", async () => {
+    it("an admin grants minting the organization's member tokens: the where pins the role and the organization's own (R81)", async () => {
       expect(
         (await grantTokens({ field: 'role', operator: 'equals', value: 'member' })).status,
+      ).toBe(403);
+      expect(
+        (
+          await grantTokens({
+            all: [
+              { field: 'role', operator: 'equals', value: 'member' },
+              { field: 'ownerModel', operator: 'equals', value: 'Organization' },
+            ],
+          })
+        ).status,
       ).toBe(200);
     });
 
