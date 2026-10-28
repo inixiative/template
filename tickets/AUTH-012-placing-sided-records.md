@@ -8,5 +8,8 @@ Records hang from two parents of one model on different polymorphic axes: an inq
 
 ## To do
 
-- Create and collection routes for sided records (inquiries, customer refs) placed under an organization, space or member name their path (`targetOrganization`, `sourceSpace`, …) and place with `placeUnder`.
+- The inquiry routes under an organization or space name their path and place with `placeUnder`, in place of `validatePermission` on the parent and `resolveInquirySource`:
+  - `organizationCreateInquiry`, `spaceCreateInquiry` (`sourceOrganization`, `sourceSpace`)
+  - `organizationReadManyInquiriesSent`, `spaceReadManyInquiriesSent` (`sourceOrganization`, `sourceSpace`)
+  - `organizationReadManyInquiriesReceived`, `spaceReadManyInquiriesReceived` (`targetOrganization`, `targetSpace`)
 - Tests per side: a record placed on one side is never judged as the other.
