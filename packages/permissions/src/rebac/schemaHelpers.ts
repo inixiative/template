@@ -132,7 +132,12 @@ const membersIntegration: ActionRule = {
 };
 
 export const integrationAdministering = {
-  create: { any: [createdByItsUserOrManager, { all: [ownedBy(members), actorIsItsUser()] }] },
+  create: {
+    any: [
+      createdByItsUserOrManager,
+      { all: [ownedBy(members), actorIsItsUser(), actionOnOwner('manage', '', members)] },
+    ],
+  },
   own: {
     any: [actorIsItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
   },

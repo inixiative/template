@@ -11,6 +11,7 @@ import {
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { organizationRouter } from '#/modules/organization';
+import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -186,5 +187,30 @@ describe("the organization's own integrations: an admin adds them, a member uses
 
   it('a member reads and operates them, and manages nothing', async () => {
     expect((await reach(await seatKey('member'))).Organization).toEqual(['read', 'operate']);
+  });
+});
+
+describe('a member adds their own member integration only as an admin (R85)', () => {
+  const addsOwn = async (role: Role) => {
+    const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
+    const { app } = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [seat],
+      mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
+    });
+    return (
+      await app.fetch(
+        post(`/api/v1/organizationUser/${seat.id}/integrations`, {
+          name: `i-${crypto.randomUUID()}`,
+          provider: 'slack',
+          role: 'viewer',
+        }),
+      )
+    ).status;
+  };
+
+  it('an admin adds one on their own member row; a member does not', async () => {
+    expect(await addsOwn('admin')).toBe(201);
+    expect(await addsOwn('member')).toBe(403);
   });
 });

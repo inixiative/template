@@ -581,8 +581,16 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
         post(`/api/v1/organizationUser/${row.id}/integrations`, { name: 'i', ...body }),
       );
 
-    it('its user creates one at or below their role, owned by the member row', async () => {
-      const { user, organizationUser } = await asMember('member');
+    it('its user creates one at or below their role as an admin, owned by the member row; a member does not (R85)', async () => {
+      const plain = await asMember('member');
+      expect(
+        (
+          await create(plain.user, [plain.organizationUser], plain.organizationUser, {
+            role: 'member',
+          })
+        ).status,
+      ).toBe(403);
+      const { user, organizationUser } = await asMember('admin');
       const response = await create(user, [organizationUser], organizationUser, { role: 'member' });
       expect(response.status).toBe(201);
       const { data } = (await response.json()) as { data: Integration };
