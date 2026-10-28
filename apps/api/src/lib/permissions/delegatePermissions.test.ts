@@ -599,7 +599,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       ).toBe(403);
     });
 
-    it("an admin up the chain deletes a member's integration; another member does not", async () => {
+    it("the organization's owner deletes a member's integration; an admin or another member does not (R82, R83)", async () => {
       const { organizationUser } = await asMember('member');
       const integration = await memberIntegration(organizationUser, { role: 'viewer' });
       const remove = (user: User, organizationUsers: OrganizationUser[]) =>
@@ -607,7 +607,9 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       const { user: other, organizationUser: otherMember } = await asMember('member');
       expect((await remove(other, [otherMember])).status).toBe(403);
       const { user: admin, organizationUser: adminMember } = await asMember('admin');
-      expect((await remove(admin, [adminMember])).status).toBe(204);
+      expect((await remove(admin, [adminMember])).status).toBe(403);
+      const { user: owner, organizationUser: ownerMember } = await asMember('owner');
+      expect((await remove(owner, [ownerMember])).status).toBe(204);
     });
 
     it("an owner of the organization cannot create one on another member's row", async () => {

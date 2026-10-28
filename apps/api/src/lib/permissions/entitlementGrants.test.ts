@@ -68,9 +68,12 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     expect((await grant('admin', integrations('space.organization', ['manage']))).status).toBe(403);
   });
 
-  it("via organizationUser.organization: members' own integrations, which only their user manages", async () => {
+  it("via organizationUser.organization: members' integrations, which the owner manages and an admin does not (R82)", async () => {
     expect(
       (await grant('owner', integrations('organizationUser.organization', ['manage']))).status,
+    ).toBe(200);
+    expect(
+      (await grant('admin', integrations('organizationUser.organization', ['manage']))).status,
     ).toBe(403);
   });
 

@@ -125,18 +125,26 @@ export const createdByItsUserOrManager: ActionRule = {
   any: [actionOnOwner('operate', '', ['User']), actionOnOwner('manage', '', organizationOrSpace)],
 };
 
+const notMembers: OwnerModel[] = ['User', 'Organization', 'Space'];
+
+const membersIntegration: ActionRule = {
+  any: [{ all: [ownedBy(members), actorIsItsUser()] }, actionOnOwner('own', '', members)],
+};
+
 export const integrationAdministering = {
   create: { any: [createdByItsUserOrManager, { all: [ownedBy(members), actorIsItsUser()] }] },
-  own: { any: [actorIsItsUser(), actionOnOwner('own', '', organizationOrSpace)] },
-  manage: {
-    any: [actorIsItsUser(), actionOnOwner('manage', '', organizationOrSpace)],
+  own: {
+    any: [actorIsItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
   },
-  delete: { any: ['manage', actionOnOwner('manage')] },
+  manage: {
+    any: [actorIsItsUser(), actionOnOwner('manage', '', organizationOrSpace), membersIntegration],
+  },
+  delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
 } satisfies Record<string, ActionRule>;
 
 export const integrationAccess = {
-  operate: actionOnOwner('operate'),
-  read: actionOnOwner('read'),
+  operate: { any: [actionOnOwner('operate', '', notMembers), membersIntegration] },
+  read: { any: [actionOnOwner('read', '', notMembers), membersIntegration] },
 } satisfies Record<string, ActionRule>;
 
 export const integrationRoleWrite: ActionRule = { all: ['manage', roleHeldAtOwner()] };
