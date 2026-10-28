@@ -5,6 +5,7 @@ import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
+import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
@@ -22,6 +23,7 @@ import { registerWebhookHook } from '#/hooks/webhooks/hook';
 
 export const registerHooks = () => {
   registerDelegatedKeysHook();
+  registerFullDelegateHook();
   registerRulesHook();
   registerAuditLogHook();
   registerEmailVersioningHook();

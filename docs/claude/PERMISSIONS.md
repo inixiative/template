@@ -255,7 +255,7 @@ A role and named entitlements expand through `delegateEntries` (`packages/permis
 
 - `role` applies at every anchor the owner has (`narrowing(resource, anchor, role)` per anchor and path), so a User token's role reaches each of the user's organizations, capped by the member row there; an integration's role reaches whatever its owner reaches.
 - `entitlements` are entries `{ resource, anchor: { resource, id, path? }, where?, actions }`, held as written. "Only the user's own things" is no role plus one entry anchored on `db:user`.
-- `full` is inheritance, not a permission: a `full` delegate skips to its owner — `delegateTable` (`apps/api/src/lib/permissions/ownerTable.ts`) installs the owner's table unchanged, for tokens and for integration owners. The schema never reads `full` (CI rule `no-full-in-rebac-schema`). Setting `full` takes `own` on the delegate's owner. A token that is not `full` has a role, entitlements or both; `full` takes neither. `full` may be set on tokens owned by a User, OrganizationUser, SpaceUser or Integration, and on integrations owned by a User, OrganizationUser or SpaceUser (`delegatePermissionRules.ts`).
+- `full` is inheritance, not a permission: writing `full` clears the delegate's role and entitlements (the `fullDelegate` hook), and a `full` delegate skips to its owner — `delegateTable` (`apps/api/src/lib/permissions/ownerTable.ts`) installs the owner's table unchanged, for tokens and for integration owners. The schema never reads `full` (CI rule `no-full-in-rebac-schema`). Setting `full` takes `own` on the delegate's owner. A token that is not `full` has a role, entitlements or both; `full` takes neither. `full` may be set on tokens owned by a User, OrganizationUser, SpaceUser or Integration, and on integrations owned by a User, OrganizationUser or SpaceUser (`delegatePermissionRules.ts`).
 
 Nothing is inherited: a token holds only its own permissions. They are installed with the owner's table as owner, so at check time each action holds only if the owner still allows it on that record through the normal walk. Demote the member and its tokens lose it on the next request.
 
@@ -351,8 +351,8 @@ The action is checked on the record, never asked of the anchor.
 Entitlements change only through their own endpoint, never through a record update: `PATCH /organizationUser/:id/entitlements`, `/spaceUser/:id/entitlements`, `/integration/:id/entitlements` and `/token/:id/entitlements`, with body `{ add?, remove? }` (`changeEntitlements`, `apps/api/src/lib/permissions/changeEntitlements.ts`).
 
 - The writer must be able to change the holder: `memberRoleWrite` on a member row, `validateIntegrationRole` on an integration, `validateTokenWrite` on a token.
-- Every entry in `add` and in `remove` goes through the same grant check: you remove only what you could grant, so an admin cannot strip what only an owner gives.
-- A malformed entry is refused (422) before anything is saved; a removal that matches nothing stored is ignored.
+- Every entry in `add`, and every entry in `remove` that matches a stored one, goes through the same grant check: you remove only what you could grant, so an admin cannot strip what only an owner gives. A removal that matches nothing stored is skipped, unchecked.
+- The only refusal is a permission one (403); a malformed `add` entry is invalid input (422).
 - Record updates (`PATCH /organizationUser/:id`, `/spaceUser/:id`, `/integration/:id`, `/token/:id`) do not take `entitlements`.
 
 ### The Path Names One Branch

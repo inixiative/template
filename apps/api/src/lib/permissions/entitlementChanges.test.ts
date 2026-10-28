@@ -98,6 +98,14 @@ describe("a member's entitlements change only through add and remove (R78)", () 
     expect(await stored(target)).toEqual([ownIntegrations(['manage'])]);
   });
 
+  it('a removal that matches nothing stored is skipped unchecked, even one the writer could not grant', async () => {
+    const target = await member([ownIntegrations(['read'])]);
+    expect(
+      (await change('admin', target, { remove: [spaceIntegrations(['manage'])] })).status,
+    ).toBe(200);
+    expect(await stored(target)).toEqual([ownIntegrations(['read'])]);
+  });
+
   it('a removal that matches nothing stored is filtered out', async () => {
     const target = await member([ownIntegrations(['read'])]);
     expect((await change('admin', target, { remove: [ownIntegrations(['manage'])] })).status).toBe(

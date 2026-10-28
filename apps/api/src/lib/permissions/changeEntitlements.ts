@@ -22,9 +22,9 @@ export const changeEntitlements = async (
   stored: unknown,
   { add = [], remove = [] }: EntitlementChanges,
 ): Promise<EntitlementEntry[]> => {
-  await validateEntitlementGrants(writer, [...add, ...remove] as EntitlementEntry[]);
-  const kept = ((stored as EntitlementEntry[] | null) ?? []).filter(
-    (entry) => !remove.some((removed) => isEqual(removed, entry)),
-  );
+  const current = (stored as EntitlementEntry[] | null) ?? [];
+  const removed = current.filter((entry) => remove.some((match) => isEqual(match, entry)));
+  await validateEntitlementGrants(writer, [...add, ...removed] as EntitlementEntry[]);
+  const kept = current.filter((entry) => !removed.includes(entry));
   return uniqWith([...kept, ...(add as EntitlementEntry[])], isEqual);
 };

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { db, unregisterDbHook } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -11,6 +11,8 @@ import {
   createOrganization,
   createOrganizationUser,
 } from '@template/db/test';
+import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -19,11 +21,24 @@ import { patch } from '#tests/utils/request';
 
 let organization: Organization;
 
+const hooks = [
+  'fullDelegate',
+  'fullDelegate:upsert',
+  'rules:create',
+  'rules:upsert',
+  'rules:update',
+  'rules:updateManyAndReturn',
+];
+
 beforeAll(async () => {
+  for (const name of hooks) unregisterDbHook(name);
+  registerFullDelegateHook();
+  registerRulesHook();
   ({ entity: organization } = await createOrganization());
 });
 
 afterAll(async () => {
+  for (const name of hooks) unregisterDbHook(name);
   await cleanupTouchedTables(db);
 });
 
@@ -93,6 +108,10 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
     const { entity: token } = await tokenOf(seat, { role: null, full: true });
     const app = as(user, seat);
     expect((await update(app, token.id, { full: false, role: 'viewer' })).status).toBe(200);
-    expect((await update(app, token.id, { full: true, role: null })).status).toBe(200);
+    expect((await update(app, token.id, { full: true })).status).toBe(200);
+    expect(await db.token.findUniqueOrThrow({ where: { id: token.id } })).toMatchObject({
+      full: true,
+      role: null,
+    });
   });
 });
