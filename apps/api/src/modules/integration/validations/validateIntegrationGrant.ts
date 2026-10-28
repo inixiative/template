@@ -13,7 +13,7 @@ import { delegatePermissionsOf } from '#/lib/permissions/ownerTable';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 import { validateFullGrant } from '#/lib/permissions/validateFullGrant';
 
-export const validateIntegrationGrant = async (
+export const validateIntegrationRole = async (
   writer: Permix,
   integration: Record<string, unknown>,
 ): Promise<void> => {
@@ -24,5 +24,12 @@ export const validateIntegrationGrant = async (
     !check(writer, rebacSchema, 'integration', pseudo, integrationRoleWrite)
   )
     throw makeError({ status: 403, message: 'Access denied' });
+};
+
+export const validateIntegrationGrant = async (
+  writer: Permix,
+  integration: Record<string, unknown>,
+): Promise<void> => {
+  await validateIntegrationRole(writer, integration);
   await validateEntitlementGrants(writer, delegatePermissionsOf(integration).entitlements ?? []);
 };

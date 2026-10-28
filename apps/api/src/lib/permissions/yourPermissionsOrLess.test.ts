@@ -104,10 +104,12 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
   const update = (
     writer: { user: User; organizationUser: OrganizationUser },
     integration: Integration,
-    permissions: Permissions,
+    { entitlements, ...permissions }: Permissions,
   ) =>
     as(writer.user, [writer.organizationUser])(
-      patch(`/api/v1/integration/${integration.id}`, permissions),
+      entitlements
+        ? patch(`/api/v1/integration/${integration.id}/entitlements`, { add: entitlements })
+        : patch(`/api/v1/integration/${integration.id}`, permissions),
     );
 
   beforeAll(async () => {

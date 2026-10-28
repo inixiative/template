@@ -46,6 +46,8 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
 
   const write = async (by: Role, target: SpaceUser, body: object) =>
     (await writer(by))(patch(`/api/v1/spaceUser/${target.id}`, body));
+  const grantTo = async (by: Role, target: SpaceUser, add: unknown) =>
+    (await writer(by))(patch(`/api/v1/spaceUser/${target.id}/entitlements`, { add }));
 
   it('updates the role', async () => {
     const { entity: target } = await spaceMember('member');
@@ -56,18 +58,18 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
 
   it("a space admin grants a space member's entitlements it could take itself", async () => {
     const { entity: target } = await spaceMember('member');
-    expect((await write('admin', target, { entitlements: onSpace('operate') })).status).toBe(200);
+    expect((await grantTo('admin', target, onSpace('operate'))).status).toBe(200);
     const stored = await db.spaceUser.findUniqueOrThrow({ where: { id: target.id } });
     expect(stored.entitlements).toEqual(onSpace('operate'));
   });
 
   it('a space admin cannot grant own', async () => {
     const { entity: target } = await spaceMember('member');
-    expect((await write('admin', target, { entitlements: onSpace('own') })).status).toBe(403);
+    expect((await grantTo('admin', target, onSpace('own'))).status).toBe(403);
   });
 
   it('a flat map of actions is not an entitlement', async () => {
     const { entity: target } = await spaceMember('member');
-    expect((await write('owner', target, { entitlements: { operate: true } })).status).toBe(422);
+    expect((await grantTo('owner', target, { operate: true })).status).toBe(422);
   });
 });

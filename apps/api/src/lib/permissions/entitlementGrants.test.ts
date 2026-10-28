@@ -35,7 +35,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
   const grant = async (by: 'owner' | 'admin' | 'member', granted: Record<string, unknown>) => {
     const { entity: target } = await createOrganizationUser({ role: 'member' }, { organization });
     return (await writer(by)).fetch(
-      patch(`/api/v1/organizationUser/${target.id}`, { entitlements: [granted] }),
+      patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [granted] }),
     );
   };
 
@@ -129,7 +129,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       ['send'],
     );
     const response = await app.fetch(
-      patch(`/api/v1/organizationUser/${wSeat.id}`, { entitlements: [sendAtOther] }),
+      patch(`/api/v1/organizationUser/${wSeat.id}/entitlements`, { add: [sendAtOther] }),
     );
     expect(response.status).toBe(403);
   });
@@ -139,7 +139,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     const { entity: space } = await createSpace({}, { organization });
     const offTree = entry('db:organization', ['db:space', space.id, 'spaces'], ['read']);
     const response = await (await writer('owner')).fetch(
-      patch(`/api/v1/organizationUser/${target.id}`, { entitlements: [offTree] }),
+      patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [offTree] }),
     );
     expect(response.status).toBe(422);
   });
@@ -152,7 +152,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
         ...(where ? { where } : {}),
       };
       return (await writer('admin')).fetch(
-        patch(`/api/v1/organizationUser/${target.id}`, { entitlements: [mint] }),
+        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [mint] }),
       );
     };
 
