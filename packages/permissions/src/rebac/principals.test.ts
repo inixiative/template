@@ -371,10 +371,10 @@ describe('every action lives on its own model (Aron, 2026-10-25)', () => {
     expect(can(admin, 'organization', o1, 'delete')).toBe(false);
   });
 
-  it('deleting a token is delete on the token: its own user, as a user', async () => {
+  it('deleting a token is delete on the token: its own user, or a token within reach (R84)', async () => {
     const mine = { ...tokenUnder(o1), ownerModel: 'User', userId: 'u1', user: u1 };
     const own = () => table(grant('db:user', 'u1', 'own'));
     expect(can(acting(await own(), ActorModel.User, 'u1'), 'token', mine, 'delete')).toBe(true);
-    expect(can(acting(await own(), ActorModel.Token), 'token', mine, 'delete')).toBe(false);
+    expect(can(acting(await own(), ActorModel.Token), 'token', mine, 'delete')).toBe(true);
   });
 });

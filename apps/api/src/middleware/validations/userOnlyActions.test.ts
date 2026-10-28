@@ -84,16 +84,19 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
 
   it('the user-only operations refuse every token and leave the rows in place', async () => {
     const { key } = await mint(user, 'owner');
-    const { token: sibling } = await mint(user, 'viewer');
 
-    expect((await call(key, 'DELETE', `/token/${sibling.id}`)).status).toBe(403);
     expect((await call(key, 'POST', '/me/rotateJwts')).status).toBe(403);
     expect((await call(key, 'POST', '/me/redact')).status).toBe(403);
     expect((await call(key, 'DELETE', `/organization/${organization.id}`)).status).toBe(403);
 
-    expect(await db.token.findUnique({ where: { id: sibling.id } })).not.toBeNull();
     expect(await db.organization.findUnique({ where: { id: organization.id } })).not.toBeNull();
     expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).email).toBe(user.email);
+  });
+
+  it('deleting a token only removes access, so a token may do it (R84)', async () => {
+    const { key } = await mint(user, 'owner');
+    const { token: sibling } = await mint(user, 'viewer');
+    expect((await call(key, 'DELETE', `/token/${sibling.id}`)).status).toBe(204);
   });
 
   it("a superadmin's token passes a user-only check", async () => {

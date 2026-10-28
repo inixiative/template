@@ -594,7 +594,7 @@ Every create-token route calls `createToken`, which checks `create` on a pseudo 
 
 ##### Token Deletion
 
-`delete` on `db:token` is user-only (`actorIsUser`) and passes on `leave` or on `manage` at the token's owner (at the integration's owner for an integration-owned token). The user deletes their own tokens and their integrations' tokens (`leave`, through the copied `userId`); organization and space admins delete tokens owned in their scope.
+`delete` on `db:token` passes on `leave` or on `manage` at the token's owner (for an integration-owned token, `manage` on the integration). Deleting only removes access, so a token may do it within its reach; minting and updating a token stay user-only. The user deletes their own tokens and their integrations' tokens (`leave`, through the copied `userId`); organization and space admins delete tokens owned in their scope, and only the owner deletes tokens of members' integrations.
 
 ---
 
