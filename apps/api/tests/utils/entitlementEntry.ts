@@ -1,11 +1,16 @@
 export type Entry = {
   resource: string;
-  anchor: { resource: string; id: string };
+  anchor: { resource: string; id: string; path?: string };
   actions: Record<string, boolean>;
+  where?: { [key: string]: string | null | { [key: string]: string }[] };
 };
 
-export const entry = (resource: string, anchor: [string, string], actions: string[]): Entry => ({
+export const entry = (
+  resource: string,
+  [anchorResource, id, path]: [string, string, string?],
+  actions: string[],
+): Entry => ({
   resource,
-  anchor: { resource: anchor[0], id: anchor[1] },
+  anchor: { resource: anchorResource, id, ...(path ? { path } : {}) },
   actions: Object.fromEntries(actions.map((action) => [action, true])),
 });

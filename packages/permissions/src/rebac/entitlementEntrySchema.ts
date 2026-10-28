@@ -14,7 +14,13 @@ const resources = Object.keys(rebacSchema.permissions) as [string, ...string[]];
 const entitlementEntrySchema = z
   .object({
     resource: z.enum(resources),
-    anchor: z.object({ resource: z.enum(resources), id: z.string().min(1) }).strict(),
+    anchor: z
+      .object({
+        resource: z.enum(resources),
+        id: z.string().min(1),
+        path: z.string().min(1).optional(),
+      })
+      .strict(),
     actions: z.record(z.string(), z.boolean()),
     where: (z.record(z.string(), z.unknown()) as unknown as z.ZodType<Condition>).optional(),
   })

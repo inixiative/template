@@ -1,5 +1,5 @@
 export { validateActionRule } from '@inixiative/permissions';
-export { canGrantEntitlement } from './canGrantEntitlement';
+export { canGrantEntitlement, placeEntitlement } from './canGrantEntitlement';
 export { check } from './check';
 export { entitlementEntriesSchema, parseEntitlements } from './entitlementEntrySchema';
 export { rebacSchema } from './schema';

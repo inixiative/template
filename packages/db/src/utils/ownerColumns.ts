@@ -4,7 +4,6 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { type Condition, Operator } from '@inixiative/json-rules';
 import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
 import { type AccessorName, toModelName } from '@template/db/utils/modelNames';
 import { getAccessorRelations, type RelationInfo } from '@template/db/utils/prismaMapRelations';
@@ -45,27 +44,4 @@ export const ownerColumns = (
   if (axis === undefined) return keys;
   if (!axis) return null;
   return { [axis.field]: toModelName(ownerAccessor), ...keys };
-};
-
-export const placedUnder = (
-  child: AccessorName,
-  ownerAccessor: AccessorName,
-  ownerId: string,
-): Condition | null => {
-  const relation = ownerRelation(child, ownerAccessor);
-  if (!relation) return null;
-  const owner: Condition = {
-    field: `${relation.relationName}.id`,
-    operator: Operator.equals,
-    value: ownerId,
-  };
-  const axis = ownerAxis(child, ownerAccessor);
-  if (axis === undefined) return owner;
-  if (!axis) return null;
-  return {
-    all: [
-      { field: axis.field, operator: Operator.equals, value: toModelName(ownerAccessor) },
-      owner,
-    ],
-  };
 };

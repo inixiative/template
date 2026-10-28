@@ -201,7 +201,7 @@ describe("a member token keeps its member's entitlement's resource and anchor, n
   const tokenOn = async (tokenRole: 'member' | 'viewer') =>
     (
       await memberKey('viewer', { role: tokenRole }, [
-        entry('db:space', ['db:organization', organization.id], ['operate']),
+        entry('db:space', ['db:organization', organization.id, 'organization'], ['operate']),
       ])
     ).rawKey;
 
@@ -250,7 +250,7 @@ describe('what an integration entitlement from the organization reaches (2026-10
 
   const fromOrganization = () =>
     fullMemberToken('viewer', [
-      entry('db:integration', ['db:organization', organization.id], ['manage']),
+      entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
     ]);
 
   it('manage on integrations from the organization reaches its own integrations', async () => {
@@ -260,9 +260,23 @@ describe('what an integration entitlement from the organization reaches (2026-10
     );
   });
 
-  it("it does not reach a space's integrations: an anchor acts at its direct children (R55)", async () => {
+  it("via organization it does not reach a space's integration: the path names the organization's own", async () => {
     const integration = await spaceIntegration();
     expect(await holds(await fromOrganization(), 'integration', integration.id, 'manage')).toBe(
+      false,
+    );
+  });
+
+  it("via space.organization it reaches the spaces' integrations, not the organization's own", async () => {
+    const key = await fullMemberToken('viewer', [
+      entry(
+        'db:integration',
+        ['db:organization', organization.id, 'space.organization'],
+        ['manage'],
+      ),
+    ]);
+    expect(await holds(key, 'integration', (await spaceIntegration()).id, 'manage')).toBe(true);
+    expect(await holds(key, 'integration', (await organizationIntegration()).id, 'manage')).toBe(
       false,
     );
   });
@@ -286,7 +300,11 @@ describe('what an integration entitlement from the organization reaches (2026-10
         })
       ).entity;
     const key = await fullMemberToken('viewer', [
-      entry('db:integration', ['db:organizationUser', anchorMember.id], ['operate']),
+      entry(
+        'db:integration',
+        ['db:organizationUser', anchorMember.id, 'organizationUser'],
+        ['operate'],
+      ),
     ]);
     expect(
       await holds(key, 'integration', (await memberIntegration(anchorMember)).id, 'operate'),

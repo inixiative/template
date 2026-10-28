@@ -332,7 +332,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
           entitlements: [
             {
               resource: 'db:contact',
-              anchor: { resource: 'db:organization', id: other.id },
+              anchor: { resource: 'db:organization', id: other.id, path: 'organization' },
               actions: { create: true },
             },
           ],

@@ -4,14 +4,7 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { Operator } from '@inixiative/json-rules';
-import {
-  type AccessorName,
-  type OrganizationId,
-  placedUnder,
-  type SpaceId,
-  type UserId,
-} from '@template/db';
+import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import {
   createPermissions,
@@ -65,24 +58,9 @@ export const userGrants = (
   ),
 ];
 
-const accessorOf = (resource: string) => resource.slice('db:'.length) as AccessorName;
-
-export const atAnchor = (entry: PermissionEntry): PermissionEntry => {
-  if (!('anchor' in entry) || !entry.anchor) return entry;
-  const { resource, anchor, where } = entry as EntitlementEntry;
-  const placement =
-    resource === anchor.resource
-      ? { field: 'id', operator: Operator.equals, value: anchor.id }
-      : (placedUnder(accessorOf(resource), accessorOf(anchor.resource), anchor.id) ?? false);
-  return { ...entry, where: where === undefined ? placement : { all: [placement, where] } };
-};
-
 export const installGrants = async (permix: Permix, grants: Grant[]): Promise<void> => {
   for (const { entries, owner } of grants)
-    await permix.setup(
-      entries.map(atAnchor),
-      owner ? { owner: await grantsPermix(owner) } : undefined,
-    );
+    await permix.setup(entries, owner ? { owner: await grantsPermix(owner) } : undefined);
 };
 
 export const grantsPermix = async (grants: Grant[]): Promise<Permix> => {

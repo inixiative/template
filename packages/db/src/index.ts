@@ -162,7 +162,7 @@ export {
   toAccessor,
   toModelName,
 } from './utils/modelNames';
-export { ownerColumns, placedUnder } from './utils/ownerColumns';
+export { ownerColumns } from './utils/ownerColumns';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';

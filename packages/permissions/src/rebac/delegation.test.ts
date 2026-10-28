@@ -3,7 +3,6 @@ import type { HydratedRecord } from '@template/db';
 import { createPermissions, type PermissionEntry, type Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import { atAnchor } from '@template/permissions/roles/userGrants';
 
 const u1 = { id: 'u1' };
 const o1 = { id: 'o1' };
@@ -46,14 +45,13 @@ const organization = async (org = o1) => {
 const member = async (role: Role, granted: PermissionEntry[] = [], grantor?: Permix) => {
   const permix = createPermissions();
   await permix.setup({ resource: 'db:organization', id: 'o1', actions: all(roleActions[role]) });
-  if (granted.length)
-    await permix.setup(granted.map(atAnchor), { owner: grantor ?? (await organization()) });
+  if (granted.length) await permix.setup(granted, { owner: grantor ?? (await organization()) });
   return permix;
 };
 
 const heldBy = async (owner: Permix, granted: PermissionEntry[]) => {
   const permix = createPermissions();
-  await permix.setup(granted.map(atAnchor), { owner });
+  await permix.setup(granted, { owner });
   return permix;
 };
 

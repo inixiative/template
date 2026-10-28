@@ -4,29 +4,12 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import type { Condition } from '@inixiative/json-rules';
-import { type AccessorName, fetchOne, hydrate, ownerColumns } from '@template/db';
+import { type AccessorName, fetchOne, type HydratedRecord, hydrate } from '@template/db';
 import type { EntitlementEntry, Permix } from '@template/permissions';
-import { canGrantEntitlement } from '@template/permissions/rebac';
+import { canGrantEntitlement, placeEntitlement } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 
 const modelOf = (resource: string) => resource.slice('db:'.length) as AccessorName;
-
-const exactKeys = new Set(['field', 'operator', 'value']);
-
-const pinned = (where: Condition | undefined): Record<string, unknown> => {
-  if (!where || typeof where !== 'object') return {};
-  if ('all' in where && Array.isArray(where.all) && Object.keys(where).length === 1)
-    return Object.assign({}, ...where.all.map(pinned));
-  const leaf = where as Record<string, unknown>;
-  const exact =
-    leaf.operator === 'equals' &&
-    typeof leaf.field === 'string' &&
-    !leaf.field.includes('.') &&
-    'value' in leaf &&
-    Object.keys(leaf).every((key) => exactKeys.has(key));
-  return exact ? { [leaf.field as string]: leaf.value } : {};
-};
 
 const anchorRecord = async ({ resource, id }: EntitlementEntry['anchor']) => {
   const model = modelOf(resource);
@@ -41,16 +24,13 @@ const placedRecord = async (entry: EntitlementEntry) => {
       status: 422,
       message: `No ${entry.anchor.resource} ${entry.anchor.id} to grant from`,
     });
-  const model = modelOf(entry.resource);
-  const anchorModel = modelOf(entry.anchor.resource);
-  if (model === anchorModel) return anchor;
-  const placement = ownerColumns(model, anchorModel, anchor);
-  if (!placement)
+  const placed = placeEntitlement(entry, anchor);
+  if (!placed)
     throw makeError({
       status: 422,
-      message: `${entry.resource} is not under ${entry.anchor.resource}: anchor on its tree`,
+      message: `${entry.resource} does not reach ${entry.anchor.resource} by ${entry.anchor.path ?? 'no path'}: anchor on its tree`,
     });
-  return hydrate(model, { ...pinned(entry.where), ...placement, id: '' });
+  return placed as HydratedRecord;
 };
 
 export const validateEntitlementGrants = async (
