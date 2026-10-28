@@ -4,11 +4,7 @@
  * @partOf primitive:authz
  * @uses none
  */
-import {
-  createCanGrantEntitlement,
-  type EntitlementEntry,
-  placeEntitlement as place,
-} from '@inixiative/permissions';
+import { createCanGrantEntitlement, type EntitlementEntry } from '@inixiative/permissions';
 import type { HydratedRecord } from '@template/db';
 import type { Permix } from '@template/permissions/client';
 import { schemaMap } from '@template/permissions/rebac/check';
@@ -21,6 +17,3 @@ export const canGrantEntitlement = (
   entry: EntitlementEntry,
   placed: HydratedRecord,
 ): boolean => canGrant(permix, rebacSchema, entry, placed);
-
-export const placeEntitlement = (entry: EntitlementEntry, anchor: HydratedRecord) =>
-  place(schemaMap, entry, anchor);

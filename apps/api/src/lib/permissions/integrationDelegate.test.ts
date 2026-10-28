@@ -234,7 +234,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       const member = await memberOf(writerRole, organization, writer);
       const integration = await memberIntegration(member, null);
       const response = await userApp(writer, [member]).fetch(
-        patch(`/api/v1/integration/${integration.id}`, { entitlements }),
+        patch(`/api/v1/integration/${integration.id}/entitlements`, { add: entitlements }),
       );
       const stored = await db.integration.findUniqueOrThrow({ where: { id: integration.id } });
       return { status: response.status, stored: stored.entitlements };

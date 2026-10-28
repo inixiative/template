@@ -126,7 +126,9 @@ describe('granting inquiry entitlements: the writer could act on the side named'
       mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
     });
     return (
-      await app.fetch(patch(`/api/v1/organizationUser/${target.id}`, { entitlements: [granted] }))
+      await app.fetch(
+        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [granted] }),
+      )
     ).status;
   };
 

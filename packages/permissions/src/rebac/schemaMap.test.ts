@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import type { EntitlementEntry } from '@inixiative/permissions';
-import { placeEntitlement } from '@template/permissions/rebac/canGrantEntitlement';
+import { type EntitlementEntry, placeEntitlement as place } from '@inixiative/permissions';
+import { schemaMap } from '@template/permissions/rebac/check';
+
+const placeEntitlement = (entry: EntitlementEntry, anchor: Record<string, unknown>) =>
+  place(schemaMap, entry, anchor);
 
 const organization = { id: 'o1' };
 const space = { id: 's1', organizationId: 'o1' };

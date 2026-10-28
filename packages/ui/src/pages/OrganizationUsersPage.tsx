@@ -43,7 +43,6 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   const tenant = useAppStore((state) => state.tenant);
 
   // Filter roles to only those the current actor can invite via inquiry.send permission.
-  // REBAC checks content.role against highRoles to determine if own vs manage is required.
   const inviteRoles = (Object.values(Role) as Role[]).filter((role) =>
     checkPermission(
       permissions,

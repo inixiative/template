@@ -6,7 +6,7 @@
  */
 import { type AccessorName, fetchOne, type HydratedRecord, hydrate } from '@template/db';
 import type { EntitlementEntry, Permix } from '@template/permissions';
-import { canGrantEntitlement, placeEntitlement } from '@template/permissions/rebac';
+import { canGrantEntitlement, placeEntitlement, schemaMap } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 
 const modelOf = (resource: string) => resource.slice('db:'.length) as AccessorName;
@@ -24,7 +24,7 @@ const placedRecord = async (entry: EntitlementEntry) => {
       status: 422,
       message: `No ${entry.anchor.resource} ${entry.anchor.id} to grant from`,
     });
-  const placed = placeEntitlement(entry, anchor);
+  const placed = placeEntitlement(schemaMap, entry, anchor);
   if (!placed)
     throw makeError({
       status: 422,

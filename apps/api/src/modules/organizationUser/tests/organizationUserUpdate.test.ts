@@ -78,7 +78,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     const grant = async (app: ReturnType<typeof createTestApp>, entitlements: unknown) => {
       const target = await newMember();
       const response = await app.fetch(
-        patch(`/api/v1/organizationUser/${target.id}`, { entitlements }),
+        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: entitlements }),
       );
       const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
       return { status: response.status, stored: stored.entitlements };
@@ -98,17 +98,19 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       });
     });
 
-    it("an admin clears a member's entitlements", async () => {
+    it("an admin removes a member's entitlements", async () => {
       const { entity: target } = await createOrganizationUser(
         { role: 'member', entitlements: onOrganization('operate') },
         { organization: org },
       );
       const response = await fetch(
-        patch(`/api/v1/organizationUser/${target.id}`, { entitlements: null }),
+        patch(`/api/v1/organizationUser/${target.id}/entitlements`, {
+          remove: onOrganization('operate'),
+        }),
       );
       expect(response.status).toBe(200);
       const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
-      expect(stored.entitlements).toBeNull();
+      expect(stored.entitlements).toEqual([]);
     });
 
     const memberApp = (user: User, organizationUser: OrganizationUser) =>
@@ -124,7 +126,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         { organization: org },
       );
       const response = await (await writer('owner')).fetch(
-        patch(`/api/v1/organizationUser/${entity.id}`, { entitlements: [granted] }),
+        patch(`/api/v1/organizationUser/${entity.id}/entitlements`, { add: [granted] }),
       );
       expect(response.status).toBe(200);
       const row = await db.organizationUser.findUniqueOrThrow({ where: { id: entity.id } });
@@ -181,8 +183,8 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         const admin = await writer('admin');
         const grantOn = (action: string) =>
           admin.fetch(
-            patch(`/api/v1/organizationUser/${target.id}`, {
-              entitlements: [entry('db:organization', ['db:organization', org.id], [action])],
+            patch(`/api/v1/organizationUser/${target.id}/entitlements`, {
+              add: [entry('db:organization', ['db:organization', org.id], [action])],
             }),
           );
         expect((await grantOn('manage')).status).toBe(200);
@@ -255,10 +257,10 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         { organization: org },
       );
       const response = await tokenApp.fetch(
-        new Request(`http://test/api/v1/organizationUser/${target.id}`, {
+        new Request(`http://test/api/v1/organizationUser/${target.id}/entitlements`, {
           method: 'PATCH',
           headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ entitlements }),
+          body: JSON.stringify({ add: entitlements }),
         }),
       );
       return response.status;

@@ -19,18 +19,17 @@ const report = (
 };
 
 export const permissionsBodyRefinement = (
-  body: { entitlements?: unknown; permissionRules?: unknown },
+  body: { entitlements?: unknown; add?: unknown; remove?: unknown; permissionRules?: unknown },
   ctx: z.RefinementCtx,
 ): void => {
-  if (Array.isArray(body.entitlements))
-    body.entitlements.forEach((entry: { where?: unknown }, index) => {
-      if (entry.where !== undefined)
-        report(
-          ctx,
-          ['entitlements', index, 'where'],
-          validateRule(entry.where, { positive: true }).errors,
-        );
-    });
+  for (const key of ['entitlements', 'add', 'remove'] as const) {
+    const entries = body[key];
+    if (Array.isArray(entries))
+      entries.forEach((entry: { where?: unknown }, index) => {
+        if (entry.where !== undefined)
+          report(ctx, [key, index, 'where'], validateRule(entry.where, { positive: true }).errors);
+      });
+  }
   if (isPlainObject(body.permissionRules))
     for (const [action, rule] of Object.entries(body.permissionRules as Record<string, unknown>))
       report(ctx, ['permissionRules', action], validateActionRule(rule).errors);

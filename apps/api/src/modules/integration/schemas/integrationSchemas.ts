@@ -28,10 +28,10 @@ export const integrationCreateBodySchema = IntegrationScalarInputSchema.omit({
 });
 
 export const integrationUpdateBodySchema = integrationCreateBodySchema
+  .omit({ entitlements: true })
   .extend({
     role: z.nativeEnum(Role).nullable(),
     full: z.boolean(),
-    entitlements: entitlementEntriesSchema.nullable(),
   })
   .partial();
 
