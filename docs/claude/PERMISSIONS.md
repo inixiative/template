@@ -289,7 +289,7 @@ A token's role is checked by `create` on `db:token`; an integration's role by `i
 
 ### In Controllers
 
-A check that depends on the body runs in the controller or its service with the same `check`, on a hydrated record, or on a pseudo record (`ownerColumns`) when the row does not exist yet. `validateFullGrant` (`apps/api/src/lib/permissions/validateFullGrant.ts`):
+A check that depends on the body runs in the controller or its service with the same `check`, on a hydrated record, or on a pseudo record (the library's `placeUnder`) when the row does not exist yet. `validateFullGrant` (`apps/api/src/lib/permissions/validateFullGrant.ts`):
 
 ```typescript
 import { check, rebacSchema } from '@template/permissions/rebac';
@@ -605,11 +605,14 @@ A route on a submodel (a collection or a create under an owner: `/organization/:
 
 ```typescript
 // apps/api/src/middleware/validations/validateSubmodelPermission.ts
-const pseudo = await hydrate(submodel, ownerColumns(submodel, ownerType, owner));
+const [placed] = placeUnder(schemaMap, `db:${submodel}`, ownerType, `db:${ownerType}`, owner, {
+  ownerModel: toModelName(ownerType),
+});
+const pseudo = await hydrate(submodel, { id: '', ...placed });
 check(permix, rebacSchema, submodel, pseudo, action);
 ```
 
-- `ownerColumns(child, ownerAccessor, owner)` (`packages/db/src/utils/ownerColumns.ts`) builds the pseudo record: `id: ''`, the polymorphism registry's discriminator for that owner, and the owner keys from the child's single relation to it. An empty id never matches a grant keyed by a real row.
+- `placeUnder(schemaMap, child, ownerRelation, owner, row, pins)` (the library's, re-exported from `@template/permissions/rebac`) builds the pseudo record along the owner's relation: the owner keys (composite ones too), the owner attached, the kind pinned to the owner's model; `id: ''`. An empty id never matches a grant keyed by a real row.
 - The route templates set `routeConfig` (with `model` / `submodel`) before route middleware runs, so the middleware reads the submodel there; the owner is `c.get('resource')` (`meResourceMiddleware` loads the user on `/me`).
 - It never reads the request body (route middleware runs before validation). Checks that depend on the body (a token's role / full, an integration's role via `integrationRoleWrite`, an inquiry's `send`) stay in their services.
 - Using it on a route with no submodel throws on each request to that route, not when the route is built (`validateSubmodelPermission.test.ts`).
