@@ -131,15 +131,14 @@ const actorHoldsItsRow: ActionRule = {
   ],
 };
 
-export const actorHoldsOrOwnsOwner: ActionRule = {
+export const actorHoldsItsChain: ActionRule = {
   any: [
     { all: [ownedBy(['User', ...members]), actorIsUserAt('userId')] },
-    { all: [ownedBy(notIntegration), actionOnOwner('own', '', notIntegration)] },
     {
       all: [
         ownedBy(['Integration']),
         ownedBy(['User', ...members], 'integration.'),
-        { any: [actorIsUserAt('integration.userId'), { rel: 'integration', action: 'own' }] },
+        actorIsUserAt('integration.userId'),
       ],
     },
   ],
@@ -172,7 +171,14 @@ export const integrationAccess = {
   read: { any: [actionOnOwner('read', '', notMembers), membersIntegration] },
 } satisfies Record<string, ActionRule>;
 
-export const integrationRoleWrite: ActionRule = { all: ['manage', roleHeldAtOwner()] };
+export const integrationRoleWrite: ActionRule = {
+  any: [
+    actorHoldsItsChain,
+    {
+      all: ['manage', roleHeldAtOwner(), { any: [ownedBy(organizationOrSpace), actorHoldsItsRow] }],
+    },
+  ],
+};
 
 export const tokenAccessIsYours: ActionRule = {
   any: [
@@ -186,8 +192,8 @@ export const tokenAccessIsYours: ActionRule = {
     {
       all: [
         ownedBy(['Integration']),
-        roleHeldAtOwner('integration.'),
         ownedByYouOrOrganizationOrSpace('integration.'),
+        { any: [ownedBy(['User', ...members], 'integration.'), roleHeldAtOwner('integration.')] },
       ],
     },
   ],

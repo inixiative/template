@@ -4,7 +4,7 @@
  * @partOf feature:auth
  * @uses primitive:authz, infrastructure:prisma
  */
-import type { Prisma } from '@template/db';
+import { hydrate, type Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { makeController } from '#/lib/utils/makeController';
@@ -19,7 +19,10 @@ export const tokenEntitlementsController = makeController(
     const token = getResource<'token'>(c);
     await validateTokenWrite(permix, token);
 
-    const entitlements = await changeEntitlements(permix, token.entitlements, c.req.valid('json'));
+    const entitlements = await changeEntitlements(permix, token.entitlements, c.req.valid('json'), {
+      model: 'token',
+      record: await hydrate('token', token),
+    });
     const { keyHash: _keyHash, ...updated } = await db.token.update({
       where: { id: token.id },
       data: { entitlements: entitlements as Prisma.InputJsonValue },

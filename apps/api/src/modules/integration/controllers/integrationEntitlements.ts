@@ -4,7 +4,7 @@
  * @partOf feature:integrations
  * @uses primitive:authz, infrastructure:prisma
  */
-import type { Prisma } from '@template/db';
+import { hydrate, type Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { makeController } from '#/lib/utils/makeController';
@@ -23,6 +23,7 @@ export const integrationEntitlementsController = makeController(
       permix,
       integration.entitlements,
       c.req.valid('json'),
+      { model: 'integration', record: await hydrate('integration', integration) },
     );
     const updated = await db.integration.update({
       where: { id: integration.id },

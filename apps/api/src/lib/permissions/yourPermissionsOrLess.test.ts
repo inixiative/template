@@ -233,7 +233,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect(stored.role).toBe('admin');
     });
 
-    it("its user or the organization's owner makes a member's integration full; an admin does not (R82)", async () => {
+    it("its user makes their member integration full or changes its role; the organization's owner and an admin do not: the chain ends at the member (R91)", async () => {
       const ownerMember = await member('owner');
       const { entity: integration } = await createIntegration({
         ownerModel: 'OrganizationUser',
@@ -242,7 +242,8 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
         role: 'member',
       });
       expect((await update(admin, integration, { role: null, full: true })).status).toBe(403);
-      expect((await update(owner, integration, { role: null, full: true })).status).toBe(200);
+      expect((await update(owner, integration, { role: null, full: true })).status).toBe(403);
+      expect((await update(owner, integration, { role: 'viewer' })).status).toBe(403);
       expect((await update(ownerMember, integration, { role: null, full: true })).status).toBe(200);
     });
 
@@ -330,11 +331,11 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect((await mint(m, path, { role: 'member' })).status).toBe(201);
     });
 
-    it('its user mints at or below their access, never above it, though they administer it', async () => {
+    it('its user mints any role on it: the chain ends at them (R91)', async () => {
       const { m, integration } = await memberIntegration();
       const path = `integration/${integration.id}`;
-      expect((await mint(m, path, { role: 'admin' })).status).toBe(403);
-      expect((await mint(m, path, { role: 'owner' })).status).toBe(403);
+      expect((await mint(m, path, { role: 'admin' })).status).toBe(201);
+      expect((await mint(m, path, { role: 'owner' })).status).toBe(201);
     });
 
     it('its user mints a full token on it: they are its owner', async () => {

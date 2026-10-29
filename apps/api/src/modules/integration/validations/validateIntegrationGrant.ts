@@ -31,5 +31,9 @@ export const validateIntegrationGrant = async (
   integration: Record<string, unknown>,
 ): Promise<void> => {
   await validateIntegrationRole(writer, integration);
-  await validateEntitlementGrants(writer, delegatePermissionsOf(integration).entitlements ?? []);
+  const record = await hydrate('integration', { id: '', ...integration } as HydratedRecord);
+  await validateEntitlementGrants(writer, delegatePermissionsOf(integration).entitlements ?? [], {
+    model: 'integration',
+    record,
+  });
 };

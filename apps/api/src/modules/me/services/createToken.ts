@@ -42,7 +42,10 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   if (!check(permix, rebacSchema, 'token', pseudo, TokenAction.create))
     throw makeError({ status: 403, message: 'Access denied' });
   if (row.full) validateFullGrant(permix, 'token', pseudo);
-  await validateEntitlementGrants(permix, params.entitlements ?? []);
+  await validateEntitlementGrants(permix, params.entitlements ?? [], {
+    model: 'token',
+    record: pseudo,
+  });
 
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];

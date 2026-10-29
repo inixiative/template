@@ -411,18 +411,22 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
         lacks: 'own',
       },
       {
-        name: 'owner token, full integration, admin member',
+        name: 'owner token, full integration, admin member: capped at the member (R91)',
         memberRole: 'admin',
         integration: { full: true },
         token: { role: 'owner' },
-        status: 403,
+        status: 201,
+        holds: 'manage',
+        lacks: 'own',
       },
       {
-        name: 'admin token, full integration, member member',
+        name: 'admin token, full integration, member member: capped at the member (R91)',
         memberRole: 'member',
         integration: { full: true },
         token: { role: 'admin' },
-        status: 403,
+        status: 201,
+        holds: 'operate',
+        lacks: 'manage',
       },
       {
         name: 'admin token, viewer integration, owner member',
@@ -596,11 +600,11 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       });
     });
 
-    it('its user cannot give it a role above their own', async () => {
+    it('its user gives it any role: the chain ends at them (R91)', async () => {
       const { user, organizationUser } = await asMember('member');
       expect(
-        (await create(user, [organizationUser], organizationUser, { role: 'admin' })).status,
-      ).toBe(403);
+        (await create(user, [organizationUser], organizationUser, { role: 'owner' })).status,
+      ).toBe(201);
     });
 
     it("the organization's owner deletes a member's integration; an admin or another member does not (R82, R83)", async () => {

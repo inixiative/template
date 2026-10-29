@@ -7,7 +7,7 @@
 import type { AccessorName, HydratedRecord } from '@template/db';
 import type { Permix } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { actorHoldsOrOwnsOwner } from '@template/permissions/rebac/schemaHelpers';
+import { actionOnOwner, actorHoldsItsChain } from '@template/permissions/rebac/schemaHelpers';
 import { makeError } from '#/lib/errors';
 
 export const validateFullGrant = (
@@ -15,6 +15,10 @@ export const validateFullGrant = (
   model: AccessorName,
   delegate: HydratedRecord,
 ): void => {
-  if (!check(writer, rebacSchema, model, delegate, actorHoldsOrOwnsOwner))
+  if (
+    !check(writer, rebacSchema, model, delegate, {
+      any: [actorHoldsItsChain, actionOnOwner('own', '', ['Organization', 'Space'])],
+    })
+  )
     throw makeError({ status: 403, message: 'Access denied' });
 };

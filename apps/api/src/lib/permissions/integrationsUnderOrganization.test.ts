@@ -380,3 +380,59 @@ describe('acting as your member row: you hold it, so full on it is yours to set;
     ).toBe(403);
   });
 });
+
+describe('a chain that ends at you is yours to write; a token carrying you keeps the checks (R91)', () => {
+  const { call } = createTokenProbeApp((hono) =>
+    hono.route('/api/v1/organizationUser', organizationUserRouter),
+  );
+
+  it('a member gives their member integration an entitlement beyond their own; it holds only what the member holds', async () => {
+    const { entity: seat, context } = await createOrganizationUser(
+      { role: 'member' },
+      { organization },
+    );
+    const { app } = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [seat],
+      mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
+    });
+    const response = await app.fetch(
+      post(`/api/v1/organizationUser/${seat.id}/integrations`, {
+        name: `i-${crypto.randomUUID()}`,
+        provider: 'slack',
+        role: 'viewer',
+        entitlements: [
+          {
+            resource: 'db:organization',
+            anchor: { resource: 'db:organization', id: organization.id },
+            actions: { manage: true },
+          },
+        ],
+      }),
+    );
+    expect(response.status).toBe(201);
+    const { data } = (await response.json()) as { data: Integration };
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'Integration', full: true, role: null },
+      { integration: data },
+    );
+    expect(await holds(rawKey, 'organization', organization.id, 'operate')).toBe(false);
+    expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(false);
+  });
+
+  it("a member's admin token does not give their member integration the owner role", async () => {
+    const { entity: seat } = await createOrganizationUser({ role: 'admin' }, { organization });
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', role: 'admin' },
+      { organizationUser: seat },
+    );
+    const add = (role: Role) =>
+      call(rawKey, 'POST', `/api/v1/organizationUser/${seat.id}/integrations`, {
+        name: `i-${crypto.randomUUID()}`,
+        provider: 'slack',
+        role,
+      });
+    expect((await add('admin')).status).toBe(201);
+    expect((await add('owner')).status).toBe(403);
+  });
+});
