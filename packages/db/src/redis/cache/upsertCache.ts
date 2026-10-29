@@ -28,22 +28,18 @@ export const upsertCache = async <T>(
 
   return withCacheSpan(key, false, async (setResult) => {
     try {
-      const redis = getRedisClient();
-      if (!force && (await redis.exists(key))) {
-        setResult('hit');
-        return false;
-      }
       const payload = superjson.stringify(value);
-      await writeThrough(
-        redis,
+      const written = await writeThrough(
+        getRedisClient(),
         { key, generationKey: generationKey(key), writtenKey: writtenKey(key) },
         { value: newGeneration(), ttlSeconds: GENERATION_TTL_SECONDS },
         ttl,
         payload,
+        force,
       );
-      meterLargeWrite(key, payload, ttl, 'upsertCache');
-      setResult('miss');
-      return true;
+      setResult(written ? 'written' : 'kept');
+      if (written) meterLargeWrite(key, payload, ttl, 'upsertCache');
+      return written;
     } catch {
       setResult('error');
       return false;

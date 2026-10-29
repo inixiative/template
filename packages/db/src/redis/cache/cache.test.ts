@@ -11,6 +11,7 @@ import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { type LogRecord, observeLogRecords } from '@template/shared/logger/records';
+import * as telemetry from '@template/shared/telemetry';
 import type { Redis } from 'ioredis';
 import superjson from 'superjson';
 
@@ -321,6 +322,30 @@ describe('upsertCache', () => {
     expect(await cache(key, async () => ({ v: 9 }))).toEqual({ v: 1 });
     expect(await upsertCache(key, { v: 3 }, { force: true })).toBe(true);
     expect(await cache(key, async () => ({ v: 9 }))).toEqual({ v: 3 });
+  });
+
+  it('records written when it writes and kept when the key was already there', async () => {
+    const key = cacheKey('user', 'upsert-results');
+    const results: unknown[] = [];
+    const span = spyOn(telemetry, 'withSpan').mockImplementation(((
+      _name: string,
+      _options: unknown,
+      run: (span: { setAttribute: (name: string, value: unknown) => void }) => unknown,
+    ) =>
+      run({
+        setAttribute: (name, value) => {
+          if (name === 'cache.result') results.push(value);
+        },
+      })) as typeof telemetry.withSpan);
+
+    try {
+      await upsertCache(key, 1);
+      await upsertCache(key, 2);
+    } finally {
+      span.mockRestore();
+    }
+
+    expect(results).toEqual(['written', 'kept']);
   });
 });
 
