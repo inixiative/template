@@ -4,6 +4,7 @@
  * @partOf primitive:caching, infrastructure:redis, infrastructure:observability
  * @uses none
  */
+import { singleFlightLockKey } from '@template/db/lock/singleFlight/singleFlightLock';
 import { generationKey } from '@template/db/redis/cache/generation/generationKey';
 import type { Generation } from '@template/db/redis/cache/generation/readGeneration';
 import { publishIfCurrent } from '@template/db/redis/cache/queries/publishIfCurrent';
@@ -18,14 +19,21 @@ export const publishComputed = async (
   redis: RedisEval,
   key: string,
   captured: Generation,
+  holder: string,
   ttlSeconds: number,
   payload: string,
 ): Promise<void> => {
   try {
     const published = await publishIfCurrent(
       redis,
-      { key, generationKey: generationKey(key), writtenKey: writtenKey(key) },
+      {
+        key,
+        generationKey: generationKey(key),
+        writtenKey: writtenKey(key),
+        lockKey: singleFlightLockKey(key),
+      },
       captured,
+      holder,
       ttlSeconds,
       payload,
     );

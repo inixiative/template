@@ -33,15 +33,14 @@ export const ageGatedReclaim = async (
   laneTtlSec: number,
   supersededPrefix: string,
   supersededTtlSec: number,
-): Promise<boolean> =>
-  Number(
-    await redis.eval(
-      AGE_GATED_RECLAIM,
-      1,
-      lane,
-      jobId,
-      String(laneTtlSec),
-      supersededPrefix,
-      String(supersededTtlSec),
-    ),
-  ) === 1;
+): Promise<void> => {
+  await redis.eval(
+    AGE_GATED_RECLAIM,
+    1,
+    lane,
+    jobId,
+    String(laneTtlSec),
+    supersededPrefix,
+    String(supersededTtlSec),
+  );
+};

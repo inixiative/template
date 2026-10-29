@@ -40,6 +40,7 @@ export type AcquireOptions = {
 };
 
 export type Lock = {
+  holder: string;
   acquire: (options?: AcquireOptions) => Promise<boolean>;
   verify: () => Promise<boolean>;
   release: () => Promise<LockReleaseResult>;

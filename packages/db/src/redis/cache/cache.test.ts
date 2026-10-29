@@ -537,7 +537,6 @@ describe('cache invalidation during a read', () => {
     const inFlight = cache(key, paused.produce, 60);
     await paused.hasRead;
     await getRedisClient().del(`lock:cache-singleflight:${key}`);
-    await new Promise((resolve) => setTimeout(resolve, 600));
     await clearKey(cacheKey('race', 'lapsed', [], true));
     paused.resume();
 

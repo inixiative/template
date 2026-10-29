@@ -185,13 +185,37 @@ describe('refreshRollingCacheTarget', () => {
     await rollingCache.markQueued(undefined);
     const ctx = createTestWorker();
 
+    const lane = laneKey(ctx.job.name, key);
+
     const superseded = refreshRollingCacheTarget(ctx, { name, key, target: null });
-    await Bun.sleep(100);
-    await claimLane(laneKey(ctx.job.name, key), 'newer-job');
+    while ((await getRedisClient().get(lane)) !== ctx.job.id) await Bun.sleep(10);
+    await claimLane(lane, 'newer-job');
     await superseded.catch(() => {});
     await aborted;
     await Bun.sleep(50);
 
     expect(await rollingCache.read('value', undefined)).toEqual({ state: 'queued' });
+  });
+
+  it('a leaf whose compute stops quietly at the deadline still reports itself stuck and clears the queued marker on its last attempt', async () => {
+    const name = `quietCache${Bun.randomUUIDv7().slice(-8)}`;
+    registered.push(name);
+    const rollingCache = makeRollingCache({
+      name,
+      intervalSeconds: 300,
+      timeoutSeconds: 1,
+      results: { value: () => cacheKey(name, 'only') },
+      compute: async (_target, { signal }) => {
+        while (!signal?.aborted) await Bun.sleep(10);
+      },
+    });
+    const key = rollingCache.targetKey();
+    await rollingCache.markQueued(undefined);
+
+    await expect(
+      enqueueJob('refreshRollingCacheTarget', { name, key, target: null }),
+    ).rejects.toThrow(`did not refresh ${key} within 1s`);
+
+    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'empty' });
   });
 });

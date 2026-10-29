@@ -268,9 +268,10 @@ Behavior:
 - Real values cached with provided TTL (default 24 hours)
 - **Only the lock holder publishes.** A caller that does not hold the key's single-flight lock waits
   up to 10 seconds for the holder's value, then computes its own and returns it unpublished. A
-  caller that cannot reach the lock or the generation (Redis failing) does the same. The holder
-  publishes only while its lease holds: a pattern clear finds computes by their live locks, so one
-  whose lock lapsed before the clear's lock scan reached it was never cancelled and must not publish.
+  caller that cannot reach the lock or the generation (Redis failing) does the same. The publish
+  eval itself checks that the single-flight lock still holds the caller's token (`lock.holder`): a
+  pattern clear finds computes by their live locks, so one whose lock lapsed or was evicted before
+  the clear's lock scan reached it was never cancelled and must not publish.
 - **A clear cancels the publish.** The holder captures the key's generation before `fn` runs and
   publishes only if it has not moved. A value read before a `clearKey` or an `upsertCache` is
   returned to its caller but never lands in the cache.

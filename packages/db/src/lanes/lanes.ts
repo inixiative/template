@@ -39,8 +39,9 @@ export const getJobSupersededBy = async (jobId: string): Promise<string | null> 
 
 // Marks one job superseded by id, without touching any lane. A superseding child writes its own when
 // it finds its parent superseded, so the tombstone reaches its children in turn.
-export const tombstoneJob = (jobId: string, supersededBy: string): Promise<unknown> =>
-  getRedisClient().set(supersededKey(jobId), supersededBy, 'EX', SUPERSEDED_TTL_SEC);
+export const tombstoneJob = async (jobId: string, supersededBy: string): Promise<void> => {
+  await getRedisClient().set(supersededKey(jobId), supersededBy, 'EX', SUPERSEDED_TTL_SEC);
+};
 
 // A superseding staged job parked in `waiting-children` is not running, so nothing refreshes its lane
 // (LANE_TTL_SEC assumes a running job's watchLane). If the lane expired while it waited, a newer
@@ -55,7 +56,7 @@ export const holdLaneWhileParked = async (lane: string, jobId: string): Promise<
 };
 
 // Re-assert a lapsed baton at job start, never displacing a newer holder (see ageGatedReclaim).
-export const reclaimLane = (lane: string, jobId: string): Promise<boolean> =>
+export const reclaimLane = (lane: string, jobId: string): Promise<void> =>
   ageGatedReclaim(
     getRedisClient(),
     lane,

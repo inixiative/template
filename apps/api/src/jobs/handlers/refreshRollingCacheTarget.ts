@@ -35,25 +35,26 @@ export const refreshRollingCacheTarget = makeSupersedingJob<RefreshRollingCacheT
       const { refresh, timeoutSeconds, channel, clearQueued } = getRollingCache(name);
       const deadline = AbortSignal.timeout(timeoutSeconds * 1000);
       const refreshSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
+      const reportStuck = async (): Promise<never> => {
+        await emitAppEvent('rollingCache.leafStuck', {
+          rollingCache: name,
+          key,
+          target,
+          timeoutSeconds,
+          attempt: job.attemptsMade + 1,
+        });
+        throw new Error(`Rolling cache "${name}" did not refresh ${key} within ${timeoutSeconds}s`);
+      };
       const isRefreshed = await settleWithin(
         refresh(target, { signal: refreshSignal }),
         timeoutSeconds * 1000,
-        async () => {
-          await emitAppEvent('rollingCache.leafStuck', {
-            rollingCache: name,
-            key,
-            target,
-            timeoutSeconds,
-            attempt: job.attemptsMade + 1,
-          });
-          throw new Error(
-            `Rolling cache "${name}" did not refresh ${key} within ${timeoutSeconds}s`,
-          );
-        },
-      ).catch(async (error: unknown) => {
-        if (!signal?.aborted && isFinalAttempt(job)) await clearQueued(target);
-        throw error;
-      });
+        reportStuck,
+      )
+        .then((refreshed) => (refreshed || !deadline.aborted ? refreshed : reportStuck()))
+        .catch(async (error: unknown) => {
+          if (!signal?.aborted && isFinalAttempt(job)) await clearQueued(target);
+          throw error;
+        });
       if (isRefreshed) {
         await emitAppEvent('rollingCache.refreshed', {
           rollingCache: name,

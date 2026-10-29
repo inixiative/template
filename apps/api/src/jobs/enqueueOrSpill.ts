@@ -70,7 +70,7 @@ export const enqueueOrSpill = async ({
         options: jobOptions,
       });
     } catch (err) {
-      if (baton) await releaseLane(baton, jobId, previousHolder).catch(() => {});
+      if (baton) await releaseLane(baton, jobId, previousHolder);
       throw err;
     }
     log.info(`Spilled job ${handlerName} to outbox (${jobId}, ${lane} lane over pressure)`);
@@ -88,7 +88,7 @@ export const enqueueOrSpill = async ({
     const added = await queue.add(handlerName, data, { ...jobOptions, jobId });
     placedId = added?.id ?? jobId;
   } catch (err) {
-    if (baton) await releaseLane(baton, jobId, previousHolder).catch(() => {});
+    if (baton) await releaseLane(baton, jobId, previousHolder);
     throw err;
   }
   if (placedId !== jobId) {

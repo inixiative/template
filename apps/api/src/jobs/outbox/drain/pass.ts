@@ -69,7 +69,7 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
         // retry; don't leave the prior job superseded by a job that never got created. A self-claim
         // (the spill-time baton, previousHolder === jobId) must survive the retry — keep it.
         if (baton && previousHolder !== jobId) {
-          await releaseLane(baton, jobId, previousHolder).catch(() => {});
+          await releaseLane(baton, jobId, previousHolder);
         }
         failed.push(row.id);
         log.error(

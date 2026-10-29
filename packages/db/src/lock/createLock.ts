@@ -180,5 +180,5 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     return releasePromise;
   };
 
-  return { acquire, verify, release, isWithinLease, assertHeld };
+  return { holder: processId, acquire, verify, release, isWithinLease, assertHeld };
 };
