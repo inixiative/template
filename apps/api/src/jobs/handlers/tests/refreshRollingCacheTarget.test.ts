@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   cacheKey,
+  claimLane,
   db,
   flushRedis,
   getRedisClient,
+  laneKey,
   makeRollingCache,
   unregisterRollingCache,
 } from '@template/db';
 import { cleanupTouchedTables, createOrganization } from '@template/db/test';
 import { enqueueJob } from '#/jobs/enqueue';
+import { refreshRollingCacheTarget } from '#/jobs/handlers/refreshRollingCacheTarget';
+import { createTestWorker } from '#tests/createTestWorker';
 
 const registered: string[] = [];
 
@@ -158,5 +162,36 @@ describe('refreshRollingCacheTarget', () => {
       enqueueJob('refreshRollingCacheTarget', { name, key, target: { id: 'organization' } }),
     ).rejects.toThrow('is not registered');
     expect(await getRedisClient().exists(key)).toBe(0);
+  });
+
+  it('a superseded last attempt leaves the queued marker for the run that replaced it', async () => {
+    const name = `supersededCache${Bun.randomUUIDv7().slice(-8)}`;
+    registered.push(name);
+    let isAborted: () => void = () => {};
+    const aborted = new Promise<void>((resolve) => {
+      isAborted = resolve;
+    });
+    const rollingCache = makeRollingCache({
+      name,
+      intervalSeconds: 300,
+      results: { value: () => cacheKey(name, 'only') },
+      compute: async (_target, { signal }) => {
+        while (!signal?.aborted) await Bun.sleep(10);
+        isAborted();
+        signal.throwIfAborted();
+      },
+    });
+    const key = rollingCache.targetKey();
+    await rollingCache.markQueued(undefined);
+    const ctx = createTestWorker();
+
+    const superseded = refreshRollingCacheTarget(ctx, { name, key, target: null });
+    await Bun.sleep(100);
+    await claimLane(laneKey(ctx.job.name, key), 'newer-job');
+    await superseded.catch(() => {});
+    await aborted;
+    await Bun.sleep(50);
+
+    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'queued' });
   });
 });

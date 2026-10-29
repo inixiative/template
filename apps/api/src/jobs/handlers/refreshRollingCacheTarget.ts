@@ -51,7 +51,7 @@ export const refreshRollingCacheTarget = makeSupersedingJob<RefreshRollingCacheT
           );
         },
       ).catch(async (error: unknown) => {
-        if (isFinalAttempt(job)) await clearQueued(target);
+        if (!signal?.aborted && isFinalAttempt(job)) await clearQueued(target);
         throw error;
       });
       if (isRefreshed) {
