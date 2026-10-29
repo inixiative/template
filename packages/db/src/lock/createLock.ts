@@ -71,8 +71,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   // freed if the delete still reaches Redis, otherwise at its TTL — say so, don't stay silent.
   const compareAndDelete = async (): Promise<LockReleaseResult> => {
     try {
-      const result = await fencedDelete(redis, key, processId);
-      return result === 1 ? 'released' : 'notHeld';
+      return (await fencedDelete(redis, key, processId)) ? 'released' : 'notHeld';
     } catch (err) {
       log.error(
         `Lock fenced delete unconfirmed; the key is freed if the delete still reaches Redis, otherwise at its TTL: ${key}`,
@@ -98,7 +97,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   };
 
   const tick = async () => {
-    let renewed: unknown;
+    let renewed: boolean;
     const sentAt = performance.now();
     try {
       renewed = await fencedRefresh(redis, key, processId, ttlMs);
@@ -106,7 +105,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
       log.warn(`Lock refresh failed: ${key}`, err);
       return;
     }
-    if (renewed === 1) {
+    if (renewed) {
       leaseValidUntil = sentAt + ttlMs;
       return;
     }

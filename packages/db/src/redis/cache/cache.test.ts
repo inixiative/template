@@ -530,6 +530,21 @@ describe('cache invalidation during a read', () => {
     expect(await readRaw(key)).toBe('new');
   });
 
+  it('does not publish after its lock lapsed, though the pattern clear that followed found no lock to cancel', async () => {
+    const key = cacheKey('race', 'lapsed', ['v1']);
+    const paused = pausedProducer('old');
+
+    const inFlight = cache(key, paused.produce, 60);
+    await paused.hasRead;
+    await getRedisClient().del(`lock:cache-singleflight:${key}`);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await clearKey(cacheKey('race', 'lapsed', [], true));
+    paused.resume();
+
+    expect(await inFlight).toBe('old');
+    expect(await getRedisClient().get(key)).toBeNull();
+  });
+
   it('keeps a value upserted while a producer was still reading', async () => {
     const key = cacheKey('race', 'upsert');
     const paused = pausedProducer('old');

@@ -16,6 +16,7 @@ import { validateKey } from '@template/db/redis/cache/validateKey';
 import { writtenKey } from '@template/db/redis/cache/writtenKey';
 import { getRedisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
+import { sum } from 'lodash-es';
 
 const clearOne = (redis: ReturnType<typeof getRedisClient>, key: string): Promise<number> =>
   clearExact(
@@ -43,9 +44,12 @@ export const clearKey = async (pattern: string): Promise<number> => {
     for await (const lockKeys of redis.scanStream({
       match: singleFlightLockKey(pattern),
       count: 100,
-    }))
-      for (const lockKey of lockKeys as string[])
-        deleted += await clearOne(redis, lockKey.slice(lockPrefix.length));
+    })) {
+      const cleared = await Promise.all(
+        (lockKeys as string[]).map((lockKey) => clearOne(redis, lockKey.slice(lockPrefix.length))),
+      );
+      deleted += sum(cleared);
+    }
 
     const stream = redis.scanStream({ match: pattern, count: 100 });
 

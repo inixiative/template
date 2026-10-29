@@ -11,5 +11,8 @@ import type { LockRedis } from '@template/db/lock/types';
 const FENCED_DELETE =
   "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
 
-export const fencedDelete = (redis: LockRedis, key: string, token: string): Promise<unknown> =>
-  redis.eval(FENCED_DELETE, 1, key, token);
+export const fencedDelete = async (
+  redis: LockRedis,
+  key: string,
+  token: string,
+): Promise<boolean> => Number(await redis.eval(FENCED_DELETE, 1, key, token)) === 1;

@@ -14,9 +14,7 @@ export const createClaim = (opts: ClaimOptions, redis: LockRedis, key: string): 
   return {
     acquire: async (): Promise<ClaimResult> => {
       const incumbent = await claimOnce(redis, key, holder, ttlMs);
-      return typeof incumbent === 'string'
-        ? { claimed: false, holder: incumbent }
-        : { claimed: true, holder };
+      return incumbent === null ? { claimed: true, holder } : { claimed: false, holder: incumbent };
     },
     verify: async () => (await redis.get(key)) === holder,
   };

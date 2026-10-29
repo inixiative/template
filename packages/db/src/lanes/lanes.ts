@@ -55,7 +55,7 @@ export const holdLaneWhileParked = async (lane: string, jobId: string): Promise<
 };
 
 // Re-assert a lapsed baton at job start, never displacing a newer holder (see ageGatedReclaim).
-export const reclaimLane = (lane: string, jobId: string): Promise<unknown> =>
+export const reclaimLane = (lane: string, jobId: string): Promise<boolean> =>
   ageGatedReclaim(
     getRedisClient(),
     lane,
@@ -73,11 +73,10 @@ export const releaseLane = (
   lane: string,
   jobId: string,
   previousHolder?: string | null,
-): Promise<unknown> =>
+): Promise<void> =>
   fencedRelease(getRedisClient(), lane, jobId, previousHolder ?? '', SUPERSEDED_PREFIX).catch(
     (err) => {
       log.error(`releaseLane: fenced delete failed; lane key will linger until TTL: ${lane}`, err);
-      return null;
     },
   );
 

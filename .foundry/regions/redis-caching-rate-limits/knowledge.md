@@ -619,7 +619,9 @@ Behavior:
 - Real values cached with provided TTL (default 24 hours)
 - **Only the lock holder publishes.** A caller that does not hold the key's single-flight lock waits
   up to 10 seconds for the holder's value, then computes its own and returns it unpublished. A
-  caller that cannot reach the lock or the generation (Redis failing) does the same.
+  caller that cannot reach the lock or the generation (Redis failing) does the same. The holder
+  publishes only while its lease holds: a pattern clear finds computes by their live locks, so one
+  whose lock lapsed before the clear's lock scan reached it was never cancelled and must not publish.
 - **A clear cancels the publish.** The holder captures the key's generation before `fn` runs and
   publishes only if it has not moved. A value read before a `clearKey` or an `upsertCache` is
   returned to its caller but never lands in the cache.
@@ -671,6 +673,11 @@ its publish, and the next caller recomputes. To drop one value you know is bad (
 and clear only if it is still that value: if a recompute is already running the key is empty, so the
 clear is skipped and the caller's next `cache()` waits on the running one. A failed exact clear logs and returns 0; a failed pattern clear throws, because the caller
 cannot tell which of its keys survived.
+
+A pattern clear walks the whole keyspace twice, once for the locks and once for the values, 100 keys
+per SCAN round trip: `SCAN ... MATCH` visits every key whatever the pattern, and lock keys
+(`lock:cache-singleflight:<key>`) share no prefix with values, so one pass would mean `MATCH *` with
+every key sent to the client. The locks in each scanned page are cancelled in parallel.
 
 ##### Automatic Invalidation
 

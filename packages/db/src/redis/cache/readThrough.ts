@@ -37,7 +37,7 @@ export const readThrough = async <T>(
     const value = await fn();
     const effectiveTtl = resolveTtl(value, ttl);
 
-    if (effectiveTtl > 0 && generation !== null)
+    if (effectiveTtl > 0 && generation !== null && lock.isWithinLease())
       await publishComputed(redis, key, generation, effectiveTtl, superjson.stringify(value));
 
     return value;
