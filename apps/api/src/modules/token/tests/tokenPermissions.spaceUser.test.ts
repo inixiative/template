@@ -146,7 +146,7 @@ describe('SpaceUser Token Permissions', () => {
       expect(response.status).toBe(201);
     });
 
-    it('an admin does not mint an owner-role token: it is above their role', async () => {
+    it('an admin mints an owner-role token on their own member row: it holds their role or less (Aron, 2026-10-29)', async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser], [adminSpaceUser]);
       const response = await fetch(
         post(`/api/v1/spaceUser/${adminSpaceUser.id}/tokens`, {
@@ -154,7 +154,7 @@ describe('SpaceUser Token Permissions', () => {
           role: 'owner',
         }),
       );
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(201);
     });
 
     it('member can create member-role token', async () => {
@@ -168,7 +168,7 @@ describe('SpaceUser Token Permissions', () => {
       expect(response.status).toBe(201);
     });
 
-    it('a member does not mint an admin-role token: it is above their role', async () => {
+    it('a member mints an admin-role token on their own member row: it holds their role or less (Aron, 2026-10-29)', async () => {
       const { fetch } = createApp(memberUser, [memberOrgUser], [memberSpaceUser]);
       const response = await fetch(
         post(`/api/v1/spaceUser/${memberSpaceUser.id}/tokens`, {
@@ -176,7 +176,7 @@ describe('SpaceUser Token Permissions', () => {
           role: 'admin',
         }),
       );
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(201);
     });
 
     it('cannot create token for another user', async () => {

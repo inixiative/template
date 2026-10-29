@@ -73,16 +73,16 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
     });
   });
 
-  it('the role is capped by what the member holds: an admin cannot raise it to owner', async () => {
+  it("an admin raises its own token to owner: it holds the member's role or less (Aron, 2026-10-29)", async () => {
     const { seat, user } = await seatOf('admin');
     const { entity: token } = await tokenOf(seat, { role: 'viewer' });
-    expect((await update(as(user, seat), token.id, { role: 'owner' })).status).toBe(403);
+    expect((await update(as(user, seat), token.id, { role: 'owner' })).status).toBe(200);
   });
 
-  it('a viewer cannot raise its token above viewer', async () => {
+  it("a viewer raises its own token above viewer: it holds the member's role or less (Aron, 2026-10-29)", async () => {
     const { seat, user } = await seatOf('viewer');
     const { entity: token } = await tokenOf(seat, { role: 'viewer' });
-    expect((await update(as(user, seat), token.id, { role: 'member' })).status).toBe(403);
+    expect((await update(as(user, seat), token.id, { role: 'member' })).status).toBe(200);
   });
 
   it('another user cannot change my token', async () => {

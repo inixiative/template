@@ -127,8 +127,31 @@ export const createdByItsUserOrManager: ActionRule = {
 
 const notMembers: OwnerModel[] = ['User', 'Organization', 'Space'];
 
+const actorIsItsMember: ActionRule = {
+  all: [
+    { rule: { field: '__actor.record.full', operator: Operator.equals, value: true } },
+    { rule: { field: 'ownerModel', operator: Operator.equals, path: '__actor.record.ownerModel' } },
+    { rule: { field: 'userId', operator: Operator.equals, path: '__actor.record.userId' } },
+    {
+      rule: {
+        field: 'organizationId',
+        operator: Operator.equals,
+        path: '__actor.record.organizationId',
+      },
+    },
+    {
+      any: [
+        ownedBy(['OrganizationUser']),
+        { rule: { field: 'spaceId', operator: Operator.equals, path: '__actor.record.spaceId' } },
+      ],
+    },
+  ],
+};
+
+const itsUserOrMember = (): ActionRule => ({ any: [actorIsItsUser(), actorIsItsMember] });
+
 const membersIntegration: ActionRule = {
-  any: [{ all: [ownedBy(members), actorIsItsUser()] }, actionOnOwner('own', '', members)],
+  any: [{ all: [ownedBy(members), itsUserOrMember()] }, actionOnOwner('own', '', members)],
 };
 
 const membersOwnDelegate = (action: string): ActionRule => ({
@@ -143,7 +166,7 @@ export const integrationAdministering = {
   create: {
     any: [
       createdByItsUserOrManager,
-      { all: [ownedBy(members), actorIsItsUser(), actionOnOwner('operate', '', members)] },
+      { all: [ownedBy(members), itsUserOrMember(), actionOnOwner('operate', '', members)] },
       membersOwnDelegate('manage'),
     ],
   },
@@ -178,7 +201,13 @@ export const integrationRoleWrite: ActionRule = { all: ['manage', roleHeldAtOwne
 
 export const tokenAccessIsYours: ActionRule = {
   any: [
-    { all: [ownedBy(notIntegration), roleHeldAtOwner(), ownedByYouOrOrganizationOrSpace()] },
+    {
+      all: [
+        ownedBy(notIntegration),
+        ownedByYouOrOrganizationOrSpace(),
+        { any: [ownedBy(['User', ...members]), roleHeldAtOwner()] },
+      ],
+    },
     {
       all: [
         ownedBy(['Integration']),

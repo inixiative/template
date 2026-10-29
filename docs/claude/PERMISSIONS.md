@@ -281,7 +281,7 @@ Each pseudo record is built from the anchor down the path: the foreign keys the 
 - `{ token, anchor O via organization, create, where role = member, ownerModel = Organization }`: an admin grants minting O's own member tokens; with no role pinned the role is unknown and the grant is refused.
 - A path that does not end at the anchor's model, through a list, or with no path on another model: 422.
 
-A token's role is checked by `create` on `db:token`; an integration's role by `integrationRoleWrite` on `db:integration` (`validateIntegrationGrant`). Situations: `entitlementGrants.test.ts`, `integrationDelegate.test.ts`, `memberTokenGrants.test.ts`, `packages/permissions/src/rebac/schemaMap.test.ts`.
+A token's role is checked by `create` on `db:token`: a token owned by your user or your own member row takes any role, since it holds your role or less; a token owned by an organization, a space or an integration takes a role you hold there. An integration's role is checked by `integrationRoleWrite` on `db:integration` (`validateIntegrationGrant`). Situations: `entitlementGrants.test.ts`, `integrationDelegate.test.ts`, `memberTokenGrants.test.ts`, `packages/permissions/src/rebac/schemaMap.test.ts`.
 
 ---
 
@@ -379,7 +379,7 @@ Sides are separate axes: `targetOrganization` reaches what O (or its members) re
 | a member (OrganizationUser) | every action | nothing |
 | a space member (SpaceUser) | every action | nothing |
 
-An owner reaches members' integrations so they can be seen and turned off; they are reached by id, not listed. A member's own tokens read and operate that member's integrations as far as their role allows; an admin token of an admin member also adds and manages them. Adding the organization's integrations takes admin; using them takes operate (member). A member adds their own member integration as a member (`operate` on the member's organization or space); through a member token it takes admin, and a token holds its member's role or less (`integrationsUnderOrganization.test.ts`).
+An owner reaches members' integrations so they can be seen and turned off; they are reached by id, not listed. A member's own tokens read and operate that member's integrations as far as their role allows; an admin token of an admin member also adds and manages them, and a full member token is the member: it adds them and owns them. Adding the organization's integrations takes admin; using them takes operate (member). A member adds their own member integration as a member (`operate` on the member's organization or space); through a member token it takes admin, and a token holds its member's role or less (`integrationsUnderOrganization.test.ts`).
 
 ---
 

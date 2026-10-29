@@ -190,10 +190,10 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect(await holds(minted.key!, 'organization', organization.id, 'manage')).toBe(true);
     });
 
-    it('a member mints on its own member row at its role, never above it', async () => {
+    it("a member mints on its own member row at any role: it holds the member's role or less (Aron, 2026-10-29)", async () => {
       const writer = await member('member');
       const path = `organizationUser/${writer.organizationUser.id}`;
-      expect((await mint(writer, path, { role: 'admin' })).status).toBe(403);
+      expect((await mint(writer, path, { role: 'admin' })).status).toBe(201);
       expect((await mint(writer, path, { role: 'member' })).status).toBe(201);
     });
 
