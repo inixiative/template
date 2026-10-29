@@ -8,6 +8,7 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
+  createIntegration,
   createOrganization,
   createOrganizationUser,
 } from '@template/db/test';
@@ -113,5 +114,25 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
       full: true,
       role: null,
     });
+  });
+
+  it("an admin cannot make the organization integration's token full: full needs own on the integration", async () => {
+    const { entity: integration } = await createIntegration({
+      organizationId: organization.id,
+      ownerModel: 'Organization',
+      role: 'viewer',
+    });
+    const tokenOfIntegration = async () =>
+      (await createKeyedToken({ ownerModel: 'Integration', role: 'viewer' }, { integration }))
+        .entity;
+    const full = { full: true, role: null };
+    const admin = await seatOf('admin');
+    expect(
+      (await update(as(admin.user, admin.seat), (await tokenOfIntegration()).id, full)).status,
+    ).toBe(403);
+    const owner = await seatOf('owner');
+    expect(
+      (await update(as(owner.user, owner.seat), (await tokenOfIntegration()).id, full)).status,
+    ).toBe(200);
   });
 });

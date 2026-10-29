@@ -67,6 +67,22 @@ describe('Organizations Tokens', () => {
     });
   });
 
+  describe('POST /api/v1/organization/:id/tokens from outside', () => {
+    it('a user with no seat in the organization mints nothing, a token without a role included', async () => {
+      const { entity: outsider } = await createUser();
+      const { fetch: outsiderFetch } = createTestApp({
+        mockUser: outsider,
+        mockOrganizationUsers: [],
+        mount: [(app) => app.route('/api/v1/organization', organizationRouter)],
+      });
+      for (const role of ['viewer', null])
+        expect(
+          (await outsiderFetch(post(`/api/v1/organization/${org.id}/tokens`, { name: 'k', role })))
+            .status,
+        ).toBe(403);
+    });
+  });
+
   describe('GET /api/v1/organization/:id/tokens', () => {
     it('returns organization tokens without keyHash', async () => {
       await createToken(

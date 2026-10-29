@@ -159,6 +159,20 @@ describe('a member token holds its member row, never the user (template #210 7f6
     expect(await holds(rawKey, 'integration', integration.id, 'manage')).toBe(false);
   });
 
+  it("a space member's stored entitlement stands on the space owner's table, not the member's role", async () => {
+    const { context } = await createOrganizationUser({ role: 'member' }, { organization });
+    const { entity: spaceUser } = await createSpaceUser(
+      { role: 'viewer', entitlements: [entry('db:space', ['db:space', space.id], ['manage'])] },
+      { ...context, space },
+    );
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'SpaceUser', role: null, full: true },
+      { spaceUser },
+    );
+    expect(await holds(rawKey, 'space', space.id, 'manage')).toBe(true);
+    expect(await holds(rawKey, 'space', otherSpace.id, 'manage')).toBe(false);
+  });
+
   it('a SpaceUser token has no me: /me answers 401', async () => {
     const rawKey = await spaceUserKey('owner', 'member', 'member');
     expect((await call(rawKey, 'GET', '/api/v1/me')).status).toBe(401);
