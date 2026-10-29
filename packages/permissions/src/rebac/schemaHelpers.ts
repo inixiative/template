@@ -63,19 +63,16 @@ export const actionOnOwner = (
     })),
 });
 
+const actorIsUserAt = (field: string): ActionRule => ({
+  all: [actorIsUser, { rule: { field, operator: Operator.equals, path: '__actor.record.id' } }],
+});
+
 export const actorIsItsUser = (at = ''): ActionRule => ({
   all: [
     { rule: { field: `${at}userId`, operator: Operator.notEmpty } },
     {
       any: [
-        {
-          all: [
-            actorIsUser,
-            {
-              rule: { field: `${at}userId`, operator: Operator.equals, path: '__actor.record.id' },
-            },
-          ],
-        },
+        actorIsUserAt(`${at}userId`),
         {
           all: [
             actorIsDelegateOfUser,
@@ -127,74 +124,52 @@ export const createdByItsUserOrManager: ActionRule = {
 
 const notMembers: OwnerModel[] = ['User', 'Organization', 'Space'];
 
-const actorIsItsMember: ActionRule = {
-  all: [
-    { rule: { field: '__actor.record.full', operator: Operator.equals, value: true } },
-    { rule: { field: 'ownerModel', operator: Operator.equals, path: '__actor.record.ownerModel' } },
+const actorHoldsItsRow: ActionRule = {
+  any: [
+    actorIsUserAt('userId'),
     { rule: { field: 'userId', operator: Operator.equals, path: '__actor.record.userId' } },
+  ],
+};
+
+export const actorHoldsOrOwnsOwner: ActionRule = {
+  any: [
+    { all: [ownedBy(['User', ...members]), actorIsUserAt('userId')] },
+    { all: [ownedBy(notIntegration), actionOnOwner('own', '', notIntegration)] },
     {
-      rule: {
-        field: 'organizationId',
-        operator: Operator.equals,
-        path: '__actor.record.organizationId',
-      },
-    },
-    {
-      any: [
-        ownedBy(['OrganizationUser']),
-        { rule: { field: 'spaceId', operator: Operator.equals, path: '__actor.record.spaceId' } },
+      all: [
+        ownedBy(['Integration']),
+        ownedBy(['User', ...members], 'integration.'),
+        { any: [actorIsUserAt('integration.userId'), { rel: 'integration', action: 'own' }] },
       ],
     },
   ],
 };
 
-const itsUserOrMember = (): ActionRule => ({ any: [actorIsItsUser(), actorIsItsMember] });
+const membersIntegration = actionOnOwner('own', '', members);
 
-const membersIntegration: ActionRule = {
-  any: [{ all: [ownedBy(members), itsUserOrMember()] }, actionOnOwner('own', '', members)],
-};
-
-const membersOwnDelegate = (action: string): ActionRule => ({
-  all: [
-    ownedBy(members),
-    { rule: { field: 'userId', operator: Operator.equals, path: '__actor.record.userId' } },
-    actionOnOwner(action, '', members),
-  ],
-});
+const usersIntegration: ActionRule = { all: [ownedBy(['User']), actorIsItsUser()] };
 
 export const integrationAdministering = {
   create: {
     any: [
       createdByItsUserOrManager,
-      { all: [ownedBy(members), itsUserOrMember(), actionOnOwner('operate', '', members)] },
-      membersOwnDelegate('manage'),
+      {
+        all: [ownedBy(members), actorHoldsItsRow, 'manage', actionOnOwner('operate', '', members)],
+      },
     ],
   },
   own: {
-    any: [actorIsItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
+    any: [usersIntegration, actionOnOwner('own', '', organizationOrSpace), membersIntegration],
   },
   manage: {
-    any: [
-      actorIsItsUser(),
-      actionOnOwner('manage', '', organizationOrSpace),
-      membersIntegration,
-      membersOwnDelegate('manage'),
-    ],
+    any: [usersIntegration, actionOnOwner('manage', '', organizationOrSpace), membersIntegration],
   },
   delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
 } satisfies Record<string, ActionRule>;
 
 export const integrationAccess = {
-  operate: {
-    any: [
-      actionOnOwner('operate', '', notMembers),
-      membersIntegration,
-      membersOwnDelegate('operate'),
-    ],
-  },
-  read: {
-    any: [actionOnOwner('read', '', notMembers), membersIntegration, membersOwnDelegate('read')],
-  },
+  operate: { any: [actionOnOwner('operate', '', notMembers), membersIntegration] },
+  read: { any: [actionOnOwner('read', '', notMembers), membersIntegration] },
 } satisfies Record<string, ActionRule>;
 
 export const integrationRoleWrite: ActionRule = { all: ['manage', roleHeldAtOwner()] };

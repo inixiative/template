@@ -4,6 +4,7 @@
  * @partOf primitive:authz
  * @uses none
  */
+import { Operator } from '@inixiative/json-rules';
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import {
@@ -12,17 +13,34 @@ import {
   type PermissionEntry,
   type Permix,
 } from '@template/permissions/client';
+import { narrowing } from '@template/permissions/roles/narrowing';
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
 
 export type Grant = { entries: PermissionEntry[]; owner?: Grant[] };
 
-type OrganizationMember = { role: Role; organizationId: string; entitlements?: unknown };
-type SpaceMember = { role: Role; spaceId: string; entitlements?: unknown };
+type OrganizationMember = {
+  id: string;
+  role: Role;
+  organizationId: string;
+  entitlements?: unknown;
+};
+type SpaceMember = { id: string; role: Role; spaceId: string; entitlements?: unknown };
 
 const entitlementsOf = (member: { entitlements?: unknown }): EntitlementEntry[] =>
   (member.entitlements ?? []) as EntitlementEntry[];
+
+const ownsItsIntegrations = (
+  memberModel: 'OrganizationUser' | 'SpaceUser',
+  id: string,
+): EntitlementEntry => {
+  const path = memberModel === 'OrganizationUser' ? 'organizationUser' : 'spaceUser';
+  return {
+    ...narrowing('db:integration', { resource: `db:${path}`, id, path }, 'owner'),
+    where: { field: 'ownerModel', operator: Operator.equals, value: memberModel },
+  };
+};
 
 export const organizationOwnerGrants = (organizationId: string): Grant[] => [
   { entries: [getOrgPermissions('owner', organizationId as OrganizationId)] },
@@ -50,10 +68,16 @@ export const userGrants = (
     ],
   },
   ...members.flatMap((member) =>
-    ownedBy(entitlementsOf(member), organizationOwnerGrants(member.organizationId)),
+    ownedBy(
+      [ownsItsIntegrations('OrganizationUser', member.id), ...entitlementsOf(member)],
+      organizationOwnerGrants(member.organizationId),
+    ),
   ),
   ...spaceMembers.flatMap((member) =>
-    ownedBy(entitlementsOf(member), spaceOwnerGrants(member.spaceId)),
+    ownedBy(
+      [ownsItsIntegrations('SpaceUser', member.id), ...entitlementsOf(member)],
+      spaceOwnerGrants(member.spaceId),
+    ),
   ),
 ];
 
