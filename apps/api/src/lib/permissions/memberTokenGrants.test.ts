@@ -98,15 +98,16 @@ describe('a member token holds its member row, never the user (template #210 7f6
     expect(await holds(rawKey, 'space', space.id, 'operate')).toBe(false);
   });
 
-  it('a token create stored on a member mints nothing: minting is create on a token, and only a user mints', async () => {
+  it('a token create stored on a member mints nothing through its token: only a user mints', async () => {
     const { rawKey } = await memberKey('member', { role: null, full: true }, [
-      entry('db:token', ['db:organization', organization.id], ['create']),
+      entry('db:token', ['db:organization', organization.id, 'organization'], ['create']),
     ]);
     const response = await call(rawKey, 'POST', `/api/v1/organization/${organization.id}/tokens`, {
       name: 'k',
       role: 'viewer',
     });
     expect(response.status).toBe(403);
+    expect(((await response.json()) as { message: string }).message).toBe('Access denied');
   });
 
   it('a SpaceUser token has no me: /me answers 401', async () => {

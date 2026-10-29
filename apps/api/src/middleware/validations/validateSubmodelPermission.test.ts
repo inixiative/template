@@ -279,12 +279,15 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
   describe('attempts to get around it', () => {
     it("a body naming another owner changes nothing: the check is on the route's owner", async () => {
       const { entity: other } = await createOrganization();
-      const response = await app.request(`/api/v1/organization/${organization.id}/contacts`, {
-        method: 'POST',
-        headers: { ...org.member, 'content-type': 'application/json' },
-        body: JSON.stringify({ ownerModel: 'Organization', organizationId: other.id }),
-      });
-      expect(response.status).toBe(403);
+      const post = (headers: Headers) =>
+        app.request(`/api/v1/organization/${organization.id}/contacts`, {
+          method: 'POST',
+          headers: { ...headers, 'content-type': 'application/json' },
+          body: JSON.stringify({ ownerModel: 'Organization', organizationId: other.id }),
+        });
+      expect((await post(org.admin)).status).toBe(422);
+      const { context } = await createOrganizationUser({ role: 'owner' }, { organization: other });
+      expect((await post(await jwt(context.user))).status).toBe(403);
     });
 
     it('a WS subscribe probe answers as the route does', async () => {
