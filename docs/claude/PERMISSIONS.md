@@ -337,7 +337,7 @@ write a custom middleware that returns 404 when the permission check fails.
 
 ## Entitlements
 
-Grants beyond a role, stored as library entries `{ resource, anchor: { resource, id, path? }, where?, actions }` (`entitlementEntriesSchema`). Delegates (tokens, integrations) install theirs with their owner's table as owner ([Delegates and Their Owners](#delegates-and-their-owners)). Member rows (`OrganizationUser`, `SpaceUser`) install theirs with their tenant as owner: the organization's or the space's owner table. A flat action map is refused (422).
+Grants beyond a role, stored as library entries `{ resource, anchor: { resource, id, path? }, where?, actions }` (`entitlementEntriesSchema`). Delegates (tokens, integrations) install theirs with their owner's table as owner ([Delegates and Their Owners](#delegates-and-their-owners)). Member rows (`OrganizationUser`, `SpaceUser`) install theirs with their tenant as owner: the organization's or the space's owner table. A flat action map is refused (422). An entry that reached the database past that check is dropped when the holder signs in (`storedEntitlements`, by the library's `entitlementProblem`); the rest of its entries and its role still install. A token or integration with no role that is not `full` stands on its entitlements alone, so one malformed entry signs it out (401).
 
 ### How Entitlements Are Applied
 

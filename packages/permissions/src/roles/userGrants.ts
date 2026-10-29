@@ -14,6 +14,7 @@ import {
 } from '@template/permissions/client';
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
+import { storedEntitlements } from '@template/permissions/roles/storedEntitlements';
 import { getUserPermissions } from '@template/permissions/roles/user';
 
 export type Grant = { entries: PermissionEntry[]; owner?: Grant[] };
@@ -22,7 +23,7 @@ type OrganizationMember = { role: Role; organizationId: string; entitlements?: u
 type SpaceMember = { role: Role; spaceId: string; entitlements?: unknown };
 
 const entitlementsOf = (member: { entitlements?: unknown }): EntitlementEntry[] =>
-  (member.entitlements ?? []) as EntitlementEntry[];
+  storedEntitlements(member.entitlements);
 
 export const organizationOwnerGrants = (organizationId: string): Grant[] => [
   { entries: [getOrgPermissions('owner', organizationId as OrganizationId)] },

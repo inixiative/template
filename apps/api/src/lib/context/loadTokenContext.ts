@@ -13,7 +13,8 @@ import {
   toAccessor,
   type UserWithRelations,
 } from '@template/db';
-import type { Token, TokenOwnerModel } from '@template/db/generated/client/client';
+import type { Integration, Token, TokenOwnerModel } from '@template/db/generated/client/client';
+import { standsOnMalformedEntitlements } from '@template/permissions';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
@@ -48,6 +49,11 @@ export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | n
 
   const token = await hydrate('token', row);
   if (!ownerIsPresent(token)) return null;
+  if (
+    standsOnMalformedEntitlements(token) ||
+    standsOnMalformedEntitlements(token.integration as Integration | null | undefined)
+  )
+    return null;
 
   const user =
     token.ownerModel === 'User' && token.userId ? await findUserWithRelations(token.userId) : null;
