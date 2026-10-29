@@ -104,7 +104,7 @@ const key = `cache:User:${id}`;  // Don't do this
 | `lock` | `lock:*` | Distributed locks via `createLock` |
 | `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
 | `cacheWritten` | `cachewritten:*` | When the value under a `cache:` key was written (epoch ms); set and cleared with the value, read by `checkCache` |
-| `cacheGeneration` | `cachegen:*` | A `cache:` key's generation (`cachegen:<key>`) and the cache-wide epoch (`cachegen:epoch`); a clear moves them so a compute in flight skips its publish |
+| `cacheGeneration` | `cachegen:*` | A `cache:` key's generation (`cachegen:<key>`); a clear moves it so a compute in flight skips its publish |
 | `cacheQueued` | `cachequeued:*` | A rolling-cache target whose refresh is enqueued and has not taken its lock; read by `checkCache` as `queued` |
 | `rollingCache` | `rollingcache:*` | Rolling-cache timers (`rollingcache:timer:<name>`), kept out of `cache:` so a flush never reschedules a refresh |
 
@@ -266,13 +266,16 @@ Behavior:
 - Computes via fn() on cache miss; concurrent misses on one key compute once (single-flight)
 - **Negative caching**: `null`/`undefined` cached with 1 min TTL (prevents thundering herd, allows quick discovery of new records)
 - Real values cached with provided TTL (default 24 hours)
-- **A clear cancels the publish.** The compute captures the key's generation and the cache epoch
-  before `fn` runs and publishes only if neither moved. A value read before a `clearKey` or an
-  `upsertCache` is returned to its caller but never lands in the cache. Without the lock or the
-  generation (Redis failing) the value is returned unpublished.
+- **Only the lock holder publishes.** A caller that does not hold the key's single-flight lock waits
+  up to 10 seconds for the holder's value, then computes its own and returns it unpublished. A
+  caller that cannot reach the lock or the generation (Redis failing) does the same.
+- **A clear cancels the publish.** The holder captures the key's generation before `fn` runs and
+  publishes only if it has not moved. A value read before a `clearKey` or an `upsertCache` is
+  returned to its caller but never lands in the cache.
 
 Telemetry: each call opens a `cache <accessor>` span labelled with its result, and reads count into
-`cache.read` by accessor and result (`hit`, `miss`, `error`). A single-flight wait is timed into
+`cache.read` by accessor and result (`hit`, `miss`, `error`); an `upsertCache` span records `written`,
+`kept` or `error`. A single-flight wait is timed into
 `cache.lock.wait`; a publish skipped because a clear ran counts into `cache.publish.skipped`. Every
 tag is the accessor, never the key, so cardinality stays bounded.
 ### checkCache()
@@ -310,9 +313,10 @@ await clearKey('cache:User:*');
 ```
 
 A clear also cancels computes in flight. An exact clear deletes the value and its write time and moves
-the key's generation in one Lua call; a pattern clear moves the cache-wide epoch before it scans.
-Either way a `cache()` compute that read before the clear skips its publish, and the next caller
-recomputes. To drop one value you know is bad (a token the vendor rejected), read it with `checkCache`
+the key's generation in one Lua call. A pattern clear first scans the single-flight locks under the
+pattern and clears each of those keys the same way, so only the computes it matches are cancelled,
+then scans and deletes the values. Either way a `cache()` compute that read before the clear skips
+its publish, and the next caller recomputes. To drop one value you know is bad (a token the vendor rejected), read it with `checkCache`
 and clear only if it is still that value: if a recompute is already running the key is empty, so the
 clear is skipped and the caller's next `cache()` waits on the running one. A failed exact clear logs and returns 0; a failed pattern clear throws, because the caller
 cannot tell which of its keys survived.

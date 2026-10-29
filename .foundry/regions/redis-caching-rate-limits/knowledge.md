@@ -27,7 +27,7 @@
 The API-wide limiter (principal, space, organization) and the /api/auth/* per-IP limiter.
 
 **cache**  
-Get-or-compute with TTL (default 24h), single-flight on misses, negative caching of null for 1 minute.
+Get-or-compute with TTL (default 24h), single-flight on misses (only the lock holder publishes; a caller that waits 10 seconds without the lock returns its value unpublished), negative caching of null for 1 minute.
 
 **cacheKey**  
 The one builder of canonical keys: cache:{accessor}:{field}:{value}[:{tags}][:*].
@@ -39,7 +39,7 @@ The reverse-reference map: per model, every cache key a record is reachable by; 
 The read-through cache(): cache keys, TTLs, single-flight, mutation-driven invalidation.
 
 **clearKey**  
-Delete an exact cache key or a wildcard pattern via SCAN.
+Delete an exact cache key or a wildcard pattern via SCAN, cancelling the computes in flight it matches: each key's generation moves, so a compute that read before the clear skips its publish.
 
 **clientIp**  
 Non-null caller IP from the trusted x-forwarded-for hop, IPv6 bucketed to /64.
@@ -96,7 +96,7 @@ Redis connections, key namespaces and built-in key uses.
 The reserved key prefixes: bull, cache, job, ws, otp, session, limit, lock, lane.
 
 **upsertCache**  
-Write a value already in hand into the cache.
+Write a value already in hand into the cache: set-if-absent unless forced, checked and written in one Lua call; it moves the key's generation, so a compute in flight on that key skips its publish.
 
 **wildcard key**  
 A cacheKey with the wildcard flag, ending in :*, to clear a family of keys.
@@ -109,7 +109,7 @@ The template's Redis layer: the role-separated connections and namespaced keys e
 
 All Redis access comes from packages/db/src/redis: getRedisClient for every regular command (cache, rate limits, sessions, OTP), getRedisSub for blocking SUBSCRIBE, getRedisPub for publishing, and createRedisConnection for dedicated connections such as BullMQ. Every key is built on a redisNamespace prefix (cache, limit, session, otp, job, lock, lane, ws, bull). Lua scripts live in the owning module's queries/ folder with the function that evals them (the lua-in-queries CI rule). In tests every connection is one in-memory mock, cleared with flushRedis.
 
-Caching is read-through: cache(cacheKey(...), fn, ttl) returns a hit or computes, single-flights misses and negatively caches null for a minute; upsertCache writes a value you already hold; clearKey deletes exact keys or SCAN patterns. Keys are built only with cacheKey, which normalizes the domain so writes and clears meet. Invalidation is automatic: the cacheReference map lists, per model, every key a record is read under, and an after-commit hook clears keys from both the previous and the result row. Read failures degrade to a miss. Do not cache reads whose invalidation needs a graph walk; raw SQL writes that bypass the mutation lifecycle must clear explicitly; each cached entity needs a read-after-write test.
+Caching is read-through: cache(cacheKey(...), fn, ttl) returns a hit or computes, single-flights misses and negatively caches null for a minute; upsertCache writes a value you already hold; clearKey deletes exact keys or SCAN patterns. A clear or an upsert moves the key's generation, and a compute publishes only if the generation it read before running is unchanged, so a value read before a clear never lands; a pattern clear finds the computes it cancels by their single-flight locks. Keys are built only with cacheKey, which normalizes the domain so writes and clears meet. Invalidation is automatic: the cacheReference map lists, per model, every key a record is read under, and an after-commit hook clears keys from both the previous and the result row. Read failures degrade to a miss. Do not cache reads whose invalidation needs a graph walk; raw SQL writes that bypass the mutation lifecycle must clear explicitly; each cached entity needs a read-after-write test.
 
 Rate limits are identity limits: rateLimit(rules) ANDs fixed-window buckets (one atomic Lua INCR + PEXPIRE per rule, incrementFixedWindows), returns 429 with Retry-After, and fails open when Redis is down. apiRateLimit covers the API keyed by principal, space and organization; authRateLimit covers /api/auth/* per IP. Identities come from userIdentity (c.get('user')?.id ?? c.get('token')?.userId) or clientIp (IPv6 bucketed to /64), and maxes come only from rateLimitMax. Batch sub-requests are not counted; cost limits on spend are a separate detector. Not here: BullMQ jobs and cron (jobs-cron), distributed locks and supersede lanes (concurrency-locks, though they use the lock/lane namespaces), the job overflow flags and depth probe (job-lanes-outbox), WebSocket pub/sub (ws-connections) and stream seq (ws-channels / ws-data-streams), and the frontend's TanStack query-key invalidation.
 
@@ -172,15 +172,15 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| return it from the cache or compute and store it; get or set in one call; I'll do a get, parse, compute on miss, set with expiry; two concurrent misses should only compute once; redis being down shouldn't break the read; a null result should be cached too | **cache** · primitive `packages/db/src/redis/cache.ts#cache` — One-off read-through caching; values recomputed on a timer belong in makeRollingCache. | docs/claude/REDIS.md § Cache Utilities; docs/claude/JOBS.md § Handler Patterns › Rolling Caches (Root, Branch, Leaf) | A hand-written `const hit = await redis.get(key); if (hit) return JSON.parse(hit); const v = await fn(); await redis.set(key, JSON.stringify(v), 'EX', ttl)` get-or-set without single-flight, negative caching or graceful degradation. (docs/claude/REDIS.md § cache() Get-or-Set; § Cache Fallback). throws cache key Error (`server-error`) |
-| build the key so the write and the clear match; I'll format the key with a template string; two utilities for the same job, one key builder; the key never matched so the clear missed; the cache key generator in code and in docs | **cacheKey** · primitive `packages/db/src/redis/cache.ts#cacheKey` — Always use instead of hand-formatted key strings, or invalidation silently misses. | docs/claude/REDIS.md § Cache Utilities; docs/claude/HOOKS.md § Cache Invalidation | Template-string cache keys (`cache:user:${id}`) or differently cased domains, so the clear never meets the write. (docs/claude/REDIS.md § Invalidation conventions ("Always build keys with cacheKey, never hand-format")) |
+| return it from the cache or compute and store it; get or set in one call; I'll do a get, parse, compute on miss, set with expiry; two concurrent misses should only compute once; redis being down shouldn't break the read; a null result should be cached too | **cache** · primitive `packages/db/src/redis/cache/cache.ts#cache` — One-off read-through caching; values recomputed on a timer belong in makeRollingCache. | docs/claude/REDIS.md § Cache Utilities; docs/claude/JOBS.md § Handler Patterns › Rolling Caches (Root, Branch, Leaf) | A hand-written `const hit = await redis.get(key); if (hit) return JSON.parse(hit); const v = await fn(); await redis.set(key, JSON.stringify(v), 'EX', ttl)` get-or-set without single-flight, negative caching or graceful degradation. (docs/claude/REDIS.md § cache() Get-or-Set; § Cache Fallback). throws cache key Error (`server-error`) |
+| build the key so the write and the clear match; I'll format the key with a template string; two utilities for the same job, one key builder; the key never matched so the clear missed; the cache key generator in code and in docs | **cacheKey** · primitive `packages/db/src/redis/cache/cacheKey.ts#cacheKey` — Always use instead of hand-formatted key strings, or invalidation silently misses. | docs/claude/REDIS.md § Cache Utilities; docs/claude/HOOKS.md § Cache Invalidation | Template-string cache keys (`cache:user:${id}`) or differently cased domains, so the clear never meets the write. (docs/claude/REDIS.md § Invalidation conventions ("Always build keys with cacheKey, never hand-format")) |
 | clear the cache automatically when the row changes; add the one-liner to the cache-clear map; I'll clear the key in the service after the update; register every key this model is read under; the after-commit hook clears old and new keys; we shouldn't cache things we can't clear | **cacheReference** · primitive `apps/api/src/hooks/cache/constants/cacheReference.ts#cacheReference` — Register keys here so the clear-cache hook invalidates automatically; don't clear caches by hand in services. | docs/claude/HOOKS.md § Cache Invalidation | Calling clearKey / redis.del in a service after an update instead of registering the model's keys in cacheReference so the after-commit hook clears them. (catalog entry cacheReference; docs/claude/HOOKS.md § Cache Invalidation) |
-| clear this exact key or pattern; an ad-hoc clear outside the mutation hooks; defer the clears to after commit; wildcard invalidation with a scan | **clearKey** · primitive `packages/db/src/redis/cache.ts#clearKey` — Invalidation; mutation cache hooks already clear post-commit, call directly only outside them. | docs/claude/REDIS.md § Cache Utilities; docs/claude/HOOKS.md § Ordered List | — |
+| clear this exact key or pattern; an ad-hoc clear outside the mutation hooks; defer the clears to after commit; wildcard invalidation with a scan | **clearKey** · primitive `packages/db/src/redis/cache/clearKey.ts#clearKey` — Invalidation; mutation cache hooks already clear post-commit, call directly only outside them. | docs/claude/REDIS.md § Cache Utilities; docs/claude/HOOKS.md § Ordered List | — |
 | load one record by id or unique key, cached; I'll wrap the find in a redis get and set; a single row by key, not a lens or relations; look up the user by id with caching | **fetchOne** · primitive `packages/db/src/hydrate/fetchOne.ts#fetchOne` — Single record by key: fetchOne; already have the record and need relations: hydrate; set of rows from a lens: fetchLens. | — | A findUnique wrapped in a hand-rolled Redis get/set to cache a single record by id or unique field. (catalog entry fetchOne) |
-| look up a registered rolling cache by name, throwing if none registered | **getRollingCache** · primitive `packages/db/src/redis/rollingCacheRegistry.ts#getRollingCache` — Single known cache: use this; iterating all caches: listRollingCaches instead. | docs/claude/REDIS.md § Cache Utilities | — |
-| register a cached value that shared handlers recompute on a timer | **makeRollingCache** · primitive `packages/db/src/redis/makeRollingCache.ts#makeRollingCache` — For values recomputed on a schedule, instead of a new job handler or CronJob row; one-off reads use cache(). | docs/claude/REDIS.md § Cache Utilities; docs/claude/JOBS.md § Handler Patterns › Rolling Caches (Root, Branch, Leaf) | — |
-| register a named rolling cache so the minute coordinator refreshes it | **registerRollingCache** · primitive `packages/db/src/redis/rollingCacheRegistry.ts#registerRollingCache` — Defining a new rolling cache; names must be unique or it throws. | — | — |
-| I already have the value, just store it; write a known value into the cache; I'll set it with a manual redis set and expiry; not compute-on-miss, I hold the value already | **upsertCache** · primitive `packages/db/src/redis/cache.ts#upsertCache` — When you already hold the value; cache() when it must be computed on miss. | — | — |
+| look up a registered rolling cache by name, throwing if none registered | **getRollingCache** · primitive `packages/db/src/redis/cache/rollingCache/rollingCacheRegistry.ts#getRollingCache` — Single known cache: use this; iterating all caches: listRollingCaches instead. | docs/claude/REDIS.md § Cache Utilities | — |
+| register a cached value that shared handlers recompute on a timer | **makeRollingCache** · primitive `packages/db/src/redis/cache/rollingCache/makeRollingCache.ts#makeRollingCache` — For values recomputed on a schedule, instead of a new job handler or CronJob row; one-off reads use cache(). | docs/claude/REDIS.md § Cache Utilities; docs/claude/JOBS.md § Handler Patterns › Rolling Caches (Root, Branch, Leaf) | — |
+| register a named rolling cache so the minute coordinator refreshes it | **registerRollingCache** · primitive `packages/db/src/redis/cache/rollingCache/rollingCacheRegistry.ts#registerRollingCache` — Defining a new rolling cache; names must be unique or it throws. | — | — |
+| I already have the value, just store it; write a known value into the cache; I'll set it with a manual redis set and expiry; not compute-on-miss, I hold the value already | **upsertCache** · primitive `packages/db/src/redis/cache/upsertCache.ts#upsertCache` — When you already hold the value; cache() when it must be computed on miss. | — | — |
 | require every makeRollingCache definition to be imported by the worker's refresh barrel | **rolling-cache-registered** · rule `scripts/ci/rules/rolling-cache-registered.sh` — Applies whenever you call makeRollingCache from @template/db; without the barrel entry the cache is never refreshed. | docs/claude/JOBS.md § Handler Patterns › Rolling Caches (Root, Branch, Leaf); docs/claude/REDIS.md § Cache Utilities | — |
 | mutations clear the cache without any code in services; invalidation driven by the lifecycle hooks; I'll sprinkle clears after each write; raw sql writes bypass it, clear by hand there | **Automatic cache invalidation via reference map** · pattern docs/claude/REDIS.md § Cache Utilities › Automatic Invalidation — Mutation-driven caches; values computed from aggregated data: rolling cache instead. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | — |
 | tests shouldn't hit the real queue; the queue is mocked by default in tests | **BullMQ queue mock** · pattern tests/mocks/queue.ts — stub queue add/getJobs so tests don't process real jobs | part 4 | — |
@@ -188,8 +188,8 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | cache the permission lookups across calls; I'll memoize the whole check call; wrap the single load read, not the engine; the hydrator already de-dupes within one call | **Cache in hydrator load seam** · pattern @inixiative/permissions/README.md § Hydration (Prisma example) — Hydrator already de-dupes within one call; wrap load only for cross-call caching. | code `createHydrator`, `buildPrismaMapV7`, `createRebacCheck`, `buildPrismaMapV6` | a memo map wrapped around the whole hydrator or check call, or caching added inside the engine, instead of wrapping the single read passed as load (@inixiative/permissions/README.md § Hydration ("load is the cache seam")) |
 | tests run against an in-memory redis; all connections go to one shared mock under test | **In-memory Redis mock in tests** · pattern packages/db/src/redis/client.ts — route getRedisClient, getRedisSub and createRedisConnection to one shared RedisMock in tests | part 4 | — |
 | log when redis connects or errors; redis connection events go through the shared logger | **Redis connection event logging** · pattern docs/claude/REDIS.md § Error Handling › Connection Errors — log Redis connect and error events through the shared logger | part 4 | — |
-| serve a rolling cache entry, computing once via cache() on cold miss | **read** · primitive packages/db/src/redis/makeRollingCache.ts — Normal reads; refresh to force recompute. | part 4 | — |
-| recompute one target and overwrite its entry, skipping write if aborted | **refresh** · primitive packages/db/src/redis/makeRollingCache.ts — Forcing recompute; read for serving values. | part 4 | — |
+| serve a rolling cache entry, computing once via cache() on cold miss | **read** · primitive packages/db/src/redis/cache/rollingCache/makeRollingCache.ts — Normal reads; refresh to force recompute. | part 4 | — |
+| recompute one target and overwrite its entry, skipping write if aborted | **refresh** · primitive packages/db/src/redis/cache/rollingCache/makeRollingCache.ts — Forcing recompute; read for serving values. | part 4 | — |
 | the key contains the word undefined; catch a bad key before it hits redis | **validateKey** · primitive docs/claude/REDIS.md § Error Handling › Key Validation — throw when a cache key contains 'undefined' to catch bugs early | part 4 | throws cache key Error (`server-error`) |
 | never hand-format a cache key; every read, write and clear uses the same builder | **Build cache keys only with cacheKey** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Every cache read, write and invalidation. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | Any hand-formatted key in a cache read, write or clear. (docs/claude/REDIS.md § Invalidation conventions) |
 | A cache compute function must never return null or undefined. | **compute never returns null or undefined** · rule docs/claude/REDIS.md — Any cache() or rolling cache compute callback. | part 4 | — |
@@ -201,7 +201,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Every rolling cache module must be imported in the rollingCaches registry. | **Register rolling caches in rollingCaches.ts** · rule apps/api/src/lib/rollingCaches.ts — Every makeRollingCache definition; enforced by rolling-cache-registered CI rule. | part 4 | — |
 | targets must be { model, args } with real findMany args selecting JSON-scalar columns. | **Rolling cache targets use Prisma findMany args** · rule docs/claude/REDIS.md § Cache Utilities › Rolling Caches — Per-target rolling caches; omit targets for one system-wide value. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | — |
 
-- *Also here, by name:* MAX_ROLLING_CACHE_TARGETS (`packages/db/src/redis/rollingCacheTypes.ts`); MIN_ROLLING_CACHE_INTERVAL_SECONDS (`packages/db/src/redis/rollingCacheTypes.ts`); ROLLING_CACHE_LEAF_ATTEMPTS (`packages/db/src/redis/rollingCacheTypes.ts`); ROLLING_CACHE_TICK_SECONDS (`packages/db/src/redis/rollingCacheTypes.ts`); coordinateRollingCaches (`apps/api/src/jobs/handlers/coordinateRollingCaches.ts`); fetchCacheKeys (`apps/api/src/hooks/cache/constants/cacheReference.ts`); listRollingCaches (`packages/db/src/redis/rollingCacheRegistry.ts`); refreshRollingCache (`apps/api/src/jobs/handlers/refreshRollingCache.ts`); refreshRollingCacheTarget (`apps/api/src/jobs/handlers/refreshRollingCacheTarget.ts`); registerClearCacheHook (`apps/api/src/hooks/cache/hook.ts`); resolveRollingCacheTargets (`packages/db/src/redis/resolveRollingCacheTargets.ts`); rollingCacheTimerKey (`apps/api/src/jobs/rollingCacheTimerKey.ts`); unregisterRollingCache (`packages/db/src/redis/rollingCacheRegistry.ts`)
+- *Also here, by name:* MAX_ROLLING_CACHE_TARGETS (`packages/db/src/redis/cache/rollingCache/rollingCacheTypes.ts`); MIN_ROLLING_CACHE_INTERVAL_SECONDS (`packages/db/src/redis/cache/rollingCache/rollingCacheTypes.ts`); ROLLING_CACHE_LEAF_ATTEMPTS (`packages/db/src/redis/cache/rollingCache/rollingCacheTypes.ts`); ROLLING_CACHE_TICK_SECONDS (`packages/db/src/redis/cache/rollingCache/rollingCacheTypes.ts`); coordinateRollingCaches (`apps/api/src/jobs/handlers/coordinateRollingCaches.ts`); fetchCacheKeys (`apps/api/src/hooks/cache/constants/cacheReference.ts`); listRollingCaches (`packages/db/src/redis/cache/rollingCache/rollingCacheRegistry.ts`); refreshRollingCache (`apps/api/src/jobs/handlers/refreshRollingCache.ts`); refreshRollingCacheTarget (`apps/api/src/jobs/handlers/refreshRollingCacheTarget.ts`); registerClearCacheHook (`apps/api/src/hooks/cache/hook.ts`); resolveRollingCacheTargets (`packages/db/src/redis/cache/rollingCache/resolveRollingCacheTargets.ts`); rollingCacheTimerKey (`apps/api/src/jobs/rollingCacheTimerKey.ts`); unregisterRollingCache (`packages/db/src/redis/cache/rollingCache/rollingCacheRegistry.ts`)
 
 ### Class `rate-limiting`: Fixed-window rate limits keyed by user/space/org/IP; 429 + Retry-After
 
@@ -254,7 +254,7 @@ Located in `packages/db/src/redis/`.
 
 | Connection | Purpose | Notes |
 |------------|---------|-------|
-| Main (`getRedisClient`) | All regular operations | Cache, rate limits, sessions, OTP |
+| Main (`getRedisClient`) | All regular operations | Cache, rate limits, sign-in handshake sessions, OTP |
 | Subscriber (`getRedisSub`) | Pub/sub subscriptions | `SUBSCRIBE` is blocking, needs own connection |
 | Publisher (`getRedisPub`) | Pub/sub publishing | Shares main client (publish doesn't block) |
 | BullMQ | Job queues | Manages own connections via `createRedisConnection` |
@@ -309,10 +309,13 @@ const key = `cache:User:${id}`;  // Don't do this
 | `job` | `job:*` | Job-system state: overflow flags (`job:overflow`), the slow lane's deferral list and idle clock |
 | `ws` | `ws:*` | WebSocket pub/sub channels and data-stream seq counters (`ws:seq:{<stream>}`) |
 | `otp` | `otp:*` | One-time passwords / verification codes |
-| `session` | `session:*` | BetterAuth sessions (via secondaryStorage) |
+| `session` | `session:*` | BetterAuth sign-in handshake sessions and one-time tokens (via secondaryStorage) |
 | `limit` | `limit:*` | Rate limiting counters |
 | `lock` | `lock:*` | Distributed locks via `createLock` |
 | `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
+| `cacheWritten` | `cachewritten:*` | When the value under a `cache:` key was written (epoch ms); set and cleared with the value, read by `checkCache` |
+| `cacheGeneration` | `cachegen:*` | A `cache:` key's generation (`cachegen:<key>`); a clear moves it so a compute in flight skips its publish |
+| `cacheQueued` | `cachequeued:*` | A rolling-cache target whose refresh is enqueued and has not taken its lock; read by `checkCache` as `queued` |
 | `rollingCache` | `rollingcache:*` | Rolling-cache timers (`rollingcache:timer:<name>`), kept out of `cache:` so a flush never reschedules a refresh |
 
 ---
@@ -336,7 +339,7 @@ cacheKey('user', { email })            // → cache:user:email:foo@example.com
 
 ##### Sessions (`session:*`)
 
-BetterAuth session storage via `secondaryStorage` config:
+BetterAuth's `secondaryStorage` (in `apps/api/src/lib/auth.ts`). It holds only the sign-in handshake: a session lives at most 10 minutes and `jwtHandoff` deletes it as soon as it hands out the person's JWT, plus the 1-minute OAuth one-time tokens. No request outside `/api/auth` reads it ([AUTH.md](./AUTH.md#what-lives-where)).
 
 ```typescript
 // In lib/auth.ts
@@ -344,6 +347,7 @@ secondaryStorage: {
   get: (key) => redis.get(`${redisNamespace.session}:${key}`),
   set: (key, value, ttl) => redis.setex(`${redisNamespace.session}:${key}`, ttl, JSON.stringify(value)),
   delete: (key) => redis.del(`${redisNamespace.session}:${key}`),
+  getAndDelete: (key) => redis.getdel(`${redisNamespace.session}:${key}`),
 }
 ```
 
@@ -371,7 +375,7 @@ are not counted (the batch request paid once; the skip keys on the registry-reso
 transaction, not the spoofable `x-batch-id` header). A **cost** limit — AI calls, anything that bounds
 spend — is a separate detector that must still run inside a batch; it is not an `apiRateLimit` rule.
 
-Identity comes from `userIdentity` (session user, token owner, token scope), the IP from the trusted
+Identity comes from the session user or the token (its user, its organization and space keys), the IP from the trusted
 `x-forwarded-for` hop bucketed to /64 (`clientIp`). Maxes resolve through `rateLimitMax(tier, c)`,
 the seam for subscriptions / feature flags (INFRA-027) — never a column on Token, Organization or Space.
 
@@ -404,7 +408,7 @@ Cross-server WebSocket broadcasting:
 // Pub/sub channel for all WS messages
 const WS_CHANNEL = 'ws:broadcast';
 
-// Messages include type: 'user' | 'channel' | 'broadcast'
+// Messages include type: 'channel' | 'broadcast'
 await pub.publish(WS_CHANNEL, JSON.stringify({ type: 'channel', target: 'org:123', event }));
 ```
 
@@ -535,9 +539,12 @@ On mutation, all matching cache keys are deleted.
 ##### Wildcard Keys
 
 ```typescript
-// Delete all sessions for a user
-cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
+cacheKey('user', userId, [], true)  // → cache:user:id:abc:*
 ```
+
+A wildcard clear cancels the `cache()` computes in flight under its pattern (found by their
+single-flight locks), then scans and deletes. Prefer exact keys in the reference map: an exact clear
+is one Lua call, a wildcard clear is two scans.
 
 ---
 
@@ -549,8 +556,8 @@ cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
 A job whose only work is recomputing a cached value on a timer is not a new handler or a `CronJob` row: it is a rolling cache (`makeRollingCache`, see [REDIS.md](REDIS.md#rolling-caches)). Three handlers serve every registered cache, one per layer, each built from the primitive that fits it:
 
 - **Root:** `coordinateRollingCaches`, `makeSingletonJob`, one seeded cron row (`coordinateRollingCaches`, every minute — `ROLLING_CACHE_TICK_SECONDS`). Each cache keeps its own timer in Redis (`rollingcache:timer:<name>`, TTL = one interval), so caches with different intervals share the root. Every cache whose timer has a tick or less left gets its branch enqueued; deduplication makes that a no-op while a branch is open. Nothing else: there is no supervisor, and BullMQ keeps the branch open until its leaves report.
-- **Branch:** `refreshRollingCache`, a keyed staged singleton (`makeSingletonJob({ stages, finish }, { lockKey: ({ name }) => name })`). Its stage resolves the target selector and adds one leaf per target as a child; it stays open until every leaf has reported, and `finish` sets the timer, so the next refresh is one interval after the data was fresh. A branch never refires while it is open.
-- **Leaf:** `refreshRollingCacheTarget`, a child, `makeSupersedingJob` keyed by the target's cache key, slow lane. Refreshes one target. A leaf that fails all its attempts keeps the last good value, and the next interval tries again. An unregistered cache name or a failed write throws; nothing in this path swallows an error. A forced refresh is just enqueueing the leaf; it supersedes a running copy by key.
+- **Branch:** `refreshRollingCache`, a keyed staged singleton (`makeSingletonJob({ stages, finish }, { lockKey: ({ name }) => name })`). Its stage resolves the target selector and adds one leaf per target as a child through `ctx.enqueueChildJobs`, their starts spread over the cache's `spreadSeconds` (default: half the interval); it stays open until every leaf has reported, and `finish` sets the timer, so the next refresh is one interval after the data was fresh. A branch never refires while it is open.
+- **Leaf:** `refreshRollingCacheTarget`, a child, `makeSupersedingJob` keyed by the target's `targetKey` (cache name + target fields), slow lane. Refreshes one target: runs its `compute` once, which writes every result of that target. A refresh that lands emits `rollingCache.refreshed` (`{ rollingCache, key, channel? }`); when the cache declares a `channel`, its websocket handoff sends subscribers a `query`/`refetch` hint keyed by the parsed channel. A leaf that fails all its attempts keeps the last good value, and the next interval tries again. An unregistered cache name or a failed write throws; nothing in this path swallows an error. A forced refresh is just enqueueing the leaf; it supersedes a running copy by key. `checkRollingCache` does exactly that on a read that finds the entry empty, or stale with nothing computing.
 
 Each leaf attempt runs under `timeoutSeconds` (`settleWithin` from `@template/shared/utils`, with the deadline combined into the refresh signal via `AbortSignal.any`). Past it the leaf emits `rollingCache.leafStuck` (`{ rollingCache, key, target, timeoutSeconds, attempt }`) and throws, so BullMQ retries it and, after the last attempt, counts it done so the branch closes. The hung compute cannot be stopped, but the aborted signal keeps its late result from being written. Entries live longer than an interval plus every attempt (`ttlSeconds`, enforced at registration), so a read always hits. The template has no platform alert rules: the `rollingCache.leafStuck` app event (recorded as an `AppEvent` row by the observe adapter) is the hook an app wires its alert to.
 
@@ -563,7 +570,11 @@ The schedule lives in the definition: changing the interval is a code change, de
 
 #### Cache Utilities
 
-Located in `packages/db/src/redis/cache.ts`.
+Located in `packages/db/src/redis/cache/`, one file per behaviour: `cache.ts`, `checkCache.ts`,
+`clearKey.ts`, `upsertCache.ts`, with `generation/` (clear cancels in-flight work), `queued/` (the
+rolling-cache queued marker), `queries/` (the Lua scripts, each a typed function over `RedisEval`),
+`telemetry/` and `rollingCache/`. The single-flight lock is a lock, so it lives in
+`packages/db/src/lock/singleFlight/`.
 
 ##### cacheKey() Builder
 
@@ -603,9 +614,40 @@ const user = await cache(
 
 Behavior:
 - Returns cached value if exists (including `null`/`undefined`)
-- Computes via fn() on cache miss
+- Computes via fn() on cache miss; concurrent misses on one key compute once (single-flight)
 - **Negative caching**: `null`/`undefined` cached with 1 min TTL (prevents thundering herd, allows quick discovery of new records)
 - Real values cached with provided TTL (default 24 hours)
+- **Only the lock holder publishes.** A caller that does not hold the key's single-flight lock waits
+  up to 10 seconds for the holder's value, then computes its own and returns it unpublished. A
+  caller that cannot reach the lock or the generation (Redis failing) does the same.
+- **A clear cancels the publish.** The holder captures the key's generation before `fn` runs and
+  publishes only if it has not moved. A value read before a `clearKey` or an `upsertCache` is
+  returned to its caller but never lands in the cache.
+
+Telemetry: each call opens a `cache <accessor>` span labelled with its result, and reads count into
+`cache.read` by accessor and result (`hit`, `miss`, `error`); an `upsertCache` span records `written`,
+`kept` or `error`. A single-flight wait is timed into
+`cache.lock.wait`; a publish skipped because a clear ran counts into `cache.publish.skipped`. Every
+tag is the accessor, never the key, so cardinality stays bounded.
+##### checkCache()
+
+Read a key without computing it. Every write (`cache`, `upsertCache`) stores the write time beside the
+value (`cachewritten:<key>`, same TTL, same Lua eval), and an exact `clearKey` deletes both:
+
+```typescript
+import { checkCache } from '@template/db';
+
+const check = await checkCache<Stats>(key, { freshForSeconds: 600 });
+// { state: 'empty' }        nothing written, nobody computing, nothing queued
+// { state: 'queued' }       nothing written yet, a refresh is enqueued and has not taken the lock
+// { state: 'computing' }    nothing written yet, the key's single-flight lock is held
+// { state: 'fresh' | 'stale', value, writtenAt, isComputing, isQueued }
+```
+
+`computedUnder` names a different single-flight lock to report `computing` from (a rolling cache
+passes its target's key, so every result of one target computes under one lock). `singleFlightLock(key)`
+is that lock, exported for a writer that computes outside `cache()`. A Redis failure throws rather
+than reading as empty, so a caller that queues work on a miss doesn't pile work onto an outage.
 
 ##### clearKey()
 
@@ -619,8 +661,16 @@ await clearKey('cache:User:id:123');
 
 // Wildcard pattern (uses SCAN, non-blocking)
 await clearKey('cache:User:*');
-await clearKey('cache:Session:userId:abc:*');
 ```
+
+A clear also cancels computes in flight. An exact clear deletes the value and its write time and moves
+the key's generation in one Lua call. A pattern clear first scans the single-flight locks under the
+pattern and clears each of those keys the same way, so only the computes it matches are cancelled,
+then scans and deletes the values. Either way a `cache()` compute that read before the clear skips
+its publish, and the next caller recomputes. To drop one value you know is bad (a token the vendor rejected), read it with `checkCache`
+and clear only if it is still that value: if a recompute is already running the key is empty, so the
+clear is skipped and the caller's next `cache()` waits on the running one. A failed exact clear logs and returns 0; a failed pattern clear throws, because the caller
+cannot tell which of its keys survived.
 
 ##### Automatic Invalidation
 
@@ -645,42 +695,81 @@ invalidation for every way its inputs change, and each one missed is a stale rea
 rolling cache recomputes on a fixed interval, and its entries outlive the longest a refresh can take,
 every retry included, so a read always hits. There is no invalidation to write.
 
+One definition declares its **input** (`targets`: what one refresh is for), its **outputs**
+(`results`: every entry a refresh fills, each a function returning that entry's key) and the **job**
+(`compute`: one pass that writes its results):
+
 ```typescript
 import { cacheKey, db, makeRollingCache } from '@template/db';
+import { WS_CHANNELS } from '@template/shared/ws';
 
-export const spaceCounts = makeRollingCache({
-  name: 'spaceCounts',                          // unique; a second registration throws
+export const spaceStats = makeRollingCache({
+  name: 'spaceStats',                           // unique; a second registration throws
   intervalSeconds: 3600,                        // at least 300 (five coordinator ticks)
-  key: ({ id }) => cacheKey('spaceCounts', id),
-  compute: ({ id }) => db.space.count({ where: { organizationId: id } }),
   targets: { model: 'Organization', args: { select: { id: true } } },
+  results: {
+    total: ({ id }) => cacheKey('spaceStats', id, ['total']),
+    byName: ({ id, name }: { id: string; name: string }) =>
+      cacheKey('spaceStats', { organizationId: id, name }, ['byName']),
+  },
+  compute: async ({ id }, { results, write, signal }) => {
+    const spaces = await db.space.findMany({ where: { organizationId: id } });
+    signal?.throwIfAborted();
+    await write(results.total({ id }), spaces.length);
+    for (const { name } of spaces) await write(results.byName({ id, name }), 1);
+  },
+  channel: ({ id }) => WS_CHANNELS.someRead.name(id), // optional: announce refreshes
 });
 
-const count = await spaceCounts.read({ id: organizationId });
+// api (apps/api/src/jobs/checkRollingCache.ts): name the result and pass its params; never build a key
+const check = await checkRollingCache(spaceStats, 'total', { id: organizationId });
+// → { state: 'empty' | 'queued' | 'computing' | 'fresh' | 'stale', value?, writtenAt?, isComputing?, isQueued?, channel? }
 ```
 
-- **Define it inline**, in the module that owns the data (`packages/db/src/redis/makeRollingCache.ts`
-  is the primitive). It registers itself on import, like a factory.
+- **Define it inline**, in the module that owns the data
+  (`packages/db/src/redis/cache/rollingCache/makeRollingCache.ts` is the primitive). It registers itself on import, like a factory.
 - **Register the module** in `apps/api/src/lib/rollingCaches.ts` (import-only). The worker imports
   that barrel and its coordinator refreshes every registered cache; the `rolling-cache-registered`
   CI rule fails a definition missing from it.
 - **`targets` is `{ model, args }`**, where `args` is that model's own Prisma `findMany` args — no
-  shorthand of our own. Each returned row is one refresh job's payload and the argument to `key` and
+  shorthand of our own. Each returned row is one refresh job's payload and the argument to
   `compute`, typed by your `select`; select JSON-scalar columns, since the row crosses the queue as
   JSON (a BigInt throws, a Date arrives as a string). `distinct` is a real `DISTINCT` on Postgres.
   Resolution fails closed above `MAX_ROLLING_CACHE_TARGETS` (10,000) rather than refreshing a
-  partial list. A cache with one value for the whole system omits `targets`; `read()` takes no
-  argument.
-- **Three times.** `intervalSeconds` is how often a target is refreshed. `timeoutSeconds` (default:
-  one interval) is how long one leaf attempt may run before it reports itself stuck. `ttlSeconds`
-  (default: interval × (`ROLLING_CACHE_LEAF_ATTEMPTS` + 2)) is how long an entry lives; registration
-  throws unless it is longer than interval + every attempt × timeout + one tick.
-- **`read`** serves the cached value; a cold miss (first read after a deploy) computes through
-  `cache()`, so concurrent readers share one computation. **`refresh`** recomputes one target and
-  overwrites the entry (`force`); a refresh whose signal aborted while it computed writes nothing, and
-  a write that fails throws so the leaf retries.
-- **`compute` never returns null or undefined**: `cache()` keeps null for only a minute and reads
-  undefined as a miss. Return an empty value of the shape instead.
+  partial list. A cache with one value for the whole system omits `targets`; its result functions
+  take no params.
+- **Result params are one object** holding the target's selected fields plus whatever names the
+  entry. `targetOf(params)` picks the `select: true` fields back out, so a reader can queue the
+  target's refresh from what it already has. `targetKey(target)` (cache name + sorted target fields)
+  is the target's identity: the leaf's supersede key and its single-flight lock.
+- **Every result of a target is computed by one job, under one lock.** Don't split a pass that reads
+  the same rows into two caches; give one cache two results.
+- **Four times.** `intervalSeconds` is how often a target is refreshed. `spreadSeconds` (default: half
+  the interval, whole, less than the interval) is the window a branch spreads its leaves' starts
+  across. `timeoutSeconds` (default: one interval) is how long one leaf attempt may run before it
+  reports itself stuck. `ttlSeconds` (default: interval × (`ROLLING_CACHE_LEAF_ATTEMPTS` + 2)) is how
+  long an entry lives; registration throws unless it is longer than interval + spread + every
+  attempt × timeout + one tick.
+- **A read never computes.** `read(result, params)` is `checkCache` on that result's key: `empty`,
+  `queued` (a refresh is enqueued), `computing` (the target's lock is held), `fresh`, or `stale`
+  (older than one scheduled refresh, with `isComputing` and `isQueued` beside it).
+  `checkRollingCache` (`apps/api/src/jobs/checkRollingCache.ts`) is the api read: on `empty`, or
+  `stale` with nothing computing or queued, it sets the target's queued marker and, only if it set
+  it, enqueues the target's leaf, so N cold readers send one job. A failed enqueue clears the marker.
+  It reads again and returns the cache's `channel` so a client knows where to wait.
+- **`refresh(target)`** waits up to `timeoutSeconds` for the target's lock (else returns false), runs
+  `compute` once, and holds the lock until the last write lands. `write` is `upsertCache` with
+  `force` and the cache's TTL; a write after `signal` aborted is dropped, and a failed write throws so
+  the leaf retries. `compute` gets the signal: check it between batches. An abort releases the lock
+  at once, and a refresh whose signal aborted while it waited for the lock releases it without
+  computing, so the refresh that superseded it does not wait on a compute whose writes are dropped. A
+  refresh that wrote clears the target's queued marker; an aborted one leaves it for its retry, and a
+  leaf that fails its last attempt clears it so the next reader can queue again.
+- **Warm on boot.** The worker enqueues every registered cache's branch when it starts
+  (`apps/api/src/jobs/warmRollingCaches.ts`), so a deploy that changed result keys is not cold until
+  the next interval.
+- **A written value is never null or undefined**: `cache()` keeps null for only a minute and reads
+  undefined as a miss. Write an empty value of the shape instead.
 - `getRollingCache(name)` throws for a name nothing registered; tests that define their own cache
   remove it with `unregisterRollingCache`.
 
@@ -702,15 +791,15 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **lua-in-queries** `scripts/ci/rules/lua-in-queries.sh` [rule] keep each Redis Lua script with its eval function in the module's queries/ folder Use: scripts/ci/rules/lua-in-queries.sh
 
 #### Class `caching`
-- **cache** `packages/db/src/redis/cache.ts#cache` [primitive] get a Redis-cached value or compute, store and return it with single-flight Use: const value = await cache(key, () => load(), ttlSeconds)
-- **cacheKey** `packages/db/src/redis/cache.ts#cacheKey` [primitive] build the canonical normalized cache key from domain, identifier and tags Use: cacheKey('User', { email }, tags)
+- **cache** `packages/db/src/redis/cache/cache.ts#cache` [primitive] get a Redis-cached value or compute, store and return it with single-flight Use: const value = await cache(key, () => load(), ttlSeconds)
+- **cacheKey** `packages/db/src/redis/cache/cacheKey.ts#cacheKey` [primitive] build the canonical normalized cache key from domain, identifier and tags Use: cacheKey('User', { email }, tags)
 - **cacheReference** `apps/api/src/hooks/cache/constants/cacheReference.ts#cacheReference` [primitive] map each model to the cache keys cleared when its records mutate Use: Add `Model: (r) => [cacheKey('model', r.id)]` to cacheReference
-- **clearKey** `packages/db/src/redis/cache.ts#clearKey` [primitive] delete cache entries matching a key or pattern Use: await clearKey(cacheKey('User', id))
+- **clearKey** `packages/db/src/redis/cache/clearKey.ts#clearKey` [primitive] delete cache entries matching a key or pattern Use: await clearKey(cacheKey('User', id))
 - **fetchOne** `packages/db/src/hydrate/fetchOne.ts#fetchOne` [primitive] fetch one hydrated record by identifier, cached in Redis with a TTL Use: const rec = await fetchOne<T>(accessor, identifier, ttl)
-- **getRollingCache** `packages/db/src/redis/rollingCacheRegistry.ts#getRollingCache` [primitive] look up a registered rolling cache by name, throwing if none registered Use: const cache = getRollingCache('myCache');
-- **makeRollingCache** `packages/db/src/redis/makeRollingCache.ts#makeRollingCache` [primitive] register a cached value that shared handlers recompute on a timer Use: export const myCache = makeRollingCache({ ...config })
-- **registerRollingCache** `packages/db/src/redis/rollingCacheRegistry.ts#registerRollingCache` [primitive] register a named rolling cache so the minute coordinator refreshes it Use: registerRollingCache({ name: 'myCache', ... });
-- **upsertCache** `packages/db/src/redis/cache.ts#upsertCache` [primitive] write a known value into the cache, optionally forcing overwrite Use: await upsertCache(cacheKey('User', id), user, { ttl })
+- **getRollingCache** `packages/db/src/redis/cache/rollingCache/rollingCacheRegistry.ts#getRollingCache` [primitive] look up a registered rolling cache by name, throwing if none registered Use: const cache = getRollingCache('myCache');
+- **makeRollingCache** `packages/db/src/redis/cache/rollingCache/makeRollingCache.ts#makeRollingCache` [primitive] register a cached value that shared handlers recompute on a timer Use: export const myCache = makeRollingCache({ ...config })
+- **registerRollingCache** `packages/db/src/redis/cache/rollingCache/rollingCacheRegistry.ts#registerRollingCache` [primitive] register a named rolling cache so the minute coordinator refreshes it Use: registerRollingCache({ name: 'myCache', ... });
+- **upsertCache** `packages/db/src/redis/cache/upsertCache.ts#upsertCache` [primitive] write a known value into the cache, optionally forcing overwrite Use: await upsertCache(cacheKey('User', id), user, { ttl })
 - **rolling-cache-registered** `scripts/ci/rules/rolling-cache-registered.sh` [rule] require every makeRollingCache definition to be imported by the worker's refresh barrel Use: Add `import '<module>';` to the worker's rolling-cache import-only barrel
 
 #### Class `rate-limiting`

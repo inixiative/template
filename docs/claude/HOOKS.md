@@ -350,8 +350,9 @@ On mutation, all matching cache keys are deleted.
 cacheKey('user', userId, [], true)  // → cache:user:id:abc:*
 ```
 
-A wildcard clear moves the cache-wide epoch, so it cancels every `cache()` compute in
-flight, not only the keys it matches. Prefer exact keys in the reference map.
+A wildcard clear cancels the `cache()` computes in flight under its pattern (found by their
+single-flight locks), then scans and deletes. Prefer exact keys in the reference map: an exact clear
+is one Lua call, a wildcard clear is two scans.
 
 ---
 

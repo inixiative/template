@@ -15,13 +15,15 @@ cache under them:
 
 ## What landed
 
-**A clear cancels the computes it races.** `cache()` captures the key's generation and the cache-wide
-epoch after it takes the single-flight lock and before the producer runs, and publishes through one
-Lua call that writes only if neither moved (`queries/publishIfCurrent`). An exact `clearKey` deletes
-the value and its write time and moves the generation in one call (`queries/clearExact`); a pattern
-clear moves the epoch before it scans and now throws when it fails. `upsertCache` writes through with
-a fresh generation (`queries/writeThrough`).
-Without the lock or the generation the value is returned unpublished. INFRA-044 step 3 depends on
+**A clear cancels the computes it races.** `cache()` captures the key's generation after it takes the
+single-flight lock and before the producer runs, and publishes through one Lua call that writes only
+if it has not moved (`queries/publishIfCurrent`). An exact `clearKey` deletes the value and its write
+time and moves the generation in one call (`queries/clearExact`); a pattern clear does the same for
+every key whose single-flight lock matches the pattern, then scans and deletes the values, and throws
+when it fails. `upsertCache` checks and writes through with a fresh generation in one call
+(`queries/writeThrough`).
+Only the lock holder publishes: a caller without the lock (it waited out the 10-second single-flight
+wait, or Redis failed) returns its value unpublished. INFRA-044 step 3 depends on
 this.
 
 **Queued state.** `checkCache` reports `queued` (a refresh is enqueued and has not taken its lock),
