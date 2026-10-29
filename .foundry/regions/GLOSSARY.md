@@ -55,9 +55,6 @@ One permission expression: string delegation, { rel, action }, { rule }, { any }
 **ActionRule**  
 One rule: action string, { rel, action }, { rule }, { any }, { all }, or null. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
 
-**actionRuleSchema**  
-Recursive Zod validator for a serialized ActionRule, on the @inixiative/permissions-roles / permissions-rebac/actionRuleSchema subpath. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
-
 **Actions live in slices**  
 State changes and their side effects are slice actions; components never set state directly. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
@@ -891,7 +888,7 @@ Collects a new org's name and an auto-derived, uniqueness-checked slug. *Region:
 Creates a typed permix instance for role-based action checks. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **createRebacCheck**  
-Builds check from an injected resolveRelation; generic over the resource union. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+Builds check from a SchemaMap (resources, fieldMap, polymorphism); generic over the resource union. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **createRebacCheck / createHydrator**  
 The @inixiative/permissions-roles / permissions-rebac engine: build the check from the schema, hydrate the ownership closure, then evaluate. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
@@ -3080,9 +3077,6 @@ Infer the source from the route context; resolve the target from ids, slugs or t
 **resolveOperation**  
 Looks up an operationId's route and fills path params for in-process callers. *Region:* [Request schemas and OpenAPI](api-schemas-openapi/knowledge.md)
 
-**resolveRelation**  
-The injected, ORM-specific function returning the model a relation segment points at. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
-
 **resolveSender**  
 Loads the sending row through its lens as the sender variable; identity only, not branding. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
@@ -3315,6 +3309,9 @@ picks / omits / enumPicks / enumOmits: what the type surface lets anyone mention
 
 **schema-introspection**  
 Class: runtime schema maps (@inixiative/prisma-map, prismaMap.gen.ts) and the template's model-metadata helpers. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
+
+**SchemaMap**  
+{ resources, fieldMap, polymorphism? }: which fieldMap model each resource is, its relations and foreign keys, and the polymorphic models' kinds; built in the template from the generated prismaMap and PolymorphismRegistry. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **Scope invention**  
 Adding adjacent things nobody asked for: 'in case' fields, single-call wrappers, compat shims, unused barrels. *Region:* [Engineering process and docs](engineering-process-docs/knowledge.md)
@@ -3802,7 +3799,7 @@ packages/db tsconfig alias to ./test/* for test utilities. *Region:* [Monorepo l
 packages/email: MJML template storage, components, rendering, and Resend/console clients. *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
 
 **@template/permissions**  
-The template package that injects its Prisma-derived resolveRelation, rebacSchema and role mappings into this core. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+The template package that builds its SchemaMap from the generated prismaMap and polymorphism registry, and passes it with its rebacSchema and role mappings into this core. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **@template/permissions**  
 packages/permissions-roles / permissions-rebac: RBAC/ReBAC roles, checks, entitlements and context setup on permix. *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
@@ -4152,6 +4149,9 @@ The flow for every rule entering execution: validateRuleInLens, then narrowRule,
 
 **validate:encryption**  
 The CI script ENCRYPTION.md describes; it does not exist yet in template. *Region:* [Encryption and secrets](encryption/knowledge.md)
+
+**validateActionRule**  
+Checks a serialized ActionRule's shape and every { rule } as a positive json-rules condition, returning { ok, errors }, on the @inixiative/permissions subpath. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **validateEncryptionVersions**  
 Pre-deploy check returning { valid, errors } for version downgrades, jumps, mixed-version bumps and bad keyrings; not yet wired into any script or CI. *Region:* [Encryption and secrets](encryption/knowledge.md)

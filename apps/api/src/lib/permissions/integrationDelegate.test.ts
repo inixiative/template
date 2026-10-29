@@ -210,6 +210,22 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       expect(await holds(key, 'organization', organization.id, 'own')).toBe(false);
       expect(await holds(key, 'organization', otherOrganization.id, 'read')).toBe(false);
     });
+
+    it("its role is written like a member's: manage it and hold the role you set (an admin sets admin, not owner)", async () => {
+      const { entity: integration } = await createIntegration({
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        role: 'member',
+      });
+      const { entity: admin } = await createUser();
+      const adminMember = await memberOf('admin', organization, admin);
+      const set = (role: Role) =>
+        userApp(admin, [adminMember]).fetch(
+          patch(`/api/v1/integration/${integration.id}`, { role }),
+        );
+      expect((await set('admin')).status).toBe(200);
+      expect((await set('owner')).status).toBe(403);
+    });
   });
 
   describe('granting an integration: the writer could take every action it would hold', () => {
@@ -218,7 +234,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       const member = await memberOf(writerRole, organization, writer);
       const integration = await memberIntegration(member, null);
       const response = await userApp(writer, [member]).fetch(
-        patch(`/api/v1/integration/${integration.id}`, { entitlements }),
+        patch(`/api/v1/integration/${integration.id}/entitlements`, { add: entitlements }),
       );
       const stored = await db.integration.findUniqueOrThrow({ where: { id: integration.id } });
       return { status: response.status, stored: stored.entitlements };

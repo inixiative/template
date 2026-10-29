@@ -43,7 +43,6 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   const tenant = useAppStore((state) => state.tenant);
 
   // Filter roles to only those the current actor can invite via inquiry.send permission.
-  // REBAC checks content.role against highRoles to determine if own vs manage is required.
   const inviteRoles = (Object.values(Role) as Role[]).filter((role) =>
     checkPermission(
       permissions,
@@ -126,7 +125,12 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
               size="sm"
               aria-label="Remove member"
               onClick={() => deleteMutation.mutate({ path: { id: member.id } })}
-              show={checkPermission(permissions, 'organizationUser', memberRecord, memberRemoval)}
+              show={checkPermission(
+                permissions,
+                'organizationUser',
+                memberRecord,
+                memberRemoval('organization'),
+              )}
             >
               <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
             </Button>

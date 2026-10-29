@@ -19,7 +19,7 @@ export const meCreateIntegrationController = makeController(
 
     const row = {
       ...body,
-      ownerModel: 'User',
+      ownerModel: 'User' as const,
       userId: user.id,
     };
     await validateIntegrationGrant(c.get('permix'), row);

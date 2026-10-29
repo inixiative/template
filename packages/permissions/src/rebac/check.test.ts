@@ -767,7 +767,22 @@ describe('rebac check', () => {
         space: { organization: 'organization' },
         organization: { parentSpace: 'space' },
       };
-      const cyclicCheck = createRebacCheck((model, segment) => relations[model]?.[segment] ?? null);
+      const toOne = (type: string) => ({ kind: 'object' as const, type, isList: false });
+      const cyclicCheck = createRebacCheck({
+        resources: { space: 'space', organization: 'organization' },
+        fieldMap: {
+          models: Object.fromEntries(
+            Object.entries(relations).map(([model, fields]) => [
+              model,
+              {
+                fields: Object.fromEntries(
+                  Object.entries(fields).map(([segment, type]) => [segment, toOne(type)]),
+                ),
+              },
+            ]),
+          ),
+        },
+      });
       const cyclicSchema = {
         permissions: {
           organization: { actions: { own: { rel: 'parentSpace', action: 'own' } } },

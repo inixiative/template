@@ -273,19 +273,19 @@
     {
       "tag": "permissions-roles",
       "atlas": "primitive:authz",
-      "description": "Roles, actions and checks: Role / PlatformRole, StandardAction, installPermissions (setupUserPermissions / setupTokenPermissions), permix.check in controllers, validatePermission / validateSubmodelPermission middleware, entitlements and token restriction, role assignment, frontend checks (usePermission, permissions.check, NavItem.access)",
+      "description": "Roles, actions and checks: Role / PlatformRole, StandardAction, installPermissions (installPermissionsFor / userPermissions), permix.check in controllers, validatePermission / validateSubmodelPermission middleware, entitlements and token restriction, role assignment, frontend checks (usePermission, permissions.check, NavItem.access)",
       "region": "permissions-roles"
     },
     {
       "tag": "permissions-rebac",
       "atlas": "primitive:authz",
-      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, validateActionRule), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
       "region": "permissions-rebac"
     },
     {
       "tag": "permissions-rebac",
       "atlas": "primitive:authz",
-      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, validateActionRule), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
       "region": "permissions-rebac"
     },
     {

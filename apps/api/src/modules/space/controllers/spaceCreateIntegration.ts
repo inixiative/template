@@ -19,7 +19,7 @@ export const spaceCreateIntegrationController = makeController(
 
     const row = {
       ...body,
-      ownerModel: 'Space',
+      ownerModel: 'Space' as const,
       organizationId: space.organizationId,
       spaceId: space.id,
     };

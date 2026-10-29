@@ -44,13 +44,7 @@ export const deleteRoute = <const T extends RouteArgs>(args: T) => {
     tags: routeTags,
     security: securityForRoute(args),
     description: description ?? `Deletes an existing ${resourceName}.`,
-    middleware: prepareMiddleware({
-      model,
-      middleware,
-      skipId: skipId,
-      includeDeleted: args.includeDeleted,
-      route: (): RouteConfig => route,
-    }),
+    middleware: prepareMiddleware(args, { skipId: skipId, route: (): RouteConfig => route }),
     request: buildRequest(args),
     responses: {
       204: { description: 'Success' },

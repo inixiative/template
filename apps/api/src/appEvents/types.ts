@@ -36,19 +36,13 @@ export type WSChannelsHandoff = {
   message: { data: WSQueryEvent };
 };
 
-export type WSUsersHandoff = {
-  kind: 'users';
-  target: { userIds: string[] };
-  message: { data: WSQueryEvent };
-};
-
 export type WSStreamAppendHandoff = {
   kind: 'stream';
   target: { stream: string; userIds?: string[] };
   append: ValidatedStreamAppend;
 };
 
-export type WSHandoff = WSChannelsHandoff | WSUsersHandoff | WSStreamAppendHandoff;
+export type WSHandoff = WSChannelsHandoff | WSStreamAppendHandoff;
 
 export type ObserveAdapter = {
   record: (event: AppEventPayload) => Promise<void>;

@@ -7,10 +7,9 @@
 import { hydrate, type OrganizationId, Prisma } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { roleAssignment } from '@template/permissions/rebac/schemaHelpers';
+import { memberRoleWrite } from '@template/permissions/rebac/schemaHelpers';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
-import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 import { makeController } from '#/lib/utils/makeController';
 import { validateNotLastOwner } from '#/modules/organization/validations/validateNotLastOwner';
 import { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
@@ -29,12 +28,10 @@ export const organizationUserUpdateController = makeController(
       role: body.role ?? orgUser.role,
     });
     if (
-      !check(permix, rebacSchema, 'organizationUser', before, roleAssignment) ||
-      !check(permix, rebacSchema, 'organizationUser', after, roleAssignment)
+      !check(permix, rebacSchema, 'organizationUser', before, memberRoleWrite('organization')) ||
+      !check(permix, rebacSchema, 'organizationUser', after, memberRoleWrite('organization'))
     )
       throw makeError({ status: 403, message: 'Access denied' });
-
-    await validateEntitlementGrants(permix, body.entitlements ?? []);
 
     if (orgUser.role === Role.owner && body.role !== undefined && body.role !== Role.owner) {
       await validateNotLastOwner(orgUser.organizationId as OrganizationId);
@@ -42,13 +39,7 @@ export const organizationUserUpdateController = makeController(
 
     const updated = await db.organizationUser.update({
       where: { id: orgUser.id },
-      data: {
-        ...body,
-        entitlements:
-          body.entitlements === null
-            ? Prisma.DbNull
-            : (body.entitlements as Prisma.InputJsonValue | undefined),
-      },
+      data: body,
     });
 
     return respond.ok(updated);

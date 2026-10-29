@@ -201,7 +201,7 @@ describe("a member token keeps its member's entitlement's resource and anchor, n
   const tokenOn = async (tokenRole: 'member' | 'viewer') =>
     (
       await memberKey('viewer', { role: tokenRole }, [
-        entry('db:space', ['db:organization', organization.id], ['operate']),
+        entry('db:space', ['db:organization', organization.id, 'organization'], ['operate']),
       ])
     ).rawKey;
 
@@ -213,5 +213,125 @@ describe("a member token keeps its member's entitlement's resource and anchor, n
     const key = await tokenOn('viewer');
     expect(await holds(key, 'space', space.id, 'read')).toBe(true);
     expect(await holds(key, 'space', space.id, 'operate')).toBe(false);
+  });
+});
+
+describe('what an integration entitlement from the organization reaches (2026-10-26)', () => {
+  const fullMemberToken = async (role: Role, entitlements?: Entry[]) => {
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role, entitlements },
+      { organization },
+    );
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', full: true, role: null },
+      { organizationUser },
+    );
+    return rawKey;
+  };
+
+  const spaceIntegration = async () =>
+    (
+      await createIntegration({
+        ownerModel: 'Space',
+        organizationId: organization.id,
+        spaceId: space.id,
+        role: 'viewer',
+      })
+    ).entity;
+
+  const organizationIntegration = async () =>
+    (
+      await createIntegration({
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        role: 'viewer',
+      })
+    ).entity;
+
+  const fromOrganization = () =>
+    fullMemberToken('viewer', [
+      entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
+    ]);
+
+  it('manage on integrations from the organization reaches its own integrations', async () => {
+    const integration = await organizationIntegration();
+    expect(await holds(await fromOrganization(), 'integration', integration.id, 'manage')).toBe(
+      true,
+    );
+  });
+
+  it("via organization it reaches a space's integration too: every kind under the organization (R81)", async () => {
+    const integration = await spaceIntegration();
+    expect(await holds(await fromOrganization(), 'integration', integration.id, 'manage')).toBe(
+      true,
+    );
+  });
+
+  it("via space.organization it reaches the spaces' integrations, not the organization's own", async () => {
+    const key = await fullMemberToken('viewer', [
+      entry(
+        'db:integration',
+        ['db:organization', organization.id, 'space.organization'],
+        ['manage'],
+      ),
+    ]);
+    expect(await holds(key, 'integration', (await spaceIntegration()).id, 'manage')).toBe(true);
+    expect(await holds(key, 'integration', (await organizationIntegration()).id, 'manage')).toBe(
+      false,
+    );
+  });
+
+  it("a composite anchor: a member's integrations, not another member's", async () => {
+    const { entity: anchorMember } = await createOrganizationUser(
+      { role: 'viewer' },
+      { organization },
+    );
+    const { entity: otherMember } = await createOrganizationUser(
+      { role: 'viewer' },
+      { organization },
+    );
+    const memberIntegration = async (member: { userId: string }) =>
+      (
+        await createIntegration({
+          ownerModel: 'OrganizationUser',
+          organizationId: organization.id,
+          userId: member.userId,
+          role: 'viewer',
+        })
+      ).entity;
+    const key = await fullMemberToken('viewer', [
+      entry(
+        'db:integration',
+        ['db:organizationUser', anchorMember.id, 'organizationUser'],
+        ['operate'],
+      ),
+    ]);
+    expect(
+      await holds(key, 'integration', (await memberIntegration(anchorMember)).id, 'operate'),
+    ).toBe(true);
+    expect(
+      await holds(key, 'integration', (await memberIntegration(otherMember)).id, 'operate'),
+    ).toBe(false);
+  });
+
+  it('a role token keeps every branch its member holds: one entry per path is not collapsed', async () => {
+    const { rawKey } = await memberKey('viewer', { role: 'owner' }, [
+      entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
+      entry(
+        'db:integration',
+        ['db:organization', organization.id, 'space.organization'],
+        ['manage'],
+      ),
+    ]);
+    expect(await holds(rawKey, 'integration', (await organizationIntegration()).id, 'manage')).toBe(
+      true,
+    );
+    expect(await holds(rawKey, 'integration', (await spaceIntegration()).id, 'manage')).toBe(true);
+  });
+
+  it('an org admin does not manage a space-owned integration', async () => {
+    const key = await fullMemberToken('admin');
+    const integration = await spaceIntegration();
+    expect(await holds(key, 'integration', integration.id, 'manage')).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { z } from '@hono/zod-openapi';
-import { db, hydrate, ownerColumns, unregisterDbHook } from '@template/db';
+import { db, type HydratedRecord, hydrate, unregisterDbHook } from '@template/db';
 import type { Organization, Role, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -12,7 +12,7 @@ import {
   createUser,
 } from '@template/db/test';
 import { createPermissions } from '@template/permissions/client';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { check, placeUnder, rebacSchema, schemaMap } from '@template/permissions/rebac';
 import { app } from '#/app';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { readRoute } from '#/lib/routeTemplates';
@@ -332,7 +332,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
           entitlements: [
             {
               resource: 'db:contact',
-              anchor: { resource: 'db:organization', id: other.id },
+              anchor: { resource: 'db:organization', id: other.id, path: 'organization' },
               actions: { create: true },
             },
           ],
@@ -353,10 +353,15 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       );
       const permix = createPermissions();
       await permix.setup({ resource: 'db:contact', id: contact.id, actions: { create: true } });
-      const pseudo = await hydrate('contact', {
-        id: '',
-        ...ownerColumns('contact', 'organization', organization),
-      });
+      const [placed] = placeUnder(
+        schemaMap,
+        'db:contact',
+        'organization',
+        'db:organization',
+        organization,
+        { ownerModel: 'Organization' },
+      );
+      const pseudo = await hydrate('contact', { id: '', ...placed } as HydratedRecord);
       expect(pseudo.id).toBe('');
       expect(check(permix, rebacSchema, 'contact', pseudo, 'create')).toBe(false);
       expect(check(permix, rebacSchema, 'contact', { ...pseudo, id: contact.id }, 'create')).toBe(
@@ -366,32 +371,47 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
   });
 });
 
-describe('ownerColumns gives a child the columns that place it under its owner', () => {
-  it('a polymorphic child carries the discriminator and the owner keys', () => {
+describe("placeUnder places a child under its owner along the owner's relation", () => {
+  const under = (child: string, owner: string, record: Record<string, unknown>, kind?: string) =>
+    placeUnder(
+      schemaMap,
+      `db:${child}`,
+      owner,
+      `db:${owner}`,
+      record,
+      kind ? { ownerModel: kind } : {},
+    );
+
+  it('a polymorphic child carries the pinned kind and the owner keys', () => {
     const space = { id: 's1', organizationId: 'o1' };
-    expect(ownerColumns('integration', 'space', space)).toEqual({
-      ownerModel: 'Space',
-      organizationId: 'o1',
-      spaceId: 's1',
-    });
-    expect(ownerColumns('contact', 'user', { id: 'u1' })).toEqual({
-      ownerModel: 'User',
-      userId: 'u1',
-    });
-    expect(
-      ownerColumns('token', 'organizationUser', { id: 'm1', organizationId: 'o1', userId: 'u1' }),
-    ).toEqual({ ownerModel: 'OrganizationUser', organizationId: 'o1', userId: 'u1' });
+    expect(under('integration', 'space', space, 'Space')).toEqual([
+      { ownerModel: 'Space', organizationId: 'o1', spaceId: 's1', space },
+    ]);
+    const user = { id: 'u1' };
+    expect(under('contact', 'user', user, 'User')).toEqual([
+      { ownerModel: 'User', userId: 'u1', user },
+    ]);
+    const member = { id: 'm1', organizationId: 'o1', userId: 'u1' };
+    expect(under('token', 'organizationUser', member, 'OrganizationUser')).toEqual([
+      {
+        ownerModel: 'OrganizationUser',
+        organizationId: 'o1',
+        userId: 'u1',
+        organizationUser: member,
+      },
+    ]);
   });
 
   it('a plain child carries the single relation to its owner', () => {
-    expect(ownerColumns('authProvider', 'organization', { id: 'o1' })).toEqual({
-      organizationId: 'o1',
-    });
+    const organization = { id: 'o1' };
+    expect(under('authProvider', 'organization', organization)).toEqual([
+      { organizationId: 'o1', organization },
+    ]);
   });
 
-  it('an owner the child cannot have is an error', () => {
-    expect(() => ownerColumns('flow', 'organization', { id: 'o1' })).toThrow();
-    expect(() => ownerColumns('contact', 'integration', { id: 'i1' })).toThrow();
+  it('an owner the child cannot have places nothing', () => {
+    expect(under('flow', 'organization', { id: 'o1' })).toEqual([]);
+    expect(under('contact', 'integration', { id: 'i1' })).toEqual([]);
   });
 });
 

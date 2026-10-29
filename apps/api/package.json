@@ -13,7 +13,7 @@
     "test": "bun run --cwd ../.. with test api bun test --max-concurrency=1 --cwd apps/api src/ tests/",
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "db:seed": "bun run scripts/seed.ts",
     "generate:openapi": "OPENAPI_OUTPUT_PATH=./openapi.local.gen.json bun run ./scripts/generateOpenapiSpec.ts && cp ./openapi.local.gen.json ../../packages/sdk/openapi.gen.json"
   },

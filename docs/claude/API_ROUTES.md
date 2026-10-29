@@ -1078,7 +1078,7 @@ import { UserScalarSchema } from '@template/db/zod/models';
 ### Inputs from Generated
 
 ```typescript
-import { UserCreateInputObjectZodSchema } from '@template/db/zod';
+import { UserCreateInputObjectZodSchema } from '@template/db/zod/objects/UserCreateInput.schema';
 ```
 
 ### Colocation Rule

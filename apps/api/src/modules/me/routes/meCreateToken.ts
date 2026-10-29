@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, feature:auth
  */
 
-import { createRoute } from '#/lib/routeTemplates';
+import { createRoute, permissionsBodyRefinement } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 import {
@@ -17,6 +17,7 @@ export const meCreateTokenRoute = createRoute({
   model: Modules.me,
   submodel: Modules.token,
   skipId: true,
+  bodyRefinement: permissionsBodyRefinement,
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
   tags: [Tags.me, Tags.token],

@@ -13,12 +13,8 @@ import { meResourceMiddleware } from '#/middleware/resources/meResourceMiddlewar
 import { resourceContextMiddleware } from '#/middleware/resources/resourceContextMiddleware';
 import { Modules } from '#/modules/modules';
 
-type PrepareMiddlewareArgs = {
-  model: RouteArgs['model'];
-  middleware: MiddlewareHandler | MiddlewareHandler[] | undefined;
-  skipId?: boolean;
-  filterLens?: LensNarrowing;
-  includeDeleted?: boolean;
+type RouteMiddlewareSetup = {
+  skipId: boolean;
   route: () => RouteConfig;
 };
 
@@ -36,14 +32,10 @@ const routeConfigSetter =
     await next();
   };
 
-export const prepareMiddleware = ({
-  model,
-  middleware,
-  skipId = true,
-  filterLens,
-  includeDeleted = false,
-  route,
-}: PrepareMiddlewareArgs): MiddlewareHandler[] => {
+export const prepareMiddleware = (
+  { model, middleware, filterLens, includeDeleted = false }: RouteArgs,
+  { skipId, route }: RouteMiddlewareSetup,
+): MiddlewareHandler[] => {
   const middlewareArray = Array.isArray(middleware) ? middleware : middleware ? [middleware] : [];
   const resourceMiddleware = skipId ? [] : [resourceContextMiddleware()];
   const filterMiddleware = filterLens ? [filterLensSetter(filterLens)] : [];

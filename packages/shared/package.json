@@ -6,7 +6,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "test": "ENVIRONMENT=test NODE_ENV=test bun test --concurrency=1",
     "test:watch": "ENVIRONMENT=test NODE_ENV=test bun test --concurrency=1 --watch"
   },

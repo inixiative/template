@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, feature:integrations
  */
-import { createRoute } from '#/lib/routeTemplates';
+import { createRoute, permissionsBodyRefinement } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import {
   INTEGRATION_IMMUTABLE_FIELDS,
@@ -16,6 +16,7 @@ import { Modules } from '#/modules/modules';
 export const organizationCreateIntegrationRoute = createRoute({
   model: Modules.organization,
   submodel: Modules.integration,
+  bodyRefinement: permissionsBodyRefinement,
   bodySchema: integrationCreateBodySchema,
   responseSchema: integrationReadResponseSchema,
   middleware: [validateSubmodelPermission('create')],

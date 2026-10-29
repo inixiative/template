@@ -83,21 +83,23 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
     it('the user cannot evict a peer', async () => {
       const member = await session(u1, 'operate');
       expect(can(member, 'organizationUser', r2, 'leave')).toBe(false);
-      expect(can(member, 'organizationUser', r2, memberRemoval)).toBe(false);
+      expect(can(member, 'organizationUser', r2, memberRemoval('organization'))).toBe(false);
     });
 
     it('an admin evicts a member through the org, never through leave', async () => {
       const admin = await session(ua, 'manage');
-      expect(can(admin, 'organizationUser', r2, memberRemoval)).toBe(true);
+      expect(can(admin, 'organizationUser', r2, memberRemoval('organization'))).toBe(true);
       expect(can(admin, 'organizationUser', r2, 'leave')).toBe(false);
     });
 
     it('an admin cannot evict an owner, an owner can', async () => {
       const owner = { ...r2, role: 'owner' };
-      expect(can(await session(ua, 'manage'), 'organizationUser', owner, memberRemoval)).toBe(
-        false,
-      );
-      expect(can(await session(uo, 'own'), 'organizationUser', owner, memberRemoval)).toBe(true);
+      expect(
+        can(await session(ua, 'manage'), 'organizationUser', owner, memberRemoval('organization')),
+      ).toBe(false);
+      expect(
+        can(await session(uo, 'own'), 'organizationUser', owner, memberRemoval('organization')),
+      ).toBe(true);
     });
 
     it('a member reads their own relation and every relation of their org', async () => {
@@ -293,14 +295,21 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
       expect(can(nobody, 'user', u1, 'own')).toBe(true);
     });
 
-    it('a user creates an organization, and so does a token its user owns; no other token', async () => {
+    it('a user creates an organization, and so does a token its user owns that holds operate; no other token', async () => {
       const blank = { id: '' };
       expect(can(acting(await table(), ActorModel.User), 'organization', blank, 'create')).toBe(
         true,
       );
-      const userToken = await table();
-      userToken.setActor({ model: ActorModel.Token, record: { id: 't1', ownerModel: 'User' } });
-      expect(can(userToken, 'organization', blank, 'create')).toBe(true);
+      const userToken = async (role: string) => {
+        const permix = await table();
+        permix.setActor({
+          model: ActorModel.Token,
+          record: { id: 't1', ownerModel: 'User', role },
+        });
+        return permix;
+      };
+      expect(can(await userToken('member'), 'organization', blank, 'create')).toBe(true);
+      expect(can(await userToken('viewer'), 'organization', blank, 'create')).toBe(false);
       const orgToken = await table(grant('db:organization', 'o1', 'own'));
       orgToken.setActor({
         model: ActorModel.Token,
@@ -362,10 +371,10 @@ describe('every action lives on its own model (Aron, 2026-10-25)', () => {
     expect(can(admin, 'organization', o1, 'delete')).toBe(false);
   });
 
-  it('deleting a token is delete on the token: its own user, as a user', async () => {
+  it('deleting a token is delete on the token: its own user, or a token within reach (R84)', async () => {
     const mine = { ...tokenUnder(o1), ownerModel: 'User', userId: 'u1', user: u1 };
     const own = () => table(grant('db:user', 'u1', 'own'));
     expect(can(acting(await own(), ActorModel.User, 'u1'), 'token', mine, 'delete')).toBe(true);
-    expect(can(acting(await own(), ActorModel.Token), 'token', mine, 'delete')).toBe(false);
+    expect(can(acting(await own(), ActorModel.Token), 'token', mine, 'delete')).toBe(true);
   });
 });

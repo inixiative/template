@@ -104,10 +104,12 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
   const update = (
     writer: { user: User; organizationUser: OrganizationUser },
     integration: Integration,
-    permissions: Permissions,
+    { entitlements, ...permissions }: Permissions,
   ) =>
     as(writer.user, [writer.organizationUser])(
-      patch(`/api/v1/integration/${integration.id}`, permissions),
+      entitlements
+        ? patch(`/api/v1/integration/${integration.id}/entitlements`, { add: entitlements })
+        : patch(`/api/v1/integration/${integration.id}`, permissions),
     );
 
   beforeAll(async () => {
@@ -210,9 +212,9 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
   });
 
   describe('writing an integration, like a member', () => {
-    it('an admin creates a member or viewer integration, never admin or owner', async () => {
+    it('an admin creates a member, viewer or admin integration, never owner', async () => {
       expect((await createOrgIntegration(admin, { role: 'owner' })).status).toBe(403);
-      expect((await createOrgIntegration(admin, { role: 'admin' })).status).toBe(403);
+      expect((await createOrgIntegration(admin, { role: 'admin' })).status).toBe(201);
       const created = await createOrgIntegration(admin, { role: 'member' });
       expect(created.status).toBe(201);
       expect(((await created.json()) as { data: Integration }).data.role).toBe('member');
@@ -222,15 +224,16 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect((await createOrgIntegration(owner, { role: 'owner' })).status).toBe(201);
     });
 
-    it('an admin cannot raise an integration to admin, owner or full', async () => {
+    it('an admin raises an integration to admin, never to owner or full', async () => {
       const integration = await orgIntegration('member');
-      expect((await update(admin, integration, { role: 'admin' })).status).toBe(403);
       expect((await update(admin, integration, { role: 'owner' })).status).toBe(403);
+      expect((await update(admin, integration, { role: null, full: true })).status).toBe(403);
+      expect((await update(admin, integration, { role: 'admin' })).status).toBe(200);
       const stored = await db.integration.findUniqueOrThrow({ where: { id: integration.id } });
-      expect(stored.role).toBe('member');
+      expect(stored.role).toBe('admin');
     });
 
-    it("only its user makes a member's integration full, and only when that member holds own", async () => {
+    it("its user or the organization's owner makes a member's integration full; an admin does not (R82)", async () => {
       const ownerMember = await member('owner');
       const { entity: integration } = await createIntegration({
         ownerModel: 'OrganizationUser',
@@ -239,7 +242,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
         role: 'member',
       });
       expect((await update(admin, integration, { role: null, full: true })).status).toBe(403);
-      expect((await update(owner, integration, { role: null, full: true })).status).toBe(403);
+      expect((await update(owner, integration, { role: null, full: true })).status).toBe(200);
       expect((await update(ownerMember, integration, { role: null, full: true })).status).toBe(200);
     });
 
@@ -282,7 +285,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
 
     it('an admin cannot give an organization integration the power to assign roles: its token could then make owners', async () => {
       const assignMembers = [
-        entry('db:organizationUser', ['db:organization', organization.id], ['assignHigh']),
+        entry('db:organization', ['db:organization', organization.id], ['own']),
       ];
       const integration = await orgIntegration('member');
       expect((await update(admin, integration, { entitlements: assignMembers })).status).toBe(403);
@@ -310,12 +313,12 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect((await anonymous(del(`/api/v1/integration/${integration.id}`))).status).toBe(403);
     });
 
-    it('its user administers it; an organization admin and owner do not', async () => {
+    it("its user and the organization's owner administer it; an admin does not (R82)", async () => {
       const { m, integration } = await memberIntegration();
       const rename = (writer: { user: User; organizationUser: OrganizationUser }) =>
         update(writer, integration, { name: `i-${randomUUID()}` } as Permissions);
       expect((await rename(admin)).status).toBe(403);
-      expect((await rename(owner)).status).toBe(403);
+      expect((await rename(owner)).status).toBe(200);
       expect((await rename(m)).status).toBe(200);
     });
 

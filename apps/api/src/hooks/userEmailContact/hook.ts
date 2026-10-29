@@ -1,5 +1,5 @@
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
-import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
+import { ContactOwnerModel, ContactSource, ContactType } from '@template/db/generated/client/enums';
 import { castArray } from 'lodash-es';
 
 type CreatedUser = { id: string; email: string };
@@ -25,7 +25,7 @@ export const registerUserEmailContactHook = () => {
             userId: user.id,
             type: ContactType.email,
             value: { address: user.email },
-            source: 'user-creation',
+            source: ContactSource.userCreation,
           },
           update: {},
         });

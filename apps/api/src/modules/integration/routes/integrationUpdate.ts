@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { IntegrationScalarSchema } from '@template/db';
-import { updateRoute } from '#/lib/routeTemplates';
+import { permissionsBodyRefinement, updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   INTEGRATION_IMMUTABLE_FIELDS,
@@ -16,6 +16,7 @@ import { Modules } from '#/modules/modules';
 export const integrationUpdateRoute = updateRoute({
   model: Modules.integration,
   middleware: [validatePermission('manage')],
+  bodyRefinement: permissionsBodyRefinement,
   bodySchema: integrationUpdateBodySchema,
   sanitizeKeys: INTEGRATION_IMMUTABLE_FIELDS,
   responseSchema: IntegrationScalarSchema,

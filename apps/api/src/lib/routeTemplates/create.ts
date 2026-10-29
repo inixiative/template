@@ -48,13 +48,7 @@ export const createRoute = <const T extends RouteArgs>(args: T) => {
     tags: routeTags,
     security: securityForRoute(args),
     description: description ?? `Creates a new ${resourceName}.`,
-    middleware: prepareMiddleware({
-      model,
-      middleware,
-      skipId: skipResource,
-      includeDeleted: args.includeDeleted,
-      route: (): RouteConfig => route,
-    }),
+    middleware: prepareMiddleware(args, { skipId: skipResource, route: (): RouteConfig => route }),
     request: buildRequest({ ...args, skipId: skipIdForRequest }),
     responses: buildResponses(args, 201),
   });

@@ -8,6 +8,7 @@ export {
   paginateRequestSchema,
   paginateResponseSchema,
 } from '#/lib/routeTemplates/paginationSchemas';
+export { permissionsBodyRefinement } from '#/lib/routeTemplates/permissionsBodyRefinement';
 export { polymorphicBodyRefinement } from '#/lib/routeTemplates/polymorphicBodyRefinement';
 export { readRoute } from '#/lib/routeTemplates/read';
 export type * from '#/lib/routeTemplates/types';

@@ -15,7 +15,6 @@
     "./lib/encryption/*": "./src/lib/encryption/*",
     "./test": "./src/test/index.ts",
     "./test/*": "./src/test/*",
-    "./zod": "./src/generated/zod/schemas/index.ts",
     "./zod/models": "./src/generated/zod/schemas/variants/pure/index.ts",
     "./zod/*": "./src/generated/zod/schemas/*.ts",
     "./generated/prismaMap": "./src/generated/prismaMap.gen.ts",
@@ -36,12 +35,12 @@
     "db:studio": "prisma studio",
     "db:seed": "bun run --cwd ../../apps/api db:seed",
     "db:truncate:webhooks": "bun run scripts/truncateWebhookSubscriptions.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bun check"
   },
   "dependencies": {
     "@inixiative/json-rules": "^3.6.0",
-    "@prisma/adapter-pg": "^7.4.2",
-    "@prisma/client": "^7.4.2",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "@supercharge/promise-pool": "^3.3.0",
     "@template/shared": "workspace:*",
     "bcryptjs": "^3.0.3",
@@ -58,7 +57,7 @@
     "@types/ioredis-mock": "^8.2.7",
     "@types/lodash-es": "^4.17.12",
     "@types/pg": "^8.18.0",
-    "prisma": "^7.4.2",
+    "prisma": "^7.10.1",
     "prisma-zod-generator": "^2.1.4",
     "zod": "^4.3.6"
   }

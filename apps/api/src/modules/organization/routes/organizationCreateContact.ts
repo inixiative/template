@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, feature:contact
  */
-import { createRoute } from '#/lib/routeTemplates';
+import { createRoute, permissionsBodyRefinement } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import {
   CONTACT_CREATE_IMMUTABLE_FIELDS,
@@ -16,6 +16,7 @@ import { Modules } from '#/modules/modules';
 export const organizationCreateContactRoute = createRoute({
   model: Modules.organization,
   submodel: Modules.contact,
+  bodyRefinement: permissionsBodyRefinement,
   bodySchema: contactCreateBodySchema,
   responseSchema: contactReadResponseSchema,
   middleware: [validateSubmodelPermission('create')],
