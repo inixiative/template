@@ -131,22 +131,6 @@ const membersIntegration: ActionRule = {
   any: [{ all: [ownedBy(members), actorIsItsUser()] }, actionOnOwner('own', '', members)],
 };
 
-export const integrationAdministering = {
-  create: {
-    any: [
-      createdByItsUserOrManager,
-      { all: [ownedBy(members), actorIsItsUser(), actionOnOwner('manage', '', members)] },
-    ],
-  },
-  own: {
-    any: [actorIsItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
-  },
-  manage: {
-    any: [actorIsItsUser(), actionOnOwner('manage', '', organizationOrSpace), membersIntegration],
-  },
-  delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
-} satisfies Record<string, ActionRule>;
-
 const membersOwnDelegate = (action: string): ActionRule => ({
   all: [
     ownedBy(members),
@@ -154,6 +138,28 @@ const membersOwnDelegate = (action: string): ActionRule => ({
     actionOnOwner(action, '', members),
   ],
 });
+
+export const integrationAdministering = {
+  create: {
+    any: [
+      createdByItsUserOrManager,
+      { all: [ownedBy(members), actorIsItsUser(), actionOnOwner('operate', '', members)] },
+      membersOwnDelegate('manage'),
+    ],
+  },
+  own: {
+    any: [actorIsItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
+  },
+  manage: {
+    any: [
+      actorIsItsUser(),
+      actionOnOwner('manage', '', organizationOrSpace),
+      membersIntegration,
+      membersOwnDelegate('manage'),
+    ],
+  },
+  delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
+} satisfies Record<string, ActionRule>;
 
 export const integrationAccess = {
   operate: {

@@ -190,7 +190,12 @@ describe("the organization's own integrations: an admin adds them, a member uses
   });
 });
 
-describe('a member adds their own member integration only as an admin (R85)', () => {
+describe('a member adds their own member integration; through a member token, only as an admin (Aron, 2026-10-29)', () => {
+  const { call } = createTokenProbeApp((hono) =>
+    hono.route('/api/v1/organizationUser', organizationUserRouter),
+  );
+  const body = () => ({ name: `i-${crypto.randomUUID()}`, provider: 'slack', role: 'viewer' });
+
   const addsOwn = async (role: Role) => {
     const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
     const { app } = createTestApp({
@@ -198,19 +203,31 @@ describe('a member adds their own member integration only as an admin (R85)', ()
       mockOrganizationUsers: [seat],
       mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
     });
-    return (
-      await app.fetch(
-        post(`/api/v1/organizationUser/${seat.id}/integrations`, {
-          name: `i-${crypto.randomUUID()}`,
-          provider: 'slack',
-          role: 'viewer',
-        }),
-      )
-    ).status;
+    return (await app.fetch(post(`/api/v1/organizationUser/${seat.id}/integrations`, body())))
+      .status;
   };
 
-  it('an admin adds one on their own member row; a member does not', async () => {
-    expect(await addsOwn('admin')).toBe(201);
-    expect(await addsOwn('member')).toBe(403);
+  const addsOwnByToken = async (role: Role, tokenRole: Role) => {
+    const { entity: seat } = await createOrganizationUser({ role }, { organization });
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', role: tokenRole },
+      { organizationUser: seat },
+    );
+    return (await call(rawKey, 'POST', `/api/v1/organizationUser/${seat.id}/integrations`, body()))
+      .status;
+  };
+
+  it('a member adds one on their own member row; a viewer does not', async () => {
+    expect(await addsOwn('member')).toBe(201);
+    expect(await addsOwn('viewer')).toBe(403);
+  });
+
+  it("an admin member's admin token adds one; a member token does not", async () => {
+    expect(await addsOwnByToken('admin', 'admin')).toBe(201);
+    expect(await addsOwnByToken('admin', 'member')).toBe(403);
+  });
+
+  it("a member's admin token does not: a token holds its member's role or less", async () => {
+    expect(await addsOwnByToken('member', 'admin')).toBe(403);
   });
 });

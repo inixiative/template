@@ -490,7 +490,7 @@ Sides are separate axes: `targetOrganization` reaches what O (or its members) re
 | a member (OrganizationUser) | every action | nothing |
 | a space member (SpaceUser) | every action | nothing |
 
-An owner reaches members' integrations so they can be seen and turned off; they are reached by id, not listed. A member's own tokens read and operate that member's integrations as far as their role allows. Adding the organization's integrations takes admin; using them takes operate (member). A member adds their own member integration only as an admin (`manage` on the member's organization or space) (`integrationsUnderOrganization.test.ts`).
+An owner reaches members' integrations so they can be seen and turned off; they are reached by id, not listed. A member's own tokens read and operate that member's integrations as far as their role allows; an admin token of an admin member also adds and manages them. Adding the organization's integrations takes admin; using them takes operate (member). A member adds their own member integration as a member (`operate` on the member's organization or space); through a member token it takes admin, and a token holds its member's role or less (`integrationsUnderOrganization.test.ts`).
 
 #### Validation Middleware
 
