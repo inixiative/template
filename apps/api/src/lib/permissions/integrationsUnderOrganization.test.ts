@@ -18,7 +18,7 @@ import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import type { Entry } from '#tests/utils/entitlementEntry';
-import { del, post } from '#tests/utils/request';
+import { del, patch, post } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
 
@@ -418,6 +418,39 @@ describe('a chain that ends at you is yours to write; a token carrying you keeps
     );
     expect(await holds(rawKey, 'organization', organization.id, 'operate')).toBe(false);
     expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(false);
+  });
+
+  it("the organization's owner writes no entitlements on a member's integration, whatever its role (R91)", async () => {
+    const { entity: seat } = await createOrganizationUser({ role: 'member' }, { organization });
+    const { entity: owner, context } = await createOrganizationUser(
+      { role: 'owner' },
+      { organization },
+    );
+    const { app } = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [owner],
+      mount: [(hono) => hono.route('/api/v1/integration', integrationRouter)],
+    });
+    const add = {
+      add: [
+        {
+          resource: 'db:organization',
+          anchor: { resource: 'db:organization', id: organization.id },
+          actions: { read: true },
+        },
+      ],
+    };
+    for (const role of [null, 'viewer'] as const) {
+      const { entity: integration } = await createIntegration({
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: seat.userId,
+        role,
+      });
+      expect(
+        (await app.fetch(patch(`/api/v1/integration/${integration.id}/entitlements`, add))).status,
+      ).toBe(403);
+    }
   });
 
   it("a member's admin token does not give their member integration the owner role", async () => {
