@@ -67,10 +67,10 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     ).toBe(200);
   });
 
-  it('a member does not', async () => {
-    expect((await grant('member', integrations('organization', ['manage'], slack))).status).toBe(
-      403,
-    );
+  it("a member does not: it cannot change a member's entitlements at all", async () => {
+    const response = await grant('member', integrations('organization', ['manage'], slack));
+    expect(response.status).toBe(403);
+    expect(((await response.json()) as { message: string }).message).toBe('Access denied');
   });
 
   it("via space.organization: the spaces' integrations, granted by the owner, not an admin", async () => {
@@ -90,18 +90,32 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
   it('a where pinning a space elsewhere is judged under the anchor, not at that space', async () => {
     const { entity: other } = await createOrganization();
     const { entity: elsewhere } = await createSpace({}, { organization: other });
-    expect(
-      (
-        await grant(
-          'admin',
-          integrations('space.organization', ['manage'], {
-            field: 'spaceId',
-            operator: 'equals',
-            value: elsewhere.id,
-          }),
-        )
-      ).status,
-    ).toBe(403);
+    const { entity: here, context } = await createOrganizationUser(
+      { role: 'admin' },
+      { organization },
+    );
+    const { entity: there } = await createOrganizationUser(
+      { role: 'owner' },
+      { organization: other, user: context.user },
+    );
+    const { entity: target } = await createOrganizationUser({ role: 'member' }, { organization });
+    const app = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [here, there],
+      mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
+    });
+    const pinnedElsewhere = integrations('space.organization', ['manage'], {
+      field: 'spaceId',
+      operator: 'equals',
+      value: elsewhere.id,
+    });
+    const response = await app.fetch(
+      patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [pinnedElsewhere] }),
+    );
+    expect(response.status).toBe(403);
+    expect(((await response.json()) as { message: string }).message).toBe(
+      'A delegate holds your permissions or less',
+    );
   });
 
   it('a path that does not end at the anchor is a malformed grant', async () => {

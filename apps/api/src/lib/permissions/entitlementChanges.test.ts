@@ -122,14 +122,15 @@ describe("a member's entitlements change only through add and remove (R78)", () 
     expect((await change('owner', target, { add: [pathless] })).status).toBe(422);
   });
 
-  it('updating the member row never touches its entitlements', async () => {
+  it('updating the member row cannot carry entitlements: the body is refused', async () => {
     const target = await member([ownIntegrations(['read'])]);
-    await (await writer('owner')).fetch(
+    const response = await (await writer('owner')).fetch(
       patch(`/api/v1/organizationUser/${target.id}`, {
         role: 'viewer',
         entitlements: [spaceIntegrations(['manage'])],
       }),
     );
+    expect(response.status).toBe(422);
     expect(await stored(target)).toEqual([ownIntegrations(['read'])]);
   });
 });
