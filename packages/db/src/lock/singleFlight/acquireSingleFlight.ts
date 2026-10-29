@@ -13,13 +13,11 @@ import { log } from '@template/shared/logger';
 import { recordDuration } from '@template/shared/telemetry';
 
 const SINGLE_FLIGHT_POLL_MS = 50;
-const SINGLE_FLIGHT_MAX_WAIT_MS = 20_000;
+const SINGLE_FLIGHT_MAX_WAIT_MS = 10_000;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-type SingleFlight<T> =
-  | { result: 'hit'; value: T }
-  | { result: 'settled'; holdsLock: boolean; lockUnavailable: boolean };
+type SingleFlight<T> = { result: 'hit'; value: T } | { result: 'settled'; holdsLock: boolean };
 
 export const acquireSingleFlight = async <T>(
   redis: ReturnType<typeof getRedisClient>,
@@ -64,5 +62,5 @@ export const acquireSingleFlight = async <T>(
     }
   }
 
-  return { result: 'settled', holdsLock, lockUnavailable };
+  return { result: 'settled', holdsLock };
 };

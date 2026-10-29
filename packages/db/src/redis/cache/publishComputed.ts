@@ -4,7 +4,6 @@
  * @partOf primitive:caching, infrastructure:redis, infrastructure:observability
  * @uses none
  */
-import { epochKey } from '@template/db/redis/cache/generation/epochKey';
 import { generationKey } from '@template/db/redis/cache/generation/generationKey';
 import type { Generation } from '@template/db/redis/cache/generation/readGeneration';
 import { publishIfCurrent } from '@template/db/redis/cache/queries/publishIfCurrent';
@@ -25,7 +24,7 @@ export const publishComputed = async (
   try {
     const published = await publishIfCurrent(
       redis,
-      { key, generationKey: generationKey(key), epochKey: epochKey(), writtenKey: writtenKey(key) },
+      { key, generationKey: generationKey(key), writtenKey: writtenKey(key) },
       captured,
       ttlSeconds,
       payload,

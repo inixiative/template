@@ -4,7 +4,8 @@
  * @partOf primitive:caching, infrastructure:redis
  * @uses none
  */
-import { epochKey } from '@template/db/redis/cache/generation/epochKey';
+
+import { singleFlightLockKey } from '@template/db/lock/singleFlight/singleFlightLock';
 import { generationKey } from '@template/db/redis/cache/generation/generationKey';
 import {
   GENERATION_TTL_SECONDS,
@@ -16,6 +17,14 @@ import { writtenKey } from '@template/db/redis/cache/writtenKey';
 import { getRedisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 
+const clearOne = (redis: ReturnType<typeof getRedisClient>, key: string): Promise<number> =>
+  clearExact(
+    redis,
+    { key, generationKey: generationKey(key), writtenKey: writtenKey(key) },
+    newGeneration(),
+    GENERATION_TTL_SECONDS,
+  );
+
 export const clearKey = async (pattern: string): Promise<number> => {
   validateKey(pattern);
   const isPattern = pattern.includes('*');
@@ -24,18 +33,20 @@ export const clearKey = async (pattern: string): Promise<number> => {
     const redis = getRedisClient();
 
     if (!isPattern) {
-      const deleted = await clearExact(
-        redis,
-        { key: pattern, generationKey: generationKey(pattern), writtenKey: writtenKey(pattern) },
-        newGeneration(),
-        GENERATION_TTL_SECONDS,
-      );
+      const deleted = await clearOne(redis, pattern);
       if (deleted) log.debug(`Cleared cache key: ${pattern}`);
       return deleted;
     }
 
-    await redis.set(epochKey(), newGeneration(), 'EX', GENERATION_TTL_SECONDS);
     let deleted = 0;
+    const lockPrefix = singleFlightLockKey('');
+    for await (const lockKeys of redis.scanStream({
+      match: singleFlightLockKey(pattern),
+      count: 100,
+    }))
+      for (const lockKey of lockKeys as string[])
+        deleted += await clearOne(redis, lockKey.slice(lockPrefix.length));
+
     const stream = redis.scanStream({ match: pattern, count: 100 });
 
     for await (const keys of stream) {

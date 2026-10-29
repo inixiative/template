@@ -277,6 +277,29 @@ describe('cache single-flight failure modes', () => {
     expect(calls).toBe(1);
   });
 
+  it('a waiter that never gets the lock computes after 10 seconds and does not publish', async () => {
+    const key = cacheKey('user', 'waited-out');
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const holder = cache(key, async () => {
+      await gate;
+      return 'holder';
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const started = Date.now();
+    expect(await cache(key, async () => 'waiter')).toBe('waiter');
+    const waited = Date.now() - started;
+    expect(waited).toBeGreaterThanOrEqual(10_000);
+    expect(waited).toBeLessThan(12_000);
+    expect(await getRedisClient().get(key)).toBeNull();
+
+    release();
+    expect(await holder).toBe('holder');
+  }, 15_000);
+
   it('derives the ttl from the value when given a function', async () => {
     const key = cacheKey('user', 'ttl-fn');
     await cache(
@@ -510,19 +533,37 @@ describe('cache invalidation during a read', () => {
     expect(await getRedisClient().get(key)).toBeNull();
   });
 
-  it('throws and deletes nothing when the pattern clear cannot bump the epoch', async () => {
-    const key = cacheKey('race', 'epoch-fails', ['v1']);
-    await getRedisClient().setex(key, 60, superjson.stringify('cached'));
-    const set = spyOn(getRedisClient(), 'set').mockRejectedValueOnce(new Error('down'));
+  it('a pattern clear leaves a compute outside its pattern alone', async () => {
+    const key = cacheKey('race', 'outside', ['v1']);
+    const paused = pausedProducer('kept');
 
+    const inFlight = cache(key, paused.produce, 60);
+    await paused.hasRead;
+    await clearKey(cacheKey('race', 'elsewhere', [], true));
+    paused.resume();
+
+    expect(await inFlight).toBe('kept');
+    expect(await readRaw(key)).toBe('kept');
+  });
+
+  it('throws and deletes nothing when the pattern clear cannot cancel a compute in flight', async () => {
+    const cached = cacheKey('race', 'cancel-fails', ['v1']);
+    const computing = cacheKey('race', 'cancel-fails', ['v2']);
+    await getRedisClient().setex(cached, 60, superjson.stringify('cached'));
+    const paused = pausedProducer('old');
+
+    const inFlight = cache(computing, paused.produce, 60);
+    await paused.hasRead;
+    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('down'));
     try {
-      await expect(clearKey(cacheKey('race', 'epoch-fails', [], true))).rejects.toThrow('down');
-      expect(set).toHaveBeenCalledTimes(1);
+      await expect(clearKey(cacheKey('race', 'cancel-fails', [], true))).rejects.toThrow('down');
     } finally {
-      set.mockRestore();
+      evalSpy.mockRestore();
     }
+    paused.resume();
+    await inFlight;
 
-    expect(await readRaw(key)).toBe('cached');
+    expect(await readRaw(cached)).toBe('cached');
   });
 
   it('throws when the pattern clear cannot scan', async () => {
@@ -576,20 +617,20 @@ describe('cache invalidation during a read', () => {
   });
 
   it('a retried pattern clear still cancels a producer that read before the failed one', async () => {
-    const key = cacheKey('race', 'epoch-fails-in-flight', ['v1']);
+    const key = cacheKey('race', 'cancel-fails-in-flight', ['v1']);
     const paused = pausedProducer('old');
 
     const inFlight = cache(key, paused.produce, 60);
     await paused.hasRead;
-    const set = spyOn(getRedisClient(), 'set').mockRejectedValueOnce(new Error('down'));
+    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('down'));
     try {
-      await expect(clearKey(cacheKey('race', 'epoch-fails-in-flight', [], true))).rejects.toThrow(
+      await expect(clearKey(cacheKey('race', 'cancel-fails-in-flight', [], true))).rejects.toThrow(
         'down',
       );
     } finally {
-      set.mockRestore();
+      evalSpy.mockRestore();
     }
-    expect(await clearKey(cacheKey('race', 'epoch-fails-in-flight', [], true))).toBe(0);
+    expect(await clearKey(cacheKey('race', 'cancel-fails-in-flight', [], true))).toBe(0);
     paused.resume();
 
     expect(await inFlight).toBe('old');
@@ -611,12 +652,17 @@ describe('cache invalidation during a read', () => {
 
   it('returns the value without publishing it when the generation read fails', async () => {
     const key = cacheKey('race', 'generation-read-fails');
-    const mget = spyOn(getRedisClient(), 'mget').mockRejectedValueOnce(new Error('down'));
+    const redis = getRedisClient();
+    const get = redis.get.bind(redis);
+    const generationRead = spyOn(redis, 'get').mockImplementation(((name: string) =>
+      name.startsWith(`${redisNamespace.cacheGeneration}:`)
+        ? Promise.reject(new Error('down'))
+        : get(name)) as Redis['get']);
 
     try {
       expect(await cache(key, async () => 'computed', 60)).toBe('computed');
     } finally {
-      mget.mockRestore();
+      generationRead.mockRestore();
     }
 
     expect(await getRedisClient().get(key)).toBeNull();

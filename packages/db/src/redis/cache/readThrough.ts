@@ -15,7 +15,7 @@ import { getRedisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import superjson from 'superjson';
 
-export const cacheRead = async <T>(
+export const readThrough = async <T>(
   key: string,
   fn: () => Promise<T>,
   ttl: number | ((value: T) => number),
@@ -30,18 +30,15 @@ export const cacheRead = async <T>(
   const lock = singleFlightLock(key);
   const flight = await acquireSingleFlight<T>(redis, key, lock, setResult);
   if (flight.result === 'hit') return flight.value;
-  const { holdsLock, lockUnavailable } = flight;
+  const { holdsLock } = flight;
 
   try {
-    const generation = lockUnavailable ? null : await readGeneration(redis, key);
+    const generation = holdsLock ? await readGeneration(redis, key) : null;
     const value = await fn();
     const effectiveTtl = resolveTtl(value, ttl);
 
-    if (effectiveTtl > 0 && generation) {
-      const payload = superjson.stringify(value);
-      const write = publishComputed(redis, key, generation, effectiveTtl, payload);
-      if (holdsLock) await write;
-    }
+    if (effectiveTtl > 0 && generation !== null)
+      await publishComputed(redis, key, generation, effectiveTtl, superjson.stringify(value));
 
     return value;
   } finally {
