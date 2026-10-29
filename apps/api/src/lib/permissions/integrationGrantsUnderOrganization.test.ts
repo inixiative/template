@@ -81,8 +81,11 @@ const _reach = async (key: string) => {
 };
 
 describe('granted: the where narrows the kinds an entitlement under the organization reaches (R81, R83)', () => {
-  const grant = async (role: Role, granted: Entry) => {
-    const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
+  const grant = async (role: Role, granted: Entry, held?: Entry[]) => {
+    const { entity: seat, context } = await createOrganizationUser(
+      { role, entitlements: held },
+      { organization },
+    );
     const { entity: target } = await createOrganizationUser({ role: 'viewer' }, { organization });
     const { app } = createTestApp({
       mockUser: context.user,
@@ -123,6 +126,30 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
     expect(await holds(key, 'integration', integrations.Organization.id, 'manage')).toBe(true);
     for (const kind of ['Space', 'OrganizationUser', 'SpaceUser'] as const)
       expect(await holds(key, 'integration', integrations[kind].id, 'manage')).toBe(false);
+  });
+
+  it('an admin entitled to own every kind under the organization grants that ownership onward', async () => {
+    const owning = entry(
+      'db:integration',
+      ['db:organization', organization.id, 'organization'],
+      ['own'],
+    );
+    expect(await grant('admin', owning)).toBe(403);
+    expect(await grant('admin', owning, [owning])).toBe(200);
+  });
+
+  it("an admin entitled to own the organization's own integrations grants that, not every kind", async () => {
+    const owning = (where?: Entry['where']) => ({
+      ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['own']),
+      ...(where ? { where } : {}),
+    });
+    const theOrganizationsOwn = owning({
+      field: 'ownerModel',
+      operator: 'equals',
+      value: 'Organization',
+    });
+    expect(await grant('admin', theOrganizationsOwn, [theOrganizationsOwn])).toBe(200);
+    expect(await grant('admin', owning(), [theOrganizationsOwn])).toBe(403);
   });
 
   const kindsIn = (...values: Kind[]) =>
