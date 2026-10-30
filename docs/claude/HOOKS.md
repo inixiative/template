@@ -342,7 +342,7 @@ export const cacheReference: CacheReference = {
 };
 ```
 
-On mutation, all matching cache keys are deleted.
+On mutation, the hook marks the matching keys in the transaction's cache overlay, and they are cleared when the transaction commits ([REDIS.md - cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)).
 
 ### Wildcard Keys
 

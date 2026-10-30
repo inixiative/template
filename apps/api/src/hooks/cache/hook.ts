@@ -6,9 +6,7 @@
  */
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
-  clearKey,
   DbAction,
-  db,
   HookTiming,
   isNoOpUpdate,
   markCacheWritten,
@@ -16,7 +14,6 @@ import {
   type Prisma,
   registerDbHook,
 } from '@template/db';
-import { ConcurrencyType } from '@template/shared/utils';
 import { keyBy } from 'lodash-es';
 import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
 import { isManyAction } from '#/hooks/shared/hookRows';
@@ -70,13 +67,6 @@ export const registerClearCacheHook = () => {
     }
 
     if (keys.size === 0) return;
-
     await markCacheWritten([...keys]);
-
-    const clearKeys = [...keys].map((key) => async () => {
-      await clearKey(key);
-    });
-
-    db.onCommit(clearKeys, ConcurrencyType.redis);
   });
 };

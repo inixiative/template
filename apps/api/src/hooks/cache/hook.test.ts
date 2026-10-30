@@ -1,6 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { cache, cacheKey, clearKey, db, fetchOne, unregisterDbHook } from '@template/db';
+import {
+  cache,
+  cacheKey,
+  checkCache,
+  clearKey,
+  db,
+  fetchOne,
+  markCacheWritten,
+  unregisterDbHook,
+} from '@template/db';
 import type { Organization, OrganizationUser } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -20,6 +29,11 @@ const rollingBack = (fn: () => Promise<unknown>) =>
       throw new Error('rollback');
     })
     .catch(() => {});
+
+const cachedName = async (key: string) => {
+  const check = await checkCache<Organization>(key);
+  return 'value' in check ? check.value?.name : undefined;
+};
 
 const memberKeyOf = (member: { organizationId: string; userId: string }) =>
   cacheKey('organizationUser', { organizationId: member.organizationId, userId: member.userId });
@@ -125,5 +139,58 @@ describe('a read through the cache inside a transaction', () => {
       after = (await fetchOne<Organization>('organization', organization.id))?.name;
     });
     expect(after).toBe('written-by-sibling');
+  });
+  it('publishes a value it computed when it commits', async () => {
+    const { entity: organization } = await createOrganization();
+    const key = cacheKey('organization', organization.id);
+    await db.txn(async () => {
+      await fetchOne('organization', organization.id);
+      expect(await cachedName(key)).toBeUndefined();
+    });
+    expect(await cachedName(key)).toBe(organization.name);
+  });
+
+  it('publishes the value it recomputed after its own write when it commits', async () => {
+    const { entity: organization } = await createOrganization();
+    const key = cacheKey('organization', organization.id);
+    await fetchOne('organization', organization.id);
+    await db.txn(async () => {
+      await db.organization.update({ where: { id: organization.id }, data: { name: 'renamed' } });
+      await fetchOne('organization', organization.id);
+    });
+    expect(await cachedName(key)).toBe('renamed');
+  });
+
+  it('clears a key it wrote and did not read again when it commits', async () => {
+    const { entity: organization } = await createOrganization();
+    const key = cacheKey('organization', organization.id);
+    await fetchOne('organization', organization.id);
+    await db.txn(async () => {
+      await db.organization.update({ where: { id: organization.id }, data: { name: 'renamed' } });
+    });
+    expect(await cachedName(key)).toBeUndefined();
+  });
+
+  it('does not publish a value computed before another clear of the key landed', async () => {
+    const { entity: organization } = await createOrganization();
+    const key = cacheKey('organization', organization.id);
+    await db.txn(async () => {
+      await fetchOne('organization', organization.id);
+      await clearKey(key);
+    });
+    expect(await cachedName(key)).toBeUndefined();
+  });
+  it('treats every key under a written pattern as written, and leaves none of them stale after commit', async () => {
+    const { entity: organization } = await createOrganization();
+    const key = cacheKey('organization', organization.id, ['summary']);
+    await cache(key, async () => 'before');
+    let inside: string | undefined;
+    await db.txn(async () => {
+      await markCacheWritten([cacheKey('organization', organization.id, [], true)]);
+      inside = await cache(key, async () => 'after');
+    });
+    expect(inside).toBe('after');
+    const check = await checkCache<string>(key);
+    expect('value' in check ? check.value : undefined).not.toBe('before');
   });
 });

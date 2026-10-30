@@ -39,6 +39,7 @@ import {
   type CacheOverlay,
   newCacheOverlay,
 } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
+import { publishOverlay } from '@template/db/redis/cache/transactionOverlay/publishOverlay';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import {
@@ -174,6 +175,7 @@ const dbMethods = {
         await drainFinally(opened);
       }
       const { result, openTransaction } = settled;
+      await publishOverlay(openTransaction.cacheOverlay);
 
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
       // onCommit handler) drains its own and a rollback discards these with the object.

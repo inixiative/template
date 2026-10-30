@@ -18,6 +18,8 @@ export const cache = async <T>(
   validateKey(key);
   const overlay = db.cacheOverlay();
   return withCacheSpan(key, true, (setResult) =>
-    overlay ? readInTransaction(overlay, key, fn, setResult) : readThrough(key, fn, ttl, setResult),
+    overlay
+      ? readInTransaction(overlay, key, fn, ttl, setResult)
+      : readThrough(key, fn, ttl, setResult),
   );
 };

@@ -285,20 +285,26 @@ tag is the accessor, never the key, so cardinality stays bounded.
 ### cache() inside a transaction
 
 Each outermost `db.txn` holds a cache overlay (`db.cacheOverlay()`), and `cache()` inside the
-transaction reads through it instead of publishing:
+transaction reads through it:
 
 - A value the transaction computed is returned from the overlay. Otherwise the shared cache is read,
-  and a miss computes `fn` on the transaction's client and keeps the value in the overlay. Nothing
-  reaches Redis before commit, so a rollback leaves nothing behind (dropping the overlay with the
-  transaction).
-- The clear-cache hook marks the keys a write invalidates (`markCacheWritten`) at the same point it
-  queues their after-commit clears. A marked key skips the shared cache and recomputes, so the
-  transaction reads its own writes.
+  and a miss computes `fn` on the transaction's client and keeps the value in the overlay with the
+  key's generation, read before `fn` runs. Nothing reaches Redis before commit, so a rollback leaves
+  nothing behind.
+- The clear-cache hook marks the keys a write invalidates (`markCacheWritten`). A marked key skips the
+  shared cache and recomputes, so the transaction reads its own writes. A marked pattern marks every
+  key it matches.
 - Each key has a serialized queue: a compute and its store run on it, and a mark waits on it. Batch
   sub-requests in one round share the transaction, so a sibling's compute that read before a write
   lands before that write's mark, and the mark removes it.
 - There is no single-flight lock inside a transaction. A cache function only reads; one that writes
   would mark its own key and wait on itself.
+
+When the transaction commits, before its `db.onCommit` batches, each key it touched runs one Lua call:
+a marked key is cleared (value, write time, new generation), and a value it computed is published
+only if the key's generation is still the one read before the compute. Another clear in between, from
+any process, wins and leaves a miss. A failed call logs and leaves the key as the clear left it.
+Marked patterns are cleared afterwards with `clearKey`, which throws on failure.
 
 Long-lived values that no write hook clears are not `cache()` values: they are read directly and
 refreshed asynchronously (rolling caches), never computed in a request's transaction.
@@ -353,7 +359,7 @@ every key sent to the client. The locks in each scanned page are cancelled in pa
 
 ### Automatic Invalidation
 
-Cache keys defined in the cache reference map are auto-cleared on mutations via an after-commit db hook, which also marks them in the transaction's cache overlay. See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
+Cache keys defined in the cache reference map are marked on mutations by a db hook in the transaction's cache overlay and cleared when it commits (see [cache() inside a transaction](#cache-inside-a-transaction)). See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
 
 #### Invalidation conventions
 
