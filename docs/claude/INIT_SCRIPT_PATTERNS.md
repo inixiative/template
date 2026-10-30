@@ -541,6 +541,8 @@ await execAsync('infisical org list --format json', { encoding: 'utf-8' });
 
 **Rule:** If you see `execSync` anywhere in `init/api/`, it's a bug. Convert to async immediately.
 
+**Rule:** A secret never goes in a command's arguments, where a process listing and a failed command's message both show it. Hand it on stdin with `execFileWithInput` (`init/utils/exec.ts`; Infisical reads `KEY=@/dev/stdin`), pass a connection string through `env`, and call HTTP APIs with `fetch` rather than `curl`.
+
 ### 11. Railway CLI vs GraphQL API
 
 **Pattern:** Use Railway CLI commands for simple queries, GraphQL API for mutations.

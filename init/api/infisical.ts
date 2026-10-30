@@ -1,7 +1,12 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { execAsync, execFileAsync } from '../utils/exec';
+import { execAsync, execFileAsync, execFileWithInput } from '../utils/exec';
+
+export const infisicalSecretArgument = (key: string) => {
+  if (!/^[A-Z][A-Z0-9_]*$/.test(key)) throw new Error(`Invalid secret name: ${key}`);
+  return `${key}=@/dev/stdin`;
+};
 
 const INFISICAL_API = 'https://app.infisical.com/api';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisical');
@@ -249,7 +254,7 @@ class InfisicalApi {
           });
         } else if (error instanceof Error && error.message.includes('secretKeyCiphertext')) {
           // E2EE-enabled project — CLI handles the encryption
-          await execFileAsync(
+          await execFileWithInput(
             'infisical',
             [
               'secrets',
@@ -257,8 +262,9 @@ class InfisicalApi {
               `--projectId=${projectId}`,
               `--env=${environment}`,
               `--path=${path}`,
-              `${key}=${value}`,
+              infisicalSecretArgument(key),
             ],
+            value,
             { env: { ...process.env, PATH: CLI_PATH } },
           );
         } else {
