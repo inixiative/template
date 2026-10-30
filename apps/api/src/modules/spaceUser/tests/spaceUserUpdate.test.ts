@@ -68,6 +68,12 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
     expect((await grantTo('admin', target, onSpace('own'))).status).toBe(403);
   });
 
+  it("a space admin cannot change a space owner's entitlements; another space owner can", async () => {
+    const { entity: target } = await spaceMember('owner');
+    expect((await grantTo('admin', target, onSpace('operate'))).status).toBe(403);
+    expect((await grantTo('owner', target, onSpace('operate'))).status).toBe(200);
+  });
+
   it('a flat map of actions is not an entitlement', async () => {
     const { entity: target } = await spaceMember('member');
     expect((await grantTo('owner', target, { operate: true })).status).toBe(422);

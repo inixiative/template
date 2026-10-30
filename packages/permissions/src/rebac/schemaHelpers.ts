@@ -54,29 +54,7 @@ const actorIsUserAt = (field: string): ActionRule => ({
   all: [actorIsUser, { rule: { field, operator: Operator.equals, path: '__actor.record.id' } }],
 });
 
-export const actorIsItsUser = (at = ''): ActionRule => ({
-  all: [
-    { rule: { field: `${at}userId`, operator: Operator.notEmpty } },
-    {
-      any: [
-        actorIsUserAt(`${at}userId`),
-        {
-          all: [
-            actorIsDelegateOfUser,
-            {
-              rule: {
-                field: `${at}userId`,
-                operator: Operator.equals,
-                path: '__actor.record.userId',
-              },
-            },
-          ],
-        },
-      ],
-    },
-    { rel: `${at}user`, action: 'manage' },
-  ],
-});
+export const managesItsUser = (at = ''): ActionRule => ({ rel: `${at}user`, action: 'manage' });
 
 const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   any: [
@@ -102,7 +80,7 @@ export const memberRemoval = (tenant: 'organization' | 'space'): ActionRule => (
 });
 
 export const ownedByYouOrOrganizationOrSpace = (at = ''): ActionRule => ({
-  any: [ownedBy(organizationOrSpace, at), actorIsItsUser(at)],
+  any: [ownedBy(organizationOrSpace, at), managesItsUser(at)],
 });
 
 export const createdByItsUserOrManager: ActionRule = {
@@ -131,9 +109,9 @@ export const actorHoldsItsChain: ActionRule = {
   ],
 };
 
-const membersIntegration = actionOnOwner('own', '', members);
-
-const usersIntegration: ActionRule = { all: [ownedBy(['User']), actorIsItsUser()] };
+const membersIntegration: ActionRule = {
+  any: [{ all: [ownedBy(members), managesItsUser()] }, actionOnOwner('own', '', members)],
+};
 
 export const integrationAdministering = {
   create: {
@@ -145,17 +123,46 @@ export const integrationAdministering = {
     ],
   },
   own: {
-    any: [usersIntegration, actionOnOwner('own', '', organizationOrSpace), membersIntegration],
+    any: [managesItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
   },
   manage: {
-    any: [usersIntegration, actionOnOwner('manage', '', organizationOrSpace), membersIntegration],
+    any: [
+      'own',
+      managesItsUser(),
+      actionOnOwner('manage', '', organizationOrSpace),
+      membersIntegration,
+    ],
   },
   delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
 } satisfies Record<string, ActionRule>;
 
+const sameOwnerRowAsActor: ActionRule = {
+  all: ['ownerModel', 'organizationId', 'spaceId', 'userId'].map((field) => ({
+    rule: { field, operator: Operator.equals, path: `__actor.record.${field}` },
+  })),
+};
+
+const membersOwnDelegate = (action: string): ActionRule => ({
+  all: [ownedBy(members), sameOwnerRowAsActor, actionOnOwner(action, '', members)],
+});
+
 export const integrationAccess = {
-  operate: { any: [actionOnOwner('operate', '', notMembers), membersIntegration] },
-  read: { any: [actionOnOwner('read', '', notMembers), membersIntegration] },
+  operate: {
+    any: [
+      'manage',
+      actionOnOwner('operate', '', notMembers),
+      membersIntegration,
+      membersOwnDelegate('operate'),
+    ],
+  },
+  read: {
+    any: [
+      'operate',
+      actionOnOwner('read', '', notMembers),
+      membersIntegration,
+      membersOwnDelegate('read'),
+    ],
+  },
 } satisfies Record<string, ActionRule>;
 
 export const integrationRoleWrite: ActionRule = {
@@ -193,29 +200,25 @@ export const managedUpTheChain: ActionRule = {
   ],
 };
 
-// Spreadable rebac action block for owner-polymorphic models. The model has
-// nullable FKs to one or more owner relations (default: user / organization /
-// space). For each action, OR over the owner relations — only the populated
-// FK resolves; the others' rel returns false (no record found).
-//
-// Each action delegates to the SAME action on the owner — the read =>
-// operate => manage => own chain lives on the owner side (User/Org/Space)
-// and is reused as-is.
-//
-// Usage:
-//   contact: { actions: ownerActions() }
-//   emailTemplate: { actions: ownerActions(['organization', 'space']) }
-//   contact: { actions: { ...ownerActions(), customAction: { ... } } }
+type StandardRules = { own: ActionRule; manage: ActionRule; operate: ActionRule; read: ActionRule };
+
+export const chainedStandardActions = ({ own, manage, operate, read }: StandardRules) => ({
+  own,
+  manage: { any: ['own', manage] },
+  operate: { any: ['manage', operate] },
+  read: { any: ['operate', read] },
+});
+
 export const ownerActions = (
   rels: readonly string[] = ['user', 'organization', 'space'],
 ): ResourcePermission['actions'] => {
   const fanout = (action: string): ActionRule => ({
     any: rels.map((rel) => ({ rel, action })),
   });
-  return {
+  return chainedStandardActions({
     own: fanout('own'),
     manage: fanout('manage'),
     operate: fanout('operate'),
     read: fanout('read'),
-  };
+  });
 };

@@ -14,35 +14,33 @@ to a day stale, while the sweep spends most of its budget on rules that never re
 Nothing records which rules are clock-sensitive. `isContinuous` is dynamic-and-reconcilable;
 `sweepableSegments` takes everything that passes it.
 
-## Shape (Aron, 2026-10-03)
+## Shape (Aron, 2026-10-03, 2026-10-29)
 
-Not a reference row. A column on the table that holds the rule, derived at save, saying the rule
-has something date-sensitive that needs recomputing on a schedule, and how fine. One fact per
-rule, read by the sweep as a `where`.
+A column on the table that holds the rule, derived at save, saying how fine a clock the rule
+reads; a `lastComputedAt` on what the rule computed; one job per unit that looks one unit ahead.
 
-- **The engine owns "does this rule read `now`".** json-rules already classifies date values:
-  `ago`/`ahead` (rolling, units years → seconds), `this`/`last`/`next` (period), `start`/`end`
-  (edge); `isDateExpr` is the gate and `requireNow` is where evaluation demands a clock. Add a
-  fold beside `ruleSourceValues`: `ruleClockUnit(rule): ClockUnit | null` with
-  `ClockUnit = hour | day | week | month | quarter | year`, the smallest unit any date expression
-  in the tree depends on (Aron, 2026-10-05: six units, each its own tick). Rolling: seconds,
-  minutes and hours → `hour`; days → `day`; weeks → `week`; months → `month`; quarters →
-  `quarter`; years → `year`. Period and edge: the period unit.
-  Absolute dates and column-to-column `path` compares → `null`. Walks `all`/`any`/relation/aggregate/window
-  nodes like the other folds; a hand-rolled walk in the segment module is wrong under v3 bindings.
-- **`Segment.clockUnit`**, a nullable enum column, written by the `segmentRuleReferences`
-  after-write hook next to `syncRuleReferenceEdges`, so it is derived in the same place as the
-  edges and rebuilt on revive with them. The column lives on the rule-bearing table, the way
-  `conditions` does; a second materialized rule surface gets its own column. Email templates and
+- **The engine owns "does this rule read `now`".** json-rules `clockUnit(rule): ClockUnit | null`
+  returns the finest clock unit any date expression in the tree reads, one of `CLOCK_UNITS`
+  (`second | minute | hour | day | week | month | quarter | year`). Rolling (`ago`/`ahead`): each
+  unit it names. Period (`this`/`last`/`next`) and edge (`start`/`end`): the period's unit
+  (`isoWeek` → `week`). Absolute dates, column-to-column `path` compares and their offsets, and
+  `dayIn`/`dayNotIn` → `null`. It walks `all`/`any`/`if`/relation/aggregate/range through
+  `visitCondition`.
+- **The floor is an engine setting.** `engineGlobals` `clock.finestUnit` (default `second`). A
+  unit finer than the floor is chopped to it, not rounded. The app sets `hour` once at boot; a
+  finer floor is a product decision, not a default.
+- **`clockUnit` lives on the rule-bearing row.** `Segment.clockUnit`, a nullable enum column,
+  written by the `segmentRuleReferences` after-write hook next to `syncRuleReferenceEdges`, so it
+  is derived in the same place as the edges and rebuilt on revive with them. Derived enrichment
+  maps (FEAT-020) carry it on the map and/or the field definition, folded from their rules on the
+  same hook; a synthetic map declares it. One enum and one sweep family cover every materialized
+  rule surface (Zealot: `Groups`, `IntegrationMap`, `CustomFieldDefinition`). Email templates and
   components evaluate at render and materialize nothing, so they need no tick and no column.
-- **One job per unit.** `sweepSegments` takes `{ clockUnit?: ClockUnit }` in its cron payload and
-  `sweepableSegments(filter)` adds the `where`; dependency order is unchanged. Six cron rows pick
-  up their own unit — hourly, daily (keep 04:00), weekly, monthly, quarterly, yearly — beside the existing nightly
-  backstop over every sound dynamic segment. Hourly is the floor; a finer tick is a product
-  decision, not a default.
-- **Same column on derived enrichment maps.** When FEAT-020 lands, a derived map folds `clockUnit`
-  from its own rules on the same hook and a synthetic map declares it, so one enum and one sweep
-  family cover every materialized rule surface (Zealot: `IntegrationMap`, ZLT-5215).
+- **`lastComputedAt` lives on what was computed:** the segment, or the derived enrichment rows.
+- **One job per unit, one unit ahead.** Each unit's cron row (hourly, daily (keep 04:00), weekly,
+  monthly, quarterly, yearly) checks one clock unit ahead: whatever with that `clockUnit` whose
+  `lastComputedAt` would no longer hold by the next tick is recomputed. Dependency order is
+  unchanged, and the nightly backstop over every sound dynamic segment stays.
 - **Dependents need no column.** A segment that reads a clock-sensitive segment's membership is
   refreshed by the dependents fan-out `reconcileSegment` already runs after a diff.
 
@@ -55,11 +53,16 @@ alone keeps it fresh.
 
 ## Tests
 
-- Fold: rolling hours → `hour`; rolling minutes → `hour`; `thisWeek` → `week`; `lastQuarter` → `quarter`; `thisYear` → `year`; absolute date → `null`; a date expression
+- Fold: rolling hours → `hour`; rolling minutes → `minute`; `thisWeek` → `week`; `lastQuarter` →
+  `quarter`; `thisYear` → `year`; `isoWeek` → `week`; absolute date → `null`; a date expression
   nested under `any` → relation → aggregate is found; `path` compare → `null`.
+- Floor: under `clock.finestUnit = 'hour'`, rolling minutes and `this: 'minute'` → `hour`; `day`
+  stays `day`; `null` stays `null`.
 - Hook: saving a rolling rule writes `clockUnit`; editing it to an absolute date clears it;
   revive rebuilds it.
-- Sweep: the hourly row enqueues only `hour` segments, the weekly row only `week`; the backstop still enqueues all.
+- Sweep: the hourly row recomputes only `hour` rows whose `lastComputedAt` won't hold by the next
+  tick, and skips one that will; the weekly row touches only `week` rows; the backstop still
+  enqueues all.
 
 ## Refinements (2026-10-05)
 
@@ -72,5 +75,5 @@ alone keeps it fresh.
   crossed** (around 12:00 UTC on the boundary day) so every owner is fresh before anyone looks;
   early zones wait up to half a day. That is a cron time, not a design point. The hourly row is
   zone-free: an hour boundary is the same instant everywhere.
-- Hourly is the floor on purpose. A two-hour rolling window can be an hour stale at its edge —
+- The app's `hour` floor is on purpose. A two-hour rolling window can be an hour stale at its edge —
   fine for targeting, not for gating a payout; that is a per-use product line, not a minute tier.

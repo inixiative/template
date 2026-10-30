@@ -1,8 +1,10 @@
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
 export type Entry = {
   resource: string;
   anchor: { resource: string; id: string; path?: string };
   actions: Record<string, boolean>;
-  where?: { [key: string]: string | null | { [key: string]: string }[] };
+  where?: { [key: string]: Json };
 };
 
 export const entry = (

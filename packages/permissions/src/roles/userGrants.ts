@@ -13,10 +13,10 @@ import {
   type PermissionEntry,
   type Permix,
 } from '@template/permissions/client';
-import { narrowing } from '@template/permissions/roles/narrowing';
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
+import { wellFormedEntitlements } from '@template/permissions/roles/wellFormedEntitlements';
 
 export type Grant = { entries: PermissionEntry[]; owner?: Grant[] };
 
@@ -28,16 +28,15 @@ type OrganizationMember = {
 };
 type SpaceMember = { id: string; role: Role; spaceId: string; entitlements?: unknown };
 
-const entitlementsOf = (member: { entitlements?: unknown }): EntitlementEntry[] =>
-  (member.entitlements ?? []) as EntitlementEntry[];
-
 const ownsItsIntegrations = (
   memberModel: 'OrganizationUser' | 'SpaceUser',
   id: string,
 ): EntitlementEntry => {
   const path = memberModel === 'OrganizationUser' ? 'organizationUser' : 'spaceUser';
   return {
-    ...narrowing('db:integration', { resource: `db:${path}`, id, path }, 'owner'),
+    resource: 'db:integration',
+    anchor: { resource: `db:${path}`, id, path },
+    actions: { own: true, manage: true, operate: true, read: true },
     where: { field: 'ownerModel', operator: Operator.equals, value: memberModel },
   };
 };
@@ -69,13 +68,16 @@ export const userGrants = (
   },
   ...members.flatMap((member) =>
     ownedBy(
-      [ownsItsIntegrations('OrganizationUser', member.id), ...entitlementsOf(member)],
+      [
+        ownsItsIntegrations('OrganizationUser', member.id),
+        ...wellFormedEntitlements(member.entitlements),
+      ],
       organizationOwnerGrants(member.organizationId),
     ),
   ),
   ...spaceMembers.flatMap((member) =>
     ownedBy(
-      [ownsItsIntegrations('SpaceUser', member.id), ...entitlementsOf(member)],
+      [ownsItsIntegrations('SpaceUser', member.id), ...wellFormedEntitlements(member.entitlements)],
       spaceOwnerGrants(member.spaceId),
     ),
   ),

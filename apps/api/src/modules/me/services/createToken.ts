@@ -11,6 +11,7 @@ import { type DelegatePermissions, TokenAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
+import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 import { validateFullGrant } from '#/lib/permissions/validateFullGrant';
 import type { AppEnv } from '#/types/appEnv';
@@ -41,6 +42,7 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   const pseudo = await hydrate('token', { id: '', ...row } as HydratedRecord);
   if (!check(permix, rebacSchema, 'token', pseudo, TokenAction.create))
     throw makeError({ status: 403, message: 'Access denied' });
+  validateDelegateRole(pseudo);
   if (row.full) validateFullGrant(permix, 'token', pseudo);
   await validateEntitlementGrants(permix, params.entitlements ?? [], {
     model: 'token',

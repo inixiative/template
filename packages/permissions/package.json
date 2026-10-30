@@ -16,7 +16,7 @@
     "./roles/*": "./src/roles/*"
   },
   "dependencies": {
-    "@inixiative/permissions": "^0.12.1",
+    "@inixiative/permissions": "^0.14.0",
     "@template/db": "workspace:*",
     "lodash-es": "^4.18.1",
     "zod": "^4.3.6"

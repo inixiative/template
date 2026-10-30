@@ -4,11 +4,13 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
+
 import { type AccessorName, fetchOne, type HydratedRecord, hydrate } from '@template/db';
 import type { EntitlementEntry, Permix } from '@template/permissions';
 import {
   canGrantEntitlement,
   check,
+  entitlementProblem,
   placeEntitlement,
   rebacSchema,
   schemaMap,
@@ -25,6 +27,8 @@ const anchorRecord = async ({ resource, id }: EntitlementEntry['anchor']) => {
 };
 
 const placedRecords = async (entry: EntitlementEntry) => {
+  const problem = entitlementProblem(entry);
+  if (problem) throw makeError({ status: 422, message: problem });
   const anchor = await anchorRecord(entry.anchor);
   if (!anchor)
     throw makeError({
