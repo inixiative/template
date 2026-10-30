@@ -121,7 +121,7 @@ export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 ```
 
 Higher index = more permissions. Used for:
-- `capAtRole(entry, role)` - an owner's grant entry capped at a delegate's role ([A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner))
+- `capAtRole(entry, role)` - an owner's grant entry capped at a delegate's role: the standard actions at or below the role that the entry implies through the action chain ([building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md))
 
 ---
 
@@ -253,7 +253,7 @@ A delegate holds its permissions, capped live by its owner. `installPermissionsF
 | `Organization` / `Space` | `owner` on itself |
 | `Integration` | the integration's permissions, capped by its own owner's table |
 
-A delegate's role caps its owner. `delegateTable` (`apps/api/src/lib/permissions/ownerTable.ts`) installs the owner's grants with every entry capped at the role (`capAtRole`: the actions at or below the role; an entry holding more gets the role's own action), so a member-role token of an owner takes member actions from its member, a User token's role reaches each of the user's organizations capped there, and an integration's role caps whatever its owner holds:
+A delegate's role caps its owner. `delegateTable` (`apps/api/src/lib/permissions/ownerTable.ts`) installs the owner's grants with every entry capped at the role (`capAtRole`: the standard actions at or below the role that the entry implies through the action chain — `packages/permissions/src/rebac/ENTITLEMENTS.md`; non-standard actions are not inherited), so a member-role token of an owner takes member actions from its member, a User token's role reaches each of the user's organizations capped there, and an integration's role caps whatever its owner holds:
 
 - `role` is the ceiling; `full` is no ceiling (the owner's grants as they are).
 - `entitlements` are entries `{ resource, anchor: { resource, id, path? }, where?, actions }`, held as written. "Only the user's own things" is no role plus one entry anchored on `db:user`.
