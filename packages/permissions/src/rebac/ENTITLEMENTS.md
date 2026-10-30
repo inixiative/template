@@ -19,7 +19,7 @@ A rule that only walks to the owner for the same action (`{ rel: 'organization',
 ## What the chain is used for
 
 - **Lowering.** Whoever holds an entitlement can pass on a copy with lower actions: each granted action must reach a held one through the chain.
-- **Capping.** A delegate (token, integration) holds its owner's grants capped at its role (`capAtRole`): it keeps the standard actions at or below its role that the entry implies through the chain (`reachableFrom`).
+- **Capping.** A delegate (token, integration) holds its owner's role capped at its own role (`capAtRole`), never its owner's entitlements: those it holds only when given them, or when it is `full`.
 - **Copying.** A copy, or a copy with a narrower `where`, is checked against what the holder holds through the same chain.
 
 ## Models that are not standard
@@ -28,4 +28,4 @@ Not every model has all four, and not every model chains all of them. A model th
 
 ## Non-standard actions
 
-`send`, `resolve`, `delete`, `token.create` and the like are not part of the chain. They delegate only where their rule says so (`delete: { any: ['manage', …] }`). A capped delegate does not inherit them from its owner's entitlements: to give one, grant it explicitly.
+`send`, `resolve`, `delete`, `token.create` and the like are not part of the chain. They delegate only where their rule says so (`delete: { any: ['manage', …] }`). To give one to a delegate, grant it explicitly.
