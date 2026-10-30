@@ -5,12 +5,11 @@
  * @uses infrastructure:prisma, primitive:caching
  */
 import type { UserWithRelations } from '@template/db';
-import { cache, cacheKey, db, upsertCache } from '@template/db';
+import { cache, cacheKey, db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
 
 const USER_CACHE_TTL = 60 * 10 + 6; // 10.1 minutes
-const RECORD_CACHE_TTL = 60 * 10; // 10 minutes
 
 export const findUserByEmail = async (email: string): Promise<User | null> => {
   return cache<User | null>(
@@ -60,48 +59,7 @@ export const findUserWithRelations = async (userId: string): Promise<UserWithRel
         }),
       ]);
 
-      const result: UserWithRelations = {
-        ...user,
-        organizations,
-        spaceUsers,
-        spaces,
-      };
-
-      // Cache all records
-      upsertCache(cacheKey('user', user.id), user, { ttl: RECORD_CACHE_TTL });
-
-      for (const org of organizations) {
-        upsertCache(cacheKey('organization', org.id), org, { ttl: RECORD_CACHE_TTL });
-      }
-
-      for (const space of spaces) {
-        upsertCache(cacheKey('space', space.id), space, { ttl: RECORD_CACHE_TTL });
-      }
-
-      for (const orgUser of user.organizationUsers) {
-        upsertCache(
-          cacheKey('organizationUser', {
-            organizationId: orgUser.organizationId,
-            userId: orgUser.userId,
-          }),
-          orgUser,
-          { ttl: RECORD_CACHE_TTL },
-        );
-      }
-
-      for (const spaceUser of spaceUsers) {
-        upsertCache(
-          cacheKey('spaceUser', {
-            organizationId: spaceUser.organizationId,
-            spaceId: spaceUser.spaceId,
-            userId: spaceUser.userId,
-          }),
-          spaceUser,
-          { ttl: RECORD_CACHE_TTL },
-        );
-      }
-
-      return result;
+      return { ...user, organizations, spaceUsers, spaces };
     },
     USER_CACHE_TTL,
   );
