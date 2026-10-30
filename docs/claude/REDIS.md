@@ -250,6 +250,9 @@ cacheKey('user', 'abc-123', ['WithOrgs'])                // cache:user:id:abc-12
 cacheKey('session', { userId: 'abc-123' }, [], true)     // cache:session:userId:abc-123:*
 ```
 
+Identifier values are escaped (`*`, `?`, `[`, `]`, `\` and `%` become `%XX`), so data never reads
+as a pattern; only the wildcard flag makes one.
+
 ### cache() Get-or-Set
 
 ```typescript
@@ -263,6 +266,8 @@ const user = await cache(
 ```
 
 Behavior:
+- Under `db.withDeleted` the cache is neither read nor written: `fn` runs directly, so a
+  tombstone-inclusive result never lands under the shared live key
 - Returns cached value if exists (including `null`/`undefined`)
 - Computes via fn() on cache miss; concurrent misses on one key compute once (single-flight)
 - **Negative caching**: `null`/`undefined` cached with 1 min TTL (prevents thundering herd, allows quick discovery of new records)
@@ -304,8 +309,8 @@ When the transaction commits, before it releases its held locks and before its `
 each key it touched runs one Lua call:
 a marked key is cleared (value, write time, new generation), and a value it computed is published
 only if the key's generation is still the one read before the compute. Another clear in between, from
-any process, wins and leaves a miss. A failed call logs, and the key keeps its pre-commit value until its TTL.
-Marked patterns are cleared afterwards with `clearKey`, which throws on failure.
+any process, wins and leaves a miss. Marked patterns are cleared afterwards with `clearKey`. A failure is loud: `db.txn` throws it after
+its `db.onCommit` batches have run, so a Redis outage never skips the other after-commit work.
 
 Long-lived values that no write hook clears are not `cache()` values: they are read directly and
 refreshed asynchronously (rolling caches), never computed in a request's transaction.

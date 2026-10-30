@@ -17,6 +17,9 @@ type Identifier = string | Record<string, string>;
 
 type CacheDomain = AccessorName | ModelName | (string & {});
 
+const withoutGlob = (value: string): string =>
+  value.replace(/[%*?[\]\\]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+
 const toAccessorName = (domain: CacheDomain): string =>
   isModelName(domain) ? toAccessor(domain) : domain;
 
@@ -29,11 +32,11 @@ export const cacheKey = (
   const idParts: string[] = [];
 
   if (typeof identifier === 'string') {
-    idParts.push('id', identifier);
+    idParts.push('id', withoutGlob(identifier));
   } else {
     const pairs = Object.entries(identifier).sort(([a], [b]) => a.localeCompare(b));
     for (const [field, value] of pairs) {
-      idParts.push(field, value);
+      idParts.push(field, withoutGlob(value));
     }
   }
 

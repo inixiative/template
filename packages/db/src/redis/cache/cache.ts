@@ -4,6 +4,7 @@
  * @uses infrastructure:observability
  */
 import { db } from '@template/db/client';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { DEFAULT_TTL } from '@template/db/redis/cache/defaultTtl';
 import { readThrough } from '@template/db/redis/cache/readThrough';
 import { withCacheSpan } from '@template/db/redis/cache/telemetry/withCacheSpan';
@@ -16,6 +17,7 @@ export const cache = async <T>(
   ttl: number | ((value: T) => number) = DEFAULT_TTL,
 ): Promise<T> => {
   validateKey(key);
+  if (auditActorContext.isSoftDeleteBypassed()) return fn();
   const overlay = db.cacheOverlay();
   return withCacheSpan(key, true, (setResult) =>
     overlay

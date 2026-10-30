@@ -41,6 +41,13 @@ describe('cacheKey', () => {
     expect(cacheKey('user', 'x', ['User'])).not.toBe(cacheKey('user', 'x', ['user']));
   });
 
+  it('escapes glob characters in identifier values, so data never reads as a pattern', () => {
+    const key = cacheKey('user', { email: 'a*b?[c]\\%@x.com' });
+    expect(key).not.toMatch(/[*?[\]\\]/);
+    expect(key).not.toBe(cacheKey('user', { email: 'aXb?[c]\\%@x.com' }));
+    expect(cacheKey('user', 'a*b', [], true).endsWith(':*')).toBe(true);
+  });
+
   it('appends a wildcard segment only when requested', () => {
     expect(cacheKey('user', 'x', [], true).endsWith(':*')).toBe(true);
     expect(cacheKey('user', 'x', [], false).endsWith(':*')).toBe(false);

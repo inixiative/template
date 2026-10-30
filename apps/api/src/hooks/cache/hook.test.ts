@@ -1,14 +1,15 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import { createHash } from 'node:crypto';
 import {
   cache,
   cacheKey,
   checkCache,
+  clearHookRegistry,
   clearKey,
   db,
   fetchOne,
+  getRedisClient,
   markCacheWritten,
-  unregisterDbHook,
 } from '@template/db';
 import type { Organization, OrganizationUser } from '@template/db/generated/client/client';
 import {
@@ -18,6 +19,7 @@ import {
   createUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
+import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { loadTokenContext } from '#/lib/context/loadTokenContext';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -39,9 +41,12 @@ const memberKeyOf = (member: { organizationId: string; userId: string }) =>
   cacheKey('organizationUser', { organizationId: member.organizationId, userId: member.userId });
 
 describe('a read through the cache inside a transaction', () => {
-  beforeAll(() => registerClearCacheHook());
+  beforeAll(() => {
+    registerClearCacheHook();
+    registerSoftDeleteCascadeHook();
+  });
   afterAll(async () => {
-    unregisterDbHook('clearCache');
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 
@@ -206,5 +211,43 @@ describe('a read through the cache inside a transaction', () => {
     };
     expect(await read(other)).toBe('other');
     expect(await read(mine)).toBe('mine');
+  });
+  it('neither reads nor writes the shared cache under withDeleted', async () => {
+    const key = cacheKey('organization', 'withDeleted-probe');
+    await cache(key, async () => 'live');
+    const read = await db.withDeleted(() => cache(key, async () => 'tombstone-inclusive'));
+    expect(read).toBe('tombstone-inclusive');
+    const check = await checkCache<string>(key);
+    expect('value' in check ? check.value : undefined).toBe('live');
+  });
+
+  it('drops a member’s cached relations when their organization is soft-deleted', async () => {
+    const { entity: user } = await createUser();
+    const member = await createOrganizationUser({ role: 'owner' }, { user });
+    expect((await findUserWithRelations(user.id))?.organizations).toHaveLength(1);
+    await db.organization.update({
+      where: { id: member.entity.organizationId },
+      data: { deletedAt: new Date() },
+    });
+    expect((await findUserWithRelations(user.id))?.organizations).toHaveLength(0);
+  });
+
+  it('throws a failed clear at commit only after the onCommit batches ran', async () => {
+    const { entity: organization } = await createOrganization();
+    let batchRan = false;
+    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
+    try {
+      await expect(
+        db.txn(async () => {
+          await db.organization.update({ where: { id: organization.id }, data: { name: 'x' } });
+          db.onCommit(() => {
+            batchRan = true;
+          });
+        }),
+      ).rejects.toThrow('redis down');
+    } finally {
+      evalSpy.mockRestore();
+    }
+    expect(batchRan).toBe(true);
   });
 });
