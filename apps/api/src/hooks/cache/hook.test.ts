@@ -16,6 +16,7 @@ import {
   cleanupTouchedTables,
   createOrganization,
   createOrganizationUser,
+  createSpace,
   createUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
@@ -88,7 +89,7 @@ describe('a read through the cache inside a transaction', () => {
         where: { id: member.entity.id },
         data: { role: 'owner' },
       });
-      await clearKey(cacheKey('User', user.id, ['relations']));
+      await clearKey(cacheKey('user', user.id, ['organizationUsers']));
       await clearKey(memberKeyOf(member.entity));
       await findUserWithRelations(user.id);
     });
@@ -249,5 +250,12 @@ describe('a read through the cache inside a transaction', () => {
       evalSpy.mockRestore();
     }
     expect(batchRan).toBe(true);
+  });
+  it('lists a space created in an organization the user owns', async () => {
+    const { entity: user } = await createUser();
+    const member = await createOrganizationUser({ role: 'owner' }, { user });
+    expect((await findUserWithRelations(user.id))?.spaces).toHaveLength(0);
+    const { entity: space } = await createSpace({}, { organization: member.context.organization });
+    expect((await findUserWithRelations(user.id))?.spaces.map((s) => s.id)).toEqual([space.id]);
   });
 });

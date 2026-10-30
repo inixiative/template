@@ -309,11 +309,15 @@ When the transaction commits, before it releases its held locks and before its `
 each key it touched runs one Lua call:
 a marked key is cleared (value, write time, new generation), and a value it computed is published
 only if the key's generation is still the one read before the compute. Another clear in between, from
-any process, wins and leaves a miss. Marked patterns are cleared afterwards with `clearKey`. A failure is loud: `db.txn` throws it after
-its `db.onCommit` batches have run, so a Redis outage never skips the other after-commit work.
+any process, wins and leaves a miss. Marked patterns are cleared afterwards with `clearKey`, and keys under a marked pattern are left to that
+clear. A key the transaction neither wrote nor computed a publishable value for sends nothing. A
+failure is loud: `db.txn` throws it after its `db.onCommit` batches have run, so a cache failure never
+skips them. A write that committed then reports an error, so a caller that retries on error must be
+idempotent.
 
-Long-lived values that no write hook clears are not `cache()` values: they are read directly and
-refreshed asynchronously (rolling caches), never computed in a request's transaction.
+`cache()` is for computes that take milliseconds to seconds and that a write hook clears. A compute
+that takes minutes does not belong in a request: it runs in a job and is read directly (a rolling
+cache), never computed in a request or its transaction.
 
 ### checkCache()
 

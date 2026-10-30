@@ -10,11 +10,7 @@ import { cacheKey } from '@template/db';
 type CacheReference = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => string[] };
 
 export const cacheReference: CacheReference = {
-  User: (r) => [
-    cacheKey('user', r.id),
-    cacheKey('user', { email: r.email }),
-    cacheKey('user', r.id, ['relations']),
-  ],
+  User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
 
   Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
 
@@ -25,7 +21,6 @@ export const cacheReference: CacheReference = {
   OrganizationUser: (r) => [
     cacheKey('organizationUser', { organizationId: r.organizationId, userId: r.userId }),
     cacheKey('user', r.userId, ['organizationUsers']),
-    cacheKey('user', r.userId, ['relations']),
   ],
 
   Space: (r) => [
@@ -43,7 +38,6 @@ export const cacheReference: CacheReference = {
     }),
     cacheKey('user', r.userId, ['spaceUsers']),
     cacheKey('space', r.spaceId, ['spaceUsers']),
-    cacheKey('user', r.userId, ['relations']),
   ],
 
   CustomerRef: (r) => {
