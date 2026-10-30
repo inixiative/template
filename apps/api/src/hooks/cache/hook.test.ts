@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { cacheKey, clearKey, db, fetchOne, unregisterDbHook } from '@template/db';
+import { cache, cacheKey, clearKey, db, fetchOne, unregisterDbHook } from '@template/db';
 import type { Organization, OrganizationUser } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -104,5 +104,26 @@ describe('a read through the cache inside a transaction', () => {
     const role = (after?.context.token as unknown as { organizationUser: { role: string } })
       .organizationUser.role;
     expect(role).toBe('viewer');
+  });
+  it('drops a value a sibling computed from the row before a write in the same transaction', async () => {
+    const { entity: organization } = await createOrganization();
+    const key = cacheKey('organization', organization.id);
+    const { promise: released, resolve: release } = Promise.withResolvers<void>();
+    let after: string | undefined;
+    await db.txn(async () => {
+      const sibling = cache(key, async () => {
+        const read = await db.organization.findUnique({ where: { id: organization.id } });
+        await released;
+        return read;
+      });
+      const write = db.organization.update({
+        where: { id: organization.id },
+        data: { name: 'written-by-sibling' },
+      });
+      setTimeout(release, 50);
+      await Promise.all([sibling, write]);
+      after = (await fetchOne<Organization>('organization', organization.id))?.name;
+    });
+    expect(after).toBe('written-by-sibling');
   });
 });
