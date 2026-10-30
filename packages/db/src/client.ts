@@ -35,6 +35,10 @@ import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
 import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
 import { withLockUntilSettled } from '@template/db/lock/withLockUntilSettled';
+import {
+  type CacheOverlay,
+  newCacheOverlay,
+} from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import {
@@ -135,6 +139,7 @@ const dbMethods = {
               heldLocks: new Map(),
               settled: false,
               bridgedContext,
+              cacheOverlay: newCacheOverlay(),
             };
             opened = openTransaction;
             scope.openTransaction = openTransaction;
@@ -252,6 +257,8 @@ const dbMethods = {
   getScope: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
 
   isInTxn: (): boolean => !!store.getStore()?.openTransaction,
+
+  cacheOverlay: (): CacheOverlay | null => store.getStore()?.openTransaction?.cacheOverlay ?? null,
 
   // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences

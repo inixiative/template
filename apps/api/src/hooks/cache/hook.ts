@@ -11,6 +11,7 @@ import {
   db,
   HookTiming,
   isNoOpUpdate,
+  markCacheWritten,
   NOOP_FIELDS,
   type Prisma,
   registerDbHook,
@@ -69,6 +70,8 @@ export const registerClearCacheHook = () => {
     }
 
     if (keys.size === 0) return;
+
+    await markCacheWritten([...keys]);
 
     const clearKeys = [...keys].map((key) => async () => {
       await clearKey(key);

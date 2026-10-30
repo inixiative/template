@@ -20,6 +20,7 @@
 - [Cache Utilities](#cache-utilities)
   - [cacheKey() Builder](#cachekey-builder)
   - [cache() Get-or-Set](#cache-get-or-set)
+  - [cache() inside a transaction](#cache-inside-a-transaction)
   - [checkCache()](#checkcache)
   - [clearKey()](#clearkey)
   - [Automatic Invalidation](#automatic-invalidation)
@@ -281,6 +282,27 @@ Telemetry: each call opens a `cache <accessor>` span labelled with its result, a
 `kept` or `error`. A single-flight wait is timed into
 `cache.lock.wait`; a publish skipped because a clear ran counts into `cache.publish.skipped`. Every
 tag is the accessor, never the key, so cardinality stays bounded.
+### cache() inside a transaction
+
+Each outermost `db.txn` holds a cache overlay (`db.cacheOverlay()`), and `cache()` inside the
+transaction reads through it instead of publishing:
+
+- A value the transaction computed is returned from the overlay. Otherwise the shared cache is read,
+  and a miss computes `fn` on the transaction's client and keeps the value in the overlay. Nothing
+  reaches Redis before commit, so a rollback leaves nothing behind (dropping the overlay with the
+  transaction).
+- The clear-cache hook marks the keys a write invalidates (`markCacheWritten`) at the same point it
+  queues their after-commit clears. A marked key skips the shared cache and recomputes, so the
+  transaction reads its own writes.
+- Each key has a serialized queue: a compute and its store run on it, and a mark waits on it. Batch
+  sub-requests in one round share the transaction, so a sibling's compute that read before a write
+  lands before that write's mark, and the mark removes it.
+- There is no single-flight lock inside a transaction. A cache function only reads; one that writes
+  would mark its own key and wait on itself.
+
+Long-lived values that no write hook clears are not `cache()` values: they are read directly and
+refreshed asynchronously (rolling caches), never computed in a request's transaction.
+
 ### checkCache()
 
 Read a key without computing it. Every write (`cache`, `upsertCache`) stores the write time beside the
@@ -331,7 +353,7 @@ every key sent to the client. The locks in each scanned page are cancelled in pa
 
 ### Automatic Invalidation
 
-Cache keys defined in the cache reference map are auto-cleared on mutations via an after-commit db hook. See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
+Cache keys defined in the cache reference map are auto-cleared on mutations via an after-commit db hook, which also marks them in the transaction's cache overlay. See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
 
 #### Invalidation conventions
 

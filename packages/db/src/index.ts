@@ -69,6 +69,7 @@ export {
   MAX_ROLLING_CACHE_TARGETS,
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
   makeRollingCache,
+  markCacheWritten,
   type RedisEval,
   type RedisNamespace,
   type RegisteredRollingCache,

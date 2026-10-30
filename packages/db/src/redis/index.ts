@@ -26,6 +26,7 @@ export {
   type RollingCacheValue,
   type RollingCacheWrite,
 } from './cache/rollingCache/rollingCacheTypes';
+export { markCacheWritten } from './cache/transactionOverlay/markCacheWritten';
 export { upsertCache } from './cache/upsertCache';
 export {
   COMMAND_TIMEOUT_MS,
