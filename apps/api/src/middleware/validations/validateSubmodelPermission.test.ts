@@ -362,7 +362,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         'organization',
         'db:organization',
         organization,
-        { ownerModel: 'Organization' },
+        { field: 'ownerModel', operator: 'equals', value: 'Organization' },
       );
       const pseudo = await hydrate('contact', { id: '', ...placed } as HydratedRecord);
       expect(pseudo.id).toBe('');
@@ -382,7 +382,7 @@ describe("placeUnder places a child under its owner along the owner's relation",
       owner,
       `db:${owner}`,
       record,
-      kind ? { ownerModel: kind } : {},
+      kind ? { field: 'ownerModel', operator: 'equals', value: kind } : undefined,
     );
 
   it('a polymorphic child carries the pinned kind and the owner keys', () => {

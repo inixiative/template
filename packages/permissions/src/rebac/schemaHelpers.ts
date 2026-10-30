@@ -63,36 +63,7 @@ export const actionOnOwner = (
     })),
 });
 
-export const actorIsItsUser = (at = ''): ActionRule => ({
-  all: [
-    { rule: { field: `${at}userId`, operator: Operator.notEmpty } },
-    {
-      any: [
-        {
-          all: [
-            actorIsUser,
-            {
-              rule: { field: `${at}userId`, operator: Operator.equals, path: '__actor.record.id' },
-            },
-          ],
-        },
-        {
-          all: [
-            actorIsDelegateOfUser,
-            {
-              rule: {
-                field: `${at}userId`,
-                operator: Operator.equals,
-                path: '__actor.record.userId',
-              },
-            },
-          ],
-        },
-      ],
-    },
-    { rel: `${at}user`, action: 'manage' },
-  ],
-});
+export const managesItsUser = (at = ''): ActionRule => ({ rel: `${at}user`, action: 'manage' });
 
 const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   any: [
@@ -118,7 +89,7 @@ export const memberRemoval = (tenant: 'organization' | 'space'): ActionRule => (
 });
 
 export const ownedByYouOrOrganizationOrSpace = (at = ''): ActionRule => ({
-  any: [ownedBy(organizationOrSpace, at), actorIsItsUser(at)],
+  any: [ownedBy(organizationOrSpace, at), managesItsUser(at)],
 });
 
 export const createdByItsUserOrManager: ActionRule = {
@@ -128,43 +99,56 @@ export const createdByItsUserOrManager: ActionRule = {
 const notMembers: OwnerModel[] = ['User', 'Organization', 'Space'];
 
 const membersIntegration: ActionRule = {
-  any: [{ all: [ownedBy(members), actorIsItsUser()] }, actionOnOwner('own', '', members)],
+  any: [{ all: [ownedBy(members), managesItsUser()] }, actionOnOwner('own', '', members)],
 };
 
 export const integrationAdministering = {
   create: {
     any: [
       createdByItsUserOrManager,
-      { all: [ownedBy(members), actorIsItsUser(), actionOnOwner('manage', '', members)] },
+      { all: [ownedBy(members), managesItsUser(), actionOnOwner('manage', '', members)] },
     ],
   },
   own: {
-    any: [actorIsItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
+    any: [managesItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
   },
   manage: {
-    any: [actorIsItsUser(), actionOnOwner('manage', '', organizationOrSpace), membersIntegration],
+    any: [
+      'own',
+      managesItsUser(),
+      actionOnOwner('manage', '', organizationOrSpace),
+      membersIntegration,
+    ],
   },
   delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
 } satisfies Record<string, ActionRule>;
 
+const sameOwnerRowAsActor: ActionRule = {
+  all: ['ownerModel', 'organizationId', 'spaceId', 'userId'].map((field) => ({
+    rule: { field, operator: Operator.equals, path: `__actor.record.${field}` },
+  })),
+};
+
 const membersOwnDelegate = (action: string): ActionRule => ({
-  all: [
-    ownedBy(members),
-    { rule: { field: 'userId', operator: Operator.equals, path: '__actor.record.userId' } },
-    actionOnOwner(action, '', members),
-  ],
+  all: [ownedBy(members), sameOwnerRowAsActor, actionOnOwner(action, '', members)],
 });
 
 export const integrationAccess = {
   operate: {
     any: [
+      'manage',
       actionOnOwner('operate', '', notMembers),
       membersIntegration,
       membersOwnDelegate('operate'),
     ],
   },
   read: {
-    any: [actionOnOwner('read', '', notMembers), membersIntegration, membersOwnDelegate('read')],
+    any: [
+      'operate',
+      actionOnOwner('read', '', notMembers),
+      membersIntegration,
+      membersOwnDelegate('read'),
+    ],
   },
 } satisfies Record<string, ActionRule>;
 
@@ -190,29 +174,25 @@ export const managedUpTheChain: ActionRule = {
   ],
 };
 
-// Spreadable rebac action block for owner-polymorphic models. The model has
-// nullable FKs to one or more owner relations (default: user / organization /
-// space). For each action, OR over the owner relations — only the populated
-// FK resolves; the others' rel returns false (no record found).
-//
-// Each action delegates to the SAME action on the owner — the read =>
-// operate => manage => own chain lives on the owner side (User/Org/Space)
-// and is reused as-is.
-//
-// Usage:
-//   contact: { actions: ownerActions() }
-//   emailTemplate: { actions: ownerActions(['organization', 'space']) }
-//   contact: { actions: { ...ownerActions(), customAction: { ... } } }
+type StandardRules = { own: ActionRule; manage: ActionRule; operate: ActionRule; read: ActionRule };
+
+export const chainedStandardActions = ({ own, manage, operate, read }: StandardRules) => ({
+  own,
+  manage: { any: ['own', manage] },
+  operate: { any: ['manage', operate] },
+  read: { any: ['operate', read] },
+});
+
 export const ownerActions = (
   rels: readonly string[] = ['user', 'organization', 'space'],
 ): ResourcePermission['actions'] => {
   const fanout = (action: string): ActionRule => ({
     any: rels.map((rel) => ({ rel, action })),
   });
-  return {
+  return chainedStandardActions({
     own: fanout('own'),
     manage: fanout('manage'),
     operate: fanout('operate'),
     read: fanout('read'),
-  };
+  });
 };

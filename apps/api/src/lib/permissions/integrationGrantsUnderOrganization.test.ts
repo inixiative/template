@@ -183,3 +183,45 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
       expect(await holds(key, 'integration', integrations[kind].id, 'manage')).toBe(false);
   });
 });
+
+describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one held entitlement (R103)', () => {
+  const grant = async (granted: Entry, held: Entry[]) => {
+    const { entity: seat, context } = await createOrganizationUser(
+      { role: 'admin', entitlements: held },
+      { organization },
+    );
+    const { entity: target } = await createOrganizationUser({ role: 'viewer' }, { organization });
+    const { app } = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [seat],
+      mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
+    });
+    return (
+      await app.fetch(
+        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [granted] }),
+      )
+    ).status;
+  };
+  const staticSegments = (where: Entry['where']) => ({
+    ...entry('db:segment', ['db:organization', organization.id, 'organization'], ['own']),
+    where,
+  });
+  const isStatic = { field: 'type', operator: 'equals', value: 'static' };
+
+  it('an exact copy and a narrowed copy pass; the same without its where does not', async () => {
+    const held = staticSegments(isStatic);
+    expect(await grant(held, [held])).toBe(200);
+    expect(
+      await grant(
+        staticSegments({ all: [isStatic, { field: 'name', operator: 'equals', value: 'x' }] }),
+        [held],
+      ),
+    ).toBe(200);
+    expect(
+      await grant(
+        entry('db:segment', ['db:organization', organization.id, 'organization'], ['own']),
+        [held],
+      ),
+    ).toBe(403);
+  });
+});

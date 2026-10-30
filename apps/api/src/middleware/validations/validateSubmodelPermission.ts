@@ -23,7 +23,9 @@ export const validateSubmodelPermission =
       );
 
     const [placed] = placeUnder(schemaMap, `db:${submodel}`, ownerType, `db:${ownerType}`, owner, {
-      ownerModel: toModelName(ownerType),
+      field: 'ownerModel',
+      operator: 'equals',
+      value: toModelName(ownerType),
     });
     if (!placed) throw new Error(`${submodel} cannot be placed under ${ownerType}`);
     const pseudo = await hydrate(submodel, { id: '', ...placed } as HydratedRecord);

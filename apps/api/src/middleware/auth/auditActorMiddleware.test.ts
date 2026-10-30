@@ -62,6 +62,7 @@ describe('an integration acts through its token, and the audit names it (Aron, 2
     const { entity: integration } = await createIntegration({
       ownerModel: 'User',
       userId: user.id,
+      role: 'viewer',
     });
     const { key, token } = await mint({ ownerModel: 'Integration' }, { integration });
     expect(await echo(key)).toMatchObject({
@@ -75,6 +76,7 @@ describe('an integration acts through its token, and the audit names it (Aron, 2
     const { entity: integration } = await createIntegration({
       ownerModel: 'User',
       userId: user.id,
+      role: 'viewer',
     });
     const { key } = await mint({ ownerModel: 'User' }, { user });
     expect((await echo(key, { 'x-integration-id': integration.id })).integrationId).toBeNull();

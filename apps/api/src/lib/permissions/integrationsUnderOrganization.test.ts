@@ -154,6 +154,28 @@ describe("a member's own tokens reach that member's integrations, as far as thei
     expect(await holds(rawKey, 'integration', integration.id, 'operate')).toBe(false);
   });
 
+  it("the member's token reaches its own member row's integration, not the same person's space-member one (R100)", async () => {
+    const { entity: seat, context } = await createOrganizationUser(
+      { role: 'member' },
+      { organization },
+    );
+    const { entity: space } = await createSpace({}, { organization });
+    await createSpaceUser({ role: 'member' }, { ...context, space });
+    const at = { organizationId: organization.id, userId: seat.userId, role: 'viewer' as const };
+    const { entity: own } = await createIntegration({ ...at, ownerModel: 'OrganizationUser' });
+    const { entity: spaceMembers } = await createIntegration({
+      ...at,
+      ownerModel: 'SpaceUser',
+      spaceId: space.id,
+    });
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', role: 'member' },
+      { organizationUser: seat },
+    );
+    expect(await holds(rawKey, 'integration', own.id, 'read')).toBe(true);
+    expect(await holds(rawKey, 'integration', spaceMembers.id, 'read')).toBe(false);
+  });
+
   it("another member's token reaches nothing of it", async () => {
     const { integration } = await ownToken('member');
     const { rawKey } = await ownToken('member');
