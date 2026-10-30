@@ -174,6 +174,31 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect(minted.status).toBe(422);
     });
 
+    it('an integration that goes from a role to none must keep something: entitlements, or it is a 422 (R114)', async () => {
+      expect((await update(owner, await orgIntegration('viewer'), { role: null })).status).toBe(
+        422,
+      );
+      const entitled = await orgIntegration('viewer', [
+        entry('db:space', ['db:space', space.id], ['read']),
+      ]);
+      expect((await update(owner, entitled, { role: null })).status).toBe(200);
+    });
+
+    it('a token left with a role over a role-less integration is judged as it will be: it can be repaired (R114)', async () => {
+      const integration = await orgIntegration('admin', [
+        entry('db:space', ['db:space', space.id], ['read']),
+      ]);
+      expect((await mint(owner, `integration/${integration.id}`, { role: 'member' })).status).toBe(
+        201,
+      );
+      expect((await update(owner, integration, { role: null })).status).toBe(200);
+      const token = await db.token.findFirstOrThrow({ where: { integrationId: integration.id } });
+      const repaired = await as(owner.user, [owner.organizationUser])(
+        patch(`/api/v1/token/${token.id}`, { full: true, role: null }),
+      );
+      expect(repaired.status).toBe(200);
+    });
+
     it('an owner mints an owner token on its own member row; lowered to admin, the token operates as admin', async () => {
       const writer = await member('owner');
       const minted = await mint(writer, `organizationUser/${writer.organizationUser.id}`, {
