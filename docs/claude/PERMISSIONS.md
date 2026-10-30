@@ -650,7 +650,7 @@ check(permix, rebacSchema, 'organizationUser', before, memberRoleWrite('organiza
   check(permix, rebacSchema, 'organizationUser', after, memberRoleWrite('organization'));
 ```
 
-Removing a member checks `memberRemoval(tenant)` (`leave`, or `memberRoleWrite` on the row) at the route. These are rules, not named actions, so they cannot be granted as entitlements.
+Removing a member checks `memberRemoval(tenant)` (`leave`, or `memberRoleWrite` on the row) at the route. These are rules, not named actions, so they cannot be granted as entitlements. Removing tombstones the member row: `softDeleteCascade` tombstones what the row owned (its integrations) and hard-deletes its tokens, and a later invite revives the row with what died with it (`memberRemoval.test.ts`).
 
 ### Role Assignment Rules
 

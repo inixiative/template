@@ -296,7 +296,7 @@ const { role } = resolvedContent; // always from original inquiry.content
 
 | Type | Source | Target | Unique | Expiry | Side Effect |
 |------|--------|--------|--------|--------|-------------|
-| `inviteOrganizationUser` | Organization | User | `targeted` | 30 days | Creates `OrganizationUser` |
+| `inviteOrganizationUser` | Organization | User | `targeted` | 30 days | Creates `OrganizationUser`, or revives the user's removed one (`revive`) with the invited role |
 | `createSpace` | Organization | admin | — | 90 days | Creates `Space` under source org |
 | `updateSpace` | Space | admin | `untargeted` | 90 days | Updates `Space` with content fields |
 | `transferSpace` | Space | Organization | `untargeted` | 30 days | Sets `Space.organizationId` to target org |

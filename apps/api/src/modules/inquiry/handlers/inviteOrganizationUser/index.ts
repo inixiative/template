@@ -1,4 +1,4 @@
-import { db, type OrganizationId, type UserId } from '@template/db';
+import { db, type OrganizationId, revive, type UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   baseResolutionInputSchema,
@@ -33,13 +33,18 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
   autoApprove: async () => false,
 
   handleApprove: async (inquiry: Inquiry, resolvedContent: InviteOrganizationUserContent) => {
-    await db.organizationUser.create({
-      data: {
-        organizationId: inquiry.sourceOrganizationId as OrganizationId,
-        userId: inquiry.targetUserId! as UserId,
-        role: resolvedContent.role,
-      },
-    });
+    const organizationId = inquiry.sourceOrganizationId as OrganizationId;
+    const userId = inquiry.targetUserId! as UserId;
+    const [revived] = await revive(db.organizationUser, { organizationId, userId });
+    if (revived)
+      await db.organizationUser.update({
+        where: { id: revived.id },
+        data: { role: resolvedContent.role },
+      });
+    else
+      await db.organizationUser.create({
+        data: { organizationId, userId, role: resolvedContent.role },
+      });
   },
 
   appEvents: inviteOrganizationUserAppEvents,
