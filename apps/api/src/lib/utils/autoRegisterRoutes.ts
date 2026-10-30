@@ -61,8 +61,8 @@ export const autoRegisterRoutes = async (
     for (const [index, leftSegment] of leftSegments.entries()) {
       const rightSegment = rightSegments[index];
       if (rightSegment === undefined) break;
-      const leftPriority = leftSegment.startsWith('*') ? 2 : /^[{:]/.test(leftSegment) ? 1 : 0;
-      const rightPriority = rightSegment.startsWith('*') ? 2 : /^[{:]/.test(rightSegment) ? 1 : 0;
+      const leftPriority = leftSegment.startsWith('*') ? 2 : leftSegment.startsWith('{') ? 1 : 0;
+      const rightPriority = rightSegment.startsWith('*') ? 2 : rightSegment.startsWith('{') ? 1 : 0;
       if (leftPriority !== rightPriority) return leftPriority - rightPriority;
       if (leftPriority === 0 && leftSegment !== rightSegment) {
         return leftSegment.localeCompare(rightSegment);

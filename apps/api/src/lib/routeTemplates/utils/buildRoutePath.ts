@@ -19,10 +19,10 @@ export const buildRoutePath = (args: BuildRoutePathArgs): string => {
 
   const parts: string[] = [''];
 
-  // Need :id when: submodel (need parent) OR single-item operation (not create, not many)
+  // Need {id} when: submodel (need parent) OR single-item operation (not create, not many)
   const needsId = !skipId && (submodel || (!many && operation !== 'create'));
   if (needsId) {
-    parts.push(':id');
+    parts.push('{id}');
   }
 
   if (submodel) {

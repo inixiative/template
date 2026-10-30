@@ -7,7 +7,7 @@ const { app } = createTestApp({
     (app) =>
       app.openAPIRegistry.registerPath({
         method: 'post',
-        path: '/api/v1/organization/:id/consent',
+        path: '/api/v1/organization/{id}/consent',
         'x-batch': false,
         responses: {},
       }),
@@ -15,7 +15,7 @@ const { app } = createTestApp({
 });
 
 describe('assertBatchable', () => {
-  it('refuses a request to an unbatchable route whose path has a :param', () => {
+  it('refuses a request to an unbatchable route whose path has a parameter', () => {
     expect(() =>
       assertBatchable(app, [[{ method: 'POST', path: '/api/v1/organization/abc/consent' }]]),
     ).toThrow('cannot run in a batch');

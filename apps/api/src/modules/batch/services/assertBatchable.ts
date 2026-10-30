@@ -18,7 +18,7 @@ const segmentsOf = (path: string) =>
     }
   });
 
-const isParam = (segment: string) => /^(\{.+\}|:.+)$/.test(segment);
+const isParam = (segment: string) => /^\{.+\}$/.test(segment);
 
 // An interpolated segment resolves only once its round runs, so it may reach any route below it.
 const matchesRoute = (requestPath: string, routePath: string) => {
