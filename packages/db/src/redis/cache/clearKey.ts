@@ -6,6 +6,7 @@
  */
 
 import { singleFlightLockKey } from '@template/db/lock/singleFlight/singleFlightLock';
+import { isPattern } from '@template/db/redis/cache/cachePattern';
 import { generationKey } from '@template/db/redis/cache/generation/generationKey';
 import {
   GENERATION_TTL_SECONDS,
@@ -28,12 +29,12 @@ const clearOne = (redis: ReturnType<typeof getRedisClient>, key: string): Promis
 
 export const clearKey = async (pattern: string): Promise<number> => {
   validateKey(pattern);
-  const isPattern = pattern.includes('*');
+  const isPatternClear = isPattern(pattern);
 
   try {
     const redis = getRedisClient();
 
-    if (!isPattern) {
+    if (!isPatternClear) {
       const deleted = await clearOne(redis, pattern);
       if (deleted) log.debug(`Cleared cache key: ${pattern}`);
       return deleted;
@@ -64,7 +65,7 @@ export const clearKey = async (pattern: string): Promise<number> => {
     return deleted;
   } catch (error) {
     log.error(`Failed to clear cache for pattern ${pattern}:`, error);
-    if (isPattern) throw error;
+    if (isPatternClear) throw error;
     return 0;
   }
 };

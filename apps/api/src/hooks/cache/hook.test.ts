@@ -193,4 +193,18 @@ describe('a read through the cache inside a transaction', () => {
     const check = await checkCache<string>(key);
     expect('value' in check ? check.value : undefined).not.toBe('before');
   });
+  it('publishes a key whose data holds a star as itself, clearing no other key', async () => {
+    const mine = cacheKey('User', 'a*b@example.com', ['email']);
+    const other = cacheKey('User', 'aXb@example.com', ['email']);
+    await cache(other, async () => 'other');
+    await db.txn(async () => {
+      await cache(mine, async () => 'mine');
+    });
+    const read = async (key: string) => {
+      const check = await checkCache<string>(key);
+      return 'value' in check ? check.value : undefined;
+    };
+    expect(await read(other)).toBe('other');
+    expect(await read(mine)).toBe('mine');
+  });
 });

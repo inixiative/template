@@ -5,6 +5,7 @@
  * @uses none
  */
 
+import { isPattern } from '@template/db/redis/cache/cachePattern';
 import { clearKey } from '@template/db/redis/cache/clearKey';
 import { generationKey } from '@template/db/redis/cache/generation/generationKey';
 import {
@@ -16,7 +17,6 @@ import { cacheAccessor } from '@template/db/redis/cache/telemetry/cacheAccessor'
 import { meterLargeWrite } from '@template/db/redis/cache/telemetry/meterLargeWrite';
 import {
   type CacheOverlay,
-  isPattern,
   isWrittenInTransaction,
 } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
 import { writtenKey } from '@template/db/redis/cache/writtenKey';
@@ -24,12 +24,11 @@ import { getRedisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import { incrementCounter } from '@template/shared/telemetry';
 import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
-import superjson from 'superjson';
 
 const publishKey = async (overlay: CacheOverlay, key: string): Promise<void> => {
   const entry = overlay.values.get(key);
   const shouldPublish = !!entry && entry.generation !== null && entry.ttlSeconds > 0;
-  const payload = shouldPublish ? superjson.stringify(entry.value) : '';
+  const payload = shouldPublish ? entry.payload : '';
 
   try {
     const published = await publishAtCommit(
@@ -53,14 +52,18 @@ const publishKey = async (overlay: CacheOverlay, key: string): Promise<void> => 
 };
 
 export const publishOverlay = async (overlay: CacheOverlay): Promise<void> => {
-  const touched = [...new Set([...overlay.written, ...overlay.values.keys()])];
+  const patterns = [...overlay.written].filter(isPattern);
+  const keys = new Set([
+    ...overlay.values.keys(),
+    ...[...overlay.written].filter((key) => !isPattern(key)),
+  ]);
   const concurrency = getConcurrency([ConcurrencyType.redis]);
   await resolveAll(
-    touched.filter((key) => !isPattern(key)).map((key) => () => publishKey(overlay, key)),
+    [...keys].map((key) => () => publishKey(overlay, key)),
     concurrency,
   );
   await resolveAll(
-    touched.filter(isPattern).map((pattern) => () => clearKey(pattern)),
+    patterns.map((pattern) => () => clearKey(pattern)),
     concurrency,
   );
 };

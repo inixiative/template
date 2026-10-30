@@ -5,10 +5,9 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db/client';
+import { isPattern, matchesPattern } from '@template/db/redis/cache/cachePattern';
 import {
   type CacheOverlay,
-  isPattern,
-  matchesPattern,
   onOverlayKey,
 } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
 

@@ -14,6 +14,7 @@ import {
   onOverlayKey,
 } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
 import { getRedisClient } from '@template/db/redis/client';
+import superjson from 'superjson';
 
 export const readInTransaction = <T>(
   overlay: CacheOverlay,
@@ -26,7 +27,7 @@ export const readInTransaction = <T>(
     const held = overlay.values.get(key);
     if (held) {
       setResult('hit');
-      return held.value as T;
+      return superjson.parse<T>(held.payload);
     }
 
     const redis = getRedisClient();
@@ -38,6 +39,10 @@ export const readInTransaction = <T>(
 
     const generation = await readGeneration(redis, key);
     const value = await fn();
-    overlay.values.set(key, { value, ttlSeconds: resolveTtl(value, ttl), generation });
+    overlay.values.set(key, {
+      payload: superjson.stringify(value),
+      ttlSeconds: resolveTtl(value, ttl),
+      generation,
+    });
     return value;
   });

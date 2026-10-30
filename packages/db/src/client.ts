@@ -167,6 +167,7 @@ const dbMethods = {
             ...(options?.maxWait ? { maxWait: options.maxWait } : {}),
           },
         );
+        await publishOverlay(settled.openTransaction.cacheOverlay);
       } finally {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a
         // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
@@ -175,7 +176,6 @@ const dbMethods = {
         await drainFinally(opened);
       }
       const { result, openTransaction } = settled;
-      await publishOverlay(openTransaction.cacheOverlay);
 
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
       // onCommit handler) drains its own and a rollback discards these with the object.

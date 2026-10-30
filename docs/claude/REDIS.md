@@ -289,7 +289,7 @@ transaction reads through it:
 
 - A value the transaction computed is returned from the overlay. Otherwise the shared cache is read,
   and a miss computes `fn` on the transaction's client and keeps the value in the overlay with the
-  key's generation, read before `fn` runs. Nothing reaches Redis before commit, so a rollback leaves
+  key's generation, read before `fn` runs. Each reader gets its own copy, as from Redis. Nothing reaches Redis before commit, so a rollback leaves
   nothing behind.
 - The clear-cache hook marks the keys a write invalidates (`markCacheWritten`). A marked key skips the
   shared cache and recomputes, so the transaction reads its own writes. A marked pattern marks every
@@ -300,10 +300,11 @@ transaction reads through it:
 - There is no single-flight lock inside a transaction. A cache function only reads; one that writes
   would mark its own key and wait on itself.
 
-When the transaction commits, before its `db.onCommit` batches, each key it touched runs one Lua call:
+When the transaction commits, before it releases its held locks and before its `db.onCommit` batches,
+each key it touched runs one Lua call:
 a marked key is cleared (value, write time, new generation), and a value it computed is published
 only if the key's generation is still the one read before the compute. Another clear in between, from
-any process, wins and leaves a miss. A failed call logs and leaves the key as the clear left it.
+any process, wins and leaves a miss. A failed call logs, and the key keeps its pre-commit value until its TTL.
 Marked patterns are cleared afterwards with `clearKey`, which throws on failure.
 
 Long-lived values that no write hook clears are not `cache()` values: they are read directly and
