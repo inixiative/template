@@ -122,6 +122,22 @@ describe('the API refuses a malformed entitlement; a write prunes the broken one
     }).fetch;
   };
 
+  it('the 422 names what is wrong with the entry', async () => {
+    const noAction = { ...readOrganization(), actions: { read: false } };
+    const response = await (await asOwner())(
+      post(`/api/v1/organization/${organization.id}/integrations`, {
+        name: `i-${crypto.randomUUID()}`,
+        provider: 'slack',
+        role: 'viewer',
+        entitlements: [noAction],
+      }),
+    );
+    expect(response.status).toBe(422);
+    expect(((await response.json()) as { message: string }).message).toBe(
+      'an entitlement grants at least one action',
+    );
+  });
+
   it('creating an integration with a malformed entitlement is a 422, and nothing is stored', async () => {
     const response = await (await asOwner())(
       post(`/api/v1/organization/${organization.id}/integrations`, {
