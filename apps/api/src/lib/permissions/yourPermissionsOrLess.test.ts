@@ -166,13 +166,12 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       ).toBe(403);
     });
 
-    it('an admin mints on an integration and uses the reach an owner gave it, into a space the admin cannot see', async () => {
+    it('a role token on an integration with no role is an error: the role narrows nothing (R114)', async () => {
       const integration = await orgIntegration(null, [
         entry('db:space', ['db:space', space.id], ['read', 'operate']),
       ]);
       const minted = await mint(admin, `integration/${integration.id}`, { role: 'member' });
-      expect(minted.status).toBe(201);
-      expect(await holds(minted.key!, 'space', space.id, 'operate')).toBe(true);
+      expect(minted.status).toBe(422);
     });
 
     it('an owner mints an owner token on its own member row; lowered to admin, the token operates as admin', async () => {
