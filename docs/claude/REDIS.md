@@ -268,6 +268,9 @@ const user = await cache(
 Behavior:
 - Under `db.withDeleted` the cache is neither read nor written: `fn` runs directly, so a
   tombstone-inclusive result never lands under the shared live key
+  (the live value would also be missing the deleted rows the caller asked for). Rolling caches are
+  still read normally (`checkCache` and the rolling read never compute); only computing through
+  `cache()` is skipped
 - Returns cached value if exists (including `null`/`undefined`)
 - Computes via fn() on cache miss; concurrent misses on one key compute once (single-flight)
 - **Negative caching**: `null`/`undefined` cached with 1 min TTL (prevents thundering herd, allows quick discovery of new records)
