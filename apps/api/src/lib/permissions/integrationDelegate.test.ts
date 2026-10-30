@@ -275,7 +275,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       expect((await raise(owner, ownerMember, 'owner')).status).toBe(200);
     });
 
-    it("a member's integration is a narrowing of the member: set at or below the member's role", async () => {
+    it("a member's integration is capped by the member: set at or below the member's role", async () => {
       const { entity: writer } = await createUser();
       const member = await memberOf('member', organization, writer);
       const integration = await memberIntegration(member, null);

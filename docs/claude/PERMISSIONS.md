@@ -121,7 +121,7 @@ export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 ```
 
 Higher index = more permissions. Used for:
-- `narrowing(...)` - a token's role claims every action at or below it ([A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner))
+- `capAtRole(entry, role)` - an owner's grant entry capped at a delegate's role ([A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner))
 
 ---
 
@@ -253,13 +253,13 @@ A delegate holds its permissions, capped live by its owner. `installPermissionsF
 | `Organization` / `Space` | `owner` on itself |
 | `Integration` | the integration's permissions, capped by its own owner's table |
 
-A role and named entitlements expand through `delegateEntries` (`packages/permissions/src/roles/delegatePermissions.ts`):
+A delegate's role caps its owner. `delegateTable` (`apps/api/src/lib/permissions/ownerTable.ts`) installs the owner's grants with every entry capped at the role (`capAtRole`: the actions at or below the role; an entry holding more gets the role's own action), so a member-role token of an owner takes member actions from its member, a User token's role reaches each of the user's organizations capped there, and an integration's role caps whatever its owner holds:
 
-- `role` applies at every anchor the owner has (`narrowing(resource, anchor, role)` per anchor and path), so a User token's role reaches each of the user's organizations, capped by the member row there; an integration's role reaches whatever its owner reaches.
+- `role` is the ceiling; `full` is no ceiling (the owner's grants as they are).
 - `entitlements` are entries `{ resource, anchor: { resource, id, path? }, where?, actions }`, held as written. "Only the user's own things" is no role plus one entry anchored on `db:user`.
 - `full` is inheritance, not a permission: writing `full` clears the delegate's role and entitlements (the `fullDelegate` hook), and a `full` delegate skips to its owner — `delegateTable` (`apps/api/src/lib/permissions/ownerTable.ts`) installs the owner's table unchanged, for tokens and for integration owners. The schema never reads `full` (CI rule `no-full-in-rebac-schema`). Setting `full` takes `own` on the delegate's owner. A token that is not `full` has a role, entitlements or both; `full` takes neither. `full` may be set on tokens owned by a User, OrganizationUser, SpaceUser or Integration, and on integrations owned by a User, OrganizationUser or SpaceUser (`delegatePermissionRules.ts`).
 
-Nothing is inherited: a token holds only its own permissions. They are installed with the owner's table as owner, so at check time each action holds only if the owner still allows it on that record through the normal walk. Demote the member and its tokens lose it on the next request.
+The owner's grants are read from the database on every request, so demote the member and its tokens lose it on the next request. Named entitlements are installed with the owner's table as owner: each holds only if the owner still allows it on that record through the normal walk.
 
 ### A Token Never Exceeds Its Owner
 
@@ -392,7 +392,7 @@ Located in `packages/permissions/src/rebac/`.
 
 ### Schema
 
-The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`; read the rules there. It is keyed by resource (`db:user`, `db:organization`, `db:token`, ...), each with its `actions`. Rules shared across models are named helpers in `schemaHelpers.ts`: `actionOnOwner` (the action on whichever owner `ownerModel` names), `actorIsItsUser`, the role-write rules `memberRoleWrite`, `memberRemoval` and `integrationRoleWrite`, `roleHeldAtOwner` (the delegate's role held at its owner), and the integration blocks `integrationAdministering` (`create`, `own`, `manage`, `delete`) and `integrationAccess` (`operate`, `read`). `db:token` has `leave`, `own`, `read`, `create` and `delete`; `db:integration` also has `delete`.
+The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`; read the rules there. It is keyed by resource (`db:user`, `db:organization`, `db:token`, ...), each with its `actions`. Rules shared across models are named helpers in `schemaHelpers.ts`: `actionOnOwner` (the action on whichever owner `ownerModel` names), `managesItsUser` (manage on the record's user), the role-write rules `memberRoleWrite`, `memberRemoval` and `integrationRoleWrite`, `roleHeldAtOwner` (the delegate's role held at its owner), and the integration blocks `integrationAdministering` (`create`, `own`, `manage`, `delete`) and `integrationAccess` (`operate`, `read`). `db:token` has `leave`, `own`, `read`, `create` and `delete`; `db:integration` also has `delete`.
 
 ### ActionRule Types
 

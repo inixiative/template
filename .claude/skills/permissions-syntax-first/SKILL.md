@@ -44,7 +44,7 @@ Permissions questions tangle because one sentence mixes several parties and seve
 |---|---|---|---|
 | 1. Access to X | who can see or reach X | `read` on it | listing tokens |
 | 2. Actions on X itself | who administers X | `own` / `manage`: its user, or your role at its org/space | revoke, rename |
-| 3. X's access to other things | what X can reach, as a narrowing of its owner | its role / entitlements / full, set at or below its owner | its role / entitlements / full, checked against the minter |
+| 3. X's access to other things | what X can reach: its owner, capped at its role | its role / entitlements / full, set at or below its owner | its role / entitlements / full, checked against the minter |
 | 4. Acting with X, on its behalf | what X does as an actor | execution — out of scope (Signet) | requests made with the token (`__actor.model == Token`) |
 
 **Step 3 — never let one bucket answer another.** A bucket-2 fact ("M manages their integration") must not satisfy a bucket-3 check ("M may give a token admin access") — that merge produced a real bug. A bucket-4 fact (the actor is a token) is a condition on the actor, not on the thing.
@@ -67,8 +67,8 @@ Shared pieces already in `schema.ts` — reuse, don't re-derive:
 - `actionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
 - `roleHeldAtOwner`: the role on the row is one the actor holds at the direct owner (owner→own, admin→manage, member→operate, viewer→read via `roleToStandardAction`);
 - `memberRoleWrite(tenant)` / `integrationRoleWrite`: manage the row's tenant (the integration itself) and hold there the role being set; `memberRemoval(tenant)` = `leave` or `memberRoleWrite`. Rules routes and controllers check, never named actions;
-- `actorIsItsUser(at)`: `${at}userId` is set and is the acting user (or a User-owned token of that user), narrowed by `manage` on that user;
-- `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `actorIsItsUser(at)`;
+- `managesItsUser(at)`: `{ rel: `${at}user`, action: 'manage' }` — the user, or a delegate of the user at manage or above;
+- `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `managesItsUser(at)`;
 - `ownedBy(owners, at)` and `actionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
 
 Other parts of the system (use them, don't parallel them):
