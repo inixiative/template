@@ -17,8 +17,8 @@ export {
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
 export type { ActionRule } from './rebac/types';
-export { type DelegatePermissions, delegateEntries } from './roles/delegatePermissions';
-export { narrowing } from './roles/narrowing';
+export { capAtRole } from './roles/capAtRole';
+export type { DelegatePermissions } from './roles/delegatePermissions';
 // Organization permissions
 export { getOrgPermissions } from './roles/organization';
 // Shared role utilities

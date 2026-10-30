@@ -79,7 +79,7 @@ const spaceUserKey = async (memberRole: Role, spaceRole: Role, tokenRole: Role) 
 describe('a member token holds its member row, never the user (template #210 7f651bcc)', () => {
   it('an OrganizationUser token: its org at its role, and nothing else', async () => {
     const { rawKey, organizationUser } = await memberKey('admin', { role: 'owner' });
-    expect(await grantsFor(rawKey)).toEqual({});
+    expect(await grantsFor(rawKey)).toEqual({ [`db:organization:${organization.id}`]: ['manage'] });
     expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'own')).toBe(false);
     expect(await holds(rawKey, 'user', organizationUser.userId, 'read')).toBe(false);
@@ -87,7 +87,7 @@ describe('a member token holds its member row, never the user (template #210 7f6
 
   it('a SpaceUser token: its space at its role, and not the organization', async () => {
     const rawKey = await spaceUserKey('admin', 'owner', 'owner');
-    expect(await grantsFor(rawKey)).toEqual({});
+    expect(await grantsFor(rawKey)).toEqual({ [`db:space:${space.id}`]: ['own'] });
     expect(await holds(rawKey, 'space', space.id, 'own')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'read')).toBe(false);
   });
@@ -108,6 +108,20 @@ describe('a member token holds its member row, never the user (template #210 7f6
     });
     expect(response.status).toBe(403);
     expect(((await response.json()) as { message: string }).message).toBe('Access denied');
+  });
+
+  it("an owner's member-role token holds its member's own table, capped at member (R103)", async () => {
+    const { rawKey } = await memberKey('owner', { role: 'member' });
+    expect(await grantsFor(rawKey)).toEqual({
+      [`db:organization:${organization.id}`]: ['operate'],
+    });
+    expect(await holds(rawKey, 'organization', organization.id, 'operate')).toBe(true);
+    expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(false);
+  });
+
+  it('a full token is its member, with no ceiling (R103)', async () => {
+    const { rawKey } = await memberKey('owner', { role: null, full: true });
+    expect(await grantsFor(rawKey)).toEqual({ [`db:organization:${organization.id}`]: ['own'] });
   });
 
   it('a SpaceUser token has no me: /me answers 401', async () => {
