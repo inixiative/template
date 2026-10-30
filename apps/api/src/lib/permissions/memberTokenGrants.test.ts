@@ -129,68 +129,34 @@ describe('a member token holds its member row, never the user (template #210 7f6
     expect(await grantsFor(rawKey)).toEqual({ [`db:organization:${organization.id}`]: ['own'] });
   });
 
-  describe("a token caps its member's entitlements by what each one implies, never by assuming it (R103)", () => {
-    const underOrganization = (resource: string, actions: string[]) =>
-      entry(resource, ['db:organization', organization.id, 'organization'], actions);
-
-    it('own on segments is operate on them for the member and its member-role token, not own (R105)', async () => {
-      const { entity: segment } = await createSegment(
-        { ownerModel: 'Organization' },
-        { organization },
-      );
-      const { rawKey } = await memberKey('viewer', { role: 'member' }, [
-        underOrganization('db:segment', ['own']),
-      ]);
-      expect(await holds(rawKey, 'segment', segment.id, 'operate')).toBe(true);
-      expect(await holds(rawKey, 'segment', segment.id, 'manage')).toBe(false);
-    });
-
-    it('own on integrations is manage on them for an admin-role token, not own (R105)', async () => {
-      const { entity: integration } = await createIntegration({
-        organizationId: organization.id,
-        ownerModel: 'Organization',
-        role: 'viewer',
-      });
-      const { rawKey } = await memberKey('viewer', { role: 'admin' }, [
-        underOrganization('db:integration', ['own']),
-      ]);
-      expect(await holds(rawKey, 'integration', integration.id, 'manage')).toBe(true);
-      expect(await holds(rawKey, 'integration', integration.id, 'own')).toBe(false);
-    });
-
-    it('manage on integrations gives a member-role token read and operate, not manage', async () => {
-      const { entity: integration } = await createIntegration({
-        organizationId: organization.id,
-        ownerModel: 'Organization',
-        role: 'viewer',
-      });
-      const { rawKey } = await memberKey('viewer', { role: 'member' }, [
-        underOrganization('db:integration', ['manage']),
-      ]);
-      expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(true);
-      expect(await holds(rawKey, 'integration', integration.id, 'operate')).toBe(true);
-      expect(await holds(rawKey, 'integration', integration.id, 'manage')).toBe(false);
-    });
-
-    it('own on tokens gives a member-role token read on them', async () => {
-      const { entity: token } = await createKeyedToken(
-        { ownerModel: 'Organization', role: 'viewer' },
-        { organization },
-      );
-      const { rawKey } = await memberKey('viewer', { role: 'member' }, [
-        underOrganization('db:token', ['own']),
-      ]);
-      expect(await holds(rawKey, 'token', token.id, 'read')).toBe(true);
-    });
-  });
-
   it("an org owner's admin-role token does not manage the org's spaces through org own; a space entitlement does (R107)", async () => {
     const { rawKey } = await memberKey('owner', { role: 'admin' });
     expect(await holds(rawKey, 'space', space.id, 'manage')).toBe(false);
-    const { rawKey: entitled } = await memberKey('owner', { role: 'admin' }, [
-      entry('db:space', ['db:space', space.id], ['manage']),
-    ]);
+    const { organizationUser } = await memberKey('owner', { role: 'admin' });
+    const { rawKey: entitled } = await createKeyedToken(
+      {
+        ownerModel: 'OrganizationUser',
+        role: 'admin',
+        entitlements: [entry('db:space', ['db:space', space.id], ['manage'])],
+      },
+      { organizationUser },
+    );
     expect(await holds(entitled, 'space', space.id, 'manage')).toBe(true);
+  });
+
+  it("a role token holds its member's role, narrowed, and none of its member's entitlements (R110)", async () => {
+    const { entity: integration } = await createIntegration({
+      organizationId: organization.id,
+      ownerModel: 'Organization',
+      role: 'viewer',
+    });
+    const manageTheOrganizations = {
+      ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
+      where: { field: 'ownerModel', operator: 'equals', value: 'Organization' },
+    };
+    const { rawKey } = await memberKey('viewer', { role: 'admin' }, [manageTheOrganizations]);
+    expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(true);
+    expect(await holds(rawKey, 'integration', integration.id, 'manage')).toBe(false);
   });
 
   it('a SpaceUser token has no me: /me answers 401', async () => {
@@ -281,7 +247,7 @@ describe("a member's entitlements are owned by its organization (Aron, 2026-10-2
   });
 });
 
-describe("a member token keeps its member's entitlement's resource and anchor, narrowed to its role", () => {
+describe("a member token holds its member's role, narrowed, not its member's entitlements (R110)", () => {
   const tokenOn = async (tokenRole: 'member' | 'viewer') =>
     (
       await memberKey('viewer', { role: tokenRole }, [
@@ -289,13 +255,13 @@ describe("a member token keeps its member's entitlement's resource and anchor, n
       ])
     ).rawKey;
 
-  it('a member-role token operates the spaces its member was entitled to', async () => {
-    expect(await holds(await tokenOn('member'), 'space', space.id, 'operate')).toBe(true);
+  it('a member-role token does not operate the spaces its member was entitled to', async () => {
+    expect(await holds(await tokenOn('member'), 'space', space.id, 'operate')).toBe(false);
   });
 
-  it('a viewer-role token reads them and does not operate', async () => {
+  it('a viewer-role token neither reads nor operates them: a viewer reaches spaces only through the entitlement', async () => {
     const key = await tokenOn('viewer');
-    expect(await holds(key, 'space', space.id, 'read')).toBe(true);
+    expect(await holds(key, 'space', space.id, 'read')).toBe(false);
     expect(await holds(key, 'space', space.id, 'operate')).toBe(false);
   });
 });
@@ -398,8 +364,8 @@ describe('what an integration entitlement from the organization reaches (2026-10
     ).toBe(false);
   });
 
-  it('a role token keeps every branch its member holds: one entry per path is not collapsed', async () => {
-    const { rawKey } = await memberKey('viewer', { role: 'owner' }, [
+  it('a full token keeps every branch its member holds: one entry per path is not collapsed', async () => {
+    const rawKey = await fullMemberToken('viewer', [
       entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
       entry(
         'db:integration',

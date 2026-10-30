@@ -39,6 +39,7 @@ const nobody: OwnerTable = [];
 
 const inheritedAt = (role: Role, owner: OwnerTable): OwnerTable =>
   owner.flatMap((grant) => {
+    if (grant.owner) return [];
     const entries = grant.entries.flatMap((entry) => capAtRole(entry, role) ?? []);
     return entries.length ? [{ ...grant, entries }] : [];
   });

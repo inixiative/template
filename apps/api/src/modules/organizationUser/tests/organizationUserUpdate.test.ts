@@ -191,7 +191,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         expect((await grantOn('own')).status).toBe(403);
       });
 
-      it("the holder's owner-role user token sets roles the holder holds", async () => {
+      it("the holder's owner-role user token holds the holder's role, not its entitlement: it cannot set roles (R110)", async () => {
         const { user } = await holderOf('manage');
         const { rawKey } = await createKeyedToken({ ownerModel: 'User', role: 'owner' }, { user });
         const target = await newMember();
@@ -209,7 +209,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
             body: JSON.stringify({ role: 'admin' }),
           }),
         );
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(403);
       });
     });
 

@@ -127,12 +127,17 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
         expect(await holds(key, 'organization', organization.id, row.lacks)).toBe(false);
       });
 
-    it('an integration entitled to one space reaches that space and no other', async () => {
+    it('a full token on an integration entitled to one space reaches that space and no other (R114)', async () => {
       const member = await memberOf('owner', organization, (await createUser()).entity);
       const integration = await memberIntegration(member, null, [
         entry('db:space', ['db:space', space.id], ['read', 'operate', 'manage']),
       ]);
-      const key = await tokenFor(integration, 'owner');
+      const key = (
+        await createKeyedToken(
+          { ownerModel: 'Integration', role: null, full: true },
+          { integration },
+        )
+      ).rawKey;
       expect(await holds(key, 'space', space.id, 'manage')).toBe(true);
       expect(await holds(key, 'space', otherSpace.id, 'read')).toBe(false);
       expect(await holds(key, 'organization', organization.id, 'read')).toBe(false);
