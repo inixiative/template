@@ -118,12 +118,14 @@ export const integrationAdministering = {
   delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
 } satisfies Record<string, ActionRule>;
 
+const sameOwnerRowAsActor: ActionRule = {
+  all: ['ownerModel', 'organizationId', 'spaceId', 'userId'].map((field) => ({
+    rule: { field, operator: Operator.equals, path: `__actor.record.${field}` },
+  })),
+};
+
 const membersOwnDelegate = (action: string): ActionRule => ({
-  all: [
-    ownedBy(members),
-    { rule: { field: 'userId', operator: Operator.equals, path: '__actor.record.userId' } },
-    actionOnOwner(action, '', members),
-  ],
+  all: [ownedBy(members), sameOwnerRowAsActor, actionOnOwner(action, '', members)],
 });
 
 export const integrationAccess = {
