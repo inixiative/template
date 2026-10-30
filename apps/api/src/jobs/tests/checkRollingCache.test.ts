@@ -72,4 +72,15 @@ describe('checkRollingCache', () => {
     });
     expect(runs()).toBe(2);
   });
+
+  it('cold readers at once enqueue one refresh between them', async () => {
+    const { rollingCache, runs } = makeCountingCache();
+
+    const checks = await Promise.all(
+      Array.from({ length: 5 }, () => checkRollingCache(rollingCache, 'value', undefined)),
+    );
+
+    expect(runs()).toBe(1);
+    expect(checks.every((check) => check.state !== 'empty')).toBe(true);
+  });
 });

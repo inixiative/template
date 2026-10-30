@@ -43,15 +43,17 @@ export {
   FindForUpdateLockTimeoutError,
   type Lock,
   LockLostError,
-  type LockLostReason,
   type LockOptions,
   type LockRedis,
   type LockReleaseResult,
   maxSafeHeartbeatMs,
+  singleFlightLock,
 } from './lock';
 // Redis client and cache utilities
 export {
+  CACHE_STATES,
   type CacheCheck,
+  type CacheState,
   COMMAND_TIMEOUT_MS,
   cache,
   cacheKey,
@@ -67,6 +69,7 @@ export {
   MAX_ROLLING_CACHE_TARGETS,
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
   makeRollingCache,
+  markCacheWritten,
   type RedisEval,
   type RedisNamespace,
   type RegisteredRollingCache,
@@ -83,7 +86,6 @@ export {
   type RollingCacheValue,
   type RollingCacheWrite,
   redisNamespace,
-  singleFlightLock,
   unregisterRollingCache,
   upsertCache,
 } from './redis';

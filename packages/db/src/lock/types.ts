@@ -8,7 +8,6 @@ import type { RedisEval } from '@template/db/redis/types';
 import type { Redis } from 'ioredis';
 
 export type LockRedis = Pick<Redis, 'set' | 'get'> & RedisEval;
-export type LockLostReason = 'token_mismatch' | 'refresh_errors';
 export type LockReleaseResult = 'released' | 'notHeld' | 'unconfirmed';
 
 export type LockTarget = { service: string; identifier: string } | { key: string };
@@ -18,8 +17,7 @@ export type LockOptions = LockTarget & {
   ttlMs?: number;
   heartbeat?: true;
   heartbeatMs?: number;
-  maxMissed?: number;
-  onLockLost?: (reason: LockLostReason) => void | Promise<void>;
+  onLockLost?: () => void | Promise<void>;
 };
 
 export type ClaimOptions = LockTarget & {
@@ -42,6 +40,7 @@ export type AcquireOptions = {
 };
 
 export type Lock = {
+  holder: string;
   acquire: (options?: AcquireOptions) => Promise<boolean>;
   verify: () => Promise<boolean>;
   release: () => Promise<LockReleaseResult>;

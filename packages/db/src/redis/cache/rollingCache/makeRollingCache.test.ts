@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { cacheKey } from '@template/db/redis/cache';
-import { flushRedis, getRedisClient } from '@template/db/redis/client';
-import { makeRollingCache } from '@template/db/redis/makeRollingCache';
-import { redisNamespace } from '@template/db/redis/namespaces';
+import { cacheKey } from '@template/db/redis/cache/cacheKey';
+import { makeRollingCache } from '@template/db/redis/cache/rollingCache/makeRollingCache';
 import {
   getRollingCache,
   listRollingCaches,
   unregisterRollingCache,
-} from '@template/db/redis/rollingCacheRegistry';
+} from '@template/db/redis/cache/rollingCache/rollingCacheRegistry';
 import {
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
   ROLLING_CACHE_LEAF_ATTEMPTS,
   type RollingCacheComputeContext,
-} from '@template/db/redis/rollingCacheTypes';
+} from '@template/db/redis/cache/rollingCache/rollingCacheTypes';
+import { flushRedis, getRedisClient } from '@template/db/redis/client';
+import { redisNamespace } from '@template/db/redis/namespaces';
 
 const registered: string[] = [];
 
@@ -358,5 +358,109 @@ describe('makeRollingCache', () => {
     expect(await next).toBe(true);
     expect(batches).toBeLessThan(100);
     expect(await rollingCache.read('value', undefined)).toMatchObject({ state: 'fresh' });
+  });
+  it('reports queued from the mark until the refresh takes the lock, and clears the mark once it writes', async () => {
+    const name = uniqueName('queued');
+    let release: () => void = () => {};
+    const rollingCache = makeRollingCache({
+      name,
+      intervalSeconds: 300,
+      ...single(name, () => new Promise<string>((resolve) => (release = () => resolve('done')))),
+    });
+
+    expect(await rollingCache.markQueued(undefined)).toBe(true);
+    expect(await rollingCache.markQueued(undefined)).toBe(false);
+    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'queued' });
+
+    const refreshing = rollingCache.refresh(undefined);
+    await Bun.sleep(20);
+    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'computing' });
+
+    release();
+    expect(await refreshing).toBe(true);
+    expect(await rollingCache.read('value', undefined)).toMatchObject({
+      state: 'fresh',
+      value: 'done',
+      isComputing: false,
+      isQueued: false,
+    });
+    expect(await rollingCache.markQueued(undefined)).toBe(true);
+  });
+
+  it('a refresh aborted mid-compute leaves the mark, because its retry is still queued', async () => {
+    const name = uniqueName('queuedAbort');
+    const controller = new AbortController();
+    const rollingCache = makeRollingCache({
+      name,
+      intervalSeconds: 300,
+      ...single(name, async () => {
+        controller.abort();
+        return 'late';
+      }),
+    });
+
+    await rollingCache.markQueued(undefined);
+    expect(await rollingCache.refresh(undefined, { signal: controller.signal })).toBe(false);
+    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'queued' });
+  });
+
+  it('an abort releases the lock at once, so the next refresh does not wait on a compute that ignores the signal', async () => {
+    const name = uniqueName('abortReleases');
+    const controller = new AbortController();
+    let finishStuck: () => void = () => {};
+    let runs = 0;
+    const rollingCache = makeRollingCache({
+      name,
+      intervalSeconds: 300,
+      timeoutSeconds: 5,
+      results: { value: () => cacheKey(name, 'all') },
+      compute: async (_target, { results, write }) => {
+        runs += 1;
+        if (runs === 1) await new Promise<void>((resolve) => (finishStuck = resolve));
+        await write(results.value(), runs);
+      },
+    });
+
+    const stuck = rollingCache.refresh(undefined, { signal: controller.signal });
+    await Bun.sleep(20);
+    controller.abort();
+    const startedAt = performance.now();
+    expect(await rollingCache.refresh()).toBe(true);
+    expect(performance.now() - startedAt).toBeLessThan(1_000);
+
+    finishStuck();
+    expect(await stuck).toBe(false);
+    expect(await rollingCache.read('value', undefined)).toMatchObject({ state: 'fresh', value: 2 });
+  });
+  it('a refresh whose signal aborted while it waited for the lock releases it without computing', async () => {
+    const name = uniqueName('abortWhileWaiting');
+    let runs = 0;
+    let finishHolder: () => void = () => {};
+    const rollingCache = makeRollingCache({
+      name,
+      intervalSeconds: 300,
+      timeoutSeconds: 5,
+      results: { value: () => cacheKey(name, 'all') },
+      compute: async (_target, { results, write }) => {
+        runs += 1;
+        if (runs === 1) await new Promise<void>((resolve) => (finishHolder = resolve));
+        await write(results.value(), runs);
+      },
+    });
+
+    const holder = rollingCache.refresh();
+    await Bun.sleep(20);
+    const controller = new AbortController();
+    const waiting = rollingCache.refresh(undefined, { signal: controller.signal });
+    controller.abort();
+    finishHolder();
+
+    expect(await holder).toBe(true);
+    expect(await waiting).toBe(false);
+    expect(runs).toBe(1);
+    expect(await rollingCache.read('value', undefined)).toMatchObject({
+      state: 'fresh',
+      isComputing: false,
+    });
   });
 });

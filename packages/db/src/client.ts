@@ -35,6 +35,11 @@ import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
 import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
 import { withLockUntilSettled } from '@template/db/lock/withLockUntilSettled';
+import {
+  type CacheOverlay,
+  newCacheOverlay,
+} from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
+import { publishOverlay } from '@template/db/redis/cache/transactionOverlay/publishOverlay';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import {
@@ -123,6 +128,7 @@ const dbMethods = {
     const run = async () => {
       let opened: OpenTransaction | null = null;
       let settled: { result: T; openTransaction: OpenTransaction };
+      let cacheFailures: unknown[] = [];
       try {
         settled = await db.raw.$transaction(
           async (transactionClient) => {
@@ -135,6 +141,7 @@ const dbMethods = {
               heldLocks: new Map(),
               settled: false,
               bridgedContext,
+              cacheOverlay: newCacheOverlay(),
             };
             opened = openTransaction;
             scope.openTransaction = openTransaction;
@@ -161,6 +168,7 @@ const dbMethods = {
             ...(options?.maxWait ? { maxWait: options.maxWait } : {}),
           },
         );
+        cacheFailures = await publishOverlay(settled.openTransaction.cacheOverlay);
       } finally {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a
         // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
@@ -173,17 +181,23 @@ const dbMethods = {
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
       // onCommit handler) drains its own and a rollback discards these with the object.
       const batches = openTransaction.afterCommitBatches;
-      for (const batch of batches) {
-        const results = await db.parallel(
-          batch.fns.map((fn) => () => Promise.resolve(fn())),
-          { concurrency: batch.concurrency, resolution: 'allSettled' },
-        );
+      const failures = [...cacheFailures];
+      try {
+        for (const batch of batches) {
+          const results = await db.parallel(
+            batch.fns.map((fn) => () => Promise.resolve(fn())),
+            { concurrency: batch.concurrency, resolution: 'allSettled' },
+          );
 
-        throwIfFailures(
-          'db.onCommit() callback failed',
-          results.filter((result) => result.status === 'rejected').map((result) => result.reason),
-        );
+          throwIfFailures(
+            'db.onCommit() callback failed',
+            results.filter((result) => result.status === 'rejected').map((result) => result.reason),
+          );
+        }
+      } catch (error) {
+        failures.unshift(error);
       }
+      throwIfFailures('db.txn() after-commit work failed', failures);
       return result;
     };
 
@@ -252,6 +266,8 @@ const dbMethods = {
   getScope: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
 
   isInTxn: (): boolean => !!store.getStore()?.openTransaction,
+
+  cacheOverlay: (): CacheOverlay | null => store.getStore()?.openTransaction?.cacheOverlay ?? null,
 
   // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences

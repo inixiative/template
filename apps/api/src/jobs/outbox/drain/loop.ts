@@ -15,7 +15,6 @@ const DRAIN_LOCK = {
   identifier: 'drain',
   ttlMs: 300_000,
   heartbeatMs: 60_000,
-  maxMissed: 3,
 };
 
 // No re-entrancy guard: createLock's NX acquire already skips a tick whose predecessor is still draining.

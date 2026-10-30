@@ -20,6 +20,7 @@
 - [Cache Utilities](#cache-utilities)
   - [cacheKey() Builder](#cachekey-builder)
   - [cache() Get-or-Set](#cache-get-or-set)
+  - [cache() inside a transaction](#cache-inside-a-transaction)
   - [checkCache()](#checkcache)
   - [clearKey()](#clearkey)
   - [Automatic Invalidation](#automatic-invalidation)
@@ -104,6 +105,8 @@ const key = `cache:User:${id}`;  // Don't do this
 | `lock` | `lock:*` | Distributed locks via `createLock` |
 | `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
 | `cacheWritten` | `cachewritten:*` | When the value under a `cache:` key was written (epoch ms); set and cleared with the value, read by `checkCache` |
+| `cacheGeneration` | `cachegen:*` | A `cache:` key's generation (`cachegen:<key>`); a clear moves it so a compute in flight skips its publish |
+| `cacheQueued` | `cachequeued:*` | A rolling-cache target whose refresh is enqueued and has not taken its lock; read by `checkCache` as `queued` |
 | `rollingCache` | `rollingcache:*` | Rolling-cache timers (`rollingcache:timer:<name>`), kept out of `cache:` so a flush never reschedules a refresh |
 
 ---
@@ -217,7 +220,11 @@ Managed by BullMQ internally. Queue name is `jobs`:
 
 ## Cache Utilities
 
-Located in `packages/db/src/redis/cache.ts`.
+Located in `packages/db/src/redis/cache/`, one file per behaviour: `cache.ts`, `checkCache.ts`,
+`clearKey.ts`, `upsertCache.ts`, with `generation/` (clear cancels in-flight work), `queued/` (the
+rolling-cache queued marker), `queries/` (the Lua scripts, each a typed function over `RedisEval`),
+`telemetry/` and `rollingCache/`. The single-flight lock is a lock, so it lives in
+`packages/db/src/lock/singleFlight/`.
 
 ### cacheKey() Builder
 
@@ -243,6 +250,9 @@ cacheKey('user', 'abc-123', ['WithOrgs'])                // cache:user:id:abc-12
 cacheKey('session', { userId: 'abc-123' }, [], true)     // cache:session:userId:abc-123:*
 ```
 
+Identifier values are escaped (`*`, `?`, `[`, `]`, `\` and `%` become `%XX`), so data never reads
+as a pattern; only the wildcard flag makes one.
+
 ### cache() Get-or-Set
 
 ```typescript
@@ -256,10 +266,61 @@ const user = await cache(
 ```
 
 Behavior:
+- Under `db.withDeleted` the cache is neither read nor written: `fn` runs directly, so a
+  tombstone-inclusive result never lands under the shared live key
+  (the live value would also be missing the deleted rows the caller asked for). Rolling caches are
+  still read normally (`checkCache` and the rolling read never compute); only computing through
+  `cache()` is skipped
 - Returns cached value if exists (including `null`/`undefined`)
-- Computes via fn() on cache miss
+- Computes via fn() on cache miss; concurrent misses on one key compute once (single-flight)
 - **Negative caching**: `null`/`undefined` cached with 1 min TTL (prevents thundering herd, allows quick discovery of new records)
 - Real values cached with provided TTL (default 24 hours)
+- **Only the lock holder publishes.** A caller that does not hold the key's single-flight lock waits
+  up to 10 seconds for the holder's value, then computes its own and returns it unpublished. A
+  caller that cannot reach the lock or the generation (Redis failing) does the same. The publish
+  eval itself checks that the single-flight lock still holds the caller's token (`lock.holder`): a
+  pattern clear finds computes by their live locks, so one whose lock lapsed or was evicted before
+  the clear's lock scan reached it was never cancelled and must not publish.
+- **A clear cancels the publish.** The holder captures the key's generation before `fn` runs and
+  publishes only if it has not moved. A value read before a `clearKey` or an `upsertCache` is
+  returned to its caller but never lands in the cache.
+
+Telemetry: each call opens a `cache <accessor>` span labelled with its result, and reads count into
+`cache.read` by accessor and result (`hit`, `miss`, `error`); an `upsertCache` span records `written`,
+`kept` or `error`. A single-flight wait is timed into
+`cache.lock.wait`; a publish skipped because a clear ran counts into `cache.publish.skipped`. Every
+tag is the accessor, never the key, so cardinality stays bounded.
+### cache() inside a transaction
+
+Each outermost `db.txn` holds a cache overlay (`db.cacheOverlay()`), and `cache()` inside the
+transaction reads through it:
+
+- A value the transaction computed is returned from the overlay. Otherwise the shared cache is read,
+  and a miss computes `fn` on the transaction's client and keeps the value in the overlay with the
+  key's generation, read before `fn` runs. Each reader gets its own copy, as from Redis. Nothing reaches Redis before commit, so a rollback leaves
+  nothing behind.
+- The clear-cache hook marks the keys a write invalidates (`markCacheWritten`). A marked key skips the
+  shared cache and recomputes, so the transaction reads its own writes. A marked pattern marks every
+  key it matches.
+- Each key has a serialized queue: a compute and its store run on it, and a mark waits on it. Batch
+  sub-requests in one round share the transaction, so a sibling's compute that read before a write
+  lands before that write's mark, and the mark removes it.
+- There is no single-flight lock inside a transaction. A cache function only reads; one that writes
+  would mark its own key and wait on itself.
+
+When the transaction commits, before it releases its held locks and before its `db.onCommit` batches,
+each key it touched runs one Lua call:
+a marked key is cleared (value, write time, new generation), and a value it computed is published
+only if the key's generation is still the one read before the compute. Another clear in between, from
+any process, wins and leaves a miss. Marked patterns are cleared afterwards with `clearKey`, and keys under a marked pattern are left to that
+clear. A key the transaction neither wrote nor computed a publishable value for sends nothing. A
+failure is loud: `db.txn` throws it after its `db.onCommit` batches have run, so a cache failure never
+skips them. A write that committed then reports an error, so a caller that retries on error must be
+idempotent.
+
+`cache()` is for computes that take milliseconds to seconds and that a write hook clears. A compute
+that takes minutes does not belong in a request: it runs in a job and is read directly (a rolling
+cache), never computed in a request or its transaction.
 
 ### checkCache()
 
@@ -270,9 +331,10 @@ value (`cachewritten:<key>`, same TTL, same Lua eval), and an exact `clearKey` d
 import { checkCache } from '@template/db';
 
 const check = await checkCache<Stats>(key, { freshForSeconds: 600 });
-// { state: 'empty' }        nothing written, nobody computing
+// { state: 'empty' }        nothing written, nobody computing, nothing queued
+// { state: 'queued' }       nothing written yet, a refresh is enqueued and has not taken the lock
 // { state: 'computing' }    nothing written yet, the key's single-flight lock is held
-// { state: 'fresh' | 'stale', value, writtenAt, isComputing }
+// { state: 'fresh' | 'stale', value, writtenAt, isComputing, isQueued }
 ```
 
 `computedUnder` names a different single-flight lock to report `computing` from (a rolling cache
@@ -292,12 +354,25 @@ await clearKey('cache:User:id:123');
 
 // Wildcard pattern (uses SCAN, non-blocking)
 await clearKey('cache:User:*');
-await clearKey('cache:Session:userId:abc:*');
 ```
+
+A clear also cancels computes in flight. An exact clear deletes the value and its write time and moves
+the key's generation in one Lua call. A pattern clear first scans the single-flight locks under the
+pattern and clears each of those keys the same way, so only the computes it matches are cancelled,
+then scans and deletes the values. Either way a `cache()` compute that read before the clear skips
+its publish, and the next caller recomputes. To drop one value you know is bad (a token the vendor rejected), read it with `checkCache`
+and clear only if it is still that value: if a recompute is already running the key is empty, so the
+clear is skipped and the caller's next `cache()` waits on the running one. A failed exact clear logs and returns 0; a failed pattern clear throws, because the caller
+cannot tell which of its keys survived.
+
+A pattern clear walks the whole keyspace twice, once for the locks and once for the values, 100 keys
+per SCAN round trip: `SCAN ... MATCH` visits every key whatever the pattern, and lock keys
+(`lock:cache-singleflight:<key>`) share no prefix with values, so one pass would mean `MATCH *` with
+every key sent to the client. The locks in each scanned page are cancelled in parallel.
 
 ### Automatic Invalidation
 
-Cache keys defined in the cache reference map are auto-cleared on mutations via an after-commit db hook. See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
+Cache keys defined in the cache reference map are marked on mutations by a db hook in the transaction's cache overlay and cleared when it commits (see [cache() inside a transaction](#cache-inside-a-transaction)). See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
 
 #### Invalidation conventions
 
@@ -346,11 +421,11 @@ export const spaceStats = makeRollingCache({
 
 // api (apps/api/src/jobs/checkRollingCache.ts): name the result and pass its params; never build a key
 const check = await checkRollingCache(spaceStats, 'total', { id: organizationId });
-// → { state: 'empty' | 'computing' | 'fresh' | 'stale', value?, writtenAt?, isComputing?, channel? }
+// → { state: 'empty' | 'queued' | 'computing' | 'fresh' | 'stale', value?, writtenAt?, isComputing?, isQueued?, channel? }
 ```
 
-- **Define it inline**, in the module that owns the data (`packages/db/src/redis/makeRollingCache.ts`
-  is the primitive). It registers itself on import, like a factory.
+- **Define it inline**, in the module that owns the data
+  (`packages/db/src/redis/cache/rollingCache/makeRollingCache.ts` is the primitive). It registers itself on import, like a factory.
 - **Register the module** in `apps/api/src/lib/rollingCaches.ts` (import-only). The worker imports
   that barrel and its coordinator refreshes every registered cache; the `rolling-cache-registered`
   CI rule fails a definition missing from it.
@@ -374,14 +449,23 @@ const check = await checkRollingCache(spaceStats, 'total', { id: organizationId 
   long an entry lives; registration throws unless it is longer than interval + spread + every
   attempt × timeout + one tick.
 - **A read never computes.** `read(result, params)` is `checkCache` on that result's key: `empty`,
-  `computing` (the target's lock is held), `fresh`, or `stale` (older than one scheduled refresh,
-  with `isComputing` beside it). `checkRollingCache` (`apps/api/src/jobs/checkRollingCache.ts`) is the
-  api read: on `empty`, or `stale` with nothing computing, it enqueues the target's leaf and reads
-  again, and it returns the cache's `channel` so a client knows where to wait.
+  `queued` (a refresh is enqueued), `computing` (the target's lock is held), `fresh`, or `stale`
+  (older than one scheduled refresh, with `isComputing` and `isQueued` beside it).
+  `checkRollingCache` (`apps/api/src/jobs/checkRollingCache.ts`) is the api read: on `empty`, or
+  `stale` with nothing computing or queued, it sets the target's queued marker and, only if it set
+  it, enqueues the target's leaf, so N cold readers send one job. A failed enqueue clears the marker.
+  It reads again and returns the cache's `channel` so a client knows where to wait.
 - **`refresh(target)`** waits up to `timeoutSeconds` for the target's lock (else returns false), runs
   `compute` once, and holds the lock until the last write lands. `write` is `upsertCache` with
   `force` and the cache's TTL; a write after `signal` aborted is dropped, and a failed write throws so
-  the leaf retries. `compute` gets the signal: check it between batches.
+  the leaf retries. `compute` gets the signal: check it between batches. An abort releases the lock
+  at once, and a refresh whose signal aborted while it waited for the lock releases it without
+  computing, so the refresh that superseded it does not wait on a compute whose writes are dropped. A
+  refresh that wrote clears the target's queued marker; an aborted one leaves it for its retry, and a
+  leaf that fails its last attempt clears it so the next reader can queue again.
+- **Warm on boot.** The worker enqueues every registered cache's branch when it starts
+  (`apps/api/src/jobs/warmRollingCaches.ts`), so a deploy that changed result keys is not cold until
+  the next interval.
 - **A written value is never null or undefined**: `cache()` keeps null for only a minute and reads
   undefined as a miss. Write an empty value of the shape instead.
 - `getRollingCache(name)` throws for a name nothing registered; tests that define their own cache

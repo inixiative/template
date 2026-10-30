@@ -342,14 +342,17 @@ export const cacheReference: CacheReference = {
 };
 ```
 
-On mutation, all matching cache keys are deleted.
+On mutation, the hook marks the matching keys in the transaction's cache overlay, and they are cleared when the transaction commits ([REDIS.md - cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)).
 
 ### Wildcard Keys
 
 ```typescript
-// Delete all sessions for a user
-cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
+cacheKey('user', userId, [], true)  // → cache:user:id:abc:*
 ```
+
+A wildcard clear cancels the `cache()` computes in flight under its pattern (found by their
+single-flight locks), then scans and deletes. Prefer exact keys in the reference map: an exact clear
+is one Lua call, a wildcard clear is two scans.
 
 ---
 

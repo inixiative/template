@@ -13,6 +13,7 @@
 import { createClaim } from '@template/db/lock/createClaim';
 import { lockKeyOf } from '@template/db/lock/lockKeyOf';
 import { LockLostError } from '@template/db/lock/lockLostError';
+import { TOLERATED_REFRESH_FAILURES } from '@template/db/lock/maxSafeHeartbeatMs';
 import { fencedDelete } from '@template/db/lock/queries/fencedDelete';
 import { fencedRefresh } from '@template/db/lock/queries/fencedRefresh';
 import type {
@@ -20,7 +21,6 @@ import type {
   Claim,
   ClaimOptions,
   Lock,
-  LockLostReason,
   LockOptions,
   LockRedis,
   LockReleaseResult,
@@ -42,28 +42,25 @@ export function createLock(opts: LockOptions | ClaimOptions): Lock | Claim {
 }
 
 const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): Lock => {
-  const { ttlMs = 30_000, heartbeatMs = 10_000, maxMissed = 1, onLockLost } = opts;
+  const { ttlMs = 30_000, heartbeatMs = 10_000, onLockLost } = opts;
 
-  if (maxMissed < 1) {
-    throw new Error(`createLock: maxMissed must be >= 1, got ${maxMissed}`);
-  }
   if (heartbeatMs <= 0) {
     throw new Error(`createLock: heartbeatMs must be > 0, got ${heartbeatMs}`);
   }
-  if ((maxMissed + 1) * heartbeatMs >= ttlMs) {
+  if ((TOLERATED_REFRESH_FAILURES + 1) * heartbeatMs >= ttlMs) {
     throw new Error(
-      `createLock: unsafe config — (maxMissed + 1) * heartbeatMs (${(maxMissed + 1) * heartbeatMs}ms) must be < ttlMs (${ttlMs}ms)`,
+      `createLock: unsafe config — heartbeatMs ${heartbeatMs}ms must leave room for one failed refresh before ttlMs ${ttlMs}ms`,
     );
   }
 
   const processId = crypto.randomUUID();
   let stop: (() => void) | null = null;
-  let missed = 0;
   let hasDeclaredLoss = false;
   let hasReleased = false;
   let hasAcquired = false;
   let hasLostLease = false;
   let leaseValidUntil = 0;
+  let releasePromise: Promise<LockReleaseResult> | null = null;
 
   const stopHeartbeat = () => {
     stop?.();
@@ -74,8 +71,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   // freed if the delete still reaches Redis, otherwise at its TTL — say so, don't stay silent.
   const compareAndDelete = async (): Promise<LockReleaseResult> => {
     try {
-      const result = await fencedDelete(redis, key, processId);
-      return result === 1 ? 'released' : 'notHeld';
+      return (await fencedDelete(redis, key, processId)) ? 'released' : 'notHeld';
     } catch (err) {
       log.error(
         `Lock fenced delete unconfirmed; the key is freed if the delete still reaches Redis, otherwise at its TTL: ${key}`,
@@ -85,17 +81,14 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     }
   };
 
-  // Never deletes: a spent missed-beat budget means ownership is uncertain, not gone, and deleting
-  // here could give up a lease we still hold while the caller's critical section is running.
-  // The callback is not awaited — after refresh_errors the declaring beat must return at once so
-  // the next refresh is scheduled; a slow callback could let a lease that survived lapse.
-  const declareLost = (reason: LockLostReason): void => {
+  // Only a token mismatch is a loss; a Redis error is uncertainty, and the heartbeat keeps refreshing.
+  const declareLost = (): void => {
     if (hasDeclaredLoss || hasReleased) return;
     hasDeclaredLoss = true;
-    log.warn(`Lock lost: ${key}`, { reason });
+    log.warn(`Lock lost: ${key}`);
     if (!onLockLost) return;
     try {
-      void Promise.resolve(onLockLost(reason)).catch((err) =>
+      void Promise.resolve(onLockLost()).catch((err) =>
         log.error(`Lock onLockLost callback failed: ${key}`, err),
       );
     } catch (err) {
@@ -103,33 +96,34 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     }
   };
 
-  // Only a thrown refresh spends the missed-beat budget, and exhausting it keeps refreshing — a
-  // lease that survived a Redis blip is held until release. A `0` is a definitive token mismatch:
-  // loss at once, and the heartbeat stops because there is nothing left to refresh.
   const tick = async () => {
-    let renewed: unknown;
+    let renewed: boolean;
     const sentAt = performance.now();
     try {
       renewed = await fencedRefresh(redis, key, processId, ttlMs);
     } catch (err) {
-      missed += 1;
-      log.warn(`Lock refresh failed: ${key}`, { missed }, err);
-      if (missed > maxMissed) declareLost('refresh_errors');
+      log.warn(`Lock refresh failed: ${key}`, err);
       return;
     }
-    if (renewed === 1) {
-      missed = 0;
+    if (renewed) {
       leaseValidUntil = sentAt + ttlMs;
       return;
     }
     stopHeartbeat();
-    declareLost('token_mismatch');
+    declareLost();
   };
 
   const tryAcquire = async (): Promise<boolean> => {
+    if (hasReleased) {
+      throw new Error('createLock: this lock was released; create a new lock to acquire again');
+    }
     const sentAt = performance.now();
     const result = await redis.set(key, processId, 'PX', ttlMs, 'NX');
     if (result !== 'OK') return false;
+    if (hasReleased) {
+      await compareAndDelete();
+      return false;
+    }
     hasAcquired = true;
     leaseValidUntil = sentAt + ttlMs;
     stop = heartbeat(tick, heartbeatMs, {
@@ -178,13 +172,13 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     if (!isWithinLease()) throw new LockLostError(key);
   };
 
-  // Always attempts the fenced delete, once, after the critical section — the only place the
-  // key is ever deleted.
-  const release = async (): Promise<LockReleaseResult> => {
+  const release = (): Promise<LockReleaseResult> => {
+    if (releasePromise) return releasePromise;
     hasReleased = true;
     stopHeartbeat();
-    return compareAndDelete();
+    releasePromise = compareAndDelete();
+    return releasePromise;
   };
 
-  return { acquire, verify, release, isWithinLease, assertHeld };
+  return { holder: processId, acquire, verify, release, isWithinLease, assertHeld };
 };

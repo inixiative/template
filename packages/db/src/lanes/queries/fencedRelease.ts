@@ -22,10 +22,12 @@ end
 return 0
 `;
 
-export const fencedRelease = (
+export const fencedRelease = async (
   redis: RedisEval,
   lane: string,
   jobId: string,
   previousHolder: string,
   supersededPrefix: string,
-): Promise<unknown> => redis.eval(FENCED_RELEASE, 1, lane, jobId, previousHolder, supersededPrefix);
+): Promise<void> => {
+  await redis.eval(FENCED_RELEASE, 1, lane, jobId, previousHolder, supersededPrefix);
+};

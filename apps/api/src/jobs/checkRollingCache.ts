@@ -33,13 +33,21 @@ export const checkRollingCache = async <
   const target = rollingCache.targetOf(params);
   const channel = rollingCache.channel?.(target);
   const check = await rollingCache.read(result, params);
-  const isQueued = check.state === 'empty' || (check.state === 'stale' && !check.isComputing);
-  if (!isQueued) return { ...check, channel };
+  const needsRefresh =
+    check.state === 'empty' || (check.state === 'stale' && !check.isComputing && !check.isQueued);
+  if (!needsRefresh) return { ...check, channel };
 
-  await enqueueJob('refreshRollingCacheTarget', {
-    name: rollingCache.name,
-    key: rollingCache.targetKey(target),
-    target,
-  });
+  if (await rollingCache.markQueued(target)) {
+    try {
+      await enqueueJob('refreshRollingCacheTarget', {
+        name: rollingCache.name,
+        key: rollingCache.targetKey(target),
+        target,
+      });
+    } catch (error) {
+      await rollingCache.clearQueued(target);
+      throw error;
+    }
+  }
   return { ...(await rollingCache.read(result, params)), channel };
 };

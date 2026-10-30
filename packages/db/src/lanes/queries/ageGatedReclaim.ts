@@ -26,15 +26,15 @@ end
 return 1
 `;
 
-export const ageGatedReclaim = (
+export const ageGatedReclaim = async (
   redis: RedisEval,
   lane: string,
   jobId: string,
   laneTtlSec: number,
   supersededPrefix: string,
   supersededTtlSec: number,
-): Promise<unknown> =>
-  redis.eval(
+): Promise<void> => {
+  await redis.eval(
     AGE_GATED_RECLAIM,
     1,
     lane,
@@ -43,3 +43,4 @@ export const ageGatedReclaim = (
     supersededPrefix,
     String(supersededTtlSec),
   );
+};
