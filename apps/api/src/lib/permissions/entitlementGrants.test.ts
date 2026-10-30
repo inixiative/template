@@ -187,7 +187,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       expect((await grantTokens()).status).toBe(403);
     });
 
-    it("an admin grants minting the organization's member tokens: the where pins the role and the organization's own (R81)", async () => {
+    it('minting is a person-only action: no one grants it, whatever the where pins (R94)', async () => {
       expect(
         (await grantTokens({ field: 'role', operator: 'equals', value: 'member' })).status,
       ).toBe(403);
@@ -200,7 +200,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
             ],
           })
         ).status,
-      ).toBe(200);
+      ).toBe(403);
     });
 
     it('a where that can hold on a missing value is malformed: write it positively', async () => {

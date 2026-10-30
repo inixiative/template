@@ -15,14 +15,12 @@ import {
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
+import { wellFormedEntitlements } from '@template/permissions/roles/wellFormedEntitlements';
 
 export type Grant = { entries: PermissionEntry[]; owner?: Grant[] };
 
 type OrganizationMember = { role: Role; organizationId: string; entitlements?: unknown };
 type SpaceMember = { role: Role; spaceId: string; entitlements?: unknown };
-
-const entitlementsOf = (member: { entitlements?: unknown }): EntitlementEntry[] =>
-  (member.entitlements ?? []) as EntitlementEntry[];
 
 export const organizationOwnerGrants = (organizationId: string): Grant[] => [
   { entries: [getOrgPermissions('owner', organizationId as OrganizationId)] },
@@ -50,10 +48,13 @@ export const userGrants = (
     ],
   },
   ...members.flatMap((member) =>
-    ownedBy(entitlementsOf(member), organizationOwnerGrants(member.organizationId)),
+    ownedBy(
+      wellFormedEntitlements(member.entitlements),
+      organizationOwnerGrants(member.organizationId),
+    ),
   ),
   ...spaceMembers.flatMap((member) =>
-    ownedBy(entitlementsOf(member), spaceOwnerGrants(member.spaceId)),
+    ownedBy(wellFormedEntitlements(member.entitlements), spaceOwnerGrants(member.spaceId)),
   ),
 ];
 

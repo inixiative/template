@@ -81,9 +81,11 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
     expect(await holds(key, 'organization', organization.id, 'own')).toBe(false);
   });
 
-  it("a token's role is capped by its member, the member's entitlements included", async () => {
-    const key = await userToken(await member('viewer', { operate: true }), 'owner');
-    expect(await holds(key, 'organization', organization.id, 'operate')).toBe(true);
+  it("a token's role is capped by its member's role; the member's entitlements stay with the member (R110)", async () => {
+    const entitledViewer = await member('viewer', { operate: true });
+    const key = await userToken(entitledViewer, 'owner');
+    expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
+    expect(await holds(key, 'organization', organization.id, 'operate')).toBe(false);
     expect(await holds(key, 'organization', organization.id, 'manage')).toBe(false);
   });
 

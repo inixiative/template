@@ -44,7 +44,7 @@ Permissions questions tangle because one sentence mixes several parties and seve
 |---|---|---|---|
 | 1. Access to X | who can see or reach X | `read` on it | listing tokens |
 | 2. Actions on X itself | who administers X | `own` / `manage`: its user, or your role at its org/space | revoke, rename |
-| 3. X's access to other things | what X can reach, as a narrowing of its owner | its role / entitlements / full, set at or below its owner | its role / entitlements / full, checked against the minter |
+| 3. X's access to other things | what X can reach: its owner, capped at its role | its role / entitlements / full, set at or below its owner | its role / entitlements / full, checked against the minter |
 | 4. Acting with X, on its behalf | what X does as an actor | execution — out of scope (Signet) | requests made with the token (`__actor.model == Token`) |
 
 **Step 3 — never let one bucket answer another.** A bucket-2 fact ("M manages their integration") must not satisfy a bucket-3 check ("M may give a token admin access") — that merge produced a real bug. A bucket-4 fact (the actor is a token) is a condition on the actor, not on the thing.
@@ -67,8 +67,8 @@ Shared pieces already in `schema.ts` — reuse, don't re-derive:
 - `actionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
 - `roleHeldAtOwner`: the role on the row is one the actor holds at the direct owner (owner→own, admin→manage, member→operate, viewer→read via `roleToStandardAction`);
 - `memberRoleWrite(tenant)` / `integrationRoleWrite`: manage the row's tenant (the integration itself) and hold there the role being set; `memberRemoval(tenant)` = `leave` or `memberRoleWrite`. Rules routes and controllers check, never named actions;
-- `actorIsItsUser(at)`: `${at}userId` is set and is the acting user (or a User-owned token of that user), narrowed by `manage` on that user;
-- `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `actorIsItsUser(at)`;
+- `managesItsUser(at)`: `{ rel: `${at}user`, action: 'manage' }` — the user, or a delegate of the user at manage or above;
+- `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `managesItsUser(at)`;
 - `ownedBy(owners, at)` and `actionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
 
 Other parts of the system (use them, don't parallel them):
@@ -89,7 +89,7 @@ An action on something that does not exist yet, or on a collection, is checked o
   The rule for creating a token lives on `db:token`, never on its owner (`token.create` on organization/space/user was the bug behind a bypass: stored actions on a member's organization entry satisfied it).
 - **Collections are pseudo records too** (user, 10-26): `validateSubmodelPermission(action)` checks the action on a pseudo record of the route's submodel under the loaded owner (from the polymorphism registry); it never reads the body. Lists that are really "which of these can I see" (spaces of an organization, member-shaped lists, customers, segment memberships, inquiries) stay a model check on the real owner until AUTH-008.
 - **Role writes** (members, integrations) need the body, so they run in the controller: `memberRoleWrite` / `integrationRoleWrite` on the row as it is and on the row as it will be.
-- **Grants:** the library's `placeEntitlement` builds one pseudo record per kind the entry reaches, from the hydrated anchor down the path (each step's known foreign keys, each owner placed under the anchor), and `canGrantEntitlement` checks each action on every one. A polymorphic step reaches every kind that carries its keys (`organization` on an integration = the org's, its spaces', its members'); the `where`'s root leaves (the `where`, or each leaf of its top `all`) on the kind field narrow the first step's kinds, each checked with json-rules; the path already fixes the keys, so leaves on them narrow nothing.
+- **Grants:** the library's `placeEntitlement` builds one pseudo record per kind the entry reaches, from the hydrated anchor down the path (each step's known foreign keys, each owner placed under the anchor), and `canGrantEntitlement` checks each action on every one. A polymorphic step reaches every kind that carries its keys (`organization` on an integration = the org's, its spaces', its members'); the `where`'s root leaves (the `where`, or each leaf of its top `all`) on the kind field narrow the first step's kinds, each checked with json-rules; the path already fixes the keys, so leaves on them narrow nothing. `canGrantEntitlement` is two passes: the writer's role table alone (no entitlements, no actor — person-only actions are never grantable), else one held entitlement passed on whole (same resource and anchor, actions held or lowered by pure delegation, `where` copied or narrowed, its granter still backing it). Held entitlements never combine.
 
 ## 4. Rules from this branch (what went wrong and the syntax answer)
 
