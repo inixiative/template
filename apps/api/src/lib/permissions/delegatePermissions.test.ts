@@ -338,7 +338,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
     });
   });
 
-  it('a member token does not inherit its member entitlements unless it is full; a full token on a member row takes own, a full user token is the user', async () => {
+  it('a member token inherits its member entitlements capped at its role; a full token on a member row takes own, a full user token is the user', async () => {
     const { entity: user } = await createUser();
     const { entity: organizationUser } = await createOrganizationUser(
       {
@@ -356,6 +356,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       },
     );
     expect(plain.status).toBe(201);
+    expect(await holds(plain.key!, 'organization', organization.id, 'operate')).toBe(true);
     expect(await holds(plain.key!, 'organization', organization.id, 'manage')).toBe(false);
     const onRow = await mint(
       user,
