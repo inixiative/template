@@ -271,7 +271,7 @@ An integration has a nullable `role`, `full` and `entitlements`, capped live by 
 
 ### Granting an Entitlement
 
-A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` runs the writer's ordinary check on every one, with fields the record does not carry read as unknown. There is no other path to granting: no "owner of the tenant" shortcut.
+A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes. The role pass: the writer's table alone (no entitlements, no actor) takes each action, with fields the record does not carry read as unknown; a rule on `__actor` never passes, so a person-only action (minting a token, redacting, rotating JWTs) is never grantable. Failing that, the entitlement pass: the entry is one entitlement the writer holds, passed on whole — same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed, and its granter still backing each action. Held entitlements never combine: to pass on two, grant two. There is no other path to granting: no "owner of the tenant" shortcut.
 
 Each pseudo record is built from the anchor down the path: the foreign keys the parent knows, one record per kind the step admits, each with its owner placed under the anchor, ids below the anchor unknown, plus the `where`'s exact `equals` values. The `where`'s root leaves (the `where` itself, or each leaf of its top `all`; nothing nested) on the kind field are checked on each kind the first step admits, and a kind a leaf fails is dropped: `ownerModel in [Organization, Space]` keeps those two kinds. The path gives the keys, so a leaf on any other field (a key, the placed owner, a dotted field) narrows nothing. So, for an owner and an admin of O:
 
@@ -279,7 +279,7 @@ Each pseudo record is built from the anchor down the path: the foreign keys the 
 - the same with `where ownerModel = Organization`: the organization's own integrations. An admin grants it (managing those is `manage` on O).
 - the same with `where ownerModel in [Organization, OrganizationUser]`: the organization's own and its members' integrations. Only the owner grants it (admins hold nothing on members' integrations).
 - `{ integration, anchor O via space.organization, manage }`: the integrations of O's spaces and space members. Only the owner grants it.
-- `{ token, anchor O via organization, create, where role = member, ownerModel = Organization }`: an admin grants minting O's own member tokens; with no role pinned the role is unknown and the grant is refused.
+- `{ token, anchor O via organization, create, … }`: refused for everyone. Minting is person-only, and the grant check has no actor.
 - A path that does not end at the anchor's model, through a list, or with no path on another model: 422.
 
 A token's role is checked by `create` on `db:token`; an integration's role by `integrationRoleWrite` on `db:integration` (`validateIntegrationGrant`). Situations: `entitlementGrants.test.ts`, `integrationDelegate.test.ts`, `memberTokenGrants.test.ts`, `packages/permissions/src/rebac/schemaMap.test.ts`.
@@ -337,7 +337,7 @@ write a custom middleware that returns 404 when the permission check fails.
 
 ## Entitlements
 
-Grants beyond a role, stored as library entries `{ resource, anchor: { resource, id, path? }, where?, actions }` (`entitlementEntriesSchema`). Delegates (tokens, integrations) install theirs with their owner's table as owner ([Delegates and Their Owners](#delegates-and-their-owners)). Member rows (`OrganizationUser`, `SpaceUser`) install theirs with their tenant as owner: the organization's or the space's owner table. A flat action map is refused (422). An entry that reached the database past that check is dropped when the holder signs in (`storedEntitlements`, by the library's `entitlementProblem`); the rest of its entries and its role still install. A token or integration with no role that is not `full` stands on its entitlements alone, so one malformed entry signs it out (401).
+Grants beyond a role, stored as library entries `{ resource, anchor: { resource, id, path? }, where?, actions }` (`entitlementEntriesSchema`). Delegates (tokens, integrations) install theirs with their owner's table as owner ([Delegates and Their Owners](#delegates-and-their-owners)). Member rows (`OrganizationUser`, `SpaceUser`) install theirs with their tenant as owner: the organization's or the space's owner table. A flat action map is refused (422). Stored entries are pruned to the well-formed ones wherever they are read (`wellFormedEntitlements`, by the library's `entitlementProblem`): installing a holder, and the stored list an entitlement change starts from, so a write drops what is broken. A token that is not `full`, has no role, and has nothing left after pruning is signed out (401), by the same row rule that refuses it on write (`tokenHoldsSomething`, 422).
 
 ### How Entitlements Are Applied
 
@@ -613,7 +613,7 @@ const pseudo = await hydrate(submodel, { id: '', ...placed });
 check(permix, rebacSchema, submodel, pseudo, action);
 ```
 
-- `placeUnder(schemaMap, child, ownerRelation, owner, row, pins)` (the library's, re-exported from `@template/permissions/rebac`) builds the pseudo record along the owner's relation: the owner keys (composite ones too), the owner attached, the kind pinned to the owner's model; `id: ''`. An empty id never matches a grant keyed by a real row.
+- `placeUnder(schemaMap, child, ownerRelation, owner, row, where)` (the library's, re-exported from `@template/permissions/rebac`) builds the pseudo record along the owner's relation: the owner keys (composite ones too), the owner attached, the kind narrowed by `where` (`ownerModel equals` the owner's model); `id: ''`. An empty id never matches a grant keyed by a real row.
 - The route templates set `routeConfig` (with `model` / `submodel`) before route middleware runs, so the middleware reads the submodel there; the owner is `c.get('resource')` (`meResourceMiddleware` loads the user on `/me`).
 - It never reads the request body (route middleware runs before validation). Checks that depend on the body (a token's role / full, an integration's role via `integrationRoleWrite`, an inquiry's `send`) stay in their services.
 - Using it on a route with no submodel throws on each request to that route, not when the route is built (`validateSubmodelPermission.test.ts`).
@@ -667,7 +667,7 @@ Removing a member checks `memberRemoval(tenant)` (`leave`, or `memberRoleWrite` 
 
 ### Token Creation
 
-Every create-token route calls `createToken`, which checks `create` on a pseudo record of the token: the actor is a user (`actorIsUser`), holds the role at the token's direct owner (for an integration-owned token, at the integration's owner — its access, never its administering), and the owner is theirs (`userId == __actor.record.id`) or an organization or space they are on. Setting `full` takes `own` on the token's direct owner (`validateFullGrant`). Named entitlements go through `validateEntitlementGrants`. The row rules in `RulesRegistry` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`) cover only `full` (no role or entitlements beside it; the owners it may sit on) and that a token which is not `full` has a role or entitlements.
+Every create-token route calls `createToken`, which checks `create` on a pseudo record of the token: the actor is a user (`actorIsUser`), holds the role at the token's direct owner (for an integration-owned token, at the integration's owner — its access, never its administering), and the owner is theirs (they manage its user: `{ rel: 'user', action: 'manage' }`) or an organization or space they are on. Setting `full` takes `own` on the token's direct owner (`validateFullGrant`). Named entitlements go through `validateEntitlementGrants`. The row rules in `RulesRegistry` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`) cover only `full` (no role or entitlements beside it; the owners it may sit on) and that a token which is not `full` has a role or entitlements.
 
 ### Token Update
 

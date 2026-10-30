@@ -25,6 +25,15 @@ const fullOnlyOn = (owners: string[]): Condition =>
     `full only on a delegate of ${owners.join(', ')}`,
   );
 
+export const tokenHoldsSomething: Condition = {
+  any: [
+    { field: 'full', operator: Operator.equals, value: true },
+    { field: 'role', operator: Operator.notEmpty, value: true },
+    { field: 'entitlements', operator: Operator.notEmpty, value: true },
+  ],
+  error: 'a token that is not full has a role, entitlements or both',
+};
+
 export const delegatePermissionRules = {
   Integration: {
     all: [...fullTakesNothingElse, fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser'])],
@@ -33,14 +42,7 @@ export const delegatePermissionRules = {
     all: [
       ...fullTakesNothingElse,
       fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser', 'Integration']),
-      {
-        any: [
-          { field: 'full', operator: Operator.equals, value: true },
-          { field: 'role', operator: Operator.notEmpty, value: true },
-          { field: 'entitlements', operator: Operator.notEmpty, value: true },
-        ],
-        error: 'a token that is not full has a role, entitlements or both',
-      },
+      tokenHoldsSomething,
     ],
   },
 } satisfies Record<string, Condition>;

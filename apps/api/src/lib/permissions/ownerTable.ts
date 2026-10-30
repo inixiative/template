@@ -17,8 +17,8 @@ import {
   type Grant,
   organizationOwnerGrants,
   spaceOwnerGrants,
-  storedEntitlements,
   userGrants,
+  wellFormedEntitlements,
 } from '@template/permissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
@@ -39,7 +39,7 @@ type Delegated = {
 export const delegatePermissionsOf = (row: PermissionsRow): DelegatePermissions => ({
   role: row.role ?? null,
   full: row.full ?? false,
-  entitlements: row.entitlements == null ? null : storedEntitlements(row.entitlements),
+  entitlements: wellFormedEntitlements(row.entitlements),
 });
 
 const nobody: OwnerTable = [];

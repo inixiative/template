@@ -24,7 +24,6 @@ export { getOrgPermissions } from './roles/organization';
 // Shared role utilities
 export { isSuperadmin } from './roles/shared';
 export { getSpacePermissions } from './roles/space';
-export { standsOnMalformedEntitlements, storedEntitlements } from './roles/storedEntitlements';
 export {
   type Grant,
   grantsPermix,
@@ -33,4 +32,5 @@ export {
   spaceOwnerGrants,
   userGrants,
 } from './roles/userGrants';
+export { wellFormedEntitlements } from './roles/wellFormedEntitlements';
 export type { PermissionsCheck } from './types';

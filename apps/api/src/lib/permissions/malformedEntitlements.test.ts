@@ -8,9 +8,13 @@ import {
   createOrganizationUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
+import { integrationRouter } from '#/modules/integration';
+import { organizationRouter } from '#/modules/organization';
+import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { patch, post } from '#tests/utils/request';
 
 const { call, holds } = createTokenProbeApp();
 
@@ -73,7 +77,7 @@ const actorModel = async (key: string) =>
     }
   ).actor?.model ?? null;
 
-describe('a malformed stored entitlement is dropped at sign-in, the rest kept (R91)', () => {
+describe('a malformed stored entitlement is pruned at sign-in, the rest kept (R91, R94)', () => {
   it('a member keeps its role and its other entitlements; the broken one is gone', async () => {
     const key = await memberKey([manageItsIntegrations(), broken()]);
     expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
@@ -86,12 +90,63 @@ describe('a malformed stored entitlement is dropped at sign-in, the rest kept (R
     expect(await holds(key, 'integration', integration.id, 'manage')).toBe(true);
   });
 
-  it('a token with no role stands on its entitlements: a broken one signs it out', async () => {
-    const intact = await tokenKey(null, [readOrganization()]);
-    expect(await actorModel(intact)).toBe('Token');
-    expect(await holds(intact, 'organization', organization.id, 'read')).toBe(true);
-    const withBroken = await tokenKey(null, [readOrganization(), broken()]);
-    expect(await actorModel(withBroken)).toBeNull();
-    expect(await holds(withBroken, 'organization', organization.id, 'read')).toBe(false);
+  it('a token with no role keeps its well-formed entitlements; the broken one is gone', async () => {
+    const key = await tokenKey(null, [readOrganization(), broken()]);
+    expect(await actorModel(key)).toBe('Token');
+    expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
+  });
+
+  it('a token with no role, not full, and nothing left after pruning is signed out (R94)', async () => {
+    expect(await actorModel(await tokenKey(null, [broken()]))).toBeNull();
+    expect(
+      await actorModel(await tokenKey(null, { 'db:organization': { read: true } } as never)),
+    ).toBeNull();
+  });
+});
+
+describe('the API refuses a malformed entitlement; a write prunes the broken ones stored (R94)', () => {
+  const asOwner = async () => {
+    const { entity: seat, context } = await createOrganizationUser(
+      { role: 'owner' },
+      { organization },
+    );
+    return createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [seat],
+      mount: [
+        (hono) => {
+          hono.route('/api/v1/organization', organizationRouter);
+          hono.route('/api/v1/integration', integrationRouter);
+        },
+      ],
+    }).fetch;
+  };
+
+  it('creating an integration with a malformed entitlement is a 422, and nothing is stored', async () => {
+    const response = await (await asOwner())(
+      post(`/api/v1/organization/${organization.id}/integrations`, {
+        name: `i-${crypto.randomUUID()}`,
+        provider: 'slack',
+        role: 'viewer',
+        entitlements: [broken()],
+      }),
+    );
+    expect(response.status).toBe(422);
+  });
+
+  it('adding to an integration that stores a broken entry writes the good ones only', async () => {
+    const { entity: stored } = await createIntegration({
+      organizationId: organization.id,
+      ownerModel: 'Organization',
+      role: 'viewer',
+      entitlements: [broken()],
+    });
+    const response = await (await asOwner())(
+      patch(`/api/v1/integration/${stored.id}/entitlements`, { add: [readOrganization()] }),
+    );
+    expect(response.status).toBe(200);
+    expect(
+      (await db.integration.findUniqueOrThrow({ where: { id: stored.id } })).entitlements,
+    ).toEqual([readOrganization()]);
   });
 });

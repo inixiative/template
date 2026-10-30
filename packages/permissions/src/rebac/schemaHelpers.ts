@@ -63,36 +63,7 @@ export const actionOnOwner = (
     })),
 });
 
-export const actorIsItsUser = (at = ''): ActionRule => ({
-  all: [
-    { rule: { field: `${at}userId`, operator: Operator.notEmpty } },
-    {
-      any: [
-        {
-          all: [
-            actorIsUser,
-            {
-              rule: { field: `${at}userId`, operator: Operator.equals, path: '__actor.record.id' },
-            },
-          ],
-        },
-        {
-          all: [
-            actorIsDelegateOfUser,
-            {
-              rule: {
-                field: `${at}userId`,
-                operator: Operator.equals,
-                path: '__actor.record.userId',
-              },
-            },
-          ],
-        },
-      ],
-    },
-    { rel: `${at}user`, action: 'manage' },
-  ],
-});
+export const managesItsUser = (at = ''): ActionRule => ({ rel: `${at}user`, action: 'manage' });
 
 const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   any: [
@@ -118,7 +89,7 @@ export const memberRemoval = (tenant: 'organization' | 'space'): ActionRule => (
 });
 
 export const ownedByYouOrOrganizationOrSpace = (at = ''): ActionRule => ({
-  any: [ownedBy(organizationOrSpace, at), actorIsItsUser(at)],
+  any: [ownedBy(organizationOrSpace, at), managesItsUser(at)],
 });
 
 export const createdByItsUserOrManager: ActionRule = {
@@ -128,21 +99,21 @@ export const createdByItsUserOrManager: ActionRule = {
 const notMembers: OwnerModel[] = ['User', 'Organization', 'Space'];
 
 const membersIntegration: ActionRule = {
-  any: [{ all: [ownedBy(members), actorIsItsUser()] }, actionOnOwner('own', '', members)],
+  any: [{ all: [ownedBy(members), managesItsUser()] }, actionOnOwner('own', '', members)],
 };
 
 export const integrationAdministering = {
   create: {
     any: [
       createdByItsUserOrManager,
-      { all: [ownedBy(members), actorIsItsUser(), actionOnOwner('manage', '', members)] },
+      { all: [ownedBy(members), managesItsUser(), actionOnOwner('manage', '', members)] },
     ],
   },
   own: {
-    any: [actorIsItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
+    any: [managesItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
   },
   manage: {
-    any: [actorIsItsUser(), actionOnOwner('manage', '', organizationOrSpace), membersIntegration],
+    any: [managesItsUser(), actionOnOwner('manage', '', organizationOrSpace), membersIntegration],
   },
   delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
 } satisfies Record<string, ActionRule>;
