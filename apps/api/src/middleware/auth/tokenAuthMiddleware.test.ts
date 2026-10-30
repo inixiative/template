@@ -302,6 +302,7 @@ describe('every token type is refused once its owner is gone', () => {
     const { entity: integration } = await createIntegration({
       ownerModel: 'User',
       userId: user.id,
+      role: 'viewer',
     });
     const headers = await ownerBearer({ ownerModel: 'Integration' }, { integration });
     expect(await authenticatedTokenId(headers)).not.toBeNull();
@@ -418,6 +419,7 @@ describe('a token is refused once anything its owner stands on is gone, cached o
       const { entity: integration } = await createIntegration({
         ownerModel: 'User',
         userId: user.id,
+        role: 'viewer',
       });
       const { rawKey } = await createKeyedToken(
         { ownerModel: 'Integration', role: 'owner' },

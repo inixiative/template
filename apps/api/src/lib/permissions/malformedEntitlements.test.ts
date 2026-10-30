@@ -104,6 +104,22 @@ describe('a malformed stored entitlement is pruned at sign-in, the rest kept (R9
   });
 });
 
+describe('a token is the narrowing of its chain: a chain that holds nothing signs it out (R108)', () => {
+  it('a token on an integration left with nothing after pruning has no actor', async () => {
+    const { entity: empty } = await createIntegration({
+      organizationId: organization.id,
+      ownerModel: 'Organization',
+      role: null,
+      entitlements: [broken()],
+    });
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'Integration', role: 'viewer' },
+      { integration: empty },
+    );
+    expect(await actorModel(rawKey)).toBeNull();
+  });
+});
+
 describe('the API refuses a malformed entitlement; a write prunes the broken ones stored (R94)', () => {
   const asOwner = async () => {
     const { entity: seat, context } = await createOrganizationUser(

@@ -17,7 +17,7 @@ import {
 } from '@template/db';
 import type { Token, TokenOwnerModel } from '@template/db/generated/client/client';
 import { wellFormedEntitlements } from '@template/permissions';
-import { tokenHoldsSomething } from '#/hooks/rules/delegatePermissionRules';
+import { delegateHoldsSomething } from '#/hooks/rules/delegatePermissionRules';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
@@ -36,6 +36,12 @@ const ownerIsPresent = (token: HydratedRecord & Token): boolean => {
   return Boolean(owner) && (memberParts[token.ownerModel] ?? []).every((part) => owner?.[part]);
 };
 
+const holdsSomething = (delegate: unknown): boolean =>
+  check(delegateHoldsSomething, {
+    ...(delegate as Record<string, unknown>),
+    entitlements: wellFormedEntitlements((delegate as { entitlements?: unknown }).entitlements),
+  }) === true;
+
 export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | null> => {
   let fetched = false;
   const row = await cache<Token | null>(
@@ -52,13 +58,7 @@ export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | n
 
   const token = await hydrate('token', row);
   if (!ownerIsPresent(token)) return null;
-  if (
-    check(tokenHoldsSomething, {
-      ...token,
-      entitlements: wellFormedEntitlements(token.entitlements),
-    }) !== true
-  )
-    return null;
+  if (![token, token.integration].filter(Boolean).every(holdsSomething)) return null;
 
   const user =
     token.ownerModel === 'User' && token.userId ? await findUserWithRelations(token.userId) : null;

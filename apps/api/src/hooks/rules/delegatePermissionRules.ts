@@ -25,7 +25,7 @@ const fullOnlyOn = (owners: string[]): Condition =>
     `full only on a delegate of ${owners.join(', ')}`,
   );
 
-export const tokenHoldsSomething: Condition = {
+export const delegateHoldsSomething: Condition = {
   any: [
     { field: 'full', operator: Operator.equals, value: true },
     { field: 'role', operator: Operator.notEmpty, value: true },
@@ -42,7 +42,7 @@ export const delegatePermissionRules = {
     all: [
       ...fullTakesNothingElse,
       fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser', 'Integration']),
-      tokenHoldsSomething,
+      delegateHoldsSomething,
     ],
   },
 } satisfies Record<string, Condition>;
