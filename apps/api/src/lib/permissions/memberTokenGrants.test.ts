@@ -133,7 +133,7 @@ describe('a member token holds its member row, never the user (template #210 7f6
     const underOrganization = (resource: string, actions: string[]) =>
       entry(resource, ['db:organization', organization.id, 'organization'], actions);
 
-    it('own on segments does not give a member-role token operate on them', async () => {
+    it('own on segments is operate on them for the member and its member-role token, not own (R105)', async () => {
       const { entity: segment } = await createSegment(
         { ownerModel: 'Organization' },
         { organization },
@@ -141,10 +141,11 @@ describe('a member token holds its member row, never the user (template #210 7f6
       const { rawKey } = await memberKey('viewer', { role: 'member' }, [
         underOrganization('db:segment', ['own']),
       ]);
-      expect(await holds(rawKey, 'segment', segment.id, 'operate')).toBe(false);
+      expect(await holds(rawKey, 'segment', segment.id, 'operate')).toBe(true);
+      expect(await holds(rawKey, 'segment', segment.id, 'manage')).toBe(false);
     });
 
-    it('own on integrations does not give an admin-role token manage on them', async () => {
+    it('own on integrations is manage on them for an admin-role token, not own (R105)', async () => {
       const { entity: integration } = await createIntegration({
         organizationId: organization.id,
         ownerModel: 'Organization',
@@ -153,7 +154,8 @@ describe('a member token holds its member row, never the user (template #210 7f6
       const { rawKey } = await memberKey('viewer', { role: 'admin' }, [
         underOrganization('db:integration', ['own']),
       ]);
-      expect(await holds(rawKey, 'integration', integration.id, 'manage')).toBe(false);
+      expect(await holds(rawKey, 'integration', integration.id, 'manage')).toBe(true);
+      expect(await holds(rawKey, 'integration', integration.id, 'own')).toBe(false);
     });
 
     it('manage on integrations gives a member-role token read and operate, not manage', async () => {

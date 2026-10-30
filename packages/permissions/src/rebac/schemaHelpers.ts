@@ -113,7 +113,12 @@ export const integrationAdministering = {
     any: [managesItsUser(), actionOnOwner('own', '', organizationOrSpace), membersIntegration],
   },
   manage: {
-    any: [managesItsUser(), actionOnOwner('manage', '', organizationOrSpace), membersIntegration],
+    any: [
+      'own',
+      managesItsUser(),
+      actionOnOwner('manage', '', organizationOrSpace),
+      membersIntegration,
+    ],
   },
   delete: { any: ['manage', actionOnOwner('manage', '', notMembers)] },
 } satisfies Record<string, ActionRule>;
@@ -169,16 +174,25 @@ export const managedUpTheChain: ActionRule = {
   ],
 };
 
+type StandardRules = { own: ActionRule; manage: ActionRule; operate: ActionRule; read: ActionRule };
+
+export const chainedStandardActions = ({ own, manage, operate, read }: StandardRules) => ({
+  own,
+  manage: { any: ['own', manage] },
+  operate: { any: ['manage', operate] },
+  read: { any: ['operate', read] },
+});
+
 export const ownerActions = (
   rels: readonly string[] = ['user', 'organization', 'space'],
 ): ResourcePermission['actions'] => {
   const fanout = (action: string): ActionRule => ({
     any: rels.map((rel) => ({ rel, action })),
   });
-  return {
+  return chainedStandardActions({
     own: fanout('own'),
     manage: fanout('manage'),
     operate: fanout('operate'),
     read: fanout('read'),
-  };
+  });
 };
