@@ -150,3 +150,11 @@ describe('the API refuses a malformed entitlement; a write prunes the broken one
     ).toEqual([readOrganization()]);
   });
 });
+
+describe('on an integration, read and operate delegate up to manage (R101)', () => {
+  it("a token whose only authority is manage on the organization's integrations also operates and reads them", async () => {
+    const key = await tokenKey(null, [manageItsIntegrations()]);
+    for (const action of ['manage', 'operate', 'read'])
+      expect(await holds(key, 'integration', integration.id, action)).toBe(true);
+  });
+});

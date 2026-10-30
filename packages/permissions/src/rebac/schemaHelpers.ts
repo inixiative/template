@@ -129,13 +129,19 @@ const membersOwnDelegate = (action: string): ActionRule => ({
 export const integrationAccess = {
   operate: {
     any: [
+      'manage',
       actionOnOwner('operate', '', notMembers),
       membersIntegration,
       membersOwnDelegate('operate'),
     ],
   },
   read: {
-    any: [actionOnOwner('read', '', notMembers), membersIntegration, membersOwnDelegate('read')],
+    any: [
+      'operate',
+      actionOnOwner('read', '', notMembers),
+      membersIntegration,
+      membersOwnDelegate('read'),
+    ],
   },
 } satisfies Record<string, ActionRule>;
 
