@@ -6,6 +6,7 @@ import {
   createIntegration,
   createOrganization,
   createOrganizationUser,
+  createSegment,
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
@@ -79,7 +80,9 @@ const spaceUserKey = async (memberRole: Role, spaceRole: Role, tokenRole: Role) 
 describe('a member token holds its member row, never the user (template #210 7f651bcc)', () => {
   it('an OrganizationUser token: its org at its role, and nothing else', async () => {
     const { rawKey, organizationUser } = await memberKey('admin', { role: 'owner' });
-    expect(await grantsFor(rawKey)).toEqual({ [`db:organization:${organization.id}`]: ['manage'] });
+    expect(await grantsFor(rawKey)).toEqual({
+      [`db:organization:${organization.id}`]: ['read', 'operate', 'manage'],
+    });
     expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'own')).toBe(false);
     expect(await holds(rawKey, 'user', organizationUser.userId, 'read')).toBe(false);
@@ -87,7 +90,9 @@ describe('a member token holds its member row, never the user (template #210 7f6
 
   it('a SpaceUser token: its space at its role, and not the organization', async () => {
     const rawKey = await spaceUserKey('admin', 'owner', 'owner');
-    expect(await grantsFor(rawKey)).toEqual({ [`db:space:${space.id}`]: ['own'] });
+    expect(await grantsFor(rawKey)).toEqual({
+      [`db:space:${space.id}`]: ['read', 'operate', 'manage', 'own'],
+    });
     expect(await holds(rawKey, 'space', space.id, 'own')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'read')).toBe(false);
   });
@@ -113,7 +118,7 @@ describe('a member token holds its member row, never the user (template #210 7f6
   it("an owner's member-role token holds its member's own table, capped at member (R103)", async () => {
     const { rawKey } = await memberKey('owner', { role: 'member' });
     expect(await grantsFor(rawKey)).toEqual({
-      [`db:organization:${organization.id}`]: ['operate'],
+      [`db:organization:${organization.id}`]: ['read', 'operate'],
     });
     expect(await holds(rawKey, 'organization', organization.id, 'operate')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(false);
@@ -122,6 +127,59 @@ describe('a member token holds its member row, never the user (template #210 7f6
   it('a full token is its member, with no ceiling (R103)', async () => {
     const { rawKey } = await memberKey('owner', { role: null, full: true });
     expect(await grantsFor(rawKey)).toEqual({ [`db:organization:${organization.id}`]: ['own'] });
+  });
+
+  describe("a token caps its member's entitlements by what each one implies, never by assuming it (R103)", () => {
+    const underOrganization = (resource: string, actions: string[]) =>
+      entry(resource, ['db:organization', organization.id, 'organization'], actions);
+
+    it('own on segments does not give a member-role token operate on them', async () => {
+      const { entity: segment } = await createSegment(
+        { ownerModel: 'Organization' },
+        { organization },
+      );
+      const { rawKey } = await memberKey('viewer', { role: 'member' }, [
+        underOrganization('db:segment', ['own']),
+      ]);
+      expect(await holds(rawKey, 'segment', segment.id, 'operate')).toBe(false);
+    });
+
+    it('own on integrations does not give an admin-role token manage on them', async () => {
+      const { entity: integration } = await createIntegration({
+        organizationId: organization.id,
+        ownerModel: 'Organization',
+        role: 'viewer',
+      });
+      const { rawKey } = await memberKey('viewer', { role: 'admin' }, [
+        underOrganization('db:integration', ['own']),
+      ]);
+      expect(await holds(rawKey, 'integration', integration.id, 'manage')).toBe(false);
+    });
+
+    it('manage on integrations gives a member-role token read and operate, not manage', async () => {
+      const { entity: integration } = await createIntegration({
+        organizationId: organization.id,
+        ownerModel: 'Organization',
+        role: 'viewer',
+      });
+      const { rawKey } = await memberKey('viewer', { role: 'member' }, [
+        underOrganization('db:integration', ['manage']),
+      ]);
+      expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(true);
+      expect(await holds(rawKey, 'integration', integration.id, 'operate')).toBe(true);
+      expect(await holds(rawKey, 'integration', integration.id, 'manage')).toBe(false);
+    });
+
+    it('own on tokens gives a member-role token read on them', async () => {
+      const { entity: token } = await createKeyedToken(
+        { ownerModel: 'Organization', role: 'viewer' },
+        { organization },
+      );
+      const { rawKey } = await memberKey('viewer', { role: 'member' }, [
+        underOrganization('db:token', ['own']),
+      ]);
+      expect(await holds(rawKey, 'token', token.id, 'read')).toBe(true);
+    });
   });
 
   it('a SpaceUser token has no me: /me answers 401', async () => {
