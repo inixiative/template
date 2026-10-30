@@ -118,10 +118,11 @@ describe('tokens of integrations under an organization follow their integration 
     return (await app.fetch(del(`/api/v1/token/${token.id}`))).status;
   };
 
-  it("the owner deletes any of them; an admin only the organization's own integration's tokens", async () => {
+  it("the owner deletes any of them; an admin only the organization's own integration's tokens; a member none", async () => {
     for (const kind of kinds) {
       expect(await deletes('owner', kind)).toBe(204);
       expect(await deletes('admin', kind)).toBe(kind === 'Organization' ? 204 : 403);
+      expect(await deletes('member', kind)).toBe(403);
     }
   });
 });
@@ -209,6 +210,10 @@ describe("the organization's own integrations: an admin adds them, a member uses
 
   it('a member reads and operates them, and manages nothing', async () => {
     expect((await reach(await seatKey('member'))).Organization).toEqual(['read', 'operate']);
+  });
+
+  it('a viewer reads them and operates nothing', async () => {
+    expect((await reach(await seatKey('viewer'))).Organization).toEqual(['read']);
   });
 });
 
