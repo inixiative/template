@@ -184,6 +184,15 @@ describe('a member token holds its member row, never the user (template #210 7f6
     });
   });
 
+  it("an org owner's admin-role token does not manage the org's spaces through org own; a space entitlement does (R107)", async () => {
+    const { rawKey } = await memberKey('owner', { role: 'admin' });
+    expect(await holds(rawKey, 'space', space.id, 'manage')).toBe(false);
+    const { rawKey: entitled } = await memberKey('owner', { role: 'admin' }, [
+      entry('db:space', ['db:space', space.id], ['manage']),
+    ]);
+    expect(await holds(entitled, 'space', space.id, 'manage')).toBe(true);
+  });
+
   it('a SpaceUser token has no me: /me answers 401', async () => {
     const rawKey = await spaceUserKey('owner', 'member', 'member');
     expect((await call(rawKey, 'GET', '/api/v1/me')).status).toBe(401);
