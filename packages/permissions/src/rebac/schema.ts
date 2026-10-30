@@ -17,6 +17,7 @@ import {
   integrationAdministering,
   lowRoles,
   managedUpTheChain,
+  memberRowActions,
   ownerActions,
   tokenAccessIsYours,
 } from '@template/permissions/rebac/schemaHelpers';
@@ -107,39 +108,9 @@ export const rebacSchema: RebacSchema = {
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
-    'db:organizationUser': {
-      actions: {
-        ...chainedStandardActions({
-          read: {
-            any: [
-              { rel: 'user', action: 'read' },
-              { rel: 'organization', action: 'read' },
-            ],
-          },
-          operate: { rel: 'organization', action: 'operate' },
-          manage: { rel: 'organization', action: 'manage' },
-          own: { rel: 'organization', action: 'own' },
-        }),
-        leave: { rel: 'user', action: 'operate' },
-      },
-    },
+    'db:organizationUser': { actions: memberRowActions('organization') },
 
-    'db:spaceUser': {
-      actions: {
-        ...chainedStandardActions({
-          read: {
-            any: [
-              { rel: 'user', action: 'read' },
-              { rel: 'space', action: 'read' },
-            ],
-          },
-          operate: { rel: 'space', action: 'operate' },
-          manage: { rel: 'space', action: 'manage' },
-          own: { rel: 'space', action: 'own' },
-        }),
-        leave: { rel: 'user', action: 'operate' },
-      },
-    },
+    'db:spaceUser': { actions: memberRowActions('space') },
 
     'db:token': {
       actions: {

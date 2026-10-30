@@ -79,6 +79,16 @@ export const memberRemoval = (tenant: 'organization' | 'space'): ActionRule => (
   any: ['leave', memberRoleWrite(tenant)],
 });
 
+export const memberRowActions = (tenant: 'organization' | 'space') => ({
+  own: { rel: tenant, action: 'own' },
+  manage: { any: ['own', { rel: tenant, action: 'manage' }] },
+  operate: { rel: 'user', action: 'operate' },
+  read: {
+    any: ['operate', 'manage', { rel: 'user', action: 'read' }, { rel: tenant, action: 'read' }],
+  },
+  leave: { rel: 'user', action: 'operate' },
+});
+
 export const ownedByYouOrOrganizationOrSpace = (at = ''): ActionRule => ({
   any: [ownedBy(organizationOrSpace, at), managesItsUser(at)],
 });
@@ -109,6 +119,13 @@ export const actorHoldsItsChain: ActionRule = {
   ],
 };
 
+const operatesAtItsMembersTenant: ActionRule = {
+  any: [
+    { all: [ownedBy(['OrganizationUser']), { rel: 'organization', action: 'operate' }] },
+    { all: [ownedBy(['SpaceUser']), { rel: 'space', action: 'operate' }] },
+  ],
+};
+
 const membersIntegration: ActionRule = {
   any: [{ all: [ownedBy(members), managesItsUser()] }, actionOnOwner('own', '', members)],
 };
@@ -118,7 +135,13 @@ export const integrationAdministering = {
     any: [
       createdByItsUserOrManager,
       {
-        all: [ownedBy(members), actorHoldsItsRow, 'manage', actionOnOwner('operate', '', members)],
+        all: [
+          ownedBy(members),
+          actorHoldsItsRow,
+          'manage',
+          actionOnOwner('operate', '', members),
+          operatesAtItsMembersTenant,
+        ],
       },
     ],
   },
