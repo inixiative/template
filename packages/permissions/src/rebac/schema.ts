@@ -10,6 +10,7 @@ import {
   actionOnOwner,
   actorIsDelegateOfUser,
   actorIsUser,
+  chainedStandardActions,
   createdByItsUserOrManager,
   delegateHoldsOperate,
   highRoles,
@@ -97,43 +98,47 @@ export const rebacSchema: RebacSchema = {
       actions: { ...ownerActions(), create: createdByItsUserOrManager },
     },
     'db:segmentMember': {
-      actions: {
+      actions: chainedStandardActions({
         own: { rel: 'segment', action: 'own' },
         manage: { rel: 'segment', action: 'manage' },
         operate: { rel: 'segment', action: 'operate' },
         read: { rel: 'segment', action: 'read' },
-      },
+      }),
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:organizationUser': {
       actions: {
-        read: {
-          any: [
-            { rel: 'user', action: 'read' },
-            { rel: 'organization', action: 'read' },
-          ],
-        },
+        ...chainedStandardActions({
+          read: {
+            any: [
+              { rel: 'user', action: 'read' },
+              { rel: 'organization', action: 'read' },
+            ],
+          },
+          operate: { rel: 'organization', action: 'operate' },
+          manage: { rel: 'organization', action: 'manage' },
+          own: { rel: 'organization', action: 'own' },
+        }),
         leave: { rel: 'user', action: 'operate' },
-        operate: { rel: 'organization', action: 'operate' },
-        manage: { rel: 'organization', action: 'manage' },
-        own: { rel: 'organization', action: 'own' },
       },
     },
 
     'db:spaceUser': {
       actions: {
-        read: {
-          any: [
-            { rel: 'user', action: 'read' },
-            { rel: 'space', action: 'read' },
-          ],
-        },
+        ...chainedStandardActions({
+          read: {
+            any: [
+              { rel: 'user', action: 'read' },
+              { rel: 'space', action: 'read' },
+            ],
+          },
+          operate: { rel: 'space', action: 'operate' },
+          manage: { rel: 'space', action: 'manage' },
+          own: { rel: 'space', action: 'own' },
+        }),
         leave: { rel: 'user', action: 'operate' },
-        operate: { rel: 'space', action: 'operate' },
-        manage: { rel: 'space', action: 'manage' },
-        own: { rel: 'space', action: 'own' },
       },
     },
 

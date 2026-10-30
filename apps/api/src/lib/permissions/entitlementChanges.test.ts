@@ -60,6 +60,14 @@ const change = async (
 ) => (await writer(role)).fetch(patch(`/api/v1/organizationUser/${target.id}/entitlements`, body));
 
 describe("a member's entitlements change only through add and remove (R78)", () => {
+  it("an admin cannot change an owner's entitlements, even with what it could grant; another owner can", async () => {
+    const target = (await createOrganizationUser({ role: 'owner' }, { organization })).entity;
+    const response = await change('admin', target, { add: [ownIntegrations(['read'])] });
+    expect(response.status).toBe(403);
+    expect(((await response.json()) as { message: string }).message).toBe('Access denied');
+    expect((await change('owner', target, { add: [ownIntegrations(['read'])] })).status).toBe(200);
+  });
+
   it('an owner adds one, and it is stored', async () => {
     const target = await member();
     expect((await change('owner', target, { add: [spaceIntegrations(['manage'])] })).status).toBe(
@@ -122,14 +130,15 @@ describe("a member's entitlements change only through add and remove (R78)", () 
     expect((await change('owner', target, { add: [pathless] })).status).toBe(422);
   });
 
-  it('updating the member row never touches its entitlements', async () => {
+  it('updating the member row cannot carry entitlements: the body is refused', async () => {
     const target = await member([ownIntegrations(['read'])]);
-    await (await writer('owner')).fetch(
+    const response = await (await writer('owner')).fetch(
       patch(`/api/v1/organizationUser/${target.id}`, {
         role: 'viewer',
         entitlements: [spaceIntegrations(['manage'])],
       }),
     );
+    expect(response.status).toBe(422);
     expect(await stored(target)).toEqual([ownIntegrations(['read'])]);
   });
 });

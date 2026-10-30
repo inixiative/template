@@ -166,13 +166,37 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       ).toBe(403);
     });
 
-    it('an admin mints on an integration and uses the reach an owner gave it, into a space the admin cannot see', async () => {
+    it('a role token on an integration with no role is an error: the role narrows nothing (R114)', async () => {
       const integration = await orgIntegration(null, [
         entry('db:space', ['db:space', space.id], ['read', 'operate']),
       ]);
       const minted = await mint(admin, `integration/${integration.id}`, { role: 'member' });
-      expect(minted.status).toBe(201);
-      expect(await holds(minted.key!, 'space', space.id, 'operate')).toBe(true);
+      expect(minted.status).toBe(422);
+    });
+
+    it('an integration that goes from a role to none must keep something: entitlements, or it is a 422 (R114)', async () => {
+      expect((await update(owner, await orgIntegration('viewer'), { role: null })).status).toBe(
+        422,
+      );
+      const entitled = await orgIntegration('viewer', [
+        entry('db:space', ['db:space', space.id], ['read']),
+      ]);
+      expect((await update(owner, entitled, { role: null })).status).toBe(200);
+    });
+
+    it('a token left with a role over a role-less integration is judged as it will be: it can be repaired (R114)', async () => {
+      const integration = await orgIntegration('admin', [
+        entry('db:space', ['db:space', space.id], ['read']),
+      ]);
+      expect((await mint(owner, `integration/${integration.id}`, { role: 'member' })).status).toBe(
+        201,
+      );
+      expect((await update(owner, integration, { role: null })).status).toBe(200);
+      const token = await db.token.findFirstOrThrow({ where: { integrationId: integration.id } });
+      const repaired = await as(owner.user, [owner.organizationUser])(
+        patch(`/api/v1/token/${token.id}`, { full: true, role: null }),
+      );
+      expect(repaired.status).toBe(200);
     });
 
     it('an owner mints an owner token on its own member row; lowered to admin, the token operates as admin', async () => {
@@ -281,15 +305,6 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect((await update(admin, integration, { entitlements: ownOrganization })).status).toBe(
         403,
       );
-    });
-
-    it('an admin cannot give an organization integration the power to assign roles: its token could then make owners', async () => {
-      const assignMembers = [
-        entry('db:organization', ['db:organization', organization.id], ['own']),
-      ];
-      const integration = await orgIntegration('member');
-      expect((await update(admin, integration, { entitlements: assignMembers })).status).toBe(403);
-      expect((await createOrgIntegration(admin, { entitlements: assignMembers })).status).toBe(403);
     });
   });
 

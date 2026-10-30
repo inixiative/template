@@ -81,8 +81,11 @@ const _reach = async (key: string) => {
 };
 
 describe('granted: the where narrows the kinds an entitlement under the organization reaches (R81, R83)', () => {
-  const grant = async (role: Role, granted: Entry) => {
-    const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
+  const grant = async (role: Role, granted: Entry, held?: Entry[]) => {
+    const { entity: seat, context } = await createOrganizationUser(
+      { role, entitlements: held },
+      { organization },
+    );
     const { entity: target } = await createOrganizationUser({ role: 'viewer' }, { organization });
     const { app } = createTestApp({
       mockUser: context.user,
@@ -123,5 +126,102 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
     expect(await holds(key, 'integration', integrations.Organization.id, 'manage')).toBe(true);
     for (const kind of ['Space', 'OrganizationUser', 'SpaceUser'] as const)
       expect(await holds(key, 'integration', integrations[kind].id, 'manage')).toBe(false);
+  });
+
+  it('an admin entitled to own every kind under the organization grants that ownership onward', async () => {
+    const owning = entry(
+      'db:integration',
+      ['db:organization', organization.id, 'organization'],
+      ['own'],
+    );
+    expect(await grant('admin', owning)).toBe(403);
+    expect(await grant('admin', owning, [owning])).toBe(200);
+  });
+
+  it("an admin entitled to own the organization's own integrations grants that, not every kind", async () => {
+    const owning = (where?: Entry['where']) => ({
+      ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['own']),
+      ...(where ? { where } : {}),
+    });
+    const theOrganizationsOwn = owning({
+      field: 'ownerModel',
+      operator: 'equals',
+      value: 'Organization',
+    });
+    expect(await grant('admin', theOrganizationsOwn, [theOrganizationsOwn])).toBe(200);
+    expect(await grant('admin', owning(), [theOrganizationsOwn])).toBe(403);
+  });
+
+  const kindsIn = (...values: Kind[]) =>
+    underOrganization({ field: 'ownerModel', operator: 'in', value: values });
+
+  it('where ownerModel in [...]: an admin grants the kinds it holds, not one more (R88)', async () => {
+    expect(await grant('admin', kindsIn('Organization'))).toBe(200);
+    expect(await grant('admin', kindsIn('Organization', 'OrganizationUser'))).toBe(403);
+    expect(await grant('owner', kindsIn('Organization', 'OrganizationUser'))).toBe(200);
+  });
+
+  it('every leaf of a root `all` narrows; a nested rule narrows nothing (R88)', async () => {
+    const both = underOrganization({
+      all: [
+        { field: 'ownerModel', operator: 'in', value: ['Organization', 'OrganizationUser'] },
+        { field: 'ownerModel', operator: 'in', value: ['Organization', 'Space'] },
+      ],
+    });
+    expect(await grant('admin', both)).toBe(200);
+    const nested = underOrganization({
+      all: [{ all: [{ field: 'ownerModel', operator: 'equals', value: 'Organization' }] }],
+    });
+    expect(await grant('admin', nested)).toBe(403);
+  });
+
+  it('the holder of an `in` grant manages the kinds it names, nothing else', async () => {
+    const key = await seatKey('viewer', [kindsIn('Organization', 'OrganizationUser')]);
+    expect(await holds(key, 'integration', integrations.Organization.id, 'manage')).toBe(true);
+    expect(await holds(key, 'integration', integrations.OrganizationUser.id, 'manage')).toBe(true);
+    for (const kind of ['Space', 'SpaceUser'] as const)
+      expect(await holds(key, 'integration', integrations[kind].id, 'manage')).toBe(false);
+  });
+});
+
+describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one held entitlement (R103)', () => {
+  const grant = async (granted: Entry, held: Entry[]) => {
+    const { entity: seat, context } = await createOrganizationUser(
+      { role: 'admin', entitlements: held },
+      { organization },
+    );
+    const { entity: target } = await createOrganizationUser({ role: 'viewer' }, { organization });
+    const { app } = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [seat],
+      mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
+    });
+    return (
+      await app.fetch(
+        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [granted] }),
+      )
+    ).status;
+  };
+  const staticSegments = (where: Entry['where']) => ({
+    ...entry('db:segment', ['db:organization', organization.id, 'organization'], ['own']),
+    where,
+  });
+  const isStatic = { field: 'type', operator: 'equals', value: 'static' };
+
+  it('an exact copy and a narrowed copy pass; the same without its where does not', async () => {
+    const held = staticSegments(isStatic);
+    expect(await grant(held, [held])).toBe(200);
+    expect(
+      await grant(
+        staticSegments({ all: [isStatic, { field: 'name', operator: 'equals', value: 'x' }] }),
+        [held],
+      ),
+    ).toBe(200);
+    expect(
+      await grant(
+        entry('db:segment', ['db:organization', organization.id, 'organization'], ['own']),
+        [held],
+      ),
+    ).toBe(403);
   });
 });

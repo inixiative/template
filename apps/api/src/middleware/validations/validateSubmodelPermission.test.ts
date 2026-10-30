@@ -279,12 +279,15 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
   describe('attempts to get around it', () => {
     it("a body naming another owner changes nothing: the check is on the route's owner", async () => {
       const { entity: other } = await createOrganization();
-      const response = await app.request(`/api/v1/organization/${organization.id}/contacts`, {
-        method: 'POST',
-        headers: { ...org.member, 'content-type': 'application/json' },
-        body: JSON.stringify({ ownerModel: 'Organization', organizationId: other.id }),
-      });
-      expect(response.status).toBe(403);
+      const post = (headers: Headers) =>
+        app.request(`/api/v1/organization/${organization.id}/contacts`, {
+          method: 'POST',
+          headers: { ...headers, 'content-type': 'application/json' },
+          body: JSON.stringify({ ownerModel: 'Organization', organizationId: other.id }),
+        });
+      expect((await post(org.admin)).status).toBe(422);
+      const { context } = await createOrganizationUser({ role: 'owner' }, { organization: other });
+      expect((await post(await jwt(context.user))).status).toBe(403);
     });
 
     it('a WS subscribe probe answers as the route does', async () => {
@@ -319,6 +322,23 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         'denied',
       );
       expect(await gate(headers, 'POST', `/organization/${other.id}/contacts`)).toBe('passes');
+    });
+
+    it("an entitlement stored on one seat and anchored at the user's other organization opens nothing there", async () => {
+      const { entity: other } = await createOrganization();
+      const contactsHere = {
+        resource: 'db:contact',
+        anchor: { resource: 'db:organization', id: organization.id, path: 'organization' },
+        actions: { create: true },
+      };
+      const { context } = await createOrganizationUser(
+        { role: 'viewer', entitlements: [contactsHere] },
+        { organization: other },
+      );
+      await createOrganizationUser({ role: 'viewer' }, { organization, user: context.user });
+      expect(
+        await gate(await jwt(context.user), 'POST', `/organization/${organization.id}/contacts`),
+      ).toBe('denied');
     });
 
     it('an entitlement anchored at another organization opens nothing here', async () => {
@@ -359,7 +379,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         'organization',
         'db:organization',
         organization,
-        { ownerModel: 'Organization' },
+        { field: 'ownerModel', operator: 'equals', value: 'Organization' },
       );
       const pseudo = await hydrate('contact', { id: '', ...placed } as HydratedRecord);
       expect(pseudo.id).toBe('');
@@ -379,7 +399,7 @@ describe("placeUnder places a child under its owner along the owner's relation",
       owner,
       `db:${owner}`,
       record,
-      kind ? { ownerModel: kind } : {},
+      kind ? { field: 'ownerModel', operator: 'equals', value: kind } : undefined,
     );
 
   it('a polymorphic child carries the pinned kind and the owner keys', () => {

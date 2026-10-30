@@ -14,7 +14,7 @@ export const spaceUserDeleteController = makeController(
   async (c, respond) => {
     const spaceUser = getResource<'spaceUser'>(c);
 
-    await db.spaceUser.delete({ where: { id: spaceUser.id } });
+    await db.spaceUser.update({ where: { id: spaceUser.id }, data: { deletedAt: new Date() } });
 
     return respond.noContent();
   },

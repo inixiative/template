@@ -118,10 +118,11 @@ describe('tokens of integrations under an organization follow their integration 
     return (await app.fetch(del(`/api/v1/token/${token.id}`))).status;
   };
 
-  it("the owner deletes any of them; an admin only the organization's own integration's tokens", async () => {
+  it("the owner deletes any of them; an admin only the organization's own integration's tokens; a member none", async () => {
     for (const kind of kinds) {
       expect(await deletes('owner', kind)).toBe(204);
       expect(await deletes('admin', kind)).toBe(kind === 'Organization' ? 204 : 403);
+      expect(await deletes('member', kind)).toBe(403);
     }
   });
 });
@@ -152,6 +153,28 @@ describe("a member's own tokens reach that member's integrations, as far as thei
     const { rawKey, integration } = await ownToken('viewer');
     expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(true);
     expect(await holds(rawKey, 'integration', integration.id, 'operate')).toBe(false);
+  });
+
+  it("the member's token reaches its own member row's integration, not the same person's space-member one (R100)", async () => {
+    const { entity: seat, context } = await createOrganizationUser(
+      { role: 'member' },
+      { organization },
+    );
+    const { entity: space } = await createSpace({}, { organization });
+    await createSpaceUser({ role: 'member' }, { ...context, space });
+    const at = { organizationId: organization.id, userId: seat.userId, role: 'viewer' as const };
+    const { entity: own } = await createIntegration({ ...at, ownerModel: 'OrganizationUser' });
+    const { entity: spaceMembers } = await createIntegration({
+      ...at,
+      ownerModel: 'SpaceUser',
+      spaceId: space.id,
+    });
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', role: 'member' },
+      { organizationUser: seat },
+    );
+    expect(await holds(rawKey, 'integration', own.id, 'read')).toBe(true);
+    expect(await holds(rawKey, 'integration', spaceMembers.id, 'read')).toBe(false);
   });
 
   it("another member's token reaches nothing of it", async () => {
@@ -187,6 +210,10 @@ describe("the organization's own integrations: an admin adds them, a member uses
 
   it('a member reads and operates them, and manages nothing', async () => {
     expect((await reach(await seatKey('member'))).Organization).toEqual(['read', 'operate']);
+  });
+
+  it('a viewer reads them and operates nothing', async () => {
+    expect((await reach(await seatKey('viewer'))).Organization).toEqual(['read']);
   });
 });
 
