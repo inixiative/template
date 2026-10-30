@@ -18,6 +18,7 @@ A rule that only walks to the owner for the same action (`{ rel: 'organization',
 
 ## What the chain is used for
 
+- **Reading.** An entitlement answers every action its held action implies through the chain, while whoever granted it can still do that action: a `manage` entitlement whose granter is down to `read` still reads. Every side of a cross-tenant chain is asked the same action.
 - **Lowering.** Whoever holds an entitlement can pass on a copy with lower actions: each granted action must reach a held one through the chain.
 - **Capping.** A delegate (token, integration) holds its owner's role capped at its own role (`capAtRole`), never its owner's entitlements: those it holds only when given them, or when it is `full`.
 - **Copying.** A copy, or a copy with a narrower `where`, is checked against what the holder holds through the same chain.
