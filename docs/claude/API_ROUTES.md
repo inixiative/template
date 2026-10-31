@@ -85,6 +85,8 @@ Pattern: `resourceActionSubresource`
 
 **Always use templates** from `#/lib/routeTemplates` - never raw `createRoute`.
 
+Route paths write parameters the OpenAPI way, `{id}`. `@hono/zod-openapi` converts them to Hono's `:id` when it registers the route, so the spec, the SDK and every reader of the spec see `{id}`, and Hono's runtime (`c.req.routePath`) sees `:id`. The `openapi-path-params` CI rule refuses a `:param` in a route definition, and any parameter other than `{id}` until a route needs one (the rule says how to widen it). The frontend converts back to `:id` in one place, `@template/ui/lib/toRoutePattern`, for telemetry and MSW handlers.
+
 ```typescript
 import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#/lib/routeTemplates';
 ```
@@ -94,8 +96,8 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | Arg | Type | Description |
 |-----|------|-------------|
 | `model` | Module | Resource name (singular) - **required** |
-| `submodel` | Module | Nested resource (e.g., `token` → `/:id/tokens`) |
-| `action` | string | Verb action (e.g., `activate` → `/:id/activate`) |
+| `submodel` | Module | Nested resource (e.g., `token` → `/{id}/tokens`) |
+| `action` | string | Verb action (e.g., `activate` → `/{id}/activate`) |
 | `many` | boolean | List endpoint (affects path, operationId) |
 | `paginate` | boolean | Add pagination query params (requires `many`) |
 | `admin` | boolean | Adds 'Admin' prefix to operationId and tag |
@@ -135,7 +137,7 @@ createRoute({ model: 'organization', submodel: 'token', bodySchema, responseSche
 // Action
 actionRoute({ model: 'user', action: 'activate', bodySchema, responseSchema })
 
-// Action on a subresource collection → POST /:id/segments/reach
+// Action on a subresource collection → POST /{id}/segments/reach
 actionRoute({ model: 'space', submodel: 'segment', action: 'reach', bodySchema, responseSchema })
 
 // Admin
