@@ -13,7 +13,6 @@ docs/claude/COMMUNICATIONS.md	path	packages/db/lens
 docs/claude/CONCURRENCY.md	anchor	./REDIS.md#distributed-locks
 docs/claude/CONTEXT.md	name	getRequestId
 docs/claude/CONTEXT.md	name	getUser
-docs/claude/HOOKS.md	anchor	#slow-mutation-logging
 docs/claude/HOOKS.md	name	segmentLensFor
 docs/claude/INIT_SCRIPT_PATTERNS.md	name	setStoringToken
 docs/claude/INIT_SCRIPT_PATTERNS.md	name	storingToken
