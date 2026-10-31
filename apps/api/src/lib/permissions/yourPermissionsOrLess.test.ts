@@ -292,7 +292,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
     });
 
     it('an organization integration is never full: it holds itself', async () => {
-      expect((await createOrgIntegration(owner, { full: true })).status).toBe(422);
+      expect((await createOrgIntegration(owner, { full: true })).status).toBe(403);
     });
 
     it('an admin cannot name an entitlement action it does not hold on an integration', async () => {
@@ -329,12 +329,12 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect((await anonymous(del(`/api/v1/integration/${integration.id}`))).status).toBe(403);
     });
 
-    it("its user and the organization's owner administer it; an admin does not (R82)", async () => {
+    it("its user administers it; the organization's owner and an admin do not", async () => {
       const { m, integration } = await memberIntegration();
       const rename = (writer: { user: User; organizationUser: OrganizationUser }) =>
         update(writer, integration, { name: `i-${randomUUID()}` } as Permissions);
       expect((await rename(admin)).status).toBe(403);
-      expect((await rename(owner)).status).toBe(200);
+      expect((await rename(owner)).status).toBe(403);
       expect((await rename(m)).status).toBe(200);
     });
 

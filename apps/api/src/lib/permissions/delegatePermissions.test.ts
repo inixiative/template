@@ -206,7 +206,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
           full: true,
         },
       );
-      expect(minted.status).toBe(422);
+      expect(minted.status).toBe(403);
     });
 
     it("an organization's integration cannot be full", async () => {
@@ -218,7 +218,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       const response = await userApp(user, [organizationUser]).fetch(
         patch(`/api/v1/integration/${integration.id}`, { full: true }),
       );
-      expect(response.status).toBe(422);
+      expect(response.status).toBe(403);
     });
   });
 
@@ -459,7 +459,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       expect((await mintOn(integration, owner, [ownerMember], { full: true })).status).toBe(403);
     });
 
-    it("nobody holds an organization's integration, so its tokens are never full; an admin mints a role token (R90)", async () => {
+    it("an organization's integration's token is full only from its owner; an admin mints a role token (Aron, 2026-10-30)", async () => {
       const { entity: integration } = await createIntegration({
         ownerModel: 'Organization',
         organizationId: organization.id,
@@ -469,7 +469,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       expect((await mintOn(integration, admin, [adminMember], { full: true })).status).toBe(403);
       expect((await mintOn(integration, admin, [adminMember], { role: 'admin' })).status).toBe(201);
       const { user: owner, organizationUser: ownerMember } = await asMember('owner');
-      expect((await mintOn(integration, owner, [ownerMember], { full: true })).status).toBe(403);
+      expect((await mintOn(integration, owner, [ownerMember], { full: true })).status).toBe(201);
     });
 
     type Write = {

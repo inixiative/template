@@ -4,14 +4,9 @@
  * @partOf primitive:authz
  * @uses primitive:errors
  */
-import type { AccessorName, HydratedRecord } from '@template/db';
+import { type AccessorName, type HydratedRecord, toAccessor } from '@template/db';
 import type { Permix } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import {
-  actionOnOwner,
-  actorHoldsItsChain,
-  ownedBy,
-} from '@template/permissions/rebac/schemaHelpers';
 import { makeError } from '#/lib/errors';
 
 export const validateFullGrant = (
@@ -21,11 +16,8 @@ export const validateFullGrant = (
 ): void => {
   if (
     !check(writer, rebacSchema, model, delegate, {
-      any: [
-        actorHoldsItsChain,
-        actionOnOwner('own', '', ['Organization', 'Space']),
-        ownedBy(['Integration']),
-      ],
+      rel: toAccessor(delegate.ownerModel as string),
+      action: 'delegateFull',
     })
   )
     throw makeError({ status: 403, message: 'Access denied' });

@@ -87,6 +87,7 @@ export const memberRowActions = (tenant: 'organization' | 'space') => ({
     any: ['operate', 'manage', { rel: 'user', action: 'read' }, { rel: tenant, action: 'read' }],
   },
   leave: { rel: 'user', action: 'operate' },
+  delegateFull: { all: [actorIsUser, 'operate'] },
 });
 
 export const ownedByYouOrOrganizationOrSpace = (at = ''): ActionRule => ({
@@ -141,6 +142,18 @@ export const integrationAdministering = {
     ],
   },
   delete: { any: ['manage', actionOnOwner('own', '', members)] },
+  delegateFull: {
+    all: [
+      actorIsUser,
+      {
+        any: [
+          { all: [ownedBy(['User']), managesItsUser()] },
+          actionOnOwner('own', '', organizationOrSpace),
+          actionOnOwner('operate', '', members),
+        ],
+      },
+    ],
+  },
 } satisfies Record<string, ActionRule>;
 
 export const integrationAccess = {
