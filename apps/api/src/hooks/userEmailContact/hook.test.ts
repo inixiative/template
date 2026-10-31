@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';

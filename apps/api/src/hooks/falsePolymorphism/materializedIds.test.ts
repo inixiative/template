@@ -4,7 +4,6 @@ import {
   materializedIdConflicts,
   snapshotHookRegistry,
   syncRuleReferenceEdges,
-  unregisterDbHook,
   withMaterializedIds,
 } from '@template/db';
 import type { EmailComponent, Tag } from '@template/db/generated/client/client';

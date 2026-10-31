@@ -1,11 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import {
-  clearHookRegistry,
-  db,
-  type RuleReferenceRow,
-  ruleReferenceTargets,
-  unregisterDbHook,
-} from '@template/db';
+import { clearHookRegistry, db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import {
   cleanupTouchedTables,
   createEmailComponent,
