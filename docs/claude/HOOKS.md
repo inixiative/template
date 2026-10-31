@@ -50,7 +50,6 @@
   - [**FK fields are automatically immutable**](#fk-fields-are-automatically-immutable)
   - [Why Strip Instead of Throw?](#why-strip-instead-of-throw)
 - [Supported Operations](#supported-operations)
-  - [Slow Mutation Logging](#slow-mutation-logging)
 - [Limitations](#limitations)
   - [Rules: Nested Updates Skip Validation](#rules-nested-updates-skip-validation)
   - [Rules: updateManyAndReturn Validates After](#rules-updatemanyandreturn-validates-after)
