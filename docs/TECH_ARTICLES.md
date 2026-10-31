@@ -231,7 +231,7 @@ Eight deep-dive technical articles targeting senior/staff engineers. Each articl
 4. Permission system: RBAC + ABAC + ReBAC unified
    - `@inixiative/permissions` for relationship walks over your own rows, with no tuple store
    - json-rules for attribute-based policies (stored in the database)
-   - Runtime policy changes without redeployment
+   - Tenants write rules on their own records, validated before saving, that can only widen access
    - Cycle detection in permission graphs
 5. Frontend context switching
    - URL-synced tenant context

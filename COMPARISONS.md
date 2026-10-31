@@ -113,7 +113,7 @@ Before comparing individual systems, there's one architectural property that no 
 - Side effects (webhooks, jobs, cache invalidation) fire only after transactions commit via `db.onCommit()`.
 - With permissions 1.0 (end of 2026), "which users have permission X" becomes one query, so finding them and enqueuing a job for each happens in one transaction.
 
-The moment permissions live in a hosted authorization service, jobs live in Redis, and webhooks live in Svix, you've lost transactional consistency across all of them. You can't ask "find users with this permission and notify them" in a single atomic operation. This template can.
+The moment permissions live in a hosted authorization service, jobs live in Redis, and webhooks live in Svix, you've lost transactional consistency across all of them. You can't ask "find users with this permission and notify them" in a single atomic operation. With permissions 1.0, this template can.
 
 ---
 
@@ -155,23 +155,23 @@ RBAC, ABAC and ReBAC in one engine, [`@inixiative/permissions`](https://github.c
 |---------|----------|-------------------|-----------|--------|------|-----------|
 | RBAC + ABAC + ReBAC in one model | Yes | Yes | Yes | RBAC + ABAC, no relation walks | RBAC + ABAC | Flat role column |
 | Decides on your own rows, no second store | Yes | No, tuple store you sync | No, fact store you sync | Attributes passed per request | Rules built per request | Yes |
-| Rules are JSON data | Yes (json-rules) | DSL | Polar | YAML | Serializable rules | No |
+| Rules are JSON data | Yes (json-rules) | DSL; OpenFGA's model is JSON | Polar | YAML | Serializable rules | No |
 | A tenant writes a rule on one of its records | Yes, can only widen | Parameters per tuple; logic is global | Facts per record; logic is global | No | No | No |
 | Delegation re-checked against its grantor at every use | Yes | No | No | No | No | No |
 | Delegates (tokens, integrations) capped at their owner | Yes | Modelled by hand | Modelled by hand | Modelled by hand | Manual | Rare |
 | Tenant hierarchy (organization, space) | Yes | Modelled in the graph | Via Polar | Via derived roles | Manual | Manual |
-| Every route enforces a declared check | Yes | No | No | Via sidecar | No | `if (role !== 'admin')` |
+| Every route enforces a declared check | Yes | No | No | No | No | `if (role !== 'admin')` |
 | Schema from Prisma metadata | Yes (prisma-map) | No | No | No | No | No |
 | "Which records can I read" as one query | Permissions 1.0, end of 2026 | Id lists | Yes (`list_local`) | Yes (query plans) | Yes (`accessibleBy`) | Hand-written |
 
 The library's full comparison, with a source for every cell: [COMPARISON.md](https://github.com/inixiative/permissions/blob/main/COMPARISON.md).
 
 ### The gap no one fills
-Every other system that walks relationships keeps its own copy of them. User created? Write a tuple. Role changed? Write another. Tenant switched? Update the graph. You now have two sources of truth, dual writes and consistency tokens. Here the check reads the rows that already exist. No sync, no drift, no state where permissions say yes but the record is gone.
+The Zanzibar family and Oso Cloud keep their own copy of your relationships. User created? Write a tuple. Role changed? Write another. Tenant switched? Update the graph. You now have two sources of truth, dual writes and consistency tokens. Here the check reads the rows that already exist. No sync, no drift, no state where permissions say yes but the record is gone.
 
 The other half is who can change the rules. Every system lets an operator edit the policy. Here a tenant can write a rule on one of its own records, validated before it is saved, and it can only widen access. Policy grows per tenant instead of being one document a team has to edit for everyone.
 
-And delegation stays honest. An entitlement names who granted it, and every check asks that grantor again, up the whole chain. Demote anyone in the chain and everything they handed on stops on the next request, with nothing to clean up.
+And delegation stays honest. Every entitlement is backed by whoever granted it, and every check asks that grantor again, up the whole chain. Demote anyone in the chain and everything they handed on stops on the next request, with nothing to clean up.
 
 ### Honest assessment
 Today a check answers one record at a time; listing "everything I can read" means loading and checking. Permissions 1.0 (end of 2026) compiles the same rules to a Prisma `where` and to SQL, so that becomes one query. The engine is TypeScript only, has no decision log or playground, and has no deny rules by design: you narrow by composing a stricter rule.

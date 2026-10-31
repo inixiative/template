@@ -165,7 +165,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Authorization & Permissions
 
-**Full RBAC/ABAC/ReBAC Authorization** - Comprehensive permission system supporting Role-Based (RBAC), Attribute-Based (ABAC), and Relationship-Based (ReBAC) access control powered by Permix with JSON-Rules support. This unified system lets you define permissions using simple roles, complex attribute-based rules, or relationship graphs - all within the same framework. JSON-Rules integration enables dynamic permission logic without code deployment.
+**Full RBAC/ABAC/ReBAC Authorization** - Comprehensive permission system supporting Role-Based (RBAC), Attribute-Based (ABAC), and Relationship-Based (ReBAC) access control powered by [`@inixiative/permissions`](https://github.com/inixiative/permissions), with conditions in json-rules. This unified system lets you define permissions using simple roles, complex attribute-based rules, or relationship graphs - all within the same framework. JSON-Rules integration enables dynamic permission logic without code deployment.
 
 - ✅ **Multi-Level RBAC** - Roles at platform (superadmin, user), organization and space (owner, admin, member, viewer), each mapping to one standard action (own, manage, operate, read)
 
