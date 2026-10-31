@@ -44,7 +44,9 @@ const memberGrants = (member: Member, resource: MemberResource, tenantOwner: Gra
     isMemberSelfGrant(resource, member),
   );
   return [
-    ...ownedBy(usersSide, [{ entries: [getUserPermissions(member.userId as UserId)] }]),
+    ...(member.userId
+      ? ownedBy(usersSide, [{ entries: [getUserPermissions(member.userId)] }])
+      : []),
     ...ownedBy(tenantsSide, tenantOwner),
   ];
 };
