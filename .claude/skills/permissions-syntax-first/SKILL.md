@@ -20,8 +20,8 @@ The goal of a unit is the ruling's sentence, and the change ends there. When thi
 
 ## 1. Read before you edit
 
-- The running rulings doc (`tmp/permissions-rulings.md`; create it if missing — the user requires one). Process rule: every edit names the ruling it implements; no ruling → ask, don't edit.
-- `docs/claude/PERMISSIONS.md`, Vocabulary section. Names are composed of vocabulary words: user, tenant (user/organization/space), member (OrganizationUser/SpaceUser), JWT, token, actor, owner, delegate (token or integration), permissions (`{ role, full, entitlements }`), anchor, entitlement. No aliases (`person`, `seat`, `claim`, `hasUser` are wrong).
+- The running rulings doc (`tmp/permissions-rulings.md`; create it if missing — the user requires one). Process rule: every edit names the ruling it implements; no ruling, ask; don't edit.
+- `docs/claude/PERMISSIONS.md`, Vocabulary section. Names are composed of vocabulary words: user, tenant (organization/space), member (OrganizationUser/SpaceUser), JWT, token, actor, owner, delegate (token or integration), permissions (`{ role, full, entitlements }`), anchor, entitlement, pseudo record. No aliases (`person`, `claim`, `hasUser` are wrong). Worked examples use user U1, organization O1, member M1 of O1, integration I1 on M1, token T.
 
 ## 1a. Disentangle before you design
 
@@ -30,11 +30,11 @@ Permissions questions tangle because one sentence mixes several parties and seve
 **Step 1 — name the parties**, each with a vocabulary word:
 - **actor**: who is making the request (a user via JWT or spoof, or a token). Says nothing about relationships.
 - **user**: a person's account. Only a user is ever superadmin.
-- **tenant**: user, organization or space.
-- **member**: the row joining a user to an organization or space (OrganizationUser, SpaceUser).
+- **tenant**: organization or space (a space is a sub-tenancy of its organization).
+- **member**: the row joining a user to an organization or space (OrganizationUser, SpaceUser); the only place a person's role at a tenant is stored. `operate` on it is being the member; `manage`/`own` on it administer it.
 - **delegate**: something that acts for its owner: a token or an integration.
 - **owner**: the immediate thing a delegate belongs to (owners all the way down).
-- **permissions**: a delegate's `{ role, full, entitlements }`.
+- **permissions**: a delegate's `{ role, full, entitlements }`. Role = a narrowing of the tenant; entitlements = given by hand only; full = the owner's permissions whole and in sync.
 - **entitlement**: a named grant `{ resource, anchor: { resource, id, path? }, where?, actions }`; **anchor**: the record it acts from, reached from the entitled record along `path` (relation names; none for a self anchor).
 - **pseudo record**: the would-be row checked for a create or a collection action.
 
@@ -43,11 +43,11 @@ Permissions questions tangle because one sentence mixes several parties and seve
 | Bucket | Question | Example: integration | Example: token |
 |---|---|---|---|
 | 1. Access to X | who can see or reach X | `read` on it | listing tokens |
-| 2. Actions on X itself | who administers X | `own` / `manage`: its user, or your role at its org/space | revoke, rename |
+| 2. Actions on X itself | who administers X | by its owner's kind: its user; `operate` on its member row; or `manage` at its tenant. No `own` | revoke, rename: the same split by owner kind |
 | 3. X's access to other things | what X can reach: its owner, capped at its role | its role / entitlements / full, set at or below its owner | its role / entitlements / full, checked against the minter |
 | 4. Acting with X, on its behalf | what X does as an actor | execution — out of scope (Signet) | requests made with the token (`__actor.model == Token`) |
 
-**Step 3 — never let one bucket answer another.** A bucket-2 fact ("M manages their integration") must not satisfy a bucket-3 check ("M may give a token admin access") — that merge produced a real bug. A bucket-4 fact (the actor is a token) is a condition on the actor, not on the thing.
+**Step 3 — never let one bucket answer another.** Every schema action is an action on the record (bucket 1 or 2), never an action the record takes. A bucket-2 fact ("M manages their integration") must not satisfy a bucket-3 check ("M may give a token admin access") — that merge produced a real bug. A bucket-4 fact (the actor is a token) is a condition on the actor, not on the thing.
 
 **Step 4 — one named group per bucket in the schema** (e.g. `integrationAdministering`, `integrationAccess`), spread into the model's actions. If a requirement doesn't fit one bucket, it is two requirements.
 
@@ -65,8 +65,11 @@ The actor is `{ model: 'User' | 'Token', record }` (sanitized row). Rules read i
 Shared pieces already in `schema.ts` — reuse, don't re-derive:
 - `actorIsUser` (`__actor.model == User`), `actorIsDelegateOfUser` (`__actor.record.ownerModel == User`);
 - `actionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
-- `roleHeldAtOwner`: the role on the row is one the actor holds at the direct owner (owner→own, admin→manage, member→operate, viewer→read via `roleToStandardAction`);
-- `memberRoleWrite(tenant)` / `integrationRoleWrite`: manage the row's tenant (the integration itself) and hold there the role being set; `memberRemoval(tenant)` = `leave` or `memberRoleWrite`. Rules routes and controllers check, never named actions;
+- `roleHeldAtOwner`: the role on the row is one the actor holds at the direct owner (owner `own`, admin `manage`, member `operate`, viewer `read`, via `roleToStandardAction`);
+- `memberRowActions(tenant)`: a member row's `operate` (its user), `manage`/`own` (the tenant), `read`, `leave`, `delegateFull`;
+- `memberRoleWrite(tenant)`: manage the tenant and hold there the role being set; `memberRemoval(tenant)` = `leave` or `memberRoleWrite`; `integrationRoleWrite`: `manage` on the integration and the role held at its owner. Rules routes and controllers check, never named actions;
+- `integrationAdministering` / `integrationAccess`, `tokenAccessIsYours` / `tokenAdministering`: integrations and tokens administered by their owner's kind (tenant: the tenant's roles; member: `operate` on the member row, the tenant owner reads and deletes; user: the user);
+- `delegateFull`: the person-only action on a delegate's owner that lets you set `full` (`validateFullGrant` checks it);
 - `managesItsUser(at)`: `{ rel: `${at}user`, action: 'manage' }` — the user, or a delegate of the user at manage or above;
 - `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `managesItsUser(at)`;
 - `ownedBy(owners, at)` and `actionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
@@ -75,7 +78,8 @@ Other parts of the system (use them, don't parallel them):
 - `placeEntitlement` + `canGrantEntitlement` (library, over `schemaMap`) — the only check for writing entitlements, validity included; entitlements change only through `PATCH …/:id/entitlements` (`{ add, remove }`, both through that check), never a record update;
 - `RulesRegistry` json-rules write rules, enforced by the rules hook — a row's own columns only (`full` takes no role or entitlements; where `full` may be set; a token has permissions). Nothing in a rules object reads an entitlement or its anchor. Don't call `validateRules` from controllers;
 - hydration / the lens — relations come from hydrating, never from copying keys;
-- the one `full` skip at install (`delegateTable`).
+- the one `full` skip at install (`delegateTable`);
+- the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `userGrants` routes it to the user and everything else to the tenant.
 
 ## 3. Pseudo records
 
@@ -99,7 +103,9 @@ An action on something that does not exist yet, or on a collection, is checked o
 | actions named after other models (`organization.create` on user) | each action on its own model (test: a dotted action is named after its model) |
 | a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpace('integration.')` |
 | `leave` as an alternative that skipped the role check | the role check always runs; "yours" is an extra requirement |
-| `full` arms in the schema | `full` is inheritance: skipped at install (`delegateTable`); setting it takes `own` on the owner. CI rule `no-full-in-rebac-schema` |
+| `full` arms in the schema | `full` is inheritance: skipped at install (`delegateTable`); setting it takes `delegateFull` on the owner (`validateFullGrant`). CI rule `no-full-in-rebac-schema` |
+| deciding who is related to what by comparing `__actor` ids | an action on the record: acting as a member is `operate` on the member row; actor rules only gate person-only actions |
+| a role token acting as its member by default | `operate` on the member row: held by `full`, or given by hand as an entitlement |
 | write-time "ceiling" with a trim in `validateDelegateGrant` | `roleHeldAtOwner` + `memberRoleWrite`/`integrationRoleWrite` + `canGrantEntitlement` |
 | copying delegated keys onto a pseudo record | hydrate the relation and read it |
 | explicit `validateRules` in controllers | the rules hook |
@@ -122,6 +128,9 @@ An action on something that does not exist yet, or on a collection, is checked o
 - "you shouldn't be able to do things for other people's members or integrations. If it is a member and it's not you, no."
 - An integration has three parts: administering it, its access to its owner, its executions (out of scope).
 - "Are we making things simpler?"
+- "Everything just is on."
+- "If the owner is a tenant, you need to be an admin. If the owner is a member, you need to be operate for admin. There's no own, I think, for integration."
+- "Actor things are for stuff that we don't want tokens doing, not for trying to determine the relationship graph"
 
 ## 5. Procedure
 
