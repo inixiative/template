@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@inixiative/json-rules": "^3.6.0",
-    "@inixiative/permissions": "^0.17.0",
+    "@inixiative/permissions": "^0.17.1",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@supercharge/promise-pool": "^3.3.0",
