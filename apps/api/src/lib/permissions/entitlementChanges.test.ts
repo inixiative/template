@@ -7,6 +7,7 @@ import {
   createOrganization,
   createOrganizationUser,
 } from '@template/db/test';
+import { isMemberSelfGrant, wellFormedEntitlements } from '@template/permissions';
 import { integrationRouter } from '#/modules/integration';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
@@ -53,8 +54,10 @@ const spaceIntegrations = (actions: string[]) =>
 const member = async (entitlements?: Entry[]) =>
   (await createOrganizationUser({ role: 'member', entitlements }, { organization })).entity;
 
-const stored = async (target: OrganizationUser) =>
-  (await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } })).entitlements;
+const stored = async (target: OrganizationUser): Promise<unknown> =>
+  wellFormedEntitlements(
+    (await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } })).entitlements,
+  ).filter((entry) => !isMemberSelfGrant('db:organizationUser', target)(entry));
 
 const change = async (
   role: Role,
@@ -84,7 +87,7 @@ describe("a member's entitlements change only through add and remove (R78)", () 
     expect((await change('admin', target, { add: [spaceIntegrations(['manage'])] })).status).toBe(
       403,
     );
-    expect(await stored(target)).toBeNull();
+    expect(await stored(target)).toEqual([]);
   });
 
   it('removing needs the ability to grant it: an admin cannot strip what only an owner gives', async () => {

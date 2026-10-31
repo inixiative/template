@@ -1,9 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import { cleanupTouchedTables, createEmailTemplate, createOrganization } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render/save';
 import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
+
+registerMemberSelfGrantHook();
 
 registerRulesHook();
 registerEmailTemplateSlugReservationHook();

@@ -13,6 +13,7 @@ import {
   createOrganizationUser,
 } from '@template/db/test';
 import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
@@ -25,6 +26,7 @@ let organization: Organization;
 const hooks = [
   'fullDelegate',
   'fullDelegate:upsert',
+  'memberSelfGrant',
   'rules:create',
   'rules:upsert',
   'rules:update',
@@ -34,6 +36,7 @@ const hooks = [
 beforeAll(async () => {
   for (const name of hooks) unregisterDbHook(name);
   registerFullDelegateHook();
+  registerMemberSelfGrantHook();
   registerRulesHook();
   ({ entity: organization } = await createOrganization());
 });

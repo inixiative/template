@@ -20,6 +20,7 @@ import {
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
@@ -108,6 +109,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
   beforeAll(async () => {
     registerClearCacheHook();
     registerDelegatedKeysHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: otherOrganization } = await createOrganization());

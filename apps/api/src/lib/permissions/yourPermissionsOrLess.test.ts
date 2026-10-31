@@ -19,6 +19,7 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
@@ -114,6 +115,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
 
   beforeAll(async () => {
     registerClearCacheHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));

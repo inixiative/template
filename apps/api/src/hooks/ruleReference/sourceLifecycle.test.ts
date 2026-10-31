@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
+import {
+  clearHookRegistry,
+  db,
+  type RuleReferenceRow,
+  ruleReferenceTargets,
+  unregisterDbHook,
+} from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -10,6 +16,7 @@ import {
   createTag,
 } from '@template/db/test';
 import { referenceKey } from '@template/shared/rules';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
@@ -71,6 +78,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
 
   beforeAll(async () => {
     registerPreventHardDeleteHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerSegmentConditionsHook();
     registerRuleReferenceHook();

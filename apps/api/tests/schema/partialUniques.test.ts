@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import {
   ContactType,
   TagOwnerModel,
@@ -25,6 +25,7 @@ import {
   getNextSeq,
 } from '@template/db/test';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 
@@ -33,6 +34,7 @@ import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 // (tag↔category check). We avoid registerHooks() because it also wires up
 // the outbound webhook hook which signs payloads with PEM keys not present
 // in the test env.
+registerMemberSelfGrantHook();
 registerRulesHook();
 registerContactRulesHook();
 registerTagOwnerCategoryHook();

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { db, type Prisma, unregisterDbHook } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -10,6 +10,7 @@ import {
 } from '@template/db/test';
 import { memberSelfGrant } from '@template/permissions';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 
 const spaceManage = (spaceId: string) => ({
   resource: 'db:space',
@@ -22,11 +23,11 @@ describe('every member row carries a self-grant to operate itself, and it cannot
 
   beforeAll(async () => {
     registerMemberSelfGrantHook();
+    registerRulesHook();
     ({ entity: organization } = await createOrganization());
   });
 
   afterAll(async () => {
-    unregisterDbHook('memberSelfGrant');
     await cleanupTouchedTables(db);
   });
 
@@ -45,41 +46,56 @@ describe('every member row carries a self-grant to operate itself, and it cannot
     expect(stored.entitlements as unknown).toEqual([memberSelfGrant('db:spaceUser', member)]);
   });
 
-  it('writing entitlements without it keeps it beside the ones written', async () => {
+  it('other entitlements are written beside it', async () => {
     const { entity: space } = await createSpace({}, { organization });
     const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
+    const self = memberSelfGrant('db:organizationUser', member) as Prisma.InputJsonObject;
     const updated = await db.organizationUser.update({
       where: { id: member.id },
-      data: { entitlements: [spaceManage(space.id)] },
+      data: { entitlements: [spaceManage(space.id), self] },
     });
-    expect(updated.entitlements as unknown).toEqual([
-      spaceManage(space.id),
-      memberSelfGrant('db:organizationUser', member),
-    ]);
+    expect(updated.entitlements as unknown).toEqual([spaceManage(space.id), self]);
   });
 
-  it('clearing entitlements keeps it', async () => {
+  it('a write that drops it is refused, by id, by the organization and user key, or in bulk (Aron, 2026-10-31)', async () => {
     const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
-    const updated = await db.organizationUser.update({
-      where: { id: member.id },
-      data: { entitlements: [] },
-    });
-    expect(updated.entitlements as unknown).toEqual([
-      memberSelfGrant('db:organizationUser', member),
-    ]);
+    await expect(
+      db.organizationUser.update({ where: { id: member.id }, data: { entitlements: [] } }),
+    ).rejects.toThrow();
+    await expect(
+      db.organizationUser.update({
+        where: {
+          organizationId_userId: { organizationId: member.organizationId, userId: member.userId },
+        },
+        data: { entitlements: [] },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      db.organizationUser.updateManyAndReturn({
+        where: { id: member.id },
+        data: { entitlements: [] },
+      }),
+    ).rejects.toThrow();
   });
 
-  it('clearing entitlements through the organization and user key keeps it', async () => {
+  it("a write that weakens it, or swaps in another member's, is refused", async () => {
     const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
-    const updated = await db.organizationUser.update({
-      where: {
-        organizationId_userId: { organizationId: member.organizationId, userId: member.userId },
-      },
-      data: { entitlements: [] },
-    });
-    expect(updated.entitlements as unknown).toEqual([
-      memberSelfGrant('db:organizationUser', member),
-    ]);
+    const { entity: other } = await createOrganizationUser({ role: 'member' }, { organization });
+    const self = memberSelfGrant('db:organizationUser', member) as Prisma.InputJsonObject;
+    await expect(
+      db.organizationUser.update({
+        where: { id: member.id },
+        data: { entitlements: [{ ...self, actions: { read: true } }] },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      db.organizationUser.update({
+        where: { id: member.id },
+        data: {
+          entitlements: [memberSelfGrant('db:organizationUser', other) as Prisma.InputJsonObject],
+        },
+      }),
+    ).rejects.toThrow();
   });
 
   it('an upsert that creates the member writes it', async () => {

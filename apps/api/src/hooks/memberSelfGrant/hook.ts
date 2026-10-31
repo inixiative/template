@@ -4,7 +4,7 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
+import { DbAction, HookTiming, registerDbHook } from '@template/db';
 import { isMemberSelfGrant, type MemberResource, memberSelfGrant } from '@template/permissions';
 import { castArray } from 'lodash-es';
 
@@ -30,29 +30,16 @@ const onCreate = (model: MemberModel, row: Row) => {
   row.entitlements = withSelfGrant(model, row as Member, row.entitlements);
 };
 
-const onWrite = async (model: MemberModel, where: Row, data: Row) => {
-  if (!('entitlements' in data)) return;
-  const member = (await db.delegate(model).findUnique({ where })) as Member | null;
-  if (member) data.entitlements = withSelfGrant(model, member, data.entitlements);
-};
-
 export const registerMemberSelfGrantHook = () => {
   registerDbHook(
     'memberSelfGrant',
     ['OrganizationUser', 'SpaceUser'],
     HookTiming.before,
-    [DbAction.create, DbAction.createManyAndReturn, DbAction.update, DbAction.upsert],
+    [DbAction.create, DbAction.createManyAndReturn, DbAction.upsert],
     async ({ model, action, args }) => {
       const memberModel = model as MemberModel;
-      if (action === DbAction.upsert) {
-        const { where, create, update } = args as { where: Row; create: Row; update: Row };
-        onCreate(memberModel, create);
-        return onWrite(memberModel, where, update);
-      }
-      if (action === DbAction.update) {
-        const { where, data } = args as { where: Row; data: Row };
-        return onWrite(memberModel, where, data);
-      }
+      if (action === DbAction.upsert)
+        return onCreate(memberModel, (args as { create: Row }).create);
       for (const row of castArray((args as { data: Row | Row[] }).data) as Row[])
         onCreate(memberModel, row);
     },

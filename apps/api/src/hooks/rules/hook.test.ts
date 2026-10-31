@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { db, snapshotHookRegistry } from '@template/db';
+import { db, snapshotHookRegistry, unregisterDbHook } from '@template/db';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { clearRulesCache, RulesRegistry, setRulesCache } from '#/hooks/rules/registry';

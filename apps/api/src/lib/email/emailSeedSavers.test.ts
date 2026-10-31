@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
 import {
@@ -9,6 +9,7 @@ import {
   createTagCategory,
 } from '@template/db/test';
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { emailSeedSavers } from '#/lib/email/emailSeedSavers';
@@ -34,6 +35,7 @@ const invalidTemplate: SeedFile = {
 };
 
 beforeAll(() => {
+  registerMemberSelfGrantHook();
   registerRulesHook();
   registerRuleReferenceHook();
 });

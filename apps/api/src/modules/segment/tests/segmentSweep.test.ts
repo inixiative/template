@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -9,6 +9,7 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -28,6 +29,7 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();

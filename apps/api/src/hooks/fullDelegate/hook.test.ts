@@ -8,6 +8,7 @@ import {
   createOrganizationUser,
 } from '@template/db/test';
 import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
@@ -24,20 +25,12 @@ describe('writing full clears the role and entitlements beside it', () => {
 
   beforeAll(async () => {
     registerFullDelegateHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     ({ entity: organization } = await createOrganization());
   });
 
   afterAll(async () => {
-    for (const name of [
-      'fullDelegate',
-      'fullDelegate:upsert',
-      'rules:create',
-      'rules:upsert',
-      'rules:update',
-      'rules:updateManyAndReturn',
-    ])
-      unregisterDbHook(name);
     await cleanupTouchedTables(db);
   });
 
