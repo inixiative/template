@@ -4,7 +4,6 @@
  * @partOf primitive:authz
  * @uses none
  */
-import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import {
   createPermissions,
@@ -23,11 +22,11 @@ type OrganizationMember = { role: Role; organizationId: string; entitlements?: u
 type SpaceMember = { role: Role; spaceId: string; entitlements?: unknown };
 
 export const organizationOwnerGrants = (organizationId: string): Grant[] => [
-  { entries: [getOrgPermissions('owner', organizationId as OrganizationId)] },
+  { entries: [getOrgPermissions('owner', organizationId)] },
 ];
 
 export const spaceOwnerGrants = (spaceId: string): Grant[] => [
-  { entries: [getSpacePermissions('owner', spaceId as SpaceId)] },
+  { entries: [getSpacePermissions('owner', spaceId)] },
 ];
 
 const ownedBy = (entries: EntitlementEntry[], owner: Grant[]): Grant[] =>
@@ -40,11 +39,9 @@ export const userGrants = (
 ): Grant[] => [
   {
     entries: [
-      ...(userId ? [getUserPermissions(userId as UserId)] : []),
-      ...members.map((member) =>
-        getOrgPermissions(member.role, member.organizationId as OrganizationId),
-      ),
-      ...spaceMembers.map((member) => getSpacePermissions(member.role, member.spaceId as SpaceId)),
+      ...(userId ? [getUserPermissions(userId)] : []),
+      ...members.map((member) => getOrgPermissions(member.role, member.organizationId)),
+      ...spaceMembers.map((member) => getSpacePermissions(member.role, member.spaceId)),
     ],
   },
   ...members.flatMap((member) =>

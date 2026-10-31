@@ -1,4 +1,4 @@
-import { db, type SpaceId } from '@template/db';
+import { db } from '@template/db';
 import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import {
   baseResolutionInputSchema,
@@ -14,7 +14,7 @@ const validate = async (inquiry: Partial<Inquiry>, content: UpdateSpaceContent):
   const { slug } = content;
   if (!slug) return;
 
-  const spaceId = inquiry.sourceSpaceId as SpaceId;
+  const spaceId = inquiry.sourceSpaceId!;
   const space = await db.space.findUniqueOrThrow({ where: { id: spaceId } });
 
   const [existingSpace, existingInquiry] = await Promise.all([
@@ -53,7 +53,7 @@ export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
 
   handleApprove: async (inquiry, content) => {
     const space = await db.space.update({
-      where: { id: inquiry.sourceSpaceId as SpaceId },
+      where: { id: inquiry.sourceSpaceId! },
       data: content,
     });
     await emitAppEvent('space.updated', { space });

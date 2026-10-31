@@ -4,7 +4,6 @@
  * @partOf feature:inquiry
  * @uses feature:tenancy, feature:users
  */
-import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { getResource, getResourceType } from '#/lib/context/getResource';
@@ -20,12 +19,12 @@ const nullSourceFields = {
 };
 
 export type InquirySourceFields =
-  | { sourceModel: (typeof InquiryResourceModel)['User']; sourceUserId: UserId }
+  | { sourceModel: (typeof InquiryResourceModel)['User']; sourceUserId: string }
   | {
       sourceModel: (typeof InquiryResourceModel)['Organization'];
-      sourceOrganizationId: OrganizationId;
+      sourceOrganizationId: string;
     }
-  | { sourceModel: (typeof InquiryResourceModel)['Space']; sourceSpaceId: SpaceId }
+  | { sourceModel: (typeof InquiryResourceModel)['Space']; sourceSpaceId: string }
   | { sourceModel: (typeof InquiryResourceModel)['admin'] };
 
 export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields => {
@@ -36,7 +35,7 @@ export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields =>
     return {
       ...nullSourceFields,
       sourceModel: InquiryResourceModel.Organization,
-      sourceOrganizationId: org.id as OrganizationId,
+      sourceOrganizationId: org.id,
     };
   }
 
@@ -45,7 +44,7 @@ export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields =>
     return {
       ...nullSourceFields,
       sourceModel: InquiryResourceModel.Space,
-      sourceSpaceId: space.id as SpaceId,
+      sourceSpaceId: space.id,
     };
   }
 
@@ -53,6 +52,6 @@ export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields =>
   return {
     ...nullSourceFields,
     sourceModel: InquiryResourceModel.User,
-    sourceUserId: user.id as UserId,
+    sourceUserId: user.id,
   };
 };

@@ -6,7 +6,6 @@
  */
 import type { Prisma } from '@template/db';
 import type { ContactType } from '@template/db/generated/client/enums';
-import { contactId as toContactId } from '@template/db/typedModelIds';
 import { ContactRegistry } from '@template/shared/contact';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
@@ -69,7 +68,7 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
   });
   for (const c of contacts) {
     const def = ContactRegistry[c.type as ContactType];
-    const scrubbed = def.redact(toContactId(c.id), c.value as never);
+    const scrubbed = def.redact(c.id, c.value as never);
     await db.contact.update({
       where: { id: c.id },
       data: { value: scrubbed as Prisma.InputJsonValue, deletedAt: now },

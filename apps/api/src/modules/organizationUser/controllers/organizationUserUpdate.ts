@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import { hydrate, type OrganizationId, Prisma } from '@template/db';
+import { hydrate, Prisma } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { memberRoleWrite } from '@template/permissions/rebac/schemaHelpers';
@@ -34,7 +34,7 @@ export const organizationUserUpdateController = makeController(
       throw makeError({ status: 403, message: 'Access denied' });
 
     if (orgUser.role === Role.owner && body.role !== undefined && body.role !== Role.owner) {
-      await validateNotLastOwner(orgUser.organizationId as OrganizationId);
+      await validateNotLastOwner(orgUser.organizationId);
     }
 
     const updated = await db.organizationUser.update({

@@ -4,7 +4,6 @@
  * @partOf primitive:authz
  * @uses feature:tenancy
  */
-import type { SpaceId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import type { PermissionEntry } from '@template/permissions/client';
 
@@ -15,7 +14,7 @@ export const spaceRoles = {
   viewer: { space: { read: true } },
 } as const;
 
-export const getSpacePermissions = (role: Role, spaceId: SpaceId): PermissionEntry => {
+export const getSpacePermissions = (role: Role, spaceId: string): PermissionEntry => {
   const baseActions = spaceRoles[role].space;
   return {
     resource: 'db:space',

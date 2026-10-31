@@ -74,7 +74,6 @@
 
 | Type | Convention | Example |
 |------|------------|---------|
-| ID types | `<Model>Id` | `UserId`, `OrganizationId` |
 | Context values | camelCase | `user`, `organization`, `permix` |
 | Primitive constants | SCREAMING_SNAKE | `DEFAULT_PAGE_SIZE`, `MAX_RETRIES` |
 | Object constants (enums/registries) | PascalCase | `Modules`, `JobType`, `BatchStatus` |
@@ -87,13 +86,12 @@ Two distinct meanings — **don't mix them**:
 | Prefix | Meaning | Example |
 |--------|---------|---------|
 | `_name` | **Unused** variable/parameter | `(_input, key) => …`, `const { x: _drop, ...rest } = obj` |
-| `__name` | **Private / internal** — not for outside use | `private __body`, `__model` phantom-type brand, `__send()` |
+| `__name` | **Private / internal** — not for outside use | `private __body`, `__send()` |
 
-**Why both?** TypeScript's `private` keyword only works on class members. For module-level helpers, object literal keys, type brands, and other plain-data internals, there is no language-level private. The double-underscore convention covers those cases. Single underscore is reserved for the universal "ignored" meaning (matches `argsIgnorePattern: "^_"`).
+**Why both?** TypeScript's `private` keyword only works on class members. For module-level helpers, object literal keys, and other plain-data internals, there is no language-level private. The double-underscore convention covers those cases. Single underscore is reserved for the universal "ignored" meaning (matches `argsIgnorePattern: "^_"`).
 
 **Apply consistently:**
 - Class private methods/fields: `private __methodName()`, `private __field` (the keyword *and* the prefix reinforce intent).
-- Type brand keys on phantom types: `string & { readonly __model: Model }`.
 - Object-literal helpers a consumer shouldn't reach into: `{ __cache: …, lookup() { … } }`.
 - Unused destructured fields: `const { legacy: _legacy, ...rest }`.
 - Unused callback params: `(_event, payload) => …`.
@@ -237,7 +235,6 @@ back-relations do the same, side plus the full model name: `sourceRuleReferences
 
 TODO: Document ID format
 - UUIDv7 for sortability
-- Type-safe branded IDs
 
 ---
 

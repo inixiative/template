@@ -162,7 +162,6 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | run only the api in watch mode; start just the backend; I'll start the whole stack to work on the api | **turbo watch local#api** · primitive docs/claude/DEVELOPER.md § Development — all services at once: bun run local instead | part 4 | — |
 | run only the web frontend; start just the web app locally; I'll bring up everything for a frontend change | **turbo watch local#web** · primitive docs/claude/DEVELOPER.md § Development — all services at once: bun run local instead | part 4 | — |
 | run only the job worker, watched; start just the worker with reload; I'll run the api when I only need the worker; the worker alone in watch mode | **turbo watch local:worker#api** · primitive docs/claude/DEVELOPER.md § Development — all services at once: bun run local instead | part 4 | — |
-| declare the typed id kind for a new model; add the id type when adding a model; I'll use a plain string for the new model's id | **typedModelIds** · primitive packages/db/src/typedModelIds.ts — declare typed ID kinds for each Prisma model | part 4 | — |
 | wait for the services before running the script; don't sleep, wait for readiness; I'll add a fixed sleep in the ci step; block until postgres and redis answer | **wait-postgres.sh / wait-redis.sh** · primitive scripts/db/wait-postgres.sh, scripts/db/wait-redis.sh — Scripts and CI; local:db already waits via --wait. | part 4 | — |
 | local uploads disappear when the container restarts; minio storage isn't persistent on purpose; I'll add a volume so uploads survive | **Ephemeral local storage** · rule docs/claude/DOCKER.md § Storage buckets — Local development with MinIO. | part 4 | — |
 | the local env file is gitignored; I'll commit my env file so others get it; where do local env values live | **Local env files are not committed** · rule docs/claude/SETUP.md > Environment Variables — local development and test runner configuration | part 4 | — |
@@ -708,9 +707,8 @@ When creating a new project from this template:
 
 1. Update package names from `@template/*` to `@yourproject/*`
 2. Add your app-specific models to `packages/db/prisma/schema/`
-3. Update typed model IDs in `packages/db/src/typedModelIds.ts`
-4. Update CLAUDE.md with project-specific context
-5. Update reference repos if you have similar production codebases
+3. Update CLAUDE.md with project-specific context
+4. Update reference repos if you have similar production codebases
 
 <!-- unit doc:docs/claude/DATABASE.md#local-setup -->
 **Source:** `docs/claude/DATABASE.md` § Local Setup (in "Database")
