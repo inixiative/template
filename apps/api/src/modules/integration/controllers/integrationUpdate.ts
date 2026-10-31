@@ -1,15 +1,5 @@
-/**
- * @atlas
- * @kind controller
- * @partOf feature:integrations
- * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
- */
-import { check } from '@inixiative/json-rules';
 import type { Prisma } from '@template/db';
-import { wellFormedEntitlements } from '@template/permissions';
-import { delegateHoldsSomething } from '#/hooks/rules/delegatePermissionRules';
 import { getResource } from '#/lib/context/getResource';
-import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationUpdateRoute } from '#/modules/integration/routes/integrationUpdate';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationGrant';

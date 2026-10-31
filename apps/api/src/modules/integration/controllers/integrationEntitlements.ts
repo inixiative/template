@@ -4,7 +4,7 @@
  * @partOf feature:integrations
  * @uses primitive:authz, infrastructure:prisma
  */
-import { hydrate, type Prisma } from '@template/db';
+import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { makeController } from '#/lib/utils/makeController';

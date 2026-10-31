@@ -9,10 +9,8 @@ import { type AccessorName, fetchOne, type HydratedRecord, hydrate } from '@temp
 import type { EntitlementEntry, Permix } from '@template/permissions';
 import {
   canGrantEntitlement,
-  check,
   entitlementProblem,
   placeEntitlement,
-  rebacSchema,
   schemaMap,
 } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';

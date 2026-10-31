@@ -108,18 +108,13 @@ export const integrationAdministering = {
     any: [
       createdByItsUserOrManager,
       {
-        all: [
-          ownedBy(members),
-          'manage',
-          actionOnOwner('operate', '', members),
-          operatesAtItsMembersTenant,
-        ],
+        all: [ownedBy(members), actionOnOwner('operate', '', members), operatesAtItsMembersTenant],
       },
     ],
   },
   manage: {
     any: [
-      { all: [ownedBy(['User']), managesItsUser()] },
+      actionOnOwner('manage', '', ['User']),
       actionOnOwner('manage', '', organizationOrSpace),
       actionOnOwner('operate', '', members),
     ],
@@ -130,7 +125,7 @@ export const integrationAdministering = {
       actorIsUser,
       {
         any: [
-          { all: [ownedBy(['User']), managesItsUser()] },
+          actionOnOwner('manage', '', ['User']),
           actionOnOwner('own', '', organizationOrSpace),
           actionOnOwner('operate', '', members),
         ],
@@ -171,7 +166,7 @@ export const tokenAccessIsYours: ActionRule = {
 
 export const tokenAdministering: ActionRule = {
   any: [
-    { all: [ownedBy(['User']), managesItsUser()] },
+    actionOnOwner('manage', '', ['User']),
     actionOnOwner('manage', '', organizationOrSpace),
     actionOnOwner('operate', '', members),
     actionOnOwner('own', '', members),
