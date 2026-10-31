@@ -7,7 +7,6 @@
 import { Operator } from '@inixiative/json-rules';
 import { ContactSource, InquiryType } from '@template/db/generated/client/enums';
 import {
-  actionOnOwner,
   actorIsDelegateOfUser,
   actorIsUser,
   chainedStandardActions,

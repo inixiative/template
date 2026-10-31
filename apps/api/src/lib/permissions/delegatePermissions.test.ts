@@ -332,13 +332,13 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       const { user: other, organizationUser: otherMember } = await asMember('member');
       expect((await revoke(other, [otherMember], member.id!)).status).toBe(403);
       expect((await revoke(admin, [adminMember], member.id!)).status).toBe(403);
-      const { user: orgOwner, organizationUser: ownerSeat } = await asMember('owner');
-      expect((await revoke(orgOwner, [ownerSeat], full.id!)).status).toBe(204);
+      const { user: orgOwner, organizationUser: ownerMember } = await asMember('owner');
+      expect((await revoke(orgOwner, [ownerMember], full.id!)).status).toBe(204);
       expect((await revoke(user, [organizationUser], mine.id!)).status).toBe(204);
     });
   });
 
-  it('a member token inherits its member entitlements capped at its role; a full token on your member row is the member (R90), a full user token is the user', async () => {
+  it('a member token inherits its member entitlements capped at its role; a full token on your member row is the member, a full user token is the user', async () => {
     const { entity: user } = await createUser();
     const { entity: organizationUser } = await createOrganizationUser(
       {
@@ -373,7 +373,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
     expect(await holds(whole.key!, 'organization', organization.id, 'manage')).toBe(true);
   });
 
-  describe('setting full takes holding or owning the direct owner, for tokens and integrations alike (Aron, 2026-10-26; R90)', () => {
+  describe('setting full takes delegateFull on the direct owner, for tokens and integrations alike (Aron, 2026-10-30)', () => {
     type Mint = {
       name: string;
       memberRole: Role;
@@ -489,7 +489,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
         status: 200,
       },
       {
-        name: 'an admin member makes it full: they hold it (R90)',
+        name: 'an admin member makes it full',
         memberRole: 'admin',
         before: { role: 'viewer' },
         after: { full: true, role: null },
@@ -503,14 +503,14 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
         status: 200,
       },
       {
-        name: 'an admin member takes full away (R90)',
+        name: 'an admin member takes full away',
         memberRole: 'admin',
         before: { full: true },
         after: { full: false, role: 'member' },
         status: 200,
       },
       {
-        name: 'a member member makes it full (R90)',
+        name: 'a member member makes it full',
         memberRole: 'member',
         before: { role: 'viewer' },
         after: { full: true, role: null },
@@ -542,7 +542,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
     });
 
     for (const spaceRole of ['owner', 'admin'] as const)
-      it(`its user makes their space member's integration full as a space ${spaceRole}: they hold it (R90)`, async () => {
+      it(`its user makes their space member's integration full as a space ${spaceRole}`, async () => {
         const { user, organizationUser } = await asMember('member');
         const { entity: spaceUser } = await createSpaceUser(
           { role: spaceRole },

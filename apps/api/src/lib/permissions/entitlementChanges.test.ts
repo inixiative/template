@@ -26,10 +26,13 @@ afterAll(async () => {
 });
 
 const writer = async (role: Role) => {
-  const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
+  const { entity: organizationUser, context } = await createOrganizationUser(
+    { role },
+    { organization },
+  );
   return createTestApp({
     mockUser: context.user,
-    mockOrganizationUsers: [seat],
+    mockOrganizationUsers: [organizationUser],
     mount: [
       (hono) => {
         hono.route('/api/v1/organizationUser', organizationUserRouter);
@@ -158,17 +161,17 @@ describe('integrations and tokens change their entitlements the same way', () =>
   });
 
   it("a member's token: its user adds and removes any entitlement; the member caps it (R91)", async () => {
-    const { entity: seat, context } = await createOrganizationUser(
+    const { entity: organizationUser, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
     );
     const { entity: token } = await createKeyedToken(
       { ownerModel: 'OrganizationUser', role: 'viewer' },
-      { organizationUser: seat },
+      { organizationUser: organizationUser },
     );
     const app = createTestApp({
       mockUser: context.user,
-      mockOrganizationUsers: [seat],
+      mockOrganizationUsers: [organizationUser],
       mount: [(hono) => hono.route('/api/v1/token', tokenRouter)],
     });
     const to = (body: { add?: Entry[]; remove?: Entry[] }) =>

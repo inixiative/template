@@ -85,20 +85,20 @@ describe('a token deletes tokens: it only removes access (R84)', () => {
   });
 
   const memberToken = async (
-    seat: OrganizationUser,
+    member: OrganizationUser,
     data: { role: 'admin' | 'viewer' | null; full?: boolean },
-  ) => createKeyedToken({ ownerModel: 'OrganizationUser', ...data }, { organizationUser: seat });
+  ) => createKeyedToken({ ownerModel: 'OrganizationUser', ...data }, { organizationUser: member });
 
   it("a member's full token deletes another token of that member", async () => {
-    const { entity: seat } = await createOrganizationUser({ role: 'admin' });
-    const { rawKey } = await memberToken(seat, { role: null, full: true });
-    const { entity: sibling } = await memberToken(seat, { role: 'viewer' });
+    const { entity: member } = await createOrganizationUser({ role: 'admin' });
+    const { rawKey } = await memberToken(member, { role: null, full: true });
+    const { entity: sibling } = await memberToken(member, { role: 'viewer' });
     expect((await call(rawKey, 'DELETE', `/api/v1/token/${sibling.id}`)).status).toBe(204);
   });
 
   it("a token cannot delete a token outside its owner's reach", async () => {
-    const { entity: seat, context } = await createOrganizationUser({ role: 'member' });
-    const { rawKey } = await memberToken(seat, { role: null, full: true });
+    const { entity: member, context } = await createOrganizationUser({ role: 'member' });
+    const { rawKey } = await memberToken(member, { role: null, full: true });
     const { entity: other } = await createOrganizationUser(
       { role: 'member' },
       { organization: context.organization },

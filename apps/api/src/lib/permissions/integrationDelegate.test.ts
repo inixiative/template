@@ -262,7 +262,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       expect(await holds(key, 'organization', organization.id, 'manage')).toBe(false);
     });
 
-    it('an admin-role member gives manage on a space; it does not manage it (R91)', async () => {
+    it('an admin-role member gives manage on a space (R91)', async () => {
       const manageSpace = [entry('db:space', ['db:space', space.id], ['manage'])];
       expect((await grant('admin', manageSpace)).status).toBe(200);
     });

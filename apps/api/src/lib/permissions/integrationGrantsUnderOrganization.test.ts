@@ -21,7 +21,6 @@ const { holds } = createTokenProbeApp();
 
 type Kind = 'Organization' | 'Space' | 'OrganizationUser' | 'SpaceUser';
 const kinds: Kind[] = ['Organization', 'Space', 'OrganizationUser', 'SpaceUser'];
-const actions = ['read', 'operate', 'manage', 'own', 'delete'] as const;
 
 let organization: Organization;
 const integrations = {} as Record<Kind, Integration>;
@@ -60,36 +59,26 @@ afterAll(async () => {
   await cleanupTouchedTables(db);
 });
 
-const seatKey = async (role: Role, entitlements?: Entry[]) => {
-  const { entity: seat } = await createOrganizationUser({ role, entitlements }, { organization });
+const memberKey = async (role: Role, entitlements?: Entry[]) => {
+  const { entity: member } = await createOrganizationUser({ role, entitlements }, { organization });
   return (
     await createKeyedToken(
       { ownerModel: 'OrganizationUser', full: true, role: null },
-      { organizationUser: seat },
+      { organizationUser: member },
     )
   ).rawKey;
 };
 
-const _reach = async (key: string) => {
-  const table: Record<string, string[]> = {};
-  for (const kind of kinds) {
-    table[kind] = [];
-    for (const action of actions)
-      if (await holds(key, 'integration', integrations[kind].id, action)) table[kind].push(action);
-  }
-  return table;
-};
-
 describe('granted: the where narrows the kinds an entitlement under the organization reaches (R81, R83)', () => {
   const grant = async (role: Role, granted: Entry, held?: Entry[]) => {
-    const { entity: seat, context } = await createOrganizationUser(
+    const { entity: member, context } = await createOrganizationUser(
       { role, entitlements: held },
       { organization },
     );
     const { entity: target } = await createOrganizationUser({ role: 'viewer' }, { organization });
     const { app } = createTestApp({
       mockUser: context.user,
-      mockOrganizationUsers: [seat],
+      mockOrganizationUsers: [member],
       mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
     });
     return (
@@ -116,13 +105,13 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
   });
 
   it('the holder of the unfiltered grant deletes all four kinds', async () => {
-    const key = await seatKey('viewer', [underOrganization()]);
+    const key = await memberKey('viewer', [underOrganization()]);
     for (const kind of kinds)
       expect(await holds(key, 'integration', integrations[kind].id, 'delete')).toBe(true);
   });
 
   it("the holder of the filtered grant deletes the organization's own, nothing else", async () => {
-    const key = await seatKey('viewer', [theOrganizations()]);
+    const key = await memberKey('viewer', [theOrganizations()]);
     expect(await holds(key, 'integration', integrations.Organization.id, 'delete')).toBe(true);
     for (const kind of ['Space', 'OrganizationUser', 'SpaceUser'] as const)
       expect(await holds(key, 'integration', integrations[kind].id, 'delete')).toBe(false);
@@ -176,7 +165,7 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
   });
 
   it('the holder of an `in` grant deletes the kinds it names, nothing else', async () => {
-    const key = await seatKey('viewer', [kindsIn('Organization', 'OrganizationUser')]);
+    const key = await memberKey('viewer', [kindsIn('Organization', 'OrganizationUser')]);
     expect(await holds(key, 'integration', integrations.Organization.id, 'delete')).toBe(true);
     expect(await holds(key, 'integration', integrations.OrganizationUser.id, 'delete')).toBe(true);
     for (const kind of ['Space', 'SpaceUser'] as const)
@@ -186,14 +175,14 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
 
 describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one held entitlement (R103)', () => {
   const grant = async (granted: Entry, held: Entry[]) => {
-    const { entity: seat, context } = await createOrganizationUser(
+    const { entity: member, context } = await createOrganizationUser(
       { role: 'admin', entitlements: held },
       { organization },
     );
     const { entity: target } = await createOrganizationUser({ role: 'viewer' }, { organization });
     const { app } = createTestApp({
       mockUser: context.user,
-      mockOrganizationUsers: [seat],
+      mockOrganizationUsers: [member],
       mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
     });
     return (

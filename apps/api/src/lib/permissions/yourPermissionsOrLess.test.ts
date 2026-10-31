@@ -353,12 +353,12 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect((await mint(m, path, { role: 'owner' })).status).toBe(201);
     });
 
-    it('its user mints a full token on it: they are its owner', async () => {
+    it('its user mints a full token on it: they operate its member', async () => {
       const { m, integration } = await memberIntegration();
       expect((await mint(m, `integration/${integration.id}`, { full: true })).status).toBe(201);
     });
 
-    it('a member mints a full token on their member row: they hold it (R90)', async () => {
+    it('a member mints a full token on their member row: they operate it', async () => {
       const m = await member('member');
       expect(
         (await mint(m, `organizationUser/${m.organizationUser.id}`, { role: null, full: true }))

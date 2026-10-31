@@ -148,7 +148,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
 
   it('send is not grantable from the target side: every way to send reads the source, which the path leaves unknown', async () => {
     const { entity: other } = await createOrganization();
-    const { entity: wSeat, context } = await createOrganizationUser(
+    const { entity: writerMember, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
     );
@@ -158,7 +158,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     );
     const app = createTestApp({
       mockUser: context.user,
-      mockOrganizationUsers: [wSeat, wOther],
+      mockOrganizationUsers: [writerMember, wOther],
       mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
     });
     const sendAtOther = entry(
@@ -167,7 +167,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       ['send'],
     );
     const response = await app.fetch(
-      patch(`/api/v1/organizationUser/${wSeat.id}/entitlements`, { add: [sendAtOther] }),
+      patch(`/api/v1/organizationUser/${writerMember.id}/entitlements`, { add: [sendAtOther] }),
     );
     expect(response.status).toBe(403);
   });

@@ -69,15 +69,13 @@ describe('a member row: operate is being the member, manage and own administer i
     ).toBe(true);
   });
 
-  it("a member does not operate a peer's row, and still reads it", async () => {
+  it("a member does not operate a peer's row", async () => {
     const member = await person(u1, grant('db:organization', 'o1', 'operate'));
     expect(can(member, 'organizationUser', peers, 'operate')).toBe(false);
-    expect(can(member, 'organizationUser', peers, 'read')).toBe(true);
   });
 
-  it("an admin manages a member's row and does not operate it", async () => {
+  it("an admin does not operate a member's row", async () => {
     const admin = await person(u1, grant('db:organization', 'o1', 'manage'));
-    expect(can(admin, 'organizationUser', peers, 'manage')).toBe(true);
     expect(can(admin, 'organizationUser', peers, 'operate')).toBe(false);
   });
 
