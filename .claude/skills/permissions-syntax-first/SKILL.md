@@ -66,8 +66,8 @@ Shared pieces already in `schema.ts` — reuse, don't re-derive:
 - `actorIsUser` (`__actor.model == User`), `actorIsDelegateOfUser` (`__actor.record.ownerModel == User`);
 - `actionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
 - `roleHeldAtOwner`: the role on the row is one the actor holds at the direct owner (owner `own`, admin `manage`, member `operate`, viewer `read`, via `roleToStandardAction`);
-- `memberRowActions(tenant)`: a member row's `operate` (its user), `manage`/`own` (the tenant), `read`, `leave`, `delegateFull`;
-- `memberRoleWrite(tenant)`: manage the tenant and hold there the role being set; `memberRemoval(tenant)` = `leave` or `memberRoleWrite`; `integrationRoleWrite`: `manage` on the integration and the role held at its owner. Rules routes and controllers check, never named actions;
+- `memberRowActions(tenant)`: a member row's `operate` and `leave` (`manage` on its user: reaching another tenancy through a user needs manage; `operate` on a user stays in that user's tenancy), `manage`/`own` (the tenant), `read`, `delegateFull`;
+- `memberRoleWrite(tenant)`: manage the tenant and hold there the role being set; `memberRemoval(tenant)` = `leave` or `memberRoleWrite`; `integrationRoleWrite`: `delegateFull` on its owner, or `manage` on the integration and the role held at its owner. Rules routes and controllers check, never named actions;
 - `integrationAdministering` / `integrationAccess`, `tokenAccessIsYours` / `tokenAdministering`: integrations and tokens administered by their owner's kind (tenant: the tenant's roles; member: `operate` on the member row, the tenant owner reads and deletes; user: the user);
 - `delegateFull`: the person-only action on a delegate's owner that lets you set `full` (`validateFullGrant` checks it);
 - `managesItsUser(at)`: `{ rel: `${at}user`, action: 'manage' }` — the user, or a delegate of the user at manage or above;

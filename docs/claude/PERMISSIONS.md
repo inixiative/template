@@ -234,11 +234,11 @@ The table says what a principal holds. The actor says only who is acting: `permi
 
 | Action on M1 | Who holds it | Rule |
 |---|---|---|
-| `operate` (being M1) | U1, and whoever holds M1's own permissions whole | `{ rel: 'user', action: 'operate' }`, plus the member self-grant |
+| `operate` (being M1) | U1, and whoever holds M1's own permissions whole | `{ rel: 'user', action: 'manage' }`, plus the member self-grant |
 | `manage` (administering M1) | an admin or owner of O1 | `own`, or `manage` on O1 |
 | `own` | the owner of O1 | `own` on O1 |
 | `read` | U1, O1's admins and owner, and anyone who reads O1 | `operate`, `manage`, `read` on U1, or `read` on O1 |
-| `leave` | U1 | `{ rel: 'user', action: 'operate' }` |
+| `leave` | U1 | `{ rel: 'user', action: 'manage' }` |
 | `delegateFull` | U1, as a person | `actorIsUser` and `operate` |
 
 So the owner of O1 owns M1 and still does not operate it: removing M1 is the owner's, acting as M1 is U1's (`packages/permissions/src/rebac/memberRow.test.ts`). A member's things (its integrations, its tokens) are administered by `operate` on the member row, so they follow the person, not the tenant.
@@ -614,7 +614,7 @@ The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed
 | `{ all: ActionRule[] }` | all pass | `{ all: [actorIsUser, 'own'] }` |
 | `null` | only a held grant passes | `own: null` |
 
-Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'operate' }` passes when the record's `user` is a user the credential holds `operate` on. The record must arrive with `user` hydrated; a bare foreign key is denied, never guessed (`principals.test.ts`).
+Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'operate' }` passes when the record's `user` is a user the credential holds `operate` on. `operate` on a user stays inside that user's own tenancy (the user's own tokens, integrations and records). Reaching into another tenancy through the user needs `manage` on them: being one of their members (`operate` and `leave` on a member row) and resolving an inquiry addressed to them. So a member-role token on U1 handles U1's own things but neither acts as U1's members, leaves an organization nor accepts an invite; an admin- or owner-role token on U1, a full one, and U1 do (`memberRow.test.ts`, `principals.test.ts`, `memberRemoval.test.ts`). The record must arrive with `user` hydrated; a bare foreign key is denied, never guessed (`principals.test.ts`).
 
 ### How It Works
 
