@@ -8,17 +8,8 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
+import { memberSelfGrant } from '@template/permissions';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-
-const selfGrant = (
-  resource: 'db:organizationUser' | 'db:spaceUser',
-  member: { id: string; userId: string },
-) => ({
-  resource,
-  anchor: { resource: 'db:user', id: member.userId, path: 'user' },
-  where: { field: 'id', operator: 'equals', value: member.id },
-  actions: { operate: true },
-});
 
 const spaceManage = (spaceId: string) => ({
   resource: 'db:space',
@@ -42,14 +33,16 @@ describe('every member row carries a self-grant to operate itself, and it cannot
   it('an organization member row is created with it', async () => {
     const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
     const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: member.id } });
-    expect(stored.entitlements).toEqual([selfGrant('db:organizationUser', member)]);
+    expect(stored.entitlements as unknown).toEqual([
+      memberSelfGrant('db:organizationUser', member),
+    ]);
   });
 
   it('a space member row is created with it', async () => {
     const { entity: space } = await createSpace({}, { organization });
     const { entity: member } = await createSpaceUser({ role: 'member' }, { space });
     const stored = await db.spaceUser.findUniqueOrThrow({ where: { id: member.id } });
-    expect(stored.entitlements).toEqual([selfGrant('db:spaceUser', member)]);
+    expect(stored.entitlements as unknown).toEqual([memberSelfGrant('db:spaceUser', member)]);
   });
 
   it('writing entitlements without it keeps it beside the ones written', async () => {
@@ -59,9 +52,9 @@ describe('every member row carries a self-grant to operate itself, and it cannot
       where: { id: member.id },
       data: { entitlements: [spaceManage(space.id)] },
     });
-    expect(updated.entitlements).toEqual([
+    expect(updated.entitlements as unknown).toEqual([
       spaceManage(space.id),
-      selfGrant('db:organizationUser', member),
+      memberSelfGrant('db:organizationUser', member),
     ]);
   });
 
@@ -71,6 +64,36 @@ describe('every member row carries a self-grant to operate itself, and it cannot
       where: { id: member.id },
       data: { entitlements: [] },
     });
-    expect(updated.entitlements).toEqual([selfGrant('db:organizationUser', member)]);
+    expect(updated.entitlements as unknown).toEqual([
+      memberSelfGrant('db:organizationUser', member),
+    ]);
+  });
+
+  it('clearing entitlements through the organization and user key keeps it', async () => {
+    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
+    const updated = await db.organizationUser.update({
+      where: {
+        organizationId_userId: { organizationId: member.organizationId, userId: member.userId },
+      },
+      data: { entitlements: [] },
+    });
+    expect(updated.entitlements as unknown).toEqual([
+      memberSelfGrant('db:organizationUser', member),
+    ]);
+  });
+
+  it('an upsert that creates the member writes it', async () => {
+    const { entity: other } = await createOrganizationUser({ role: 'member' }, { organization });
+    const { entity: second } = await createOrganization();
+    const created = await db.organizationUser.upsert({
+      where: {
+        organizationId_userId: { organizationId: second.id, userId: other.userId },
+      },
+      create: { organizationId: second.id, userId: other.userId, role: 'member' },
+      update: { entitlements: [] },
+    });
+    expect(created.entitlements as unknown).toEqual([
+      memberSelfGrant('db:organizationUser', created),
+    ]);
   });
 });

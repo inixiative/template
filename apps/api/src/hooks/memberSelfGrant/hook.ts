@@ -5,8 +5,8 @@
  * @uses infrastructure:prisma
  */
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
-import { type MemberResource, memberSelfGrant } from '@template/permissions';
-import { castArray, isEqual } from 'lodash-es';
+import { isMemberSelfGrant, type MemberResource, memberSelfGrant } from '@template/permissions';
+import { castArray } from 'lodash-es';
 
 type Row = Record<string, unknown>;
 type MemberModel = 'OrganizationUser' | 'SpaceUser';
@@ -19,8 +19,10 @@ const resourceOf: Record<MemberModel, MemberResource> = {
 
 const withSelfGrant = (model: MemberModel, member: Member, entitlements: unknown) => {
   const written = Array.isArray(entitlements) ? entitlements : [];
-  const grant = memberSelfGrant(resourceOf[model], member);
-  return written.some((entry) => isEqual(entry, grant)) ? written : [...written, grant];
+  const resource = resourceOf[model];
+  return written.some(isMemberSelfGrant(resource, member))
+    ? written
+    : [...written, memberSelfGrant(resource, member)];
 };
 
 const onCreate = (model: MemberModel, row: Row) => {
@@ -28,14 +30,10 @@ const onCreate = (model: MemberModel, row: Row) => {
   row.entitlements = withSelfGrant(model, row as Member, row.entitlements);
 };
 
-const storedMember = (model: MemberModel, id: string): Promise<Member> =>
-  model === 'OrganizationUser'
-    ? db.organizationUser.findUniqueOrThrow({ where: { id } })
-    : db.spaceUser.findUniqueOrThrow({ where: { id } });
-
 const onWrite = async (model: MemberModel, where: Row, data: Row) => {
-  if (!('entitlements' in data) || typeof where.id !== 'string') return;
-  data.entitlements = withSelfGrant(model, await storedMember(model, where.id), data.entitlements);
+  if (!('entitlements' in data)) return;
+  const member = (await db.delegate(model).findUnique({ where })) as Member | null;
+  if (member) data.entitlements = withSelfGrant(model, member, data.entitlements);
 };
 
 export const registerMemberSelfGrantHook = () => {
