@@ -154,6 +154,17 @@ describe('Contact CRUD', () => {
       expect(response.status).toBe(422);
     });
 
+    it('rejects a rule that delegates back to its own action', async () => {
+      const response = await fetch(
+        post('/api/v1/me/contacts', {
+          type: 'email',
+          value: { address: `cycle${getNextSeq()}@example.com` },
+          permissionRules: { read: 'read' },
+        }),
+      );
+      expect(response.status).toBe(422);
+    });
+
     // Note: same-owner duplicate detection via @@unique is currently a NO-OP
     // when the polymorphic FKs include NULLs (Postgres treats NULL as distinct).
     // Needs `NullsNotDistinct` or a per-ownerModel partial unique index — follow-up.

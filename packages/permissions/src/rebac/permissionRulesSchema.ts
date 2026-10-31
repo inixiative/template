@@ -4,6 +4,7 @@
  * @partOf primitive:authz
  * @uses none
  */
+import { validateActionRule } from '@inixiative/permissions';
 import type { AccessorName } from '@template/db';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { z } from 'zod';
@@ -33,8 +34,23 @@ export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly 
   const schemaActions = Object.keys(rebacSchema.permissions[`db:${model}`]?.actions ?? {});
   const allowed = pick ? schemaActions.filter((a) => pick.includes(a)) : schemaActions;
   if (allowed.length === 0) return z.never().nullable().optional();
+  const resource = `db:${model}`;
   return z
     .record(z.enum(allowed as [string, ...string[]]), actionRuleSchema)
+    .superRefine((rowRules, ctx) => {
+      for (const [action, rule] of Object.entries(rowRules))
+        for (const issue of validateActionRule(rule, {
+          schema: rebacSchema,
+          resource,
+          action,
+          rowRules,
+        }).errors)
+          ctx.addIssue({
+            code: 'custom',
+            path: [action],
+            message: `${issue.path}: ${issue.message}`,
+          });
+    })
     .nullable()
     .optional();
 };

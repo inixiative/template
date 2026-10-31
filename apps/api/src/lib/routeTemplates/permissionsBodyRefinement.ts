@@ -5,8 +5,6 @@
  * @uses primitive:authz
  */
 import { type ValidationIssue, validateRule } from '@inixiative/json-rules';
-import { validateActionRule } from '@template/permissions/rebac';
-import { isPlainObject } from 'lodash-es';
 import type { z } from 'zod';
 
 const report = (
@@ -19,7 +17,7 @@ const report = (
 };
 
 export const permissionsBodyRefinement = (
-  body: { entitlements?: unknown; add?: unknown; remove?: unknown; permissionRules?: unknown },
+  body: { entitlements?: unknown; add?: unknown; remove?: unknown },
   ctx: z.RefinementCtx,
 ): void => {
   for (const key of ['entitlements', 'add', 'remove'] as const) {
@@ -30,7 +28,4 @@ export const permissionsBodyRefinement = (
           report(ctx, [key, index, 'where'], validateRule(entry.where, { positive: true }).errors);
       });
   }
-  if (isPlainObject(body.permissionRules))
-    for (const [action, rule] of Object.entries(body.permissionRules as Record<string, unknown>))
-      report(ctx, ['permissionRules', action], validateActionRule(rule).errors);
 };
