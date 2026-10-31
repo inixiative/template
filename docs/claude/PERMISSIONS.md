@@ -33,9 +33,9 @@
   - [The Backstop Rules](#the-backstop-rules)
 - [Resolution at Read Time](#resolution-at-read-time)
   - [installPermissions](#installpermissions)
-  - [permissionsOfUser](#usergrants)
-  - [ownerPermissions](#ownertable)
-  - [delegatedPermissions](#delegatetable)
+  - [permissionsOfUser](#permissionsofuser)
+  - [ownerPermissions](#ownerpermissions)
+  - [delegatedPermissions](#delegatedpermissions)
   - [A Token on a Member Row](#a-token-on-a-member-row)
   - [Worked Example: I1](#worked-example-i1)
   - [A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)
@@ -119,6 +119,8 @@ One word per party, used in code and prose alike. Names in code are composed of 
 | **delegate** | a token or an integration |
 | **permissions** | a delegate's `{ role, full, entitlements }` |
 | **entitlement** | a named grant `{ resource, anchor: { resource, id, path? }, where?, actions }` |
+| **member self-grant** | the entitlement every member row carries to `operate` on itself, backed by its user ([The Member Self-Grant](#the-member-self-grant)) |
+| **delegateFull** | the person-only action on an owner that lets you set `full` on its delegate ([Full and delegateFull](#full-and-delegatefull)) |
 | **anchor** | the record an entitlement acts from, reached from the entitled record along `path` |
 | **pseudo record** | the would-be row a create, a collection action or a grant is checked on |
 | **me** | the user when the actor is a user, or a User-owned token's user (`me(c)`) |
