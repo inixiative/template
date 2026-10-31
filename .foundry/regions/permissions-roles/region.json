@@ -1,9 +1,11 @@
 {
   "id": "permissions-roles",
   "title": "Roles, actions and permission checks",
-  "routing": "Is this about who may do what by role: PlatformRole and superadmin, Role on OrganizationUser / SpaceUser (owner, admin, member, viewer; roleHierarchy, isSuperadmin), StandardAction tiers (own \u2287 manage \u2287 operate \u2287 read), the per-request Permix (installPermissions, installPermissionsFor / userPermissions, ownerPermissions / delegatedPermissions, narrowing, permix.setup / setActor / getActor / setSuperadmin), entitlements and their allow-override, a delegate never exceeding its owner, validatePermission / validateSubmodelPermission and the validation middleware order, role assignment (memberRoleWrite, integrationRoleWrite, memberRemoval, leave), user-only actions (actorIsUser), or frontend checks (permissions-roles / permissions-rebac.check, usePermission / checkPermission, NavItem.access, Button show / disabledText)?",
-  "concepts": ["permissions-roles"],
-  "tokens": 14168,
+  "routing": "Is this about who may do what by role: PlatformRole and superadmin, Role on OrganizationUser / SpaceUser (owner, admin, member, viewer; roleHierarchy, isSuperadmin), StandardAction tiers (own \u2287 manage \u2287 operate \u2287 read), the per-request Permix (installPermissions, installPermissionsFor / userPermissions, permissionsOfUser, ownerPermissions / delegatedPermissions (the library's delegate), permix.setup / setActor / getActor / setSuperadmin), member rows and the member self-grant, full and delegateFull (validateFullGrant), entitlements and their allow-override, a delegate never exceeding its owner, validatePermission / validateSubmodelPermission and the validation middleware order, role assignment (memberRoleWrite, integrationRoleWrite, memberRemoval, leave), user-only actions (actorIsUser), or frontend checks (permissions-roles / permissions-rebac.check, usePermission / checkPermission, NavItem.access, Button show / disabledText)?",
+  "concepts": [
+    "permissions-roles"
+  ],
+  "tokens": 19681,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,23 +16,28 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 14168
+      "tokens": 19681
     }
   },
   "runsAgreed": 0,
   "sources": {
-    "docs": ["FEATURES.md", "docs/claude/PERMISSIONS.md"],
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/PERMISSIONS.md"
+    ],
     "docUnits": [
       "doc:docs/claude/PERMISSIONS.md#overview",
+      "doc:docs/claude/PERMISSIONS.md#the-model",
       "doc:docs/claude/PERMISSIONS.md#roles",
       "doc:docs/claude/PERMISSIONS.md#actions",
-      "doc:docs/claude/PERMISSIONS.md#permix",
-      "doc:docs/claude/PERMISSIONS.md#permission-setup",
-      "doc:docs/claude/PERMISSIONS.md#permission-checks",
+      "doc:docs/claude/PERMISSIONS.md#member-rows",
+      "doc:docs/claude/PERMISSIONS.md#integrations-and-tokens-by-owner-kind",
+      "doc:docs/claude/PERMISSIONS.md#full-and-delegatefull",
+      "doc:docs/claude/PERMISSIONS.md#resolution-at-read-time",
+      "doc:docs/claude/PERMISSIONS.md#writing-delegates",
       "doc:docs/claude/PERMISSIONS.md#entitlements",
+      "doc:docs/claude/PERMISSIONS.md#permix",
       "doc:docs/claude/PERMISSIONS.md#validation-middleware",
-      "doc:docs/claude/PERMISSIONS.md#role-assignment",
-      "doc:docs/claude/PERMISSIONS.md#token-permissions",
       "doc:docs/claude/PERMISSIONS.md#frontend-checks",
       "doc:FEATURES.md#authorization-permissions"
     ],
