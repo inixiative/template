@@ -153,7 +153,7 @@ Controller
 
 ### Why Behaviour Is Rules, Not Code?
 
-Every SaaS hits the same wall: each tenant wants something done a little differently. Who sees which records, who gets notified, which rows a report includes, what a role may do. If each of those is code, every request becomes a ticket, a branch in the code (`if tenant is X`), a test, a review and a deploy.
+Every SaaS hits the same wall: each tenant wants something done a little differently. Who sees which records, who gets notified, which rows a report includes, who a record is shared with. If each of those is code, every request becomes a ticket, a branch in the code (`if tenant is X`), a test, a review and a deploy.
 
 **The cost of doing it in code:**
 
@@ -173,22 +173,29 @@ Every SaaS hits the same wall: each tenant wants something done a little differe
 
 Each level has its limits, and every level below rules leaves manual work behind once its options run out: the request that doesn't fit becomes engineering work, and the lower the level, the more of it there is.
 
-Rules still have edges: a rule can only ask about the fields and relations it can see, with the operators the engine has. Widening those is code, but it's done once, in the engine or the data model, and every tenant gets it, not one tenant's case.
+Rules still have edges: a rule can only ask about what its lens exposes (for a permission rule, the hydrated record and the actor), with the operators the engine has. Widening those is code, but it's done once, in the engine or the data model, and every tenant gets it, not one tenant's case.
 
-**The approach:** build the engine once and make every case data. Behaviour that varies by tenant, record or person is stored as a rule, not written as a code path. Rules are [json-rules](https://github.com/inixiative/json-rules) conditions and [permissions](https://github.com/inixiative/permissions) action rules, and both are plain JSON. They live in the database, compose like any other data and are authored at runtime, so a tenant sets up how it wants things to work, from the client, without any of it appearing in code. The engine evaluates a tenant's rule exactly as it evaluates the schema's, so adding tenants adds rows, not code, and nothing needs a deploy. One rule also runs in every place it has to: in memory, as a Prisma query, or as SQL, so the API, the UI and the jobs enforce the same thing.
+**The approach:** build the engine once and make every case data. The schema is code, written once. A tenant's rules are rows: [json-rules](https://github.com/inixiative/json-rules) conditions and [permissions](https://github.com/inixiative/permissions) action rules, both plain JSON. They live in the database, compose like any other data and are authored at runtime through the API, so a client can offer a rule editor (rules-builder renders one from the same lens) without any of it appearing in code. The engine evaluates a tenant's rule exactly as it evaluates the schema's, so adding tenants adds rows, not code, and changing a rule needs no deploy.
+
+What makes this hold up:
+
+- **One rule language.** Permission conditions, entitlement `where`s, segment conditions and email conditions are the same json-rules AST, so a tenant learns one language and the API validates all of them the same way.
+- **One rule, several targets.** A json-rules condition runs in memory, compiles to a Prisma query or compiles to SQL, so a segment is checked on one row and listed in one query by the same rule. A permission rule runs in memory on the hydrated record.
+- **Live records, no sync.** Rules read your own records as they are. There is no separate authorization store to keep in sync.
+- **Self-describing.** Each rule field's info route says what the rule may read, so a client editor needs no hard-coding.
 
 Sharing is the clearest case. Without rules you get only the access the system was built to give; with them, three ways to share ad hoc:
 
-- **A rule on the record.** A model with a `permissionRules` column (`Contact` today; any model can add one) carries its own rule per action, ORed with the schema's. It can share one record with one user, with anyone matching a rule on the acting user or token's own row, or with anyone who can reach a record it relates to.
-- **An entitlement on a holder.** A member row, token or integration can be given an action on a resource from an anchor, narrowed by a `where`.
-- **A relation.** To share with a whole tenant the record has no relation to, add a row that relates the two and let the schema walk it. That is a model and a schema line, not new engine code.
+- **A rule on the record.** A model with a `permissionRules` column (`Contact` today, for `read`; the model picks which actions take one) carries its own `ActionRule`, ORed with the schema's. It can share one record with one user, with anyone matching a rule on the acting user or token's own row, or with anyone who can reach a record it relates to.
+- **An entitlement on a holder.** A member row, token or integration can be given an action on a resource from an anchor, narrowed by a `where`, and re-checked against whoever granted it each time it is used.
+- **A relation.** To share with a whole tenant the record has no relation to, add a row that relates the two and let the schema walk it. That is a developer change, made once: a model and a schema line, not new engine code.
 
 The guardrails are part of the design:
 
-- Stored rules are positive only: a tenant's rule can widen access, never revoke what the schema grants.
-- `validateActionRule` checks a rule before it is saved.
-- Who may write a record's rules is an ordinary schema action on that record.
-- The app decides what it refuses to persist; the engine doesn't police vocabulary.
+- A record's rule is ORed with the schema's, so it can widen access but never revoke what the schema grants.
+- Permission rules and entitlement `where`s are positive: a rule that could pass on a missing value is refused (422).
+- The API checks a permission rule with `validateActionRule` before it is saved.
+- Writing a contact's rules takes `manage` on that contact, like any other field.
 
 See [PERMISSIONS.md](PERMISSIONS.md) for the schema and entitlements.
 
