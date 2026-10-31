@@ -138,3 +138,25 @@ describe('inviting a removed member back revives their row', () => {
     ).toBeNull();
   });
 });
+
+describe('a removed member delegates nothing from the tombstoned row', () => {
+  it('its user can no longer mint a token, full or not, on the removed member', async () => {
+    const { entity: member, context } = await createOrganizationUser(
+      { role: 'member' },
+      { organization },
+    );
+    expect((await asOwner()(del(`/api/v1/organizationUser/${member.id}`))).status).toBe(204);
+    const asRemoved = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [member],
+      mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
+    }).fetch;
+    for (const body of [
+      { name: 'k', full: true },
+      { name: 'k', role: 'member' },
+    ])
+      expect(
+        (await asRemoved(post(`/api/v1/organizationUser/${member.id}/tokens`, body))).status,
+      ).toBe(404);
+  });
+});
