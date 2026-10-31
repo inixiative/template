@@ -1,6 +1,6 @@
 # AUTH-006: Enforce webhook tenant isolation
 
-**Status**: 🔄 Stopgap shipped (PR #201, 2026-10-18): no cross-tenant delivery. A subscription hears the CustomerRefs its owner is a party to and the counterparty changes on them: providers hear customers, customers hear providers. Still open: org-to-space inheritance, the combined payload, the delivery-time recheck.
+**Status**: 🔄 Stopgap shipped (PR #201, 2026-10-18): no cross-tenant delivery. A subscription hears the CustomerRefs its owner is a party to and the counterparty changes on them: providers hear customers, customers hear providers. Still open: org-to-space inheritance, the delivery-time recheck.
 **Assignee**: Unassigned
 **Priority**: High
 **Created**: 2026-09-30
@@ -48,14 +48,12 @@ Tenancy comes from `CustomerRef`. Zealot's brand-based filter (`eligibleWebhookS
 - **Audience: the two parties of that CustomerRef.** The provider hears about its customers ("my customer changed"); the customer hears about its provider ("my organization changed"). No one else.
 - **Both axes for every party.** `CustomerModel` and `ProviderModel` both allow User, Organization and Space, so each party model is registered on both `customerModel` and `providerModel` axes (today User and Organization are on the customer axis only).
 - **Inheritance must work.** An organization's subscription also hears about the CustomerRefs of the organization's spaces (Aron: "Inheritance should be able to work"). Resolve it through the existing ownership relations, not a second registry.
-- **Payload.** The CustomerRef plus the counterpart party's columns (scalar only, redacted), plus which side changed: `customer`, `provider` or `relationship`.
 - **Delivery-time check.** `sendWebhook` re-checks that the CustomerRef is still live and the subscriber is still one of its parties (or inherits one); otherwise it sends nothing and stores no `WebhookEvent`.
 
 ## Open questions
 
 - **Own record.** Does an owner's subscription hear changes to the owner itself (an organization listening to its own row) without a CustomerRef? Aron said "I can listen to my own org"; it is unresolved whether that means the owner's own row or a member listening to their organization.
 - **Who creates CustomerRefs.** Nothing in template, Kingdom or Tribe creates CustomerRefs outside factories, so after this fix those apps deliver no webhooks until each app decides which relationships are CustomerRefs (for example whether organization membership makes a user a customer of the organization).
-- **Counterpart visibility.** Which of a provider's fields its customers may receive, and the reverse.
 
 ## Implementation references
 
@@ -70,7 +68,6 @@ Tenancy comes from `CustomerRef`. Zealot's brand-based filter (`eligibleWebhookS
 
 - Define which records each User, Organization, and Space subscription is entitled to receive, including any intended organization-to-space inheritance and customer/provider direction.
 - Resolve related-model changes through the declared relationships before choosing recipients.
-- Define the CustomerRef event's payload and resource ID: a CustomerRef snapshot or an explicitly identified related-resource change. Preserve the intended integration contract while preventing unrelated-row exposure.
 - Enforce recipient isolation before enqueueing, and define the delivery-time behavior when the relationship or subscription ownership changes while work is queued.
 - Preserve integration-origin suppression, inactive-subscription handling, poisoned-record isolation, and no-op suppression.
 
@@ -80,7 +77,7 @@ This ticket concerns recipient authority and payload scoping. Existing transacti
 
 - [ ] The verified unrelated-organization/User reproduction becomes a regression asserting zero unauthorized enqueue calls.
 - [ ] User-, Organization-, and Space-owned subscriptions have positive entitlement tests and negative unrelated-owner tests.
-- [ ] Related User/Organization/Space mutations reach only the audience established by their CustomerRef relationships, with a documented payload/resource-ID contract.
+- [ ] Related User/Organization/Space mutations reach only the audience established by their CustomerRef relationships.
 - [ ] Direct CustomerRef mutations, bulk mutations, and deletes preserve ownership isolation; delete handling retains the relationship context needed for an authorized event.
 - [ ] Tests cover a queued delivery whose owner relationship changes before execution, according to the documented authorization policy.
 - [ ] Denied deliveries perform no outbound fetch and persist no unauthorized payload in WebhookEvent.
