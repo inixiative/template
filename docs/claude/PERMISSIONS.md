@@ -205,6 +205,8 @@ The engine is `@inixiative/permissions`; `createPermissions` in `packages/permis
 
 `prepareRequest` creates the empty permix, `installPermissions` fills it ([Permission Setup](#permission-setup)), and a check is always `check(permix, rebacSchema, model, record, action)` from `@template/permissions/rebac` on a hydrated record.
 
+`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchOne` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut.
+
 ### Superadmin Bypass
 
 `permix.setSuperadmin(true)` makes every check pass. `installPermissions` sets it from `isSuperadmin(me(c))`.
