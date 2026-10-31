@@ -23,12 +23,12 @@ import { createTestApp } from '#tests/createTestApp';
 import { del, post } from '#tests/utils/request';
 
 let organization: Organization;
-let owner: { user: User; seat: OrganizationUser };
+let owner: { user: User; member: OrganizationUser };
 
 const asOwner = () =>
   createTestApp({
     mockUser: owner.user,
-    mockOrganizationUsers: [owner.seat],
+    mockOrganizationUsers: [owner.member],
     mount: [
       (app) => app.route('/api/v1/organizationUser', organizationUserRouter),
       (app) => app.route('/api/v1/spaceUser', spaceUserRouter),
@@ -40,9 +40,9 @@ const rowOf = (id: string) =>
 
 beforeAll(async () => {
   registerSoftDeleteCascadeHook();
-  const { entity: seat, context } = await createOrganizationUser({ role: 'owner' });
+  const { entity: member, context } = await createOrganizationUser({ role: 'owner' });
   organization = context.organization;
-  owner = { user: context.user, seat };
+  owner = { user: context.user, member };
 });
 
 afterAll(async () => {
@@ -52,21 +52,21 @@ afterAll(async () => {
 
 describe('removing a member tombstones the row, and what it held goes with it', () => {
   it('the member row is tombstoned, its integrations tombstoned with it, its tokens deleted', async () => {
-    const { entity: seat } = await createOrganizationUser({ role: 'member' }, { organization });
+    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
     const { entity: integration } = await createIntegration({
       ownerModel: 'OrganizationUser',
       organizationId: organization.id,
-      userId: seat.userId,
+      userId: member.userId,
       role: 'viewer',
     });
     const { entity: token } = await createToken(
       { ownerModel: 'OrganizationUser', role: 'member' },
-      { organizationUser: seat },
+      { organizationUser: member },
     );
 
-    expect((await asOwner()(del(`/api/v1/organizationUser/${seat.id}`))).status).toBe(204);
+    expect((await asOwner()(del(`/api/v1/organizationUser/${member.id}`))).status).toBe(204);
 
-    const tombstoned = await rowOf(seat.id);
+    const tombstoned = await rowOf(member.id);
     expect(tombstoned?.deletedAt).toBeInstanceOf(Date);
     const gone = await db.integration.findFirst({
       where: { id: integration.id, deletedAt: { not: null } },
@@ -77,19 +77,19 @@ describe('removing a member tombstones the row, and what it held goes with it', 
 
   it('removing a space member tombstones the space member row', async () => {
     const { entity: space } = await createSpace({}, { organization });
-    const { entity: seat, context } = await createOrganizationUser(
+    const { entity: member, context } = await createOrganizationUser(
       { role: 'member' },
       { organization },
     );
-    const { entity: spaceSeat } = await createSpaceUser(
+    const { entity: spaceMember } = await createSpaceUser(
       { role: 'member' },
-      { ...context, organizationUser: seat, space },
+      { ...context, organizationUser: member, space },
     );
 
-    expect((await asOwner()(del(`/api/v1/spaceUser/${spaceSeat.id}`))).status).toBe(204);
+    expect((await asOwner()(del(`/api/v1/spaceUser/${spaceMember.id}`))).status).toBe(204);
 
     const tombstoned = await db.spaceUser.findFirst({
-      where: { id: spaceSeat.id, deletedAt: { not: null } },
+      where: { id: spaceMember.id, deletedAt: { not: null } },
     });
     expect(tombstoned?.deletedAt).toBeInstanceOf(Date);
   });
@@ -97,17 +97,17 @@ describe('removing a member tombstones the row, and what it held goes with it', 
 
 describe('inviting a removed member back revives their row', () => {
   it('the same row comes back live with the role of the new invite, and its integrations with it', async () => {
-    const { entity: seat, context } = await createOrganizationUser(
+    const { entity: member, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
     );
     const { entity: integration } = await createIntegration({
       ownerModel: 'OrganizationUser',
       organizationId: organization.id,
-      userId: seat.userId,
+      userId: member.userId,
       role: 'viewer',
     });
-    expect((await asOwner()(del(`/api/v1/organizationUser/${seat.id}`))).status).toBe(204);
+    expect((await asOwner()(del(`/api/v1/organizationUser/${member.id}`))).status).toBe(204);
 
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -132,9 +132,31 @@ describe('inviting a removed member back revives their row', () => {
     const live = await db.organizationUser.findMany({
       where: { organizationId: organization.id, userId: context.user.id },
     });
-    expect(live.map(({ id, role }) => ({ id, role }))).toEqual([{ id: seat.id, role: 'member' }]);
+    expect(live.map(({ id, role }) => ({ id, role }))).toEqual([{ id: member.id, role: 'member' }]);
     expect(
       (await db.integration.findUnique({ where: { id: integration.id } }))?.deletedAt,
     ).toBeNull();
+  });
+});
+
+describe('a removed member delegates nothing from the tombstoned row', () => {
+  it('its user can no longer mint a token, full or not, on the removed member', async () => {
+    const { entity: member, context } = await createOrganizationUser(
+      { role: 'member' },
+      { organization },
+    );
+    expect((await asOwner()(del(`/api/v1/organizationUser/${member.id}`))).status).toBe(204);
+    const asRemoved = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [member],
+      mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
+    }).fetch;
+    for (const body of [
+      { name: 'k', full: true },
+      { name: 'k', role: 'member' },
+    ])
+      expect(
+        (await asRemoved(post(`/api/v1/organizationUser/${member.id}/tokens`, body))).status,
+      ).toBe(404);
   });
 });

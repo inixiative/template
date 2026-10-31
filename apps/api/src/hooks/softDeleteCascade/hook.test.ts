@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, revive } from '@template/db';
+import { clearHookRegistry, db, revive, unregisterDbHook } from '@template/db';
 import { ContactOwnerModel, InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -11,10 +11,12 @@ import {
   createUser,
 } from '@template/db/test';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 
 registerSoftDeleteCascadeHook();
+registerMemberSelfGrantHook();
 registerRulesHook();
 registerContactRulesHook();
 

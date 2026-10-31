@@ -118,8 +118,15 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
       expect(can(token, 'inquiry', inquiryTo(u1, u2), 'resolve')).toBe(false);
     });
 
-    it('a user token holding operate on the user can do all three', async () => {
+    it("a user token holding operate on the user deletes the user's tokens, but neither leaves an organization nor accepts an invite: those reach another tenancy (Aron, 2026-10-31)", async () => {
       const token = await narrowedUserToken(u1, 'operate');
+      expect(can(token, 'token', tokenOf('t2', u1), 'leave')).toBe(true);
+      expect(can(token, 'organizationUser', r1, 'leave')).toBe(false);
+      expect(can(token, 'inquiry', inquiryTo(u1, u2), 'resolve')).toBe(false);
+    });
+
+    it('a user token holding manage on the user does all three', async () => {
+      const token = await narrowedUserToken(u1, 'manage');
       expect(can(token, 'organizationUser', r1, 'leave')).toBe(true);
       expect(can(token, 'token', tokenOf('t2', u1), 'leave')).toBe(true);
       expect(can(token, 'inquiry', inquiryTo(u1, u2), 'resolve')).toBe(true);
@@ -295,7 +302,7 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
       expect(can(nobody, 'user', u1, 'own')).toBe(true);
     });
 
-    it('a user creates an organization, and so does a token its user owns that holds operate; no other token', async () => {
+    it('a user creates an organization, and so does any token its user owns; no other token (R9)', async () => {
       const blank = { id: '' };
       expect(can(acting(await table(), ActorModel.User), 'organization', blank, 'create')).toBe(
         true,
@@ -309,7 +316,7 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
         return permix;
       };
       expect(can(await userToken('member'), 'organization', blank, 'create')).toBe(true);
-      expect(can(await userToken('viewer'), 'organization', blank, 'create')).toBe(false);
+      expect(can(await userToken('viewer'), 'organization', blank, 'create')).toBe(true);
       const orgToken = await table(grant('db:organization', 'o1', 'own'));
       orgToken.setActor({
         model: ActorModel.Token,

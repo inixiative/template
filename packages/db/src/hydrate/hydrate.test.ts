@@ -57,27 +57,23 @@ describe('hydrate', () => {
     expect(hydratedOrgUser.organization.id).toBe(context.organization!.id);
   });
 
-  it('deduplicates fetches for same record', async () => {
-    const { entity: token } = await createToken({
+  it('attaches an organization reached on two paths on both', async () => {
+    const { entity: token, context } = await createToken({
       organizationUser: {},
       ownerModel: TokenOwnerModel.OrganizationUser,
     });
 
-    const pending = new Map();
-    await hydrate(
-      'token',
-      {
-        id: token.id,
-        userId: token.userId,
-        organizationId: token.organizationId,
-      },
-      pending,
-    );
+    const result = await hydrate('token', {
+      id: token.id,
+      userId: token.userId,
+      organizationId: token.organizationId,
+    });
 
-    // Organization accessed via token.organizationId - should only be in pending once
-    // Cache key format: cache:organization:id:<value>
-    const orgKeys = [...pending.keys()].filter((k) => k.includes(':organization:'));
-    expect(orgKeys.length).toBe(1);
+    const organizationId = context.organization!.id;
+    expect((result.organization as { id: string }).id).toBe(organizationId);
+    expect((result.organizationUser as { organization: { id: string } }).organization.id).toBe(
+      organizationId,
+    );
   });
 
   it('handles null FK gracefully', async () => {
@@ -142,5 +138,32 @@ describe('fetchOne', () => {
     expect(tombstone?.id).toBe(user.id);
     expect(await getRedisClient().exists(cacheKey('user', user.id))).toBe(0);
     expect(await fetchOne('user', user.id)).toBeNull();
+  });
+
+  it('hydrates live relations only, even inside a withDeleted block', async () => {
+    const { entity: token } = await createToken({
+      organizationUser: {},
+      ownerModel: TokenOwnerModel.OrganizationUser,
+    });
+    await db.organizationUser.update({
+      where: {
+        organizationId_userId: {
+          organizationId: token.organizationId as string,
+          userId: token.userId as string,
+        },
+      },
+      data: { deletedAt: new Date() },
+    });
+
+    const result = await db.withDeleted(() =>
+      hydrate('token', {
+        id: token.id,
+        ownerModel: token.ownerModel,
+        organizationId: token.organizationId,
+        userId: token.userId,
+      }),
+    );
+
+    expect(result.organizationUser).toBeUndefined();
   });
 });

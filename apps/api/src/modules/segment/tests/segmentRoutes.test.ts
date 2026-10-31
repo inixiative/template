@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import type {
   CustomerRef,
   Organization,
@@ -21,6 +21,7 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -62,6 +63,7 @@ describe('segment routes', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();

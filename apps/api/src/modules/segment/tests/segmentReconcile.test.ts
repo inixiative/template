@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, type Prisma } from '@template/db';
+import { clearHookRegistry, db, type Prisma, unregisterDbHook } from '@template/db';
 import type {
   CustomerRef,
   Organization,
@@ -31,6 +31,7 @@ import {
   getNextSeq,
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
@@ -89,6 +90,7 @@ describe('segment reconcile', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
 

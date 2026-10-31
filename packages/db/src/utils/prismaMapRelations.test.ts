@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { getAccessorRelations, getModelRelations } from '@template/db/utils/prismaMapRelations';
+import { getModelRelations } from '@template/db/utils/prismaMapRelations';
 
 describe('getModelRelations', () => {
   it('returns relations for a model', () => {
@@ -68,22 +68,5 @@ describe('getModelRelations', () => {
 
   it('throws for unknown model', () => {
     expect(() => getModelRelations('NonExistentModel' as never)).toThrow();
-  });
-});
-
-describe('getAccessorRelations', () => {
-  it('works with camelCase accessor names', () => {
-    const relations = getAccessorRelations('organizationUser');
-
-    expect(relations).toBeArray();
-    const orgRel = relations.find((r) => r.relationName === 'organization');
-    expect(orgRel).toBeDefined();
-  });
-
-  it('returns same results as getModelRelations', () => {
-    const fromModel = getModelRelations('OrganizationUser');
-    const fromAccessor = getAccessorRelations('organizationUser');
-
-    expect(fromModel).toEqual(fromAccessor);
   });
 });

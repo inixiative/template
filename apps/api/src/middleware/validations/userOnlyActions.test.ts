@@ -111,11 +111,11 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
     expect((await call(key, 'POST', '/me/webhookSubscriptions', webhook())).status).toBe(403);
   });
 
-  it('a viewer token cannot create an organization: creating one is operate on the user', async () => {
+  it('any token its user owns creates an organization, a viewer token too (R9)', async () => {
     const { key } = await mint(user, 'viewer');
     expect(
       (await call(key, 'POST', '/organization', { name: 'o', slug: randomUUID() })).status,
-    ).toBe(403);
+    ).toBe(201);
   });
 
   it('a member token creates on the user, including an organization', async () => {

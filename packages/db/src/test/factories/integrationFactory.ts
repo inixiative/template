@@ -10,6 +10,7 @@ import { createFactory, getNextSeq } from '@template/db/test/factory';
 const integrationFactory = createFactory('Integration', {
   defaults: () => ({
     name: `${faker.company.name()} ${getNextSeq()}`,
+    role: 'viewer' as const,
   }),
 });
 

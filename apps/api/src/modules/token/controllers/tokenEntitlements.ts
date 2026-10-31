@@ -19,7 +19,8 @@ export const tokenEntitlementsController = makeController(
     const permix = c.get('permix');
     const token = getResource<'token'>(c);
     await validateTokenWrite(permix, token);
-    validateDelegateRole(await hydrate('token', token as HydratedRecord));
+    const record = await hydrate('token', token as HydratedRecord);
+    validateDelegateRole(record);
 
     const entitlements = await changeEntitlements(permix, token.entitlements, c.req.valid('json'));
     const { keyHash: _keyHash, ...updated } = await db.token.update({

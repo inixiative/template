@@ -19,6 +19,7 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
@@ -114,6 +115,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
 
   beforeAll(async () => {
     registerClearCacheHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
@@ -214,10 +216,10 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect(await holds(minted.key!, 'organization', organization.id, 'manage')).toBe(true);
     });
 
-    it('a member mints on its own member row at its role, never above it', async () => {
+    it("a member mints on its own member row at any role: it holds the member's role or less (Aron, 2026-10-29)", async () => {
       const writer = await member('member');
       const path = `organizationUser/${writer.organizationUser.id}`;
-      expect((await mint(writer, path, { role: 'admin' })).status).toBe(403);
+      expect((await mint(writer, path, { role: 'admin' })).status).toBe(201);
       expect((await mint(writer, path, { role: 'member' })).status).toBe(201);
     });
 
@@ -257,7 +259,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect(stored.role).toBe('admin');
     });
 
-    it("its user or the organization's owner makes a member's integration full; an admin does not (R82)", async () => {
+    it("its user makes their member integration full or changes its role; the organization's owner and an admin do not: the chain ends at the member (R91)", async () => {
       const ownerMember = await member('owner');
       const { entity: integration } = await createIntegration({
         ownerModel: 'OrganizationUser',
@@ -266,7 +268,8 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
         role: 'member',
       });
       expect((await update(admin, integration, { role: null, full: true })).status).toBe(403);
-      expect((await update(owner, integration, { role: null, full: true })).status).toBe(200);
+      expect((await update(owner, integration, { role: null, full: true })).status).toBe(403);
+      expect((await update(owner, integration, { role: 'viewer' })).status).toBe(403);
       expect((await update(ownerMember, integration, { role: null, full: true })).status).toBe(200);
     });
 
@@ -291,7 +294,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
     });
 
     it('an organization integration is never full: it holds itself', async () => {
-      expect((await createOrgIntegration(owner, { full: true })).status).toBe(422);
+      expect((await createOrgIntegration(owner, { full: true })).status).toBe(403);
     });
 
     it('an admin cannot name an entitlement action it does not hold on an integration', async () => {
@@ -328,12 +331,12 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect((await anonymous(del(`/api/v1/integration/${integration.id}`))).status).toBe(403);
     });
 
-    it("its user and the organization's owner administer it; an admin does not (R82)", async () => {
+    it("its user administers it; the organization's owner and an admin do not", async () => {
       const { m, integration } = await memberIntegration();
       const rename = (writer: { user: User; organizationUser: OrganizationUser }) =>
         update(writer, integration, { name: `i-${randomUUID()}` } as Permissions);
       expect((await rename(admin)).status).toBe(403);
-      expect((await rename(owner)).status).toBe(200);
+      expect((await rename(owner)).status).toBe(403);
       expect((await rename(m)).status).toBe(200);
     });
 
@@ -345,24 +348,24 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect((await mint(m, path, { role: 'member' })).status).toBe(201);
     });
 
-    it('its user mints at or below their access, never above it, though they administer it', async () => {
+    it('its user mints any role on it: the chain ends at them (R91)', async () => {
       const { m, integration } = await memberIntegration();
       const path = `integration/${integration.id}`;
-      expect((await mint(m, path, { role: 'admin' })).status).toBe(403);
-      expect((await mint(m, path, { role: 'owner' })).status).toBe(403);
+      expect((await mint(m, path, { role: 'admin' })).status).toBe(201);
+      expect((await mint(m, path, { role: 'owner' })).status).toBe(201);
     });
 
-    it('its user mints a full token on it: they are its owner', async () => {
+    it('its user mints a full token on it: they operate its member', async () => {
       const { m, integration } = await memberIntegration();
       expect((await mint(m, `integration/${integration.id}`, { full: true })).status).toBe(201);
     });
 
-    it('a member does not mint a full token on their member row: that takes own on the organization', async () => {
+    it('a member mints a full token on their member row: they operate it', async () => {
       const m = await member('member');
       expect(
         (await mint(m, `organizationUser/${m.organizationUser.id}`, { role: null, full: true }))
           .status,
-      ).toBe(403);
+      ).toBe(201);
     });
   });
 });

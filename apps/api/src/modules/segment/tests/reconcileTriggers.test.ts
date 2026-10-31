@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, type ModelName } from '@template/db';
+import { clearHookRegistry, db, type ModelName, unregisterDbHook } from '@template/db';
 import type { CustomerRef, Segment, Space, Tag, User } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -16,6 +16,7 @@ import {
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName } from '#/appEvents/handlers';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
@@ -71,6 +72,7 @@ describe('reconcile triggers — membership follows the events', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
     registerSoftDeleteCascadeHook();

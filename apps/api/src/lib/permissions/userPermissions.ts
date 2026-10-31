@@ -9,13 +9,13 @@ import type { User } from '@template/db/generated/client/client';
 import {
   ActorModel,
   actorOf,
-  installGrants,
+  installPermissions,
   isSuperadmin,
-  userGrants,
+  permissionsOfUser,
 } from '@template/permissions';
 import { createPermissions, type Permix } from '@template/permissions/client';
 import type { TokenWithRelations } from '#/lib/context/types';
-import { delegateTable, ownerTable } from '#/lib/permissions/ownerTable';
+import { delegatedPermissions, ownerPermissions } from '#/lib/permissions/ownerPermissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
 type Acting = Pick<UserWithRelations, 'organizationUsers' | 'spaceUsers'> & {
@@ -32,10 +32,10 @@ export const installPermissionsFor = async (
   else if (user) permix.setActor(actorOf(ActorModel.User, user));
   permix.setSuperadmin(isSuperadmin(user));
 
-  const usersTable = userGrants(user?.id ?? null, organizationUsers, spaceUsers);
-  if (!token) return installGrants(permix, usersTable);
-  const owner = token.ownerModel === 'User' ? usersTable : await ownerTable(token);
-  await installGrants(permix, delegateTable(token, owner));
+  const usersPermissions = permissionsOfUser(user?.id ?? null, organizationUsers, spaceUsers);
+  if (!token) return installPermissions(permix, usersPermissions);
+  const owner = token.ownerModel === 'User' ? usersPermissions : await ownerPermissions(token);
+  await installPermissions(permix, delegatedPermissions(token, owner));
 };
 
 export const userPermissions = async (userId: string): Promise<Permix | null> => {

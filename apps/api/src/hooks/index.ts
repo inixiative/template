@@ -7,6 +7,7 @@ import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
@@ -24,6 +25,7 @@ import { registerWebhookHook } from '#/hooks/webhooks/hook';
 export const registerHooks = () => {
   registerDelegatedKeysHook();
   registerFullDelegateHook();
+  registerMemberSelfGrantHook();
   registerRulesHook();
   registerAuditLogHook();
   registerEmailVersioningHook();

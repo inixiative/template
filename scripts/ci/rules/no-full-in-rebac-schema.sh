@@ -12,7 +12,7 @@ if [[ ! -d "$rebac_dir" ]]; then
 fi
 
 VIOLATIONS=$(
-  grep -rnE "field:[[:space:]]*['\"]full['\"]" "$rebac_dir" --include='*.ts' \
+  grep -rnE "(field|path):[[:space:]]*['\"]([^'\"]*\.)?full['\"]" "$rebac_dir" --include='*.ts' \
   | grep -vE '\.test\.ts:' \
   || true
 )
@@ -20,7 +20,7 @@ VIOLATIONS=$(
 if [[ -n "$VIOLATIONS" ]]; then
   echo "The rebac schema reads \`full\`:"
   echo "\`full\` is inheritance, not a permission rule: a full delegate skips to its owner when"
-  echo "permissions are installed, and setting it takes \`own\` on the owner. Keep it out of the schema."
+  echo "permissions are installed. No rule reads it, on the record or on the actor."
   echo ""
   echo "$VIOLATIONS"
   exit 1

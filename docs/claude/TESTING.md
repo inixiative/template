@@ -21,6 +21,7 @@
   - [TypedBuildResult (Type Safety)](#typedbuildresult-type-safety)
   - [FK Auto-Inference](#fk-auto-inference)
   - [Composite Foreign Keys](#composite-foreign-keys)
+  - [Factory Data the Rules Expect](#factory-data-the-rules-expect)
   - [Cleanup](#cleanup)
   - [Test Data Patterns](#test-data-patterns)
 - [VCR (external services)](#vcr-external-services)
@@ -292,6 +293,15 @@ Compare to simple FK:
 // Simple: just sets webhookSubscriptionId from dependency's id
 foreignKey: 'webhookSubscriptionId'
 ```
+
+### Factory Data the Rules Expect
+
+Some database rules (`apps/api/src/hooks/rules/registry.ts`) hold only for rows production writes through every hook. A test that turns on the rules hook (`registerRulesHook()`) also turns on the hooks production pairs it with, so factory rows pass the same rules:
+
+- **Members:** every `OrganizationUser` and `SpaceUser` must hold its self-grant (`memberSelfGrantRules`), which the `memberSelfGrant` hook writes on create. Call `registerMemberSelfGrantHook()` beside `registerRulesHook()`, and unregister `memberSelfGrant` wherever the file unregisters the rules hook.
+- **Integrations and tokens:** a delegate that is not `full` must have a role, entitlements or both. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements.
+
+How a test file turns hooks on and off is not yet uniform across the suite ([TEST-002](../../tickets/TEST-002-hook-registration-in-tests.md)).
 
 ### Cleanup
 

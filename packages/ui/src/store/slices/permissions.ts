@@ -5,11 +5,11 @@
  * @uses primitive:sdk
  */
 import { actorOf } from '@template/permissions/actorOf';
-import { ActorModel, createPermissions } from '@template/permissions/client';
+import { ActorModel, createPermissions, installPermissions } from '@template/permissions/client';
 import { check as rebacCheck } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
+import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
 import { isSuperadmin } from '@template/permissions/roles/shared';
-import { installGrants, userGrants } from '@template/permissions/roles/userGrants';
 import type { MeReadResponses } from '@template/sdk';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
@@ -47,9 +47,9 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
           return;
         }
 
-        await installGrants(
+        await installPermissions(
           permix,
-          userGrants(me.id, me.organizationUsers ?? [], me.spaceUsers ?? []),
+          permissionsOfUser(me.id, me.organizationUsers ?? [], me.spaceUsers ?? []),
         );
       },
     },

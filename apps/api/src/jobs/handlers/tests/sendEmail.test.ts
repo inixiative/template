@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry } from '@template/db';
+import { clearHookRegistry, unregisterDbHook } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import {
   cleanupTouchedTables,
@@ -14,6 +14,7 @@ import {
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { fieldsLens } from '@template/email/rules';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -23,6 +24,8 @@ import { emailRegistry } from '#/lib/email';
 import { type EmailEntry, type RecipientTarget, registry } from '#/lib/email/registry';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { createTestApp } from '#tests/createTestApp';
+
+registerMemberSelfGrantHook();
 
 registerRulesHook();
 

@@ -151,9 +151,9 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       { name: 'segment reach: managers', path: '/segments/reach', create: managers },
       { name: 'auth providers: only owners create', path: '/authProviders', create: ['owner'] },
       {
-        name: 'tokens: only owners list (R38: token list read = own at the owner)',
+        name: "tokens: owners and admins list the organization's tokens (Aron, 2026-10-30)",
         path: '/tokens',
-        list: ['owner'],
+        list: ['owner', 'admin'],
       },
     ];
 
@@ -196,9 +196,9 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         create: withOrgOwner(managers),
       },
       {
-        name: 'tokens: only space owners (and org owners) list',
+        name: "tokens: the space's owners and admins (and org owners) list",
         path: '/tokens',
-        list: withOrgOwner(['owner']),
+        list: withOrgOwner(['owner', 'admin']),
       },
     ];
 
@@ -324,7 +324,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       expect(await gate(headers, 'POST', `/organization/${other.id}/contacts`)).toBe('passes');
     });
 
-    it("an entitlement stored on one seat and anchored at the user's other organization opens nothing there", async () => {
+    it("an entitlement stored on one member and anchored at the user's other organization opens nothing there", async () => {
       const { entity: other } = await createOrganization();
       const contactsHere = {
         resource: 'db:contact',

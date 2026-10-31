@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import { TagOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -9,8 +9,11 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
+
+registerMemberSelfGrantHook();
 
 registerRulesHook();
 registerTagOwnerCategoryHook();

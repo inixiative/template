@@ -7,19 +7,18 @@
 import { Operator } from '@inixiative/json-rules';
 import { ContactSource, InquiryType } from '@template/db/generated/client/enums';
 import {
-  actionOnOwner,
   actorIsDelegateOfUser,
   actorIsUser,
   chainedStandardActions,
   createdByItsUserOrManager,
-  delegateHoldsOperate,
   highRoles,
   integrationAccess,
   integrationAdministering,
   lowRoles,
-  managedUpTheChain,
+  memberRowActions,
   ownerActions,
   tokenAccessIsYours,
+  tokenAdministering,
 } from '@template/permissions/rebac/schemaHelpers';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 import { omit } from 'lodash-es';
@@ -33,6 +32,7 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
+        delegateFull: { all: [actorIsUser, 'own'] },
         'user.rotateJwts': { all: [actorIsUser, 'operate'] },
         'user.changePassword': { all: [actorIsUser, 'operate'] },
         'user.redact': { all: [actorIsUser, 'own'] },
@@ -45,7 +45,7 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
-        create: { any: [actorIsUser, { all: [actorIsDelegateOfUser, delegateHoldsOperate] }] },
+        create: { any: [actorIsUser, actorIsDelegateOfUser] },
         delete: { all: [actorIsUser, 'own'] },
       },
     },
@@ -108,47 +108,16 @@ export const rebacSchema: RebacSchema = {
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
-    'db:organizationUser': {
-      actions: {
-        ...chainedStandardActions({
-          read: {
-            any: [
-              { rel: 'user', action: 'read' },
-              { rel: 'organization', action: 'read' },
-            ],
-          },
-          operate: { rel: 'organization', action: 'operate' },
-          manage: { rel: 'organization', action: 'manage' },
-          own: { rel: 'organization', action: 'own' },
-        }),
-        leave: { rel: 'user', action: 'operate' },
-      },
-    },
+    'db:organizationUser': { actions: memberRowActions('organization') },
 
-    'db:spaceUser': {
-      actions: {
-        ...chainedStandardActions({
-          read: {
-            any: [
-              { rel: 'user', action: 'read' },
-              { rel: 'space', action: 'read' },
-            ],
-          },
-          operate: { rel: 'space', action: 'operate' },
-          manage: { rel: 'space', action: 'manage' },
-          own: { rel: 'space', action: 'own' },
-        }),
-        leave: { rel: 'user', action: 'operate' },
-      },
-    },
+    'db:spaceUser': { actions: memberRowActions('space') },
 
     'db:token': {
       actions: {
         leave: { rel: 'user', action: 'operate' },
-        own: actionOnOwner('own'),
-        read: 'own',
+        read: { any: ['leave', tokenAdministering] },
         create: { all: [actorIsUser, tokenAccessIsYours] },
-        delete: { any: ['leave', managedUpTheChain] },
+        delete: { any: ['leave', tokenAdministering] },
       },
     },
 
@@ -236,7 +205,7 @@ export const rebacSchema: RebacSchema = {
         // Resolve: target decides (approve/deny/requestChanges)
         resolve: {
           any: [
-            { rel: 'targetUser', action: 'operate' },
+            { rel: 'targetUser', action: 'manage' },
             {
               any: [
                 // transferSpace — target org owner only

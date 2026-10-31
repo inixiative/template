@@ -45,9 +45,12 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     ...(where ? { where } : {}),
   });
 
-  it("via organization: the organization's own Slack integrations, granted by its owner", async () => {
-    expect((await grant('owner', integrations('organization', ['manage'], slack))).status).toBe(
+  it("via organization: every Slack integration under the organization; its owner grants deleting them, not managing them, since members' are not the owner's to manage", async () => {
+    expect((await grant('owner', integrations('organization', ['delete'], slack))).status).toBe(
       200,
+    );
+    expect((await grant('owner', integrations('organization', ['manage'], slack))).status).toBe(
+      403,
     );
   });
 
@@ -73,17 +76,25 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     expect(((await response.json()) as { message: string }).message).toBe('Access denied');
   });
 
-  it("via space.organization: the spaces' integrations, granted by the owner, not an admin", async () => {
-    expect((await grant('owner', integrations('space.organization', ['manage']))).status).toBe(200);
-    expect((await grant('admin', integrations('space.organization', ['manage']))).status).toBe(403);
-  });
-
-  it("via organizationUser.organization: members' integrations, which the owner manages and an admin does not (R82)", async () => {
+  it("via space.organization: the spaces' own integrations, granted by the owner, not an admin", async () => {
+    const theSpaces = { field: 'ownerModel', operator: 'equals', value: 'Space' };
     expect(
-      (await grant('owner', integrations('organizationUser.organization', ['manage']))).status,
+      (await grant('owner', integrations('space.organization', ['manage'], theSpaces))).status,
     ).toBe(200);
     expect(
-      (await grant('admin', integrations('organizationUser.organization', ['manage']))).status,
+      (await grant('admin', integrations('space.organization', ['manage'], theSpaces))).status,
+    ).toBe(403);
+  });
+
+  it("via organizationUser.organization: members' integrations, which the owner reads and deletes but does not manage, and an admin does not touch", async () => {
+    expect(
+      (await grant('owner', integrations('organizationUser.organization', ['delete']))).status,
+    ).toBe(200);
+    expect(
+      (await grant('owner', integrations('organizationUser.organization', ['manage']))).status,
+    ).toBe(403);
+    expect(
+      (await grant('admin', integrations('organizationUser.organization', ['delete']))).status,
     ).toBe(403);
   });
 
@@ -137,7 +148,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
 
   it('send is not grantable from the target side: every way to send reads the source, which the path leaves unknown', async () => {
     const { entity: other } = await createOrganization();
-    const { entity: wSeat, context } = await createOrganizationUser(
+    const { entity: writerMember, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
     );
@@ -147,7 +158,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     );
     const app = createTestApp({
       mockUser: context.user,
-      mockOrganizationUsers: [wSeat, wOther],
+      mockOrganizationUsers: [writerMember, wOther],
       mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
     });
     const sendAtOther = entry(
@@ -156,7 +167,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       ['send'],
     );
     const response = await app.fetch(
-      patch(`/api/v1/organizationUser/${wSeat.id}/entitlements`, { add: [sendAtOther] }),
+      patch(`/api/v1/organizationUser/${writerMember.id}/entitlements`, { add: [sendAtOther] }),
     );
     expect(response.status).toBe(403);
   });

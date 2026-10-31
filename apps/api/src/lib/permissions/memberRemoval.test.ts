@@ -94,12 +94,12 @@ describe('removing an organization member, through the route', () => {
     expect(await remove(bearer(rawKey), path(row))).toBe(204);
   });
 
-  it("a user's token leaves for its user when it holds operate, not when it only reads", async () => {
+  it("a user's token leaves for its user when it holds manage on the user, not operate: leaving reaches another tenancy (Aron, 2026-10-31)", async () => {
     const { row, user } = await member('member');
-    const reader = await createKeyedToken({ ownerModel: 'User', role: 'viewer' }, { user });
-    expect(await remove(bearer(reader.rawKey), path(row))).toBe(403);
     const operator = await createKeyedToken({ ownerModel: 'User', role: 'member' }, { user });
-    expect(await remove(bearer(operator.rawKey), path(row))).toBe(204);
+    expect(await remove(bearer(operator.rawKey), path(row))).toBe(403);
+    const manager = await createKeyedToken({ ownerModel: 'User', role: 'admin' }, { user });
+    expect(await remove(bearer(manager.rawKey), path(row))).toBe(204);
   });
 });
 
