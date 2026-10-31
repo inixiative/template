@@ -583,6 +583,17 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
         post(`/api/v1/organizationUser/${row.id}/integrations`, { name: 'i', ...body }),
       );
 
+    it('an integration that is not full has a role, entitlements or both, like a token (Aron, 2026-10-31)', async () => {
+      const { user, organizationUser } = await asMember('member');
+      expect((await create(user, [organizationUser], organizationUser, {})).status).toBe(422);
+      expect(
+        (await create(user, [organizationUser], organizationUser, { entitlements: [] })).status,
+      ).toBe(422);
+      expect(
+        (await create(user, [organizationUser], organizationUser, { role: 'viewer' })).status,
+      ).toBe(201);
+    });
+
     it('its user creates one at or below their role as a member, owned by the member row; a viewer does not (Aron, 2026-10-29)', async () => {
       const plain = await asMember('viewer');
       expect(

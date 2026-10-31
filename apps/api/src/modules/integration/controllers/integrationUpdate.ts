@@ -27,20 +27,6 @@ export const integrationUpdateController = makeController(
       await validateIntegrationRole(c.get('permix'), integration);
       await validateIntegrationRole(c.get('permix'), { ...integration, ...body });
     }
-    const losesItsRole = integration.role !== null && 'role' in body && body.role === null;
-    if (
-      losesItsRole &&
-      check(delegateHoldsSomething, {
-        ...integration,
-        ...body,
-        entitlements: wellFormedEntitlements(integration.entitlements),
-      }) !== true
-    )
-      throw makeError({
-        status: 422,
-        message: 'an integration with no role is full or holds entitlements',
-      });
-
     const updated = await db.integration.update({
       where: { id: integration.id },
       data: body as Prisma.IntegrationUncheckedUpdateInput,

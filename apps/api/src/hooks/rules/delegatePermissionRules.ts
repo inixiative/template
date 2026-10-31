@@ -31,12 +31,16 @@ export const delegateHoldsSomething: Condition = {
     { field: 'role', operator: Operator.notEmpty, value: true },
     { field: 'entitlements', operator: Operator.notEmpty, value: true },
   ],
-  error: 'a token that is not full has a role, entitlements or both',
+  error: 'a delegate that is not full has a role, entitlements or both',
 };
 
 export const delegatePermissionRules = {
   Integration: {
-    all: [...fullTakesNothingElse, fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser'])],
+    all: [
+      ...fullTakesNothingElse,
+      fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser']),
+      delegateHoldsSomething,
+    ],
   },
   Token: {
     all: [
@@ -45,4 +49,5 @@ export const delegatePermissionRules = {
       delegateHoldsSomething,
     ],
   },
+  Member: delegateHoldsSomething,
 } satisfies Record<string, Condition>;
