@@ -12,16 +12,16 @@ import type {
   TokenOwnerModel,
 } from '@template/db/generated/client/client';
 import {
-  capAtRole,
-  type Grant,
+  delegate,
   organizationOwnerGrants,
+  type Permissions,
+  rebacSchema,
+  roleToStandardAction,
   spaceOwnerGrants,
   userGrants,
   wellFormedEntitlements,
 } from '@template/permissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
-
-export type OwnerTable = Grant[];
 
 type PermissionsRow = { role?: Role | null; full?: boolean; entitlements?: unknown };
 
@@ -35,25 +35,16 @@ type Delegated = {
   integration?: (Delegated & PermissionsRow) | null;
 };
 
-const nobody: OwnerTable = [];
+const nobody: Permissions = [];
 
-const inheritedAt = (role: Role, owner: OwnerTable): OwnerTable =>
-  owner.flatMap((grant) => {
-    if (grant.owner) return [];
-    const entries = grant.entries.flatMap((entry) => capAtRole(entry, role) ?? []);
-    return entries.length ? [{ ...grant, entries }] : [];
+export const delegateTable = (delegated: PermissionsRow, owner: Permissions): Permissions =>
+  delegate(rebacSchema, owner, {
+    full: delegated.full,
+    ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
+    entitlements: wellFormedEntitlements(delegated.entitlements),
   });
 
-export const delegateTable = (delegate: PermissionsRow, owner: OwnerTable): OwnerTable => {
-  if (delegate.full) return owner;
-  const stored = wellFormedEntitlements(delegate.entitlements);
-  return [
-    ...(delegate.role ? inheritedAt(delegate.role, owner) : []),
-    ...(stored.length ? [{ entries: stored, owner }] : []),
-  ];
-};
-
-export const ownerTable = async (delegated: Delegated): Promise<OwnerTable> => {
+export const ownerTable = async (delegated: Delegated): Promise<Permissions> => {
   const { organizationId, spaceId, userId, organizationUser, spaceUser, integration } = delegated;
   switch (delegated.ownerModel) {
     case 'User': {

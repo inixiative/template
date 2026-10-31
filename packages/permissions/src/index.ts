@@ -6,32 +6,31 @@ export {
   type Actor,
   ActorModel,
   createPermissions,
+  delegate,
   type EntitlementEntry,
+  installPermissions,
   OrganizationAction,
   type PermissionEntry,
+  type Permissions,
   type Permix,
   TokenAction,
   UserAction,
+  wellFormedEntitlements,
 } from './client';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
 export type { ActionRule } from './rebac/types';
-export { capAtRole } from './roles/capAtRole';
 export type { DelegatePermissions } from './roles/delegatePermissions';
 export { isMemberSelfGrant, type MemberResource, memberSelfGrant } from './roles/memberSelfGrant';
 // Organization permissions
 export { getOrgPermissions } from './roles/organization';
 // Shared role utilities
-export { isSuperadmin } from './roles/shared';
+export { isSuperadmin, roleToStandardAction } from './roles/shared';
 export { getSpacePermissions } from './roles/space';
 export {
-  type Grant,
-  grantsPermix,
-  installGrants,
   organizationOwnerGrants,
   spaceOwnerGrants,
   userGrants,
 } from './roles/userGrants';
-export { wellFormedEntitlements } from './roles/wellFormedEntitlements';
 export type { PermissionsCheck } from './types';

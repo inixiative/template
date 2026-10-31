@@ -9,7 +9,7 @@ import type { User } from '@template/db/generated/client/client';
 import {
   ActorModel,
   actorOf,
-  installGrants,
+  installPermissions,
   isSuperadmin,
   userGrants,
 } from '@template/permissions';
@@ -33,9 +33,9 @@ export const installPermissionsFor = async (
   permix.setSuperadmin(isSuperadmin(user));
 
   const usersTable = userGrants(user?.id ?? null, organizationUsers, spaceUsers);
-  if (!token) return installGrants(permix, usersTable);
+  if (!token) return installPermissions(permix, usersTable);
   const owner = token.ownerModel === 'User' ? usersTable : await ownerTable(token);
-  await installGrants(permix, delegateTable(token, owner));
+  await installPermissions(permix, delegateTable(token, owner));
 };
 
 export const userPermissions = async (userId: string): Promise<Permix | null> => {

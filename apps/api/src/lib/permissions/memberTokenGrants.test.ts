@@ -32,7 +32,9 @@ const grantsFor = async (rawKey: string) => {
   return Object.fromEntries(
     Object.entries(grants).map(([key, actions]) => [
       key,
-      Object.keys(actions).filter((action) => actions[action]),
+      Object.keys(actions)
+        .filter((action) => actions[action])
+        .sort(),
     ]),
   );
 };
@@ -81,7 +83,7 @@ describe('a member token holds its member row, never the user (template #210 7f6
   it('an OrganizationUser token: its org at its role, and nothing else', async () => {
     const { rawKey, organizationUser } = await memberKey('admin', { role: 'owner' });
     expect(await grantsFor(rawKey)).toEqual({
-      [`db:organization:${organization.id}`]: ['read', 'operate', 'manage'],
+      [`db:organization:${organization.id}`]: ['manage', 'operate', 'read'],
     });
     expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'own')).toBe(false);
@@ -91,7 +93,7 @@ describe('a member token holds its member row, never the user (template #210 7f6
   it('a SpaceUser token: its space at its role, and not the organization', async () => {
     const rawKey = await spaceUserKey('admin', 'owner', 'owner');
     expect(await grantsFor(rawKey)).toEqual({
-      [`db:space:${space.id}`]: ['read', 'operate', 'manage', 'own'],
+      [`db:space:${space.id}`]: ['manage', 'operate', 'own', 'read'],
     });
     expect(await holds(rawKey, 'space', space.id, 'own')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'read')).toBe(false);
@@ -118,7 +120,7 @@ describe('a member token holds its member row, never the user (template #210 7f6
   it("an owner's member-role token holds its member's own table, capped at member (R103)", async () => {
     const { rawKey } = await memberKey('owner', { role: 'member' });
     expect(await grantsFor(rawKey)).toEqual({
-      [`db:organization:${organization.id}`]: ['read', 'operate'],
+      [`db:organization:${organization.id}`]: ['operate', 'read'],
     });
     expect(await holds(rawKey, 'organization', organization.id, 'operate')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(false);

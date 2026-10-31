@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import type { HydratedRecord } from '@template/db';
-import { grantsPermix, memberSelfGrant, userGrants } from '@template/permissions';
+import {
+  createPermissions,
+  installPermissions,
+  memberSelfGrant,
+  type Permissions,
+  userGrants,
+} from '@template/permissions';
 import { check } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { delegateTable } from '#/lib/permissions/ownerTable';
@@ -28,9 +34,15 @@ const withSelfGrant = (member: Member) => ({
   entitlements: [memberSelfGrant('db:organizationUser', member)],
 });
 
+const permixOf = async (permissions: Permissions) => {
+  const permix = createPermissions();
+  await installPermissions(permix, permissions);
+  return permix;
+};
+
 const operates = async (table: ReturnType<typeof delegateTable>, member: Member) =>
   check(
-    await grantsPermix(table),
+    await permixOf(table),
     rebacSchema,
     'organizationUser',
     member as unknown as HydratedRecord,
@@ -62,7 +74,7 @@ describe("only a member's self-grant is backed by its user", () => {
         { resource: 'db:user', anchor: { resource: 'db:user', id: u1.id }, actions: { own: true } },
       ],
     };
-    const full = await grantsPermix(delegateTable({ full: true }, userGrants(null, [wider], [])));
+    const full = await permixOf(delegateTable({ full: true }, userGrants(null, [wider], [])));
     expect(
       check(full, rebacSchema, 'organizationUser', m3 as unknown as HydratedRecord, 'operate'),
     ).toBe(false);

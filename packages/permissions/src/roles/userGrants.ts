@@ -6,10 +6,9 @@
  */
 import type { Role } from '@template/db/generated/client/enums';
 import {
-  createPermissions,
   type EntitlementEntry,
-  type PermissionEntry,
-  type Permix,
+  type Permissions,
+  wellFormedEntitlements,
 } from '@template/permissions/client';
 import {
   isMemberSelfGrant,
@@ -18,27 +17,28 @@ import {
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
-import { wellFormedEntitlements } from '@template/permissions/roles/wellFormedEntitlements';
 import { partition } from 'lodash-es';
-
-export type Grant = { entries: PermissionEntry[]; owner?: Grant[] };
 
 type Member = { role: Role; id?: string; userId?: string; entitlements?: unknown };
 type OrganizationMember = Member & { organizationId: string };
 type SpaceMember = Member & { spaceId: string };
 
-export const organizationOwnerGrants = (organizationId: string): Grant[] => [
+export const organizationOwnerGrants = (organizationId: string): Permissions => [
   { entries: [getOrgPermissions('owner', organizationId)] },
 ];
 
-export const spaceOwnerGrants = (spaceId: string): Grant[] => [
+export const spaceOwnerGrants = (spaceId: string): Permissions => [
   { entries: [getSpacePermissions('owner', spaceId)] },
 ];
 
-const ownedBy = (entries: EntitlementEntry[], owner: Grant[]): Grant[] =>
+const ownedBy = (entries: EntitlementEntry[], owner: Permissions): Permissions =>
   entries.length ? [{ entries, owner }] : [];
 
-const memberGrants = (member: Member, resource: MemberResource, tenantOwner: Grant[]): Grant[] => {
+const memberGrants = (
+  member: Member,
+  resource: MemberResource,
+  tenantOwner: Permissions,
+): Permissions => {
   const [usersSide, tenantsSide] = partition(
     wellFormedEntitlements(member.entitlements),
     isMemberSelfGrant(resource, member),
@@ -55,7 +55,7 @@ export const userGrants = (
   userId: string | null,
   members: OrganizationMember[],
   spaceMembers: SpaceMember[],
-): Grant[] => [
+): Permissions => [
   {
     entries: [
       ...(userId ? [getUserPermissions(userId)] : []),
@@ -70,14 +70,3 @@ export const userGrants = (
     memberGrants(member, 'db:spaceUser', spaceOwnerGrants(member.spaceId)),
   ),
 ];
-
-export const installGrants = async (permix: Permix, grants: Grant[]): Promise<void> => {
-  for (const { entries, owner } of grants)
-    await permix.setup(entries, owner ? { owner: await grantsPermix(owner) } : undefined);
-};
-
-export const grantsPermix = async (grants: Grant[]): Promise<Permix> => {
-  const permix = createPermissions();
-  await installGrants(permix, grants);
-  return permix;
-};
