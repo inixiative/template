@@ -15,7 +15,6 @@ import {
   rebacSchema,
   schemaMap,
 } from '@template/permissions/rebac';
-import { actorHoldsItsChain } from '@template/permissions/rebac/schemaHelpers';
 import { makeError } from '#/lib/errors';
 
 const modelOf = (resource: string) => resource.slice('db:'.length) as AccessorName;
@@ -44,17 +43,12 @@ const placedRecords = async (entry: EntitlementEntry) => {
   return placed as HydratedRecord[];
 };
 
-export type Delegate = { model: AccessorName; record: HydratedRecord };
-
 export const validateEntitlementGrants = async (
   writer: Permix,
   entries: EntitlementEntry[],
-  delegate?: Delegate,
 ): Promise<void> => {
-  const yours =
-    !!delegate && check(writer, rebacSchema, delegate.model, delegate.record, actorHoldsItsChain);
   for (const entry of entries)
     for (const placed of await placedRecords(entry))
-      if (!yours && !canGrantEntitlement(writer, entry, placed))
+      if (!canGrantEntitlement(writer, entry, placed))
         throw makeError({ status: 403, message: 'A delegate holds your permissions or less' });
 };

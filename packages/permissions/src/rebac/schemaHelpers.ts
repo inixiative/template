@@ -50,10 +50,6 @@ export const actionOnOwner = (
     })),
 });
 
-const actorIsUserAt = (field: string): ActionRule => ({
-  all: [actorIsUser, { rule: { field, operator: Operator.equals, path: '__actor.record.id' } }],
-});
-
 export const managesItsUser = (at = ''): ActionRule => ({ rel: `${at}user`, action: 'manage' });
 
 const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
@@ -99,19 +95,6 @@ export const createdByItsUserOrManager: ActionRule = {
 };
 
 const notMembers: OwnerModel[] = ['User', 'Organization', 'Space'];
-
-export const actorHoldsItsChain: ActionRule = {
-  any: [
-    { all: [ownedBy(['User', ...members]), actorIsUserAt('userId')] },
-    {
-      all: [
-        ownedBy(['Integration']),
-        ownedBy(['User', ...members], 'integration.'),
-        actorIsUserAt('integration.userId'),
-      ],
-    },
-  ],
-};
 
 const operatesAtItsMembersTenant: ActionRule = {
   any: [
@@ -164,12 +147,7 @@ export const integrationAccess = {
 } satisfies Record<string, ActionRule>;
 
 export const integrationRoleWrite: ActionRule = {
-  any: [
-    actorHoldsItsChain,
-    {
-      all: ['manage', roleHeldAtOwner()],
-    },
-  ],
+  any: [actionOnOwner('delegateFull'), { all: ['manage', roleHeldAtOwner()] }],
 };
 
 export const tokenAccessIsYours: ActionRule = {

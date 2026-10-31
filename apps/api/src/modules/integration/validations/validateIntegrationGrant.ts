@@ -27,9 +27,6 @@ export const validateIntegrationGrant = async (
   writer: Permix,
   integration: Record<string, unknown>,
 ): Promise<void> => {
-  const record = await validateIntegrationRole(writer, integration);
-  await validateEntitlementGrants(writer, (integration.entitlements ?? []) as EntitlementEntry[], {
-    model: 'integration',
-    record,
-  });
+  await validateIntegrationRole(writer, integration);
+  await validateEntitlementGrants(writer, (integration.entitlements ?? []) as EntitlementEntry[]);
 };

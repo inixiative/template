@@ -22,10 +22,7 @@ export const tokenEntitlementsController = makeController(
     const record = await hydrate('token', token as HydratedRecord);
     validateDelegateRole(record);
 
-    const entitlements = await changeEntitlements(permix, token.entitlements, c.req.valid('json'), {
-      model: 'token',
-      record,
-    });
+    const entitlements = await changeEntitlements(permix, token.entitlements, c.req.valid('json'));
     const { keyHash: _keyHash, ...updated } = await db.token.update({
       where: { id: token.id },
       data: { entitlements: entitlements as Prisma.InputJsonValue },

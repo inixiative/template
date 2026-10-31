@@ -23,7 +23,6 @@ export const integrationEntitlementsController = makeController(
       permix,
       integration.entitlements,
       c.req.valid('json'),
-      { model: 'integration', record: await hydrate('integration', integration) },
     );
     const updated = await db.integration.update({
       where: { id: integration.id },

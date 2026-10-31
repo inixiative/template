@@ -8,10 +8,7 @@ import { z } from '@hono/zod-openapi';
 import { type EntitlementEntry, type Permix, wellFormedEntitlements } from '@template/permissions';
 import { entitlementEntriesSchema } from '@template/permissions/rebac';
 import { isEqual } from 'lodash-es';
-import {
-  type Delegate,
-  validateEntitlementGrants,
-} from '#/lib/permissions/validateEntitlementGrants';
+import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 
 export const entitlementChangesSchema = z.object({
   add: entitlementEntriesSchema.optional(),
@@ -24,11 +21,10 @@ export const changeEntitlements = async (
   writer: Permix,
   stored: unknown,
   { add = [], remove = [] }: EntitlementChanges,
-  delegate?: Delegate,
 ): Promise<EntitlementEntry[]> => {
   const current = wellFormedEntitlements(stored);
   const removed = current.filter((entry) => remove.some((match) => isEqual(match, entry)));
-  await validateEntitlementGrants(writer, [...add, ...removed] as EntitlementEntry[], delegate);
+  await validateEntitlementGrants(writer, [...add, ...removed] as EntitlementEntry[]);
   const kept = current.filter((entry) => !removed.includes(entry));
   return wellFormedEntitlements([...kept, ...add]);
 };

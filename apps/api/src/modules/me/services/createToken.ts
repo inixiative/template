@@ -44,10 +44,7 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
     throw makeError({ status: 403, message: 'Access denied' });
   validateDelegateRole(pseudo);
   if (row.full) validateFullGrant(permix, 'token', pseudo);
-  await validateEntitlementGrants(permix, params.entitlements ?? [], {
-    model: 'token',
-    record: pseudo,
-  });
+  await validateEntitlementGrants(permix, params.entitlements ?? []);
 
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];

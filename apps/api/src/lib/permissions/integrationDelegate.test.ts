@@ -246,10 +246,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       return { status: response.status, stored: stored.entitlements };
     };
 
-    const keyOf = async ({ id }: Integration) =>
-      tokenFor(await db.integration.findUniqueOrThrow({ where: { id } }), 'owner');
-
-    it('its user gives their member integration any entitlement; it holds only what the member holds (R91)', async () => {
+    it('its user cannot give their member integration an entitlement they do not hold (Aron, 2026-10-31)', async () => {
       const manage = [entry('db:organization', ['db:organization', organization.id], ['manage'])];
       const { entity: writer } = await createUser();
       const member = await memberOf('member', organization, writer);
@@ -257,17 +254,15 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       const response = await userApp(writer, [member]).fetch(
         patch(`/api/v1/integration/${integration.id}/entitlements`, { add: manage }),
       );
-      expect(response.status).toBe(200);
-      const key = await keyOf(integration);
-      expect(await holds(key, 'organization', organization.id, 'manage')).toBe(false);
+      expect(response.status).toBe(403);
     });
 
-    it('an admin-role member gives manage on a space (R91)', async () => {
+    it('an admin-role member cannot give manage on a space it does not manage (Aron, 2026-10-31)', async () => {
       const manageSpace = [entry('db:space', ['db:space', space.id], ['manage'])];
-      expect((await grant('admin', manageSpace)).status).toBe(200);
+      expect((await grant('admin', manageSpace)).status).toBe(403);
     });
 
-    it('an entitlement from an organization the member is not in reaches nothing (R91)', async () => {
+    it('an entitlement from an organization the member is not in is refused (Aron, 2026-10-31)', async () => {
       const elsewhere = [
         entry('db:organization', ['db:organization', otherOrganization.id], ['read']),
       ];
@@ -280,9 +275,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
             patch(`/api/v1/integration/${integration.id}/entitlements`, { add: elsewhere }),
           )
         ).status,
-      ).toBe(200);
-      const key = await keyOf(integration);
-      expect(await holds(key, 'organization', otherOrganization.id, 'read')).toBe(false);
+      ).toBe(403);
     });
 
     it("another member's admin sets no role on an owner's integration; its user does", async () => {

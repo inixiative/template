@@ -421,7 +421,7 @@ describe('a full token on your member row is the member', () => {
 });
 
 describe("a member writes any entitlement on their own member integration, capped at use; the organization's owner writes none (R91)", () => {
-  it('a member gives their member integration an entitlement beyond their own; it holds only what the member holds', async () => {
+  it('a member cannot give their member integration an entitlement they do not hold (Aron, 2026-10-31)', async () => {
     const { entity: member, context } = await createOrganizationUser(
       { role: 'member' },
       { organization },
@@ -445,14 +445,7 @@ describe("a member writes any entitlement on their own member integration, cappe
         ],
       }),
     );
-    expect(response.status).toBe(201);
-    const { data } = (await response.json()) as { data: Integration };
-    const { rawKey } = await createKeyedToken(
-      { ownerModel: 'Integration', full: true, role: null },
-      { integration: data },
-    );
-    expect(await holds(rawKey, 'organization', organization.id, 'operate')).toBe(true);
-    expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(false);
+    expect(response.status).toBe(403);
   });
 
   it("the organization's owner writes no entitlements on a member's integration, whatever its role (R91)", async () => {

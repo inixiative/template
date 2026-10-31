@@ -160,7 +160,7 @@ describe('integrations and tokens change their entitlements the same way', () =>
     expect((await to([spaceIntegrations(['manage'])])).status).toBe(403);
   });
 
-  it("a member's token: its user adds and removes any entitlement; the member caps it (R91)", async () => {
+  it("a member's token: its user adds and removes only what they hold (Aron, 2026-10-31)", async () => {
     const { entity: organizationUser, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
@@ -177,10 +177,10 @@ describe('integrations and tokens change their entitlements the same way', () =>
     const to = (body: { add?: Entry[]; remove?: Entry[] }) =>
       app.fetch(patch(`/api/v1/token/${token.id}/entitlements`, body));
     expect((await to({ add: [ownIntegrations(['manage'])] })).status).toBe(200);
-    expect((await to({ add: [spaceIntegrations(['manage'])] })).status).toBe(200);
+    expect((await to({ add: [spaceIntegrations(['manage'])] })).status).toBe(403);
     expect((await to({ remove: [ownIntegrations(['manage'])] })).status).toBe(200);
-    expect((await db.token.findUniqueOrThrow({ where: { id: token.id } })).entitlements).toEqual([
-      spaceIntegrations(['manage']),
-    ]);
+    expect((await db.token.findUniqueOrThrow({ where: { id: token.id } })).entitlements).toEqual(
+      [],
+    );
   });
 });
