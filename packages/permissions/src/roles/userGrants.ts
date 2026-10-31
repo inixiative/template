@@ -12,6 +12,10 @@ import {
   type PermissionEntry,
   type Permix,
 } from '@template/permissions/client';
+import {
+  isMemberSelfGrant,
+  type MemberResource,
+} from '@template/permissions/roles/memberSelfGrant';
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
@@ -20,7 +24,7 @@ import { partition } from 'lodash-es';
 
 export type Grant = { entries: PermissionEntry[]; owner?: Grant[] };
 
-type Member = { role: Role; userId?: string; entitlements?: unknown };
+type Member = { role: Role; id?: string; userId?: string; entitlements?: unknown };
 type OrganizationMember = Member & { organizationId: string };
 type SpaceMember = Member & { spaceId: string };
 
@@ -35,13 +39,10 @@ export const spaceOwnerGrants = (spaceId: string): Grant[] => [
 const ownedBy = (entries: EntitlementEntry[], owner: Grant[]): Grant[] =>
   entries.length ? [{ entries, owner }] : [];
 
-const anchoredOnItsUser = (member: Member) => (entry: EntitlementEntry) =>
-  entry.anchor.resource === 'db:user' && entry.anchor.id === member.userId;
-
-const memberGrants = (member: Member, tenantOwner: Grant[]): Grant[] => {
+const memberGrants = (member: Member, resource: MemberResource, tenantOwner: Grant[]): Grant[] => {
   const [usersSide, tenantsSide] = partition(
     wellFormedEntitlements(member.entitlements),
-    anchoredOnItsUser(member),
+    isMemberSelfGrant(resource, member),
   );
   return [
     ...ownedBy(usersSide, [{ entries: [getUserPermissions(member.userId as UserId)] }]),
@@ -64,9 +65,11 @@ export const userGrants = (
     ],
   },
   ...members.flatMap((member) =>
-    memberGrants(member, organizationOwnerGrants(member.organizationId)),
+    memberGrants(member, 'db:organizationUser', organizationOwnerGrants(member.organizationId)),
   ),
-  ...spaceMembers.flatMap((member) => memberGrants(member, spaceOwnerGrants(member.spaceId))),
+  ...spaceMembers.flatMap((member) =>
+    memberGrants(member, 'db:spaceUser', spaceOwnerGrants(member.spaceId)),
+  ),
 ];
 
 export const installGrants = async (permix: Permix, grants: Grant[]): Promise<void> => {

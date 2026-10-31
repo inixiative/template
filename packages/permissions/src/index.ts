@@ -19,6 +19,7 @@ export { rebacSchema } from './rebac/schema';
 export type { ActionRule } from './rebac/types';
 export { capAtRole } from './roles/capAtRole';
 export type { DelegatePermissions } from './roles/delegatePermissions';
+export { isMemberSelfGrant, type MemberResource, memberSelfGrant } from './roles/memberSelfGrant';
 // Organization permissions
 export { getOrgPermissions } from './roles/organization';
 // Shared role utilities

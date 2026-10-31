@@ -141,6 +141,34 @@ describe("design: M1's self-grant, backed by U1, is read by M1's full token and 
   });
 });
 
+describe('design: where id by record path instead of the literal id', () => {
+  it("path 'id' compares the member to itself, so M1's full token would also operate M3", async () => {
+    const o2 = { id: 'o2' };
+    const m3 = { ...m1, id: 'm3', organizationId: o2.id, organization: o2 };
+    const byPath: Grant[] = [
+      { entries: [getOrgPermissions('member', o1.id as OrganizationId)] },
+      {
+        entries: [
+          {
+            resource: 'db:organizationUser',
+            anchor: { resource: 'db:user', id: u1.id, path: 'user' },
+            where: { field: 'id', operator: Operator.equals, path: 'id' },
+            actions: { operate: true },
+          },
+        ],
+        owner: [{ entries: [getUserPermissions(u1.id as UserId)] }],
+      },
+    ];
+    const full = await grantsPermix(delegateTable({ full: true }, byPath));
+    expect(
+      check(full, rebacSchema, 'organizationUser', m1 as unknown as HydratedRecord, 'operate'),
+    ).toBe(true);
+    expect(
+      check(full, rebacSchema, 'organizationUser', m3 as unknown as HydratedRecord, 'operate'),
+    ).toBe(true);
+  });
+});
+
 describe("userGrants backs a member's entitlements by the anchor's side (Aron, 2026-10-30)", () => {
   const selfGrant = (member: typeof m1) => ({
     resource: 'db:organizationUser',
@@ -161,6 +189,31 @@ describe("userGrants backs a member's entitlements by the anchor's side (Aron, 2
 
   it("M2's own permissions do not operate M1", async () => {
     expect(await operatesM1(delegateTable({ full: true }, tableOf(m2)))).toBe(false);
+  });
+
+  it("only the self-grant itself is backed by the user: a wider entitlement anchored on M1's user stays backed by the tenant", async () => {
+    const o2 = { id: 'o2' };
+    const m3 = { ...m1, id: 'm3', organizationId: o2.id, organization: o2 };
+    const wider = {
+      ...m1,
+      entitlements: [
+        {
+          resource: 'db:organizationUser',
+          anchor: { resource: 'db:user', id: m1.userId, path: 'user' },
+          actions: { operate: true },
+        },
+        {
+          resource: 'db:user',
+          anchor: { resource: 'db:user', id: m1.userId },
+          actions: { own: true },
+        },
+      ],
+    };
+    const full = await grantsPermix(delegateTable({ full: true }, userGrants(null, [wider], [])));
+    expect(
+      check(full, rebacSchema, 'organizationUser', m3 as unknown as HydratedRecord, 'operate'),
+    ).toBe(false);
+    expect(check(full, rebacSchema, 'user', u1 as unknown as HydratedRecord, 'own')).toBe(false);
   });
 
   it('an entitlement anchored on another user is backed by the tenant, not that user', async () => {

@@ -4,29 +4,22 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { Operator } from '@inixiative/json-rules';
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
+import { type MemberResource, memberSelfGrant } from '@template/permissions';
 import { castArray, isEqual } from 'lodash-es';
 
 type Row = Record<string, unknown>;
 type MemberModel = 'OrganizationUser' | 'SpaceUser';
 type Member = { id: string; userId: string };
 
-const resourceOf: Record<MemberModel, string> = {
+const resourceOf: Record<MemberModel, MemberResource> = {
   OrganizationUser: 'db:organizationUser',
   SpaceUser: 'db:spaceUser',
 };
 
-const selfGrant = (model: MemberModel, { id, userId }: Member) => ({
-  resource: resourceOf[model],
-  anchor: { resource: 'db:user', id: userId, path: 'user' },
-  where: { field: 'id', operator: Operator.equals, value: id },
-  actions: { operate: true },
-});
-
 const withSelfGrant = (model: MemberModel, member: Member, entitlements: unknown) => {
   const written = Array.isArray(entitlements) ? entitlements : [];
-  const grant = selfGrant(model, member);
+  const grant = memberSelfGrant(resourceOf[model], member);
   return written.some((entry) => isEqual(entry, grant)) ? written : [...written, grant];
 };
 
