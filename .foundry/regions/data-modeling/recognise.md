@@ -52,7 +52,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - look up one language by its code
 - validate a language field in the request
 - the full list of languages
-- which models have a branded id type
 - which template wins: the org's override or the default
 - declare which kinds a model can point at
 - turn a polymorphic ref into the actual target id
@@ -143,7 +142,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - define the tag vocabulary itself
 - iterate all timezone names
 - check the timezone against the runtime's supported list inline
-- branded id type for function signatures
 - ids that sort by creation time
 - a countries array with name and dial code
 - all country codes for a dropdown of codes

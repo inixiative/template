@@ -1,7 +1,7 @@
 {
   "id": "data-modeling",
   "title": "Schema conventions and reference data",
-  "routing": "Is this about how the schema is shaped rather than how it is queried: split schema files per model as source of truth, UUIDv7 primary keys and typed model ids (ModelIdType, userId, Typed model IDs), VarChar(36) FKs, createdAt/updatedAt, enum vs row and enum suffix naming, false polymorphism (PolymorphismRegistry / FalsePolymorphismRegistry, getPolymorphismConfig, resolveFalsePolymorphismRef, ownerModel / sourceModel / targetModel / resourceModel, special owner values default and admin), Tag / TagCategory / TagAttachment, or static reference data: COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONE_IDS and their zod schemas and lookups (countryByCode, decimalsFor, symbolFor, callingCodeFor)?",
+  "routing": "Is this about how the schema is shaped rather than how it is queried: split schema files per model as source of truth, UUIDv7 primary keys, VarChar(36) FKs, createdAt/updatedAt, enum vs row and enum suffix naming, false polymorphism (PolymorphismRegistry / FalsePolymorphismRegistry, getPolymorphismConfig, resolveFalsePolymorphismRef, ownerModel / sourceModel / targetModel / resourceModel, special owner values default and admin), Tag / TagCategory / TagAttachment, or static reference data: COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONE_IDS and their zod schemas and lookups (countryByCode, decimalsFor, symbolFor, callingCodeFor)?",
   "concepts": ["data-modeling", "reference-data"],
   "tokens": 11844,
   "tokenMethod": "chars/4",
@@ -23,7 +23,6 @@
     "docUnits": [
       "doc:docs/claude/DATABASE.md#prisma",
       "doc:docs/claude/DATABASE.md#schema-conventions",
-      "doc:docs/claude/DATABASE.md#typed-model-ids",
       "doc:docs/claude/DATABASE.md#false-polymorphism",
       "doc:docs/claude/DATABASE.md#registries",
       "doc:docs/claude/DATABASE.md#schema-reference",

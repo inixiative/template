@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { db, organizationId } from '@template/db';
+import { db } from '@template/db';
 import { encryptField } from '@template/db/lib/encryption/helpers';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
@@ -19,7 +19,7 @@ export const organizationCreateAuthProviderController = makeController(
     const data = {
       ...body,
       id: crypto.randomUUID(),
-      organizationId: organizationId(org.id),
+      organizationId: org.id,
     };
 
     const encryptedData = await encryptField('authProvider', 'secrets', { ...data, secrets });

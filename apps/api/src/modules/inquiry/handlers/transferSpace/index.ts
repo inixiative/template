@@ -1,4 +1,4 @@
-import { db, type OrganizationId, type SpaceId } from '@template/db';
+import { db } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   baseResolutionInputSchema,
@@ -20,8 +20,8 @@ export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
 
   handleApprove: async (inquiry) => {
     const space = await db.space.update({
-      where: { id: inquiry.sourceSpaceId as SpaceId },
-      data: { organizationId: inquiry.targetOrganizationId as OrganizationId },
+      where: { id: inquiry.sourceSpaceId! },
+      data: { organizationId: inquiry.targetOrganizationId! },
     });
     await emitAppEvent('space.updated', { space });
   },

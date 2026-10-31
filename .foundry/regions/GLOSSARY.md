@@ -3957,9 +3957,6 @@ Object shapes are declared with type aliases. *Region:* [Naming and code style](
 **typecheck / typecheck:fe**  
 Whole-repo type check / frontend apps only, after regenerating routes. *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
 
-**Typed model IDs**  
-Branded string types such as `UserId` with constructors like `userId(id)` that stop mixing IDs of different models. *Region:* [Schema conventions and reference data](data-modeling/knowledge.md)
-
 **TypedBuildResult**  
 Type declaring which context entries a factory guarantees. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 

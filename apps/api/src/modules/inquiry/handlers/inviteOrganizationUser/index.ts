@@ -1,4 +1,4 @@
-import { db, type OrganizationId, revive, type UserId } from '@template/db';
+import { db, revive } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   baseResolutionInputSchema,
@@ -19,8 +19,8 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
   defaultExpirationDays: 30,
 
   validate: async (inquiry: Partial<Inquiry>, _content: InviteOrganizationUserContent) => {
-    const organizationId = inquiry.sourceOrganizationId! as OrganizationId;
-    const userId = inquiry.targetUserId! as UserId;
+    const organizationId = inquiry.sourceOrganizationId!;
+    const userId = inquiry.targetUserId!;
 
     const existing = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId, userId } },
@@ -33,8 +33,8 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
   autoApprove: async () => false,
 
   handleApprove: async (inquiry: Inquiry, resolvedContent: InviteOrganizationUserContent) => {
-    const organizationId = inquiry.sourceOrganizationId as OrganizationId;
-    const userId = inquiry.targetUserId! as UserId;
+    const organizationId = inquiry.sourceOrganizationId!;
+    const userId = inquiry.targetUserId!;
     const [revived] = await revive(db.organizationUser, { organizationId, userId });
     if (revived)
       await db.organizationUser.update({

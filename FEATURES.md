@@ -222,9 +222,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Database & ORM
 
-**Prisma 7 with Advanced Patterns** - Latest Prisma ORM with PostgreSQL 18, featuring typed model IDs, mutation hooks, post-transaction queues, robust false polymorphism, and split schema architecture. Built for type safety, testability, and maintainability.
-
-- ✅ **Typed Model IDs** - Branded ID types (OrganizationId, UserId, SpaceId) prevent accidentally mixing IDs from different models. TypeScript catches `function(userId: UserId)` called with `organizationId` at compile time. Eliminates an entire class of bugs
+**Prisma 7 with Advanced Patterns** - Latest Prisma ORM with PostgreSQL 18, featuring mutation hooks, post-transaction queues, robust false polymorphism, and split schema architecture. Built for type safety, testability, and maintainability.
 
 - ✅ **Automatic Transaction Merging** - Database client uses AsyncLocalStorage and Proxy pattern to auto-merge nested transactions. Call `db.txn()` anywhere and it merges into parent transaction if one exists, or creates new one if not. Eliminates manual transaction passing through call stacks. All mutations automatically wrapped in transactions via Prisma extension
 
