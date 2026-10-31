@@ -97,4 +97,15 @@ describe('a member row: operate is being the member, manage and own administer i
     expect(can(admin, 'spaceUser', spaceRow('sr2', u2), 'operate')).toBe(false);
     expect(can(await person(u2), 'spaceUser', spaceRow('sr2', u2), 'operate')).toBe(true);
   });
+
+  it("operate on the user stays in the user's own tenancy: it neither acts as their member nor leaves it; manage does (Aron, 2026-10-31)", async () => {
+    const userOperate = createPermissions();
+    await userOperate.setup([grant('db:user', u1.id, 'operate')]);
+    expect(can(userOperate, 'organizationUser', mine, 'operate')).toBe(false);
+    expect(can(userOperate, 'organizationUser', mine, 'leave')).toBe(false);
+    const userManage = createPermissions();
+    await userManage.setup([grant('db:user', u1.id, 'manage')]);
+    expect(can(userManage, 'organizationUser', mine, 'operate')).toBe(true);
+    expect(can(userManage, 'organizationUser', mine, 'leave')).toBe(true);
+  });
 });

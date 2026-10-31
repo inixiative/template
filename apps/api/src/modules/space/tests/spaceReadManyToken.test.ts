@@ -51,13 +51,11 @@ describe('GET /api/v1/space/:id/tokens', () => {
     expect(data.some((token) => token.name === 'Test Token')).toBe(true);
   });
 
-  it('a space admin or member does not list tokens: token list read is own at the owner (R38)', async () => {
-    for (const role of ['admin', 'member'] as const) {
-      const response = await (await spaceMember(role)).fetch(
-        get(`/api/v1/space/${space.id}/tokens`),
-      );
-      expect(response.status).toBe(403);
-    }
+  it("a space admin lists the space's tokens; a member does not (Aron, 2026-10-30)", async () => {
+    const list = async (role: 'admin' | 'member') =>
+      (await (await spaceMember(role)).fetch(get(`/api/v1/space/${space.id}/tokens`))).status;
+    expect(await list('admin')).toBe(200);
+    expect(await list('member')).toBe(403);
   });
 
   it('returns 403 for user without space access', async () => {

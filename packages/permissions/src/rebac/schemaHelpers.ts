@@ -78,11 +78,11 @@ export const memberRemoval = (tenant: 'organization' | 'space'): ActionRule => (
 export const memberRowActions = (tenant: 'organization' | 'space') => ({
   own: { rel: tenant, action: 'own' },
   manage: { any: ['own', { rel: tenant, action: 'manage' }] },
-  operate: { rel: 'user', action: 'operate' },
+  operate: { rel: 'user', action: 'manage' },
   read: {
     any: ['operate', 'manage', { rel: 'user', action: 'read' }, { rel: tenant, action: 'read' }],
   },
-  leave: { rel: 'user', action: 'operate' },
+  leave: { rel: 'user', action: 'manage' },
   delegateFull: { all: [actorIsUser, 'operate'] },
 });
 

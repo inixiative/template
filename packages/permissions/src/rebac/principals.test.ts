@@ -118,8 +118,15 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
       expect(can(token, 'inquiry', inquiryTo(u1, u2), 'resolve')).toBe(false);
     });
 
-    it('a user token holding operate on the user can do all three', async () => {
+    it("a user token holding operate on the user deletes the user's tokens, but neither leaves an organization nor accepts an invite: those reach another tenancy (Aron, 2026-10-31)", async () => {
       const token = await narrowedUserToken(u1, 'operate');
+      expect(can(token, 'token', tokenOf('t2', u1), 'leave')).toBe(true);
+      expect(can(token, 'organizationUser', r1, 'leave')).toBe(false);
+      expect(can(token, 'inquiry', inquiryTo(u1, u2), 'resolve')).toBe(false);
+    });
+
+    it('a user token holding manage on the user does all three', async () => {
+      const token = await narrowedUserToken(u1, 'manage');
       expect(can(token, 'organizationUser', r1, 'leave')).toBe(true);
       expect(can(token, 'token', tokenOf('t2', u1), 'leave')).toBe(true);
       expect(can(token, 'inquiry', inquiryTo(u1, u2), 'resolve')).toBe(true);

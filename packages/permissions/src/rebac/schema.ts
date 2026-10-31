@@ -205,7 +205,7 @@ export const rebacSchema: RebacSchema = {
         // Resolve: target decides (approve/deny/requestChanges)
         resolve: {
           any: [
-            { rel: 'targetUser', action: 'operate' },
+            { rel: 'targetUser', action: 'manage' },
             {
               any: [
                 // transferSpace — target org owner only
