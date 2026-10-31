@@ -396,6 +396,10 @@ So U1 mints a full token on M1 and makes I1 full; the owner of O1 mints a full t
 
 ## Resolution at Read Time
 
+### Hydration
+
+`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchOne` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load runs in `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration.
+
 ### installPermissions
 
 One builder fills a permix for whoever acts: `installPermissionsFor(permix, { user, token, organizationUsers, spaceUsers })` (`apps/api/src/lib/permissions/userPermissions.ts`). It resets the permix, sets the actor (the token if there is one, else the user) and the superadmin bypass from the user's platform role, then installs:
