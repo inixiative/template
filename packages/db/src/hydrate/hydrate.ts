@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses infrastructure:redis
  */
+import { db } from '@template/db/client';
 import { fetchOne } from '@template/db/hydrate/fetchOne';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cacheKey } from '@template/db/redis';
@@ -45,7 +46,10 @@ export const hydrate = async <T extends HydratedRecord>(
 
     const key = cacheKey(rel.targetAccessor, identifier);
     if (!pending.has(key)) {
-      pending.set(key, fetchOne<HydratedRecord>(rel.targetAccessor, identifier));
+      pending.set(
+        key,
+        db.withoutDeleted(() => fetchOne<HydratedRecord>(rel.targetAccessor, identifier)),
+      );
     }
 
     const related = await pending.get(key)!;

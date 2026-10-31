@@ -143,4 +143,31 @@ describe('fetchOne', () => {
     expect(await getRedisClient().exists(cacheKey('user', user.id))).toBe(0);
     expect(await fetchOne('user', user.id)).toBeNull();
   });
+
+  it('hydrates live relations only, even inside a withDeleted block', async () => {
+    const { entity: token } = await createToken({
+      organizationUser: {},
+      ownerModel: TokenOwnerModel.OrganizationUser,
+    });
+    await db.organizationUser.update({
+      where: {
+        organizationId_userId: {
+          organizationId: token.organizationId as string,
+          userId: token.userId as string,
+        },
+      },
+      data: { deletedAt: new Date() },
+    });
+
+    const result = await db.withDeleted(() =>
+      hydrate('token', {
+        id: token.id,
+        ownerModel: token.ownerModel,
+        organizationId: token.organizationId,
+        userId: token.userId,
+      }),
+    );
+
+    expect(result.organizationUser).toBeUndefined();
+  });
 });
