@@ -229,8 +229,8 @@ Eight deep-dive technical articles targeting senior/staff engineers. Each articl
    - **Space-scope**: Access to a single space only (API integrations, service accounts)
    - Token resolution: SHA-256 lookup + Redis cache
 4. Permission system: RBAC + ABAC + ReBAC unified
-   - Permify for relationship-based access control (ReBAC) with graph traversal
-   - json-rules for attribute-based policies (38 operators, stored in database)
+   - `@inixiative/permissions` for relationship walks over your own rows, with no tuple store
+   - json-rules for attribute-based policies (stored in the database)
    - Runtime policy changes without redeployment
    - Cycle detection in permission graphs
 5. Frontend context switching

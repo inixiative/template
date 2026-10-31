@@ -111,9 +111,9 @@ Before comparing individual systems, there's one architectural property that no 
 - Permissions, jobs, cron, webhooks, email templates — all PostgreSQL rows.
 - `@inixiative/json-rules` compiles to Prisma queries AND raw SQL from a single definition.
 - Side effects (webhooks, jobs, cache invalidation) fire only after transactions commit via `db.onCommit()`.
-- You can query "which users have permission X" → `toPrisma()` → enqueue a job for each → all inside one atomic transaction.
+- With permissions 1.0 (end of 2026), "which users have permission X" becomes one query, so finding them and enqueuing a job for each happens in one transaction.
 
-The moment permissions live in Permify Cloud, jobs live in Redis, and webhooks live in Svix, you've lost transactional consistency across all of them. You can't ask "find users with this permission and notify them" in a single atomic operation. This template can.
+The moment permissions live in a hosted authorization service, jobs live in Redis, and webhooks live in Svix, you've lost transactional consistency across all of them. You can't ask "find users with this permission and notify them" in a single atomic operation. This template can.
 
 ---
 
@@ -147,35 +147,34 @@ The template's auth is production-grade for the features it implements. Per-org 
 ## 2. Authorization & Permissions
 
 ### What the template provides
-Permify-powered unified RBAC + ABAC + ReBAC with Google Zanzibar-style relationship graphs, json-rules integration for declarative policy evaluation without code deployment, hierarchical inheritance (platform → organization → space), per-request Permix client isolation, 10-minute Redis cache, permission middleware with automatic route enforcement, attribute entitlements via JSON, ReBAC schema auto-generated from Prisma schema via `@inixiative/prisma-map`.
+RBAC, ABAC and ReBAC in one engine, [`@inixiative/permissions`](https://github.com/inixiative/permissions), deciding on your own Postgres rows: roles per tenant (organization and space), relation walks through the schema, conditions in json-rules, entitlements an owner can hand on, delegates (tokens and integrations) that act for their owner, and rules a tenant can write on its own records. Every route declares its check, and the rows a check loads are cached in Redis and cleared on write. Everything is JSON in the database; nothing is a policy file shipped on deploy.
 
 ### Comparison
 
-| Feature | Template | Permify (raw) | SpiceDB | OpenFGA | Oso Cloud | Cerbos | CASL | Homegrown |
-|---------|----------|---------------|---------|---------|-----------|--------|------|-----------|
-| RBAC + ABAC + ReBAC unified | Yes | Yes | Yes | Yes | Yes | RBAC + ABAC | RBAC + ABAC | Flat RBAC with `role` column — no attribute or relationship checks |
-| Zanzibar-style graph | Yes (via Permify) | Yes | Gold standard | Yes | Own model | No | No | No |
-| JSON-based declarative rules | Yes (json-rules) | No (DSL) | No (DSL) | JSON schema only | No (Polar) | YAML | Serializable | No |
-| Runtime policy changes without deploy | Yes | No | No | No | No | No | Partial | No |
-| Three-tier hierarchy (platform/org/space) | Yes | Modeled via graph | Modeled via graph | Modeled via graph | Via Polar rules | Via derived roles | Manual | Manual |
-| Per-request client isolation | Yes (Permix) | Manual | Manual | Manual | Manual | Stateless | Manual | Rare |
-| Redis cache | Yes (10 min) | Internal | ZedTokens | 50-75% hit ratio | Local eval option | Stateless (N/A) | In-memory | Custom |
-| Auto-route enforcement middleware | Yes | No | No | No | No | Via sidecar | No | Usually `if (user.role !== 'admin')` scattered through controllers |
-| Schema from Prisma metadata | Yes (prisma-map) | No | No | No | No | No | No | No |
+| Feature | Template | SpiceDB / OpenFGA | Oso Cloud | Cerbos | CASL | Homegrown |
+|---------|----------|-------------------|-----------|--------|------|-----------|
+| RBAC + ABAC + ReBAC in one model | Yes | Yes | Yes | RBAC + ABAC, no relation walks | RBAC + ABAC | Flat role column |
+| Decides on your own rows, no second store | Yes | No, tuple store you sync | No, fact store you sync | Attributes passed per request | Rules built per request | Yes |
+| Rules are JSON data | Yes (json-rules) | DSL | Polar | YAML | Serializable rules | No |
+| A tenant writes a rule on one of its records | Yes, can only widen | Parameters per tuple; logic is global | Facts per record; logic is global | No | No | No |
+| Delegation re-checked against its grantor at every use | Yes | No | No | No | No | No |
+| Delegates (tokens, integrations) capped at their owner | Yes | Modelled by hand | Modelled by hand | Modelled by hand | Manual | Rare |
+| Tenant hierarchy (organization, space) | Yes | Modelled in the graph | Via Polar | Via derived roles | Manual | Manual |
+| Every route enforces a declared check | Yes | No | No | Via sidecar | No | `if (role !== 'admin')` |
+| Schema from Prisma metadata | Yes (prisma-map) | No | No | No | No | No |
+| "Which records can I read" as one query | Permissions 1.0, end of 2026 | Id lists | Yes (`list_local`) | Yes (query plans) | Yes (`accessibleBy`) | Hand-written |
+
+The library's full comparison, with a source for every cell: [COMPARISON.md](https://github.com/inixiative/permissions/blob/main/COMPARISON.md).
 
 ### The gap no one fills
-The Permify + json-rules combination is unique. No dedicated authorization service offers runtime JSON-based policy changes without code deployment. Most use their own DSL (Permify's schema language, SpiceDB's DSL, Oso's Polar). The template's approach lets you change authorization rules by updating JSON in the database — no redeploy needed.
+Every other system that walks relationships keeps its own copy of them. User created? Write a tuple. Role changed? Write another. Tenant switched? Update the graph. You now have two sources of truth, dual writes and consistency tokens. Here the check reads the rows that already exist. No sync, no drift, no state where permissions say yes but the record is gone.
 
-More importantly: every other permission system requires you to **sync your data into their model**. User created? Push a relationship tuple to SpiceDB. Role changed? Sync it. Tenant switched? Update the graph. You now have two sources of truth and an eventual consistency problem between them.
+The other half is who can change the rules. Every system lets an operator edit the policy. Here a tenant can write a rule on one of its own records, validated before it is saved, and it can only widen access. Policy grows per tenant instead of being one document a team has to edit for everyone.
 
-This template's rules evaluate against data that already exists in your database. No sync layer, no drift, no state where permissions say yes but the record doesn't exist. And because json-rules compiles to Prisma via `toPrisma()`, you can invert the question entirely: instead of "does user X have permission Y?", you can ask **"give me every user who has permission Y on resource Z"** — as a composable Prisma query, paginated, joined with anything, inside a single transaction.
-
-SpiceDB, OpenFGA, and Permify all expose reverse-lookup endpoints (`LookupSubjects`, `ListUsers`, `ListObjects`) that *can* answer "which subjects have permission X" — but they return a list of IDs from a separate RPC call that doesn't compose with your data layer. To paginate, sort, join with other tables, or wrap in a transaction with the side effects you're about to fire, you fetch the IDs, then run your own DB query against them, then reconcile. Here it's one query inside one transaction with everything else.
-
-Practical examples: notify every user entitled to see a space when it changes, bulk-migrate every actor with a given role, find all admins across orgs with a specific entitlement. With an external authorization service that's an RPC plus a DB query plus a reconciliation step. Here it's a single Prisma call you can paginate and join freely.
+And delegation stays honest. An entitlement names who granted it, and every check asks that grantor again, up the whole chain. Demote anyone in the chain and everything they handed on stops on the next request, with nothing to clean up.
 
 ### Honest assessment
-The permission system is comprehensive. The Redis cache is event-driven via the db hook — a permission change triggers cache invalidation immediately, making the TTL a safety net rather than the primary expiry mechanism. The json-rules approach trades the power of a dedicated authorization DSL for compactness and composability with the rest of the stack. For most SaaS products, that's the right trade.
+Today a check answers one record at a time; listing "everything I can read" means loading and checking. Permissions 1.0 (end of 2026) compiles the same rules to a Prisma `where` and to SQL, so that becomes one query. The engine is TypeScript only, has no decision log or playground, and has no deny rules by design: you narrow by composing a stricter rule.
 
 ---
 
@@ -670,7 +669,7 @@ The shadcn dependency on Radix primitives has a noted risk — Radix was recentl
 | System | Comparable to |
 |--------|--------------|
 | Auth foundation | BetterAuth + custom extensions (competitive with Clerk/Auth0 feature set, self-hosted) |
-| Permissions | Permify + Permix (comparable to SpiceDB/OpenFGA with better DX) |
+| Permissions | `@inixiative/permissions` on your own rows (no tuple store; tenant-authored rules; grantor-checked delegation) |
 | Job queue | BullMQ with production patterns (comparable to Trigger.dev/Inngest minus managed infrastructure) |
 | Error handling | Structured error pipeline (ahead of most frameworks' ad-hoc approach) |
 | Event system | Transaction-aware in-process events (simple but correct) |

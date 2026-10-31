@@ -167,15 +167,21 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 **Full RBAC/ABAC/ReBAC Authorization** - Comprehensive permission system supporting Role-Based (RBAC), Attribute-Based (ABAC), and Relationship-Based (ReBAC) access control powered by Permix with JSON-Rules support. This unified system lets you define permissions using simple roles, complex attribute-based rules, or relationship graphs - all within the same framework. JSON-Rules integration enables dynamic permission logic without code deployment.
 
-- ✅ **Multi-Level RBAC** - Roles at platform (superadmin, user), organization (owner, admin, member), and space (owner, admin, member) levels with clear hierarchies
+- ✅ **Multi-Level RBAC** - Roles at platform (superadmin, user), organization and space (owner, admin, member, viewer), each mapping to one standard action (own, manage, operate, read)
 
-- ✅ **Attribute-Based Control (ABAC)** - JSON-based entitlements at org and space level allow custom permission logic based on user attributes, resource properties, or contextual conditions
+- ✅ **Attribute-Based Control (ABAC)** - Conditions in json-rules over the record and the acting user or token, nested freely with `any` and `all`, inside the same rules as role and relation checks
 
-- ✅ **Relationship-Based Control (ReBAC)** - Google Zanzibar-style relationship graphs (User → OrgUser → Org → Space) for modeling complex permission scenarios like delegated access or inherited permissions
+- ✅ **Relationship-Based Control (ReBAC)** - Relation walks over your own rows through the schema (member row, organization, space), with no separate tuple store to sync
+
+- ✅ **Entitlements** - An owner hands on an action on a resource from an anchor, narrowed by a `where`. Every check asks the grantor again, so demoting anyone up the chain stops what they handed on at the next request
+
+- ✅ **Delegates** - Tokens and integrations act for their owner: `full` (the owner whole, in sync), a role (the owner capped at that role) or entitlements. Setting `full` takes the person-only `delegateFull` action on the owner
+
+- ✅ **Tenant-Authored Record Rules** - A record can carry its own rule for an action (`Contact` for `read` today), validated before it is saved and ORed with the schema, so it can only widen access
 
 - ✅ **JSON-Rules Integration** - Define permission logic declaratively using @inixiative/json-rules without code deployment. Evaluate complex conditions, combine multiple rules, and update permission logic dynamically
 
-- ✅ **Hierarchical Inheritance** - Space permissions automatically inherit from parent organization. Org owners automatically get owner access to all spaces
+- ✅ **Hierarchical Inheritance** - An organization's owners own its spaces. Other organization roles reach a space only through a space member row
 
 - ✅ **Permission Middleware** - validatePermission() and validateSubmodelPermission() enforce checks before controller execution. Routes declare required permissions in OpenAPI definitions
 
@@ -185,9 +191,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Per-Request Isolation** - Fresh Permix client instance per request ensures complete isolation between concurrent requests
 
-- ✅ **Redis Performance Caching** - Permission evaluation results cached in Redis (10min TTL) for sub-millisecond response times
+- ✅ **Redis Caching** - The rows a check loads are cached in Redis (one hour) and cleared on every write, so a check stays in-process and current
 
 - 🟣 Visual permissions builder UX (ticket FEAT-008, depends on INFRA-002)
+
+- 🟣 Listing what you can read as one query: permissions 1.0 compiles the same rules to Prisma and SQL, end of 2026 (ticket INFRA-026)
 
 [Learn more: PERMISSIONS.md](docs/claude/PERMISSIONS.md)
 
