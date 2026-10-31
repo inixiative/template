@@ -163,6 +163,16 @@ Every SaaS hits the same wall: each tenant wants something done a little differe
 - **Enforcement drifts.** A case written once for the API gets rewritten for the UI, the SQL query and the background job, and the copies disagree.
 - **You only get what was built.** Access and behaviour are limited to the cases someone anticipated. Anything else, like sharing one record with one outside user, is a feature request.
 
+**Levels of configurability.** Between hard-coding and rules there are intermediate levels, and each one breaks at the same place: the first time someone asks a new kind of question.
+
+1. **Hard-coded.** The behaviour is code. Any change is a ticket and a deploy.
+2. **Config shipped with the app.** Values move into a file or environment variables. Changing one is still a deploy, and it applies to every tenant at once.
+3. **Feature flags and settings.** A tenant switches on the features and picks the choices you built: notify admins or not, share with the organization or not. This works until the tenant wants something that isn't on the list, and then it's back to a ticket.
+4. **Parameters.** A tenant fills in values in shapes you designed: a threshold, a list of roles, a date range. More room than a toggle, but the question is still yours; the tenant only supplies its numbers. "Notify the account owner when an overdue invoice is over 10,000 and the customer is in Europe" is a new question, so it's new code.
+5. **Rules.** The question itself is data. A tenant composes conditions over its own records with the operators the engine has, so a new question is a new rule, not new code. This is the maximally configurable level and the one this template builds on.
+
+Rules still have edges: a rule can only ask about the fields and relations it can see, with the operators the engine has. Widening those is code, but it's done once, in the engine or the data model, and every tenant gets it, not one tenant's case.
+
 **The approach:** build the engine once and make every case data. Behaviour that varies by tenant, record or person is stored as a rule, not written as a code path. Rules are [json-rules](https://github.com/inixiative/json-rules) conditions and [permissions](https://github.com/inixiative/permissions) action rules, and both are plain JSON. They live in the database, compose like any other data and are authored at runtime, so a tenant sets up how it wants things to work, from the client, without any of it appearing in code. The engine evaluates a tenant's rule exactly as it evaluates the schema's, so adding tenants adds rows, not code, and nothing needs a deploy. One rule also runs in every place it has to: in memory, as a Prisma query, or as SQL, so the API, the UI and the jobs enforce the same thing.
 
 Sharing is the clearest case. Without rules you get only the access the system was built to give; with them, three ways to share ad hoc:
