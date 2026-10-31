@@ -153,7 +153,17 @@ Controller
 
 ### Why Behaviour Is Rules, Not Code?
 
-Behaviour that varies by tenant, record or person is stored as a rule, not written as a code path. Rules are [json-rules](https://github.com/inixiative/json-rules) conditions and [permissions](https://github.com/inixiative/permissions) action rules, and both are plain JSON. They live in the database, compose like any other data and are authored at runtime, so a tenant that wants something done differently sets up its own rule instead of waiting for a block of code. Tenancy doesn't multiply the code: the engine evaluates a tenant's rule the same way it evaluates the schema's. Nothing is a config file shipped on deploy.
+Every SaaS hits the same wall: each tenant wants something done a little differently. Who sees which records, who gets notified, which rows a report includes, what a role may do. If each of those is code, every request becomes a ticket, a branch in the code (`if tenant is X`), a test, a review and a deploy.
+
+**The cost of doing it in code:**
+
+- **Complexity grows with every tenant.** Each variation is another case to write, test and keep working while everything around it changes. The code base ends up as the sum of every customer's exceptions.
+- **Every change is a support ticket to the engineers.** Only engineers can change behaviour, so a customer who wants something different files a ticket and waits on your backlog. Either you say no, or the request queues behind product work and your engineers spend their time on one tenant's exceptions.
+- **Every change is a release.** Even behaviour moved into a config file still ships on deploy, so a one-tenant tweak goes through the whole pipeline and lands for everyone at once.
+- **Enforcement drifts.** A case written once for the API gets rewritten for the UI, the SQL query and the background job, and the copies disagree.
+- **You only get what was built.** Access and behaviour are limited to the cases someone anticipated. Anything else, like sharing one record with one outside user, is a feature request.
+
+**The approach:** build the engine once and make every case data. Behaviour that varies by tenant, record or person is stored as a rule, not written as a code path. Rules are [json-rules](https://github.com/inixiative/json-rules) conditions and [permissions](https://github.com/inixiative/permissions) action rules, and both are plain JSON. They live in the database, compose like any other data and are authored at runtime, so a tenant sets up how it wants things to work, from the client, without any of it appearing in code. The engine evaluates a tenant's rule exactly as it evaluates the schema's, so adding tenants adds rows, not code, and nothing needs a deploy. One rule also runs in every place it has to: in memory, as a Prisma query, or as SQL, so the API, the UI and the jobs enforce the same thing.
 
 Sharing is the clearest case. Without rules you get only the access the system was built to give; with them, three ways to share ad hoc:
 
