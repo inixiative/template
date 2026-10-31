@@ -35,11 +35,11 @@ describe('writing full clears the role and entitlements beside it', () => {
   });
 
   it('an integration created full keeps no role or entitlements', async () => {
-    const { entity: seat } = await createOrganizationUser({ role: 'owner' }, { organization });
+    const { entity: member } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity } = await createIntegration({
       ownerModel: 'OrganizationUser',
-      organizationId: seat.organizationId,
-      userId: seat.userId,
+      organizationId: member.organizationId,
+      userId: member.userId,
       full: true,
       role: 'admin',
       entitlements: operate,
@@ -48,10 +48,10 @@ describe('writing full clears the role and entitlements beside it', () => {
   });
 
   it('a token updated to full drops its role and entitlements', async () => {
-    const { entity: seat } = await createOrganizationUser({ role: 'owner' }, { organization });
+    const { entity: member } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity: token } = await createKeyedToken(
       { ownerModel: 'OrganizationUser', role: 'admin', entitlements: operate },
-      { organizationUser: seat },
+      { organizationUser: member },
     );
     const updated = await db.token.update({ where: { id: token.id }, data: { full: true } });
     expect(updated).toMatchObject({ full: true, role: null, entitlements: null });

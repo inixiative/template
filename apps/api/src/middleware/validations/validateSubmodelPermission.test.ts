@@ -324,7 +324,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       expect(await gate(headers, 'POST', `/organization/${other.id}/contacts`)).toBe('passes');
     });
 
-    it("an entitlement stored on one seat and anchored at the user's other organization opens nothing there", async () => {
+    it("an entitlement stored on one member and anchored at the user's other organization opens nothing there", async () => {
       const { entity: other } = await createOrganization();
       const contactsHere = {
         resource: 'db:contact',
