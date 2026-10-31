@@ -54,7 +54,8 @@
     "generate:routes": "bun --cwd apps/web generate:routes && bun --cwd apps/admin generate:routes && bun --cwd apps/superadmin generate:routes",
     "generate:sdk": "bun run with ${SDK_ENVIRONMENT:-local} api bash ./scripts/generate-sdk.sh",
     "deploy": "./scripts/deployment/deploy.sh",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run test:fe && bash scripts/ci/run-ci-rules.sh",
+    "check": "bun run check:setup && bun run lint && bun run typecheck && bun run test && bun run test:fe && bash scripts/ci/run-ci-rules.sh",
+    "check:setup": "bun run generate:routes && bun run db:generate && bun run generate:sdk",
     "lint": "biome check . && bun run lint:postBiome",
     "lint:postBiome": "./scripts/lint/run-post-biome-checks.sh",
     "lint:imports": "./scripts/lint/check-import-aliases.sh",
@@ -67,7 +68,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
     "@inixiative/atlas": "^0.4.1",
-    "@inixiative/config": "^0.5.147",
+    "@inixiative/config": "^0.5.149",
     "@lightpanda/browser": "^1.2.0",
     "@mendable/firecrawl-js": "^4.18.1",
     "@tanstack/react-router": "^1.166.2",

@@ -5,6 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { toRoutePattern } from '@template/ui/lib/toRoutePattern';
 
 interface EndpointInfo {
   method: string;
@@ -59,7 +60,7 @@ const generateHandlers = (endpoints: EndpointInfo[]): string => {
 
     handlerCases.push(`
   ${comment}
-  http.${httpMethod}('*${endpoint.url}', () => {
+  http.${httpMethod}('*${toRoutePattern(endpoint.url)}', () => {
     return HttpResponse.json({ data: null, error: 'Not implemented in MSW' });
   }),`);
   }

@@ -238,7 +238,7 @@ See `docs/claude/FRONTEND.md#conventions`.
 
 ## 10. Testing and Validation
 
-Run focused checks first (`bun run --cwd <workspace> typecheck`, `bun run --cwd <workspace> test`), then `bun run check` — the canonical full sweep (Biome/lint, monorepo typecheck, backend/package tests, frontend tests, CI rules). Do not report work as validated on a subset unless the user narrowed validation. If cross-package types/imports changed, typecheck each affected workspace.
+Run focused checks first (`bun run --cwd <workspace> typecheck`, `bun run --cwd <workspace> test`), then `bun run check` — the canonical full sweep (generated outputs via `bun run check:setup`, Biome/lint, monorepo typecheck, backend/package tests, frontend tests, CI rules). Do not report work as validated on a subset unless the user narrowed validation. If cross-package types/imports changed, typecheck each affected workspace.
 
 CI rule runner and fixtures: `docs/claude/SCRIPTS.md`.
 
