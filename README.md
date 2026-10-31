@@ -41,7 +41,9 @@ compose, and in the ~95k curated lines of TypeScript that make them compose *cor
   controllers. [PERMISSIONS.md](docs/claude/PERMISSIONS.md)
 - **One rules AST, three execution targets.** The same serializable condition evaluates in memory,
   compiles to a Prisma query, or compiles to a PostgreSQL `WHERE` clause. Author a rule once; enforce
-  it at whichever layer it has to run. [json-rules](https://github.com/inixiative/json-rules)
+  it at whichever layer it has to run. Rules are data, so a tenant configures its own behaviour
+  instead of you writing code per tenant ([why](docs/claude/ARCHITECTURE.md#why-behaviour-is-rules-not-code)).
+  [json-rules](https://github.com/inixiative/json-rules)
 - **Routes generate their own contract.** Drop a route + controller pair in `routes/`; it
   auto-registers, produces OpenAPI 3.1, and regenerates a fully typed SDK client. No manual imports,
   no drifting API docs. [API_ROUTES.md](docs/claude/API_ROUTES.md)
