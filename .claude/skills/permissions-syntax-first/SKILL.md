@@ -78,8 +78,8 @@ Other parts of the system (use them, don't parallel them):
 - `placeEntitlement` + `canGrantEntitlement` (library, over `schemaMap`) — the only check for writing entitlements, validity included; entitlements change only through `PATCH …/:id/entitlements` (`{ add, remove }`, both through that check), never a record update;
 - `RulesRegistry` json-rules write rules, enforced by the rules hook — a row's own columns only (`full` takes no role or entitlements; where `full` may be set; a token has permissions). Nothing in a rules object reads an entitlement or its anchor. Don't call `validateRules` from controllers;
 - hydration / the lens — relations come from hydrating, never from copying keys;
-- the one `full` skip at install (`delegateTable`);
-- the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `userGrants` routes it to the user and everything else to the tenant.
+- the one `full` skip at install (`delegatedPermissions`);
+- the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `permissionsOfUser` routes it to the user and everything else to the tenant.
 
 ## 3. Pseudo records
 
@@ -103,7 +103,7 @@ An action on something that does not exist yet, or on a collection, is checked o
 | actions named after other models (`organization.create` on user) | each action on its own model (test: a dotted action is named after its model) |
 | a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpace('integration.')` |
 | `leave` as an alternative that skipped the role check | the role check always runs; "yours" is an extra requirement |
-| `full` arms in the schema | `full` is inheritance: skipped at install (`delegateTable`); setting it takes `delegateFull` on the owner (`validateFullGrant`). CI rule `no-full-in-rebac-schema` |
+| `full` arms in the schema | `full` is inheritance: skipped at install (`delegatedPermissions`); setting it takes `delegateFull` on the owner (`validateFullGrant`). CI rule `no-full-in-rebac-schema` |
 | deciding who is related to what by comparing `__actor` ids | an action on the record: acting as a member is `operate` on the member row; actor rules only gate person-only actions |
 | a role token acting as its member by default | `operate` on the member row: held by `full`, or given by hand as an entitlement |
 | write-time "ceiling" with a trim in `validateDelegateGrant` | `roleHeldAtOwner` + `memberRoleWrite`/`integrationRoleWrite` + `canGrantEntitlement` |

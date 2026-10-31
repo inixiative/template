@@ -23,18 +23,18 @@ type Member = { role: Role; id?: string; userId?: string; entitlements?: unknown
 type OrganizationMember = Member & { organizationId: string };
 type SpaceMember = Member & { spaceId: string };
 
-export const organizationOwnerGrants = (organizationId: string): Permissions => [
+export const organizationOwnerPermissions = (organizationId: string): Permissions => [
   { entries: [getOrgPermissions('owner', organizationId)] },
 ];
 
-export const spaceOwnerGrants = (spaceId: string): Permissions => [
+export const spaceOwnerPermissions = (spaceId: string): Permissions => [
   { entries: [getSpacePermissions('owner', spaceId)] },
 ];
 
 const ownedBy = (entries: EntitlementEntry[], owner: Permissions): Permissions =>
   entries.length ? [{ entries, owner }] : [];
 
-const memberGrants = (
+const memberPermissions = (
   member: Member,
   resource: MemberResource,
   tenantOwner: Permissions,
@@ -51,7 +51,7 @@ const memberGrants = (
   ];
 };
 
-export const userGrants = (
+export const permissionsOfUser = (
   userId: string | null,
   members: OrganizationMember[],
   spaceMembers: SpaceMember[],
@@ -64,9 +64,13 @@ export const userGrants = (
     ],
   },
   ...members.flatMap((member) =>
-    memberGrants(member, 'db:organizationUser', organizationOwnerGrants(member.organizationId)),
+    memberPermissions(
+      member,
+      'db:organizationUser',
+      organizationOwnerPermissions(member.organizationId),
+    ),
   ),
   ...spaceMembers.flatMap((member) =>
-    memberGrants(member, 'db:spaceUser', spaceOwnerGrants(member.spaceId)),
+    memberPermissions(member, 'db:spaceUser', spaceOwnerPermissions(member.spaceId)),
   ),
 ];

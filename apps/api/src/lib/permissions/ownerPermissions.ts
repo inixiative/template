@@ -13,12 +13,12 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   delegate,
-  organizationOwnerGrants,
+  organizationOwnerPermissions,
   type Permissions,
+  permissionsOfUser,
   rebacSchema,
   roleToStandardAction,
-  spaceOwnerGrants,
-  userGrants,
+  spaceOwnerPermissions,
   wellFormedEntitlements,
 } from '@template/permissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
@@ -37,29 +37,31 @@ type Delegated = {
 
 const nobody: Permissions = [];
 
-export const delegateTable = (delegated: PermissionsRow, owner: Permissions): Permissions =>
+export const delegatedPermissions = (delegated: PermissionsRow, owner: Permissions): Permissions =>
   delegate(rebacSchema, owner, {
     full: delegated.full,
     ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
     entitlements: wellFormedEntitlements(delegated.entitlements),
   });
 
-export const ownerTable = async (delegated: Delegated): Promise<Permissions> => {
+export const ownerPermissions = async (delegated: Delegated): Promise<Permissions> => {
   const { organizationId, spaceId, userId, organizationUser, spaceUser, integration } = delegated;
   switch (delegated.ownerModel) {
     case 'User': {
       const user = userId ? await findUserWithRelations(userId) : null;
-      return user ? userGrants(user.id, user.organizationUsers, user.spaceUsers) : nobody;
+      return user ? permissionsOfUser(user.id, user.organizationUsers, user.spaceUsers) : nobody;
     }
     case 'OrganizationUser':
-      return organizationUser ? userGrants(null, [organizationUser], []) : nobody;
+      return organizationUser ? permissionsOfUser(null, [organizationUser], []) : nobody;
     case 'SpaceUser':
-      return spaceUser ? userGrants(null, [], [spaceUser]) : nobody;
+      return spaceUser ? permissionsOfUser(null, [], [spaceUser]) : nobody;
     case 'Organization':
-      return organizationId ? organizationOwnerGrants(organizationId) : nobody;
+      return organizationId ? organizationOwnerPermissions(organizationId) : nobody;
     case 'Space':
-      return spaceId ? spaceOwnerGrants(spaceId) : nobody;
+      return spaceId ? spaceOwnerPermissions(spaceId) : nobody;
     case 'Integration':
-      return integration ? delegateTable(integration, await ownerTable(integration)) : nobody;
+      return integration
+        ? delegatedPermissions(integration, await ownerPermissions(integration))
+        : nobody;
   }
 };

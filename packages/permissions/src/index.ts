@@ -25,12 +25,12 @@ export type { DelegatePermissions } from './roles/delegatePermissions';
 export { isMemberSelfGrant, type MemberResource, memberSelfGrant } from './roles/memberSelfGrant';
 // Organization permissions
 export { getOrgPermissions } from './roles/organization';
+export {
+  organizationOwnerPermissions,
+  permissionsOfUser,
+  spaceOwnerPermissions,
+} from './roles/permissionsOfUser';
 // Shared role utilities
 export { isSuperadmin, roleToStandardAction } from './roles/shared';
 export { getSpacePermissions } from './roles/space';
-export {
-  organizationOwnerGrants,
-  spaceOwnerGrants,
-  userGrants,
-} from './roles/userGrants';
 export type { PermissionsCheck } from './types';

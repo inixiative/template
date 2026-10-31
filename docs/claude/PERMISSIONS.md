@@ -33,9 +33,9 @@
   - [The Backstop Rules](#the-backstop-rules)
 - [Resolution at Read Time](#resolution-at-read-time)
   - [installPermissions](#installpermissions)
-  - [userGrants](#usergrants)
-  - [ownerTable](#ownertable)
-  - [delegateTable](#delegatetable)
+  - [permissionsOfUser](#usergrants)
+  - [ownerPermissions](#ownertable)
+  - [delegatedPermissions](#delegatetable)
   - [A Token on a Member Row](#a-token-on-a-member-row)
   - [Worked Example: I1](#worked-example-i1)
   - [A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)
@@ -175,7 +175,7 @@ The same enum is the role of a member at its tenant and the role of a delegate.
 export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 ```
 
-`roleToStandardAction(role)` maps a role to the one standard action it names: `owner` is `own`, `admin` is `manage`, `member` is `operate`, `viewer` is `read`. `capAtRole(entry, role)` caps a grant entry at a role: it keeps the standard actions at or below the role that the entry implies through the action chain ([building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md)).
+`roleToStandardAction(role)` maps a role to the one standard action it names: `owner` is `own`, `admin` is `manage`, `member` is `operate`, `viewer` is `read`. The library's `capAtRole(schema, entry, ceiling)` keeps an entry at a ceiling, the role's standard action: every action on the entry's resource that the ceiling reaches by pure delegation and the entry holds or implies ([building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md)).
 
 ```typescript
 // packages/permissions/src/roles/organization.ts
@@ -259,7 +259,7 @@ memberSelfGrant('db:organizationUser', { id: M1.id, userId: U1.id })
 
 - **Anchored on the member's user, along `user`, pinned to the row's id.** The anchor is U1 because U1 is what makes M1 operable; the `where` pins it to M1, so it never reaches U1's other member rows (U1's member row in another organization, or SM1).
 - **Backed by the member's user.** A member's stored entitlements are installed with an owner that must still allow each action on each record. Every other entitlement on M1 is backed by O1's owner grant; the self-grant is backed by U1 (`getUserPermissions(U1)`), because O1's owner does not hold `operate` on M1 and would back nothing. At read time U1 still operates M1 through the normal walk, so the self-grant holds exactly as long as M1 is U1's.
-- **Only that exact entry is backed by the user.** `userGrants` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry whose resource, anchor and `where` equal the self-grant of that very row goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
+- **Only that exact entry is backed by the user.** `permissionsOfUser` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry whose resource, anchor and `where` equal the self-grant of that very row goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
 - **The `memberSelfGrant` hook writes it; a rule keeps it.** The hook (`apps/api/src/hooks/memberSelfGrant/hook.ts`, before `create`, `createManyAndReturn` and `upsert` on `OrganizationUser` and `SpaceUser`) appends the self-grant on create. The rule `memberSelfGrantRules` (`apps/api/src/hooks/rules/memberSelfGrantRules.ts`, in `RulesRegistry`) requires every stored member row to hold it: the rules hook checks the row as it will be stored on create, update and `updateManyAndReturn`, so a write that removes it, weakens it, swaps in another member's, or clears entitlements in bulk is refused with 422 (`apps/api/src/hooks/memberSelfGrant/hook.test.ts`).
 - **Its id is generated before insert.** The self-grant names the row's own id, and the database would only assign that id on insert, so the hook sets `row.id ??= Bun.randomUUIDv7()` first and builds the self-grant from it.
 
@@ -355,7 +355,7 @@ Then `validateDelegateRole` refuses a role on a token whose integration has no r
 
 ### What Full Is
 
-`full` makes a delegate its owner: the owner's table is installed unchanged, on every request (`delegateTable` returns `owner` as is). Writing `full` clears the delegate's role and entitlements (the `fullDelegate` hook, `apps/api/src/hooks/fullDelegate/hook.ts`). The schema never reads `full`, on the record or on the actor (CI rule `no-full-in-rebac-schema`).
+`full` makes a delegate its owner: the owner's permissions are installed unchanged, on every request (`delegatedPermissions` returns `owner` as is). Writing `full` clears the delegate's role and entitlements (the `fullDelegate` hook, `apps/api/src/hooks/fullDelegate/hook.ts`). The schema never reads `full`, on the record or on the actor (CI rule `no-full-in-rebac-schema`).
 
 ### Who May Set It
 
@@ -404,49 +404,49 @@ So U1 mints a full token on M1 and makes I1 full; the owner of O1 mints a full t
 
 One builder fills a permix for whoever acts: `installPermissionsFor(permix, { user, token, organizationUsers, spaceUsers })` (`apps/api/src/lib/permissions/userPermissions.ts`). It resets the permix, sets the actor (the token if there is one, else the user) and the superadmin bypass from the user's platform role, then installs:
 
-- no token (JWT or spoof): `userGrants(user.id, organizationUsers, spaceUsers)`;
-- a token: `delegateTable(token, owner)`, where `owner` is that same user table for a User-owned token and `ownerTable(token)` otherwise.
+- no token (JWT or spoof): `permissionsOfUser(user.id, organizationUsers, spaceUsers)`;
+- a token: `delegatedPermissions(token, owner)`, where `owner` is those same permissions for a User-owned token and `ownerPermissions(token)` otherwise.
 
 `installPermissions(c)` (`apps/api/src/lib/context/installPermissions.ts`) is the request's call. For a user who is not the requester (a job acting as a user), `userPermissions(userId)` builds the same permix on a fresh instance, or returns `null` when the user does not exist.
 
-### userGrants
+### permissionsOfUser
 
-`userGrants(userId, members, spaceMembers)` (`packages/permissions/src/roles/userGrants.ts`, shared by the API and the UI) returns the grants to install:
+`permissionsOfUser(userId, members, spaceMembers)` (`packages/permissions/src/roles/permissionsOfUser.ts`, shared by the API and the UI) returns the permissions to install, as the library's `Permissions` (groups of entries; a group with an `owner` is entitlements backed by that owner):
 
-1. one grant with the user's own entry (`own` on the user, when a user id is given) and one role entry per member row;
-2. per member row, its well-formed stored entitlements, split in two: the member self-grant, owned by the member's user, and the rest, owned by the tenant's owner grant.
+1. one group with the user's own entry (`own` on the user, when a user id is given) and one role entry per member row;
+2. per member row, its well-formed stored entitlements, split in two: the member self-grant, owned by the member's user, and the rest, owned by the tenant's owner.
 
-`installGrants` sets each grant up with its owner, so an owned entitlement holds only while that owner allows it on the record.
+The library's `installPermissions` sets each group up with its owner, so an owned entitlement holds only while that owner allows it on the record.
 
-### ownerTable
+### ownerPermissions
 
-`ownerTable(delegated)` (`apps/api/src/lib/permissions/ownerTable.ts`) builds the owner's table from the owner model:
+`ownerPermissions(delegated)` (`apps/api/src/lib/permissions/ownerPermissions.ts`) builds the owner's permissions from the owner model:
 
-| Owner model | Owner table |
+| Owner model | Owner's permissions |
 |---|---|
-| `User` | `userGrants` for the user: the user entry, every member row and its entitlements |
-| `OrganizationUser` / `SpaceUser` | `userGrants` for that one member row: its role at the tenant, its self-grant (owned by its user) and its other entitlements (owned by the tenant) |
+| `User` | `permissionsOfUser` for the user: the user entry, every member row and its entitlements |
+| `OrganizationUser` / `SpaceUser` | `permissionsOfUser` for that one member row: its role at the tenant, its self-grant (owned by its user) and its other entitlements (owned by the tenant) |
 | `Organization` / `Space` | `own` on the tenant |
-| `Integration` | `delegateTable(integration, ownerTable(integration))`: the integration's own permissions over its owner |
+| `Integration` | `delegatedPermissions(integration, ownerPermissions(integration))`: the integration's own permissions over its owner |
 
-The tables are read from the database on every request, so demote M1 and its tokens lose it on the next request.
+The permissions are read from the database on every request, so demote M1 and its tokens lose it on the next request.
 
-### delegateTable
+### delegatedPermissions
+
+The library's `delegate` resolves a delegate from its owner's permissions; the template maps the row onto it:
 
 ```typescript
-export const delegateTable = (delegate, owner) => {
-  if (delegate.full) return owner;
-  const stored = wellFormedEntitlements(delegate.entitlements);
-  return [
-    ...(delegate.role ? inheritedAt(delegate.role, owner) : []),
-    ...(stored.length ? [{ entries: stored, owner }] : []),
-  ];
-};
+export const delegatedPermissions = (delegated, owner) =>
+  delegate(rebacSchema, owner, {
+    full: delegated.full,
+    ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
+    entitlements: wellFormedEntitlements(delegated.entitlements),
+  });
 ```
 
-- **`full`**: the owner's table, whole: its role entries, its entitlements, the member self-grant.
-- **`role`**: `inheritedAt` keeps only the owner's grants that have no owner of their own (role entries, the user entry), each capped at the role (`capAtRole`). Every owned grant (entitlements, the self-grant) is dropped.
-- **`entitlements`**: installed with the owner's table as owner: each holds only while the owner allows it on that record.
+- **`full`**: the owner's permissions, whole: its role entries, its entitlements, the member self-grant.
+- **`role`**: only the owner's groups that have no owner of their own (role entries, the user entry), each entry capped at the role's standard action (`capAtRole`). Every owned group (entitlements, the self-grant) is dropped.
+- **`entitlements`**: installed with the owner's permissions as owner: each holds only while the owner allows it on that record.
 
 A token or integration that is not `full`, has no role and has nothing left after pruning is signed out (401) at sign-in (`loadTokenContext`), by the same condition that refuses it on write.
 
@@ -456,13 +456,13 @@ A token on M1 acts as M1 only if it holds `operate` on M1:
 
 | Token on M1 | Holds | At O1 | As M1 |
 |---|---|---|---|
-| `full` | M1's table whole, self-grant included | M1's role | yes |
+| `full` | M1's permissions whole, self-grant included | M1's role | yes |
 | role `member`, no entitlements | O1 capped at `member` | `operate` | no: it is U1's personal org token |
 | role `viewer`, given `{ resource: 'db:organizationUser', anchor: { resource: 'db:organizationUser', id: M1 }, actions: { operate: true } }` | O1 at `read`, plus `operate` on M1 | `read` | yes |
 
 Acting as M1 is the entitlement, not the role: the viewer-role token given `operate` on M1 manages I1, the owner-role token without it does nothing on I1 (`integrationsUnderOrganization.test.ts`, "a token on your member row acts as you only if it holds operate on the row"). Neither reaches SM1's things or another member's.
 
-A token owned by U1 caps U1's whole table at its role, U1's own entry included. At `member` or above it keeps `operate` on U1, and every one of U1's member rows walks `operate` to U1, so it acts as each of U1's members. A `viewer` User token holds `read` on U1 and acts as none.
+A token owned by U1 caps U1's permissions at its role, U1's own entry included. At `member` or above it keeps `operate` on U1, and every one of U1's member rows walks `operate` to U1, so it acts as each of U1's members. A `viewer` User token holds `read` on U1 and acts as none.
 
 ### Worked Example: I1
 
@@ -534,7 +534,7 @@ An entitlement applies to a record when all three hold:
 - **its `where` holds** on the record (positive json-rules; "no value" is `equals null`);
 - **its owner still allows the action** on that record through the normal walk, so a grant never outlives or outreaches whoever backs it.
 
-The action is checked on the record, never asked of the anchor. Who backs it: for a delegate, its owner's table; for a member row, the tenant's owner grant, except the member self-grant, backed by the member's user.
+The action is checked on the record, never asked of the anchor. Who backs it: for a delegate, its owner's permissions; for a member row, the tenant's owner, except the member self-grant, backed by the member's user.
 
 ### Changing Entitlements
 
@@ -777,7 +777,7 @@ Person-only situations: `apps/api/src/middleware/validations/userOnlyActions.tes
 
 ## Frontend Checks
 
-The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/src/store/slices/permissions.ts`) loads the user's own, organization and space permissions from `/me` through `userGrants`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
+The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/src/store/slices/permissions.ts`) loads the user's own, organization and space permissions from `/me` through `permissionsOfUser`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
 
 | Layer | Entry point |
 |-------|-------------|
