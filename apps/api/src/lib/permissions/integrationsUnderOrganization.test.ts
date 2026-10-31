@@ -10,6 +10,7 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { integrationRouter } from '#/modules/integration';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
@@ -17,10 +18,13 @@ import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import type { Entry } from '#tests/utils/entitlementEntry';
+import { type Entry, entry } from '#tests/utils/entitlementEntry';
 import { del, patch, post } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
+const { call: viaToken } = createTokenProbeApp((hono) =>
+  hono.route('/api/v1/integration', integrationRouter),
+);
 
 type Kind = 'Organization' | 'Space' | 'OrganizationUser' | 'SpaceUser';
 const kinds: Kind[] = ['Organization', 'Space', 'OrganizationUser', 'SpaceUser'];
@@ -31,6 +35,7 @@ const integrations = {} as Record<Kind, Integration>;
 
 beforeAll(async () => {
   registerClearCacheHook();
+  registerMemberSelfGrantHook();
   ({ entity: organization } = await createOrganization());
   const { entity: space } = await createSpace({}, { organization });
   const { entity: member, context } = await createOrganizationUser(
@@ -60,6 +65,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   unregisterDbHook('clearCache');
+  unregisterDbHook('memberSelfGrant');
   await cleanupTouchedTables(db);
 });
 
@@ -83,18 +89,18 @@ const reach = async (key: string) => {
   return table;
 };
 
-describe("integrations under an organization: the owner reaches every kind, an admin the organization's own (R82, R83)", () => {
-  it('the owner holds every action on all four kinds', async () => {
-    const all = [...actions];
+describe("integrations under an organization: no one owns an integration; the tenant administers its own, the owner only reads and removes a member's (Aron, 2026-10-30)", () => {
+  it("the owner administers the organization's and the space's, and only reads and deletes a member's", async () => {
+    const administers = ['read', 'operate', 'manage', 'delete'];
     expect(await reach(await seatKey('owner'))).toEqual({
-      Organization: all,
-      Space: all,
-      OrganizationUser: all,
-      SpaceUser: all,
+      Organization: administers,
+      Space: administers,
+      OrganizationUser: ['read', 'delete'],
+      SpaceUser: ['read', 'delete'],
     });
   });
 
-  it("an admin holds the organization's own integrations, short of own, and nothing of a space's or a member's", async () => {
+  it("an admin administers the organization's own integrations, and nothing of a space's or a member's", async () => {
     expect(await reach(await seatKey('admin'))).toEqual({
       Organization: ['read', 'operate', 'manage', 'delete'],
       Space: [],
@@ -128,8 +134,8 @@ describe('tokens of integrations under an organization follow their integration 
   });
 });
 
-describe("a member's own tokens reach that member's integrations, as far as their delegation goes (F2)", () => {
-  const ownToken = async (role: Role) => {
+describe("a token given operate on its member row acts as the member, whatever its role, and only on that row's things (Aron, 2026-10-30)", () => {
+  const actsAsMember = async (role: Role) => {
     const { entity: seat } = await createOrganizationUser({ role: 'member' }, { organization });
     const { entity: integration } = await createIntegration({
       ownerModel: 'OrganizationUser',
@@ -138,25 +144,28 @@ describe("a member's own tokens reach that member's integrations, as far as thei
       role: 'viewer',
     });
     const { rawKey } = await createKeyedToken(
-      { ownerModel: 'OrganizationUser', role },
+      {
+        ownerModel: 'OrganizationUser',
+        role,
+        entitlements: [entry('db:organizationUser', ['db:organizationUser', seat.id], ['operate'])],
+      },
       { organizationUser: seat },
     );
-    return { rawKey, integration };
+    return { seat, rawKey, integration };
   };
 
-  it('a member-role token of the member reads and operates its integration', async () => {
-    const { rawKey, integration } = await ownToken('member');
-    expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(true);
-    expect(await holds(rawKey, 'integration', integration.id, 'operate')).toBe(true);
+  it('a member-role token reads, operates and manages the integration', async () => {
+    const { rawKey, integration } = await actsAsMember('member');
+    for (const action of ['read', 'operate', 'manage', 'delete'])
+      expect(await holds(rawKey, 'integration', integration.id, action)).toBe(true);
   });
 
-  it('a viewer-role token of the member reads it and does not operate it', async () => {
-    const { rawKey, integration } = await ownToken('viewer');
-    expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(true);
-    expect(await holds(rawKey, 'integration', integration.id, 'operate')).toBe(false);
+  it('a viewer-role token does too: acting as the member is the entitlement, not the role', async () => {
+    const { rawKey, integration } = await actsAsMember('viewer');
+    expect(await holds(rawKey, 'integration', integration.id, 'manage')).toBe(true);
   });
 
-  it("the member's token reaches its own member row's integration, not the same person's space-member one (R100)", async () => {
+  it("it reaches its own member row's integration, not the same person's space-member one (R100)", async () => {
     const { entity: seat, context } = await createOrganizationUser(
       { role: 'member' },
       { organization },
@@ -171,7 +180,11 @@ describe("a member's own tokens reach that member's integrations, as far as thei
       spaceId: space.id,
     });
     const { rawKey } = await createKeyedToken(
-      { ownerModel: 'OrganizationUser', role: 'member' },
+      {
+        ownerModel: 'OrganizationUser',
+        role: 'member',
+        entitlements: [entry('db:organizationUser', ['db:organizationUser', seat.id], ['operate'])],
+      },
       { organizationUser: seat },
     );
     expect(await holds(rawKey, 'integration', own.id, 'read')).toBe(true);
@@ -179,8 +192,8 @@ describe("a member's own tokens reach that member's integrations, as far as thei
   });
 
   it("another member's token reaches nothing of it", async () => {
-    const { integration } = await ownToken('member');
-    const { rawKey } = await ownToken('member');
+    const { integration } = await actsAsMember('member');
+    const { rawKey } = await actsAsMember('member');
     expect(await holds(rawKey, 'integration', integration.id, 'read')).toBe(false);
   });
 });
@@ -250,13 +263,9 @@ describe('a member adds their own member integration; through a member token, on
     expect(await addsOwn('viewer')).toBe(403);
   });
 
-  it("an admin member's admin token adds one; a member token does not", async () => {
-    expect(await addsOwnByToken('admin', 'admin')).toBe(201);
-    expect(await addsOwnByToken('admin', 'member')).toBe(403);
-  });
-
-  it("a member's admin token adds one: the member owns their member integrations (R90)", async () => {
-    expect(await addsOwnByToken('member', 'admin')).toBe(201);
+  it('a member-row role token adds none: a token reaches what it is given by hand (R114, Aron 2026-10-30)', async () => {
+    expect(await addsOwnByToken('admin', 'admin')).toBe(403);
+    expect(await addsOwnByToken('member', 'admin')).toBe(403);
   });
 
   it("a member's full user token is the user: it adds one on the member row, and owns the member's integrations", async () => {
@@ -278,7 +287,7 @@ describe('a member adds their own member integration; through a member token, on
       userId: seat.userId,
       role: 'viewer',
     });
-    expect(await holds(rawKey, 'integration', owned.id, 'own')).toBe(true);
+    expect(await holds(rawKey, 'integration', owned.id, 'manage')).toBe(true);
   });
 
   it("a viewer's full user token does not add one", async () => {
@@ -294,22 +303,6 @@ describe('a member adds their own member integration; through a member token, on
       (await call(rawKey, 'POST', `/api/v1/organizationUser/${seat.id}/integrations`, body()))
         .status,
     ).toBe(403);
-  });
-
-  it("a member's role token reaches the member's integrations at its role", async () => {
-    const { entity: seat } = await createOrganizationUser({ role: 'member' }, { organization });
-    const { rawKey } = await createKeyedToken(
-      { ownerModel: 'OrganizationUser', role: 'member' },
-      { organizationUser: seat },
-    );
-    const { entity: owned } = await createIntegration({
-      ownerModel: 'OrganizationUser',
-      organizationId: organization.id,
-      userId: seat.userId,
-      role: 'viewer',
-    });
-    expect(await holds(rawKey, 'integration', owned.id, 'operate')).toBe(true);
-    expect(await holds(rawKey, 'integration', owned.id, 'manage')).toBe(false);
   });
 });
 
@@ -369,7 +362,33 @@ describe('acting as your member row: you hold it, so full on it is yours to set;
       userId: seat.userId,
       role: 'viewer',
     });
-    expect(await holds(key, 'integration', owned.id, 'own')).toBe(true);
+    expect(await holds(key, 'integration', owned.id, 'manage')).toBe(true);
+  });
+
+  it('a member manages their member integration directly', async () => {
+    const { seat, app } = await asMember('member');
+    const { entity: owned } = await createIntegration({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: seat.userId,
+      role: 'viewer',
+    });
+    expect(
+      (await app.fetch(patch(`/api/v1/integration/${owned.id}`, { name: 'renamed' }))).status,
+    ).toBe(200);
+  });
+
+  it('a member manages their member integration through a full token on their row', async () => {
+    const { seat, key } = await mintsFull('member');
+    const { entity: owned } = await createIntegration({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: seat.userId,
+      role: 'viewer',
+    });
+    expect(
+      (await viaToken(key, 'PATCH', `/api/v1/integration/${owned.id}`, { name: 'renamed' })).status,
+    ).toBe(200);
   });
 
   it('a viewer mints one too, and it only reads', async () => {
@@ -393,7 +412,7 @@ describe('acting as your member row: you hold it, so full on it is yours to set;
     ).toBe(201);
   });
 
-  it("nobody holds an organization's integration, so not even the owner mints a full token on it", async () => {
+  it("the organization's owner mints a full token on its integration: things the organization owns may be full (Aron, 2026-10-30)", async () => {
     const { app } = await asMember('owner');
     expect(
       (
@@ -404,15 +423,11 @@ describe('acting as your member row: you hold it, so full on it is yours to set;
           }),
         )
       ).status,
-    ).toBe(403);
+    ).toBe(201);
   });
 });
 
 describe('a chain that ends at you is yours to write; a token carrying you keeps the checks (R91)', () => {
-  const { call } = createTokenProbeApp((hono) =>
-    hono.route('/api/v1/organizationUser', organizationUserRouter),
-  );
-
   it('a member gives their member integration an entitlement beyond their own; it holds only what the member holds', async () => {
     const { entity: seat, context } = await createOrganizationUser(
       { role: 'member' },
@@ -443,7 +458,7 @@ describe('a chain that ends at you is yours to write; a token carrying you keeps
       { ownerModel: 'Integration', full: true, role: null },
       { integration: data },
     );
-    expect(await holds(rawKey, 'organization', organization.id, 'operate')).toBe(false);
+    expect(await holds(rawKey, 'organization', organization.id, 'operate')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(false);
   });
 
@@ -479,20 +494,75 @@ describe('a chain that ends at you is yours to write; a token carrying you keeps
       ).toBe(403);
     }
   });
+});
 
-  it("a member's admin token does not give their member integration the owner role", async () => {
-    const { entity: seat } = await createOrganizationUser({ role: 'admin' }, { organization });
+describe('a token on your member row acts as you only if it holds operate on the row; otherwise it is your personal org token (Aron, 2026-10-30)', () => {
+  const memberWithIntegration = async () => {
+    const { entity: seat } = await createOrganizationUser({ role: 'member' }, { organization });
+    const { entity: owned } = await createIntegration({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: seat.userId,
+      role: 'viewer',
+    });
+    return { seat, owned };
+  };
+
+  it('a full token on the row holds operate on it, and manages the member integration', async () => {
+    const { seat, owned } = await memberWithIntegration();
     const { rawKey } = await createKeyedToken(
-      { ownerModel: 'OrganizationUser', role: 'admin' },
+      { ownerModel: 'OrganizationUser', role: null, full: true },
       { organizationUser: seat },
     );
-    const add = (role: Role) =>
-      call(rawKey, 'POST', `/api/v1/organizationUser/${seat.id}/integrations`, {
-        name: `i-${crypto.randomUUID()}`,
-        provider: 'slack',
-        role,
-      });
-    expect((await add('admin')).status).toBe(201);
-    expect((await add('owner')).status).toBe(403);
+    expect(await holds(rawKey, 'organizationUser', seat.id, 'operate')).toBe(true);
+    expect(await holds(rawKey, 'integration', owned.id, 'manage')).toBe(true);
+  });
+
+  it('a role token on the row is a personal org token: it acts at the org at its role and does nothing as the member', async () => {
+    const { seat, owned } = await memberWithIntegration();
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', role: 'member' },
+      { organizationUser: seat },
+    );
+    expect(await holds(rawKey, 'organization', organization.id, 'operate')).toBe(true);
+    expect(await holds(rawKey, 'organizationUser', seat.id, 'operate')).toBe(false);
+    for (const action of actions)
+      expect(await holds(rawKey, 'integration', owned.id, action)).toBe(false);
+  });
+
+  it('a role token given operate on the row by hand acts as the member: it manages the member integration', async () => {
+    const { seat, owned } = await memberWithIntegration();
+    const { rawKey } = await createKeyedToken(
+      {
+        ownerModel: 'OrganizationUser',
+        role: 'member',
+        entitlements: [entry('db:organizationUser', ['db:organizationUser', seat.id], ['operate'])],
+      },
+      { organizationUser: seat },
+    );
+    expect(await holds(rawKey, 'organizationUser', seat.id, 'operate')).toBe(true);
+    expect(await holds(rawKey, 'integration', owned.id, 'manage')).toBe(true);
+  });
+
+  it("the same for a space member's row", async () => {
+    const { entity: space } = await createSpace({}, { organization });
+    const { context } = await createOrganizationUser({ role: 'member' }, { organization });
+    const { entity: seat } = await createSpaceUser({ role: 'member' }, { ...context, space });
+    const { entity: owned } = await createIntegration({
+      ownerModel: 'SpaceUser',
+      organizationId: organization.id,
+      spaceId: space.id,
+      userId: seat.userId,
+      role: 'viewer',
+    });
+    const tokenOn = async (delegation: { role: Role | null; full?: boolean }) =>
+      (await createKeyedToken({ ownerModel: 'SpaceUser', ...delegation }, { spaceUser: seat }))
+        .rawKey;
+    expect(
+      await holds(await tokenOn({ role: null, full: true }), 'integration', owned.id, 'manage'),
+    ).toBe(true);
+    expect(await holds(await tokenOn({ role: 'member' }), 'integration', owned.id, 'read')).toBe(
+      false,
+    );
   });
 });

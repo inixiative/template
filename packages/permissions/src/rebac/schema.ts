@@ -16,10 +16,10 @@ import {
   integrationAccess,
   integrationAdministering,
   lowRoles,
-  managedUpTheChain,
   memberRowActions,
   ownerActions,
   tokenAccessIsYours,
+  tokenAdministering,
 } from '@template/permissions/rebac/schemaHelpers';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 import { omit } from 'lodash-es';
@@ -115,10 +115,9 @@ export const rebacSchema: RebacSchema = {
     'db:token': {
       actions: {
         leave: { rel: 'user', action: 'operate' },
-        own: actionOnOwner('own'),
-        read: 'own',
+        read: { any: ['leave', tokenAdministering] },
         create: { all: [actorIsUser, tokenAccessIsYours] },
-        delete: { any: ['leave', managedUpTheChain] },
+        delete: { any: ['leave', tokenAdministering] },
       },
     },
 

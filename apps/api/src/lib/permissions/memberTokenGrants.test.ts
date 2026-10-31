@@ -367,15 +367,15 @@ describe('what an integration entitlement from the organization reaches (2026-10
       entry(
         'db:integration',
         ['db:organizationUser', anchorMember.id, 'organizationUser'],
-        ['operate'],
+        ['read'],
       ),
     ]);
     expect(
-      await holds(key, 'integration', (await memberIntegration(anchorMember)).id, 'operate'),
+      await holds(key, 'integration', (await memberIntegration(anchorMember)).id, 'read'),
     ).toBe(true);
-    expect(
-      await holds(key, 'integration', (await memberIntegration(otherMember)).id, 'operate'),
-    ).toBe(false);
+    expect(await holds(key, 'integration', (await memberIntegration(otherMember)).id, 'read')).toBe(
+      false,
+    );
   });
 
   it('a full token keeps every branch its member holds: one entry per path is not collapsed', async () => {

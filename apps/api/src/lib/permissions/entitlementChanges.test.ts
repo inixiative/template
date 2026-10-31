@@ -70,10 +70,10 @@ describe("a member's entitlements change only through add and remove (R78)", () 
 
   it('an owner adds one, and it is stored', async () => {
     const target = await member();
-    expect((await change('owner', target, { add: [spaceIntegrations(['manage'])] })).status).toBe(
+    expect((await change('owner', target, { add: [spaceIntegrations(['delete'])] })).status).toBe(
       200,
     );
-    expect(await stored(target)).toEqual([spaceIntegrations(['manage'])]);
+    expect(await stored(target)).toEqual([spaceIntegrations(['delete'])]);
   });
 
   it('an admin cannot add what it could not grant', async () => {
@@ -85,12 +85,12 @@ describe("a member's entitlements change only through add and remove (R78)", () 
   });
 
   it('removing needs the ability to grant it: an admin cannot strip what only an owner gives', async () => {
-    const target = await member([spaceIntegrations(['manage'])]);
+    const target = await member([spaceIntegrations(['delete'])]);
     expect(
-      (await change('admin', target, { remove: [spaceIntegrations(['manage'])] })).status,
+      (await change('admin', target, { remove: [spaceIntegrations(['delete'])] })).status,
     ).toBe(403);
     expect(
-      (await change('owner', target, { remove: [spaceIntegrations(['manage'])] })).status,
+      (await change('owner', target, { remove: [spaceIntegrations(['delete'])] })).status,
     ).toBe(200);
     expect(await stored(target)).toEqual([]);
   });

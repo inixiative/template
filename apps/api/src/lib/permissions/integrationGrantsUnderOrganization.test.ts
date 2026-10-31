@@ -100,7 +100,7 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
   };
 
   const underOrganization = (where?: Entry['where']) => ({
-    ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
+    ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['delete']),
     ...(where ? { where } : {}),
   });
   const theOrganizations = () =>
@@ -111,36 +111,36 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
     expect(await grant('admin', underOrganization())).toBe(403);
   });
 
-  it("where ownerModel = Organization: an admin grants managing the organization's own integrations", async () => {
+  it("where ownerModel = Organization: an admin grants deleting the organization's own integrations", async () => {
     expect(await grant('admin', theOrganizations())).toBe(200);
   });
 
-  it('the holder of the unfiltered grant manages all four kinds', async () => {
+  it('the holder of the unfiltered grant deletes all four kinds', async () => {
     const key = await seatKey('viewer', [underOrganization()]);
     for (const kind of kinds)
-      expect(await holds(key, 'integration', integrations[kind].id, 'manage')).toBe(true);
+      expect(await holds(key, 'integration', integrations[kind].id, 'delete')).toBe(true);
   });
 
-  it("the holder of the filtered grant manages the organization's own, nothing else", async () => {
+  it("the holder of the filtered grant deletes the organization's own, nothing else", async () => {
     const key = await seatKey('viewer', [theOrganizations()]);
-    expect(await holds(key, 'integration', integrations.Organization.id, 'manage')).toBe(true);
+    expect(await holds(key, 'integration', integrations.Organization.id, 'delete')).toBe(true);
     for (const kind of ['Space', 'OrganizationUser', 'SpaceUser'] as const)
-      expect(await holds(key, 'integration', integrations[kind].id, 'manage')).toBe(false);
+      expect(await holds(key, 'integration', integrations[kind].id, 'delete')).toBe(false);
   });
 
-  it('an admin entitled to own every kind under the organization grants that ownership onward', async () => {
+  it('an admin entitled to read every kind under the organization grants that onward', async () => {
     const owning = entry(
       'db:integration',
       ['db:organization', organization.id, 'organization'],
-      ['own'],
+      ['read'],
     );
     expect(await grant('admin', owning)).toBe(403);
     expect(await grant('admin', owning, [owning])).toBe(200);
   });
 
-  it("an admin entitled to own the organization's own integrations grants that, not every kind", async () => {
+  it("an admin entitled to read the organization's own integrations grants that, not every kind", async () => {
     const owning = (where?: Entry['where']) => ({
-      ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['own']),
+      ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['read']),
       ...(where ? { where } : {}),
     });
     const theOrganizationsOwn = owning({
@@ -175,12 +175,12 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
     expect(await grant('admin', nested)).toBe(403);
   });
 
-  it('the holder of an `in` grant manages the kinds it names, nothing else', async () => {
+  it('the holder of an `in` grant deletes the kinds it names, nothing else', async () => {
     const key = await seatKey('viewer', [kindsIn('Organization', 'OrganizationUser')]);
-    expect(await holds(key, 'integration', integrations.Organization.id, 'manage')).toBe(true);
-    expect(await holds(key, 'integration', integrations.OrganizationUser.id, 'manage')).toBe(true);
+    expect(await holds(key, 'integration', integrations.Organization.id, 'delete')).toBe(true);
+    expect(await holds(key, 'integration', integrations.OrganizationUser.id, 'delete')).toBe(true);
     for (const kind of ['Space', 'SpaceUser'] as const)
-      expect(await holds(key, 'integration', integrations[kind].id, 'manage')).toBe(false);
+      expect(await holds(key, 'integration', integrations[kind].id, 'delete')).toBe(false);
   });
 });
 
