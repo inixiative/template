@@ -20,7 +20,10 @@ export const organizationUserDeleteController = makeController(
     if (orgUser.role === Role.owner)
       await validateNotLastOwner(orgUser.organizationId as OrganizationId);
 
-    await db.organizationUser.delete({ where: { id: orgUser.id } });
+    await db.organizationUser.update({
+      where: { id: orgUser.id },
+      data: { deletedAt: new Date() },
+    });
 
     return respond.noContent();
   },
