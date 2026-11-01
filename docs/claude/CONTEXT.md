@@ -260,7 +260,7 @@ const bracketQuery = c.get('bracketQuery');    // Record<string, any>
 const filterLens = c.get('filterLens');        // LensNarrowing | null
 ```
 
-**Pattern change:** Previous versions had `getUser()`, `getToken()`, `getRequestId()` helper functions. These were removed in favor of direct `c.get()` access.
+There are no getter helpers for these values: read them with `c.get()`, which is typed by the app's context variables.
 
 #### bracketQuery
 

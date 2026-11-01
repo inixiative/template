@@ -135,7 +135,13 @@ No cap (or cap ≥ length) → degrades to a plain `Promise.all`. `getConcurrenc
 
 ## Distributed Lock (`createLock`)
 
-`@template/db`. Single-node Redis lock with heartbeat. See [REDIS.md](./REDIS.md#distributed-locks) for the full API and footguns.
+`@template/db` (`packages/db/src/lock/createLock.ts`; options and return types in `packages/db/src/lock/types.ts`). Single-node Redis lock with heartbeat. Its footguns:
+
+- It is not Redlock: don't rely on it across Redis cluster nodes.
+- A holder suspended longer than `ttlMs` (debugger pause, OS sleep) loses the key to the next holder and wakes up believing it still holds it. Keep `ttlMs` well above any pause you expect.
+- `verify()` is point-in-time. For exactly-once effects, fence at the resource as well.
+
+`heartbeat: false` makes a one-shot claim (`acquire()` returns `{ claimed, holder }`) that is never renewed and expires at its TTL. A `{ service, identifier }` target is keyed under the `lock:*` namespace ([REDIS.md](./REDIS.md#job-coordination-job-lock)); a `{ key }` target is used as given.
 
 ```ts
 import { createLock } from '@template/db';
@@ -219,5 +225,5 @@ The one way to lock rows. `db.findForUpdate(model, where, { upserting? })` runs 
 
 ## Cross-references
 
-- [REDIS.md](./REDIS.md) — `createLock` details, namespace conventions
+- [REDIS.md](./REDIS.md) — namespace conventions, including the `lock:*` keys `createLock` writes
 - [JOBS.md](./JOBS.md) — BullMQ workers, supersede pattern (the consumer of `claimLane`/`watchLane`), fast/slow lanes

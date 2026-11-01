@@ -266,7 +266,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Runtime Schema Introspection** - Parse Prisma's runtime data model and inline schema to extract FK mappings, relations, and field metadata at runtime. Enables dynamic hydration, validation, and tooling without hardcoded model knowledge
 
-- ✅ **Advanced Constraints** - Helper functions for PostgreSQL features Prisma doesn't support natively: partial unique indexes (`addUniqueWhereNotNull`), CHECK constraints (`addCheckConstraint`), and GIST indexes (`addGistIndex`) for advanced queries
+- ✅ **Advanced Constraints** - Partial unique indexes are declared in the Prisma schema (the `partialIndexes` preview feature: `@@unique([...], where: { ... })`; `CustomerRef` keeps one row per customer/provider pair this way). Row checks the schema can't express are json-rules in `RulesRegistry` (`apps/api/src/hooks/rules/registry.ts`), enforced by the `rules` hook on every write, so the rule lives in the mutation lifecycle with the rest of the write guards instead of in hand-written SQL. [Learn more: HOOKS.md](docs/claude/HOOKS.md#rules-registry)
 
 - ✅ **False Polymorphism Registry** - Centralized configuration (`PolymorphismRegistry`) defining polymorphic patterns across models. Single source of truth for constraints, validation hooks, and FK resolution. Supports multi-axis polymorphism (Token owner + model, CustomerRef customer + provider)
 
@@ -565,7 +565,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **useValidateUniqueness()** - Real-time uniqueness validation for form fields (email, username, slug). Debounces input, calls API to check uniqueness, returns validation error. Integrates with React Hook Form
 
-- ✅ **useEventRefetch()** - Subscribes to custom events and refetches TanStack Query queries when events fire. Use for cross-component data invalidation (user created in modal, refetch user list in table)
+- ✅ **useApiWebsocket()** - Mounted once at each app root. Every mounted query whose family is in `LIVE_QUERIES` subscribes to its channel, and refetches when a business event publishes a refetch to that channel (a `websocket` handoff from the event handler). A change made by any user, request or job then refreshes every open view of that data, with no prop drilling or manual invalidation. [Learn more: WEBSOCKETS.md](docs/claude/WEBSOCKETS.md#publishing-a-refetch)
 
 - ✅ **useBreadcrumbs()** - Generates breadcrumb trail from current route using navigation config. Returns array of `{ label, path }` objects for rendering breadcrumb navigation
 
@@ -578,7 +578,6 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **useMediaQuery()** - Responsive design helper that returns boolean for media query matches. Use for conditional rendering based on screen size. Server-safe (returns false during SSR)
 
 - ✅ **useAuthProviders()** - Fetches available auth providers for current org or platform. Used by login/signup to render correct OAuth buttons, show SSO option, or show password field based on configured providers
-- ✅ **useAppEvents()** - Subscribes to named DOM custom events for cross-component communication. Pair with `useEventRefetch()` to trigger query invalidations without prop drilling or shared state
 - ✅ **useDarkMode()** - Reads and sets theme preference (light/dark/system). Syncs with Zustand ui slice, persists across sessions, applies Tailwind `dark:` class to document root. Returns `{ theme, setTheme, isDark }`
 - ✅ **useLanguage()** - Returns current locale string and setter. Backed by Zustand ui slice. Ready for i18n integration — currently returns `en` as default, locale-aware components read from this hook
 - ✅ **usePageMeta()** - Sets `document.title` and meta description for the current route. Accepts raw strings or template with app name. Called in page components to keep browser tab titles contextual

@@ -238,12 +238,12 @@ Reference values from previous round results using `<<roundIndex.requestIndex.pa
 ### Syntax
 
 ```
-<<roundIndex.requestIndex.bodyPath>>
+<<roundIndex.requestIndex.fieldPath>>
 ```
 
 - `roundIndex`: Which round (0-based)
 - `requestIndex`: Which request within that round (0-based)
-- `bodyPath`: Dot-notation path into response body
+- `fieldPath`: Dot-notation path into that request's result (`{ status, body }`), so `body.data.id` reads the response body (`modules/batch/services/interpolation.ts`)
 
 ### Examples
 

@@ -16,7 +16,7 @@
     - [Enums](#enums)
   - [Component System](#component-system)
     - [Syntax](#syntax)
-    - [Extraction (mapRefs)](#extraction-maprefs)
+    - [Extraction (decompose)](#extraction-decompose)
   - [Variable Interpolation](#variable-interpolation)
   - [The email lens](#the-email-lens)
   - [Cascade Resolution](#cascade-resolution)
@@ -84,29 +84,27 @@ Located in `packages/email` (`@template/email`).
 
 ```
 packages/email/src/
-├── client/               # Email providers
-│   ├── resend.ts         # createResendClient(apiKey)
-│   ├── console.ts        # createConsoleClient() - dev logging
-│   └── types.ts          # SendEmailOptions, EmailClient
+├── client/               # Email providers (adapter): resend.ts, console.ts, types.ts
+│   └── verification/     # Address verification (bouncer, noop)
+├── errors/               # EmailRenderError, MjmlValidationError, DivergentDuplicateSlugError, ...
+├── preflight/            # runPreflight + checks (alt text, preheader, unsubscribe link, ...)
 ├── render/               # Template pipeline
+│   ├── parseBlocks.ts    # MJML → text/component/slot node tree
+│   ├── decompose.ts      # Component extraction: strip inline bodies, collect refs + component writes
 │   ├── compose.ts        # composeTemplate/composeComponent
 │   ├── expand.ts         # Recursive component expansion
-│   ├── extractRefs.ts    # Component extraction (mapRefs)
 │   ├── interpolate.ts    # Variable substitution + conditionals
 │   ├── evaluateConditions.ts  # {{#if rule=...}} evaluation
+│   ├── settle/           # Token/branch/each settlement used by interpolate
 │   ├── lookup.ts         # Single-tier ownership lookup
 │   ├── lookupCascade.ts  # Cascade lookup across ownership tiers
 │   ├── lookupTemplate.ts # lookupTemplate/lookupComponent entrypoints
-│   ├── resolveVariants.ts # Match-or-create component variants
-│   ├── validateNoCycle.ts # Component ref cycle guard
 │   ├── save.ts           # saveEmailTemplate coordinator
 │   ├── saveComponents.ts # Component persistence
 │   ├── saveTemplate.ts   # Template persistence
-│   ├── errors.ts         # EmailRenderError
-│   └── types.ts          # SaveContext, etc.
-└── validations/          # MJML validation
-    ├── validateMjml.ts
-    └── MjmlValidationError.ts
+│   └── types.ts          # OwnerScope, EmailModel
+├── rules/                # emailLens + rule scoping/reference helpers
+└── validations/          # validateMjml, validateNoCycle, validateConditions, validateTokens
 ```
 
 ---
@@ -274,21 +272,22 @@ enum EmailOwnerModel {
 
 Pattern: `{{#component:slug}}...{{/component:slug}}`
 
-#### Extraction (mapRefs)
+#### Extraction (decompose)
 
 ```typescript
-import { mapRefs } from '@template/email/render';
+import { decompose } from '@template/email/render';
 
-const result = mapRefs(mjmlString);
-// result.map - { slug: [{ mjml, refs }] }
-// result.mjml - Tagged output with :N indices
-// result.refs - Top-level refs
+// resolve(slug) returns the body the owner's cascade already has for that slug, if any
+const { mjml, refs, writes } = decompose(mjmlString, (slug) => existing[slug]?.mjml);
+// mjml   - the template with every component's inline body stripped; only override slots stay
+// refs   - every component slug the template uses, nested refs included
+// writes - { slug, mjml, refs } for each inline body that differs from what the cascade resolves
 ```
 
 Handles:
-- Nested components (depth N)
-- Variant deduplication (same MJML = same component)
-- Variant indexing (`:0`, `:1` for different content)
+- Nested components (depth N): an inline body is decomposed in turn, and its refs bubble up
+- A ref with no inline body inherits the cascade's body; nothing is written for it
+- The same slug inlined twice with different bodies throws `DivergentDuplicateSlugError`
 
 ---
 
@@ -521,27 +520,31 @@ Coordinates template + component persistence:
 ```typescript
 import { saveEmailTemplate } from '@template/email/render';
 
-const { template, components } = await saveEmailTemplate(db, {
-  slug: 'welcome',
-  name: 'Welcome Email',
-  subject: 'Welcome, {{recipient.firstName}}!',
-  mjml: '<mjml>...</mjml>',
-  category: 'system',
-  ownerModel: 'Organization',
-  organizationId: 'org_123',
-  locale: 'en',
-});
+const { template, components } = await saveEmailTemplate(
+  {
+    slug: 'welcome',
+    name: 'Welcome Email',
+    subject: 'Welcome, {{recipient.firstName}}!',
+    mjml: '<mjml>...</mjml>',
+    ownerModel: 'Organization',
+    organizationId: 'org_123',
+    locale: 'en',
+  },
+  { lens, lensFor }, // optional: validate tokens/rules against the email lens; re-check dependents
+);
 ```
 
 Pipeline steps:
-1. Validate MJML syntax + conditional rules in `mjml` and `subject`
-   (`assertValidConditions`) — fail fast instead of shipping a render-time time-bomb
-2. Extract component refs (`mapRefs`)
-3. Lookup existing components via cascade
-4. Resolve variants (match or create)
-5. Save template + components in transaction (each component re-validates its own
-   conditionals at the unit boundary; component MJML is a fragment, so it is not
-   run through the full-document MJML validator)
+1. Validate MJML syntax (`validateMjml`) and conditional rules in `mjml` and `subject`
+   (`assertValidConditions`): fail fast instead of shipping a render-time time-bomb
+2. Look up every referenced slug through the owner's cascade (`lookupCascade`)
+3. Extract components (`decomposeNodes`): inline bodies that differ from the cascade become component writes
+4. Refuse component reference cycles (`validateNoCycle`)
+5. Save components + template in one transaction (`db.txn`), then expand the saved template and
+   validate conditions and tokens on the composed MJML (`assertValidTokens`); a non-system template
+   must carry an unconditional `{{system.unsubscribeUrl}}`. With `lensFor`, every template that uses
+   a saved component is re-validated (`validateDependents`). Component MJML is a fragment, so it is
+   not run through the full-document MJML validator.
 
 ---
 
@@ -745,7 +748,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `targetModel` axis of
   `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it.
 - **A rule-tracked lens has one spelling per reference: the row's `id`, never an FK column.**
-  `omitForeignKeys(lens)` (`packages/db/lens`, the same shape as `redactLens`) omits every FK
+  `omitForeignKeys(lens)` (`packages/db/src/lens/omitForeignKeys.ts`, the same shape as `redactLens`) omits every FK
   column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
   itself in it and declares its own id sources. Each model-rooted lens of the email lens
   (`emailLens`, `packages/email/src/rules/emailLens.ts`) wraps in `omitForeignKeys` and declares

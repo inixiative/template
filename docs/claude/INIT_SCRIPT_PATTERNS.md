@@ -566,54 +566,48 @@ await execAsync('infisical org list --format json', { encoding: 'utf-8' });
 - ✅ No unexpected view changes or blank screens
 - ❌ Common bug: setting running state at wrong time causes blank screen
 
-**Implementation:**
+**Implementation:** the storing state is a `useAsyncAction()` (`init/components/useAsyncAction.ts`): `run(label, fn)` sets `running` and `actionLabel` while `fn` runs, and returns the error message (or `null`) instead of throwing. From `init/views/RailwaySetupView.tsx`:
 ```typescript
+const tokenAction = useAsyncAction();
+
 const handleTokenSubmit = async () => {
   if (!config || !workspaceToken.trim()) return;
 
-  setStoringToken(true);  // Show "Storing..." spinner
-
-  try {
-    // Store token in Infisical
-    await setSecretAsync(projectId, 'root', 'RAILWAY_TOKEN', workspaceToken.trim());
-
-    setStoringToken(false);  // Hide storing spinner
+  const actionError = await tokenAction.run('Storing token and continuing setup...', async () => {
+    await setSecretAsync(config.infisical.projectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
 
     // Determine next step
     const existingWorkspace = config.railway?.workspaceId;
-
     if (existingWorkspace) {
-      // Have workspace - go directly to setup
       setRunning(true);
       setViewState('status');
       await runSetup(existingWorkspace);
-    } else if (workspaces.length === 1) {
-      // Only one workspace - auto-select it
+    } else if (workspaces?.length === 1) {
       setRunning(true);
       setViewState('status');
-      await runSetup(workspaces[0].id);
+      await runSetup(workspaces[0].id!);
     } else {
-      // Multiple workspaces - need to select
       setRunning(false);  // ⚠️ CRITICAL: Must set false for selector
       setViewState('workspace-select');
     }
-  } catch (error) {
-    setStoringToken(false);
+  });
+
+  if (actionError) {
     setRunning(false);
-    throw error;
+    setViewState('status');
+    await setError('railway', actionError);
   }
 };
 ```
 
 **Key rules:**
 1. **Set loading states BEFORE changing viewState**
-   - ✅ `setStoringToken(true)` → show spinner in current view
+   - ✅ `tokenAction.run(...)` → spinner in the current view while the token is stored
    - ✅ `setRunning(true)` → show spinner in status view
    - ❌ Never switch views without setting appropriate loading state first
 
-2. **Clear loading states BEFORE next transition**
-   - ✅ `setStoringToken(false)` after storage completes
-   - ✅ Then set next state (`setRunning` or `setViewState`)
+2. **One loading state per transition**
+   - ✅ `run` clears `running` when its action settles; the next state (`setRunning` or `setViewState`) is set inside it
    - ❌ Don't leave multiple loading states active simultaneously
 
 3. **Always set running=false before showing selectors**
@@ -622,17 +616,13 @@ const handleTokenSubmit = async () => {
 
 **Visual feedback in token input:**
 ```typescript
-{storingToken ? (
-  <Box marginTop={1}>
-    <Text color="cyan">
-      <Spinner type="dots" /> Storing token and continuing setup...
-    </Text>
-  </Box>
+{tokenAction.running ? (
+  <ActionSpinner label={tokenAction.actionLabel} />
 ) : (
   <>
     <Box marginTop={1}>
       <Text>Token: </Text>
-      <TextInput value={token} onChange={setToken} onSubmit={handleSubmit} mask="*" />
+      <TextInput value={workspaceToken} onChange={setWorkspaceToken} onSubmit={handleTokenSubmit} mask="*" />
     </Box>
     <Box marginTop={1}>
       <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
@@ -640,6 +630,8 @@ const handleTokenSubmit = async () => {
   </>
 )}
 ```
+
+A flow that collects several tokens and only stores them uses `TokenInputView` (`init/components/TokenInputView.tsx`), which walks the fields, saves each to Infisical and shows the spinner itself.
 
 ### 13. Atomic Progress Flags + Idempotent API Calls
 
@@ -971,7 +963,7 @@ const setupState = useMemo(
 **Naming conventions:**
 - **`running`**: Main setup task is executing
 - **`loading<Entity>`**: Specific entity is loading (e.g., `loadingOrgs`, `loadingWorkspaces`, `loadingRegions`)
-- **`storing<Action>`**: Async storage operation in progress (e.g., `storingToken`)
+- **`<action>Action`**: One async operation in progress, a `useAsyncAction()` (e.g., `tokenAction`, `confirmAction`): read `running`, `actionLabel`, `error`
 
 ```typescript
 const [running, setRunning] = useState(false);           // Setup is running
@@ -982,7 +974,7 @@ const [loadingRegions, setLoadingRegions] = useState(false); // Fetching regions
 **Rules:**
 - ✅ Use `running` for main setup execution
 - ✅ Use `loading<Entity>` pattern for data fetching
-- ✅ Use `storing<Action>` for specific async operations
+- ✅ Use `useAsyncAction()` for specific async operations (store a token, confirm a prompt)
 - ❌ Never duplicate execution state (e.g., don't have `running` boolean AND `'running'` ViewState)
 
 #### Complete Example

@@ -536,7 +536,7 @@ The two combinators differ in one place. `AND` is associative with the enclosing
 
 **Bare values default to the field's operator** — `searchFields[email]=foo` is shorthand for the field's default op (String → `contains`, others → `equals`). The leaf schema accepts either the bare value or the operator object.
 
-**JSON fields** filter (not order) via their own operators: `path` (dotted string or array), `string_contains`, `string_starts_with`, `string_ends_with`, `equals`, `not`. The `path` shape is provider-specific (Postgres key array / MySQL JSONPath) — handled by `dialect` (`apps/api/src/lib/prisma/dialect.ts`).
+**JSON fields** filter (not order) via their own operators: `path` (dotted string or array), `string_contains`, `string_starts_with`, `string_ends_with`, `equals`, `not`. The `path` shape is provider-specific (Postgres key array / MySQL JSONPath) — handled by `dialect` (`packages/db/src/lens/dialect.ts`, imported from `@template/db/lens`).
 ```
 GET /api/v1/events?searchFields[meta][path]=user.id&searchFields[meta][string_contains]=abc
 ```
@@ -1168,4 +1168,4 @@ modules/<resource>/
 
 ### Also
 
-- `apps/api/src/integrations/` - External service integrations
+- External services: adapter modules in `apps/api/src/lib/` (`storage/`, `errorReporter/`) and `packages/email/src/client/`, each one interface over swappable providers (see [ADAPTERS.md](ADAPTERS.md)); a single-provider SDK client goes in `apps/api/src/lib/clients/`

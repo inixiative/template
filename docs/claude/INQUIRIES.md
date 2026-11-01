@@ -275,7 +275,7 @@ const validate = async (inquiry, content: SpaceContent) => {
 
 ### `resolvedContent` and the Override Pattern
 
-On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution body. Only keys declared in `resolutionInputSchema` can flow into `resolvedContent`. `explanation` is always excluded (resolution-only metadata), so it never overrides content fields.
+On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution body. `resolveContent` (`services/resolveContent.ts`) parses the resolution against `resolutionInputSchema` first and merges the **parsed** values, so defaults and transforms inside an override apply and a refined schema works the same as a plain object. Only keys the resolver actually sent that the schema keeps can flow into `resolvedContent`; a key the schema defaults but the resolver didn't send never overrides content. `explanation` is always excluded (resolution-only metadata), so it never overrides content fields.
 
 **Opt-in to allow resolver overrides** by declaring the field in `resolutionInputSchema`:
 ```typescript
