@@ -92,7 +92,7 @@ A rule that only walks to the owner for the same action (`{ rel: 'organization',
 Not every model has all four, and not every model chains all of them. Each is declared in `notStandard` in `standardActionsChain.test.ts` with the exact links it misses; any undeclared gap fails that test.
 
 - **Member rows** (`db:organizationUser`, `db:spaceUser`): `operate` is being the member and `manage`/`own` administer the row, so `manage` and `own` do not imply `operate`. An entitlement holding `manage` on M1 does not act as M1.
-- **Integrations** have no `own`. `read`, `operate` and `manage` chain; who holds them depends on the integration's owner kind.
+- **Integrations** and **projects** have no `own`. `read`, `operate` and `manage` chain; who holds them depends on the record's owner kind.
 - **Contacts** (`db:contact`): `manage` also requires the contact's `source`, so it does not chain past `manage`.
 
 ## Non-standard actions

@@ -29,4 +29,10 @@ describe('preventHardDelete hook', () => {
       /is soft-delete/,
     );
   });
+
+  it('refuses hard deletes on soft-delete-only models', async () => {
+    expect(await attempt(db.project.deleteMany({ where: { id: 'no-such-id' } }))).toMatch(
+      /is soft-delete/,
+    );
+  });
 });

@@ -7,6 +7,7 @@
 import { Operator } from '@inixiative/json-rules';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
+import { omit } from 'lodash-es';
 
 export const highRoles = ['owner', 'admin'];
 export const lowRoles = roleHierarchy.filter((role) => !highRoles.includes(role));
@@ -139,6 +140,11 @@ export const integrationAccess = {
   read: {
     any: ['operate', actionOnOwner('read', '', notMembers), actionOnOwner('own', '', members)],
   },
+} satisfies Record<string, ActionRule>;
+
+export const administeredByOwnerKind = {
+  ...omit(integrationAdministering, 'delegateFull'),
+  ...integrationAccess,
 } satisfies Record<string, ActionRule>;
 
 export const integrationRoleWrite: ActionRule = {
