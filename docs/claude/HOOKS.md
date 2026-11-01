@@ -19,7 +19,9 @@
 - [Webhooks](#webhooks)
   - [Enabling Webhooks for a Model](#enabling-webhooks-for-a-model)
   - [How It Works](#how-it-works)
+  - [Tenancy (AUTH-006 stopgap)](#tenancy-auth-006-stopgap)
   - [Webhook Payload](#webhook-payload)
+  - [Retries](#retries)
   - [Circuit Breaker](#circuit-breaker)
   - [Poisoned Records](#poisoned-records)
   - [Ignored Fields](#ignored-fields)
@@ -42,6 +44,7 @@
   - [What it covers](#what-it-covers)
   - [Soft-deleted rows](#soft-deleted-rows)
   - [Bulk-friendly by construction](#bulk-friendly-by-construction)
+  - [Cache invalidation](#cache-invalidation)
   - [Scope strictness](#scope-strictness)
   - [Adding a Model](#adding-a-model)
   - [Limitations](#limitations)
@@ -53,7 +56,7 @@
 - [Limitations](#limitations)
   - [Rules: Nested Updates Skip Validation](#rules-nested-updates-skip-validation)
   - [Rules: updateManyAndReturn Validates After](#rules-updatemanyandreturn-validates-after)
-  - [Immutable Fields: Only Strips, Never Throws](#immutable-fields-only-strips-never-throws)
+  - [Immutable Fields: Strips Unless Refused](#immutable-fields-strips-unless-refused)
 
 <!-- toc:end -->
 
@@ -73,6 +76,8 @@ All Prisma mutations wrapped with before/after hooks via `mutationLifeCycle` ext
 | `args` | object | Prisma query args |
 | `result` | object/array | Mutation result projected onto the model's columns (after only). An `include` on the write never reaches hooks, so `result` and `previous` have the same shape |
 | `previous` | object/array | Previous state (if fetched) |
+
+To read what a write sets, call `writeData({ action, args })` (`apps/api/src/hooks/shared/hookRows.ts`): it returns the rows as an array, coalesced across single and bulk `create`/`update` and both arms of an `upsert` (`isManyAction(action)` tells single from bulk). Hooks that need the written values read them there, not `args.data` by hand, which misses the bulk and upsert shapes.
 
 ### Action Types
 
@@ -271,7 +276,9 @@ instead of tripping the circuit. A rejection is an `error` event with `httpStatu
 Other failures such as redirects, 401, 403 or 429 do not count, and neither do `unreachable` or
 `retrying`. When a record has 3 rejections since its own last
 success, and some other record has delivered since the first of them, `poisonIntegrationRecord`
-stamps `IntegrationRecord.poisonedAt`. Later deliveries of that record are skipped before signing,
+stamps `IntegrationRecord.poisonedAt`. `isIntegrationRecordPoisoned({ integrationId, model, resourceId })`
+(`apps/api/src/modules/integration/services/isIntegrationRecordPoisoned.ts`) is the check: `sendWebhook`
+calls it first, and later deliveries of that record are skipped before signing,
 with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp yet. See
 `tickets/INFRA-032-webhook-poisoned-records.md`.
 
@@ -556,6 +563,8 @@ Update paths shadow-merge the partial update with `previous` so type-aware valid
 
 No controller, route, or hook change needed — the hook discovers new types through the registry, and `GET /api/v1/contact/info` lists the new type's `input` / `value` JSON Schema and subtype rule.
 
+A type whose contacts can arrive before their person has an account (an inbound WhatsApp message, say) also defines `toStubEmail`. `resolveUserByContact` (`apps/api/src/lib/identity/resolveUserByContact.ts`) returns the user that owns a contact of that type and value, or creates one with the stub email; a phone-keyed type builds it with `phoneToStubEmail(digits, type)` (`packages/shared/src/contact/stubEmail.ts`, `<digits>@<type>.<PROJECT_NAME>`). A type with no `toStubEmail` cannot stub-create a user (500). Don't invent placeholder emails at the call site.
+
 ---
 
 ## Rules Registry
@@ -630,7 +639,7 @@ Nested updates log a warning (can't fetch previous for each nested record withou
 
 ## Ordered List
 
-Registry-driven hook that maintains dense `[1..N]` position columns for any model that opts in. Lives at `apps/api/src/hooks/orderedList/`, with the SQL primitives in `apps/api/src/lib/prisma/orderedList.ts`.
+Registry-driven hook that maintains dense `[1..N]` position columns for any model that opts in. Lives at `apps/api/src/hooks/orderedList/`, with the SQL primitives in `apps/api/src/lib/prisma/orderedList.ts`. Those primitives (`nextSortOrderRaw`, `insertAtRaw`, `compactAfterRemove`, `reDensifyLive`) are raw SQL that bypass the mutation lifecycle, so they are the hook's internals: to append, create the row with no position; to move it, update its position. Don't compute `MAX(position) + 1` at the call site.
 
 ### Registry
 
@@ -653,7 +662,7 @@ The key is the Prisma model name. The value maps each ordered field to its scope
 
 | Action | Behavior |
 |---|---|
-| `create` (single) | If `position` is null → append (MAX+1). If provided → clamp to `[1, MAX+1]` and shift siblings up |
+| `create` (single) | If `position` is null → append (MAX+1, `nextSortOrderRaw`). If provided → clamp to `[1, MAX+1]` and shift siblings up (`insertAtRaw`) |
 | `createManyAndReturn` | Per scope, one SELECT MAX + one CTE `UPDATE … FROM (VALUES …)` shifts existing rows; new rows are inserted at pre-computed positions |
 | `update` | Soft-delete → sets `position` to the next distinct negative, compacts siblings. Restore → appends to live tail. Explicit position change → shifts only siblings using a predicate that excludes the target row, then Prisma writes the new position |
 | `updateManyAndReturn` (BEFORE) | **Throws** if `data` writes any ordered field — bulk position arithmetic can't be reconciled with `[1..N]` semantics. Use single `update()` per row or chunk at the app layer |
@@ -721,6 +730,8 @@ export const ImmutableFieldsOverrides = {
 
 Supports dot notation for JSON paths: `'entitlements.canInvite'`
 
+`getImmutableFields(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with materialized columns, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`getRefusedFields`).
+
 ### Why Strip Instead of Throw?
 
 Immutable fields are **silently stripped** rather than throwing errors because:
@@ -730,7 +741,7 @@ Immutable fields are **silently stripped** rather than throwing errors because:
 3. **API stability** - Adding immutable fields doesn't break existing clients
 4. **Idempotency** - Sending the same value back is harmless, not an error
 
-If you need strict validation (throw on attempt to change), use the Rules Registry instead.
+If you need strict validation (throw on attempt to change), add the field to the override's `refuse` list (a 422), or use the Rules Registry for a conditional rule.
 
 ---
 
@@ -789,6 +800,6 @@ await db.txn(async () => {
 
 For `updateManyAndReturn`, rules run **after** the mutation (in the same transaction) because we can't merge `previous` with update data for each record efficiently. If validation fails, the transaction rolls back.
 
-### Immutable Fields: Only Strips, Never Throws
+### Immutable Fields: Strips Unless Refused
 
-By design, immutable field violations are silently fixed, not rejected. If you need to reject attempts to change a field, use a rule instead.
+By design, immutable field violations are silently fixed, not rejected. Only a field on the model's `refuse` list is rejected (422); to reject another, add it to `refuse` or use a rule.

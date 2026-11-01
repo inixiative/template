@@ -24,6 +24,7 @@
   - [Foreign Keys](#foreign-keys)
   - [DateTime Fields](#datetime-fields)
   - [Enum Naming](#enum-naming)
+  - [Reference Data (Code, Not Rows)](#reference-data-code-not-rows)
 - [Model Utilities](#model-utilities)
   - [PascalCase (ModelName)](#pascalcase-modelname)
   - [camelCase (AccessorName)](#camelcase-accessorname)
@@ -358,6 +359,14 @@ enum InquiryType {
   memberApplication
 }
 ```
+
+### Reference Data (Code, Not Rows)
+
+Countries, currencies, languages and time zones are constants in `@template/shared/reference` (`packages/shared/src/reference/`), never tables or seed rows.
+
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| A list of countries, currencies, languages or time zones: "a country dropdown", "how many decimals does this currency have", "the dialing code for this country" | **COUNTRIES**, **CURRENCIES**, **LANGUAGES**, **TIMEZONE_IDS** · primitive `packages/shared/src/reference/index.ts` — each has its code type and Zod schema (`CountryCodeSchema`, `CurrencyCodeSchema`, `LanguageCodeSchema`, `TimezoneIdSchema`), a guard (`isCountryCode`, …) and lookups: `countryByCode`, `callingCodeFor`, `countryNameFor`, `currencyByCode`, `decimalsFor`, `symbolFor`, `languageByCode`, `currentOffsetMinutes` | this section | a `Country` or `Currency` model or seed file; a hand-typed list of ISO codes; an npm country/currency package |
 
 ---
 
@@ -746,6 +755,8 @@ Schema-level configuration in `packages/db/src/registries/`:
 | `delegatedKeys(axis, value)` / `carryDelegatedKeys(model, row)` | The parent keys a delegating value carries; copy them from the parent row (the hook and the test factory both call it) |
 | `polymorphicKeyColumn` / `polymorphicTarget` | The key column for a value; the `{ kind, id }` a row points at |
 | `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
+| `polymorphicBindings(ownerModel, ownerId)` | The bind map `polymorphicIs` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`POLYMORPHIC_BINDS`, `isOwnerKind`) |
+| `isFalsePolymorphismRef(ref)` / `resolveFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart, and resolve returns that value's FK column (null on an unknown model, axis or value) |
 | `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |
 
 ```typescript

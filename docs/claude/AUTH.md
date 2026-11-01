@@ -166,7 +166,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 ### Revocation and sign-out
 
-`rotateUserJwts(userId)` (`apps/api/src/modules/user/services/rotateUserJwts.ts`) is the one writer of `User.jwtVersion`: it increments it through the scoped db client, inside the caller's transaction. Every caller below goes through it; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store (Aron, 2026-10-18: "the token just carries the version on the user… we just rotate that"). Permissions are not on the JWT, so a role or member change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours, so the version check does not apply to it: rotating here (`/me/rotateJwts`, the admin rotation, password reset or change) does not end it. It ends when it expires (30 days at most), when the user is deleted here, when the issuer stops publishing its key, or, for a `grant` JWT, when the grant inquiry is revoked (read live). Signing out at the issuer is the issuer's job. The cached user row (`findUserWithRelations`, 10 minutes) is dropped by the cache hooks on the version bump; if that clear fails (the hook logs Redis errors), an old JWT can work until the cache entry expires, the same bound a role change has.
+`rotateUserJwts(userId)` (`apps/api/src/modules/user/services/rotateUserJwts.ts`) is the one writer of `User.jwtVersion`: it increments it through the scoped db client, inside the caller's transaction. Every caller below goes through it; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store. Permissions are not on the JWT, so a role or member change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours, so the version check does not apply to it: rotating here (`/me/rotateJwts`, the admin rotation, password reset or change) does not end it. It ends when it expires (30 days at most), when the user is deleted here, when the issuer stops publishing its key, or, for a `grant` JWT, when the grant inquiry is revoked (read live). Signing out at the issuer is the issuer's job. The cached user row (`findUserWithRelations`, 10 minutes) is dropped by the cache hooks on the version bump; if that clear fails (the hook logs Redis errors), an old JWT can work until the cache entry expires, the same bound a role change has.
 
 | What | Revokes |
 |---|---|
@@ -179,7 +179,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 `jwtVersion` is never returned: every user response schema is `userResponseSchema` (`apps/api/src/modules/user/schemas/userResponseSchema.ts`, `UserScalarSchema.omit({ jwtVersion: true }).strip()`), `jwtHandoff` omits it from the sign-in `user`, and BetterAuth declares it `returned: false`, so none of its own responses carry it (a sign-up still waiting for email verification answers with BetterAuth's raw `user`). Nothing accepts it as input: BetterAuth declares it `input: false`, and no route takes a user body.
 
-**Future: profile editing.** Profile editing will come (Aron, 2026-10-18); the write protection belongs in that route's body schema, not in a new mechanism.
+**Future: profile editing.** No profile-editing route exists yet (FEATURES.md, 🟡 Profile Editing). When it lands, the protection of `jwtVersion` and the other server-owned columns belongs in that route's body schema, not in a new mechanism.
 
 - BetterAuth's `input: false` on `additionalFields` (`platformRole`, `lastLoginAt`, `jwtVersion`) only stops those fields in the request body of BetterAuth's own endpoints. It does nothing for our API routes or for server code calling `db.user.update`.
 - Today nothing outside `rotateUserJwts` writes `jwtVersion`: there is no user update route, and BetterAuth's `/update-user` is in `disabledPaths`.
@@ -212,7 +212,7 @@ Why not let the browser hold a short-lived session for one call (the first desig
 
 `POST /api/v1/me/changePassword` (`modules/me/routes/meChangePassword.ts`), body `{ currentPassword, newPassword }`, response `{ token, expiresAt }`:
 
-- **Who:** a user. `validatePermission(UserAction.changePassword)` on the user, `actorIsUser` in the schema: an API token cannot change its user's password, whatever it holds. A superadmin passes on any credential. A superadmin spoofing a user can change that user's password like any other action (no spoof guard; Aron, 2026-10-20: "Superadmin can do anything, always"); the response is then `{ token: null, expiresAt: null }`, so the spoofed user's new JWT never leaves the API, and the UI keeps its own JWT while spoofing or when the answer has no JWT (Aron, 2026-10-26: both). A superadmin cannot be spoofed ([Spoof Middleware](#spoof-middleware)), so a superadmin never changes their own password through a spoof.
+- **Who:** a user. `validatePermission(UserAction.changePassword)` on the user, `actorIsUser` in the schema: an API token cannot change its user's password, whatever it holds. A superadmin passes on any credential. A superadmin spoofing a user can change that user's password like any other action (no spoof guard: a superadmin passes every check, on any credential); the response is then `{ token: null, expiresAt: null }`, so the spoofed user's new JWT never leaves the API, and the UI keeps its own JWT while spoofing or when the answer has no JWT. A superadmin cannot be spoofed ([Spoof Middleware](#spoof-middleware)), so a superadmin never changes their own password through a spoof.
 - **Not in a batch:** the route is `'x-batch': false`; a batch that reaches it is refused before anything runs ([BATCH.md](./BATCH.md#routes-that-cannot-batch)).
 - **Limits:** `newPassword` length comes from `passwordLength` (`packages/shared/src/auth/passwordLength.ts`, also used by the web form), the same constants `auth.ts` gives BetterAuth as `minPasswordLength`/`maxPasswordLength`; outside them is a 422 before BetterAuth runs. Rate limits: the `/api/auth` IP bucket (`authRateLimit`, 60 a minute) first, and a per-user bucket (`credentialChangeRateLimit`, 5 a minute) after the permission checks, so a stolen JWT can't guess the current password from rotating IPs and a refused token can't use up its person's attempts.
 - **What runs:** `withThrowawaySession(user.id, (headers) => auth.api.changePassword({ body: { currentPassword, newPassword, revokeOtherSessions: true }, headers }))`. BetterAuth verifies the current password and hashes the new one; a wrong current password is its 400 `Invalid password`, and nothing changes. `revokeOtherSessions` deletes every BetterAuth session of the user and creates a new one; `jwtHandoff` sees `/change-password`, calls `rotateUserJwts` before signing (every older JWT is a 401 from now on), signs the new JWT through the same path sign-in uses, stamps `lastLoginAt` (the person just proved the password) and deletes that session.
@@ -400,10 +400,11 @@ userId: null
 organizationId: set
 ```
 
-- No user context, org-level only
+- No user context, org-level only: a machine key the organization holds itself
 - Has access only to the specific org
 - Permissions set by token's role/entitlements
 - Used for org-level integrations, CI/CD
+- Issued by `organizationCreateToken` (`apps/api/src/modules/organization/controllers/organizationCreateToken.ts`), through `createToken` like every create-token route ([PERMISSIONS.md § Minting a Token](./PERMISSIONS.md#minting-a-token))
 
 ### OrganizationUser Token
 
@@ -431,6 +432,7 @@ spaceId: set
 - Has access to the specific space within an org
 - Permissions set by token's role/entitlements
 - Used for space-level integrations
+- Issued by `spaceCreateToken` (`apps/api/src/modules/space/controllers/spaceCreateToken.ts`), through `createToken`
 
 ### SpaceUser Token
 
@@ -515,6 +517,12 @@ apiRouter.use('*', apiRateLimit);
 
 A JWT-shaped bearer is the user's JWT; any other bearer is looked up as an API token.
 Spoof runs last so a superadmin can spoof through either credential.
+
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| Put a fixed username and password in front of an operator tool (the job dashboard): "password-protect this admin page" | **basicAuthMiddleware** · primitive `apps/api/src/middleware/auth/basicAuthMiddleware.ts#basicAuthMiddleware` — one static credential per mount, answers 401 with `WWW-Authenticate`; not for users or API keys | this section · code `apps/api/src/routes/bullBoard.ts` | splitting the `Authorization` header and `atob`-decoding `Basic` credentials by hand |
+| Ask "would this caller be allowed this route?" without running it: "check the socket may read this channel" | **isAuthProbe** · primitive `apps/api/src/lib/utils/authProbe.ts#isAuthProbe` — the request carries the per-boot `x-auth-probe` secret; `makeController` answers 204 after the whole middleware chain and validation pass, without running the handler | [WEBSOCKETS.md](./WEBSOCKETS.md) (subscribe authorization, `apps/api/src/ws/probe.ts`) | a second permission check written for the socket path; calling the controller's service directly to test access |
+| Let the server's own stream probes skip the API rate limit | **isSystemProbe** · primitive `apps/api/src/lib/utils/authProbe.ts#isSystemProbe` — true only for the system probe secret (`apps/api/src/ws/streamProbe.ts`); `apiRateLimit` skips it | [REDIS.md § Rate Limiting](./REDIS.md#rate-limiting-limit) | a header or flag of your own to exempt internal calls from limits |
 
 ### Flow
 
@@ -604,7 +612,7 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 
 ## Who Is a User
 
-Only a JWT session or a superadmin spoof makes the request a user (`c.get('user')`). A token never does: it is a Token actor `{ model: 'Token', record }`, and what it may do is its permissions over its owner's table. Routes name their action; there is no "is there a user" middleware.
+Only a user JWT or a superadmin spoof makes the request a user (`c.get('user')`). A token never does: it is a Token actor `{ model: 'Token', record }`, and what it may do is its permissions over its owner's table. Routes name their action; there is no "is there a user" middleware.
 
 | Credential | `c.get('user')` | `me(c)` (the `/me` resource) |
 |------------|-----------------|-------------------------------|

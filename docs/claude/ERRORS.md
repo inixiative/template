@@ -64,7 +64,8 @@ unless overridden.
 | `ZodError` (request validation included) | 422 with `fieldErrors` (`respond422`) |
 | `ResponseValidationError` | 500 (response failed its own schema) |
 | `Prisma.PrismaClientValidationError` | 400 "Invalid query parameters" |
-| `Prisma P2002` | 409 "Resource already exists: …" |
+| `Prisma P2002` (`isUniqueConstraintError`) | 409 "Resource already exists: …" |
+| `Prisma P2034` (`isWriteConflictError`) | 409 "Write conflict" (deadlock or serialization victim, rolled back whole) |
 | `LockLostError` (`@template/db`, from `lock.assertHeld()`) | 409 "Lost the lock guarding this write; please retry" |
 | `Prisma P2025` | 404 "Resource not found" |
 | `AppError` | its body |
@@ -72,6 +73,19 @@ unless overridden.
 | anything else (raw `Error`) | 500 via `respond500` |
 
 `HTTPException`s at ≥500 and raw errors are reported to `errorReporter`; 4xx are not.
+
+`isUniqueConstraintError` and `isWriteConflictError` (`@template/db`, `packages/db/src/utils/`) are the
+type guards for those two Prisma codes; they duck-type on `code`, so they match however the error
+surfaces (raw client, extended client, wrapped transaction error). Use them, not `err.code === 'P2002'`
+or an `instanceof` check, wherever code must tell those errors apart.
+
+On the frontend, `handleApiError` (`packages/ui/src/lib/handleApiError.ts`) turns the envelope into a
+toast: `fieldErrors` become the message, and `guidance` picks the action (`fixInput`, `tryAgain`,
+`reauthenticate` with a login link, `requestPermission`, `refreshAndRetry`). `createAppQueryClient`
+calls it for every failed query and mutation unless its `meta` sets `skipErrorToast`
+(`shouldSkipToast`). A route that fails to render shows `RouteError`
+(`packages/ui/src/components/utility/ErrorBoundary.tsx`), the `errorComponent` of every app's root,
+`_authenticated` and `_public` routes. Don't toast API errors by hand in a component.
 
 Every branch, and the not-found handler, answers through `respondAppError`, which
 stamps `requestId` and builds the response through the Hono context so headers

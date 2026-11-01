@@ -405,8 +405,8 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## User Management
 
-- ✅ **User CRUD** - Create, read, update, delete users. Admin routes for platform-level user management; me routes for self-service operations. Typed IDs prevent accidental cross-model ID mixing
-- ✅ **Me Endpoint System** - Self-service API with 8+ endpoints under `/me`: read profile, update name, change password, list orgs, list spaces, list tokens, manage auth providers, delete account. Authenticated users manage their own data without needing admin access
+- ✅ **Users** - A user is created by sign-up (BetterAuth) or as an unverified guest when an inquiry targets an unknown email (`findUserOrCreateGuest`). Self-service under `/me`; superadmin routes redact a user and rotate their JWTs (`/api/admin/user/:id/redact`, `/rotateJwts`). No route updates a user yet (see Profile Editing)
+- ✅ **Me Endpoint System** - Self-service API under `/me`: read the profile, change password, rotate JWTs, redact (delete) the account; list the caller's organizations, spaces, segment memberships and inquiries received; list and create its tokens, contacts, integrations, inquiries (sent), segments and webhook subscriptions; create flows
 - ✅ **Email Verification** - BetterAuth verification flow: send verification email with signed token, verify token on click, mark email as verified. Verification model persists tokens with expiry
 - ✅ **Password Reset** - BetterAuth reset flow: request reset email, validate signed token, set new password. Tokens are single-use and expire after 1 hour
 - ✅ **User Redaction / GDPR** - Anonymize user PII on account deletion: email → `redacted-{uuid}@redacted.invalid`, name → `Redacted User`, avatar cleared. Preserves record for referential integrity while removing identifying data

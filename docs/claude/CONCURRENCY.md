@@ -1,5 +1,25 @@
 # Concurrency
 
+<!-- toc:start -->
+
+## Contents
+
+- [Serialized Queue (`createSerializedQueue`)](#serialized-queue-createserializedqueue)
+  - [When to use](#when-to-use)
+  - [When NOT to use](#when-not-to-use)
+  - [Error model](#error-model)
+  - [Implementation](#implementation)
+- [Concurrency Limits (`getConcurrency`)](#concurrency-limits-getconcurrency)
+- [Bounded Batch (`resolveAll`)](#bounded-batch-resolveall)
+- [Distributed Lock (`createLock`)](#distributed-lock-createlock)
+- [Supersede Lanes (`claimLane` / `watchLane`)](#supersede-lanes-claimlane--watchlane)
+- [Job Lanes (`withLanePriority`)](#job-lanes-withlanepriority)
+- [Recurring Beat (`heartbeat`)](#recurring-beat-heartbeat)
+- [Row Locks (`db.findForUpdate`)](#row-locks-dbfindforupdate)
+- [Cross-references](#cross-references)
+
+<!-- toc:end -->
+
 Mechanisms for coordinating async operations. Different concerns, different tools.
 
 | Concern | Tool | Scope |
@@ -193,7 +213,7 @@ The one way to lock rows. `db.findForUpdate(model, where, { upserting? })` runs 
 
 **Exclusive only; there is no shared mode.** No `FOR SHARE`, `FOR KEY SHARE` or `LOCK IN SHARE MODE`, in the primitive or around it. The `no-raw-locks` CI rule fails on raw row-lock SQL anywhere but the primitive, and on a shared lock anywhere ([SCRIPTS.md § CI Rule Scripts](./SCRIPTS.md#ci-rule-scripts)).
 
-**Why.** Zealot tried a shared mode and Aron removed it in review ([Zealot-Monorepo #2808](https://github.com/userevidence/Zealot-Monorepo/pull/2808), comment of 2026-10-14). To let parallel creates share an IntegrationMap row while blocking its delete, the PR added a `shared` option to `findForUpdate` that emitted `FOR SHARE` (`84e0a227e`), plus a call-site helper to hold the map. Review bots then found a lock-order deadlock between that shared hold and the identity locks. Each fix opened a new hole. Aron's ruling: drop the fast path, the helper and the `shared` / `FOR SHARE` option, and keep the exclusive upsert. "Letting creates share a map while blocking deletes needs a read/write lock we don't have, and holdLiveMap patches that gap at the call site. With a bigger pool, creates queue on the map row instead of failing, and at this scale that's fine." The shared mode was removed in `7db1fd20e` and never reached Zealot main. The real cause was connection-pool size: the fix was a larger connection_limit and a longer maxWait. So when exclusive locks queue, size the pool. Don't add a lock mode: a shared lock sits beside exclusive ones and creates lock orders nobody reasons about.
+**Why.** A shared mode looks like the fix when parallel creates queue on one parent row (let the creates share it, block only its delete). It has been tried: a `shared` option on `findForUpdate` that emitted `FOR SHARE`, plus a call-site helper to hold the parent. The shared hold deadlocked against the exclusive locks taken on other rows in the same writes, and each fix opened a new hole. Letting creates share a row while blocking deletes needs a read/write lock, which this codebase does not have, and a call-site helper only patches that gap. The queueing was a connection-pool problem: with a larger `connection_limit` and a longer `maxWait`, creates wait on the row instead of failing, which is fine at this scale. So when exclusive locks queue, size the pool. Don't add a lock mode: a shared lock beside exclusive ones creates lock orders nobody reasons about.
 
 ---
 

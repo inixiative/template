@@ -204,7 +204,7 @@ The handler's `sources` config is checked by `validateInquiryHandler` to confirm
 
 `resolveInquiryTarget` resolves from `body.targetModel` (already validated by `validateInquiryHandler`):
 
-- `targetModel: User` → `targetUserId` OR `targetEmail` (creates guest if not found)
+- `targetModel: User` → `targetUserId` OR `targetEmail`: `findUserOrCreateGuest` (`apps/api/src/modules/user/services/findOrCreateGuest.ts`) returns the user with that normalized email or creates an unverified guest and emits `user.created` with `isGuest: true`
 - `targetModel: Organization` → `targetOrganizationId` OR `targetOrganizationSlug`
 - `targetModel: Space` → `targetSpaceId` OR `targetOrganizationSlug` + `targetSpaceSlug` (space slugs are org-scoped)
 - `targetModel: OrganizationUser` → `targetOrganizationId` + `targetUserId` (the membership must exist)

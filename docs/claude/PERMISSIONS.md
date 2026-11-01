@@ -32,6 +32,7 @@
   - [Who May Set It](#who-may-set-it)
   - [The Backstop Rules](#the-backstop-rules)
 - [Resolution at Read Time](#resolution-at-read-time)
+  - [Hydration](#hydration)
   - [installPermissions](#installpermissions)
   - [permissionsOfUser](#permissionsofuser)
   - [ownerPermissions](#ownerpermissions)
@@ -283,7 +284,7 @@ check(permix, rebacSchema, 'organizationUser', before, memberRoleWrite('organiza
 | member | nothing |
 | viewer | nothing |
 
-The last-owner check stays in code. The same rule gates `PATCH /organizationUser/:id/entitlements` and `/spaceUser/:id/entitlements`.
+The last-owner check stays in code: `validateNotLastOwner(organizationId)` (`apps/api/src/modules/organization/validations/validateNotLastOwner.ts`) answers 400 "Cannot remove last owner" when an organization's only owner is removed (`organizationUserDelete`) or demoted (`organizationUserUpdate`); both controllers call it only when the row being changed is an owner. The same rule gates `PATCH /organizationUser/:id/entitlements` and `/spaceUser/:id/entitlements`.
 
 Removing a member checks `memberRemoval(tenant)` at the route: `leave` (U1 leaves) or `memberRoleWrite` on the row. Removing tombstones the member row: `softDeleteCascade` tombstones what it owned (its integrations) and hard-deletes its tokens, and a later invite revives the row with what died with it (`memberRemoval.test.ts`). A tombstoned member is not found by the routes, so its user mints nothing on it.
 
@@ -428,7 +429,7 @@ The library's `installPermissions` sets each group up with its owner, so an owne
 |---|---|
 | `User` | `permissionsOfUser` for the user: the user entry, every member row and its entitlements |
 | `OrganizationUser` / `SpaceUser` | `permissionsOfUser` for that one member row: its role at the tenant, its self-grant (owned by its user) and its other entitlements (owned by the tenant) |
-| `Organization` / `Space` | `own` on the tenant |
+| `Organization` / `Space` | `own` on the tenant: `organizationOwnerPermissions(organizationId)` / `spaceOwnerPermissions(spaceId)` (`packages/permissions/src/roles/permissionsOfUser.ts`) |
 | `Integration` | `delegatedPermissions(integration, ownerPermissions(integration))`: the integration's own permissions over its owner |
 
 The permissions are read from the database on every request, so demote M1 and its tokens lose it on the next request.
@@ -764,7 +765,7 @@ Routes that still check an action on the owner (`validatePermission` on spaces, 
 
 ### The user as a resource
 
-`/me/*` routes check their action like any other route; `meResourceMiddleware` loads `me(c)` as the resource, typed `user`. `me(c)` is the request's user (a JWT session or a spoof), or the user of a User-owned token; anything else has no me and gets 401.
+`/me/*` routes check their action like any other route; `meResourceMiddleware` loads `me(c)` as the resource, typed `user`. `me(c)` is the request's user (a user JWT or a spoof), or the user of a User-owned token; anything else has no me and gets 401.
 
 ```typescript
 middleware: [validateSubmodelPermission('read')]     // meReadManyContacts, -Integrations, -WebhookSubscriptions, -Tokens

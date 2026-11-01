@@ -122,7 +122,7 @@ Originally, `@template/shared` was meant for code shared between frontend and ba
 - UI components need different testing strategies
 - Package grew too large and unfocused
 
-**Migration (2026-02-12):** Moved all frontend code from `@template/shared` to `@template/ui`:
+**The split:** all frontend code lives in `@template/ui`, not `@template/shared`:
 - Components, hooks, pages
 - Zustand store slices
 - Auth utilities
@@ -256,8 +256,8 @@ Each package's `tsconfig.json` must map **all packages** to ensure consistent im
 
 **Special cases:**
 
-- `packages/db` includes `@template/db-test/*` → `./test/*` for test utilities
-- `packages/ui` includes `@template/ui/openapi.gen.json` → `./openapi.gen.json` for API spec
+- `packages/db` maps `@template/db/test` and `@template/db/test/*` to `packages/db/src/test/` for test utilities (in its tsconfig paths and its package exports)
+- `packages/ui` maps `@template/sdk/openapi.gen.json` to the SDK package's generated API spec
 - Apps use `#/*` → `./src/*` for internal imports instead of `@template/`
 
 **Generated file convention:**

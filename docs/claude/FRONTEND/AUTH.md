@@ -24,7 +24,7 @@ Sign-in, sign-up, OAuth callback, guards and the auth slice in `@template/ui`. B
 ## Architecture
 
 - **BetterAuth client** (`better-auth/client`) talks to the API's `/api/auth/*` routes.
-- **User JWT in localStorage.** Email sign-in, sign-up without verification and the OAuth callback all answer with `{ token, expiresAt, user }`; `storeJwtHandoff` (`packages/ui/src/lib/auth/storeJwtHandoff.ts`) checks that shape and calls `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). Every API call and the websocket `authenticate` frame send `Authorization: Bearer <jwt>`. The client never holds a session.
+- **User JWT in localStorage.** Email sign-in, sign-up without verification and the OAuth callback all answer with `{ token, expiresAt, user }`; `storeJwtHandoff` (`packages/ui/src/lib/auth/storeJwtHandoff.ts`) checks that shape and calls `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). The stored JWT is read only through `packages/ui/src/lib/auth/token.ts`: `getToken` (the raw value), `isTokenValid` (present and unexpired), `getTokenExpiry` and `clearToken`; never read `localStorage` or compare the expiry by hand. Every API call and the websocket `authenticate` frame send `Authorization: Bearer <jwt>`. The client never holds a session.
 - **`/me` hydrates the store.** `fetchAndHydrateMe` loads the user, organizations, spaces and space memberships, then runs `permissions.setup(me)`.
 
 **Email/password:**

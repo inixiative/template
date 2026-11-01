@@ -344,7 +344,10 @@ other lens. Everything a template does with a path or a rule goes through it:
   with `lensScopeSurface(lens, { at })`. Fetched options are keyed at the slot's path under `Email`
   (`emailSurfaceSourceValues`). `emailRuleDecoration` derives one facet per lens present.
 
-**The lens is the row owner's.** `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
+**The lens is the row owner's.** `emailOwnerProvider(owner)` (`packages/email/src/render/owner.ts`) turns
+an email row's owner reference into the lens owner the scope binds: an `Organization` or a `Space` is
+itself, and a `User`, `OrganizationUser` or `SpaceUser` owner is its user; platform rows (`default`,
+`admin`) have none. `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
 builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient
 over `DEFAULT_RECIPIENT_NARROWING`, a sender slot from the actual sender when no entry declares
 one; every prisma slot foreign-key-free and redacted) and narrows it by the slots stored on the

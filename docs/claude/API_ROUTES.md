@@ -16,7 +16,6 @@
   - [AuthProvider Module](#authprovider-module)
     - [Module Structure](#module-structure)
     - [Endpoints](#endpoints)
-    - [Platform vs Organization Providers](#platform-vs-organization-providers)
     - [Example: Read Platform Providers (Public)](#example-read-platform-providers-public)
     - [Example: Create Organization Provider (Encrypted)](#example-create-organization-provider-encrypted)
     - [Example: Read Organization Providers (Permission-Aware)](#example-read-organization-providers-permission-aware)
@@ -49,6 +48,7 @@
   - [Colocation Rule](#colocation-rule)
   - [Cross-Field Validations](#cross-field-validations)
 - [Router Exports](#router-exports)
+  - [Info routes](#info-routes)
 - [File Organization](#file-organization)
   - [Core (always present)](#core-always-present)
   - [Common Folders (as needed)](#common-folders-as-needed)
@@ -202,7 +202,7 @@ Complete real-world examples showing all patterns together.
 
 **Location:** `apps/api/src/modules/authProvider/`
 
-Manages authentication providers (OAuth, SAML) at platform and organization level. Demonstrates encryption, permissions, and public/private endpoints.
+A worked example of the route patterns: encryption, permissions, and public and private endpoints in one module. What the providers are and who may manage them is [AUTH.md § Multi-Provider Authentication](./AUTH.md#multi-provider-authentication-authprovider); this section shows only the code.
 
 #### Module Structure
 
@@ -232,20 +232,6 @@ authProvider/
 | PATCH | `/authProviders/:id` | `own` | Update auth provider |
 | DELETE | `/authProviders/:id` | `own` | Delete auth provider |
 | GET | `/admin/authProviders` | Superadmin | List all providers (admin only) |
-
-#### Platform vs Organization Providers
-
-**Platform providers:**
-- Created by superadmins
-- Available to all users/orgs (Google, GitHub, etc.)
-- Immutable by organization owners
-- No encrypted secrets (OAuth configured at platform level)
-
-**Organization providers:**
-- Created by organization owners
-- Only available to that organization (e.g., custom SAML)
-- Can be updated/deleted by org owners
-- Secrets encrypted using encryption service (see ENCRYPTION.md)
 
 #### Example: Read Platform Providers (Public)
 
