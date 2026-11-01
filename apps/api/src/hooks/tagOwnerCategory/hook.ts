@@ -19,6 +19,8 @@ const ownerKeyFields = [
   ...new Set(Object.values(PolymorphismRegistry.Tag?.axes[0]?.fkMap ?? {}).flat()),
 ];
 
+const ownershipFields = new Set(['tagCategoryId', 'ownerModel', ...ownerKeyFields]);
+
 const ownerSelect: Record<string, true> = Object.fromEntries(ownerKeyFields.map((k) => [k, true]));
 
 type CategoryOwner = { ownerModel: string } & Record<string, unknown>;
@@ -132,14 +134,11 @@ export const registerTagOwnerCategoryHook = () => {
     HookTiming.before,
     [DbAction.update, DbAction.updateManyAndReturn],
     async (options) => {
-      const { args, previous } = options as HookOptions & { action: SingleAction };
-      if (!args || typeof args !== 'object') return;
-      const a = args as Record<string, unknown>;
-      const data = a.data as TagRow | undefined;
-      if (!data) return;
-      const prev = previous as TagRow | undefined;
-      const merged: TagRow = { ...(prev ?? {}), ...data };
-      await validateOwnerMatchesCategory(merged);
+      const { args, previous } = options;
+      const data = (args as { data?: TagRow } | undefined)?.data;
+      if (!data || !Object.keys(data).some((field) => ownershipFields.has(field))) return;
+      const previousRows = castArray(previous ?? {}) as TagRow[];
+      await validateRowsBatch(previousRows.map((row) => ({ ...row, ...data })));
     },
   );
 };
