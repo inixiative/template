@@ -630,22 +630,22 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 
 #### Class `reference-data`
 - **callingCodeFor** `packages/shared/src/reference/countries.ts#callingCodeFor` [primitive] get the phone calling code for a country code Use: const prefix = callingCodeFor(countryCode);
-- **COUNTRIES** `packages/shared/src/reference/countries.ts#COUNTRIES` [primitive] list countries with ISO code, name and phone calling code Use: import { COUNTRIES } from '@shared/reference/countries'
-- **COUNTRY_CODES** `packages/shared/src/reference/countries.ts#COUNTRY_CODES` [primitive] list every supported ISO country code as a readonly typed array Use: import { COUNTRY_CODES } from '@shared/reference/countries';
+- **COUNTRIES** `packages/shared/src/reference/countries.ts#COUNTRIES` [primitive] list countries with ISO code, name and phone calling code Use: import { COUNTRIES } from '@template/shared/reference/countries'
+- **COUNTRY_CODES** `packages/shared/src/reference/countries.ts#COUNTRY_CODES` [primitive] list every supported ISO country code as a readonly typed array Use: import { COUNTRY_CODES } from '@template/shared/reference/countries';
 - **countryByCode** `packages/shared/src/reference/countries.ts#countryByCode` [primitive] look up the full country record by its code Use: const country = countryByCode.get(code);
 - **CountryCodeSchema** `packages/shared/src/reference/countries.ts#CountryCodeSchema` [primitive] validate a country code field in zod request schemas Use: country: CountryCodeSchema,
 - **countryNameFor** `packages/shared/src/reference/countries.ts#countryNameFor` [primitive] get the display name for a country code Use: const name = countryNameFor(countryCode);
-- **CURRENCIES** `packages/shared/src/reference/currencies.ts#CURRENCIES` [primitive] provide ISO currency records with name, decimals and symbol Use: import { CURRENCIES } from '@shared/reference/currencies';
-- **CURRENCY_CODES** `packages/shared/src/reference/currencies.ts#CURRENCY_CODES` [primitive] list every supported ISO currency code as a readonly typed array Use: import { CURRENCY_CODES } from '@shared/reference/currencies';
+- **CURRENCIES** `packages/shared/src/reference/currencies.ts#CURRENCIES` [primitive] provide ISO currency records with name, decimals and symbol Use: import { CURRENCIES } from '@template/shared/reference/currencies';
+- **CURRENCY_CODES** `packages/shared/src/reference/currencies.ts#CURRENCY_CODES` [primitive] list every supported ISO currency code as a readonly typed array Use: import { CURRENCY_CODES } from '@template/shared/reference/currencies';
 - **currencyByCode** `packages/shared/src/reference/currencies.ts#currencyByCode` [primitive] look up a currency's name, decimals and symbol by code Use: const { decimals, symbol } = currencyByCode.get(code)!;
 - **CurrencyCodeSchema** `packages/shared/src/reference/currencies.ts#CurrencyCodeSchema` [primitive] validate a currency code field in zod request schemas Use: currency: CurrencyCodeSchema,
-- **decimalsFor** `packages/shared/src/reference/currencies.ts#decimalsFor` [primitive] get the number of minor-unit decimals for a currency code Use: import { decimalsFor } from '@shared/reference/currencies'; decimalsFor('USD')
+- **decimalsFor** `packages/shared/src/reference/currencies.ts#decimalsFor` [primitive] get the number of minor-unit decimals for a currency code Use: import { decimalsFor } from '@template/shared/reference/currencies'; decimalsFor('USD')
 - **isCountryCode** `packages/shared/src/reference/countries.ts#isCountryCode` [primitive] narrow an arbitrary string to a known country code type Use: if (isCountryCode(value)) { ... }
 - **isCurrencyCode** `packages/shared/src/reference/currencies.ts#isCurrencyCode` [primitive] narrow an arbitrary string to a known CurrencyCode Use: if (isCurrencyCode(value)) { /* value: CurrencyCode */ }
 - **isLanguageCode** `packages/shared/src/reference/languages.ts#isLanguageCode` [primitive] narrow an arbitrary string to a known LanguageCode Use: if (isLanguageCode(value)) { /* value: LanguageCode */ }
 - **languageByCode** `packages/shared/src/reference/languages.ts#languageByCode` [primitive] look up a language's name and native name by code Use: languageByCode.get('fr')?.nativeName
 - **LanguageCodeSchema** `packages/shared/src/reference/languages.ts#LanguageCodeSchema` [primitive] validate a language code field in zod schemas Use: lang: LanguageCodeSchema
-- **LANGUAGES** `packages/shared/src/reference/languages.ts#LANGUAGES` [primitive] list ISO 639-1 languages with English and native names Use: import { LANGUAGES } from '@shared/reference/languages'
-- **symbolFor** `packages/shared/src/reference/currencies.ts#symbolFor` [primitive] get the display symbol for a currency code Use: import { symbolFor } from '@shared/reference/currencies'; symbolFor('EUR')
-- **TIMEZONE_IDS** `packages/shared/src/reference/timezones.ts#TIMEZONE_IDS` [primitive] list all supported IANA timezone identifiers Use: import { TIMEZONE_IDS } from '@shared/reference/timezones'
+- **LANGUAGES** `packages/shared/src/reference/languages.ts#LANGUAGES` [primitive] list ISO 639-1 languages with English and native names Use: import { LANGUAGES } from '@template/shared/reference/languages'
+- **symbolFor** `packages/shared/src/reference/currencies.ts#symbolFor` [primitive] get the display symbol for a currency code Use: import { symbolFor } from '@template/shared/reference/currencies'; symbolFor('EUR')
+- **TIMEZONE_IDS** `packages/shared/src/reference/timezones.ts#TIMEZONE_IDS` [primitive] list all supported IANA timezone identifiers Use: import { TIMEZONE_IDS } from '@template/shared/reference/timezones'
 - **TimezoneIdSchema** `packages/shared/src/reference/timezones.ts#TimezoneIdSchema` [primitive] validate an IANA timezone field in zod schemas Use: timezone: TimezoneIdSchema

@@ -3,7 +3,7 @@
   "title": "Request context",
   "routing": "Is this about what a live API request carries: reading identity, tenant, resource or validated input from the Hono context (AppEnv, c.get('user' | 'token' | 'organizationUsers' | 'db' | 'requestId' | 'bracketQuery' | 'filterLens')), me(c), getResource / getResourceType, getValidatedBody / getValidatedQuery, setUserContext, refreshUserContext, resourceContextMiddleware and resourceContextArgs (?lookup=), prepareRequest, db.scope / db.getScopeId / db.getScopeContext, clientAddress, TokenWithRelations, or GET /api/v1/identify? Throwing and mapping errors is `errors`.",
   "concepts": ["request-context"],
-  "tokens": 12249,
+  "tokens": 12273,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12249
+      "tokens": 12273
     }
   },
   "runsAgreed": 0,

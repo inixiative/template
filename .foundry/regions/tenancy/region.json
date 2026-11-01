@@ -3,7 +3,7 @@
   "title": "Tenancy and Superadmin",
   "routing": "Is this about the tenant structure or the platform admin? Organization, Space, OrganizationUser and SpaceUser rows and their API modules (organization, organizationUser, space, spaceUser), the User/Organization/Space/Public contexts and ?org= / ?space= URL state, tenant pages (OrganizationProfilePage, OrganizationSpacesPage, CreateOrganizationModal), validateNotLastOwner, or the superadmin side: PlatformRole, isSuperadmin, validateSuperadmin, the admin router and admin module, spoofMiddleware / x-spoof-user-email, and the superadmin app?",
   "concepts": ["tenancy", "superadmin"],
-  "tokens": 8860,
+  "tokens": 8880,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 8860
+      "tokens": 8880
     }
   },
   "runsAgreed": 0,

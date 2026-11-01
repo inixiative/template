@@ -784,7 +784,7 @@
     },
     {
       "id": "adapters-integrations",
-      "tokens": 8103,
+      "tokens": 8098,
       "recogniseTokens": 1705,
       "concepts": ["adapters", "integrations", "object-storage"],
       "runsAgreed": 0
@@ -924,7 +924,7 @@
     },
     {
       "id": "permissions-roles",
-      "tokens": 17483,
+      "tokens": 17476,
       "recogniseTokens": 1954,
       "concepts": ["permissions-roles"],
       "runsAgreed": 0
@@ -945,15 +945,15 @@
     },
     {
       "id": "tenancy",
-      "tokens": 8860,
+      "tokens": 8880,
       "recogniseTokens": 1812,
       "concepts": ["tenancy", "superadmin"],
       "runsAgreed": 0
     },
     {
       "id": "authentication",
-      "tokens": 19102,
-      "recogniseTokens": 2048,
+      "tokens": 19121,
+      "recogniseTokens": 2047,
       "concepts": ["authentication"],
       "runsAgreed": 0
     },
@@ -966,8 +966,8 @@
     },
     {
       "id": "auth-middleware-users",
-      "tokens": 9734,
-      "recogniseTokens": 1897,
+      "tokens": 9774,
+      "recogniseTokens": 1902,
       "concepts": ["auth-middleware", "users"],
       "runsAgreed": 0
     },
@@ -980,28 +980,28 @@
     },
     {
       "id": "api-routes",
-      "tokens": 17830,
+      "tokens": 17826,
       "recogniseTokens": 3163,
       "concepts": ["route-templates", "api-modules"],
       "runsAgreed": 1
     },
     {
       "id": "api-schemas-openapi",
-      "tokens": 6921,
+      "tokens": 6922,
       "recogniseTokens": 1227,
       "concepts": ["openapi", "request-schemas"],
       "runsAgreed": 0
     },
     {
       "id": "request-context-errors",
-      "tokens": 12249,
+      "tokens": 12273,
       "recogniseTokens": 2109,
       "concepts": ["request-context"],
       "runsAgreed": 0
     },
     {
       "id": "errors",
-      "tokens": 9302,
+      "tokens": 9291,
       "recogniseTokens": 1469,
       "concepts": ["errors"],
       "runsAgreed": 0
@@ -1036,7 +1036,7 @@
     },
     {
       "id": "data-modeling",
-      "tokens": 13669,
+      "tokens": 13687,
       "recogniseTokens": 1852,
       "concepts": ["data-modeling", "reference-data"],
       "runsAgreed": 0
@@ -1064,8 +1064,8 @@
     },
     {
       "id": "encryption",
-      "tokens": 12458,
-      "recogniseTokens": 1794,
+      "tokens": 12470,
+      "recogniseTokens": 1807,
       "concepts": ["encryption"],
       "runsAgreed": 0
     },
@@ -1197,8 +1197,8 @@
     },
     {
       "id": "monorepo-architecture",
-      "tokens": 18114,
-      "recogniseTokens": 3452,
+      "tokens": 18116,
+      "recogniseTokens": 3454,
       "concepts": ["monorepo-layout", "dependencies", "architecture"],
       "runsAgreed": 1
     },

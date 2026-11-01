@@ -43,7 +43,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the page the provider sends you back to after login
 - tell the whole app whether it's embedded or standalone
 - forget the saved key when the user signs out
-- swap the one-time code in the URL for a real session
+- swap the one-time code in the URL for the user JWT
 - work out the sign-in mode outside a component
 - confirm the address before an email signup can log in
 - don't store the provider secret in clear text
@@ -93,7 +93,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll let users view their existing key later
 - built-in sign-in options configured by environment
 - a credential the server must read back later
-- telemetry and unsubscribe links can't require a session
+- telemetry and unsubscribe links can't require a sign-in
 - the login token must not leak into browser history or logs
 - persist the login so the next page load stays signed in
 - email and password or provider login without the store

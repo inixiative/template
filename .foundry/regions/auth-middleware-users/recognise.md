@@ -21,7 +21,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 
 - how does the API know who's calling
 - where does the request get its user
-- accept an API key or a session on this route
+- accept an API token or a user JWT on this route
 - this endpoint must work without logging in
 - protect this with a fixed password
 - who actually made this request
@@ -90,7 +90,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - bounce authenticated users away from signup
 - turn a contact value into a user id
 - record the superadmin behind the spoof for audit
-- a key beats a cookie when both are present
+- an API token in the bearer header instead of a user JWT
 - the person record shared across every org
 - account deletion keeps the row and scrubs the data
 - I'll put the user check before the session middleware
@@ -113,7 +113,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll soft-delete the user and null the foreign keys
 - I'll validate the email in each controller that sets it
 - I'll check authenticated in a layout and redirect in an effect
-- I'll redirect home if there's already a session on the login page
+- I'll redirect home if the user is already signed in on the login page
 - I'll look up the contact row then the user by hand
 - I'll add a spoof user id to the audit log myself
 - I'll hash the authorization header and query the key table in the route

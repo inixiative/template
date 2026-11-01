@@ -3,7 +3,7 @@
   "title": "Roles, actions and permission checks",
   "routing": "Is this about who may do what and how a request's permissions get installed: PlatformRole and superadmin (isSuperadmin, permix.setSuperadmin), Role on a member row mapped to the standard actions (roleHierarchy, roleToStandardAction, getOrgPermissions / getSpacePermissions, capAtRole), the actions on each model (StandardAction, OrganizationAction / UserAction / TokenAction, person-only actions, actorOf / permix.setActor), entitlements as entry lists (wellFormedEntitlements, changeEntitlements, validateEntitlementGrants), installing a request's permissions (installPermissions, installPermissionsFor, permissionsOfUser, userPermissions), route gates (validatePermission, validateSubmodelPermission, placeUnder), or frontend checks (permissions.setup / permissions.check, usePermission / checkPermission, NavItem.access, Button show / disabledText)? Member rows, delegates and who administers a token or integration are `permissions-members`.",
   "concepts": ["permissions-roles"],
-  "tokens": 17483,
+  "tokens": 17476,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 17483
+      "tokens": 17476
     }
   },
   "runsAgreed": 0,

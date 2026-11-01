@@ -113,7 +113,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 ### Class `integrations`: Owner integrations and their synced records
 
-**Job: work with an owner's provider integration and its synced records** (Integration vs IntegrationRecord, and the poison pair) — catalog integration.prisma, integrationRecord.prisma, findOwnedIntegration; HOOKS.md § Webhooks, Poisoned Records
+**Job: work with an owner's provider integration and its synced records** (Integration vs IntegrationRecord, and the poison pair) — catalog integration.prisma, integrationRecord.prisma; HOOKS.md § Webhooks, Poisoned Records
 
 *Said as:* "the org connected its CRM", "the records we synced from the provider", "load the integration only if this owner owns it", "the receiver keeps rejecting this record, stop sending it", "I'll find the integration by id in the controller"
 

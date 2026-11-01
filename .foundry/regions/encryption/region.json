@@ -3,18 +3,18 @@
   "title": "Field encryption and key rotation",
   "routing": "Is this about encrypting a field at rest or reading it back: encryptField / decryptField, the ENCRYPTED_MODELS registry (envPrefix, buildAAD), the encrypted{Key} / \u2026Metadata / \u2026KeyVersion columns, createEncryption / encryptionService, the keyring env schema (encryptionEnv), rotating keys (rotateEncryptionKeys, the version-guarded update), validateEncryptionVersions, or the Jwks signing keys under field encryption? Where secret values live per environment (Infisical, env files) is `secrets`.",
   "concepts": ["encryption"],
-  "tokens": 12458,
+  "tokens": 12470,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1794,
+      "tokens": 1807,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12458
+      "tokens": 12470
     }
   },
   "runsAgreed": 0,

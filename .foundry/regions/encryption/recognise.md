@@ -23,7 +23,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - re-encrypt after a key change
 - which fields bind the ciphertext
 - add an encrypted field to a model
-- cookie or bearer token for this login flow
+- every API call carries a bearer: user JWT or API token
 - CI checks the key versions before deploy
 - the low-level encrypt and decrypt service
 - read the stored credential back in plaintext
@@ -61,7 +61,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - put the version in the where clause
 - including the name in the AAD
 - steps to encrypt a new column
-- how does the session travel for OAuth vs password
+- how the JWT travels after OAuth vs password sign-in
 - block the deploy on a bad version bump
 - an encryption service with an explicit keyring
 - decrypt the field so I can call the provider
@@ -94,12 +94,12 @@ A moment that says any of these, or something close, is this region's. Both voic
 - resolve the delegate from a model name without any
 - cross-worker singleton job
 - an id as a plain string
-- automation as a user without a session
+- automation as a user without signing in
 - check what versions the stored rows are on
 - an already-rotated flag on the row
 - old ciphertext became undecryptable after a rename
 - a new per-feature encryption helper
-- CSRF for the cookie flow
+- no cookie, so CSRF is not the risk; XSS on the stored JWT is
 - validate encryption on every deploy
 - build a keyring from process env in the controller
 - build a keyring from env and decrypt by hand

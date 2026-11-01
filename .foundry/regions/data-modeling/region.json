@@ -3,7 +3,7 @@
   "title": "Schema conventions and reference data",
   "routing": "Is this about how the schema is shaped rather than how it is queried: split schema files per model as source of truth, UUIDv7 primary keys, VarChar(36) FKs, createdAt/updatedAt, enum vs row and enum suffix naming, false polymorphism (PolymorphismRegistry, getPolymorphismConfig, resolveFalsePolymorphismRef, ownerModel / sourceModel / targetModel / resourceModel, special owner values default and admin), Tag / TagCategory / TagAttachment, or static reference data: COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONE_IDS and their zod schemas and lookups (countryByCode, decimalsFor, symbolFor, callingCodeFor)?",
   "concepts": ["data-modeling", "reference-data"],
-  "tokens": 13669,
+  "tokens": 13687,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 13669
+      "tokens": 13687
     }
   },
   "runsAgreed": 0,

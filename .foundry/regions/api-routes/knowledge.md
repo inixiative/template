@@ -119,7 +119,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 
-**Job: gate a route on permission** (Route permission gates: validatePermission vs validateOwnerPermission vs validateNotToken vs check) — docs/claude/PERMISSIONS.md § Validation Middleware; docs/claude/API_ROUTES.md § Middleware
+**Job: gate a route on permission** (Route permission gates: validatePermission vs validateSubmodelPermission vs check) — docs/claude/PERMISSIONS.md § Validation Middleware; docs/claude/API_ROUTES.md § Middleware
 
 *Said as:* "only certain users should be able to call this", "which permission check goes on this route", "I'll check the role at the top of the controller", "block API tokens from this endpoint", "narrow the results by what the caller can see"
 

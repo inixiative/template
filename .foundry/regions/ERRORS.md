@@ -44,13 +44,13 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **makeError 401 AUTHENTICATION_FAILED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [auth-middleware-users](auth-middleware-users/knowledge.md) | validateUser, validateActor, validateNotToken, basicAuthMiddleware | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
+| **makeError 401 AUTHENTICATION_FAILED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [auth-middleware-users](auth-middleware-users/knowledge.md) | jwtAuthMiddleware, meResourceMiddleware, refreshUserContext, basicAuthMiddleware | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 
 ## `permission-denied`
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **makeError 403 PERMISSION_DENIED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [permissions-roles](permissions-roles/knowledge.md) | validatePermission, validateNotToken, validateSuperadmin, validateOwnerPermission, Granular create permission via hydrated partial | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
+| **makeError 403 PERMISSION_DENIED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [permissions-roles](permissions-roles/knowledge.md) | validatePermission, validateSubmodelPermission, validateSuperadmin, spoofMiddleware, Granular create permission via hydrated partial | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 
 ## `resource-not-found`
 
@@ -156,7 +156,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
 | **AppError** | `apps/api/src/lib/errors/makeError.ts#AppError` | [request-context-errors](request-context-errors/knowledge.md) | makeError | documented | docs/claude/ERRORS.md § makeError / AppError |
-| **HTTPException** | `hono/http-exception` | [errors](errors/knowledge.md) | Not-found via HTTPException, validateNotToken, validateOwnerPermission *(inferred: validatePermission)* | documented | docs/claude/API_ROUTES.md § Error Responses; docs/claude/PERMISSIONS.md § Validation Middleware |
+| **HTTPException** | `hono/http-exception` | [errors](errors/knowledge.md) | Not-found via HTTPException *(inferred: validatePermission)* | documented | docs/claude/API_ROUTES.md § Error Responses; docs/claude/PERMISSIONS.md § Validation Middleware |
 
 ## `off-request-path`
 

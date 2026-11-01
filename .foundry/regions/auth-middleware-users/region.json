@@ -3,18 +3,18 @@
   "title": "Auth middleware chain and users",
   "routing": "Is this about what happens to a credential once it reaches the API: the middleware order in apps/api/src/routes/api.ts (corsMiddleware, prepareRequest, the routes mounted before auth, jwtAuthMiddleware, tokenAuthMiddleware, spoofMiddleware, auditActorMiddleware, apiRateLimit), setTokenContext, who counts as a user (me(c), meResourceMiddleware, GET /api/v1/identify, the Token actor), basicAuthMiddleware, probes (isAuthProbe, isSystemProbe), spoofing (x-spoof-user-email, spoofedBy, isSuperadminUser), or the User model: findUserByEmail, findUserOrCreateGuest, findUserWithRelations, normalizeEmail, phoneToStubEmail, redactUser / redactSensitiveFields, the me and user modules?",
   "concepts": ["auth-middleware", "users"],
-  "tokens": 9734,
+  "tokens": 9774,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1897,
+      "tokens": 1902,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 9734
+      "tokens": 9774
     }
   },
   "runsAgreed": 0,

@@ -36,7 +36,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - where do I install this dependency
 - authenticate the caller on this route
 - gate the route on a permission
-- a session-only route
+- a person-only route (no tokens)
 - api tokens shouldn't reach this
 - should the batch be all or nothing
 - commit each round separately
@@ -50,7 +50,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - who is calling this request
 - read the current user in a handler
 - impersonate a user
-- cookie or bearer token
+- user JWT or API token
 - get the current user and db in a handler
 - pass the request context around
 - a module variable for the current org
@@ -110,7 +110,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - render an email template to html
 - the schema is split per model
 - which app or package does this belong in
-- accept a session cookie or a bearer token
+- accept a user JWT or an API token
 - I'll commit the staging env
 - I'll jump the key version by two
 - I'll stash the current user on a module singleton
@@ -308,7 +308,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - tilde imports anywhere
 - I'll duplicate the component in web and admin
 - org permissions cascade to spaces
-- one chain for cookies, bearer and url tokens
+- one chain for user JWTs, API tokens and url tokens
 - where should request data live instead
 - the dot-dot-slash import in a source file
 - spec from the route definitions

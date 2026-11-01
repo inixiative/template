@@ -140,7 +140,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 **Job: authenticate and gate a request in the middleware chain** (request-flow middleware named in ARCHITECTURE.md) — docs/claude/ARCHITECTURE.md § Request Flow
 
-*Said as:* "authenticate the caller on this route", "gate the route on a permission", "a session-only route", "api tokens shouldn't reach this"
+*Said as:* "authenticate the caller on this route", "gate the route on a permission", "a person-only route (no tokens)", "api tokens shouldn't reach this"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -215,7 +215,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 **Job: read or establish who the caller is on a request** (request identity) — FEATURES.md › Multi-Strategy Authentication; › Request Context Scoping
 
-*Said as:* "who is calling this request", "read the current user in a handler", "impersonate a user", "cookie or bearer token"
+*Said as:* "who is calling this request", "read the current user in a handler", "impersonate a user", "user JWT or API token"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -283,7 +283,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | each batched request needs its own context; context leaks between batch operations; I'll share one context across the batch; a batched call sees another's user | **Batch context isolation** · pattern FEATURES.md › Architectural Patterns › Context Isolation in Batch API — give each batched request its own AppEnv so context never leaks between operations | part 4 | — |
 | rotate the encryption key without breaking rows; re-encrypt old rows in batches; I'll decrypt and re-encrypt everything in one go; store the key version per field | **Encryption versioning** · pattern FEATURES.md › Architectural Patterns › Encryption Versioning — store key version per encrypted field and re-encrypt older versions in batches | part 4 | — |
 | an org admin should have access in its spaces; I'll copy org owners onto the space rows; resolve permissions at check time, not denormalized; org permissions cascade to spaces | **Hierarchical permission inheritance** · pattern FEATURES.md › Architectural Patterns › Hierarchical Permission Inheritance — Don't denormalize org grants onto space memberships. | part 4 | copying org owners into SpaceUser rows, or querying OrganizationUser beside SpaceUser in a space check, instead of letting space own delegate to organization own (FEATURES.md › Hierarchical Permission Inheritance ("without denormalization"); docs/claude/PERMISSIONS.md § Space Permissions) |
-| accept a session cookie or a bearer token; how does a caller authenticate; I'll write a separate middleware for token callers; one chain for cookies, bearer and url tokens | **Multi-strategy authentication** · pattern FEATURES.md › Architectural Patterns › Multi-Strategy Authentication — Never cookies or sessions; don't branch on auth strategy per route. | part 4 | — |
+| accept a user JWT or an API token; how does a caller authenticate; I'll write a separate middleware for token callers; one chain for user JWTs, API tokens and url tokens | **Multi-strategy authentication** · pattern FEATURES.md › Architectural Patterns › Multi-Strategy Authentication — Never cookies or sessions; don't branch on auth strategy per route. | part 4 | — |
 | only show the nav items the user can use; the menu re-evaluates when they switch org; I'll render the menu and let the route 403; navigation driven by permissions | **Permission-based menu rendering** · pattern FEATURES.md › Architectural Patterns › Permission-Based Menu Rendering — hide nav items the user lacks permission for, re-evaluating on org/space switch | part 4 | — |
 | build a test user with sensible defaults; seed a row for this test; I'll call prisma create directly in the test; use the factory instead of a hand-built fixture; override only the fields the test cares about | **create*/build* factories** · primitive FEATURES.md › Architectural Patterns › Factory Pattern for Test Data — Always over hand-built fixtures; override only test-relevant fields. | part 4 | — |
 | compare the model against the api response; I'll convert the dates to strings by hand; the record shaped like the api returns it; assert against the serialized form | **entity.__serialize** · primitive FEATURES.md › Architectural Patterns › Factory Pattern for Test Data — When asserting against API responses rather than raw entities. | part 4 | mapping Date fields with toISOString() by hand, or casting entities as any, before asserting against API/SDK or store types (docs/claude/TESTING.md § Serialization for API/UI-Shaped Assertions) |

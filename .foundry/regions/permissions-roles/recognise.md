@@ -18,7 +18,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 
 - who is allowed to hit this endpoint
 - require a logged-in user on this route
-- this must be a real session, not a key
+- this must be a person, not an API token
 - can the caller do this to the resource
 - platform admins only
 - the resource could be owned by a user or an org

@@ -3,7 +3,7 @@
   "title": "API errors and status codes",
   "routing": "Is this about how an API request fails: throwing makeError / AppError, the global errorHandlerMiddleware, HTTP_ERROR_MAP and guidance, fieldErrors and the 422 validation envelope (validationDefaultHook on the root app), status codes, Prisma P2002 / P2025 / P2034 and isUniqueConstraintError / isWriteConflictError, raw Error vs makeError, HTTPException (never thrown in apps/api, CI rule no-raw-http-exception), json-rules UsageError, withRetry, or showing an error on the frontend (describeError, handleApiError, formatFieldErrors, ErrorBoundary, RouteError)? What a request carries is `request-context-errors`.",
   "concepts": ["errors"],
-  "tokens": 9302,
+  "tokens": 9291,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 9302
+      "tokens": 9291
     }
   },
   "runsAgreed": 0,
