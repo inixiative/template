@@ -12,7 +12,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { buildToken, buildUser } from '@template/db/test';
+import { buildOrganization, buildOrganizationUser, buildToken, buildUser } from '@template/db/test';
 import { meReadManyTokensQueryKey } from '@template/sdk';
 import { TokensPage } from '@template/ui/pages/TokensPage';
 import { useAppStore } from '@template/ui/store';
@@ -135,5 +135,58 @@ describe('TokensPage', () => {
       ).toEqual(['success']),
     );
     expect(requests.filter((request) => request.method === 'DELETE')).toHaveLength(1);
+  });
+
+  it("in an organization, shows your tokens there and the organization's, each from its own owner", async () => {
+    const { entity: organization } = await buildOrganization();
+    const { entity: membership } = await buildOrganizationUser(
+      { role: 'member' },
+      { organization, user: owner },
+    );
+    const lists: Record<string, StoredToken[]> = {
+      [`/api/v1/organizationUser/${membership.id}/tokens`]: [await serverToken('Mine here')],
+      [`/api/v1/organization/${organization.id}/tokens`]: [await serverToken('Org deploy')],
+    };
+    fetchSpy.mockImplementation(
+      Object.assign(
+        async (input: RequestInfo | URL) => {
+          const request = input as Request;
+          const path = new URL(request.url).pathname;
+          requests.push({ method: request.method, path });
+          const data = lists[path];
+          return data
+            ? Response.json({ data })
+            : Response.json({ message: 'Unexpected request' }, { status: 400 });
+        },
+        { preconnect: fetch.preconnect },
+      ),
+    );
+    const serializedOrganization = organization.__serialize() as unknown as NonNullable<
+      ReturnType<typeof useAppStore.getState>['tenant']['context']['organization']
+    >;
+    useAppStore.setState((state) => ({
+      auth: {
+        ...state.auth,
+        organizationUsers: {
+          [organization.id]: membership.__serialize() as unknown as NonNullable<
+            ReturnType<typeof useAppStore.getState>['auth']['organizationUsers']
+          >[string],
+        },
+      },
+      tenant: {
+        ...state.tenant,
+        context: { type: 'organization', organization: serializedOrganization },
+      },
+    }));
+
+    renderPage();
+
+    const mine = await screen.findByTestId('tokens-member');
+    const theirs = await screen.findByTestId('tokens-tenant');
+    await waitFor(() => expect(mine.textContent).toContain('Mine here'));
+    await waitFor(() => expect(theirs.textContent).toContain('Org deploy'));
+    expect(mine.textContent).not.toContain('Org deploy');
+    expect(theirs.textContent).not.toContain('Mine here');
+    expect(requests.map((request) => request.path).sort()).toEqual(Object.keys(lists).sort());
   });
 });

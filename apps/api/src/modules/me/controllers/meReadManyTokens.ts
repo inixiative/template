@@ -4,32 +4,19 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:auth
  */
-
-import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
+import { submodelOwnerWhere } from '#/lib/prisma/submodelOwnerWhere';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManyTokensRoute } from '#/modules/me/routes/meReadManyTokens';
 
 export const meReadManyTokensController = makeController(
   meReadManyTokensRoute,
   async (c, respond) => {
-    const user = me(c)!;
     const db = c.get('db');
-
     const { data, pagination } = await paginate(c, db.token, {
-      where: {
-        userId: user.id,
-        ownerModel: { in: ['User', 'OrganizationUser', 'SpaceUser'] },
-      },
-      include: {
-        organization: true,
-        organizationUser: true,
-        space: true,
-        spaceUser: true,
-      },
+      where: submodelOwnerWhere(c),
       omit: { keyHash: true },
     });
-
     return respond.ok(data, { pagination });
   },
 );

@@ -442,7 +442,7 @@ describe('validateSubmodelPermission on a route with no submodel is a configurat
       get: (key: string) => (key === 'routeConfig' ? route : undefined),
     } as unknown as Parameters<ReturnType<typeof validateSubmodelPermission>>[0];
     await expect(validateSubmodelPermission('read')(context, async () => {})).rejects.toThrow(
-      'validateSubmodelPermission needs a route with a model submodel',
+      'placeSubmodel needs a route with a model submodel',
     );
   });
 });

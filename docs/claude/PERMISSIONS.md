@@ -750,18 +750,31 @@ A route on a submodel (a create or a collection under an owner: `/organization/:
 
 ```typescript
 // apps/api/src/middleware/validations/validateSubmodelPermission.ts
-const [placed] = placeUnder(schemaMap, `db:${submodel}`, ownerType, `db:${ownerType}`, owner, {
-  ownerModel: toModelName(ownerType),
-});
+const { submodel, placed } = placeSubmodel(c);
 const pseudo = await hydrate(submodel, { id: '', ...placed });
 check(permix, rebacSchema, submodel, pseudo, action);
 ```
 
-- `placeUnder` (the library's, re-exported from `@template/permissions/rebac`) builds the pseudo record along the owner's relation: the owner keys, the owner attached, the kind narrowed to the owner's model; `id: ''` never matches a grant keyed by a real row.
+- `placeSubmodel` (`apps/api/src/lib/permissions/placeSubmodel.ts`) calls `placeUnder` (the library's, re-exported from `@template/permissions/rebac`), which builds the pseudo record along the owner's relation: the owner keys, the owner attached, the kind narrowed to the owner's model; `id: ''` never matches a grant keyed by a real row.
 - It never reads the request body. Checks that depend on the body (a token's role or `full`, an integration's role, an inquiry's `send`) stay in their services.
 - Using it on a route with no submodel throws on each request to that route (`validateSubmodelPermission.test.ts`).
 
 Routes that still check an action on the owner (`validatePermission` on spaces, members, inquiries, customer refs, segments) are not migrated yet.
+
+### Lists under an owner
+
+A model with a five-way owner (`User`, `OrganizationUser`, `Organization`, `Space`, `SpaceUser`; a token also has `Integration`) gets one list per owner kind: `/me/tokens`, `/organizationUser/:id/tokens`, `/organization/:id/tokens`, `/space/:id/tokens`, `/spaceUser/:id/tokens`, `/integration/:id/tokens`. Each returns exactly that owner's rows: an organization's list holds no member's rows, and `/me` holds none of the user's memberships'.
+
+The controller filters with `submodelOwnerWhere(c)` (`apps/api/src/lib/prisma/submodelOwnerWhere.ts`): the owner keys and kind of the same placement the route's `validateSubmodelPermission('read')` checked. One check on the owner covers every row the list returns, and the two can't drift apart.
+
+```typescript
+const { data, pagination } = await paginate(c, db.token, {
+  where: submodelOwnerWhere(c),
+  omit: { keyHash: true },
+});
+```
+
+A member's list is read by the member and by the organization's owner, never by an admin or another member (`memberOwnedLists.test.ts`). In the UI, an organization or space page shows two lists: yours there (the membership's) and the tenant's (`tokenContextQueries` / `integrationContextQueries` with `{ member: true }`).
 
 ### The user as a resource
 
