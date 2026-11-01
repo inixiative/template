@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { db, isHardDeletedOnTombstone } from '@template/db';
+import { db, isHardDeletedOnTombstone, isSkippedOnRevive } from '@template/db';
 import { uniq } from 'lodash-es';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
 import { REGENERATE_ON_REVIVE } from '#/hooks/softDeleteCascade/regenerateOnRevive';
@@ -68,6 +68,7 @@ export const reviveChildren = async (model: string, rows: Row[], priorDeletedAt:
       await REGENERATE_ON_REVIVE[child.model]?.(model, rows);
       continue;
     }
+    if (isSkippedOnRevive(child.model)) continue;
     const where = fkWhere(child, rows);
     if (!child.hasDeletedAt || !where) continue;
     await db.delegate(child.model).updateManyAndReturn({
