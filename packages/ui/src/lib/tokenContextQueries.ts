@@ -36,9 +36,9 @@ const deleteToken = mutation({
   mutationFn: apiMutation((opts: Parameters<typeof tokenDelete>[0]) => tokenDelete(opts)),
 });
 
-const ownerQueries = (
+const ownerQueries = <ReadManyResult extends ReturnType<typeof organizationReadManyTokens>>(
   queryKey: readonly unknown[],
-  readMany: (opts: ReadManyOptions) => ReturnType<typeof meReadManyTokens>,
+  readMany: (opts: ReadManyOptions) => ReadManyResult,
   create: (opts: CreateOptions) => ReturnType<typeof meCreateToken>,
 ) => ({
   readMany: query({ queryKey, queryFn: apiQuery(readMany) }),

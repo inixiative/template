@@ -5,6 +5,9 @@ import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createOrganization,
+  createOrganizationUser,
+  createSpace,
+  createSpaceUser,
   createToken,
   createUser,
 } from '@template/db/test';
@@ -79,7 +82,47 @@ describe('GET /me/tokens', () => {
     const { data } = await json<ReadManyTokensResponse>(response);
 
     expect(response.status).toBe(200);
-    expect(data.every((t) => t.ownerModel === 'User')).toBe(true);
+    expect(data.some((t) => t.name === 'Org Token')).toBe(false);
+  });
+
+  it("returns the user's membership tokens, each carrying the org and space it belongs to", async () => {
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role: 'member' },
+      { user, organization: org },
+    );
+    const { entity: space } = await createSpace({}, { organization: org });
+    const { entity: spaceUser } = await createSpaceUser(
+      { role: 'member' },
+      { user, organization: org, organizationUser, space },
+    );
+    await createToken(
+      { name: 'Membership Token', ownerModel: TokenOwnerModel.OrganizationUser },
+      { organizationUser, organization: org },
+    );
+    await createToken(
+      { name: 'Space Membership Token', ownerModel: TokenOwnerModel.SpaceUser },
+      { spaceUser, space, organization: org },
+    );
+
+    const response = await fetch(get('/api/v1/me/tokens'));
+    const { data } = await json<ReadManyTokensResponse>(response);
+
+    expect(response.status).toBe(200);
+    const byName = Object.fromEntries(data.map((t) => [t.name, t]));
+    expect(byName['Membership Token']).toMatchObject({
+      ownerModel: 'OrganizationUser',
+      organization: { id: org.id },
+      organizationUser: { id: organizationUser.id },
+      space: null,
+      spaceUser: null,
+    });
+    expect(byName['Space Membership Token']).toMatchObject({
+      ownerModel: 'SpaceUser',
+      organization: { id: org.id },
+      space: { id: space.id },
+      spaceUser: { id: spaceUser.id },
+    });
+    expect(byName['User Token']).toMatchObject({ organization: null, space: null });
   });
 
   it('omits keyHash from response', async () => {

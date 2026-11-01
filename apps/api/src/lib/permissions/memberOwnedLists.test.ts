@@ -157,10 +157,55 @@ describe("a tenant's list holds the tenant's own rows, never its members'", () =
     expect(tokens.every((row) => row.ownerModel === 'Space')).toBe(true);
   });
 
-  it("/me lists only the user's own tokens, not their memberships'", async () => {
-    const tokens = (await list(callers.member, '/me/tokens')) as Row[];
-    expect(tokens.every((row) => row.ownerModel === 'User')).toBe(true);
+  it("/me lists every token that is the user's: their memberships' too, never the tenant's", async () => {
+    const ids = ((await list(callers.member, '/me/tokens')) as Row[]).map((row) => row.id);
+    expect(ids).toContain(rows.memberToken);
+    expect(ids).toContain(rows.spaceMemberToken);
+    expect(ids).not.toContain(rows.organizationToken);
   });
+});
+
+describe('an organization member connects an integration as themselves', () => {
+  const create = (headers: Headers) =>
+    app.request(`/api/v1/organizationUser/${member.id}/integrations`, {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Mine in the organization', provider: null, role: 'viewer' }),
+    });
+
+  it('the member creates it under their membership', async () => {
+    const response = await create(callers.member);
+    expect(response.status).toBe(201);
+    const { data } = (await response.json()) as { data: Row & { userId: string } };
+    expect(data).toMatchObject({ ownerModel: 'OrganizationUser', userId: member.userId });
+  });
+
+  it('an organization admin and another member cannot create one for them', async () => {
+    expect((await create(callers['organization admin'])).status).toBe(403);
+    expect((await create(callers.anotherMember)).status).toBe(403);
+  });
+});
+
+describe('a member mints tokens as themselves', () => {
+  for (const [label, path] of [
+    ['organization member', () => `/organizationUser/${member.id}/tokens`],
+    ['space member', () => `/spaceUser/${spaceMember.id}/tokens`],
+  ] as const) {
+    it(`${label}: the member mints one; an admin, another member and an outsider can't`, async () => {
+      const mint = async (headers: Headers) =>
+        (
+          await app.request(`/api/v1${path()}`, {
+            method: 'POST',
+            headers: { ...headers, 'content-type': 'application/json' },
+            body: JSON.stringify({ name: 'Mine', role: 'viewer' }),
+          })
+        ).status;
+      expect(await mint(callers.member)).toBe(201);
+      expect(await mint(callers['organization admin'])).toBe(403);
+      expect(await mint(callers.anotherMember)).toBe(403);
+      expect(await mint(callers.outsider)).toBe(403);
+    });
+  }
 });
 
 describe('a space member connects an integration as themselves', () => {

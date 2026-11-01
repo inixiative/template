@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import { Icon } from '@iconify/react';
-import type { MeCreateTokenData, MeReadManyTokensResponse } from '@template/sdk';
+import type { MeCreateTokenData, OrganizationReadManyTokensResponse } from '@template/sdk';
 import {
   Button,
   Card,
@@ -29,7 +29,7 @@ import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { useState } from 'react';
 
-type Token = MeReadManyTokensResponse['data'][number];
+type Token = OrganizationReadManyTokensResponse['data'][number];
 type CreatedToken = Token & { key: string };
 
 type TokenSectionProps = {
