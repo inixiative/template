@@ -38,7 +38,9 @@ model EmailTemplate {
   inheritToSpaces Boolean @default(true)
 
   organization         Organization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  space                Space?             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  organizationUser     OrganizationUser?  @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  space                Space?             @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
+  spaceUser            SpaceUser?         @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
   user                 User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs            AuditLog[]
   communicationLogs    CommunicationLog[]

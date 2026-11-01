@@ -14,15 +14,17 @@ model OrganizationUser {
   entitlements Json?
 
   // Relations
-  organizationId     String        @db.VarChar(36)
-  userId             String        @db.VarChar(36)
-  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId     String           @db.VarChar(36)
+  userId             String           @db.VarChar(36)
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   spaceUsers         SpaceUser[]
   tokens             Token[]
   integrations       Integration[]
   projects           Project[]
-  auditLogsAsSubject AuditLog[]    @relation("AuditLogSubjectOrganizationUser")
+  emailTemplates     EmailTemplate[]
+  emailComponents    EmailComponent[]
+  auditLogsAsSubject AuditLog[]       @relation("AuditLogSubjectOrganizationUser")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
