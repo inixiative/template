@@ -31,7 +31,7 @@ Admin job-monitoring dashboard at /admin/queues.
 Collects a new org's name and an auto-derived, uniqueness-checked slug.
 
 **Four-Context Architecture**  
-User, Organization, Space and Public contexts, each with its own navigation, routes and permissions-roles / permissions-rebac.
+User, Organization, Space and Public contexts, each with its own navigation, routes and permissions.
 
 **Hierarchical Tokens**  
 Tokens scoped to User (cross-org), Organization (all spaces) or Space (one space).

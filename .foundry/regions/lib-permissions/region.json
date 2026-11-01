@@ -1,20 +1,20 @@
 {
   "id": "lib-permissions",
   "title": "Permissions library (ReBAC engine)",
-  "routing": "Is this about the @inixiative/permissions-roles / permissions-rebac library itself: ActionRule algebra (string delegation, { rel, action } walks, { self }, abac { rule }, any/all, null), RebacSchema and bridges, createRebacCheck / check, createPermissions / permix (setup, setUserId, PermixLike), createHydrator and the injected relation resolver, permissionRules row overrides, or actionRuleSchema validation?",
+  "routing": "Is this about the @inixiative/permissions library itself: ActionRule algebra (string delegation, { rel, action } walks, abac { rule } over the record and __actor, any/all, null), RebacSchema and bridges, createRebacCheck / check, createPermissions / permix (setup, setActor, PermixLike), createHydrator and the injected relation resolver, permissionRules row overrides, or validateActionRule?",
   "concepts": ["lib-permissions"],
-  "tokens": 17392,
+  "tokens": 17348,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1005,
+      "tokens": 998,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 17392
+      "tokens": 17348
     }
   },
   "runsAgreed": 0,

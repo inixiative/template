@@ -3,7 +3,7 @@
   "title": "App events and webhooks",
   "routing": "Is this about a side effect leaving a business write (emitAppEvent, makeAppEvent, AppEventName, the handlers index, email/WebSocket handoffs, cb callbacks, streamAppend, observeRegistry, AppEvent rows, db.onCommit deferral, db.parallel allSettled) or outbound webhooks (WebhookSubscription, WebhookEvent, sendWebhook, the webhookDelivery hook, webhookEnabledModels, webhookRelatedModels, webhookOwnerAllowedModels, x-webhook-signature, validateWebhookUrl, webhookUrlSchema, circuit breaker, HOOK_IGNORE_FIELDS)?",
   "concepts": ["app-events", "webhooks"],
-  "tokens": 17056,
+  "tokens": 17051,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 17056
+      "tokens": 17051
     }
   },
   "runsAgreed": 1,

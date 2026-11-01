@@ -1,20 +1,20 @@
 {
   "id": "errors",
-  "title": "Request context and errors (errors)",
-  "routing": "Is this about what a live API request carries or how it fails: reading identity, tenant, resource or validated input from the Hono context (AppEnv, c.get('user'|'db'|'requestId'|'bracketQuery'), getActor, getResource, getValidatedBody/getValidatedQuery, setUserContext, refreshUserContext, resourceContextMiddleware, resourceContextArgs, ?lookup=, prepareRequest, db.scope / db.getScopeId, clientIp/clientAddress), or throwing and mapping an API error (makeError, AppError, errorHandlerMiddleware, HTTP_ERROR_MAP, guidance, fieldErrors, status codes, Prisma P2002/P2025/P2034, isUniqueConstraintError, isWriteConflictError, raw Error vs makeError, frontend describeError/handleApiError/RouteError)?",
+  "title": "API errors and status codes",
+  "routing": "Is this about how an API request fails: throwing makeError / AppError, the global errorHandlerMiddleware, HTTP_ERROR_MAP and guidance, fieldErrors and the 422 validation envelope (validationDefaultHook on the root app), status codes, Prisma P2002 / P2025 / P2034 and isUniqueConstraintError / isWriteConflictError, raw Error vs makeError, HTTPException (never thrown in apps/api, CI rule no-raw-http-exception), json-rules UsageError, withRetry, or showing an error on the frontend (describeError, handleApiError, formatFieldErrors, ErrorBoundary, RouteError)? What a request carries is `request-context-errors`.",
   "concepts": ["errors"],
-  "tokens": 9910,
+  "tokens": 9302,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1472,
+      "tokens": 1469,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 9910
+      "tokens": 9302
     }
   },
   "runsAgreed": 0,
@@ -41,5 +41,5 @@
     "docMembers": 17
   },
   "bypassLines": 22,
-  "glossaryTerms": 25
+  "glossaryTerms": 16
 }

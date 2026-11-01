@@ -1,20 +1,20 @@
 {
   "id": "encryption",
-  "title": "Encryption and secrets (encryption)",
-  "routing": "Is this about a secret: encrypting a field at rest or reading it back (encryptField / decryptField, the ENCRYPTED_MODELS registry, encrypted{Key} / \u2026Metadata / \u2026KeyVersion columns, buildAAD), an encryption keyring ({PREFIX}_ENCRYPTION_VERSION / _KEY_CURRENT / _KEY_PREVIOUS) in any environment including test and CI, rotating or cycling keys (rotateEncryptionKeys, validateEncryptionVersions), storing a provider credential, or where secret env vars live and how they get in (Infisical, with-env, .env.local / .env.test, adding an env var)?",
+  "title": "Field encryption and key rotation",
+  "routing": "Is this about encrypting a field at rest or reading it back: encryptField / decryptField, the ENCRYPTED_MODELS registry (envPrefix, buildAAD), the encrypted{Key} / \u2026Metadata / \u2026KeyVersion columns, createEncryption / encryptionService, the keyring env schema (encryptionEnv), rotating keys (rotateEncryptionKeys, the version-guarded update), validateEncryptionVersions, or the Jwks signing keys under field encryption? Where secret values live per environment (Infisical, env files) is `secrets`.",
   "concepts": ["encryption"],
-  "tokens": 13289,
+  "tokens": 12458,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1821,
+      "tokens": 1794,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 13289
+      "tokens": 12458
     }
   },
   "runsAgreed": 0,
@@ -50,5 +50,5 @@
     "docMembers": 35
   },
   "bypassLines": 25,
-  "glossaryTerms": 30
+  "glossaryTerms": 20
 }

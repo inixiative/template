@@ -1,9 +1,9 @@
 {
   "id": "api-routes",
   "title": "API routes, controllers and modules",
-  "routing": "Is this about adding or shaping an endpoint: route templates (readRoute, createRoute, updateRoute, deleteRoute, actionRoute) and their args (model, submodel, action, many, paginate, admin, sanitizeKeys, filterLens, middleware), makeController and respond.ok / respond.created / respond.noContent, the { data } envelope, operationId naming, router exports and mounting, or where code goes inside an API module (routes/, controllers/, services/, handlers/, permissions-roles / permissions-rebac/, validations/, MODULES.md)?",
+  "routing": "Is this about adding or shaping an endpoint: route templates (readRoute, createRoute, updateRoute, deleteRoute, actionRoute) and their args (model, submodel, action, many, paginate, admin, sanitizeKeys, filterLens, middleware), makeController and respond.ok / respond.created / respond.noContent, the { data } envelope, operationId naming, router exports and mounting, or where code goes inside an API module (routes/, controllers/, services/, handlers/, permissions/, validations/, MODULES.md)?",
   "concepts": ["route-templates", "api-modules"],
-  "tokens": 17843,
+  "tokens": 17830,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 17843
+      "tokens": 17830
     }
   },
   "runsAgreed": 1,

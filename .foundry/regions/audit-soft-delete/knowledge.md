@@ -82,7 +82,7 @@ Audit log (HOOKS.md § Audit Log): `AUDIT_ENABLED_MODELS` (`isAuditEnabled`) tur
 
 Soft delete: `SOFT_DELETE_MODELS` (`isSoftDeleteModel`, `hasDeletedAt`) have a `deletedAt` column. `softDeleteScopeExtension` injects `deletedAt: null` into every read and write where and nested include (`liveWhere`, `liveIncludes`), so nobody hand-writes it ("No hand-written deletedAt: null"), and `db.withDeleted(() => …)` is the single bypass, awaited inside the callback and chosen by the endpoint (`includeDeletedMiddleware`, the admin router), never by who the caller is. The `softDeleteCascade` hook (`registerSoftDeleteCascadeHook`, `tombstoneChildren`) tombstones owned children with a shared timestamp that `revive` / `reviveChildren` match, hard-deletes the `HARD_DELETE_ON_TOMBSTONE` models (`isHardDeletedOnTombstone`), skips `CASCADE_EXEMPT` relations and regenerates `REGENERATE_ON_REVIVE` values. Revival of a soft-deleted row goes through `db.findForUpdate`, not a create-path upsert.
 
-Not here: `registerDbHook`, `mutationLifeCycle`, rules, immutable fields and ordered lists are `mutation-hooks`; `db.txn` and `db.findForUpdate` are `database-client`; the request-side actor (sessions, tokens, spoofing) is `auth-middleware-users`; Signet and Segment delete lifecycle rules are stated in the org CLAUDE.md.
+Not here: `registerDbHook`, `mutationLifeCycle`, rules, immutable fields and ordered lists are `mutation-hooks`; `db.txn` and `db.findForUpdate` are `database-client`; the request-side actor (user JWTs, tokens, spoofing) is `auth-middleware-users`; Signet and Segment delete lifecycle rules are stated in the org CLAUDE.md.
 
 ## 2b. Under construction
 

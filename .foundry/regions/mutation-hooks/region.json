@@ -1,9 +1,9 @@
 {
   "id": "mutation-hooks",
   "title": "Mutation hooks, immutable fields, ordered lists",
-  "routing": "Is this about what runs around a db write: the mutationLifeCycle extension, registerDbHook / registerHooks, before and after hooks, previous and shadowMerge, writtenPatches, isNoOpUpdate / NOOP_FIELDS / HOOK_IGNORE_FIELDS, the RulesRegistry (getRule, rules, contactRules, segmentConditions), createManyAndReturn / updateManyAndReturn instead of createMany / updateMany, no-select-on-mutations, db.raw to skip hooks, immutable fields (GLOBAL_IMMUTABLE_FIELDS, getImmutableFields, ImmutableFieldsOverrides, FK fields auto-immutable), or ordered lists (orderedListRegistry, orderedList hook, buildScope, nextSortOrderRaw, bulkAssignAppend / bulkAssignNegatives)?",
+  "routing": "Is this about what runs around a db write: the mutationLifeCycle extension, registerDbHook / registerHooks, before and after hooks, previous and shadowMerge, writeData, isNoOpUpdate / NOOP_FIELDS / HOOK_IGNORE_FIELDS, the RulesRegistry (getRule, rules, contactRules, segmentConditions), createManyAndReturn / updateManyAndReturn instead of createMany / updateMany, no-select-on-mutations, db.raw to skip hooks, immutable fields (GLOBAL_IMMUTABLE_FIELDS, getImmutableFields, ImmutableFieldsOverrides, FK fields auto-immutable), or ordered lists (orderedListRegistry, orderedList hook, buildScope, nextSortOrderRaw, bulkAssignAppend / bulkAssignNegatives)?",
   "concepts": ["mutation-hooks", "immutable-fields", "ordered-lists"],
-  "tokens": 17987,
+  "tokens": 17995,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 17987
+      "tokens": 17995
     }
   },
   "runsAgreed": 0,

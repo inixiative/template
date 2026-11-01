@@ -31,7 +31,7 @@ Bun's test runner; from apps/api it injects .env.test via with-env; root bun run
 Recorded, sanitized provider response keyed by call and version; status >= 400 replays as a thrown error.
 
 **createBearerToken**  
-Mints an API token for a test request that should authenticate as a token rather than a session.
+Mints a User-owned API token for a test request and returns its Bearer header; createUserJwt mints a user JWT instead.
 
 **createTestApp**  
 Builds the API app for route tests with mockUser, mockOrganizationUsers, mockSpaceUsers and mount; returns fetch and db.
@@ -129,7 +129,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
 | clear leftover jobs from the queue after the tests; the queue still has jobs from the last run; I'll obliterate the queue in afterAll | **cleanupTestJobs** · primitive `apps/api/src/jobs/cleanupTestJobs.ts#cleanupTestJobs` — remove leftover jobs in every state from the queue after tests | — | — |
-| authenticate a test request with a real token; I'll insert a token row and sign the header myself; get an Authorization header for this test user | **createBearerToken** · primitive `apps/api/tests/utils/createBearerToken.ts#createBearerToken` — Non-user owners or custom token data: createKeyedToken instead. | — | hand-inserting a session or token row and signing an Authorization header in a test (catalog entry createBearerToken) |
+| authenticate a test request with a real token; I'll insert a token row and sign the header myself; get an Authorization header for this test user | **createBearerToken** · primitive `apps/api/tests/utils/createBearerToken.ts#createBearerToken` — Non-user owners or custom token data: createKeyedToken instead. | — | hand-inserting a token row or hand-signing a JWT and building an Authorization header in a test (catalog entry createBearerToken; createUserJwt for a user JWT) |
 | build a request with a custom method or headers; a plain delete without a body; the low-level request builder behind the shorthand helpers | **createRequest** · primitive `apps/api/tests/utils/request.ts#createRequest` — Plain DELETE: del shorthand instead. | — | — |
 | spin up the API in a test and hit a route; test this endpoint as a logged-in org admin; I'll build a Hono app by hand and stub the auth middleware; start a real server in the test and call it with fetch; run the test under the standard harness, not against the bare database; mount the module and make requests as a mock user | **createTestApp** · primitive `apps/api/tests/createTestApp.ts#createTestApp` — Always instead of new OpenAPIHono/new Hono in tests; CI fails otherwise. | docs/claude/TESTING.md § Test Structure; docs/claude/TESTING.md § Test App | constructing a Hono/OpenAPIHono app by hand in a test, stubbing auth middleware, or starting a real server and calling it with fetch (docs/claude/TESTING.md § Test App; § Test Structure) |
 | test the websocket handler; open a fake socket connection in a test and send frames; check what a subscriber receives when the event fires; I'll connect a real WebSocket client to a test server | **createTestSocket** · primitive `apps/api/tests/createTestSocket.ts#createTestSocket` — Socket handler tests: createTestSocket; HTTP route tests: createTestApp instead. | — | — |

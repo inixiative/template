@@ -4,7 +4,7 @@
 
 ## What this region is
 
-The @inixiative/permissions-roles / permissions-rebac library: a generic rebac / abac / rbac core made of a small permix grant wrapper and a relationship-walking check engine over json-rules, with the relation resolver injected and record hydration left to the app.
+The @inixiative/permissions library: a generic rebac / abac / rbac core made of a small permix grant wrapper and a relationship-walking check engine over json-rules, with the relation resolver injected and record hydration left to the app.
 
 ## What it exists for
 

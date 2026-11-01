@@ -112,8 +112,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 
 These mention this region's words but belong elsewhere; the answer is no, and the region named answers instead.
 
-- Who is allowed to hit this endpoint → permissions-roles
 - Which table holds the membership → tenancy
 - How do I get the user, resource or body in the handler → request-context-errors
 - Add an endpoint for this model → api-routes
 - Hook the new route up so it's served → api-schemas-openapi
+- Page the results of this list → pagination

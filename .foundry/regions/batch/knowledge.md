@@ -33,7 +33,7 @@ Class: the Batch API: rounds, execution strategies, interpolation, status tracki
 The const object of strategies from which BatchExecutionStrategy and batchExecutionStrategyEnum are derived.
 
 **Deep clone mutable batch context**  
-Each sub-request gets structuredClone copies of user, session, memberships and token; only read-only values like app are shared.
+Each sub-request gets structuredClone copies of user, organizationUsers, organizations, spaceUsers, spaces, token and spoofedBy; only read-only values like app are shared.
 
 **executeBatch**  
 Runs a batch request's rounds under its strategy and returns results.
@@ -54,7 +54,7 @@ The Batch API endpoint: { strategy, requests: rounds[][], headers? } answered 20
 Reads every page of a list endpoint in-process as the caller, capped by pages.
 
 **readAsCaller**  
-Reads one API path in-process with the caller's session, permissions-roles / permissions-rebac and tenancy.
+Reads one API path in-process with the caller's identity, permissions and tenancy.
 
 **registerBatch / unregisterBatch**  
 Put a batch's db and base context in the in-memory registry, and remove it when the batch ends.
@@ -85,7 +85,7 @@ The Batch API: one HTTP call that replays ordered rounds of ordinary API request
 
 POST /api/v1/batch/execute takes { strategy, requests: rounds[][], headers? }. Requests in a round run in parallel; rounds run in order, so a later round can interpolate <<roundIndex.requestIndex.path>> from an earlier round's response into its path, body or headers (never the current or a future round, no nesting). Limits: 10 rounds, 50 requests per round, 100 in total; relative paths only; a sub-request carrying X-Batch-Id (a nested batch) is rejected. The timeout is 10s plus 2s per request, enforced over the whole batch only by the transaction strategies. The response is always 200 with per-request results and summary.status success, partialSuccess or failed; 400 is only for an invalid or nested batch and 500 for an unexpected server error.
 
-Pick the strategy by failure semantics: transactionAll when everything must commit or roll back together; transactionPerRound when each round is atomic and earlier rounds may stay committed; allowFailures to attempt everything with each request committing on its own; failOnRound to stop after the first round with a failure, without rollback. Each strategy is a StrategyExecutor listed in BatchExecutionStrategies (constants.ts), which also derives the type and zod enum. Internally, registerBatch puts the db and the caller's base context in an in-memory registry; prepareRequest sees X-Batch-Id, skips re-authentication and deep-clones the mutable context (user, organizationUsers, spaces, token, …) into each sub-request with a fresh permix. readAsCaller and readAllAsCaller reuse that machinery to read one API path, or every page of a list (through fetchAllPages, capped), with the caller's session, permissions-roles / permissions-rebac, tenancy and rate-limit exemption; Flows read their steps this way. The registry is in memory, so it does not span several server instances.
+Pick the strategy by failure semantics: transactionAll when everything must commit or roll back together; transactionPerRound when each round is atomic and earlier rounds may stay committed; allowFailures to attempt everything with each request committing on its own; failOnRound to stop after the first round with a failure, without rollback. Each strategy is a StrategyExecutor listed in BatchExecutionStrategies (constants.ts), which also derives the type and zod enum. Internally, registerBatch puts the db and the caller's base context in an in-memory registry; prepareRequest sees X-Batch-Id, skips re-authentication and deep-clones the mutable context (user, organizationUsers, spaces, token, …) into each sub-request with a fresh permix. readAsCaller and readAllAsCaller reuse that machinery to read one API path, or every page of a list (through fetchAllPages, capped), with the caller's identity, permissions, tenancy and rate-limit exemption; Flows read their steps this way. The registry is in memory, so it does not span several server instances.
 
 Related regions: the per-request context that sub-requests clone and the general 200-vs-4xx status rules are `request-context-errors`; the endpoints being batched are `api-routes / api-schemas-openapi`; fetchAllPages and list pagination are `filtering-search / pagination`; Flows, the main in-process user of readAllAsCaller, are `flows`; db.txn and the transaction client are `database-client / data-modeling`; bounded in-process concurrency (resolveAll) is `concurrency-locks`.
 

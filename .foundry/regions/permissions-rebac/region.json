@@ -1,9 +1,9 @@
 {
   "id": "permissions-rebac",
   "title": "ReBAC, owner-polymorphic and row permissions",
-  "routing": "Is this about permission decisions that depend on relationships or rows rather than a role tier: rebacSchema and ActionRule (a string inherits an action, { rel, action } delegates along a relation, dot-path delegation, { self }, { rule }, any / all, null), the @inixiative/permissions-roles / permissions-rebac check engine (createPermissions, createRebacCheck, check, createHydrator and hydrating the ownership closure, actionRuleSchema, PermixLike, typed resource union, bridges), owner-polymorphic models (ownerActions, polymorphicIs / polymorphicBindings, validateOwnerPermission), row-level permissionRules that only widen (buildPermissionRulesSchema, read only), space permissions-roles / permissions-rebac delegating to organization (SpaceUser requires OrganizationUser), or inquiry send / resolve rules per type?",
+  "routing": "Is this about permission decisions that depend on relationships or rows rather than a role tier: rebacSchema and ActionRule (a string inherits an action, { rel, action } delegates along a relation, dot-path delegation, { rule } over the record and __actor, any / all, null), the @inixiative/permissions check engine (createPermissions, createRebacCheck, check, createHydrator and hydrating the ownership closure, actionRuleSchema, PermixLike, typed resource union, bridges), owner-polymorphic models (ownerActions, polymorphicIs / polymorphicBindings), row-level permissionRules that only widen (buildPermissionRulesSchema, read only), space permissions delegating to organization (SpaceUser requires OrganizationUser), or inquiry send / resolve rules per type?",
   "concepts": ["permissions-rebac"],
-  "tokens": 17801,
+  "tokens": 17728,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 17801
+      "tokens": 17728
     }
   },
   "runsAgreed": 0,
@@ -47,5 +47,5 @@
     "docMembers": 41
   },
   "bypassLines": 24,
-  "glossaryTerms": 13
+  "glossaryTerms": 12
 }

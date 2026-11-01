@@ -3,7 +3,7 @@
   "title": "Transitions library (lifecycle guards)",
   "routing": "Is this about the @inixiative/transitions library: guarding a status or lifecycle change with checkTransition / checkPath, listing allowed actions with available, querying every eligible record with eligible + executePrismaPlan, an Action / Transition / Side with from/to predicates and per-side permission, createAuthorize, merge strategies (spread, deepMerge, append), Reason / describe, or validateTransition for tenant-configured lifecycles?",
   "concepts": ["lib-transitions"],
-  "tokens": 5100,
+  "tokens": 5061,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 5100
+      "tokens": 5061
     }
   },
   "runsAgreed": 0,

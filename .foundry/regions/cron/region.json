@@ -1,20 +1,20 @@
 {
   "id": "cron",
-  "title": "Background jobs and cron (cron)",
-  "routing": "Is this about running work outside the request: defining, registering, enqueuing or scheduling a background job? Signals: makeJob / makeSingletonJob / makeSupersedingJob, enqueueJob, ctx.enqueueChildJob or job stages, handlers/index.ts registration, WorkerContext / ctx.log, job ids, the BullMQ queue / Worker / processJob, BullBoard, CronJob rows, cron patterns, registerCronJobs / cronJobSync / removeRepeatable, admin job or cron trigger routes, cleanStaleData / archiveStaleRecords, or a fire-and-forget promise, setTimeout or node-cron schedule standing in for a job. (Fast/slow lanes and the JobOutbox overflow buffer are job-lanes-outbox.)",
+  "title": "Cron jobs and schedulers",
+  "routing": "Is this about recurring work stored as a CronJob row: its UTC pattern, handler, payload, enabled flag and retries, the BullMQ job scheduler behind it (upsertCronJobScheduler, syncCronJobScheduler, the cronJobSync hook, registerCronJobs at worker start, never the repeatable API), a tick handing off to a cronTrigger run (enqueueCronRun), validateCronJob, the admin cron routes and manual trigger (triggerCronJob, POST /api/admin/cronJob/:id/trigger), the seeded system cron rows, or retention handlers (cleanStaleData, archiveStaleRecords)? Defining and enqueuing jobs in general is `jobs-cron`.",
   "concepts": ["cron"],
-  "tokens": 8401,
+  "tokens": 8045,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1015,
+      "tokens": 999,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 8401
+      "tokens": 8045
     }
   },
   "runsAgreed": 0,
@@ -33,5 +33,5 @@
     "docMembers": 22
   },
   "bypassLines": 14,
-  "glossaryTerms": 26
+  "glossaryTerms": 16
 }

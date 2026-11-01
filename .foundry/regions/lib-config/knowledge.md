@@ -64,7 +64,7 @@ Registry of per-project port blocks: service default + 100 x block, reserved por
 A shared config export (tsconfig base/node/react, biome base/react, tsup node/react, lefthook base) a repo extends.
 
 **primitives lane**  
-json-rules, permissions-roles / permissions-rebac, transitions, rules-builder, prisma-map, atlas, gloss.
+json-rules, permissions, transitions, rules-builder, prisma-map, atlas, gloss.
 
 **react**  
 tsup preset for React/UI packages: `export default react({ entry })`.
@@ -99,7 +99,7 @@ The @inixiative/config package: the inixiative ecosystem's shared toolchain (tsc
 
 ## 2. The domain
 
-Presets are adopted through stub files that hold only `extends` plus minimal reviewed overrides: tsconfig (base for bun libraries, node adds node types, react adds DOM and JSX), biome (base, plus the react overlay), tsup (`node(...)` / `react(...)`), and lefthook/base.yml. versions.json names one coherent ecosystem state: the blessed bun, exact toolchain pins (typescript, @biomejs/biome, tsup, @types/bun, declared once at the root), required packages, the primitives lane (json-rules, permissions-roles / permissions-rebac, transitions, rules-builder, prisma-map, atlas, gloss), the agentic lane built on it (never the reverse), consumers such as template, and candidates awaiting adoption.
+Presets are adopted through stub files that hold only `extends` plus minimal reviewed overrides: tsconfig (base for bun libraries, node adds node types, react adds DOM and JSX), biome (base, plus the react overlay), tsup (`node(...)` / `react(...)`), and lefthook/base.yml. versions.json names one coherent ecosystem state: the blessed bun, exact toolchain pins (typescript, @biomejs/biome, tsup, @types/bun, declared once at the root), required packages, the primitives lane (json-rules, permissions, transitions, rules-builder, prisma-map, atlas, gloss), the agentic lane built on it (never the reverse), consumers such as template, and candidates awaiting adoption.
 
 Pick the command by job. `check` is read-only and exits non-zero on drift; CI runs it after a --frozen-lockfile install through the two-line caller of lib-ci.yml. `sync` applies the fixes and re-locks (refuses a dirty tree without --force). `scan` runs check across every checkout under a root. `train` is the only release path: it walks each lane in dependency order from the default branch at origin, publishes, records candidates, opens adoption and consumer branches, ships config last, and pushes only with --push (--dry-run prints the plan; --lane=agentic leaves primitives alone). `ports` prints a project's ports from ports.json: the service's usual default plus 100 times the project's block, so nothing collides and nothing sits on a default. Renovate owns other dependency bumps and is fenced off the toolchain.
 

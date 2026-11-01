@@ -1,9 +1,9 @@
 {
   "id": "data-modeling",
   "title": "Schema conventions and reference data",
-  "routing": "Is this about how the schema is shaped rather than how it is queried: split schema files per model as source of truth, UUIDv7 primary keys and typed model ids (ModelIdType, userId, Typed model IDs), VarChar(36) FKs, createdAt/updatedAt, enum vs row and enum suffix naming, false polymorphism (PolymorphismRegistry / FalsePolymorphismRegistry, getPolymorphismConfig, resolveFalsePolymorphismRef, ownerModel / sourceModel / targetModel / resourceModel, special owner values default and admin), Tag / TagCategory / TagAttachment, or static reference data: COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONE_IDS and their zod schemas and lookups (countryByCode, decimalsFor, symbolFor, callingCodeFor)?",
+  "routing": "Is this about how the schema is shaped rather than how it is queried: split schema files per model as source of truth, UUIDv7 primary keys, VarChar(36) FKs, createdAt/updatedAt, enum vs row and enum suffix naming, false polymorphism (PolymorphismRegistry, getPolymorphismConfig, resolveFalsePolymorphismRef, ownerModel / sourceModel / targetModel / resourceModel, special owner values default and admin), Tag / TagCategory / TagAttachment, or static reference data: COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONE_IDS and their zod schemas and lookups (countryByCode, decimalsFor, symbolFor, callingCodeFor)?",
   "concepts": ["data-modeling", "reference-data"],
-  "tokens": 13730,
+  "tokens": 13669,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 13730
+      "tokens": 13669
     }
   },
   "runsAgreed": 0,
@@ -47,5 +47,5 @@
     "docMembers": 24
   },
   "bypassLines": 21,
-  "glossaryTerms": 13
+  "glossaryTerms": 12
 }

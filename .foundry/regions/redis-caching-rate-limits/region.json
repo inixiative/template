@@ -3,7 +3,7 @@
   "title": "Redis, caching and rate limits",
   "routing": "Is this about Redis \u2014 a connection (getRedisClient, getRedisPub/getRedisSub, createRedisConnection), a key and its prefix (redisNamespace), Lua scripts \u2014 or about caching a read (cache, cacheKey, upsertCache, clearKey, cacheReference, fetchOne, TTLs, invalidation on mutation), or about request rate limits (rateLimit, apiRateLimit, authRateLimit, identities, rateLimitMax, 429 / Retry-After)?",
   "concepts": ["redis", "caching", "rate-limiting"],
-  "tokens": 17922,
+  "tokens": 17945,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 17922
+      "tokens": 17945
     }
   },
   "runsAgreed": 2,

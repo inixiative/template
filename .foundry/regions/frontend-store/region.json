@@ -1,20 +1,20 @@
 {
   "id": "frontend-store",
   "title": "Frontend store (Zustand slices)",
-  "routing": "Is this about client-side state in the frontend: the one shared Zustand store useAppStore / AppStore from @template/ui/store, its slices (AuthSlice: auth.initialize / signIn / signUp / logout / refreshMe / setSpoof / setStrategy; PermissionsSlice: permissions-roles / permissions-rebac.setup / check / clear; TenantSlice: tenant.setOrganization / setSpace / setUser / setPublic / setPage; ClientSlice; UISlice: ui.setTheme / setLoading, useThemePersistence; NavigationSlice: navigatePreserving, setFlowId), adding or removing a slice, narrow selectors and useShallow, getState() outside React, actions with side effects, or a component that wants its own store or to put server data in the store?",
+  "routing": "Is this about client-side state in the frontend: the one shared Zustand store useAppStore / AppStore from @template/ui/store, its slices (AuthSlice: auth.initialize / signIn / signUp / logout / refreshMe / setSpoof / setStrategy; PermissionsSlice: permissions.setup / check / clear; TenantSlice: tenant.setOrganization / setSpace / setUser / setPublic / setPage; ClientSlice; UISlice: ui.setTheme / setLoading, useThemePersistence; NavigationSlice: navigatePreserving, setFlowId), adding or removing a slice, narrow selectors and useShallow, getState() outside React, actions with side effects, or a component that wants its own store or to put server data in the store?",
   "concepts": ["frontend-store"],
-  "tokens": 11764,
+  "tokens": 11732,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2032,
+      "tokens": 2025,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 11764
+      "tokens": 11732
     }
   },
   "runsAgreed": 0,

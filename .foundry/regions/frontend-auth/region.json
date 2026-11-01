@@ -3,7 +3,7 @@
   "title": "Frontend Authentication",
   "routing": "Is this about signing in or out in the browser apps? The store's auth slice (auth.initialize, auth.signIn, auth.signUp, auth.refreshMe, auth.logout, auth.setSpoof, auth.setStrategy), fetchAndHydrateMe, LoginForm/SignupForm and the login/signup pages, useAuthProviders and social buttons, the OAuth callback page, requireAuth/requirePublic/authGuard route guards, redirectTo handling (navigateToLogin, navigateToSignup, navigatePreserving, redirectPreservingContext), or the embed auth strategy (useAuthStrategy)?",
   "concepts": ["frontend-auth"],
-  "tokens": 8720,
+  "tokens": 8758,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 8720
+      "tokens": 8758
     }
   },
   "runsAgreed": 0,

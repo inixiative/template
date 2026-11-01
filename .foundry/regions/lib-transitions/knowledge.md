@@ -40,7 +40,7 @@ The single-edge kernel returning true or a PathReason.
 Guard a proposed update: returns true or a Reason covering every path tried.
 
 **createAuthorize**  
-Adapter binding @inixiative/permissions-roles / permissions-rebac' rebac check to the authorize seam for one resource; fails closed on cycles.
+Adapter binding @inixiative/permissions' rebac check to the authorize seam for one resource; fails closed on cycles.
 
 **describe**  
 Builds a human-readable message from a Reason.
@@ -61,7 +61,7 @@ The @inixiative/transitions library: stateless lifecycle guard and affordance la
 to.merge strategy producing the resulting record: spread (default), deepMerge, append, appendUnique, or a callback.
 
 **permission**  
-A per-side @inixiative/permissions-roles / permissions-rebac ActionRule; absent = open, null or false = terminal deny.
+A per-side @inixiative/permissions ActionRule; absent = open, null or false = terminal deny.
 
 **predicate**  
 A json-rules Condition giving legality; from reads the current record, to reads the merged record.
@@ -73,7 +73,7 @@ A json-rules Condition giving legality; from reads the current record, to reads 
 Side metadata naming relations to load; ignored by the kernel today.
 
 **resource**  
-Map-qualified key (map:Model, e.g. db:Inquiry), the same convention @inixiative/permissions-roles / permissions-rebac uses.
+Map-qualified key (map:Model, e.g. db:Inquiry), the same convention @inixiative/permissions uses.
 
 **Side**  
 { predicate, permission?, requires? } for the from or to end of a transition.
@@ -93,9 +93,9 @@ The @inixiative/transitions library: a stateless guard and affordance layer over
 
 ## 2. The domain
 
-A rule set maps resource -> action -> Action { paths: Transition[] }; each Transition is one atomic from -> to edge, and an Action is the OR of its edges. Each Side holds a predicate (legality) and an optional permission (authz). from.* reads the current record and to.* reads the merged record, for predicates and permissions-roles / permissions-rebac alike. checkTransition(rules, resource, action, record, changes, options) returns true or a structured Reason (every path's from/to predicate and permission failures; permission-only failure maps to 403, any predicate failure to 409; describe(reason) gives a message). checkPath is the single-edge kernel. available lists actions whose from side passes for a record; eligible compiles an action's from predicate into a json-rules Prisma plan, run with executePrismaPlan to get the where for every eligible record. Column-to-column comparisons and relation counts need the map / model or a lens to compile. to.merge builds the resulting record (spread, deepMerge, append, appendUnique; a callback is not serializable). validateTransition checks a tenant config on save and returns a ValidationResult without throwing.
+A rule set maps resource -> action -> Action { paths: Transition[] }; each Transition is one atomic from -> to edge, and an Action is the OR of its edges. Each Side holds a predicate (legality) and an optional permission (authz). from.* reads the current record and to.* reads the merged record, for predicates and permissions alike. checkTransition(rules, resource, action, record, changes, options) returns true or a structured Reason (every path's from/to predicate and permission failures; permission-only failure maps to 403, any predicate failure to 409; describe(reason) gives a message). checkPath is the single-edge kernel. available lists actions whose from side passes for a record; eligible compiles an action's from predicate into a json-rules Prisma plan, run with executePrismaPlan to get the where for every eligible record. Column-to-column comparisons and relation counts need the map / model or a lens to compile. to.merge builds the resulting record (spread, deepMerge, append, appendUnique; a callback is not serializable). validateTransition checks a tenant config on save and returns a ValidationResult without throwing.
 
-It is not a state machine and does not execute changes or side effects. Permission is injected: a Side's permission is an @inixiative/permissions-roles / permissions-rebac ActionRule, evaluated through an authorize callback; createAuthorize adapts the permissions-roles / permissions-rebac check (see `lib-permissions`), and a cyclic permission graph fails closed. Omit authorize to check legality only.
+It is not a state machine and does not execute changes or side effects. Permission is injected: a Side's permission is an @inixiative/permissions ActionRule, evaluated through an authorize callback; createAuthorize adapts the permissions check (see `lib-permissions`), and a cyclic permission graph fails closed. Omit authorize to check legality only.
 
 The template does not depend on this package; it is imported nowhere there yet. Template TODO.md and tickets FEAT-018 / COMM-010 plan to move the inquiry status lifecycle (see `inquiry-handlers / inquiry-routes-ui / flows`) and the send-governance matrix onto it, so a hand-built status guard there is the moment to point here. Predicate syntax, check options (now, timeZone, bindings) and toPrisma live in `json-rules-shapes / json-rules-runtime` (time semantics in `json-rules-dates`); a transition-rule editor (useTransitionBuilder) is in `rules-builder`; lens-scoped validation is in `lens-usage`. The README's 'Not built yet' list (requires loader, permission-filtered available, lens composition) is designed, not shipped.
 

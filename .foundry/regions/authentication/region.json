@@ -1,20 +1,20 @@
 {
   "id": "authentication",
-  "title": "Authentication: sessions, providers, tokens (authentication)",
-  "routing": "Is this about how a caller proves who it is: BetterAuth sessions and the auth instance (apps/api/src/lib/auth.ts), email/password or Google sign-in, OAuth callback and the one-time token (/auth/callback#ott=), AuthProvider rows per organization vs platform providers (getPlatformProviders), Account, Session, Verification, API keys as Token rows (createToken, SHA-256 keyHash, TokenOwnerModel, token scopes, TokensPage), or the frontend auth strategy (detectAuthStrategy, setToken/getToken, fetchAndHydrateMe)?",
+  "title": "Sign-in, user JWTs and OAuth",
+  "routing": "Is this about how a person signs in and what proves it afterwards: the BetterAuth sign-in handshake (`auth` in apps/api/src/lib/auth.ts, authPlugins, disabledPaths, the 10-minute handshake session in secondaryStorage), jwtHandoff swapping that session for a user JWT, the user JWT itself (userJwtOptions, verifyIssuerJwt, jwksStore / publicJwks, User.jwtVersion, rotateUserJwts, /me/rotateJwts), account changes through withThrowawaySession (meChangePassword), the OAuth callback and one-time token (oauthHandoffPlugins, /auth/callback#ott=, completeOAuthSignIn, storeJwtHandoff), or keeping the JWT in the browser (setToken / getToken / clearToken, AuthStrategyProvider / useAuthStrategy / detectAuthStrategy)? API keys and login-provider configuration are `tokens-providers`.",
   "concepts": ["authentication"],
-  "tokens": 18583,
+  "tokens": 19102,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2054,
+      "tokens": 2048,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 18583
+      "tokens": 19102
     }
   },
   "runsAgreed": 0,
@@ -50,5 +50,5 @@
     "docMembers": 58
   },
   "bypassLines": 21,
-  "glossaryTerms": 16
+  "glossaryTerms": 21
 }

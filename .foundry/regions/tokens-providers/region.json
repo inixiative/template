@@ -1,20 +1,20 @@
 {
   "id": "tokens-providers",
-  "title": "Authentication: sessions, providers, tokens (tokens-providers)",
-  "routing": "Is this about how a caller proves who it is: BetterAuth sessions and the auth instance (apps/api/src/lib/auth.ts), email/password or Google sign-in, OAuth callback and the one-time token (/auth/callback#ott=), AuthProvider rows per organization vs platform providers (getPlatformProviders), Account, Session, Verification, API keys as Token rows (createToken, SHA-256 keyHash, TokenOwnerModel, token scopes, TokensPage), or the frontend auth strategy (detectAuthStrategy, setToken/getToken, fetchAndHydrateMe)?",
+  "title": "API tokens and login providers",
+  "routing": "Is this about an API key or a login provider: minting a token (createToken and the create-token routes), its owner kind (TokenOwnerModel: User, Organization, OrganizationUser, Space, SpaceUser), the SHA-256 keyHash shown once, how tokenAuthMiddleware reads Bearer or ?token= and loadTokenContext signs it in (10-minute row cache, the owner must exist, lastUsedAt on a cache miss), the TokensPage; or which sign-in options exist: platform providers from env vars (getPlatformProviders) vs an organization's AuthProvider rows with encrypted secrets (authProviderReadMany, organizationReadAuthProvider, organizationCreateAuthProvider, authProviderUpdate / authProviderDelete, OrganizationAuthProvidersPage, useAuthProviders), SAML status? The sign-in handshake, user JWTs and OAuth are `authentication`.",
   "concepts": ["tokens-providers"],
-  "tokens": 6147,
+  "tokens": 6433,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1024,
+      "tokens": 993,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 6147
+      "tokens": 6433
     }
   },
   "runsAgreed": 0,
@@ -34,5 +34,5 @@
     "docMembers": 9
   },
   "bypassLines": 21,
-  "glossaryTerms": 16
+  "glossaryTerms": 21
 }

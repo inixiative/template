@@ -3,7 +3,7 @@
   "title": "Navigation config and tenant context",
   "routing": "Is this about who can see which page and how context moves with the user: the per-app nav config (apps/*/app/config/nav, userContext / organizationContext / spaceContext / publicContext, NavConfig, NavItem and its access rule, adding a nav item), useAuthenticatedRouting, findRoute / findRouteAcrossContexts, checkContextPermission, getContextParams, the Unauthorized fallback, Sidebar / UserMenu / ContextSelector, useRegisterNavigation, usePageMeta / useBreadcrumbs / buildBreadcrumbs, useSectionHash / useSectionOpen / useScrollState, tenant context in ?org= / ?space= / ?spoof= / ?flow=, tenant.setOrganization / setSpace / setUser / setPublic, or navigation.navigatePreserving vs the raw router navigate?",
   "concepts": ["navigation"],
-  "tokens": 9705,
+  "tokens": 9679,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 9705
+      "tokens": 9679
     }
   },
   "runsAgreed": 0,

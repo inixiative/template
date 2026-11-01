@@ -1,9 +1,9 @@
 {
   "id": "monorepo-architecture",
   "title": "Monorepo layout and architecture",
-  "routing": "Is this about where code lives or how the workspaces relate rather than how one subsystem works: apps/* (api, web, admin, superadmin) vs packages/* (@template/db, shared, ui, sdk, permissions-roles / permissions-rebac, email), the 'Where to Find Things' map (modules/<model>/routes, hooks, jobs, prisma/schema one file per model, tests/e2e), import aliases (#/ in apps, @template/<pkg>/* subpaths, relative only in top-level barrels, no ##/ or ~/), tsconfig paths mapping every package, dependency direction and which workspace gets a new dependency, the tech stack and dependency inventory (DEPENDENCIES.md), or the system overview (middleware \u2192 routes \u2192 controllers \u2192 mutation lifecycle \u2192 jobs/Redis/Postgres, ReBAC, request context, false polymorphism, what the repo already has per FEATURES.md / COMPARISONS.md)?",
+  "routing": "Is this about where code lives or how the workspaces relate rather than how one subsystem works: apps/* (api, web, admin, superadmin) vs packages/* (@template/db, shared, ui, sdk, permissions, email), the 'Where to Find Things' map (modules/<model>/routes, hooks, jobs, prisma/schema one file per model, tests/e2e), import aliases (#/ in apps, @template/<pkg>/* subpaths, relative only in top-level barrels, no ##/ or ~/), tsconfig paths mapping every package, dependency direction and which workspace gets a new dependency, the tech stack and dependency inventory (DEPENDENCIES.md), or the system overview (middleware \u2192 routes \u2192 controllers \u2192 mutation lifecycle \u2192 jobs/Redis/Postgres, ReBAC, request context, false polymorphism, what the repo already has per FEATURES.md / COMPARISONS.md)?",
   "concepts": ["monorepo-layout", "dependencies", "architecture"],
-  "tokens": 18188,
+  "tokens": 18114,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 18188
+      "tokens": 18114
     }
   },
   "runsAgreed": 1,
@@ -92,5 +92,5 @@
     "docMembers": 78
   },
   "bypassLines": 21,
-  "glossaryTerms": 25
+  "glossaryTerms": 24
 }

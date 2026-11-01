@@ -1,20 +1,20 @@
 {
   "id": "jobs-cron",
-  "title": "Background jobs and cron (jobs)",
-  "routing": "Is this about running work outside the request: defining, registering, enqueuing or scheduling a background job? Signals: makeJob / makeSingletonJob / makeSupersedingJob, enqueueJob, ctx.enqueueChildJob or job stages, handlers/index.ts registration, WorkerContext / ctx.log, job ids, the BullMQ queue / Worker / processJob, BullBoard, CronJob rows, cron patterns, registerCronJobs / cronJobSync / removeRepeatable, admin job or cron trigger routes, cleanStaleData / archiveStaleRecords, or a fire-and-forget promise, setTimeout or node-cron schedule standing in for a job. (Fast/slow lanes and the JobOutbox overflow buffer are job-lanes-outbox.)",
+  "title": "Background jobs",
+  "routing": "Is this about running work outside the request: defining, registering or enqueuing a background job? Signals: makeJob / makeSingletonJob / makeSupersedingJob, enqueueJob and buildJobData, staged jobs (ctx.enqueueChildJob / ctx.enqueueChildJobs, makeEnqueueChildJobs), handlers/index.ts registration, WorkerContext / ctx.log / ctx.signal, job ids (validateJobId / isValidJobId), the BullMQ queue, processJob and initializeWorker, rolling caches (coordinateRollingCaches), BullBoard, POST /api/admin/job, or a fire-and-forget promise or setTimeout standing in for a job. CronJob schedules are `cron`; fast/slow lanes and the JobOutbox overflow buffer are `job-lanes-outbox`.",
   "concepts": ["jobs"],
-  "tokens": 16513,
+  "tokens": 16212,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1697,
+      "tokens": 1680,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 16513
+      "tokens": 16212
     }
   },
   "runsAgreed": 0,
@@ -55,5 +55,5 @@
     "docMembers": 68
   },
   "bypassLines": 14,
-  "glossaryTerms": 26
+  "glossaryTerms": 18
 }

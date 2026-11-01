@@ -273,19 +273,19 @@
     {
       "tag": "permissions-roles",
       "atlas": "primitive:authz",
-      "description": "Roles, actions and checks: Role / PlatformRole, StandardAction, Permix setup per context (setupOrg / Space / UserPermissions), permix.check in controllers, validatePermission / validateRole middleware, entitlements and token restriction, role assignment, frontend checks (usePermission, permissions.check, NavItem.access)",
+      "description": "Roles, actions and checks: PlatformRole / Role, the standard actions, actions per model and person-only actions, entitlements, installing a request's permissions (installPermissions), validatePermission / validateSubmodelPermission, frontend checks (usePermission, permissions.check, NavItem.access)",
       "region": "permissions-roles"
     },
     {
       "tag": "permissions-rebac",
       "atlas": "primitive:authz",
-      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, validateOwnerPermission, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
       "region": "permissions-rebac"
     },
     {
       "tag": "permissions-rebac",
       "atlas": "primitive:authz",
-      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, validateOwnerPermission, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
       "region": "permissions-rebac"
     },
     {
@@ -303,13 +303,13 @@
     {
       "tag": "authentication",
       "atlas": "feature:auth",
-      "description": "BetterAuth sessions, OAuth, AuthProviders, API tokens and token types",
+      "description": "The BetterAuth sign-in handshake, user JWTs and their revocation, the OAuth one-time token, account changes through BetterAuth server calls",
       "region": "authentication"
     },
     {
       "tag": "auth-middleware",
       "atlas": "feature:auth",
-      "description": "Auth middleware chain, spoofing, validateUser/validateActor gates",
+      "description": "Auth middleware chain (jwtAuthMiddleware, tokenAuthMiddleware), spoofing, who counts as a user (a JWT or a spoof; a token is a Token actor)",
       "region": "auth-middleware-users"
     },
     {
@@ -749,22 +749,22 @@
     },
     {
       "id": "redis-caching-rate-limits",
-      "tokens": 17922,
+      "tokens": 17945,
       "recogniseTokens": 1878,
       "concepts": ["redis", "caching", "rate-limiting"],
       "runsAgreed": 2
     },
     {
       "id": "jobs-cron",
-      "tokens": 16513,
-      "recogniseTokens": 1697,
+      "tokens": 16212,
+      "recogniseTokens": 1680,
       "concepts": ["jobs"],
       "runsAgreed": 0
     },
     {
       "id": "cron",
-      "tokens": 8401,
-      "recogniseTokens": 1015,
+      "tokens": 8045,
+      "recogniseTokens": 999,
       "concepts": ["cron"],
       "runsAgreed": 0
     },
@@ -777,14 +777,14 @@
     },
     {
       "id": "app-events-webhooks",
-      "tokens": 17056,
+      "tokens": 17051,
       "recogniseTokens": 3136,
       "concepts": ["app-events", "webhooks"],
       "runsAgreed": 1
     },
     {
       "id": "adapters-integrations",
-      "tokens": 8105,
+      "tokens": 8103,
       "recogniseTokens": 1705,
       "concepts": ["adapters", "integrations", "object-storage"],
       "runsAgreed": 0
@@ -847,7 +847,7 @@
     },
     {
       "id": "json-rules",
-      "tokens": 17119,
+      "tokens": 17113,
       "recogniseTokens": 3672,
       "concepts": ["json-rules", "rule-references"],
       "runsAgreed": 0
@@ -882,14 +882,14 @@
     },
     {
       "id": "lenses",
-      "tokens": 11721,
+      "tokens": 11715,
       "recogniseTokens": 2288,
       "concepts": ["lenses"],
       "runsAgreed": 0
     },
     {
       "id": "lens-model",
-      "tokens": 12767,
+      "tokens": 12760,
       "recogniseTokens": 854,
       "concepts": ["lib-json-rules-lens"],
       "runsAgreed": 0
@@ -910,7 +910,7 @@
     },
     {
       "id": "rules-builder",
-      "tokens": 17105,
+      "tokens": 17092,
       "recogniseTokens": 2966,
       "concepts": ["rules-builder"],
       "runsAgreed": 1
@@ -924,63 +924,63 @@
     },
     {
       "id": "permissions-roles",
-      "tokens": 17279,
-      "recogniseTokens": 1906,
+      "tokens": 17483,
+      "recogniseTokens": 1954,
       "concepts": ["permissions-roles"],
       "runsAgreed": 0
     },
     {
       "id": "permissions-members",
-      "tokens": 8228,
-      "recogniseTokens": 580,
+      "tokens": 8183,
+      "recogniseTokens": 606,
       "concepts": ["permissions-members"],
       "runsAgreed": 0
     },
     {
       "id": "permissions-rebac",
-      "tokens": 17801,
+      "tokens": 17728,
       "recogniseTokens": 1204,
       "concepts": ["permissions-rebac"],
       "runsAgreed": 0
     },
     {
       "id": "tenancy",
-      "tokens": 8867,
+      "tokens": 8860,
       "recogniseTokens": 1812,
       "concepts": ["tenancy", "superadmin"],
       "runsAgreed": 0
     },
     {
       "id": "authentication",
-      "tokens": 18583,
-      "recogniseTokens": 2054,
+      "tokens": 19102,
+      "recogniseTokens": 2048,
       "concepts": ["authentication"],
       "runsAgreed": 0
     },
     {
       "id": "tokens-providers",
-      "tokens": 6147,
-      "recogniseTokens": 1024,
+      "tokens": 6433,
+      "recogniseTokens": 993,
       "concepts": ["tokens-providers"],
       "runsAgreed": 0
     },
     {
       "id": "auth-middleware-users",
-      "tokens": 9501,
-      "recogniseTokens": 1869,
+      "tokens": 9734,
+      "recogniseTokens": 1897,
       "concepts": ["auth-middleware", "users"],
       "runsAgreed": 0
     },
     {
       "id": "frontend-auth",
-      "tokens": 8720,
+      "tokens": 8758,
       "recogniseTokens": 1672,
       "concepts": ["frontend-auth"],
       "runsAgreed": 0
     },
     {
       "id": "api-routes",
-      "tokens": 17843,
+      "tokens": 17830,
       "recogniseTokens": 3163,
       "concepts": ["route-templates", "api-modules"],
       "runsAgreed": 1
@@ -994,22 +994,22 @@
     },
     {
       "id": "request-context-errors",
-      "tokens": 12686,
-      "recogniseTokens": 2122,
+      "tokens": 12249,
+      "recogniseTokens": 2109,
       "concepts": ["request-context"],
       "runsAgreed": 0
     },
     {
       "id": "errors",
-      "tokens": 9910,
-      "recogniseTokens": 1472,
+      "tokens": 9302,
+      "recogniseTokens": 1469,
       "concepts": ["errors"],
       "runsAgreed": 0
     },
     {
       "id": "batch",
-      "tokens": 11157,
-      "recogniseTokens": 1453,
+      "tokens": 11155,
+      "recogniseTokens": 1450,
       "concepts": ["batch"],
       "runsAgreed": 0
     },
@@ -1036,7 +1036,7 @@
     },
     {
       "id": "data-modeling",
-      "tokens": 13730,
+      "tokens": 13669,
       "recogniseTokens": 1852,
       "concepts": ["data-modeling", "reference-data"],
       "runsAgreed": 0
@@ -1050,7 +1050,7 @@
     },
     {
       "id": "mutation-hooks",
-      "tokens": 17987,
+      "tokens": 17995,
       "recogniseTokens": 2885,
       "concepts": ["mutation-hooks", "immutable-fields", "ordered-lists"],
       "runsAgreed": 0
@@ -1064,15 +1064,15 @@
     },
     {
       "id": "encryption",
-      "tokens": 13289,
-      "recogniseTokens": 1821,
+      "tokens": 12458,
+      "recogniseTokens": 1794,
       "concepts": ["encryption"],
       "runsAgreed": 0
     },
     {
       "id": "secrets",
-      "tokens": 10306,
-      "recogniseTokens": 1121,
+      "tokens": 9071,
+      "recogniseTokens": 1104,
       "concepts": ["secrets"],
       "runsAgreed": 0
     },
@@ -1085,7 +1085,7 @@
     },
     {
       "id": "inquiry-routes-ui",
-      "tokens": 13156,
+      "tokens": 13150,
       "recogniseTokens": 2335,
       "concepts": ["inquiry-routes-ui"],
       "runsAgreed": 0
@@ -1113,8 +1113,8 @@
     },
     {
       "id": "frontend-store",
-      "tokens": 11764,
-      "recogniseTokens": 2032,
+      "tokens": 11732,
+      "recogniseTokens": 2025,
       "concepts": ["frontend-store"],
       "runsAgreed": 0
     },
@@ -1134,7 +1134,7 @@
     },
     {
       "id": "navigation",
-      "tokens": 9705,
+      "tokens": 9679,
       "recogniseTokens": 1715,
       "concepts": ["navigation"],
       "runsAgreed": 0
@@ -1155,7 +1155,7 @@
     },
     {
       "id": "test-harness",
-      "tokens": 11170,
+      "tokens": 11186,
       "recogniseTokens": 2038,
       "concepts": ["test-harness", "vcr"],
       "runsAgreed": 0
@@ -1197,7 +1197,7 @@
     },
     {
       "id": "monorepo-architecture",
-      "tokens": 18188,
+      "tokens": 18114,
       "recogniseTokens": 3452,
       "concepts": ["monorepo-layout", "dependencies", "architecture"],
       "runsAgreed": 1
@@ -1225,14 +1225,14 @@
     },
     {
       "id": "lib-permissions",
-      "tokens": 17392,
-      "recogniseTokens": 1005,
+      "tokens": 17348,
+      "recogniseTokens": 998,
       "concepts": ["lib-permissions"],
       "runsAgreed": 0
     },
     {
       "id": "lib-transitions",
-      "tokens": 5100,
+      "tokens": 5061,
       "recogniseTokens": 356,
       "concepts": ["lib-transitions"],
       "runsAgreed": 0
@@ -1246,8 +1246,8 @@
     },
     {
       "id": "lib-atlas",
-      "tokens": 18487,
-      "recogniseTokens": 2904,
+      "tokens": 18504,
+      "recogniseTokens": 2903,
       "concepts": ["lib-atlas", "atlas"],
       "runsAgreed": 0
     },
@@ -1260,7 +1260,7 @@
     },
     {
       "id": "lib-config",
-      "tokens": 11076,
+      "tokens": 11063,
       "recogniseTokens": 2638,
       "concepts": ["lib-config"],
       "runsAgreed": 0

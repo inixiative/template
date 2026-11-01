@@ -20,7 +20,7 @@
 ## Glossary
 
 **access**  
-NavItem rule (permissions-roles / permissions-rebac, context, pageContext) => boolean; the source of truth for page visibility.
+NavItem rule (permissions, context, pageContext) => boolean; the source of truth for page visibility.
 
 **alias**  
 NavItem flag: routable page hidden from the sidebar.
@@ -41,7 +41,7 @@ AppShell control for switching Personal/Organization/Space; reads tenant and aut
 Match a path to its nav item within one context, or across contexts.
 
 **getContextParams**  
-Turns tenant context into [model, record] for permissions-roles / permissions-rebac.check in access rules.
+Turns tenant context into [model, record] for permissions.check in access rules.
 
 **NavConfig**  
 Per-app map of context type (user, organization, space, public) to NavItem[].
@@ -79,9 +79,9 @@ The nav config as the source of truth for page access, the hooks that enforce it
 
 ## 2. The domain
 
-The nav config (ROUTING_NAVIGATION.md § Navigation; apps/*/app/config/nav/: one `NavItem` per feature, composed into one `NavItem[]` per context: `userContext`, `organizationContext`, `spaceContext`, `publicContext`) is the source of truth for who can view a page; adding a page means adding a nav item. Its `access` rule, usually `permissions-roles / permissions-rebac.check(...getContextParams(context), action)`, hides sidebar items (`Sidebar`, `UserMenu`) and gates the page through `useAuthenticatedRouting`, which uses `findRoute` / `findRouteAcrossContexts` and `checkContextPermission` and falls back space → organization → user → public before rendering Unauthorized (the Unauthorized context fallback). The same config feeds `usePageMeta` and `useBreadcrumbs` / `buildBreadcrumbs`; `useRegisterNavigation` registers it in the store at the root; `useSectionHash` / `useSectionOpen` / `useScrollState` keep section and scroll state in the URL. Tenant context never lives in the path: it rides in `?org=` / `?space=` / `?spoof=` / `?flow=`, synced with the tenant slice by `useAuthenticatedRouting` (context-free paths stay context-free). Switch context through `tenant.setOrganization` / `setSpace` / `setUser` / `setPublic` (the `ContextSelector`; a context switch redirects to the equivalent page) and move between pages with `navigation.navigatePreserving(to, 'context' | 'spoof' | 'all')` rather than the raw router navigate, which drops the context.
+The nav config (ROUTING_NAVIGATION.md § Navigation; apps/*/app/config/nav/: one `NavItem` per feature, composed into one `NavItem[]` per context: `userContext`, `organizationContext`, `spaceContext`, `publicContext`) is the source of truth for who can view a page; adding a page means adding a nav item. Its `access` rule, usually `permissions.check(...getContextParams(context), action)`, hides sidebar items (`Sidebar`, `UserMenu`) and gates the page through `useAuthenticatedRouting`, which uses `findRoute` / `findRouteAcrossContexts` and `checkContextPermission` and falls back space → organization → user → public before rendering Unauthorized (the Unauthorized context fallback). The same config feeds `usePageMeta` and `useBreadcrumbs` / `buildBreadcrumbs`; `useRegisterNavigation` registers it in the store at the root; `useSectionHash` / `useSectionOpen` / `useScrollState` keep section and scroll state in the URL. Tenant context never lives in the path: it rides in `?org=` / `?space=` / `?spoof=` / `?flow=`, synced with the tenant slice by `useAuthenticatedRouting` (context-free paths stay context-free). Switch context through `tenant.setOrganization` / `setSpace` / `setUser` / `setPublic` (the `ContextSelector`; a context switch redirects to the equivalent page) and move between pages with `navigation.navigatePreserving(to, 'context' | 'spoof' | 'all')` rather than the raw router navigate, which drops the context.
 
-Not here: route files, layout groups and guards are `frontend-apps-routing`; the store itself is `frontend-store`; `permissions-roles / permissions-rebac.check` and Permix setup are `permissions-roles / permissions-rebac`; the shell's visual layout is `theme-layout`.
+Not here: route files, layout groups and guards are `frontend-apps-routing`; the store itself is `frontend-store`; `permissions.check` and Permix setup are `permissions-roles / permissions-rebac`; the shell's visual layout is `theme-layout`.
 
 ## 3. Everything that exists here, by class
 
