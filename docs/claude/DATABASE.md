@@ -135,7 +135,7 @@ The cut-over is `launched` in `project.config.ts`, flipped by the init script's 
 | `setup.sh` | pushes and seeds the local database | skips push and seed |
 | Migration files | none | start at `0_init`, created by Launch |
 
-`scripts/checkLaunched.ts` reads the flag for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and `push-dev.sh` refuses a non-local `DATABASE_URL`.
+`scripts/checkLaunched.ts` reads the flag for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and both it and `push-dev.sh` push through `scripts/db/push-local.sh`, which refuses a non-local `DATABASE_URL`. Those databases are throwaway per-worktree Docker containers, so `push-local.sh` carries the owner's consent for Prisma's AI-agent guard and agents can run the tests; `release.sh` never does.
 
 **What Launch does** (init → Launch, [#197](https://github.com/inixiative/template/pull/197)): `bun run db:baseline` writes `prisma/migrations/0_init` as the diff from an empty database to `prisma/schema` (once); for prod, and staging when enabled, it checks the deployed database matches `prisma/schema` and otherwise blocks launch ("deploy the current schema there, then launch"); it records `0_init` as applied on each (`prisma migrate resolve --applied 0_init`); then it sets `launched = true`. Commit `prisma/migrations` and `project.config.ts` together.
 
