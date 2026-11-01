@@ -14,6 +14,7 @@ import {
   createIntegration,
   createOrganization,
   createOrganizationUser,
+  createProject,
   createSpace,
   createSpaceUser,
   createToken,
@@ -117,7 +118,13 @@ describe('handler: transferSpace', () => {
       spaceId: sourceSpace.id,
       userId: user.id,
     });
-    return { user, member, spaceUser, integration, token, emailTemplate };
+    const { entity: project } = await createProject({
+      ownerModel: 'SpaceUser',
+      organizationId: org.id,
+      spaceId: sourceSpace.id,
+      userId: user.id,
+    });
+    return { user, member, spaceUser, integration, token, emailTemplate, project };
   };
 
   const transferInquiry = async (sourceSpace: Space, target: Organization) =>
@@ -192,6 +199,7 @@ describe('handler: transferSpace', () => {
     let spaceTokenId: string;
     let integrationTokenId: string;
     let spaceEmailTemplateId: string;
+    let spaceProjectId: string;
     let liveTargetMembersBefore: string[];
 
     beforeAll(async () => {
@@ -230,6 +238,13 @@ describe('handler: transferSpace', () => {
       spaceTokenId = (await createToken({ ownerModel: 'Space' }, { space: freshSpace })).entity.id;
       spaceEmailTemplateId = (
         await createEmailTemplate({
+          ownerModel: 'Space',
+          organizationId: org.id,
+          spaceId: freshSpace.id,
+        })
+      ).entity.id;
+      spaceProjectId = (
+        await createProject({
           ownerModel: 'Space',
           organizationId: org.id,
           spaceId: freshSpace.id,
@@ -277,6 +292,9 @@ describe('handler: transferSpace', () => {
       expect(
         await db.emailTemplate.findUniqueOrThrow({ where: { id: kept.emailTemplate.id } }),
       ).toMatchObject(live);
+      expect(await db.project.findUniqueOrThrow({ where: { id: kept.project.id } })).toMatchObject(
+        live,
+      );
     });
 
     it('tombstones every other member and everything downstream, keyed to the target org', async () => {
@@ -292,6 +310,9 @@ describe('handler: transferSpace', () => {
         ),
         await withDeleted(() =>
           db.emailTemplate.findUniqueOrThrow({ where: { id: dropped.emailTemplate.id } }),
+        ),
+        await withDeleted(() =>
+          db.project.findUniqueOrThrow({ where: { id: dropped.project.id } }),
         ),
       ])
         expect(row).toMatchObject({ organizationId: targetOrg1.id, deletedAt: stamp });
@@ -335,6 +356,9 @@ describe('handler: transferSpace', () => {
       expect(
         await db.integration.findUniqueOrThrow({ where: { id: leftTargetOrg.integration.id } }),
       ).toMatchObject(live);
+      expect(
+        await db.project.findUniqueOrThrow({ where: { id: leftTargetOrg.project.id } }),
+      ).toMatchObject(live);
     });
 
     it('hiring someone a space admin had removed before the transfer leaves that removal in place', async () => {
@@ -361,6 +385,9 @@ describe('handler: transferSpace', () => {
       expect(
         await db.emailTemplate.findUniqueOrThrow({ where: { id: spaceEmailTemplateId } }),
       ).toMatchObject(inTarget);
+      expect(await db.project.findUniqueOrThrow({ where: { id: spaceProjectId } })).toMatchObject(
+        inTarget,
+      );
     });
 
     it('an old-org re-invite revives nothing in the moved space', async () => {
@@ -379,6 +406,7 @@ describe('handler: transferSpace', () => {
       expect(
         await db.integration.findUnique({ where: { id: leftOldOrg.integration.id } }),
       ).toBeNull();
+      expect(await db.project.findUnique({ where: { id: leftOldOrg.project.id } })).toBeNull();
     });
 
     it('reviving the target-org membership brings their space membership and its rows back', async () => {
@@ -393,6 +421,9 @@ describe('handler: transferSpace', () => {
       ).toMatchObject(live);
       expect(
         await db.emailTemplate.findUniqueOrThrow({ where: { id: dropped.emailTemplate.id } }),
+      ).toMatchObject(live);
+      expect(
+        await db.project.findUniqueOrThrow({ where: { id: dropped.project.id } }),
       ).toMatchObject(live);
     });
   });
