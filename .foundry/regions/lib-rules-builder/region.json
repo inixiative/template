@@ -3,7 +3,7 @@
   "title": "rules-builder library README",
   "routing": "Is this about what the @inixiative/rules-builder library itself documents: quick start and install, headless builder with your own renderers, sourced field options, filtering a collection in hand, array (list/relation) rules and nested array nodes, Decoration (hoisting, relabeling, aliasing, two wheres, tagged sources), preset facets and variable placement (FacetCondition, facetId, normalizeGroups), scope refs, coercion to real types, serialization and persisting rules with their binding, or the README's API reference?",
   "concepts": ["lib-rules-builder"],
-  "tokens": 12318,
+  "tokens": 12249,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12318
+      "tokens": 12249
     }
   },
   "runsAgreed": 0,

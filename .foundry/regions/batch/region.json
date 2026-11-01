@@ -3,18 +3,18 @@
   "title": "Batch API",
   "routing": "Is this about running several API requests in one call or reading an API path in-process as the caller: POST /api/v1/batch/execute, rounds of sub-requests, the strategies transactionAll / transactionPerRound / allowFailures / failOnRound, <<round.request.path>> interpolation, summary.status success/partialSuccess/failed, X-Batch-Id, registerBatch/unregisterBatch, executeBatch/executeRequest, StrategyExecutor, BatchExecutionStrategies, or readAsCaller / readAllAsCaller?",
   "concepts": ["batch"],
-  "tokens": 10083,
+  "tokens": 11157,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1518,
+      "tokens": 1453,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 10083
+      "tokens": 11157
     }
   },
   "runsAgreed": 0,
@@ -35,11 +35,14 @@
     "catalogClusters": [
       "auth-middleware-validation",
       "batch-request-execution",
+      "data-access-rules",
+      "locks-and-serialization",
       "request-context-access",
-      "request-response-schemas"
+      "request-response-schemas",
+      "testing-rules"
     ],
-    "codeEntries": 19,
-    "docMembers": 19
+    "codeEntries": 20,
+    "docMembers": 25
   },
   "bypassLines": 6,
   "glossaryTerms": 19

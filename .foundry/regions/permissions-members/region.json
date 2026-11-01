@@ -1,0 +1,34 @@
+{
+  "id": "permissions-members",
+  "title": "Roles, actions and permission checks (permissions-members)",
+  "routing": "Is this about who may do what by role: PlatformRole and superadmin, Role on OrganizationUser / SpaceUser (owner, admin, member, viewer; roleHierarchy, greaterRole / lesserRole / rolesAtOrAbove, isSuperadmin), StandardAction tiers (own \u2287 manage \u2287 operate \u2287 read), the per-request Permix (setupOrgPermissions / setupSpacePermissions / setupUserPermissions, setupOrgContext / setupSpaceContext / setupUserContext, permix.setup / check / setSuperadmin / getJSON), entitlements and their allow-override, tokens never exceeding the user's role, validateRole, validatePermission and the validation middleware order, role assignment (assign, leave), session-only actions, or frontend checks (permissions-roles / permissions-rebac.check, usePermission / checkPermission, NavItem.access, Button show / disabledText)?",
+  "concepts": ["permissions-members"],
+  "tokens": 8228,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 580,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 8228
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/PERMISSIONS.md"],
+    "docUnits": [
+      "doc:docs/claude/PERMISSIONS.md#member-rows",
+      "doc:docs/claude/PERMISSIONS.md#integrations-and-tokens-by-owner-kind",
+      "doc:docs/claude/PERMISSIONS.md#writing-delegates"
+    ],
+    "catalogClusters": ["mutation-hooks", "roles-and-permissions"],
+    "codeEntries": 9,
+    "docMembers": 18
+  },
+  "bypassLines": 24,
+  "glossaryTerms": 21
+}

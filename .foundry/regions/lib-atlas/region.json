@@ -3,18 +3,18 @@
   "title": "Atlas code map (library + template usage)",
   "routing": "Is this about Atlas, the code map: the @atlas top-of-file block in any template file (@kind / @partOf / @uses / @constructs, @atlas pin, @uses none / @uses?), keeping a file's block true when adding or moving it, the template's .atlas/ folder (config.ts stamp rules with defineConfig and partOfFor, kinds.ts KINDS, concepts.ts CONCEPTS with feature: / primitive: / infrastructure: / integration: / superadmin), navigating by concept with bunx atlas graph --json / bunx atlas query / MAP.md instead of grep, the atlas CLI (stamp, check, coverage, generate, report), or rolling atlas check / coverage gates into CI?",
   "concepts": ["lib-atlas", "atlas"],
-  "tokens": 18919,
+  "tokens": 18487,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 3130,
+      "tokens": 2904,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 18919
+      "tokens": 18487
     }
   },
   "runsAgreed": 0,
@@ -58,7 +58,7 @@
     ],
     "catalogClusters": ["build-deploy-ci", "code-map-atlas"],
     "codeEntries": 26,
-    "docMembers": 55
+    "docMembers": 51
   },
   "bypassLines": 15,
   "glossaryTerms": 30

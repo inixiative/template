@@ -1,20 +1,20 @@
 {
   "id": "data-modeling",
   "title": "Schema conventions and reference data",
-  "routing": "Is this about how the schema is shaped rather than how it is queried: split schema files per model as source of truth, UUIDv7 primary keys, VarChar(36) FKs, createdAt/updatedAt, enum vs row and enum suffix naming, false polymorphism (PolymorphismRegistry / FalsePolymorphismRegistry, getPolymorphismConfig, resolveFalsePolymorphismRef, ownerModel / sourceModel / targetModel / resourceModel, special owner values default and admin), Tag / TagCategory / TagAttachment, or static reference data: COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONE_IDS and their zod schemas and lookups (countryByCode, decimalsFor, symbolFor, callingCodeFor)?",
+  "routing": "Is this about how the schema is shaped rather than how it is queried: split schema files per model as source of truth, UUIDv7 primary keys and typed model ids (ModelIdType, userId, Typed model IDs), VarChar(36) FKs, createdAt/updatedAt, enum vs row and enum suffix naming, false polymorphism (PolymorphismRegistry / FalsePolymorphismRegistry, getPolymorphismConfig, resolveFalsePolymorphismRef, ownerModel / sourceModel / targetModel / resourceModel, special owner values default and admin), Tag / TagCategory / TagAttachment, or static reference data: COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONE_IDS and their zod schemas and lookups (countryByCode, decimalsFor, symbolFor, callingCodeFor)?",
   "concepts": ["data-modeling", "reference-data"],
-  "tokens": 11844,
+  "tokens": 13730,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1960,
+      "tokens": 1852,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 11844
+      "tokens": 13730
     }
   },
   "runsAgreed": 0,
@@ -33,16 +33,18 @@
       "contact-channel-definitions",
       "data-models",
       "documentation-process",
-      "email-composition-rendering",
+      "guided-flows",
+      "immutable-fields",
       "integrations-records",
+      "mutation-hooks",
       "naming-vocabulary",
-      "prisma-schema-introspection",
       "request-response-schemas",
+      "route-templates-controllers",
       "segments-membership",
-      "superadmin-operations"
+      "testing-helpers"
     ],
-    "codeEntries": 50,
-    "docMembers": 12
+    "codeEntries": 38,
+    "docMembers": 24
   },
   "bypassLines": 21,
   "glossaryTerms": 13

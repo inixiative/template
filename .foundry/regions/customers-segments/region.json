@@ -3,18 +3,18 @@
   "title": "Customers and segments",
   "routing": "Is this about provider/customer relationships or audiences built over them: CustomerRef (customer/provider pairs, includeCustomer/includeProvider, customerRefLens), Segment / SegmentMember, segment conditions and their reach, membership reconciliation (reconcileSegment, reconcileCustomerRefSegments, sweepSegments, RECONCILE_TRIGGERS, applyMembershipDiff), segment rule health (soundSegments, withSegmentsRuleIssues), or segment membership events and pages?",
   "concepts": ["customers", "segments"],
-  "tokens": 14648,
+  "tokens": 14384,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 3227,
+      "tokens": 3036,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 14648
+      "tokens": 14384
     }
   },
   "runsAgreed": 3,
@@ -39,14 +39,15 @@
       "filtering-search-ordering",
       "frontend-navigation-context",
       "immutable-fields",
+      "lenses-multi-source",
       "request-response-schemas",
       "route-registration-openapi",
       "rule-references-registry",
       "segments-membership",
       "websocket-realtime-delivery"
     ],
-    "codeEntries": 67,
-    "docMembers": 15
+    "codeEntries": 68,
+    "docMembers": 12
   },
   "bypassLines": 17,
   "glossaryTerms": 26

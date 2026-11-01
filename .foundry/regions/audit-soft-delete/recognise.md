@@ -47,6 +47,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - before and after per field
 - I need to see the tombstoned rows here
 - who gets to see deleted rows
+- strip the ignored fields off the record
 - sessions and tokens should really go when the user is deleted
 - does this model have a deleted-at column
 - fields the audit log shouldn't bother with
@@ -78,6 +79,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - what changed between the two snapshots
 - read a deleted row on purpose
 - superadmins see tombstones everywhere
+- drop the noise fields before comparing
 - ephemeral grants must not come back on revive
 - check the schema for soft-delete support on one model
 - updated-at and last-login shouldn't make audit rows
@@ -110,6 +112,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - field-level diff of two records
 - skip the deleted filter if the user is superadmin
 - the route decides whether deleted rows show
+- remove timestamps from the snapshot
 - hard-delete these children instead of tombstoning
 - one model, soft-deletable or not
 - add a noise field to the ignore list
@@ -138,6 +141,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a status history table with a writer
 - skip non-owning references when deleting
 - check the tombstone before reviving
+- the record minus the fields we ignore
 - special-case token deletion in the cascade
 - field-level check for the deleted column
 - non-meaningful changes to leave out

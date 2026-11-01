@@ -1,0 +1,37 @@
+{
+  "id": "cron",
+  "title": "Background jobs and cron (cron)",
+  "routing": "Is this about running work outside the request: defining, registering, enqueuing or scheduling a background job? Signals: makeJob / makeSingletonJob / makeSupersedingJob, enqueueJob, ctx.enqueueChildJob or job stages, handlers/index.ts registration, WorkerContext / ctx.log, job ids, the BullMQ queue / Worker / processJob, BullBoard, CronJob rows, cron patterns, registerCronJobs / cronJobSync / removeRepeatable, admin job or cron trigger routes, cleanStaleData / archiveStaleRecords, or a fire-and-forget promise, setTimeout or node-cron schedule standing in for a job. (Fast/slow lanes and the JobOutbox overflow buffer are job-lanes-outbox.)",
+  "concepts": ["cron"],
+  "tokens": 8401,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1015,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 8401
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/JOBS.md"],
+    "docUnits": ["doc:docs/claude/JOBS.md#cron-jobs", "doc:FEATURES.md#background-jobs-cron"],
+    "catalogClusters": [
+      "cron-and-recurring-work",
+      "data-access-rules",
+      "job-overflow-outbox",
+      "locks-and-serialization",
+      "seeding-data",
+      "testing-rules"
+    ],
+    "codeEntries": 11,
+    "docMembers": 22
+  },
+  "bypassLines": 14,
+  "glossaryTerms": 26
+}

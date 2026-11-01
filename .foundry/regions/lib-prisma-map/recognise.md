@@ -47,9 +47,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the real column name for this field in raw sql
 - type the table or column name so a bare string won't compile
 - type the raw sql builder's names and values, not bare strings
-- the resolver's relation map should come from the schema
 - the default is now or uuid, don't fill it in yourself
-- the relations of this model, given the client key
 - the relations of this model, given its capitalized name
 - every relation of a model with its foreign key collapsed
 - does this field have a real column behind it
@@ -85,9 +83,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the field is mapped to a snake_case column
 - a branded type for resolved database names
 - a field name compiled where a column was expected
-- I'll hand-maintain the relation targets object
 - I'll apply the schema default to the payload
-- I have the accessor string, what does it relate to
 - which relations hang off this model
 - list a model's relations from the schema map
 - skip relation fields, keep scalars and enums
@@ -123,9 +119,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll use the field name as the column in the query
 - I'll type the column parameter as string
 - I'll type both parameters as string
-- I'll keep a separate parents list for the hydrator
 - literal defaults are values, generated ones are expressions
-- I'll convert the accessor to a model name then look up relations
 - I'll scan the fields for the object kind to list relations
 - I'll loop the fields checking for object kind and read fromFields
 - I'll check the field kind against two strings
@@ -162,8 +156,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - resolve a field to its database column
 - stop a prisma field name from being passed as a column
 - branded types so the wrong name fails to compile
-- derive the relation map and the parents from one schema map
-- list the relations starting from a db accessor
 - list the relations starting from a model name
 - which relations does this model have and what key backs each
 - narrow to fields that are backed by a column
@@ -191,7 +183,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - select all the model's columns under a table alias
 - generate the runtime map of the schema
 - I'll fall back to the field name when the db name is missing
-- don't hand-maintain the relation map
 - the relation list the library gives you from the map
 - fill in the relations on a record I already have
 - validate the capitalized model name from the request

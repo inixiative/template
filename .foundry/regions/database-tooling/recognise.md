@@ -39,6 +39,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - load a dump file into the database
 - put fresh fixture data in the database
 - open a GUI to browse the rows
+- every model gets created and updated timestamps
+- how do I name a new enum
+- how to declare a foreign key column
 - where is the zod schema for this model
 - loaded prod data and webhooks started firing
 - model metadata available at runtime
@@ -46,6 +49,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - declare a model's seed records
 - seed just this one model
 - where does the new model's schema go
+- generate the id in code with a random UUID
 - pull staging data into my local database
 - apply migrations in CI
 - export the database so I can restore it later
@@ -57,6 +61,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - import the snapshot I saved earlier
 - seed the database from the command line
 - poke at the database tables visually
+- add timestamps to the new model
+- naming convention for enum values
+- FK column type in the schema
 - hand-write a request type for the model shape
 - truncate webhook subscriptions after cloning
 - which fields does this model have, in code
@@ -64,6 +71,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which fields to skip on update when re-seeding
 - load a single seed file
 - one prisma file per model
+- autoincrement id for the new table
 - clone prod locally without firing its webhooks
 - ship the schema to the deployed database
 - keep a reusable dump of this data
@@ -81,6 +89,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - seed everything as the seed actor so audit sees it
 - create-only seed data that never updates
 - re-seed one table without the rest
+- time-ordered ids for the primary key
 - dump and restore to get remote data locally
 - the deploy step that updates the database
 - back up the database before I try this
@@ -94,6 +103,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - write a one-off script to insert fixture rows
 - the shape of a seed definition
 - run only the email template seeds
+- the default id generator for a model
 - reset to the standard data set
 - loop over records with create to populate the database
 

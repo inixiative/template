@@ -40,16 +40,17 @@ A moment that says any of these, or something close, is this region's. Both voic
 - add a custom verb endpoint like activate or archive
 - a superadmin-only endpoint
 - never write a raw route definition
-- how a resource module is organized
 - where do the routes, controllers and schemas go in a module
 - the handler needs the current user or org
-- add an optional field instead of changing the signature
 - run several API calls in one request
+- bulk and multi-step endpoints answer 200 with a status field
 - build the shared primitive fully, not a minimal slice
+- where does the schema for this route live
 - what does the create endpoint return
 - declare the endpoint that inserts a new record
 - a helper used by several modules
 - break the task down before writing code
+- what schema to use for the response
 - declare the endpoint that removes a record
 - start from the generated schema and only add what's missing
 - I'll make a services file for this one Prisma call
@@ -57,6 +58,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - routes are found by file, not by import
 - declare which fields the list can be filtered by
 - call the API from the frontend
+- the body schema for a create or update
 - superadmins still get the lens where applied
 - write the handler for a route
 - where do migrations go
@@ -73,7 +75,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll add this export to the existing file
 - generate the API spec from the routes
 - return more fields to admins on the same endpoint
-- I'll add the role mapping inside the permissions package
 - login providers the platform offers versus ones an org configures
 - should this module have a fixtures folder
 - filter a list through URL query params
@@ -81,8 +82,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - return 201 from the create endpoint
 - return 204 from the delete
 - return 200 with the record
-- is there already something that does this
-- check for duplicates before merging
 - endpoints get their OpenAPI docs for free
 - attach the permission check to the route declaration
 - what to call the exported router
@@ -102,16 +101,17 @@ A moment that says any of these, or something close, is this region's. Both voic
 - an endpoint that isn't plain create, read, update or delete
 - the admin version of this list route
 - every new endpoint goes through a template
-- where do external service integrations go versus modules
 - set up a new API module folder
 - I'll pass the user and db down as function parameters
-- don't break every caller by changing the parameters
 - I'll fire the requests one after another and thread the ids through
+- I'll return a 4xx when some items fail
 - finish the foundation in shared instead of a stub
+- put the schema next to the route
 - send back the new record without its secrets
 - I'll define the POST route by hand with method, path and responses
 - I'll import this from the other module's utils
 - plan the pieces first
+- the response shape for a model's fields
 - the delete endpoint for this model
 - hand-write only fields that aren't on the model
 - does this trivial controller need a service
@@ -119,6 +119,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - add a file to register a route
 - the lens on the route controls filtering, not the response
 - I'll write a typed fetch helper for this endpoint
+- I'll hand-type the body schema for this model
 - the route's filter still narrows for admins
 - a plain async handler that returns c.json
 - should the module have its own migrations folder
@@ -135,7 +136,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - don't pile unrelated exports into one file
 - where are the interactive API docs served
 - privileged callers see extra data, others see less
-- app-specific permission pieces go in the app package
 - platform SSO config comes from env, org SSO lives in the database
 - build test data with factories not static fixtures
 - nested filters and comparison operators without GraphQL
@@ -143,8 +143,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll return c.json with status 201
 - respond with no body after deleting
 - respond from a read or update
-- don't add a new util when one exists
-- I wrote a helper that already exists
 - build the endpoint from the shared template so the spec stays consistent
 - I'll call router.use on this path to add the check
 - name the normal and admin routers for a module
@@ -164,14 +162,15 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll add a mode flag to the update body for this operation
 - the flag on the route so it sees deleted rows
 - don't hand-roll routes
-- the folder layout every module follows
 - what folders does a module have
 - store the current user in a module-level variable
 - a bespoke bulk endpoint for creating many at once
 - a requested utility should be complete
+- a shared schemas file only when several routes use it
 - created status with the safe version of the row
 - the create endpoint for this model
 - where does code shared across modules live
+- use the generated model schema for responses
 - I'll write a DELETE route by hand
 - extend the model schema instead of redefining it
 - keep the single query inline
@@ -179,6 +178,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - convention over manual wiring for module routes
 - whitelist the searchable fields for this endpoint
 - a hand-written API client module
+- mirror the Prisma create input in zod
 - does the lens apply when a superadmin lists
 - I'll add try/catch in the controller and format the response myself
 - which folder names are allowed in a module
@@ -193,7 +193,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - split the file when it serves different consumers
 - I'll maintain an OpenAPI file by hand
 - I'll make a separate admin route that returns the full record
-- what belongs in the permissions core versus the app
 - where does a custom SAML provider for one org live
 - when are fixtures allowed
 - I'll add custom query params for each filter on this list
@@ -201,8 +200,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - respond after inserting the record
 - I'll return c.body null with 204
 - send the data back with pagination metadata beside it
-- single-source the logic instead of duplicating
-- remove the duplicate implementation
 - I'll write the OpenAPI definition for this route by hand
 - put the token check at the top of the controller
 - the routes folder uses the matching template
@@ -230,6 +227,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - save provider credentials safely
 - I'll keep a searchable fields array on the route
 - duplicate the request and response types on the frontend
+- where does the request body schema come from
 - the controller should validate what it returns
 - a new folder inside an API module
 - where does the route get attached to the app

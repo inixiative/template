@@ -1,20 +1,20 @@
 {
   "id": "auth-middleware-users",
   "title": "Auth middleware, validators and users",
-  "routing": "Is this about what happens to a credential once it reaches the API: the middleware order in apps/api/src/routes/api.ts (corsMiddleware, jwtAuthMiddleware, tokenAuthMiddleware, spoofMiddleware, auditActorMiddleware), requireAuth / requirePublic, there being no \"is there a user\" gate (every route names its action; user-only acts are rules on the actor), basicAuthMiddleware, probes (isAuthProbe, isSystemProbe), spoofing (x-spoof-user-email, spoofedBy), or the User model: findUserByEmail, findUserOrCreateGuest, findUserWithRelations, normalizeEmail, phoneToStubEmail, redactUser / redactSensitiveFields, the me and user modules?",
+  "routing": "Is this about what happens to a credential once it reaches the API: the middleware order in apps/api/src/routes/api.ts (corsMiddleware, tokenAuthMiddleware, authMiddleware, spoofMiddleware, auditActorMiddleware), requireAuth / requirePublic, validateUser vs validateActor vs validateNotToken, basicAuthMiddleware, probes (isAuthProbe, isSystemProbe), spoofing (x-spoof-user-email, spoofedBy), or the User model: findUserByEmail, findUserOrCreateGuest, findUserWithRelations, normalizeEmail, phoneToStubEmail, redactUser / redactSensitiveFields, the me and user modules?",
   "concepts": ["auth-middleware", "users"],
-  "tokens": 10274,
+  "tokens": 9501,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2337,
+      "tokens": 1869,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 10274
+      "tokens": 9501
     }
   },
   "runsAgreed": 0,
@@ -24,17 +24,16 @@
       "doc:docs/claude/AUTH.md#auth-middleware-chain",
       "doc:docs/claude/AUTH.md#spoof-middleware",
       "doc:docs/claude/AUTH.md#validation-middleware",
-      "doc:docs/claude/AUTH.md#who-is-a-user",
       "doc:FEATURES.md#user-management"
     ],
     "catalogClusters": [
+      "audit-logging",
       "auth-middleware-validation",
-      "authentication-methods",
       "request-context-access",
-      "route-registration-openapi",
+      "roles-and-permissions",
       "user-identity-management"
     ],
-    "codeEntries": 33,
+    "codeEntries": 35,
     "docMembers": 10
   },
   "bypassLines": 21,

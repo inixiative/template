@@ -3,18 +3,18 @@
   "title": "The lens model",
   "routing": "Is this about what a json-rules lens is and how its layers compose \u2014 a Lens anchored at mapName and model, LensNarrowing layers that only narrow, schema narrowing (picks / omits / enumPicks / enumOmits) vs data narrowing (where clamps), relations off until the first narrowing turns them on and the model-default tree, the three where anchors (root.where, a mapDefaults model where, a root.relations path where), the all filter-first trick, composition as intersection and validateNarrowing's codes, LensRefusal, binds across layers (parent:name), enum narrowing from five sources, the full type shape, or a lens's composed / stored / projected forms (storeLens / composeLens / StoredLens)?",
   "concepts": ["lib-json-rules-lens"],
-  "tokens": 12612,
+  "tokens": 12767,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 900,
+      "tokens": 854,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12612
+      "tokens": 12767
     }
   },
   "runsAgreed": 0,

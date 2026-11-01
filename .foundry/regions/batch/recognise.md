@@ -27,18 +27,16 @@ A moment that says any of these, or something close, is this region's. Both voic
 - execute many API requests in one call
 - I'll return 207 for partial failure
 - create the parent, then use its id in the next request
-- sub-requests inherit the caller's auth without re-authenticating
 - reference a value from an earlier response in a later path or body
 - rounds go one after another so interpolation works
 - how many requests can a batch hold
 - how long can the whole batch take
-- I'll share the parent's user object across sub-requests
+- run these tasks at the same time and isolate failures
 - run the whole batch under its strategy
 - dispatch one sub-request inside a strategy
 - stop at the first round that fails, keep what already happened
 - the batch registry only works on one instance
 - a placeholder pointing at a later or same round
-- a closed set of named options with implementations
 - a batch request inside a batch
 - a sub-request with a full URL or another batch
 - run many API requests in ordered rounds in one call
@@ -56,18 +54,16 @@ A moment that says any of these, or something close, is this region's. Both voic
 - where the batch endpoint lives
 - the batch call itself succeeded even if items failed
 - run several operations atomically feeding earlier results forward
-- auth middleware skips when batch context exists
 - feed round one's id into round two
 - I'll run the rounds in parallel
 - cap requests per batch and per round
 - transaction strategies enforce the timeout over the batch
-- sub-requests mutated each other's context
+- I'll use Promise.allSettled across the handoffs
 - the entry point for a batch
 - the low-level single call
 - later steps depend on the earlier ones succeeding
 - multi-instance needs a redis-backed registry
 - you can only reference rounds that already ran
-- I'll maintain a union type and a list of names by hand
 - sub-requests can't call the batch endpoint
 - every batched request is a relative path, never nested
 - I'll build a bespoke bulk endpoint
@@ -85,10 +81,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll build a bulk endpoint for this
 - status lives in the payload, not the HTTP code
 - I'll have the client chain requests and thread the ids
-- I'll copy the headers onto each sub-request
 - I'll substitute the ids in the client between calls
 - scale the timeout with the record count
-- clone mutable context, share only read-only values
+- concurrent work where one failure must not sink the others
 - I'll loop the rounds myself in the controller
 - I'll fetch the API's own URL from inside the server
 - no rollback, just stop

@@ -3,18 +3,18 @@
   "title": "API routes, controllers and modules",
   "routing": "Is this about adding or shaping an endpoint: route templates (readRoute, createRoute, updateRoute, deleteRoute, actionRoute) and their args (model, submodel, action, many, paginate, admin, sanitizeKeys, filterLens, middleware), makeController and respond.ok / respond.created / respond.noContent, the { data } envelope, operationId naming, router exports and mounting, or where code goes inside an API module (routes/, controllers/, services/, handlers/, permissions-roles / permissions-rebac/, validations/, MODULES.md)?",
   "concepts": ["route-templates", "api-modules"],
-  "tokens": 16246,
+  "tokens": 17843,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 3194,
+      "tokens": 3163,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 16246
+      "tokens": 17843
     }
   },
   "runsAgreed": 1,
@@ -45,20 +45,24 @@
       "error-handling",
       "filtering-search-ordering",
       "frontend-state-api-client",
+      "integrations-records",
       "job-definition-and-enqueue",
       "lenses-multi-source",
       "module-layout-monorepo",
       "naming-vocabulary",
+      "permission-rule-algebra",
       "request-context-access",
       "request-response-schemas",
       "roles-and-permissions",
       "route-registration-openapi",
       "route-templates-controllers",
       "soft-delete-cascade",
-      "testing-helpers"
+      "superadmin-operations",
+      "testing-helpers",
+      "testing-rules"
     ],
     "codeEntries": 13,
-    "docMembers": 64
+    "docMembers": 75
   },
   "bypassLines": 24,
   "glossaryTerms": 19

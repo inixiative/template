@@ -13,15 +13,15 @@ A moment that says any of these, or something close, is this region's. Both voic
 - let admins see every request across the platform
 - the admin pages for received and sent requests
 - the web pages listing received and sent requests
-- only the sender can cancel and it soft-deletes
+- what the approver is allowed to submit when resolving
 - the create route checks permission itself, not in middleware
+- lock the row while I update it
+- these writes need to commit together or not at all
 - the sender can be a user, org, space or admin
 - make sure exactly one party column is set on each side
 - a list of just invitations or just transfers
 - look up the components registered for this request type
 - check permission on a request that doesn't exist yet
-- invite someone who doesn't have an account yet
-- the recipient shouldn't see unsent drafts
 - the recipient is resolving, load who sent it
 - a single read should return both sides fully
 - return the sent request with its target attached after the update
@@ -37,13 +37,15 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the sender's buttons: edit, send, cancel
 - approve or decline buttons for the recipient
 - disable the buttons once the request is finished or expired
+- you can only target a membership that already exists
 - register components for a request type instead of branching
 - the query for the current context's inbox
 - approving this type changes a list, so refresh it
 - register the form and summary for a new request type
 - the query for the current context's outbox
-- the sender comes from the route, never the body
+- a request whose source is an integration, token or membership
 - pick the include and response schema for the side acting
+- the caller knows the org slug, not its id
 - link the resulting changes back to the request that caused them
 - which sender-side lists refresh after create, send or cancel
 - move a space to another organization
@@ -59,15 +61,15 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a superadmin list of all pending and past requests
 - where admins browse requests in the admin app
 - where users see their inbox and outbox
-- cancel clears the deadline and marks it canceled
+- the shared shape of a resolution body: explanation plus overrides
 - there's no row yet so middleware can't gate it
+- read the row, then update it, without a race
+- wrap the whole thing in one transaction
 - model either side with typed nullable foreign keys
 - reject a request with both a user and an org as source
 - filter the base list page instead of writing a new one
 - which form and summary does this kind of request render with
 - a high-role invite needs own, not just manage
-- address the request to an email instead of a user id
-- the inbox only shows sent requests
 - received list needs the sender side relations only
 - the admin list needs every relation for the audit view
 - the sender edits or sends, load the recipient side relations
@@ -83,13 +85,15 @@ A moment that says any of these, or something close, is this region's. Both voic
 - let the person who asked withdraw their request
 - the inbox row needs accept and reject actions
 - is this request still actionable in the UI
+- invite by email creates a guest, membership targets don't
 - add UI for a new type without touching the pages
 - list requests addressed to this org, space or me
 - the org's space list should update after a transfer is accepted
 - add UI for a new kind of request
 - list requests this org, space or user has sent
-- I'll read the source id from the request body
+- no route creates those, a service sets the party
 - return the related rows the sender or recipient needs in one call
+- address the request by slug
 - the audit log should show which approval created this row
 - the outbox should update after I send
 - the page for handing a space over
@@ -105,15 +109,15 @@ A moment that says any of these, or something close, is this region's. Both voic
 - filter all requests by status in the admin app
 - admin inbox and outbox routes
 - the communications routes in the web app
-- withdrawing keeps the row for the audit trail
+- start the resolve form schema from the common fields
 - I'll add a permission middleware to the create route
+- two requests could read-modify-write the same row
+- several related updates must be atomic
 - I'll store a generic party id and type string
 - validate the polymorphic columns on write
 - I'll write a page that queries requests for this type
 - read the per-type UI registry entry
 - per-type permission rules at create time
-- create a placeholder user for the invitee
-- sent lists include targets, received include sources
 - the approve endpoint should return the source details
 - load the request with all its parties for a GET
 - include the related rows in one call on create and send
@@ -129,13 +133,15 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the outbox row needs its action buttons
 - let the person asked answer the request
 - treat a past deadline as closed on the frontend
+- the target org user wasn't found
 - I'll switch on the type inside the controls
 - load incoming requests for the current tenant
 - I'll invalidate that list's query inline after resolve
 - I'll switch on the type inside the list page to pick components
 - load outgoing requests for the current tenant
-- any new create path infers who is asking
+- the sending party is set by the service that holds it
 - I'll include all six relations on this mutation
+- look up the recipient org or space by slug
 - trace a membership back to its invite
 - refetch the sent list when the sender acts
 - request a transfer of ownership
@@ -148,6 +154,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the recipient's resolve action
 - move a saved draft to sent
 - the hook for editing a request
+- create it if missing without a duplicate race
+- just use a transaction here
 - I'll include every source and target relation on the resolve response
 - the full response shape with sender and recipient attached
 - return the sent and received relations the sender needs
@@ -158,7 +166,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which include goes with which endpoint
 - I'll invalidate the sent query after this mutation by hand
 - I'll call invalidate queries after resolving
+- select for update on this row inside the transaction
+- write both rows in one go so neither lands alone
 - I'll write the include object for the update endpoint by hand
+- only one of the concurrent accepts should win on this row
+- the transition and the delete aren't transactional
 
 ## When this is not your domain
 

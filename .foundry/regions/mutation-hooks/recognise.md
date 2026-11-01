@@ -50,15 +50,14 @@ A moment that says any of these, or something close, is this region's. Both voic
 - skip the hooks on purpose for this write
 - several related updates that must each be validated
 - I need to see the tombstoned rows here
+- a relation that can point at several models
 - enforce the polymorphic owner constraints on write
 - which cache keys does this row touch
-- strip the ignored fields off the record
 - foreign keys can't be changed on update
 - which fields are locked on this model
 - read the effective rule for a model
 - id and created-at can never change
 - changes to this field shouldn't trigger hooks
-- add a Postgres trigger for this
 - strip the id and foreign keys from the update payload
 - lock this field after creation for one model
 - the approve handler moves a space to another org
@@ -76,6 +75,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a sortable column on a model
 - keep positions dense from one to n
 - give this model a position column that stays in order
+- the per-record override column
 - block a real delete on a soft-delete model
 - raw SQL changed rows but the cache is stale
 - nested creates are validated too
@@ -99,7 +99,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - update a batch of rows and get them back
 - validate the update against the resulting row
 - deliver webhooks after a mutation commits
-- what fields did this write actually set
 - scope the job's writes to an actor
 - carry the actor across the transaction boundary
 - a scope key is missing on the row
@@ -111,15 +110,14 @@ A moment that says any of these, or something close, is this region's. Both voic
 - write without audit, webhooks or cache clears, deliberately
 - wrap the parent and child writes in one transaction
 - read a deleted row on purpose
+- I'll use a generic id plus type column
 - check the owner kind matches the FK that's set
 - clear the cache for rows a raw write changed
-- drop the noise fields before comparing
 - the FK update silently did nothing
 - read the resolved immutable list
 - look up what validation applies here
 - fields stripped from every model's update
 - treat position re-stamps as no-ops
-- reactive logic in the database vs in code
 - silently drop fields that can't change
 - allow this FK to change on one model
 - the handler's FK update returned 200 but changed nothing
@@ -137,6 +135,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - position arithmetic in the service
 - renumber after a delete
 - max position plus one on insert
+- widen access on one row
 - someone called delete on a tombstone-only model
 - clear the cache after a raw write
 - validate the child rows inside a nested create
@@ -160,7 +159,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - bulk update where the rules still run per row
 - the validator only sees the patch, not the whole row
 - the hook that sends outbound webhooks
-- dig through the args data, create and update by hand
 - bypass soft-delete scoping for this block
 - actor context missing in the job handler
 - which list is this row in
@@ -172,15 +170,14 @@ A moment that says any of these, or something close, is this region's. Both voic
 - use the raw client to make bulk writes work
 - just use a transaction here instead of nested writes
 - skip the deleted filter if the user is superadmin
+- the owner can be a user, org or space
 - compile-time shape for polymorphic owner checks
 - per-row invalidation when the hook was bypassed
-- remove timestamps from the snapshot
 - every FK is locked by default
 - read the overrides object directly
 - index the rules object directly
 - the global locked fields
 - the field list composed from ordering and encryption registries
-- a plpgsql function in the migration
 - the hook that removes locked fields
 - unlock the owner column so the inquiry can move it
 - escape to raw to change the owner FK
@@ -198,6 +195,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - any model with a maintained order
 - the hook that maintains position columns
 - shift the siblings when I move an item
+- I'll write a narrower rule to revoke access
 - delete-many on a model that should only soft-delete
 - the raw cascade skipped the mutation hook
 - the sub-models in the data payload get checked
@@ -221,7 +219,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a bare update-many for the batch
 - derived fields need the merged record
 - fire the subscription when a row changes
-- the written values for audit or webhooks
 - set who is acting for the duration of this call
 - revived items rejoin at the end
 - the negative sentinel for tombstones
@@ -230,7 +227,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - go around the lifecycle for this one query
 - all the writes for one action commit together
 - check the tombstone before reviving
-- the record minus the fields we ignore
 - the effective locked fields for a model
 - someone sent a new id in the update
 - per-model list of locked fields

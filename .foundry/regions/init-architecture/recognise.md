@@ -179,5 +179,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 These mention this region's words but belong elsewhere; the answer is no, and the region named answers instead.
 
 - Get my schema change into the database → database-tooling
+- Store or read a cloud secret → secrets
 - Only do this in prod → environments-deploy
 - Encrypt or decrypt a stored secret field → encryption

@@ -3,7 +3,7 @@
   "title": "Lens option sources and bridges",
   "routing": "Is this about the values a picker may offer for a lens field, or about rules over data from several sources \u2014 a narrowing's sources (an eligibility Condition or a SourceSpec { where, label, groupBy }), toSourceQueries' per-field DISTINCT queries and their steps, materializeSourceQuery / materializeSources, projectLens(\u2026, { sourceValues }) options, a from: 'mapDefaults' pointer vs a path source, bridged sources that over-fetch with a recheck, describeRuleSources and listBindings, or evaluating a rule across bridges (bridge keys like salesforce:Contact, indexBridges, embedding foreign rows, one-to-many bridge arrays)?",
   "concepts": ["lib-json-rules-lens-sources"],
-  "tokens": 8311,
+  "tokens": 8350,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 8311
+      "tokens": 8350
     }
   },
   "runsAgreed": 0,

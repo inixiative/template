@@ -189,8 +189,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 
 These mention this region's words but belong elsewhere; the answer is no, and the region named answers instead.
 
+- Run this every night → cron
 - Which job wrapper do I use → jobs-cron
 - I need to stop two of these running at once → concurrency-locks
 - Which redis connection do I use → redis-caching-rate-limits
 - Send an email to the user → email-delivery
-- Put the request or job id on every log line → observability-lifecycle

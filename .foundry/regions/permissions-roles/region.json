@@ -1,20 +1,20 @@
 {
   "id": "permissions-roles",
-  "title": "Roles, actions and permission checks",
-  "routing": "Is this about who may do what by role: PlatformRole and superadmin, Role on OrganizationUser / SpaceUser (owner, admin, member, viewer; roleHierarchy, isSuperadmin), StandardAction tiers (own \u2287 manage \u2287 operate \u2287 read), the per-request Permix (installPermissions, installPermissionsFor / userPermissions, permissionsOfUser, ownerPermissions / delegatedPermissions (the library's delegate), permix.setup / setActor / getActor / setSuperadmin), member rows and the member self-grant, full and delegateFull (validateFullGrant), entitlements and their allow-override, a delegate never exceeding its owner, validatePermission / validateSubmodelPermission and the validation middleware order, role assignment (memberRoleWrite, integrationRoleWrite, memberRemoval, leave), user-only actions (actorIsUser), or frontend checks (permissions-roles / permissions-rebac.check, usePermission / checkPermission, NavItem.access, Button show / disabledText)?",
+  "title": "Roles, actions and permission checks (permissions-roles)",
+  "routing": "Is this about who may do what by role: PlatformRole and superadmin, Role on OrganizationUser / SpaceUser (owner, admin, member, viewer; roleHierarchy, greaterRole / lesserRole / rolesAtOrAbove, isSuperadmin), StandardAction tiers (own \u2287 manage \u2287 operate \u2287 read), the per-request Permix (setupOrgPermissions / setupSpacePermissions / setupUserPermissions, setupOrgContext / setupSpaceContext / setupUserContext, permix.setup / check / setSuperadmin / getJSON), entitlements and their allow-override, tokens never exceeding the user's role, validateRole, validatePermission and the validation middleware order, role assignment (assign, leave), session-only actions, or frontend checks (permissions-roles / permissions-rebac.check, usePermission / checkPermission, NavItem.access, Button show / disabledText)?",
   "concepts": ["permissions-roles"],
-  "tokens": 19681,
+  "tokens": 17279,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2257,
+      "tokens": 1906,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 19681
+      "tokens": 17279
     }
   },
   "runsAgreed": 0,
@@ -25,11 +25,6 @@
       "doc:docs/claude/PERMISSIONS.md#the-model",
       "doc:docs/claude/PERMISSIONS.md#roles",
       "doc:docs/claude/PERMISSIONS.md#actions",
-      "doc:docs/claude/PERMISSIONS.md#member-rows",
-      "doc:docs/claude/PERMISSIONS.md#integrations-and-tokens-by-owner-kind",
-      "doc:docs/claude/PERMISSIONS.md#full-and-delegatefull",
-      "doc:docs/claude/PERMISSIONS.md#resolution-at-read-time",
-      "doc:docs/claude/PERMISSIONS.md#writing-delegates",
       "doc:docs/claude/PERMISSIONS.md#entitlements",
       "doc:docs/claude/PERMISSIONS.md#permix",
       "doc:docs/claude/PERMISSIONS.md#validation-middleware",
@@ -38,14 +33,21 @@
     ],
     "catalogClusters": [
       "auth-middleware-validation",
+      "authentication-methods",
+      "caching-and-invalidation",
       "frontend-navigation-context",
+      "integrations-records",
+      "multi-tenancy-membership",
+      "naming-vocabulary",
       "permission-rule-algebra",
       "roles-and-permissions",
       "soft-delete-cascade",
+      "superadmin-operations",
+      "testing-rules",
       "ui-components"
     ],
-    "codeEntries": 26,
-    "docMembers": 32
+    "codeEntries": 34,
+    "docMembers": 66
   },
   "bypassLines": 24,
   "glossaryTerms": 21

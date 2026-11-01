@@ -115,14 +115,16 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
 | build the full URL with query string for an operation; I'll concatenate the path and filter params by hand; get the read path for a flow from its operation id; turn an operation id into a request path | **apiPath** · primitive `apps/api/src/lib/openapi/apiPath.ts#apiPath` — Need a full path string with query (e.g. flow readPath); for the operation metadata itself use resolveOperation. | docs/claude/FLOWS.md § Registry; FEATURES.md § Flows | string-concatenating API paths and filter[...] query strings by hand for an operation (catalog apiPath) |
-| the main Hono instance everything mounts on; where routes get attached to the server; the instance used for internal batch routing | **app** · primitive `apps/api/src/app.ts#app` — hold the API's OpenAPIHono instance for internal routing in the batch API | — | — |
-| pick up every route file in the module automatically; I'll import each route and controller and register them one by one; drop a file in routes and it's served; register all the module's routes at once; no manual imports for new routes | **autoRegisterRoutes** · primitive `apps/api/src/lib/utils/autoRegisterRoutes.ts#autoRegisterRoutes` — Use instead of mounting by hand with router.openapi(route, controller) in the module's index.ts. | docs/claude/DOMAIN-DOCS.md § Migrations in progress; FEATURES.md § API Architecture & Routing | a module index.ts that imports every route and controller by hand and calls router.openapi(route, controller) line by line (FEATURES.md § API Architecture & Routing (File-Based Route Auto-Registration: "No manual imports needed")) |
+| the main Hono instance everything mounts on; where routes get attached to the server; the instance used for internal batch routing | **app** · primitive `apps/api/src/app.ts#app` — root OpenAPIHono instance that mounts routes; used for internal routing in batch API | — | — |
+| pick up every route file in the module automatically; I'll import each route and controller and register them one by one; drop a file in routes and it's served; register all the module's routes at once; no manual imports for new routes | **autoRegisterRoutes** · primitive `apps/api/src/lib/utils/autoRegisterRoutes.ts#autoRegisterRoutes` — routes that must precede others, like info routes: mount by hand before calling it | docs/claude/API_ROUTES.md § Router Exports; docs/claude/DOMAIN-DOCS.md § Migrations in progress | a module index.ts that imports every route and controller by hand and calls router.openapi(route, controller) line by line (FEATURES.md § API Architecture & Routing (File-Based Route Auto-Registration: "No manual imports needed")) |
 | look up an operation's details by its id in-process; find the route metadata for an operation without building a URL; which path and method does this operation id map to; resolve the operation for a websocket channel | **resolveOperation** · primitive `apps/api/src/lib/openapi/resolveOperation.ts#resolveOperation` — Need resolved operation details in-process (e.g. websockets); for a ready path-plus-query string use apiPath. | docs/claude/WEBSOCKETS.md § Channel registry and authorization | — |
+| derive a route's OpenAPI security requirement from its internal and security args | **securityForRoute** · primitive `apps/api/src/lib/auth/routeSecurity.ts#securityForRoute` — derive a route's OpenAPI security requirement from its internal and security args | — | — |
 | declare which auth the route accepts in OpenAPI; I'll write the security array with bearerAuth by hand; mark the route as needing a token in the spec | **securityRequirements** · primitive `apps/api/src/lib/auth/securitySchemes.ts#securityRequirements` — Use in route configs; securitySchemes holds the scheme definitions themselves. | — | hand-written security: [{ bearerAuth: [] }] arrays in route configs (catalog securityRequirements) |
+| require OpenAPI-style {id} path params in route definitions, not Hono :id | **openapi-path-params** · rule `scripts/ci/rules/openapi-path-params.sh` — Hono runtime paths (app.get, c.req.routePath) keep :id; only OpenAPI route definitions use {id}. | docs/claude/API_ROUTES.md § Route Templates | — |
 | a public endpoint tenants call; where do customer-facing routes live; mount this under the public API; the normal API surface | **apps/api/src/routes/api** · system `apps/api/src/routes/api` — Public tenant endpoints; internal/ops calls go in routes/internal, liveness in routes/health. | — | — |
 | an endpoint only our own services call; a non-public ops route; where do service-to-service calls go; an internal route that isn't exposed to tenants | **apps/api/src/routes/internal** · system `apps/api/src/routes/internal` — Non-public service calls; public endpoints belong in routes/api. | — | — |
 
-- *Also here, by name:* Tags (`apps/api/src/modules/tags.ts`); autoRegisterAdminRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); autoRegisterInternalRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); buildOperationId (`apps/api/src/lib/routeTemplates/utils/buildOperationId.ts`); buildTags (`apps/api/src/lib/routeTemplates/utils/buildTags.ts`); errorResponses (`apps/api/src/lib/routeTemplates/errorResponses.ts`); registerSecuritySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); securityForRoute (`apps/api/src/lib/auth/routeSecurity.ts`); securitySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); toOpenApi (`apps/api/src/lib/routeTemplates/utils/toOpenApi.ts`)
+- *Also here, by name:* Tags (`apps/api/src/modules/tags.ts`); autoRegisterAdminRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); autoRegisterInternalRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); buildOperationId (`apps/api/src/lib/routeTemplates/utils/buildOperationId.ts`); buildTags (`apps/api/src/lib/routeTemplates/utils/buildTags.ts`); errorResponses (`apps/api/src/lib/routeTemplates/errorResponses.ts`); registerSecuritySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); securitySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); toOpenApi (`apps/api/src/lib/routeTemplates/utils/toOpenApi.ts`)
 
 ### Class `request-schemas`: Request/response zod schemas: generated Prisma zod, ScalarSchema, sanitizeRequestSchema
 
@@ -149,14 +151,22 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| validate a return URL is a safe in-app path; I'll check it startsWith slash and not double slash; a zod field for a redirect path; the returnUrl must stay inside the app | **appPathSchema** · primitive `packages/shared/src/utils/isAppPath.ts#appPathSchema` — Zod fields like flow returnUrl; plain boolean checks: isAppPath instead. | docs/claude/FLOWS.md § Registry | hand-rolled returnUrl checks (startsWith('/') && !startsWith('//'), length caps) in a zod schema (catalog appPathSchema) |
+| validate a return URL is a safe in-app path; I'll check it startsWith slash and not double slash; a zod field for a redirect path; the returnUrl must stay inside the app | **appPathSchema** · primitive `packages/shared/src/utils/isAppPath.ts#appPathSchema` — Zod fields like flow returnUrl; plain boolean checks: isAppPath instead. | docs/claude/HOOKS.md § False Polymorphism; docs/claude/FLOWS.md § Registry | hand-rolled returnUrl checks (startsWith('/') && !startsWith('//'), length caps) in a zod schema (catalog appPathSchema) |
+| validate entitlement entries as resource, anchor, where and actions; refuse flat action maps | **entitlementEntriesSchema** · primitive `packages/permissions/src/rebac/entitlementEntrySchema.ts#entitlementEntriesSchema` — Validating incoming entitlement writes; filtering already-stored entries: wellFormedEntitlements instead. | docs/claude/PERMISSIONS.md § Entitlements | — |
+| wrap a types schema into the { guide, types } info route response | **infoResponseSchema** · primitive `apps/api/src/lib/jsonSchema/infoResponseSchema.ts#infoResponseSchema` — Info routes; jsonSchemaResponseSchema for routes returning a raw JSON Schema. | docs/claude/API_ROUTES.md § Router Exports | — |
 | check if a string is an in-app path; a boolean check for a safe relative path; is this redirect target local | **isAppPath** · primitive `packages/shared/src/utils/isAppPath.ts#isAppPath` — Imperative checks; in zod schemas use appPathSchema. | — | — |
 | check if a string is a valid id; a boolean test for our id format; is this an id or a slug | **isUuidV7** · primitive `packages/shared/src/utils/isUuidV7.ts#isUuidV7` — Imperative checks; in zod schemas use uuidV7Schema. | — | — |
+| validate entitlements/add/remove fields in a permissions request body | **permissionsBodyRefinement** · primitive `apps/api/src/lib/routeTemplates/permissionsBodyRefinement.ts#permissionsBodyRefinement` — false-polymorphic target bodies: polymorphicBodyRefinement instead | — | — |
+| require a body naming a polymorphic target to set axis field and matching FK | **polymorphicBodyRefinement** · primitive `apps/api/src/lib/routeTemplates/polymorphicBodyRefinement.ts#polymorphicBodyRefinement` — permissions entitlements/add/remove bodies: permissionsBodyRefinement instead | docs/claude/API_ROUTES.md § Schemas; docs/claude/HOOKS.md § False Polymorphism | — |
+| build a request-body Zod schema with one strict arm per polymorphic target value | **polymorphicSchema** · primitive `packages/db/src/registries/polymorphicSchema.ts#polymorphicSchema` — Use wherever a request names a false-polymorphic target instead of hand-writing a zod union. | docs/claude/HOOKS.md § False Polymorphism; docs/claude/DATABASE.md § Registries | — |
 | drop server-managed keys from the generated schema; I'll write a trimmed copy of the generated schema; a long omit chain just to remove ownerId; take the client-unsettable fields out of the body schema; the body schema shouldn't accept the owner id | **sanitizeRequestSchema** · primitive `apps/api/src/lib/routeTemplates/utils/sanitizeRequestSchema.ts#sanitizeRequestSchema` — Removing client-unsettable fields from generated schemas instead of hand-writing a reduced zod schema. | — | a hand-written reduced copy of a generated schema, or long .omit chains, just to drop server-managed keys like ownerId (catalog sanitizeRequestSchema) |
+| convert a zod schema to JSON Schema for its input or output side | **toJsonSchema** · primitive `apps/api/src/lib/jsonSchema/toJsonSchema.ts#toJsonSchema` — Use instead of calling z.toJSONSchema directly; unrepresentable types become any. | docs/claude/API_ROUTES.md § Router Exports | — |
+| validate a user JWT handoff payload of token and expiry timestamp | **userJwtHandoffSchema** · primitive `apps/api/src/modules/me/schemas/changePasswordSchemas.ts#userJwtHandoffSchema` — Reuse when a route returns a fresh user JWT; changePasswordResponseSchema wraps it with a null alternative. | — | — |
+| shape every user response, stripping jwtVersion from the user scalars | **userResponseSchema** · primitive `apps/api/src/modules/user/schemas/userResponseSchema.ts#userResponseSchema` — Any route returning a user: use this instead of UserScalarSchema directly, which would leak jwtVersion. | docs/claude/AUTH.md § User JWT | — |
 | the user with their memberships in the response; a schema for the user plus their orgs and spaces; return the full user object with relations; the shape of the logged-in user | **UserWithRelationsSchema** · primitive `packages/db/src/types/userWithRelations.ts#UserWithRelationsSchema` — Need user plus memberships: use this instead of plain UserScalarSchema. | — | — |
-| validate an id field in a schema; I'll use z.string().uuid() for the id; a zod field for our ids; a regex for uuid v7 in the schema | **uuidV7Schema** · primitive `packages/shared/src/utils/isUuidV7.ts#uuidV7Schema` — Schema fields; boolean checks outside zod: isUuidV7. | — | z.string().uuid() or a hand-written uuidv7 regex on id fields (catalog uuidV7Schema) |
+| validate an id field in a schema; I'll use z.string().uuid() for the id; a zod field for our ids; a regex for uuid v7 in the schema | **uuidV7Schema** · primitive `packages/shared/src/utils/isUuidV7.ts#uuidV7Schema` — plain boolean check outside zod: isUuidV7 instead | docs/claude/HOOKS.md § False Polymorphism | z.string().uuid() or a hand-written uuidv7 regex on id fields (catalog uuidV7Schema) |
 
-- *Also here, by name:* ResponseMetadataSchema (`apps/api/src/lib/routeTemplates/responseMetadata.ts`); idParamsSchema (`apps/api/src/lib/routeTemplates/idParamsSchema.ts`); transformJsonFields (`apps/api/src/lib/routeTemplates/utils/transformJsonFields.ts`)
+- *Also here, by name:* ResponseMetadataSchema (`apps/api/src/lib/routeTemplates/responseMetadata.ts`); changePasswordBodySchema (`apps/api/src/modules/me/schemas/changePasswordSchemas.ts`); changePasswordResponseSchema (`apps/api/src/modules/me/schemas/changePasswordSchemas.ts`); idParamsSchema (`apps/api/src/lib/routeTemplates/idParamsSchema.ts`); jsonSchemaResponseSchema (`apps/api/src/lib/jsonSchema/jsonSchemaResponseSchema.ts`); schemaGuide (`apps/api/src/lib/jsonSchema/schemaGuide.ts`); segmentInfoResponseSchema (`apps/api/src/modules/segment/schemas/segmentInfoResponseSchema.ts`); segmentRuleReferenceSchema (`apps/api/src/modules/segment/schemas/segmentSchemas.ts`); transformJsonFields (`apps/api/src/lib/routeTemplates/utils/transformJsonFields.ts`); webhookSubscriptionInfoResponseSchema (`apps/api/src/modules/webhookSubscription/schemas/webhookSubscriptionInfoResponseSchema.ts`)
 
 ## 4. The specifics, in full
 
@@ -197,27 +207,24 @@ export const userBodySchema = z.object({ ... });
 
 ##### Cross-Field Validations
 
-**Don't use `.refine()` on route schemas** - it creates `ZodEffects` types that break hono-zod-openapi.
-
-Instead, create validation files and call `.parse()` manually in controller:
+Route build throws on a `bodySchema` that carries an object-level `.refine()`/`.superRefine()`: sanitizing rebuilds its shape and would drop them silently. Pass cross-field checks as `bodyRefinement`, `queryRefinement` or `paramsRefinement`: optional `superRefine` callbacks on the route args, annotated with the value's type. `makeController` runs each on the validated value before the handler; a failure throws its `ZodError` into the same 422 `VALIDATION_ERROR` envelope as a schema failure. With `many`, the body refinement runs per item. An omitted optional body skips it. None of them reach the OpenAPI document or SDK.
 
 ```typescript
-// validations/organizationCreateUserBody.ts
-const schema = z.object({
-  userId: z.string().uuid().optional(),
-  email: z.string().email().optional(),
-}).refine((data) => data.userId || data.email, {
-  message: 'Either userId or email is required',
+createRoute({
+  model: Modules.organization,
+  submodel: Modules.organizationUser,
+  bodySchema,
+  bodyRefinement: (body: z.infer<typeof bodySchema>, ctx) => {
+    if (!body.userId && !body.email)
+      ctx.addIssue({ code: 'custom', message: 'Either userId or email is required' });
+  },
+  responseSchema,
 });
-
-export const validateOrganizationCreateUserBody = (body: unknown) => schema.parse(body);
 ```
 
-```typescript
-// In controller
-const body = c.req.valid('json');
-validateOrganizationCreateUserBody(body);  // Throws ZodError if invalid
-```
+Field-level refinements (inside the shape) stay on the schema.
+
+A body that names a false-polymorphic target uses `polymorphicBodyRefinement` as its `bodyRefinement`; see [HOOKS.md#request-validation](HOOKS.md#request-validation).
 
 ---
 
@@ -227,17 +234,27 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 
 #### Class `openapi`
 - **apiPath** `apps/api/src/lib/openapi/apiPath.ts#apiPath` [primitive] resolve an SDK operationId to its URL path with serialized bracket query Use: const path = await apiPath('listInquiries', { orgId }, { status: 'open' })
-- **app** `apps/api/src/app.ts#app` [primitive] hold the API's OpenAPIHono instance for internal routing in the batch API Use: import { app } from '@/app'; await app.request(path, init)
+- **app** `apps/api/src/app.ts#app` [primitive] root OpenAPIHono instance that mounts routes; used for internal routing in batch API Use: import { app } from '@/app'; // mount at '/' only from apps/api/src/app.ts
 - **autoRegisterRoutes** `apps/api/src/lib/utils/autoRegisterRoutes.ts#autoRegisterRoutes` [primitive] scan a module's routes/ and controllers/ and mount each pair on the router Use: await autoRegisterRoutes(router, import.meta.dir, { admin: true })
 - **resolveOperation** `apps/api/src/lib/openapi/resolveOperation.ts#resolveOperation` [primitive] look up an operationId's route and fill path params for in-process callers Use: const op = await resolveOperation(operationId, pathParams)
+- **securityForRoute** `apps/api/src/lib/auth/routeSecurity.ts#securityForRoute` [primitive] derive a route's OpenAPI security requirement from its internal and security args Use: security: securityForRoute({ internal, security })
 - **securityRequirements** `apps/api/src/lib/auth/securitySchemes.ts#securityRequirements` [primitive] build a route's OpenAPI security list from named auth schemes Use: security: securityRequirements('sessionToken')
+- **openapi-path-params** `scripts/ci/rules/openapi-path-params.sh` [rule] require OpenAPI-style {id} path params in route definitions, not Hono :id Use: write createRoute({ path: '/things/{id}' }); widen ALLOWED_PARAMS in scripts/ci/rules/openapi-path-params.sh
 - **apps/api/src/routes/api** `apps/api/src/routes/api` [system] mount the main public API route tree Use: add API route modules under apps/api/src/routes/api
 - **apps/api/src/routes/internal** `apps/api/src/routes/internal` [system] mount internal-only API endpoints Use: add internal route modules under apps/api/src/routes/internal
 
 #### Class `request-schemas`
 - **appPathSchema** `packages/shared/src/utils/isAppPath.ts#appPathSchema` [primitive] validate a returnUrl-style string is an in-app path, max 2048 chars Use: import { appPathSchema } from '@template/shared/utils'; returnUrl: appPathSchema.optional()
+- **entitlementEntriesSchema** `packages/permissions/src/rebac/entitlementEntrySchema.ts#entitlementEntriesSchema` [primitive] validate entitlement entries as resource, anchor, where and actions; refuse flat action maps Use: entitlements: entitlementEntriesSchema
+- **infoResponseSchema** `apps/api/src/lib/jsonSchema/infoResponseSchema.ts#infoResponseSchema` [primitive] wrap a types schema into the { guide, types } info route response Use: response: infoResponseSchema(typesSchema)
 - **isAppPath** `packages/shared/src/utils/isAppPath.ts#isAppPath` [primitive] check a string is a path inside this app starting with a single slash Use: if (!isAppPath(value)) throw ...
 - **isUuidV7** `packages/shared/src/utils/isUuidV7.ts#isUuidV7` [primitive] test whether a string is a uuidv7 Use: if (isUuidV7(id)) ...
+- **permissionsBodyRefinement** `apps/api/src/lib/routeTemplates/permissionsBodyRefinement.ts#permissionsBodyRefinement` [primitive] validate entitlements/add/remove fields in a permissions request body Use: bodyRefinement: permissionsBodyRefinement
+- **polymorphicBodyRefinement** `apps/api/src/lib/routeTemplates/polymorphicBodyRefinement.ts#polymorphicBodyRefinement` [primitive] require a body naming a polymorphic target to set axis field and matching FK Use: bodyRefinement: polymorphicBodyRefinement(model, axisField)
+- **polymorphicSchema** `packages/db/src/registries/polymorphicSchema.ts#polymorphicSchema` [primitive] build a request-body Zod schema with one strict arm per polymorphic target value Use: polymorphicSchema('Model', 'ownerModel', { omit: ['userId'], extend: { returnUrl } })
 - **sanitizeRequestSchema** `apps/api/src/lib/routeTemplates/utils/sanitizeRequestSchema.ts#sanitizeRequestSchema` [primitive] strip server-managed keys from a zod request body schema Use: sanitizeRequestSchema(bodySchema, ['ownerId'])
+- **toJsonSchema** `apps/api/src/lib/jsonSchema/toJsonSchema.ts#toJsonSchema` [primitive] convert a zod schema to JSON Schema for its input or output side Use: toJsonSchema(schema, 'input')
+- **userJwtHandoffSchema** `apps/api/src/modules/me/schemas/changePasswordSchemas.ts#userJwtHandoffSchema` [primitive] validate a user JWT handoff payload of token and expiry timestamp Use: import { userJwtHandoffSchema } from '@/modules/me/schemas/changePasswordSchemas'
+- **userResponseSchema** `apps/api/src/modules/user/schemas/userResponseSchema.ts#userResponseSchema` [primitive] shape every user response, stripping jwtVersion from the user scalars Use: response: userResponseSchema
 - **UserWithRelationsSchema** `packages/db/src/types/userWithRelations.ts#UserWithRelationsSchema` [primitive] validate a user with its organizations, org memberships and space memberships Use: UserWithRelationsSchema.parse(user)
-- **uuidV7Schema** `packages/shared/src/utils/isUuidV7.ts#uuidV7Schema` [primitive] validate a zod string field as a uuidv7 Use: id: uuidV7Schema
+- **uuidV7Schema** `packages/shared/src/utils/isUuidV7.ts#uuidV7Schema` [primitive] validate a string is a UUIDv7 id in zod schemas Use: z.object({ spaceId: uuidV7Schema })

@@ -1,20 +1,20 @@
 {
   "id": "jobs-cron",
-  "title": "Background jobs and cron",
+  "title": "Background jobs and cron (jobs)",
   "routing": "Is this about running work outside the request: defining, registering, enqueuing or scheduling a background job? Signals: makeJob / makeSingletonJob / makeSupersedingJob, enqueueJob, ctx.enqueueChildJob or job stages, handlers/index.ts registration, WorkerContext / ctx.log, job ids, the BullMQ queue / Worker / processJob, BullBoard, CronJob rows, cron patterns, registerCronJobs / cronJobSync / removeRepeatable, admin job or cron trigger routes, cleanStaleData / archiveStaleRecords, or a fire-and-forget promise, setTimeout or node-cron schedule standing in for a job. (Fast/slow lanes and the JobOutbox overflow buffer are job-lanes-outbox.)",
-  "concepts": ["jobs", "cron"],
-  "tokens": 19154,
+  "concepts": ["jobs"],
+  "tokens": 16513,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2400,
+      "tokens": 1697,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 19154
+      "tokens": 16513
     }
   },
   "runsAgreed": 0,
@@ -31,31 +31,28 @@
       "doc:docs/claude/JOBS.md#handler-patterns/staged-job-fan-out-and-wait",
       "doc:docs/claude/JOBS.md#enqueuing-jobs",
       "doc:docs/claude/JOBS.md#bullboard",
-      "doc:FEATURES.md#background-jobs-cron",
-      "doc:docs/claude/JOBS.md#cron-jobs"
+      "doc:FEATURES.md#background-jobs-cron"
     ],
     "catalogClusters": [
       "app-events-side-effects",
+      "auth-middleware-validation",
       "authentication-methods",
       "caching-and-invalidation",
       "cron-and-recurring-work",
       "environment-config",
-      "error-handling",
       "graceful-shutdown-lifecycle",
       "job-definition-and-enqueue",
       "job-overflow-outbox",
-      "mutation-hooks",
-      "observability-telemetry",
+      "locks-and-serialization",
       "redis-infrastructure",
-      "request-context-access",
       "segments-membership",
       "structured-logging",
       "superadmin-operations",
       "supersede-lanes",
       "testing-helpers"
     ],
-    "codeEntries": 29,
-    "docMembers": 75
+    "codeEntries": 24,
+    "docMembers": 68
   },
   "bypassLines": 14,
   "glossaryTerms": 26

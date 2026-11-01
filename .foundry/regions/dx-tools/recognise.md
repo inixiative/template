@@ -62,6 +62,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the tsconfig for dom and jsx packages
 - the bun types package on typescript six
 - adopt the shared toolchain in a repo
+- the hook that blocks raw git worktree commands
 - run the build, types and tests across every package
 - just reformat the code
 - report the lint violations
@@ -74,35 +75,41 @@ A moment that says any of these, or something close, is this region's. Both voic
 - stop the database containers
 - a file named with a space-two got committed
 - the prisma client or sdk is out of date
+- lint fails because the generated client is stale
 - relative imports that should use the alias
 - the script that fails on relative internal imports
 - who bumps dependencies: the config cli or renovate
 - verify the toolchain pins without changing anything
 - pull the pinned toolchain versions into this repo
+- lock the row while I update it
 - I'll bump this inixiative package to a newer version
 - run the local app against staging env
 - regenerate the openapi spec from the routes
 - watch mode regenerates forever
 - schema changes should regenerate the client and sdk automatically
-- which alias do I import with
 - pick up a toolchain change downstream
-- I'll type it as any for now
 - I'll add a comment explaining this block
+- I'll add vitest for the frontend tests
 - I'll also clean up this adjacent thing while here
 - I'll cast after the array check
 - the tsup preset for a server package
-- hash slash inside apps, at-template across packages
 - the tsup preset for a ui package
 - a repo using both primitives and agentic packages
 - what every ecosystem repo must have
+- I'll export the env file into the shell
+- run all the CI rule scripts
 - run all the custom lint scripts together
+- run the custom lint scripts after biome
 - the deprecation-ignore flag only in the dts step
+- a permanent script goes in a scripts subfolder
 - the local biome config has drifted from the preset
 - update the pins in this repo
+- the script behind refreshing env files
 - I'll add typescript to the package's dev dependencies
 - see the task graph
 - turbo uses hash and non-turbo uses colon
 - run one package in watch mode
+- generate the id in code with a random UUID
 - where the toolchain versions are pinned
 - I'll write our own biome rules
 - add react lint rules to a ui package
@@ -112,6 +119,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which tsconfig for the ui and sdk packages
 - I'll drop the bun types dependency
 - stub files that extend the presets
+- why was my command in the main checkout denied
 - the cached turbo tasks
 - fix whitespace and formatting only
 - see what biome complains about
@@ -126,35 +134,41 @@ A moment that says any of these, or something close, is this region's. Both voic
 - tear down the local services
 - sync conflict copies of generated files
 - did someone forget to regenerate after a schema change
+- make sure the SDK and Prisma output were regenerated
 - the import path check
 - where the import alias check is implemented
 - I'll let renovate bump typescript
 - the read-only drift check for ci
 - fix the toolchain drift locally
+- read the row, then update it, without a race
 - which version of a sibling package do we depend on
 - point local at prod data
 - the spec is stale after a route change
 - name the generated file so turbo ignores it
 - wire the generator so it cascades
-- I'll use a relative path for this import
 - update this repo to the new pins
-- import the type from where it's defined
 - no comments in source
+- use the built-in test runner, nothing else
 - don't widen the task beyond what was asked
 - casting right after narrowing to an array
 - build a node package
-- which alias prefix goes where
 - build a react component package
 - which blessed set applies when a repo mixes lanes
 - set up a new inixiative repo
+- prefix env vars inline on the command
+- self-test the rules against their fixtures
 - the checks after biome
+- the extra checks that biome doesn't cover
 - I'll set the deprecation flag globally in tsconfig
+- where do I put a script that stays
 - I'll copy the preset and tweak it locally
 - apply the shared toolchain versions
+- create missing env files from examples
 - where do typescript and biome get declared
 - show the full logs of a turbo task
 - I'll name the turbo task differently from the script
 - start a single app with reload
+- autoincrement id for the new table
 - which typescript and biome versions we use
 - where the lint rules actually live
 - I'll copy react rules into the local biome config
@@ -163,6 +177,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll add node types to the base config myself
 - I'll add jsx settings to the base config
 - I'll copy the config files wholesale
+- stop mutations landing in the main checkout
 - I'll run the type checker in each package by hand
 - I'll format with my own prettier
 - I'll run biome directly
@@ -182,28 +197,32 @@ A moment that says any of these, or something close, is this region's. Both voic
 - renovate must stay off the toolchain packages
 - I'll fix the versions while checking
 - I'll edit the package versions to match
+- two requests could read-modify-write the same row
 - ecosystem deps match the blessed set
 - run the watch command with a cloud environment composed
 - I'll also regenerate the client with this
 - I'll add the generated output to the task inputs
 - I'll write a script that runs the generators in order
-- adding or moving an import
 - I'll release to get the toolchain change
-- stop declaring types that exist in the db or sdk
 - comments narrating the next line
+- jest.fn or vi.mock in a test file
 - feature code stays trim
 - the ci rule about array casts
 - I'll write a full tsup config for the package
-- I'll use a relative import in the package
 - I'll hand-write tsup for the ui package
 - the files and scripts the check expects
+- every dev, test or start command needs env composed
 - I'll run each check script separately
+- I'll run each check script by hand
+- I'll leave the helper script in tmp
 - stub files just extend
 - I'll just check without writing
+- I'll copy the example files myself
 - toolchain deps belong at the root
 - bypass the turbo cache
 - adding a script and its turbo task
 - I'll run the whole stack for one app
+- time-ordered ids for the primary key
 - I'll bump typescript in one repo
 - extend the base biome preset
 - the react preset on top of base
@@ -212,6 +231,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - typescript preset with node
 - typescript preset with react
 - set up biome, tsconfig and tsup from the shared package
+- the guard refused my git worktree add
 - type-check the whole repo
 - format without touching lint rules
 - lint without fixing
@@ -229,18 +249,23 @@ A moment that says any of these, or something close, is this region's. Both voic
 - catch relative imports outside barrels
 - is this repo's toolchain in line
 - apply the presets and pins
+- create it if missing without a duplicate race
 - I'll export the staging env then run turbo
 - produce the api spec
 - a new generator output without the gen marker
 - the sdk didn't regenerate after the schema change
 - which build preset for a backend lib
-- relative only in barrel files
 - which build preset for components
 - lint passed but the extra checks didn't run
+- all the post-lint scripts at once
+- committed scripts have a home by category
 - why did turbo skip this task
 - filter turbo to one package
+- the default id generator for a model
 - the bill of materials for the ecosystem
 - reset everything in the database
+- select for update on this row inside the transaction
+- only one of the concurrent accepts should win on this row
 
 ## When this is not your domain
 

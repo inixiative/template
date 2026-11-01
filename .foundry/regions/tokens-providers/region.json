@@ -1,0 +1,38 @@
+{
+  "id": "tokens-providers",
+  "title": "Authentication: sessions, providers, tokens (tokens-providers)",
+  "routing": "Is this about how a caller proves who it is: BetterAuth sessions and the auth instance (apps/api/src/lib/auth.ts), email/password or Google sign-in, OAuth callback and the one-time token (/auth/callback#ott=), AuthProvider rows per organization vs platform providers (getPlatformProviders), Account, Session, Verification, API keys as Token rows (createToken, SHA-256 keyHash, TokenOwnerModel, token scopes, TokensPage), or the frontend auth strategy (detectAuthStrategy, setToken/getToken, fetchAndHydrateMe)?",
+  "concepts": ["tokens-providers"],
+  "tokens": 6147,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1024,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 6147
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/AUTH.md"],
+    "docUnits": [
+      "doc:docs/claude/AUTH.md#multi-provider-authentication-authprovider",
+      "doc:docs/claude/AUTH.md#token-authentication",
+      "doc:docs/claude/AUTH.md#token-types"
+    ],
+    "catalogClusters": [
+      "authentication-methods",
+      "request-response-schemas",
+      "superadmin-operations"
+    ],
+    "codeEntries": 14,
+    "docMembers": 9
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 16
+}

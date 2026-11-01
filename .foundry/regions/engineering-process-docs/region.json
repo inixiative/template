@@ -3,18 +3,18 @@
   "title": "Engineering process and docs",
   "routing": "Is this about how the agent should work rather than what the code does: checking FEATURES.md or COMPARISONS.md before building or declaring something missing (coming-soon items, status markers), reading the pertinent doc first, understanding the why before the how, decomposing, building the right interface from the start, flagging scope calls, interrogating before proposing, verifying a command or claim before asserting it or handing it over, editing files manually not via sed, explaining the design before implementing, fixing pre-existing issues, no backwards compatibility or legacy aliases, no comments or doc comments, never swallowing errors, scratch notes and test scripts in the tmp AI workspace, testing in tmp before handoff, not deleting other agents' work, task intake, the execution contract and circuit breaker, adversarial reviews, the change checklist, or the docs workflow (TOC, stubs, alignment review, tickets for open questions)?",
   "concepts": ["engineering-process", "docs-process"],
-  "tokens": 13471,
+  "tokens": 13720,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1989,
+      "tokens": 1876,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 13471
+      "tokens": 13720
     }
   },
   "runsAgreed": 1,
@@ -51,7 +51,7 @@
     ],
     "catalogClusters": ["documentation-process"],
     "codeEntries": 2,
-    "docMembers": 25
+    "docMembers": 23
   },
   "bypassLines": 19,
   "glossaryTerms": 25

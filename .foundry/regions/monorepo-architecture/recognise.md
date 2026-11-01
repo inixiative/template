@@ -130,7 +130,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - every response is wrapped in a data key
 - lint or test every package from the root
 - turn on error tracking or tracing
-- prepare org context before a permission check
 - can this go in shared
 - send the email after the transaction commits
 - where do scratch files go
@@ -206,7 +205,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll return the object directly from the route
 - one command across all packages
 - the toggles for sentry and telemetry
-- set up the org for the permission engine
 - I'll put node-only code in shared
 - I'll fire the webhook inside the transaction
 - I'll drop the output at the repo root
@@ -281,7 +279,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the api response envelope
 - I'll run the command in each package
 - I'll hardcode sentry on
-- I'll pass the org id into the check manually
 - shared is only code that runs on server and client
 - the side effect ran even though the write rolled back
 - throwaway scripts live in the gitignored tmp folder

@@ -3,18 +3,18 @@
   "title": "List filtering and search",
   "routing": "Is this about how a list endpoint accepts search, per-field filters or sorting \u2014 a route's filterLens (picks, relations, root.where, enumOmits) or scopeNarrowing, bracket-notation query strings (prepareRequest, c.get('bracketQuery'), searchFields, the [:] literal, AND/OR groups), the query builders (buildWhereClause, buildOrderBy, fieldSearchOperator, buildJsonWhere, escapeLikePattern, validatePathNotation), the field whitelist (searchablePaths, orderablePaths, orderByRequestSchema), or the frontend filter metadata (makeDataConfig, useDataFilters, useQueryMetadata, buildFilterQuery, serializeBracketQuery)?",
   "concepts": ["filtering-search"],
-  "tokens": 17699,
+  "tokens": 17839,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2602,
+      "tokens": 2706,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 17699
+      "tokens": 17839
     }
   },
   "runsAgreed": 2,
@@ -23,7 +23,6 @@
     "docUnits": [
       "doc:docs/claude/API_ROUTES.md#response-format/search-filtering",
       "doc:docs/claude/API_ROUTES.md#response-format/route-declaration-lens-narrowing",
-      "doc:docs/claude/API_ROUTES.md#response-format/dynamic-per-request-scope-scopenarrowing-middleware",
       "doc:docs/claude/API_ROUTES.md#response-format/admin-routes",
       "doc:docs/claude/API_ROUTES.md#response-format/how-it-works",
       "doc:docs/claude/API_ROUTES.md#response-format/security",
@@ -35,12 +34,14 @@
     ],
     "catalogClusters": [
       "filtering-search-ordering",
+      "pagination",
       "request-context-access",
-      "superadmin-operations",
+      "route-registration-openapi",
+      "route-templates-controllers",
       "testing-rules"
     ],
     "codeEntries": 51,
-    "docMembers": 23
+    "docMembers": 28
   },
   "bypassLines": 28,
   "glossaryTerms": 30

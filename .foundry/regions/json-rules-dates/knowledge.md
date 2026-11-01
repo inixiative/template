@@ -124,6 +124,7 @@ modules allowed to implement it, and every exported function must appear in this
 | evaluate | `check` | Evaluate a rule against data. |
 | compile | `toSql`, `toPrisma` | Compile a rule to a SQL WHERE, or a Prisma query plan; with `{ lens }`, narrowed by it against its base lens. |
 | compile | `toLensSelect` | Compile what a lens shows — the relations turned on, and the columns its clamps read — to Prisma `findMany` select args, to-many clamps as relation `where`s. |
+| compile | `toWhereSql`, `toLensWhereSql` | Compile a condition, or a lens's `where`s where the lens wrote them (`root`, `relations` by path, `mapDefaults` by map and model), to a predicate in the engine's `sql.dialect`: values inline, columns from the caller's `columns` map, no joins. Equality, membership and existence inside `all` / `any`, and `any` / `all` / `none` / `empty` / `notEmpty` on a to-many relation as an `EXISTS` subquery on the caller's `tables` — or, with `toMany: 'join'`, `notEmpty` / `any` in the root's `where` on the caller's LEFT JOIN of the relation; anything else throws. |
 | compile | `toSourceQueries` | Compile a lens's sources to option queries (Prisma and SQL). |
 | execute | `executePrismaPlan` | Run a Prisma query plan's steps and return its final WHERE. |
 | compose | `andWhere`, `orWhere`, `matchAll`, `matchNothing` | AND / OR compiled WHEREs with a consumer's own filters, folding the boolean constants the way the compiler does — a hand-written `AND: [x, { OR: [] }]` matches everything in Prisma. |
@@ -132,6 +133,7 @@ modules allowed to implement it, and every exported function must appear in this
 | bind | `bindRule`, `bindLens` | Substitute supplied bindings into a rule, or a lens's narrowing conditions. |
 | bind | `listBindings`, `listLensBindings` | The bind names a rule or lens reads, sorted (`{ required }` drops `bindOptional`). |
 | narrow | `narrowRule` | Inject a lens's clamps into a rule at their anchors. |
+| re-root | `prefixConditionFields` | Move a condition onto a related record (a parent's where read from the child); refuse shapes it cannot move. |
 | clamp | `clampLens` | AND clamps into a lens's first narrowing over the base, where they read the whole schema; later layers kept. |
 | coerce | `coerceRule` | Stamp each field rule with its field's `coerceType` from the lens. |
 | project | `projectLens` | What a lens exposes: by path along the relations turned on (`by: 'path'`), or flattened into a Lens (`by: 'model'`). |
@@ -141,6 +143,7 @@ modules allowed to implement it, and every exported function must appear in this
 | read | `readLensValue` | One value off a row, as a lens shows it: gated path, clamps checked per row, own properties only. |
 | walk | `getLensRoot` | The base lens a narrowing chain is rooted at. |
 | describe | `describeRule` | A rule's sources, bridge crossings and compile targets under a lens. |
+| describe | `clockUnit` | The finest clock unit (`CLOCK_UNITS`) any relative date in a rule names, at any depth; null when it reads no clock. |
 | describe | `describeRuleSources` | The literal values a rule names at each source the lens declares. |
 | materialize | `materializeSources`, `materializeSourceQuery` | Turn fetched rows into source option sets — sorted by value, or (`materializeSourceQuery` with `order: SourceOptionOrder.query`) in the order the query returned its rows. |
 | create | `createLens` | Build a lens from field maps and bridges. |
@@ -150,7 +153,7 @@ modules allowed to implement it, and every exported function must appear in this
 | index | `indexBridges` | Key a set of bridges by endpoint. |
 | read | `parseScopeRef`, `readScopeRef` | Parse a `$`-prefixed ref; read which scope it names. |
 | order | `orderRecords` | Records sorted by an `OrderBy` as every rail orders a window: own-property paths, NULLs last, stable. |
-| look up | `getOperatorsForKind`, `getArrayOperators`, `getAggregateOperators`, `getValueShape` | Read the operator catalog. |
+| look up | `getOperatorsForKind`, `getArrayOperators`, `getAggregateOperators`, `getValueShape`, `getConditionShapeKeys` | Read the operator and condition-shape catalogs. |
 
 `engineGlobals` (configure) holds process-wide defaults; `Operator`, `DateOperator`,
 `ArrayOperator`, `FieldKind`, `RuleTarget`, `ValueShape`, `NUMERIC_KINDS` and `ALL_KINDS` are

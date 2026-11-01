@@ -44,13 +44,13 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **makeError 401 AUTHENTICATION_FAILED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [auth-middleware-users](auth-middleware-users/knowledge.md) | meResourceMiddleware, jwtAuthMiddleware, basicAuthMiddleware | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
+| **makeError 401 AUTHENTICATION_FAILED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [auth-middleware-users](auth-middleware-users/knowledge.md) | validateUser, validateActor, validateNotToken, basicAuthMiddleware | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 
 ## `permission-denied`
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **makeError 403 PERMISSION_DENIED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [permissions-roles](permissions-roles/knowledge.md) | validatePermission, validateSubmodelPermission, validateSuperadmin, Granular create permission via hydrated partial | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
+| **makeError 403 PERMISSION_DENIED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [permissions-roles](permissions-roles/knowledge.md) | validatePermission, validateNotToken, validateSuperadmin, validateOwnerPermission, Granular create permission via hydrated partial | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 
 ## `resource-not-found`
 
@@ -71,8 +71,8 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 |---|---|---|---|---|---|
 | **DivergentDuplicateSlugError** | `packages/email/src/errors/DivergentDuplicateSlugError.ts` | [email-render](email-render/knowledge.md) | — | convention | email-templates part 3 (Also here) |
 | **FindForUpdateLockTimeoutError** | `packages/db/src/lock/findForUpdateLockTimeoutError.ts` | [database-client](database-client/knowledge.md) | db.findForUpdate, acquireFindForUpdateLock | convention | docs/claude/DATABASE.md § Transactions › Row Locks and Create-If-Missing |
-| **isUniqueConstraintError** | `packages/db/src/utils/isUniqueConstraintError.ts#isUniqueConstraintError` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db, query)* | documented | catalog isUniqueConstraintError; docs/claude/ERRORS.md § The global handler |
-| **isWriteConflictError** | `packages/db/src/utils/isWriteConflictError.ts#isWriteConflictError` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db.txn)* | convention | catalog isWriteConflictError |
+| **isUniqueConstraintError** | `packages/db/src/utils/isUniqueConstraintError.ts#isUniqueConstraintError` | [errors](errors/knowledge.md) | — *(inferred: db, query)* | documented | catalog isUniqueConstraintError; docs/claude/ERRORS.md § The global handler |
+| **isWriteConflictError** | `packages/db/src/utils/isWriteConflictError.ts#isWriteConflictError` | [errors](errors/knowledge.md) | — *(inferred: db.txn)* | convention | catalog isWriteConflictError |
 | **makeError 409 CONFLICT** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [request-context-errors](request-context-errors/knowledge.md) | resourceContextMiddleware, Alternate resource lookup, withOwnerLock, validate, Handler validate hook *(inferred: validateInquiryPreCreate, validateUniqueInquiry)* | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 | **Prisma P2002 (unique constraint)** | `@prisma/client PrismaClientKnownRequestError code P2002` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db, query)* | documented | docs/claude/ERRORS.md § The global handler |
 | **Prisma P2034 (write conflict / deadlock)** | `@prisma/client PrismaClientKnownRequestError code P2034` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db.txn)* | convention | packages/db/src/utils/isWriteConflictError.ts (catalog) |
@@ -131,6 +131,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 | **RuleEvaluationError** | `packages/shared/src/rules/errors.ts#RuleEvaluationError` | [json-rules](json-rules/knowledge.md) | — *(inferred: withRule)* | convention | catalog RuleEvaluationError |
 | **searchPaths stray-entry Error** | `apps/api/src/lib/prisma/paginate.ts` | [pagination](pagination/knowledge.md) | paginate | documented | docs/claude/API_ROUTES.md § Response Format › Search & Filtering |
 | **validateJobId Error** | `apps/api/src/jobs/validateJobId.ts#validateJobId` | [jobs-cron](jobs-cron/knowledge.md) | validateJobId | convention | docs/claude/JOBS.md § Enqueuing Jobs; catalog validateJobId |
+| **validateRole Error** | `apps/api/src/lib/permissions/validateRole.ts#validateRole` | [permissions-roles](permissions-roles/knowledge.md) | validateRole | documented | docs/claude/PERMISSIONS.md § Permission Setup › Role Validation |
 
 ## `bad-gateway`
 
@@ -155,7 +156,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
 | **AppError** | `apps/api/src/lib/errors/makeError.ts#AppError` | [request-context-errors](request-context-errors/knowledge.md) | makeError | documented | docs/claude/ERRORS.md § makeError / AppError |
-| **HTTPException** | `hono/http-exception` | [request-context-errors](request-context-errors/knowledge.md) | Not-found via HTTPException, validateSubmodelPermission *(inferred: validatePermission)* | documented | docs/claude/API_ROUTES.md § Error Responses; docs/claude/PERMISSIONS.md § Validation Middleware |
+| **HTTPException** | `hono/http-exception` | [errors](errors/knowledge.md) | Not-found via HTTPException, validateNotToken, validateOwnerPermission *(inferred: validatePermission)* | documented | docs/claude/API_ROUTES.md § Error Responses; docs/claude/PERMISSIONS.md § Validation Middleware |
 
 ## `off-request-path`
 

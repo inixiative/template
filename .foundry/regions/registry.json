@@ -6,14 +6,14 @@
     "catalog": ".foundry/catalog/catalog.json (feat/warden-catalog)",
     "atlas": ".atlas/concepts.ts",
     "libraries": {
-      "json-rules": "551f31f",
-      "rules-builder": "8bb1067",
-      "permissions": "9ac9747",
-      "transitions": "5102db8",
-      "prisma-map": "5a65004",
-      "atlas": "93f5b14",
-      "gloss": "c98ac89",
-      "config": "2e93179"
+      "json-rules": "407ac11",
+      "rules-builder": "d3ae8c4",
+      "permissions": "2f9a1e9",
+      "transitions": "d98df5e",
+      "prisma-map": "2713bf7",
+      "atlas": "4f4e92a",
+      "gloss": "ed3ae7b",
+      "config": "c305c53"
     },
     "method": "three independent LLM proposals, item-level majority vote (~/.foundry/evals/warden-regions)"
   },
@@ -76,7 +76,7 @@
       "tag": "cron",
       "atlas": "feature:cronJob",
       "description": "DB-stored cron jobs, repeatables, manual trigger, retention cleanup",
-      "region": "jobs-cron"
+      "region": "cron"
     },
     {
       "tag": "job-lanes",
@@ -273,19 +273,19 @@
     {
       "tag": "permissions-roles",
       "atlas": "primitive:authz",
-      "description": "Roles, actions and checks: Role / PlatformRole, StandardAction, installPermissions (installPermissionsFor / userPermissions), permix.check in controllers, validatePermission / validateSubmodelPermission middleware, entitlements and token restriction, role assignment, frontend checks (usePermission, permissions.check, NavItem.access)",
+      "description": "Roles, actions and checks: Role / PlatformRole, StandardAction, Permix setup per context (setupOrg / Space / UserPermissions), permix.check in controllers, validatePermission / validateRole middleware, entitlements and token restriction, role assignment, frontend checks (usePermission, permissions.check, NavItem.access)",
       "region": "permissions-roles"
     },
     {
       "tag": "permissions-rebac",
       "atlas": "primitive:authz",
-      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, validateActionRule), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, validateOwnerPermission, polymorphicIs), row-level overrides and space \u2192 organization delegation",
       "region": "permissions-rebac"
     },
     {
       "tag": "permissions-rebac",
       "atlas": "primitive:authz",
-      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, validateActionRule), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, validateOwnerPermission, polymorphicIs), row-level overrides and space \u2192 organization delegation",
       "region": "permissions-rebac"
     },
     {
@@ -309,7 +309,7 @@
     {
       "tag": "auth-middleware",
       "atlas": "feature:auth",
-      "description": "Auth middleware chain and spoofing; no \"is there a user\" gate — every route names its action and the rule decides",
+      "description": "Auth middleware chain, spoofing, validateUser/validateActor gates",
       "region": "auth-middleware-users"
     },
     {
@@ -358,7 +358,7 @@
       "tag": "errors",
       "atlas": "primitive:errors",
       "description": "makeError/AppError, global error handler, status conventions",
-      "region": "request-context-errors"
+      "region": "errors"
     },
     {
       "tag": "batch",
@@ -448,7 +448,7 @@
       "tag": "secrets",
       "atlas": "infrastructure:env",
       "description": "Secrets around the app: Infisical storage, secret env vars and keyrings per environment (CI included), provider credentials, how keys rotate",
-      "region": "encryption"
+      "region": "secrets"
     },
     {
       "tag": "inquiry-handlers",
@@ -719,13 +719,25 @@
       "atlas": "@inixiative/config",
       "description": "The @inixiative/config package (README): shared toolchain, sync/check/scan and the release train",
       "region": "lib-config"
+    },
+    {
+      "tag": "permissions-members",
+      "atlas": "primitive:authz",
+      "description": "Member rows and delegation: what a member row may act on, writing delegates (delegate, delegateFull) and member self-grants, integrations and tokens by owner kind (PERMISSIONS.md \u00a7 Member rows, \u00a7 Writing delegates, \u00a7 Integrations and tokens by owner kind)",
+      "region": "permissions-members"
+    },
+    {
+      "tag": "tokens-providers",
+      "atlas": "feature:auth",
+      "description": "API keys and login providers: Token rows and token types, owner scopes, creating, hashing and validating a token, token authentication; platform providers and per-organization AuthProvider rows (AUTH.md \u00a7 Token Authentication, \u00a7 Token Types, \u00a7 Multi-Provider Authentication)",
+      "region": "tokens-providers"
     }
   ],
   "regions": [
     {
       "id": "concurrency-locks",
-      "tokens": 13678,
-      "recogniseTokens": 2461,
+      "tokens": 16143,
+      "recogniseTokens": 2595,
       "concepts": [
         "locks",
         "concurrency-limits",
@@ -737,365 +749,400 @@
     },
     {
       "id": "redis-caching-rate-limits",
-      "tokens": 15504,
-      "recogniseTokens": 2217,
+      "tokens": 17922,
+      "recogniseTokens": 1878,
       "concepts": ["redis", "caching", "rate-limiting"],
       "runsAgreed": 2
     },
     {
       "id": "jobs-cron",
-      "tokens": 19154,
-      "recogniseTokens": 2400,
-      "concepts": ["jobs", "cron"],
+      "tokens": 16513,
+      "recogniseTokens": 1697,
+      "concepts": ["jobs"],
+      "runsAgreed": 0
+    },
+    {
+      "id": "cron",
+      "tokens": 8401,
+      "recogniseTokens": 1015,
+      "concepts": ["cron"],
       "runsAgreed": 0
     },
     {
       "id": "job-lanes-outbox",
-      "tokens": 14889,
-      "recogniseTokens": 2349,
+      "tokens": 14781,
+      "recogniseTokens": 2339,
       "concepts": ["job-lanes", "job-outbox"],
       "runsAgreed": 0
     },
     {
       "id": "app-events-webhooks",
-      "tokens": 15766,
-      "recogniseTokens": 2783,
+      "tokens": 17056,
+      "recogniseTokens": 3136,
       "concepts": ["app-events", "webhooks"],
       "runsAgreed": 1
     },
     {
       "id": "adapters-integrations",
-      "tokens": 8153,
-      "recogniseTokens": 1744,
+      "tokens": 8105,
+      "recogniseTokens": 1705,
       "concepts": ["adapters", "integrations", "object-storage"],
       "runsAgreed": 0
     },
     {
       "id": "ws-connections",
-      "tokens": 6633,
-      "recogniseTokens": 1419,
+      "tokens": 6783,
+      "recogniseTokens": 1274,
       "concepts": ["ws-connections"],
       "runsAgreed": 0
     },
     {
       "id": "ws-channels",
-      "tokens": 9364,
-      "recogniseTokens": 1792,
+      "tokens": 8991,
+      "recogniseTokens": 1644,
       "concepts": ["ws-channels"],
       "runsAgreed": 0
     },
     {
       "id": "ws-data-streams",
-      "tokens": 14564,
-      "recogniseTokens": 2687,
+      "tokens": 14388,
+      "recogniseTokens": 2558,
       "concepts": ["ws-data-streams"],
       "runsAgreed": 0
     },
     {
       "id": "email-templates",
-      "tokens": 8083,
+      "tokens": 8045,
       "recogniseTokens": 1308,
       "concepts": ["email-templates"],
       "runsAgreed": 0
     },
     {
       "id": "email-render",
-      "tokens": 16679,
-      "recogniseTokens": 3180,
+      "tokens": 16520,
+      "recogniseTokens": 3151,
       "concepts": ["email-render"],
       "runsAgreed": 0
     },
     {
       "id": "email-lens",
-      "tokens": 12205,
-      "recogniseTokens": 2329,
+      "tokens": 13232,
+      "recogniseTokens": 2328,
       "concepts": ["email-lens"],
       "runsAgreed": 0
     },
     {
       "id": "email-delivery",
-      "tokens": 14980,
-      "recogniseTokens": 1787,
+      "tokens": 16165,
+      "recogniseTokens": 2151,
       "concepts": ["email-delivery", "communication-preferences"],
       "runsAgreed": 0
     },
     {
       "id": "messaging-contacts",
-      "tokens": 12345,
-      "recogniseTokens": 2353,
+      "tokens": 12454,
+      "recogniseTokens": 2329,
       "concepts": ["messaging", "contacts"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules",
-      "tokens": 15472,
-      "recogniseTokens": 3681,
+      "tokens": 17119,
+      "recogniseTokens": 3672,
       "concepts": ["json-rules", "rule-references"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules-shapes",
-      "tokens": 11362,
+      "tokens": 11375,
       "recogniseTokens": 2109,
       "concepts": ["json-rules-shapes"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules-runtime",
-      "tokens": 10508,
-      "recogniseTokens": 1486,
+      "tokens": 15213,
+      "recogniseTokens": 1356,
       "concepts": ["json-rules-runtime"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules-dates",
-      "tokens": 5024,
+      "tokens": 5259,
       "recogniseTokens": 349,
       "concepts": ["lib-json-rules-dates"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules-backends",
-      "tokens": 7684,
-      "recogniseTokens": 631,
+      "tokens": 12629,
+      "recogniseTokens": 824,
       "concepts": ["lib-json-rules-backends"],
       "runsAgreed": 0
     },
     {
       "id": "lenses",
-      "tokens": 12288,
-      "recogniseTokens": 2490,
+      "tokens": 11721,
+      "recogniseTokens": 2288,
       "concepts": ["lenses"],
       "runsAgreed": 0
     },
     {
       "id": "lens-model",
-      "tokens": 12612,
-      "recogniseTokens": 900,
+      "tokens": 12767,
+      "recogniseTokens": 854,
       "concepts": ["lib-json-rules-lens"],
       "runsAgreed": 0
     },
     {
       "id": "lens-usage",
-      "tokens": 19232,
+      "tokens": 19288,
       "recogniseTokens": 1102,
       "concepts": ["lib-json-rules-lens-usage"],
       "runsAgreed": 0
     },
     {
       "id": "lens-sources",
-      "tokens": 8311,
+      "tokens": 8350,
       "recogniseTokens": 1004,
       "concepts": ["lib-json-rules-lens-sources"],
       "runsAgreed": 0
     },
     {
       "id": "rules-builder",
-      "tokens": 16729,
+      "tokens": 17105,
       "recogniseTokens": 2966,
       "concepts": ["rules-builder"],
       "runsAgreed": 1
     },
     {
       "id": "lib-rules-builder",
-      "tokens": 12318,
+      "tokens": 12249,
       "recogniseTokens": 1774,
       "concepts": ["lib-rules-builder"],
       "runsAgreed": 0
     },
     {
       "id": "permissions-roles",
-      "tokens": 14168,
-      "recogniseTokens": 2257,
+      "tokens": 17279,
+      "recogniseTokens": 1906,
       "concepts": ["permissions-roles"],
       "runsAgreed": 0
     },
     {
+      "id": "permissions-members",
+      "tokens": 8228,
+      "recogniseTokens": 580,
+      "concepts": ["permissions-members"],
+      "runsAgreed": 0
+    },
+    {
       "id": "permissions-rebac",
-      "tokens": 10130,
-      "recogniseTokens": 1681,
+      "tokens": 17801,
+      "recogniseTokens": 1204,
       "concepts": ["permissions-rebac"],
       "runsAgreed": 0
     },
     {
       "id": "tenancy",
-      "tokens": 9265,
-      "recogniseTokens": 2079,
+      "tokens": 8867,
+      "recogniseTokens": 1812,
       "concepts": ["tenancy", "superadmin"],
       "runsAgreed": 0
     },
     {
       "id": "authentication",
-      "tokens": 14816,
-      "recogniseTokens": 2733,
+      "tokens": 18583,
+      "recogniseTokens": 2054,
       "concepts": ["authentication"],
       "runsAgreed": 0
     },
     {
+      "id": "tokens-providers",
+      "tokens": 6147,
+      "recogniseTokens": 1024,
+      "concepts": ["tokens-providers"],
+      "runsAgreed": 0
+    },
+    {
       "id": "auth-middleware-users",
-      "tokens": 10274,
-      "recogniseTokens": 2337,
+      "tokens": 9501,
+      "recogniseTokens": 1869,
       "concepts": ["auth-middleware", "users"],
       "runsAgreed": 0
     },
     {
       "id": "frontend-auth",
-      "tokens": 8018,
+      "tokens": 8720,
       "recogniseTokens": 1672,
       "concepts": ["frontend-auth"],
       "runsAgreed": 0
     },
     {
       "id": "api-routes",
-      "tokens": 16246,
-      "recogniseTokens": 3194,
+      "tokens": 17843,
+      "recogniseTokens": 3163,
       "concepts": ["route-templates", "api-modules"],
       "runsAgreed": 1
     },
     {
       "id": "api-schemas-openapi",
-      "tokens": 5188,
+      "tokens": 6921,
       "recogniseTokens": 1227,
       "concepts": ["openapi", "request-schemas"],
       "runsAgreed": 0
     },
     {
       "id": "request-context-errors",
-      "tokens": 19431,
-      "recogniseTokens": 3073,
-      "concepts": ["request-context", "errors"],
+      "tokens": 12686,
+      "recogniseTokens": 2122,
+      "concepts": ["request-context"],
+      "runsAgreed": 0
+    },
+    {
+      "id": "errors",
+      "tokens": 9910,
+      "recogniseTokens": 1472,
+      "concepts": ["errors"],
       "runsAgreed": 0
     },
     {
       "id": "batch",
-      "tokens": 10083,
-      "recogniseTokens": 1518,
+      "tokens": 11157,
+      "recogniseTokens": 1453,
       "concepts": ["batch"],
       "runsAgreed": 0
     },
     {
       "id": "filtering-search",
-      "tokens": 17699,
-      "recogniseTokens": 2602,
+      "tokens": 17839,
+      "recogniseTokens": 2706,
       "concepts": ["filtering-search"],
       "runsAgreed": 2
     },
     {
       "id": "pagination",
-      "tokens": 8797,
+      "tokens": 9026,
       "recogniseTokens": 1309,
       "concepts": ["pagination"],
       "runsAgreed": 0
     },
     {
       "id": "database-client",
-      "tokens": 9969,
-      "recogniseTokens": 1945,
+      "tokens": 11056,
+      "recogniseTokens": 2057,
       "concepts": ["db-client"],
       "runsAgreed": 0
     },
     {
       "id": "data-modeling",
-      "tokens": 11844,
-      "recogniseTokens": 1960,
+      "tokens": 13730,
+      "recogniseTokens": 1852,
       "concepts": ["data-modeling", "reference-data"],
       "runsAgreed": 0
     },
     {
       "id": "database-tooling",
-      "tokens": 8076,
-      "recogniseTokens": 1198,
+      "tokens": 7969,
+      "recogniseTokens": 1292,
       "concepts": ["db-scripts", "seeding"],
       "runsAgreed": 0
     },
     {
       "id": "mutation-hooks",
-      "tokens": 14680,
-      "recogniseTokens": 2931,
+      "tokens": 17987,
+      "recogniseTokens": 2885,
       "concepts": ["mutation-hooks", "immutable-fields", "ordered-lists"],
       "runsAgreed": 0
     },
     {
       "id": "audit-soft-delete",
-      "tokens": 9844,
-      "recogniseTokens": 1887,
+      "tokens": 10923,
+      "recogniseTokens": 1928,
       "concepts": ["audit-log", "soft-delete"],
       "runsAgreed": 0
     },
     {
       "id": "encryption",
-      "tokens": 18930,
-      "recogniseTokens": 2362,
-      "concepts": ["encryption", "secrets"],
+      "tokens": 13289,
+      "recogniseTokens": 1821,
+      "concepts": ["encryption"],
+      "runsAgreed": 0
+    },
+    {
+      "id": "secrets",
+      "tokens": 10306,
+      "recogniseTokens": 1121,
+      "concepts": ["secrets"],
       "runsAgreed": 0
     },
     {
       "id": "inquiry-handlers",
-      "tokens": 12327,
-      "recogniseTokens": 2338,
+      "tokens": 11880,
+      "recogniseTokens": 2110,
       "concepts": ["inquiry-handlers"],
       "runsAgreed": 0
     },
     {
       "id": "inquiry-routes-ui",
-      "tokens": 11904,
-      "recogniseTokens": 2182,
+      "tokens": 13156,
+      "recogniseTokens": 2335,
       "concepts": ["inquiry-routes-ui"],
       "runsAgreed": 0
     },
     {
       "id": "flows",
-      "tokens": 9071,
-      "recogniseTokens": 2388,
+      "tokens": 9240,
+      "recogniseTokens": 2243,
       "concepts": ["flows"],
       "runsAgreed": 1
     },
     {
       "id": "customers-segments",
-      "tokens": 14648,
-      "recogniseTokens": 3227,
+      "tokens": 14384,
+      "recogniseTokens": 3036,
       "concepts": ["customers", "segments"],
       "runsAgreed": 3
     },
     {
       "id": "observability-lifecycle",
-      "tokens": 16905,
+      "tokens": 16911,
       "recogniseTokens": 3105,
       "concepts": ["logging", "telemetry", "process-lifecycle"],
       "runsAgreed": 3
     },
     {
       "id": "frontend-store",
-      "tokens": 11704,
+      "tokens": 11764,
       "recogniseTokens": 2032,
       "concepts": ["frontend-store"],
       "runsAgreed": 0
     },
     {
       "id": "api-client",
-      "tokens": 9177,
+      "tokens": 9332,
       "recogniseTokens": 1616,
       "concepts": ["api-client"],
       "runsAgreed": 0
     },
     {
       "id": "frontend-apps-routing",
-      "tokens": 14108,
-      "recogniseTokens": 2793,
+      "tokens": 14966,
+      "recogniseTokens": 3032,
       "concepts": ["frontend-routing"],
       "runsAgreed": 0
     },
     {
       "id": "navigation",
-      "tokens": 9699,
+      "tokens": 9705,
       "recogniseTokens": 1715,
       "concepts": ["navigation"],
       "runsAgreed": 0
     },
     {
       "id": "ui-components",
-      "tokens": 14896,
-      "recogniseTokens": 2288,
+      "tokens": 14788,
+      "recogniseTokens": 2219,
       "concepts": ["ui-components"],
       "runsAgreed": 2
     },
@@ -1108,99 +1155,99 @@
     },
     {
       "id": "test-harness",
-      "tokens": 10965,
+      "tokens": 11170,
       "recogniseTokens": 2038,
       "concepts": ["test-harness", "vcr"],
       "runsAgreed": 0
     },
     {
       "id": "test-factories-rules",
-      "tokens": 12196,
-      "recogniseTokens": 2449,
+      "tokens": 13909,
+      "recogniseTokens": 2438,
       "concepts": ["test-factories", "test-rules"],
       "runsAgreed": 0
     },
     {
       "id": "dx-setup",
-      "tokens": 12028,
-      "recogniseTokens": 2283,
+      "tokens": 11337,
+      "recogniseTokens": 2013,
       "concepts": ["dev-setup", "worktrees"],
       "runsAgreed": 0
     },
     {
       "id": "environments-deploy",
-      "tokens": 12715,
+      "tokens": 12847,
       "recogniseTokens": 2258,
       "concepts": ["env-config", "ci-deploy"],
       "runsAgreed": 0
     },
     {
       "id": "dx-tools",
-      "tokens": 13611,
-      "recogniseTokens": 2542,
+      "tokens": 15878,
+      "recogniseTokens": 2826,
       "concepts": ["scripts", "lint-rules", "build-tooling"],
       "runsAgreed": 0
     },
     {
       "id": "conventions",
-      "tokens": 10082,
+      "tokens": 9962,
       "recogniseTokens": 2077,
       "concepts": ["naming", "code-style"],
       "runsAgreed": 1
     },
     {
       "id": "monorepo-architecture",
-      "tokens": 18151,
-      "recogniseTokens": 3487,
+      "tokens": 18188,
+      "recogniseTokens": 3452,
       "concepts": ["monorepo-layout", "dependencies", "architecture"],
       "runsAgreed": 1
     },
     {
       "id": "init-architecture",
-      "tokens": 12102,
-      "recogniseTokens": 2310,
+      "tokens": 12066,
+      "recogniseTokens": 2321,
       "concepts": ["init-architecture"],
       "runsAgreed": 0
     },
     {
       "id": "init-tasks",
-      "tokens": 13037,
-      "recogniseTokens": 1851,
+      "tokens": 13554,
+      "recogniseTokens": 2128,
       "concepts": ["init-tasks"],
       "runsAgreed": 0
     },
     {
       "id": "engineering-process-docs",
-      "tokens": 13471,
-      "recogniseTokens": 1989,
+      "tokens": 13720,
+      "recogniseTokens": 1876,
       "concepts": ["engineering-process", "docs-process"],
       "runsAgreed": 1
     },
     {
       "id": "lib-permissions",
-      "tokens": 7825,
-      "recogniseTokens": 1241,
+      "tokens": 17392,
+      "recogniseTokens": 1005,
       "concepts": ["lib-permissions"],
       "runsAgreed": 0
     },
     {
       "id": "lib-transitions",
-      "tokens": 4984,
+      "tokens": 5100,
       "recogniseTokens": 356,
       "concepts": ["lib-transitions"],
       "runsAgreed": 0
     },
     {
       "id": "lib-prisma-map",
-      "tokens": 13707,
-      "recogniseTokens": 2849,
+      "tokens": 13845,
+      "recogniseTokens": 2728,
       "concepts": ["lib-prisma-map", "schema-introspection"],
       "runsAgreed": 0
     },
     {
       "id": "lib-atlas",
-      "tokens": 18919,
-      "recogniseTokens": 3130,
+      "tokens": 18487,
+      "recogniseTokens": 2904,
       "concepts": ["lib-atlas", "atlas"],
       "runsAgreed": 0
     },
@@ -1213,7 +1260,7 @@
     },
     {
       "id": "lib-config",
-      "tokens": 10865,
+      "tokens": 11076,
       "recogniseTokens": 2638,
       "concepts": ["lib-config"],
       "runsAgreed": 0

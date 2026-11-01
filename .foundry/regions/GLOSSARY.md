@@ -9,12 +9,15 @@
 ## #
 
 **#/**  
-Alias for imports inside the same app (e.g. #/lib/context/installPermissions). *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
+Alias for imports inside the same app (e.g. #/lib/context/getActor). *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
 
 ## A
 
 **AAD**  
-Additional Authenticated Data from buildAAD, binding ciphertext to immutable record fields so it cannot move to another row. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Additional Authenticated Data from buildAAD, binding ciphertext to immutable record fields so it cannot move to another row. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**AAD**  
+Additional Authenticated Data from buildAAD, binding ciphertext to immutable record fields so it cannot move to another row. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **abac rule**  
 { rule: Condition }: a json-rules predicate evaluated over the record. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
@@ -35,7 +38,10 @@ CommunicationKind[] on Contact: the kinds this contact accepts. *Region:* [Messa
 NavItem rule (permissions-roles / permissions-rebac, context, pageContext) => boolean; the source of truth for page visibility. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **Account**  
-A user's linked credentials for one provider (OAuth tokens or password). *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+A user's linked credentials for one provider (OAuth tokens or password). *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**Account**  
+A user's linked credentials for one provider (OAuth tokens or password). *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **acquireFindForUpdateLock**  
 The Redis fence findForUpdate takes for rows a transaction will read then write. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
@@ -50,10 +56,13 @@ useActionRuleBuilder with buildActionRoot / setSchemaAction / removeSchemaAction
 Route template for a custom non-CRUD verb, e.g. action: 'activate' → POST /:id/activate. *Region:* [API routes, controllers and modules](api-routes/knowledge.md)
 
 **ActionRule**  
-One permission expression: string delegation, { rel, action }, { rule }, { any }, { all }, or null. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+One permission expression: string delegation, { rel, action }, { self }, { rule }, { any }, { all }, or null. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **ActionRule**  
-One rule: action string, { rel, action }, { rule }, { any }, { all }, or null. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
+One rule: action string, { rel, action }, { self }, { rule }, { any }, { all }, or null. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
+
+**actionRuleSchema**  
+Recursive Zod validator for a serialized ActionRule, on the @inixiative/permissions-roles / permissions-rebac/actionRuleSchema subpath. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **Actions live in slices**  
 State changes and their side effects are slice actions; components never set state directly. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
@@ -92,7 +101,10 @@ Background review of the full change after significant implementation, run witho
 Gloss is past-session commentary that may be stale; trust the code and // why: over it. *Region:* [Gloss (margin comments)](lib-gloss/knowledge.md)
 
 **AES-256-GCM**  
-Authenticated encryption used per field with a random 12-byte IV and a 16-byte auth tag that detects tampering. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Authenticated encryption used per field with a random 12-byte IV and a 16-byte auth tag that detects tampering. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**AES-256-GCM**  
+Authenticated encryption used per field with a random 12-byte IV and a 16-byte auth tag that detects tampering. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **affordance**  
 The answer to "what changes can happen?" for a record or a set (available / eligible). *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
@@ -155,10 +167,16 @@ Class: the emitAppEvent side-effect bus, makeAppEvent handlers, their email/WebS
 Sequences and publishes an append through Redis via a per-stream serialized queue. *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
 
 **AppEnv**  
-Hono env type whose Variables hold db, user, organizationUsers, session, token, spoofedBy, permix, requestId, resource, resourceType, bracketQuery, filterLens. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Hono env type whose Variables hold db, user, organizationUsers, session, token, spoofedBy, permix, requestId, resource, resourceType, bracketQuery, filterLens. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**AppEnv**  
+Hono env type whose Variables hold db, user, organizationUsers, session, token, spoofedBy, permix, requestId, resource, resourceType, bracketQuery, filterLens. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **AppError**  
-HTTPException subclass that emits the standard error body; requestId is stamped by the handler. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+HTTPException subclass that emits the standard error body; requestId is stamped by the handler. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**AppError**  
+HTTPException subclass that emits the standard error body; requestId is stamped by the handler. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **AppEvent**  
 Model recording emitted events (upserted by envelope id) with actor, source and payload; diagnostic, not read back by code. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
@@ -194,7 +212,10 @@ DEVELOPER.md pause: does this match the codebase, over/under-engineered, maintai
 Class: system overview, request and data flow, key architectural patterns. *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
 
 **archiveStaleRecords**  
-Handler that archives stale records instead of deleting them. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Handler that archives stale records instead of deleting them. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**archiveStaleRecords**  
+Handler that archives stale records instead of deleting them. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **ArrayNode**  
 A list or relation condition: presence, count, or predicate (all/any/none) with a nested condition sub-builder. *Region:* [rules-builder library README](lib-rules-builder/knowledge.md)
@@ -206,7 +227,10 @@ A list or relation condition: presence, count, or predicate (all/any/none) with 
 Throws when a field name holds . or :; validateFieldMaps returns the issues. *Region:* [Using a lens: build, gate, fetch](lens-usage/knowledge.md)
 
 **assign**  
-Action gating role grants and token creation: owner/admin need own, member/viewer need manage. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Action gating role grants and token creation: owner/admin need own, member/viewer need manage. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**assign**  
+Action gating role grants and token creation: owner/admin need own, member/viewer need manage. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **atlas**  
 Class: the template's Atlas code map: concept vocabulary, @atlas annotations, navigating by concept. *Region:* [Atlas code map (library + template usage)](lib-atlas/knowledge.md)
@@ -275,10 +299,13 @@ Model storing action, subjectModel, before/after, changes and actor/context colu
 Store slice (packages/ui/src/store/slices/auth.ts) holding user, organizations, spaces, spoof state, strategy and the auth actions. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
 
 **Auth strategy**  
-Frontend choice between standalone (own login) and embedded (parent frame) authentication, detected by detectAuthStrategy. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+Frontend choice between standalone (own login) and embedded (parent frame) authentication, detected by detectAuthStrategy. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**Auth strategy**  
+Frontend choice between standalone (own login) and embedded (parent frame) authentication, detected by detectAuthStrategy. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **auth-middleware**  
-Class: the auth middleware chain and spoofing; no "is there a user" gate — every route names its action and the rule decides. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
+Class: the auth middleware chain, spoofing and the validateUser/validateActor gates. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
 
 **auth.initialize**  
 Once per load: if a token exists, hydrate /me and authenticate the websocket; sets isInitialized. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
@@ -308,7 +335,10 @@ Client message that carries credentials after the anonymous upgrade; resolved th
 Layout route: requireAuth + AppShell + nav-based access check. *Region:* [Frontend apps, routes and layouts](frontend-apps-routing/knowledge.md)
 
 **authentication**  
-Class: BetterAuth sessions, OAuth, AuthProviders, API tokens and token types. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+Class: BetterAuth sessions, OAuth, AuthProviders, API tokens and token types. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**authentication**  
+Class: BetterAuth sessions, OAuth, AuthProviders, API tokens and token types. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **authGuard**  
 createAuthGuards factory in packages/ui/src/guards/authGuard.ts; appGuards holds the instances. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
@@ -323,10 +353,16 @@ Resolves a BetterAuth session and sets the user context via setUserContext. *Reg
 The injected callback that evaluates per-side permission rules. *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
 
 **AuthProvider**  
-An organization's EMAIL, OAUTH or SAML login configuration with encrypted secrets. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+An organization's EMAIL, OAUTH or SAML login configuration with encrypted secrets. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
 
 **AuthProvider**  
-First user of the engine: an organization's OAuth client secrets in encryptedSecrets. *Region:* [Encryption and secrets](encryption/knowledge.md)
+First user of the engine: an organization's OAuth client secrets in encryptedSecrets. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**AuthProvider**  
+First user of the engine: an organization's OAuth client secrets in encryptedSecrets. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
+
+**AuthProvider**  
+An organization's EMAIL, OAUTH or SAML login configuration with encrypted secrets. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **authRedirectTo**  
 localStorage key holding redirectTo across the OAuth round trip. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
@@ -376,10 +412,16 @@ The const object of strategies from which BatchExecutionStrategy and batchExecut
 Authorization: Bearer <token>; carries both SPA session tokens and API keys. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
 
 **Bearer token**  
-Authorization: Bearer <token>; carries both SPA session tokens and API keys. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+Authorization: Bearer <token>; carries both SPA session tokens and API keys. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**Bearer token**  
+Authorization: Bearer <token>; carries both SPA session tokens and API keys. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **BetterAuth**  
-The auth library behind auth: email/password, social OAuth, sessions, verification; mounted at /api/auth/*. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+The auth library behind auth: email/password, social OAuth, sessions, verification; mounted at /api/auth/*. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**BetterAuth**  
+The auth library behind auth: email/password, social OAuth, sessions, verification; mounted at /api/auth/*. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **bind / bindOptional**  
 A { bind } token is a caller-supplied value; bindOptional lets an unsupplied one read as null, never pruned. *Region:* [Running, validating and typing rules](json-rules-runtime/knowledge.md)
@@ -415,10 +457,13 @@ Nested query params like searchFields[price][gte]=100, parsed by prepareRequest 
 Encodes list filters as bracket query notation (filter[field]=…) the API parses. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
 
 **bracketQuery**  
+Context var holding the parsed bracket-notation query (?searchFields[role]=admin becomes a nested object). *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**bracketQuery**  
 The parsed bracket-notation object on context, c.get('bracketQuery'); read it instead of re-parsing the URL. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
 **bracketQuery**  
-Context var holding the parsed bracket-notation query (?searchFields[role]=admin becomes a nested object). *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Context var holding the parsed bracket-notation query (?searchFields[role]=admin becomes a nested object). *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **breadcrumbLabel**  
 NavItem function naming a record page's crumb. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
@@ -442,16 +487,22 @@ Cross-source relation walks in the schema; far-side rows are passed only when a 
 Class: Turborepo tasks, watch mode, codegen, build presets, hot reload. *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
 
 **buildAAD**  
-Registry callback producing the AAD string; only immutable fields such as id and organizationId. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Registry callback producing the AAD string; only immutable fields such as id and organizationId. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**buildAAD**  
+Registry callback producing the AAD string; only immutable fields such as id and organizationId. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **builderSource**  
 Serialize a lens into a RuleBuilderSource a server ships to the builder. *Region:* [Rule builder: template usage](rules-builder/knowledge.md)
 
 **buildJobData**  
+Builds the job envelope every producer uses and resolves its lane. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**buildJobData**  
 Resolves the lane once: request, enqueue option, handler default, then fast. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **buildJobData**  
-Builds the job envelope every producer uses and resolves its lane. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Builds the job envelope every producer uses and resolves its lane. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **buildJsonWhere**  
 Filters inside a JSON column path (path, string_contains, equals, ...), dialect-specific. *Region:* [List filtering and search](filtering-search/knowledge.md)
@@ -484,10 +535,13 @@ The paginate step that ANDs the root lens clauses with the request filters. *Reg
 Factory variant that builds the entity in memory with no DB write. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 
 **BullBoard**  
+Web UI for inspecting, retrying and cleaning queued jobs; basic auth outside local. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**BullBoard**  
 Local web UI for inspecting job queues and job states. *Region:* [Dev setup and worktrees](dx-setup/knowledge.md)
 
 **BullBoard**  
-Web UI for inspecting, retrying and cleaning queued jobs; basic auth outside local. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Web UI for inspecting, retrying and cleaning queued jobs; basic auth outside local. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **BullBoard**  
 Admin job-monitoring dashboard at /admin/queues. *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)
@@ -618,7 +672,10 @@ Re-evaluates steps from step 0 as the caller; computes stepStates and currentSte
 The single-edge kernel returning true or a PathReason. *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
 
 **checkPermission**  
-Plain-function frontend check (permissions-roles / permissions-rebac, model, record, action); false when the record is missing. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Plain-function frontend check (permissions-roles / permissions-rebac, model, record, action); false when the record is missing. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**checkPermission**  
+Plain-function frontend check (permissions-roles / permissions-rebac, model, record, action); false when the record is missing. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **checkTransition**  
 Guard a proposed update: returns true or a Reason covering every path tried. *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
@@ -654,7 +711,10 @@ The agent guidance snippet gloss setup installs into CLAUDE.md: the three commen
 All steps rendered upfront with done / spinner / pending markers instead of streaming logs. *Region:* [Writing an init task](init-tasks/knowledge.md)
 
 **cleanStaleData**  
-Singleton cron handler that hard-deletes rows idle past a retention window. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Singleton cron handler that hard-deletes rows idle past a retention window. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**cleanStaleData**  
+Singleton cron handler that hard-deletes rows idle past a retention window. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **cleanupTouchedTables**  
 afterAll truncation of only the tables written during the suite. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
@@ -666,7 +726,10 @@ Delete an exact cache key or a wildcard pattern via SCAN. *Region:* [Redis, cach
 Non-null caller IP from the trusted x-forwarded-for hop, IPv6 bucketed to /64. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 **clientIp / clientAddress**  
-Bucketed, never-null client key for rate limits vs the exact address that may be missing. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Bucketed, never-null client key for rate limits vs the exact address that may be missing. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**clientIp / clientAddress**  
+Bucketed, never-null client key for rate limits vs the exact address that may be missing. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **ClientSlice**  
 Holds the TanStack QueryClient and ApiWebsocket so they are reachable outside React. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
@@ -849,7 +912,10 @@ Adapter binding @inixiative/permissions-roles / permissions-rebac' rebac check t
 Mints an API token for a test request that should authenticate as a token rather than a session. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
 
 **createEncryption**  
-Low-level encrypt/decrypt service built from a keyring; feature code uses encryptField/decryptField instead. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Low-level encrypt/decrypt service built from a keyring; feature code uses encryptField/decryptField instead. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**createEncryption**  
+Low-level encrypt/decrypt service built from a keyring; feature code uses encryptField/decryptField instead. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **createFactory**  
 Defines a typed build/create factory for a Prisma model with defaults and only non-inferable dependencies. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
@@ -888,7 +954,7 @@ Collects a new org's name and an auto-derived, uniqueness-checked slug. *Region:
 Creates a typed permix instance for role-based action checks. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **createRebacCheck**  
-Builds check from a SchemaMap (resources, fieldMap, polymorphism); generic over the resource union. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+Builds check from an injected resolveRelation; generic over the resource union. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **createRebacCheck / createHydrator**  
 The @inixiative/permissions-roles / permissions-rebac engine: build the check from the schema, hydrate the ownership closure, then evaluate. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
@@ -927,19 +993,34 @@ Build a view over a lens or narrowing in hand, with sourceValues. *Region:* [Rul
 Factory variant that persists the entity and its dependencies. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 
 **cron**  
-Class: DB-stored CronJob schedules, BullMQ repeatables, manual trigger and retention cleanup. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Class: DB-stored CronJob schedules, BullMQ repeatables, manual trigger and retention cleanup. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**cron**  
+Class: DB-stored CronJob schedules, BullMQ repeatables, manual trigger and retention cleanup. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **CronJob**  
-Model for a recurring job: name, jobId, UTC pattern, handler, payload, enabled, maxAttempts, backoffMs. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Model for a recurring job: name, jobId, UTC pattern, handler, payload, enabled, maxAttempts, backoffMs. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**CronJob**  
+Model for a recurring job: name, jobId, UTC pattern, handler, payload, enabled, maxAttempts, backoffMs. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **cronJobSync**  
-Hook that moves a BullMQ repeatable when a CronJob row is created, updated or deleted inside db.txn. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Hook that moves a BullMQ repeatable when a CronJob row is created, updated or deleted inside db.txn. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**cronJobSync**  
+Hook that moves a BullMQ repeatable when a CronJob row is created, updated or deleted inside db.txn. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **ctx.enqueueChildJob**  
-Adds a child to the running staged job (only inside a stage); never pass parent to enqueueJob. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Adds a child to the running staged job (only inside a stage); never pass parent to enqueueJob. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**ctx.enqueueChildJob**  
+Adds a child to the running staged job (only inside a stage); never pass parent to enqueueJob. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **ctx.log**  
-Logs to both stdout and the job's BullBoard log. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Logs to both stdout and the job's BullBoard log. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**ctx.log**  
+Logs to both stdout and the job's BullBoard log. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **ctx.log**  
 Job-handler logger that dual-writes to the facade and BullBoard. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
@@ -1037,7 +1118,10 @@ Client that bypasses transactions and hooks; only for deliberate hook skipping. 
 Opens an AsyncLocalStorage scope (request id or `job:name:id`) carrying transaction state. *Region:* [Database client and transactions](database-client/knowledge.md)
 
 **db.scope**  
-AsyncLocalStorage scope keyed by request UUID or job ID; read with db.getScopeId() and db.getScopeContext(). *Region:* [Request context and errors](request-context-errors/knowledge.md)
+AsyncLocalStorage scope keyed by request UUID or job ID; read with db.getScopeId() and db.getScopeContext(). *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**db.scope**  
+AsyncLocalStorage scope keyed by request UUID or job ID; read with db.getScopeId() and db.getScopeContext(). *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **db.txn**  
 Opens a transaction, or merges into the outermost one already open in this scope. *Region:* [Database client and transactions](database-client/knowledge.md)
@@ -1094,7 +1178,10 @@ Presentational layer that hoists lens paths to the root selector as named facets
 Presentational layer that hoists lens paths to the root selector as named facets and relabels fields and values. *Region:* [Rule builder: template usage](rules-builder/knowledge.md)
 
 **decryptField**  
-Decrypts a registered key from a record with the current or previous key of its keyring. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Decrypts a registered key from a record with the current or previous key of its keyring. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**decryptField**  
+Decrypts a registered key from a record with the current or previous key of its keyring. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **Deep clone mutable batch context**  
 Each sub-request gets structuredClone copies of user, session, memberships and token; only read-only values like app are shared. *Region:* [Batch API](batch/knowledge.md)
@@ -1208,7 +1295,10 @@ Class: docs workflow: read before, update after, doc structure and alignment rev
 { rel: 'a.b', action } checks the ancestor directly, skipping intermediate delegation; stricter than single-hop. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
 
 **Dual-key rotation**  
-Current and previous keys both decrypt during the rotation window, so no request fails mid-rotation. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Current and previous keys both decrypt during the rotation window, so no request fails mid-rotation. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**Dual-key rotation**  
+Current and previous keys both decrypt during the rotation window, so no request fails mid-rotation. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **dynamic reference**  
 An id source whose rows cannot be known at save (bind, path, contains, between); save refuses it. *Region:* [Template rules and rule references](json-rules/knowledge.md)
@@ -1306,19 +1396,34 @@ Replays recorded cassette events onto an emitter for event-stream providers. *Re
 Icon/title/description/action block; Table renders it automatically for empty data. *Region:* [UI components and shared pages](ui-components/knowledge.md)
 
 **ENCRYPTED_MODELS**  
-Registry of models and their encrypted keys (envPrefix + buildAAD); registering a key is the only step to encrypt a field. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Registry of models and their encrypted keys (envPrefix + buildAAD); registering a key is the only step to encrypt a field. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**ENCRYPTED_MODELS**  
+Registry of models and their encrypted keys (envPrefix + buildAAD); registering a key is the only step to encrypt a field. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **EncryptedFieldData**  
-The payload { ciphertext, version, iv, authTag }, split across the three columns. *Region:* [Encryption and secrets](encryption/knowledge.md)
+The payload { ciphertext, version, iv, authTag }, split across the three columns. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**EncryptedFieldData**  
+The payload { ciphertext, version, iv, authTag }, split across the three columns. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **encryptField**  
-encryptField(model, key, record) returns the three column values to persist; type-checked per model and key. *Region:* [Encryption and secrets](encryption/knowledge.md)
+encryptField(model, key, record) returns the three column values to persist; type-checked per model and key. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**encryptField**  
+encryptField(model, key, record) returns the three column values to persist; type-checked per model and key. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **encryption**  
-Class tag: field-level encryption (AES-256-GCM), keyrings, key rotation, CI version validation. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Class tag: field-level encryption (AES-256-GCM), keyrings, key rotation, CI version validation. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**encryption**  
+Class tag: field-level encryption (AES-256-GCM), keyrings, key rotation, CI version validation. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **encryptionEnv**  
-Env schema builder for every registered prefix; validates integer versions and 256-bit base64 keys at boot. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Env schema builder for every registered prefix; validates integer versions and 256-bit base64 keys at boot. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**encryptionEnv**  
+Env schema builder for every registered prefix; validates integer versions and 256-bit base64 keys at boot. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **engineering-process**  
 Class: how agents work here: why-first, decomposition, YAGNI both ways, verification, reuse what exists. *Region:* [Engineering process and docs](engineering-process-docs/knowledge.md)
@@ -1327,13 +1432,22 @@ Class: how agents work here: why-first, decomposition, YAGNI both ways, verifica
 Process-wide engine defaults by dotted path; with() scopes a synchronous override, reset() restores defaults. *Region:* [Running, validating and typing rules](json-rules-runtime/knowledge.md)
 
 **enqueueJob**  
-The one way to queue a job by handler name with options (delay, attempts, type, lane, bypass); inline in tests. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+The one way to queue a job by handler name with options (delay, attempts, type, lane, bypass); inline in tests. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**enqueueJob**  
+The one way to queue a job by handler name with options (delay, attempts, type, lane, bypass); inline in tests. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **ensureProdEncryptionKeys / ensureStagingEncryptionKeys**  
-Init Infisical steps that seed each prefix's keyring at version 1 in prod and staging. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Init Infisical steps that seed each prefix's keyring at version 1 in prod and staging. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**ensureProdEncryptionKeys / ensureStagingEncryptionKeys**  
+Init Infisical steps that seed each prefix's keyring at version 1 in prod and staging. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **Entitlements**  
-JSON boolean grants on OrganizationUser or Token, merged over role actions as an allow override. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+JSON boolean grants on OrganizationUser or Token, merged over role actions as an allow override. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**Entitlements**  
+JSON boolean grants on OrganizationUser or Token, merged over role actions as an allow override. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **enum narrowing**  
 Allowed enum values intersected from five sources, per field and per path. *Region:* [The lens model](lens-model/knowledge.md)
@@ -1360,16 +1474,25 @@ Committed templates listing every variable; the source sync-env copies from. *Re
 Uncommitted local and test env files at the root, with optional per-app overrides that load second. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)
 
 **{ENV_PREFIX}_ENCRYPTION_KEY_CURRENT**  
-Base64 32-byte key used to encrypt; generate with openssl rand -base64 32. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Base64 32-byte key used to encrypt; generate with openssl rand -base64 32. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**{ENV_PREFIX}_ENCRYPTION_KEY_CURRENT**  
+Base64 32-byte key used to encrypt; generate with openssl rand -base64 32. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **{ENV_PREFIX}_ENCRYPTION_KEY_PREVIOUS**  
-Prior key kept so old rows still decrypt during rotation; required when version > 1. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Prior key kept so old rows still decrypt during rotation; required when version > 1. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**{ENV_PREFIX}_ENCRYPTION_KEY_PREVIOUS**  
+Prior key kept so old rows still decrypt during rotation; required when version > 1. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **{ENV_PREFIX}_ENCRYPTION_VERSION**  
-Integer current key version (not "v2"); the previous version is current - 1. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Integer current key version (not "v2"); the previous version is current - 1. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**{ENV_PREFIX}_ENCRYPTION_VERSION**  
+Integer current key version (not "v2"); the previous version is current - 1. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **Environment**  
-'local' | 'test' | 'pr' | 'staging' | 'prod' from @template/shared/utils. *Region:* [Encryption and secrets](encryption/knowledge.md)
+'local' | 'test' | 'pr' | 'staging' | 'prod' from @template/shared/utils. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
 
 **Environment**  
 Type of the canonical environment names: local, test, pr, staging, prod. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)
@@ -1377,11 +1500,20 @@ Type of the canonical environment names: local, test, pr, staging, prod. *Region
 **ENVIRONMENT**  
 The env var that names the running environment; the is* flags are derived from it. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)
 
+**Environment**  
+'local' | 'test' | 'pr' | 'staging' | 'prod' from @template/shared/utils. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
+
 **envPrefix**  
-A registry key's env var prefix, e.g. AUTH_PROVIDER_SECRETS. *Region:* [Encryption and secrets](encryption/knowledge.md)
+A registry key's env var prefix, e.g. AUTH_PROVIDER_SECRETS. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**envPrefix**  
+A registry key's env var prefix, e.g. AUTH_PROVIDER_SECRETS. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **errorHandlerMiddleware**  
-app.onError handler mapping ZodError, Prisma errors, ResponseValidationError, AppError and raw Error to responses. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+app.onError handler mapping ZodError, Prisma errors, ResponseValidationError, AppError and raw Error to responses. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**errorHandlerMiddleware**  
+app.onError handler mapping ZodError, Prisma errors, ResponseValidationError, AppError and raw Error to responses. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **errorReporter**  
 The adapter that reports errors to the configured provider; app code never imports the provider SDK. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
@@ -1390,7 +1522,10 @@ The adapter that reports errors to the configured provider; app code never impor
 Adapter singleton: Sentry (createSentryReporter) when enabled with a DSN, console reporter otherwise. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **errors**  
-Class: makeError/AppError, the global errorHandlerMiddleware, HTTP_ERROR_MAP and the status conventions. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Class: makeError/AppError, the global errorHandlerMiddleware, HTTP_ERROR_MAP and the status conventions. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**errors**  
+Class: makeError/AppError, the global errorHandlerMiddleware, HTTP_ERROR_MAP and the status conventions. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **escapeLikePattern**  
 Escapes backslash, % and _ so user text matches literally in contains / startsWith / endsWith. *Region:* [List filtering and search](filtering-search/knowledge.md)
@@ -1494,7 +1629,10 @@ The sentinel a Prisma column comparison carries, resolved to prisma.<model>.fiel
 A field's @default as { kind: 'literal', value } or { kind: 'generated', expression }; generated ones are never injected. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
 **fieldErrors**  
-Per-field messages on 422 errors; Zod issues map onto it for forms. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Per-field messages on 422 errors; Zod issues map onto it for forms. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**fieldErrors**  
+Per-field messages on 422 errors; Zod issues map onto it for forms. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **FieldKind**  
 A field type key (Int, String, DateTime, …) the operator catalog is keyed by. *Region:* [Writing a json-rules rule](json-rules-shapes/knowledge.md)
@@ -1537,6 +1675,9 @@ Thrown when the create-if-missing fence is not acquired within waitMs (default 3
 
 **FindForUpdateLockTimeoutError**  
 Thrown when an `upserting` fence can't get its Redis lock within waitMs (default 3000ms); rolls the transaction back. *Region:* [Database client and transactions](database-client/knowledge.md)
+
+**findOwnedIntegration**  
+Loads an integration by id only if the caller's user or organization owns it. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
 
 **findRoute / findRouteAcrossContexts**  
 Match a path to its nav item within one context, or across contexts. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
@@ -1627,6 +1768,15 @@ turbo dependsOn ordering db:generate → generate:openapi → generate:sdk, then
 **get / post / patch / del / json**  
 Request builders and typed response parser from #tests/utils/request; jsonError for error bodies. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
 
+**getActor**  
+Returns the acting user, falling back from c.get('user') to the organizationUser / spaceUser / token user. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
+
+**getActor**  
+Resolves the acting user, organization, organizationUser, space, spaceUser and token for any session or token kind. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**getActor**  
+Resolves the acting user, organization, organizationUser, space, spaceUser and token for any session or token kind. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
+
 **getConcurrency**  
 Returns the tightest predefined cap across the ConcurrencyType resources touched. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
@@ -1634,13 +1784,22 @@ Returns the tightest predefined cap across the ConcurrencyType resources touched
 Turns tenant context into [model, record] for permissions-roles / permissions-rebac.check in access rules. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **getContextParams**  
-Returns [model, record] for the current organization, space or user context. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Returns [model, record] for the current organization, space or user context. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**getContextParams**  
+Returns [model, record] for the current organization, space or user context. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **getEncryptedFieldsByModel**  
-Lists every encrypted column per model from the registry for redactFields / ignore lists. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Lists every encrypted column per model from the registry for redactFields / ignore lists. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**getEncryptedFieldsByModel**  
+Lists every encrypted column per model from the registry for redactFields / ignore lists. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **getFieldNames**  
-Derives a key's column triplet: encrypted{Key}, encrypted{Key}Metadata, encrypted{Key}KeyVersion. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Derives a key's column triplet: encrypted{Key}, encrypted{Key}Metadata, encrypted{Key}KeyVersion. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**getFieldNames**  
+Derives a key's column triplet: encrypted{Key}, encrypted{Key}Metadata, encrypted{Key}KeyVersion. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **getModelRelations / getAccessorRelations**  
 A model's relations with relation name and target, keyed by model name or by accessor. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
@@ -1664,7 +1823,10 @@ The dedicated subscriber connection (SUBSCRIBE blocks) and the publisher client.
 Lists a model's relations with targetModel, isList, collapsed foreignKey and annotations. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
 **getResource**  
-Reads the record resourceContextMiddleware loaded for the route's :id, typed by generic. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Reads the record resourceContextMiddleware loaded for the route's :id, typed by generic. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**getResource**  
+Reads the record resourceContextMiddleware loaded for the route's :id, typed by generic. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **getSecretAsync / setSecretAsync**  
 Read or store a secret in Infisical by project, environment and path (the doc's getSecret / setSecret); the source for secrets on resume. *Region:* [Writing an init task](init-tasks/knowledge.md)
@@ -1673,7 +1835,10 @@ Read or store a secret in Infisical by project, environment and path (the doc's 
 useAppStore.getState(): reads state or calls actions outside React components and in handlers. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
 **getValidatedBody / getValidatedQuery**  
-Typed validated body/query for code that only has a generic Context<AppEnv>. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Typed validated body/query for code that only has a generic Context<AppEnv>. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**getValidatedBody / getValidatedQuery**  
+Typed validated body/query for code that only has a generic Context<AppEnv>. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **getValidOperators / isValidOperatorForField**  
 Which filter operators a model field's type allows; the SDK schema is generated from the same list. *Region:* [List filtering and search](filtering-search/knowledge.md)
@@ -1721,18 +1886,27 @@ Dagger saying a file-level preamble exists in the gloss. *Region:* [Gloss (margi
 A User created by findUserOrCreateGuest for an email with no account yet. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
 
 **guidance**  
-UI behaviour hint in the error body: fixInput, reauthenticate, requestPermission, tryAgain, refreshAndRetry, contactSupport. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+UI behaviour hint in the error body: fixInput, reauthenticate, requestPermission, tryAgain, refreshAndRetry, contactSupport. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**guidance**  
+UI behaviour hint in the error body: fixInput, reauthenticate, requestPermission, tryAgain, refreshAndRetry, contactSupport. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 ## H
 
 **handleApiError / describeError**  
-Frontend helpers turning an unknown error into a user-facing message (onError toast vs inline display). *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Frontend helpers turning an unknown error into a user-facing message (onError toast vs inline display). *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**handleApiError / describeError**  
+Frontend helpers turning an unknown error into a user-facing message (onError toast vs inline display). *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **handleApprove**  
 The handler's side effect when an inquiry is approved. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
 **handlers/index.ts**  
-Registry of JobHandlerName, JobPayloads and jobHandlers; every new handler is added here. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Registry of JobHandlerName, JobPayloads and jobHandlers; every new handler is added here. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**handlers/index.ts**  
+Registry of JobHandlerName, JobPayloads and jobHandlers; every new handler is added here. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **happy-dom**  
 DOM for frontend tests via @happy-dom/global-registrator preloaded from bunfig.toml. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
@@ -1756,7 +1930,10 @@ Client ping every 30s, reconnect if no pong in 5s; ping is answered before the p
 Appends that arrive during the snapshot read, sent after it and dropped by seq if the snapshot already holds them. *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
 
 **Hierarchical token scopes**  
-A token acts within its owner scope: a Space token cannot reach its Organization; user-shaped tokens act as that user. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+A token acts within its owner scope: a Space token cannot reach its Organization; user-shaped tokens act as that user. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**Hierarchical token scopes**  
+A token acts within its owner scope: a Space token cannot reach its Organization; user-shaped tokens act as that user. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **Hierarchical Tokens**  
 Tokens scoped to User (cross-org), Organization (all spaces) or Space (one space). *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)
@@ -1768,7 +1945,10 @@ Shared ignore registry: fields excluded from webhook payloads, stripped from aud
 Enums naming when a hook runs (before/after) and on which operations (create, update, deleteMany, ...). *Region:* [Mutation hooks, immutable fields, ordered lists](mutation-hooks/knowledge.md)
 
 **HTTP_ERROR_MAP**  
-Single source in @template/shared of each status's label, message and default guidance. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Single source in @template/shared of each status's label, message and default guidance. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**HTTP_ERROR_MAP**  
+Single source in @template/shared of each status's label, message and default guidance. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **hydrate**  
 Loads a record's schema relations recursively with deduplicated fetches, instead of hand-written includes. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
@@ -1782,7 +1962,10 @@ Event-anchored, hash-last key: planner {event}:{template}:{hash(data)}; deliver 
 Create call that treats 'already exists' as success and returns the existing id (createRailwayConnection, createRailwaySync, ensureRailwayConnection). *Region:* [Writing an init task](init-tasks/knowledge.md)
 
 **Idempotent rotation**  
-updateManyAndReturn with the old version in the where clause, so a rerun or a racing worker never double-encrypts. *Region:* [Encryption and secrets](encryption/knowledge.md)
+updateManyAndReturn with the old version in the where clause, so a rerun or a racing worker never double-encrypts. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**Idempotent rotation**  
+updateManyAndReturn with the old version in the where clause, so a rerun or a racing worker never double-encrypts. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **identity**  
 The function keying a bucket: userIdentity, principalIdentity, spaceIdentity, organizationIdentity, ipIdentity. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
@@ -1812,10 +1995,13 @@ Where a page moves when its segment gains children (bots/index.tsx + bots/$id.ts
 Pre-index foreign rows by a bridge's on field so they can be embedded under each anchor row. *Region:* [Lens option sources and bridges](lens-sources/knowledge.md)
 
 **Infisical**  
-Secret store for the pr, staging and prod environments; .infisical.json marks a project as configured. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Secret store for the pr, staging and prod environments; .infisical.json marks a project as configured. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
 
 **Infisical**  
 Secret store for pr, staging and prod; configured by init, `.infisical.json` marks it set up. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)
+
+**Infisical**  
+Secret store for the pr, staging and prod environments; .infisical.json marks a project as configured. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **INFRA-003 / INFRA-005**  
 Tickets tracking template CI/CD and the platform baseline; template commits no CI workflow today. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)
@@ -1836,7 +2022,10 @@ Installs signal handling that runs onShutdown handlers within a timeout; called 
 Starts process telemetry once from readTelemetryConfig('api'|'worker'). *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **initializeWorker**  
-Starts the BullMQ worker; skipped in the test environment. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Starts the BullMQ worker; skipped in the test environment. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**initializeWorker**  
+Starts the BullMQ worker; skipped in the test environment. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **InquiriesPage**  
 The base list page (sent / received, type filters) every typed inquiry page wraps. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
@@ -1896,7 +2085,10 @@ Phase 2 per recipient: evaluate conditions and substitute tokens, narrowed to th
 ENTRYPOINT §0.4: for shape-finding work, ask and surface forks before a closed proposal. *Region:* [Engineering process and docs](engineering-process-docs/knowledge.md)
 
 **intersectEntitlements**  
-Keeps only entitlement keys true in both the membership and the token. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Keeps only entitlement keys true in both the membership and the token. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**intersectEntitlements**  
+Keeps only entitlement keys true in both the membership and the token. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **isComplete**  
 init/utils/progressTracking.ts check for a finished step (the doc calls it isProgressComplete). *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
@@ -1926,7 +2118,10 @@ Frontend terminal check that also treats a past expiresAt as terminal. *Region:*
 Flags from packages/shared/src/utils/env.ts, one per Environment value. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)
 
 **isUniqueConstraintError / isWriteConflictError**  
-Detect Prisma P2002 duplicate keys vs P2034 write conflicts/deadlocks. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Detect Prisma P2002 duplicate keys vs P2034 write conflicts/deadlocks. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**isUniqueConstraintError / isWriteConflictError**  
+Detect Prisma P2002 duplicate keys vs P2034 write conflicts/deadlocks. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 ## J
 
@@ -1952,7 +2147,10 @@ fast or slow; a label on the job envelope (JobData.lane), defaulting to fast. *R
 DB table holding spilled adhoc job intent (handlerName, jobId, dedupeKey, lane, data, options, attempts). *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **jobs**  
-Class: BullMQ background jobs, i.e. the makeJob wrappers, handler registry, enqueueJob and the worker. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Class: BullMQ background jobs, i.e. the makeJob wrappers, handler registry, enqueueJob and the worker. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**jobs**  
+Class: BullMQ background jobs, i.e. the makeJob wrappers, handler registry, enqueueJob and the worker. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **jobs.slow.idle_ms**  
 Gauge of how long slow work has been queued without a slow job finishing; climbing means a stuck lane. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
@@ -1964,7 +2162,10 @@ Shared depth budget (default 10000) that trips overflow; low-water is 0.8 of it.
 Share of the depth budget slow jobs may fill before spilling. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **JobType**  
-adhoc (one-off), cron (repeater) or cronTrigger (manual cron run). *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+adhoc (one-off), cron (repeater) or cronTrigger (manual cron run). *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**JobType**  
+adhoc (one-off), cron (repeater) or cronTrigger (manual cron run). *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **Json boundary**  
 Path resolution stops at a visible Json column; sub-paths below it are accepted and compared untyped. *Region:* [Using a lens: build, gate, fetch](lens-usage/knowledge.md)
@@ -1987,13 +2188,19 @@ Remove outdated information, mark stubs, never document aspirational features as
 projectRows option keeping hidden clamp columns for an in-memory re-check; never returned to a viewer. *Region:* [Using a lens: build, gate, fetch](lens-usage/knowledge.md)
 
 **keyHash**  
-SHA-256 hash of an API key; the plaintext is shown once at creation and never stored. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+SHA-256 hash of an API key; the plaintext is shown once at creation and never stored. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**keyHash**  
+SHA-256 hash of an API key; the plaintext is shown once at creation and never stored. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **keyof typeof**  
 Derive a union type from a const object so values live in one place. *Region:* [Naming and code style](conventions/knowledge.md)
 
 **Keyring**  
-One envPrefix's current key, optional previous key and integer version, read from env. *Region:* [Encryption and secrets](encryption/knowledge.md)
+One envPrefix's current key, optional previous key and integer version, read from env. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**Keyring**  
+One envPrefix's current key, optional previous key and integer version, read from env. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **keyset cursor**  
 An opaque cursor packing sort chain, last-row values and filter hash (encodeCursor / decodeCursor / buildKeysetWhere). *Region:* [Offset and cursor pagination](pagination/knowledge.md)
@@ -2031,7 +2238,10 @@ A scalar field condition row; exposes valid plus field.valid / value.valid and i
 A scalar field condition row; exposes valid plus field.valid / value.valid and its reachable scopes. *Region:* [Rule builder: template usage](rules-builder/knowledge.md)
 
 **leave**  
-Action ({ rel: 'user', action: 'operate' }) letting a user remove their own membership or token row. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Self action ({ self: 'userId' }) letting a user remove their own membership or token. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**leave**  
+Self action ({ self: 'userId' }) letting a user remove their own membership or token. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **lefthook**  
 Pre-commit hooks from @inixiative/config/lefthook/base.yml running typecheck and Biome on staged files. *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
@@ -2083,6 +2293,12 @@ One visit as projectLens would give it, resolved on demand at a relation path; n
 
 **lensWhere**  
 Folds a lens's non-root narrowing clauses into a composed Prisma where across relations. *Region:* [Template lenses](lenses/knowledge.md)
+
+**lesserRole**  
+Returns the lower role; caps a token's role at its user's membership role. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**lesserRole**  
+Returns the lower role; caps a token's role at its user's membership role. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **lib-atlas**  
 The @inixiative/atlas library: the code-map CLI, annotation model and .atlas/ config. *Region:* [Atlas code map (library + template usage)](lib-atlas/knowledge.md)
@@ -2213,22 +2429,34 @@ Maps user/organization/space contexts to one query each for a list shown in seve
 Binds a handler to a route, exposing only the responders the route declares and validating the response payload. *Region:* [API routes, controllers and modules](api-routes/knowledge.md)
 
 **makeError**  
-Factory for a throwable AppError with status, message, guidance and fieldErrors; apps/api only. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Factory for a throwable AppError with status, message, guidance and fieldErrors; apps/api only. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**makeError**  
+Factory for a throwable AppError with status, message, guidance and fieldErrors; apps/api only. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **makeJob**  
-Basic typed job wrapper; with stages it becomes a staged fan-out-and-wait job. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Basic typed job wrapper; with stages it becomes a staged fan-out-and-wait job. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**makeJob**  
+Basic typed job wrapper; with stages it becomes a staged fan-out-and-wait job. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **makeSingletonJob**  
 Job wrapper that takes a createLock before running so only one run happens at a time across workers. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **makeSingletonJob**  
-Wrapper whose Redis lock (5 min TTL, 1 min heartbeat) lets only one run execute at a time. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Wrapper whose Redis lock (5 min TTL, 1 min heartbeat) lets only one run execute at a time. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**makeSingletonJob**  
+Wrapper whose Redis lock (5 min TTL, 1 min heartbeat) lets only one run execute at a time. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **makeSupersedingJob**  
 Job wrapper where a newer job with the same dedupe key supersedes older runs. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **makeSupersedingJob**  
-Wrapper where a newer job with the same dedupe key supersedes the older one via ctx.signal; cooperative, does not kill. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Wrapper where a newer job with the same dedupe key supersedes the older one via ctx.signal; cooperative, does not kill. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**makeSupersedingJob**  
+Wrapper where a newer job with the same dedupe key supersedes the older one via ctx.signal; cooperative, does not kill. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **makeUnrefInterval**  
 Recurring in-process tick that starts once, stops cleanly and never blocks exit. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
@@ -2448,7 +2676,10 @@ Negations and notBefore / notAfter / notWithin / notBetween / dayNotIn match NUL
 ## O
 
 **oauthHandoffPlugins**  
-BetterAuth plugins that mint the one-time token and move it onto the callback as #ott. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+BetterAuth plugins that mint the one-time token and move it onto the callback as #ott. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**oauthHandoffPlugins**  
+BetterAuth plugins that mint the one-time token and move it onto the callback as #ott. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **object-storage**  
 Class: the env-routed S3 storage client behind the storage adapter, and its buckets. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
@@ -2466,7 +2697,10 @@ mapDefaults wrapper that omits every FK column prismaMap knows, so references go
 The same Condition runs in memory (check), as a Prisma where (toPrisma) and as SQL (toSql). *Region:* [Writing a json-rules rule](json-rules-shapes/knowledge.md)
 
 **One-time token (ott)**  
-Single-use, 1-minute token in the OAuth callback fragment, verified atomically via Redis GETDEL. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+Single-use, 1-minute token in the OAuth callback fragment, verified atomically via Redis GETDEL. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**One-time token (ott)**  
+Single-use, 1-minute token in the OAuth callback fragment, verified atomically via Redis GETDEL. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **onIssue**  
 Registry render policy: platform (default, unbranded fallback), fail (retry then DLQ), or degrade (send with empty blocks). *Region:* [Email compose, render and save](email-render/knowledge.md)
@@ -2630,19 +2864,28 @@ Optional JSON column of row-level ActionRules that only widen access. *Region:* 
 Class tag: ReBAC schema and engine, owner-polymorphic and row-level permissions-roles / permissions-rebac. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
 
 **permissions-roles**  
-Class tag: roles, actions, Permix setup and checks. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Class tag: roles, actions, Permix setup and checks. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**permissions-roles**  
+Class tag: roles, actions, Permix setup and checks. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **PermissionsSlice**  
 Permix instance with setup(me), check(model, record, action) and clear(). *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
 **permix**  
+The per-request Permix permission checker, empty until auth middleware sets it up. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**permix**  
 The grant holder: role-derived grants keyed by resource or resource:id, a superadmin bypass, and the actor id. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **permix**  
-Per-request grant holder created in prepareRequest: setup loads grants, check answers them, setSuperadmin bypasses. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Per-request grant holder created in prepareRequest: setup loads grants, check answers them, setSuperadmin bypasses. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
 
 **permix**  
-The per-request Permix permission checker, empty until auth middleware sets it up. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Per-request grant holder created in prepareRequest: setup loads grants, check answers them, setSuperadmin bypasses. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
+
+**permix**  
+The per-request Permix permission checker, empty until auth middleware sets it up. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **permix.setSuperadmin**  
 Makes every permix check pass for a superadmin. *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)
@@ -2650,8 +2893,8 @@ Makes every permix check pass for a superadmin. *Region:* [Tenancy and Superadmi
 **permix.setup**  
 Loads role-derived grants into permix. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
-**permix.setActor**  
-Sets the actor (model + record) that { rule } conditions read as __actor. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+**permix.setUserId**  
+Sets the actor id that { self } rules compare against. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **PermixLike**  
 The grant-reading slice of permix the check engine consumes. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
@@ -2672,10 +2915,16 @@ Native Pino instance for third-party SDKs only; bypasses the OTLP/broadcast pipe
 turbo task suffix that runs a task for one package (local#api, local:worker#api). *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
 
 **Platform providers**  
-Social providers enabled by env vars, listed by getPlatformProviders; not rows. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+Social providers enabled by env vars, listed by getPlatformProviders; not rows. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**Platform providers**  
+Social providers enabled by env vars, listed by getPlatformProviders; not rows. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **PlatformRole**  
-System-wide role on User: user or superadmin; superadmin bypasses every permix check. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+System-wide role on User: user or superadmin; superadmin bypasses every permix check. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**PlatformRole**  
+System-wide role on User: user or superadmin; superadmin bypasses every permix check. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **PlatformRole**  
 System-wide role on User: user or superadmin. *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)
@@ -2711,7 +2960,10 @@ CLI command printing a project's local ports from ports.json. *Region:* [Config 
 Registry of per-project port blocks: service default + 100 x block, reserved ports skipped. *Region:* [Config package (toolchain, train)](lib-config/knowledge.md)
 
 **POST /api/admin/job**  
-Admin route that enqueues a one-off ad-hoc job. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Admin route that enqueues a one-off ad-hoc job. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**POST /api/admin/job**  
+Admin route that enqueues a one-off ad-hoc job. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **POST /api/v1/batch/execute**  
 The Batch API endpoint: { strategy, requests: rounds[][], headers? } answered 200 with batch results and a summary. *Region:* [Batch API](batch/knowledge.md)
@@ -2732,7 +2984,10 @@ A json-rules Condition giving legality; from reads the current record, to reads 
 Pre-send content checks (subject, image alt, preheader, spam phrases, unresolved lens paths) via runPreflight / emailTemplatePreflight. *Region:* [Email compose, render and save](email-render/knowledge.md)
 
 **prepareRequest**  
-First middleware: sets db, requestId, bracketQuery, a fresh permix, nulls auth/resource vars, wraps the request in db.scope; minimal setup for /api/batch. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+First middleware: sets db, requestId, bracketQuery, a fresh permix, nulls auth/resource vars, wraps the request in db.scope; minimal setup for /api/batch. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**prepareRequest**  
+First middleware: sets db, requestId, bracketQuery, a fresh permix, nulls auth/resource vars, wraps the request in db.scope; minimal setup for /api/batch. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **Prerequisites**  
 First TUI view: CLI and session checks via checkPrerequisites before any task runs. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
@@ -2780,7 +3035,10 @@ A health or auth check request (isAuthProbe, isSystemProbe) that bypasses the no
 Class: graceful shutdown handlers, health checks, connection draining, unref intervals. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **processJob**  
-The worker's per-job processor (slot claim, scopes, tracing); never called to schedule work. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+The worker's per-job processor (slot claim, scopes, tracing); never called to schedule work. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**processJob**  
+The worker's per-job processor (slot claim, scopes, tracing); never called to schedule work. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **ProfileFormCard**  
 Name/slug form shared by the three profile pages; showThemeToggle adds the theme picker. *Region:* [UI components and shared pages](ui-components/knowledge.md)
@@ -2952,7 +3210,10 @@ Class: static ISO country, currency, language and IANA timezone lists with looku
 Builds the query-refetch hint for a message handoff. *Region:* [WebSocket channels and refetch hints](ws-channels/knowledge.md)
 
 **refreshUserContext**  
-Reloads the user's memberships and permissions-roles / permissions-rebac mid-request after membership or role changes. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Reloads the user's memberships and permissions-roles / permissions-rebac mid-request after membership or role changes. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**refreshUserContext**  
+Reloads the user's memberships and permissions-roles / permissions-rebac mid-request after membership or role changes. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **REGENERATE_ON_REVIVE**  
 Columns recomputed when a tombstoned row is revived. *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
@@ -2961,7 +3222,10 @@ Columns recomputed when a tombstoned row is revived. *Region:* [Audit log and so
 Put a batch's db and base context in the in-memory registry, and remove it when the batch ends. *Region:* [Batch API](batch/knowledge.md)
 
 **registerCronJobs**  
-Worker-startup sync of enabled CronJob rows to BullMQ repeatables, removing orphans. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Worker-startup sync of enabled CronJob rows to BullMQ repeatables, removing orphans. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**registerCronJobs**  
+Worker-startup sync of enabled CronJob rows to BullMQ repeatables, removing orphans. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **registerDbHook**  
 Attaches a named before/after handler to given DbActions on a model or '*'. *Region:* [Mutation hooks, immutable fields, ordered lists](mutation-hooks/knowledge.md)
@@ -3006,7 +3270,10 @@ A rule value such as `this month` or an `ago` rolling shift, resolved from `now`
 Serializable date values: points ({ ago }, { ahead }, { start }, { end }) and ranges ({ this }, { last }, { next }). *Region:* [Writing a json-rules rule](json-rules-shapes/knowledge.md)
 
 **removeRepeatable**  
-BullMQ call whose job id is the third argument; a jobId inside repeat is overwritten. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+BullMQ call whose job id is the third argument; a jobId inside repeat is overwritten. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**removeRepeatable**  
+BullMQ call whose job id is the third argument; a jobId inside repeat is overwritten. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **renderForRecipient**  
 Per-recipient render shared by email and messaging; variables come from recipientVariables. *Region:* [Email compose, render and save](email-render/knowledge.md)
@@ -3024,13 +3291,19 @@ Owns non-toolchain dependency bumps and bumping @inixiative/config itself; fence
 Per-request db, user, org, space and permissions-roles / permissions-rebac scoped through AsyncLocalStorage; no global state. *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
 
 **request-context**  
-Class: the per-request AppEnv context, the middleware that fills it, and the getters handlers read it with. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Class: the per-request AppEnv context, the middleware that fills it, and the getters handlers read it with. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**request-context**  
+Class: the per-request AppEnv context, the middleware that fills it, and the getters handlers read it with. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **request-schemas**  
 Class: request/response zod schemas, mostly generated from Prisma (ScalarSchema, CreateInput) and narrowed with sanitize helpers. *Region:* [Request schemas and OpenAPI](api-schemas-openapi/knowledge.md)
 
 **requestId**  
-UUID per request, returned as the request-id header and stamped on every error body. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+UUID per request, returned as the request-id header and stamped on every error body. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**requestId**  
+UUID per request, returned as the request-id header and stamped on every error body. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **requireAuth**  
 Guard redirecting unauthenticated users to /login?redirectTo=…, carrying org, space and spoof. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
@@ -3077,6 +3350,9 @@ Infer the source from the route context; resolve the target from ids, slugs or t
 **resolveOperation**  
 Looks up an operationId's route and fills path params for in-process callers. *Region:* [Request schemas and OpenAPI](api-schemas-openapi/knowledge.md)
 
+**resolveRelation**  
+The injected, ORM-specific function returning the model a relation segment points at. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+
 **resolveSender**  
 Loads the sending row through its lens as the sender variable; identity only, not branding. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
@@ -3096,16 +3372,25 @@ Railway resources named {project}-{env}-{app} from project.config.ts; Vercel omi
 Route/operationId pattern: userCreate, organizationReadManySpaces, adminOrganizationReadMany. *Region:* [Naming and code style](conventions/knowledge.md)
 
 **resourceContextArgs**  
-Per-model include map deciding which relations resourceContextMiddleware loads. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Per-model include map deciding which relations resourceContextMiddleware loads. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**resourceContextArgs**  
+Per-model include map deciding which relations resourceContextMiddleware loads. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **resourceContextMiddleware**  
-Loads the :id resource into context; 404 for none, 409 for several; supports ?lookup= on unique fields. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Loads the :id resource into context; 404 for none, 409 for several; supports ?lookup= on unique fields. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**resourceContextMiddleware**  
+Loads the :id resource into context; 404 for none, 409 for several; supports ?lookup= on unique fields. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **respond**  
 The responder object a makeController handler receives: respond.ok (200), respond.created (201), respond.noContent (204). *Region:* [API routes, controllers and modules](api-routes/knowledge.md)
 
 **respond500**  
-Wraps a raw Error into the standard 500 envelope; handlers never call it directly. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Wraps a raw Error into the standard 500 envelope; handlers never call it directly. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**respond500**  
+Wraps a raw Error into the standard 500 envelope; handlers never call it directly. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **responseSchema**  
 The route's response shape, independent of filterLens. *Region:* [List filtering and search](filtering-search/knowledge.md)
@@ -3132,10 +3417,22 @@ Optional in-app binding (appPathSchema) where the flow ends; default /dashboard.
 Restores soft-deleted rows by clearing deletedAt; cascade revive matches the shared timestamp. *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
 
 **Role**  
-Per-membership and per-token role: owner, admin, member, viewer, ordered by roleHierarchy. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Per-membership and per-token role: owner, admin, member, viewer, ordered by roleHierarchy. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**Role**  
+Per-membership and per-token role: owner, admin, member, viewer, ordered by roleHierarchy. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **roleHierarchy**  
-['viewer','member','admin','owner']; higher index means more permissions-roles / permissions-rebac. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+['viewer','member','admin','owner']; higher index means more permissions-roles / permissions-rebac. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**roleHierarchy**  
+['viewer','member','admin','owner']; higher index means more permissions-roles / permissions-rebac. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
+
+**rolesAtOrAbove**  
+Role list at or above a minimum, for minimum-role filters and queries. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**rolesAtOrAbove**  
+Role list at or above a minimum, for minimum-role filters and queries. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **rolling window**  
 An `ago`-shaped date expression (`rollingShift`, `rollingExpr` in dateExpr.ts) that moves with `now`. *Region:* [json-rules dates, windows and verbs](json-rules-dates/knowledge.md)
@@ -3159,7 +3456,10 @@ Clamp at the lens anchor visit: scopes the lens's root model. *Region:* [The len
 A clamp at the lens anchor: a static route-wide filter on the root rows. *Region:* [Template lenses](lenses/knowledge.md)
 
 **rotateEncryptionKeys**  
-Singleton job enqueued at worker startup that re-encrypts rows still on the previous key version. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Singleton job enqueued at worker startup that re-encrypts rows still on the previous key version. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**rotateEncryptionKeys**  
+Singleton job enqueued at worker startup that re-encrypts rows still on the previous key version. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **round**  
 An array of sub-requests that run in parallel; rounds run in sequence. *Region:* [Batch API](batch/knowledge.md)
@@ -3258,7 +3558,10 @@ One drain tick under the outbox-drain createLock: fast rows, then slow rows, the
 Runs a callback with a given transaction client as the ambient db, so nested db.<model> calls join it. *Region:* [Database client and transactions](database-client/knowledge.md)
 
 **runJobStages**  
-Runs a multi-stage job's stages and their children. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Runs a multi-stage job's stages and their children. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**runJobStages**  
+Runs a multi-stage job's stages and their children. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **running / loading<Entity> / storing<Action>**  
 Boolean execution-state naming in init views. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
@@ -3267,7 +3570,10 @@ Boolean execution-state naming in init views. *Region:* [Init script architectur
 The outbox mutex: runs a JobOutbox write on the serialized queue shared by flushes and drains. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **RuntimeDelegate**  
-The one cast used for dynamic Prisma model access in the rotation job. *Region:* [Encryption and secrets](encryption/knowledge.md)
+The one cast used for dynamic Prisma model access in the rotation job. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**RuntimeDelegate**  
+The one cast used for dynamic Prisma model access in the rotation job. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 ## S
 
@@ -3309,9 +3615,6 @@ picks / omits / enumPicks / enumOmits: what the type surface lets anyone mention
 
 **schema-introspection**  
 Class: runtime schema maps (@inixiative/prisma-map, prismaMap.gen.ts) and the template's model-metadata helpers. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
-
-**SchemaMap**  
-{ resources, fieldMap, polymorphism? }: which fieldMap model each resource is, its relations and foreign keys, and the polymorphic models' kinds; built in the template from the generated prismaMap and PolymorphismRegistry. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **Scope invention**  
 Adding adjacent things nobody asked for: 'in case' fields, single-call wrappers, compat shims, unused barrels. *Region:* [Engineering process and docs](engineering-process-docs/knowledge.md)
@@ -3371,7 +3674,10 @@ paginate() option pinning the global search term to a subset of the lens's searc
 Shows a newly created secret once with a copy button. *Region:* [UI components and shared pages](ui-components/knowledge.md)
 
 **secrets**  
-Class tag: Infisical storage, secret env vars and keyrings per environment (CI included), provider credentials, how keys rotate. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Class tag: Infisical storage, secret env vars and keyrings per environment (CI included), provider credentials, how keys rotate. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**secrets**  
+Class tag: Infisical storage, secret env vars and keyrings per environment (CI included), provider credentials, how keys rotate. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **--section=**  
 init:agent flag running one section: project, infisical, planetscale, railway or monitoring; omitted runs the full flow (minus monitoring). *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
@@ -3415,6 +3721,9 @@ Class tag: provider-owned audiences with static/dynamic membership reconciliatio
 **SegmentType**  
 static (computed after create or rule change) or dynamic (also reacts to customer changes). *Region:* [Customers and segments](customers-segments/knowledge.md)
 
+**self**  
+{ self: field }: granted when record[field] equals the actor id. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+
 **send / resolve / read**  
 The inquiry ReBAC actions: source-side send (create, edit, send, cancel), target-side resolve, either-side read. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
@@ -3446,7 +3755,10 @@ Factory entity helper that converts Date fields to ISO strings for API/SDK/UI-sh
 Shared MSW mock server for UI tests; per-test responses via server.use. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
 
 **Session**  
-A BetterAuth login session for browser clients, stored in Redis via secondaryStorage. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+A BetterAuth login session for browser clients, stored in Redis via secondaryStorage. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**Session**  
+A BetterAuth login session for browser clients, stored in Redis via secondaryStorage. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **setEnvOverride / withEnv**  
 Schema-parsed env overrides for tests, persistent (reset by resetEnvOverrides) or scoped to one call. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
@@ -3463,11 +3775,26 @@ The settings pages' shared layout; settings are nested routes under it, not tabs
 **settleTemplate**  
 API entry that resolves a template through the cascade and renders subject and body with system tokens and RenderIssue collection. *Region:* [Email compose, render and save](email-render/knowledge.md)
 
+**setupOrgContext**  
+Loads one org's role-derived grants into permix (superadmin short-circuits). *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**setupOrgContext**  
+Loads one org's role-derived grants into permix (superadmin short-circuits). *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
+
+**setupOrgPermissions**  
+Request-level setup for every org membership (or Organization token), capped by the token. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**setupOrgPermissions**  
+Request-level setup for every org membership (or Organization token), capped by the token. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
+
 **setupState / SetupState**  
 'new' | 'stale' | 'incomplete' | 'complete', derived with useMemo via detectSetupState, never stored. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
 
 **setUserContext**  
-Stores user, organizationUsers and permissions-roles / permissions-rebac on the context from a loaded UserWithRelations. *Region:* [Request context and errors](request-context-errors/knowledge.md)
+Stores user, organizationUsers and permissions-roles / permissions-rebac on the context from a loaded UserWithRelations. *Region:* [Request context and errors (errors)](errors/knowledge.md)
+
+**setUserContext**  
+Stores user, organizationUsers and permissions-roles / permissions-rebac on the context from a loaded UserWithRelations. *Region:* [Request context and errors (request-context)](request-context-errors/knowledge.md)
 
 **shadowMerge**  
 Computes the post-update record from previous state plus Prisma atomic ops (increment, push, …) so updates can be validated. *Region:* [Template rules and rule references](json-rules/knowledge.md)
@@ -3599,7 +3926,10 @@ CI rule: every spyOn is restored (mock.restore) so tests cannot leak globals. *R
 paginate() appends { id: desc } when no id ordering is given, so pages stay consistent on non-unique sorts. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
 
 **Staged job**  
-A makeJob with ordered stages; each stage waits for the children it added, as a BullMQ flow parent. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+A makeJob with ordered stages; each stage waits for the children it added, as a BullMQ flow parent. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**Staged job**  
+A makeJob with ordered stages; each stage waits for the children it added, as a BullMQ flow parent. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **stale sweep**  
 Server closes connections idle for more than 5 minutes (cleanupStaleConnections, startStaleSweep). *Region:* [WebSocket connections](ws-connections/knowledge.md)
@@ -3608,7 +3938,10 @@ Server closes connections idle for more than 5 minutes (cleanupStaleConnections,
 A path glob -> @kind or @partOf rule in config.ts; explicit annotations always win. *Region:* [Atlas code map (library + template usage)](lib-atlas/knowledge.md)
 
 **StandardAction**  
-The base action tiers read, operate, manage, own that resource action sets extend. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+The base action tiers read, operate, manage, own that resource action sets extend. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**StandardAction**  
+The base action tiers read, operate, manage, own that resource action sets extend. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **start:<service>**  
 Production run scripts (start:api, start:worker, start:web); local dev uses bun run local. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)
@@ -3722,10 +4055,13 @@ Applies every check fix and re-locks; refuses a dirty tree without --force. *Reg
 Creates .env.local/.env.test from the examples and appends missing keys without overwriting; run by setup. *Region:* [Dev setup and worktrees](dx-setup/knowledge.md)
 
 **sync-env**  
-bun run sync-env: creates .env.local/.env.test from examples and appends newly added keys. *Region:* [Encryption and secrets](encryption/knowledge.md)
+bun run sync-env: creates .env.local/.env.test from examples and appends newly added keys. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
 
 **sync-env**  
 Creates .env.local/.env.test from the examples and appends missing keys without overwriting existing values. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)
+
+**sync-env**  
+bun run sync-env: creates .env.local/.env.test from examples and appends newly added keys. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **syncConfig**  
 Re-reads config into context; tasks call it (as onStepComplete) after each step instead of polling. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
@@ -3799,7 +4135,7 @@ packages/db tsconfig alias to ./test/* for test utilities. *Region:* [Monorepo l
 packages/email: MJML template storage, components, rendering, and Resend/console clients. *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
 
 **@template/permissions**  
-The template package that builds its SchemaMap from the generated prismaMap and polymorphism registry, and passes it with its rebacSchema and role mappings into this core. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+The template package that injects its Prisma-derived resolveRelation, rebacSchema and role mappings into this core. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **@template/permissions**  
 packages/permissions-roles / permissions-rebac: RBAC/ReBAC roles, checks, entitlements and context setup on permix. *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
@@ -3853,7 +4189,10 @@ Class: the AppShell layout system (Page, overlays, panels) and the multi-tier th
 check (in memory), toPrisma (Prisma where) and executePrismaPlan: the same rule, evaluated three ways, with documented differences. *Region:* [Running, validating and typing rules](json-rules-runtime/knowledge.md)
 
 **Three-layer permission model**  
-PlatformRole, then membership Role mapped to StandardAction tiers, then entitlements that widen. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+PlatformRole, then membership Role mapped to StandardAction tiers, then entitlements that widen. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**Three-layer permission model**  
+PlatformRole, then membership Role mapped to StandardAction tiers, then entitlements that widen. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **three-tier theme**  
 --app-* platform colors -> --space-* tenant overrides -> active tokens (--primary) that components use. *Region:* [Layout system and theme](theme-layout/knowledge.md)
@@ -3874,13 +4213,19 @@ Gitignored staging area (TASK.md, files/, notes/) for long analysis and larger r
 App toast helper with defaults (use instead of sonner) and the container mounted once in __root. *Region:* [UI components and shared pages](ui-components/knowledge.md)
 
 **Token**  
-An API key row: keyHash (SHA-256), keyPrefix, ownerModel, role, entitlements, expiresAt, isActive. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+An API key row: keyHash (SHA-256), keyPrefix, ownerModel, role, entitlements, expiresAt, isActive. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**Token**  
+An API key row: keyHash (SHA-256), keyPrefix, ownerModel, role, entitlements, expiresAt, isActive. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **tokenAuthMiddleware**  
 Hashes a Bearer or URL key, looks it up (10-minute cache) and sets the token owner's context; runs before session auth. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
 
 **TokenOwnerModel**  
-User, Organization, OrganizationUser, Space or SpaceUser. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+User, Organization, OrganizationUser, Space or SpaceUser. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**TokenOwnerModel**  
+User, Organization, OrganizationUser, Space or SpaceUser. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **toLensSelect**  
 Prisma findMany select args for what a lens shows, plus the columns its clamps and sources read. *Region:* [Using a lens: build, gate, fetch](lens-usage/knowledge.md)
@@ -3925,7 +4270,10 @@ Strategy: each round in its own transaction; earlier rounds stay committed if a 
 One atomic from -> to edge; disjunction never lives inside it. *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
 
 **triggerCronJob**  
-Runs a stored cron's handler now (POST /api/admin/cronJob/:id/trigger, optional { lane }). *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Runs a stored cron's handler now (POST /api/admin/cronJob/:id/trigger, optional { lane }). *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**triggerCronJob**  
+Runs a stored cron's handler now (POST /api/admin/cronJob/:id/trigger, optional { lane }). *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **Trimming real completion**  
 Underbuilding a requested primitive: a v1 that forces a v2, hardcoded parameters, a skipped setup/test API. *Region:* [Engineering process and docs](engineering-process-docs/knowledge.md)
@@ -3956,6 +4304,9 @@ Object shapes are declared with type aliases. *Region:* [Naming and code style](
 
 **typecheck / typecheck:fe**  
 Whole-repo type check / frontend apps only, after regenerating routes. *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
+
+**Typed model IDs**  
+Branded string types such as `UserId` with constructors like `userId(id)` that stop mixing IDs of different models. *Region:* [Schema conventions and reference data](data-modeling/knowledge.md)
 
 **TypedBuildResult**  
 Type declaring which context entries a factory guarantees. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
@@ -3999,7 +4350,10 @@ Current context carried in ?org=orgId and ?space=spaceId for shareable links. *R
 ?token=<key> fallback for WebSocket upgrades, email links and downloads. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
 
 **URL token**  
-?token=<key> fallback for WebSocket upgrades, email links and downloads. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+?token=<key> fallback for WebSocket upgrades, email links and downloads. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**URL token**  
+?token=<key> fallback for WebSocket upgrades, email links and downloads. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **UsageError**  
 The caller's input is missing or malformed: no `now` for a relative date, an invalid `now` or zone, an unbound bind. *Region:* [json-rules dates, windows and verbs](json-rules-dates/knowledge.md)
@@ -4080,7 +4434,10 @@ Document title/description and breadcrumb trail derived from the matched nav ite
 Frontend hook for page-numbered tables: filters plus page/pageSize, paginationProps(total), scroll restore, URL sync. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
 
 **usePermission**  
-UI hook returning { show, disable, disabledText } for an action on a record. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+UI hook returning { show, disable, disabledText } for an action on a record. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**usePermission**  
+UI hook returning { show, disable, disabledText } for an action on a record. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **User**  
 A person's platform identity: email, platformRole and owned relations. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
@@ -4145,16 +4502,25 @@ Shared zod schema (and isUuidV7 guard) for the typed UUIDv7 ids every model uses
 The flow for every rule entering execution: validateRuleInLens, then narrowRule, then toPrisma / toSql / check. *Region:* [Using a lens: build, gate, fetch](lens-usage/knowledge.md)
 
 **validate:encryption**  
-The CI script ENCRYPTION.md describes; it does not exist yet in template. *Region:* [Encryption and secrets](encryption/knowledge.md)
+The CI script ENCRYPTION.md describes; it does not exist yet in template. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
 
-**validateActionRule**  
-Checks a serialized ActionRule's shape and every { rule } as a positive json-rules condition, returning { ok, errors }, on the @inixiative/permissions subpath. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+**validate:encryption**  
+The CI script ENCRYPTION.md describes; it does not exist yet in template. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
+
+**validateActor**  
+401 unless getActor(c).user resolves. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
 
 **validateEncryptionVersions**  
-Pre-deploy check returning { valid, errors } for version downgrades, jumps, mixed-version bumps and bad keyrings; not yet wired into any script or CI. *Region:* [Encryption and secrets](encryption/knowledge.md)
+Pre-deploy check returning { valid, errors } for version downgrades, jumps, mixed-version bumps and bad keyrings; not yet wired into any script or CI. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**validateEncryptionVersions**  
+Pre-deploy check returning { valid, errors } for version downgrades, jumps, mixed-version bumps and bad keyrings; not yet wired into any script or CI. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **validateJobId**  
-Throwing guard for custom job ids BullMQ would reject (':' separators, '0'); isValidJobId is the boolean form. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Throwing guard for custom job ids BullMQ would reject (':' separators, '0'); isValidJobId is the boolean form. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**validateJobId**  
+Throwing guard for custom job ids BullMQ would reject (':' separators, '0'); isValidJobId is the boolean form. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **validateMjml / MjmlValidationError**  
 MJML validation at save; components skip the full-document check; failures throw MjmlValidationError. *Region:* [Email compose, render and save](email-render/knowledge.md)
@@ -4165,11 +4531,32 @@ Check a narrowing chain at construction; returns { ok, errors } with codes such 
 **validateNotLastOwner**  
 Blocks removing or demoting an organization's last owner. *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)
 
+**validateNotToken**  
+Session-only gate: 403 for token-authenticated requests. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
+
+**validateNotToken**  
+Session-only gate: 401 without a user, 403 for any token. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**validateNotToken**  
+Session-only gate: 401 without a user, 403 for any token. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
+
+**validateOwnerPermission**  
+Route middleware for owner-polymorphic resources: checks the action on the ownerModel's owner. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
+
 **validatePathNotation**  
 Rejects unsafe, snake_case, underscore-prefixed or too-deep (MAX_PATH_DEPTH 5) dotted paths. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
 **validatePermission**  
-Route middleware: hydrate the loaded resource and run check for an action; 403 on failure. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Route middleware: hydrate the loaded resource and run check for an action; 403 on failure. *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**validatePermission**  
+Route middleware: hydrate the loaded resource and run check for an action; 403 on failure. *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
+
+**validateRole**  
+Parses an unknown role value during permission setup; code throws 500 on invalid (doc says viewer). *Region:* [Roles, actions and permission checks (permissions-members)](permissions-members/knowledge.md)
+
+**validateRole**  
+Parses an unknown role value during permission setup; code throws 500 on invalid (doc says viewer). *Region:* [Roles, actions and permission checks (permissions-roles)](permissions-roles/knowledge.md)
 
 **validateRule / assertValidRule**  
 Check a rule shape and that it runs on a target; the first returns issues, the second throws. *Region:* [Running, validating and typing rules](json-rules-runtime/knowledge.md)
@@ -4185,6 +4572,9 @@ Middleware: 403 unless the user's platformRole is superadmin; mounted on the adm
 
 **validateTransition**  
 Authoring validation of predicates, merge and permission shape; returns ValidationResult and never throws. *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
+
+**validateUser**  
+401 unless c.get('user') is set. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
 
 **validateWebhookUrl**  
 Rejects unsafe user-supplied target URLs (private addresses; relaxed in non-enforced envs); isPrivateAddress and hostnameOf are its building blocks. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
@@ -4229,7 +4619,10 @@ One operation of the engine with one public name per thing it applies to and one
 The json-rules rule of one verb, one public name and one implementation per operation, enforced by test/verbs.test.ts. *Region:* [Writing a json-rules rule](json-rules-shapes/knowledge.md)
 
 **Verification**  
-Short-lived verification values such as email verification tokens. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
+Short-lived verification values such as email verification tokens. *Region:* [Authentication: sessions, providers, tokens (authentication)](authentication/knowledge.md)
+
+**Verification**  
+Short-lived verification values such as email verification tokens. *Region:* [Authentication: sessions, providers, tokens (tokens-providers)](tokens-providers/knowledge.md)
 
 **Verification discipline**  
 ENTRYPOINT §0.5: verify before asserting, no deferral as escape hatch, exhaust validation before caveating. *Region:* [Engineering process and docs](engineering-process-docs/knowledge.md)
@@ -4318,7 +4711,10 @@ A cacheKey with the wildcard flag, ending in :*, to clear a family of keys. *Reg
 filter → orderBy → skip → take on array and aggregate rules, applied before the predicate. *Region:* [Writing a json-rules rule](json-rules-shapes/knowledge.md)
 
 **with-env**  
-bun run with <env> <app> <command>: injects Infisical secrets for cloud envs, sources .env files for local/test. *Region:* [Encryption and secrets](encryption/knowledge.md)
+bun run with <env> <app> <command>: injects Infisical secrets for cloud envs, sources .env files for local/test. *Region:* [Encryption and secrets (encryption)](encryption/knowledge.md)
+
+**with-env**  
+bun run with <env> <app> <command>: injects Infisical secrets for cloud envs, sources .env files for local/test. *Region:* [Encryption and secrets (secrets)](secrets/knowledge.md)
 
 **with-env.sh**  
 scripts/deployment/with-env.sh behind `bun run with <env> <app> <cmd>`: Infisical for cloud envs, root then app .env files for local/test. *Region:* [Environments, env vars and deploy](environments-deploy/knowledge.md)
@@ -4348,7 +4744,10 @@ The one fork every stored rule is evaluated through: the sound arm runs, or the 
 Wraps an async unit of work in a named span. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **WorkerContext**  
-Handler context: scoped db, queue, BullMQ job, optional signal, and log. *Region:* [Background jobs and cron](jobs-cron/knowledge.md)
+Handler context: scoped db, queue, BullMQ job, optional signal, and log. *Region:* [Background jobs and cron (cron)](cron/knowledge.md)
+
+**WorkerContext**  
+Handler context: scoped db, queue, BullMQ job, optional signal, and log. *Region:* [Background jobs and cron (jobs)](jobs-cron/knowledge.md)
 
 **worktree slot**  
 A number 1-9 in .worktrees/.slots/<N> and WORKTREE_SLOT that owns a worktree's ports, databases, buckets and Redis DB. *Region:* [Dev setup and worktrees](dx-setup/knowledge.md)
@@ -4356,7 +4755,7 @@ A number 1-9 in .worktrees/.slots/<N> and WORKTREE_SLOT that owns a worktree's p
 **worktrees**  
 Class: worktree lifecycle through the repo scripts, with slots and per-slot DBs/ports. *Region:* [Dev setup and worktrees](dx-setup/knowledge.md)
 
-**writeData**  
+**writtenPatches**  
 Extracts the written rows from hook args across single, bulk and upsert actions. *Region:* [Mutation hooks, immutable fields, ordered lists](mutation-hooks/knowledge.md)
 
 **ws-channels**  

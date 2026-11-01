@@ -14,7 +14,7 @@
   - [Class `frontend-auth`](#class-frontend-auth-frontend-auth-auth-slice-loginsignup-forms-oauth-callback-guards)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
-    - `docs/claude/FRONTEND/AUTH.md`: Architecture; Unified Auth Method; Pages and Forms; useAuthProviders; OAuth Callback; Guards; Auth Slice; Navigation Helpers; Security; Testing; Key Files
+    - `docs/claude/FRONTEND/AUTH.md`: Architecture; Unified Auth Method; Pages and Forms; useAuthProviders; OAuth Callback; Guards; Auth Slice; Change Password; Navigation Helpers; Security; Testing; Key Files
   - [4b. Code entries](#4b-code-entries)
 
 ## Glossary
@@ -137,30 +137,32 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 |---|---|---|---|
 | just the sign-in form inside something else; embed the email and provider form without the page wrapper; I'll write my own form with email and password fields; the form, not the whole page | **LoginForm** · primitive `packages/ui/src/components/auth/LoginForm.tsx#LoginForm` — Full page with signup link: LoginPage; new accounts: SignupForm. | docs/claude/FRONTEND/AUTH.md § Pages and Forms; docs/claude/FRONTEND/AUTH.md § Testing | — |
 | the create-account form with name, email and password; a registration form for new users; I'll copy the login form and add a name field; new accounts, not existing ones | **SignupForm** · primitive `packages/ui/src/components/auth/SignupForm.tsx#SignupForm` — Full page with login link: SignupPage; existing accounts: LoginForm. | docs/claude/FRONTEND/AUTH.md § Pages and Forms; docs/claude/FRONTEND/AUTH.md § Key Files | — |
-| show the sign-in error under the form and as a toast; a failed provider load shouldn't hide the email form; how login errors should be surfaced; I'll wrap the login call in try catch and alert | **Auth error display** · pattern docs/claude/FRONTEND/AUTH.md → Pages and Forms — show sign-in errors via describeError inline and as toast; provider-load errors inline only, keeping email form | part 4 | — |
-| keep the session on the client and send it as a header; where the frontend keeps the login between page loads; I'll write the user id straight to local storage after login; attach the saved credential on every API call | **Bearer token in localStorage** · pattern docs/claude/FRONTEND/AUTH.md → Architecture — persist session token client-side and send it as Authorization Bearer on every API call | part 4 | — |
-| come back to the page I was on after social login; remember the destination across the provider round trip; I'll stash the return path in local storage before redirecting; the deep link survives the OAuth redirect | **OAuth redirect persistence** · pattern docs/claude/FRONTEND/AUTH.md → Pages and Forms — store redirectTo in localStorage.authRedirectTo before OAuth and consume it on callback | part 4 | — |
-| send the user back where they were after login; switching from login to signup loses the return url; the guard should remember the page they tried to open; I'll hardcode a redirect to the dashboard after sign in | **Preserve redirectTo across login/signup** · pattern docs/claude/FRONTEND/AUTH.md § Navigation Helpers — guard sets redirectTo; login↔signup links preserve search so post-auth returns there | code `navigateToLogin`, `navigateToSignup`, `redirectPreservingContext` | — |
-| which env vars turn on a social login button; the GitHub button only shows when its vars are set | **Auth environment variables** · primitive docs/claude/FRONTEND/AUTH.md § Security — GitHub provider listed by platformProviders.ts only when set | code `getAllowedOrigins`, `UserMenu`, `Token` | — |
+| show the sign-in error under the form and as a toast; a failed provider load shouldn't hide the email form; how login errors should be surfaced; I'll wrap the login call in try catch and alert | **Auth error display** · pattern docs/claude/FRONTEND/AUTH.md › Pages and Forms — show sign-in errors via describeError inline and toast; provider-load errors inline, email form kept | part 4 | — |
+| keep the session on the client and send it as a header; where the frontend keeps the login between page loads; I'll write the user id straight to local storage after login; attach the saved credential on every API call | **Bearer token in localStorage** · pattern docs/claude/FRONTEND/AUTH.md › Architecture — persist user JWT client-side and send it as Authorization Bearer on API calls and websocket authenticate | part 4 | — |
+| come back to the page I was on after social login; remember the destination across the provider round trip; I'll stash the return path in local storage before redirecting; the deep link survives the OAuth redirect | **OAuth redirect persistence** · pattern docs/claude/FRONTEND/AUTH.md › OAuth Callback — OAuth only; email sign-in uses search.redirectTo directly. | part 4 | — |
+| send the user back where they were after login; switching from login to signup loses the return url; the guard should remember the page they tried to open; I'll hardcode a redirect to the dashboard after sign in | **Preserve redirectTo across login/signup** · pattern packages/ui/src/lib/routeRedirect.ts — guard sets redirectTo; login↔signup links preserve search so post-auth returns there | part 4 | — |
+| which env vars turn on a social login button; the GitHub button only shows when its vars are set | **Auth environment variables** · primitive docs/claude/FRONTEND/AUTH.md § Security — configure BetterAuth secret, OAuth client credentials and API URL | code `getAllowedOrigins`, `UserMenu`, `Token`, `registry` | — |
 | the shared login pieces: forms, divider, social buttons; a continue-with-provider button; I'll build a social login button for this app; where the sign-in widgets live | **Auth UI components** · primitive packages/ui/src/components/auth/ — render login, signup forms, divider and social provider buttons | part 4 | — |
-| load the session once when the app boots; the first hydrate on startup, called by the guards; I'll call the profile endpoint in the root layout effect; boot time only, not later refreshes | **auth.initialize** · primitive packages/ui/src/store/slices/auth.ts — app boot only; refreshMe to re-hydrate later | part 4 | — |
-| sign the user out and clean everything up; clear the key, user, permissions and tenant then go to login; I'll clear each store field and navigate to login by hand; on an auth failure the catch should just call logout; a partial teardown that only clears the token | **auth.logout** · primitive packages/ui/src/store/slices/auth.ts — sign out, clear token/user/permissions/tenant and navigate to /login | part 4 | a logout handler that clears the token, user and permissions by hand and navigates to /login (docs/claude/FRONTEND/AUTH.md § Auth Slice) |
-| reload my profile after my membership changed; re-fetch who I am without re-initializing; I'll fetch the profile endpoint again after the update; a later refresh, not the first load | **auth.refreshMe** · primitive packages/ui/src/store/slices/auth.ts — after user data changes; initialize only for first load | part 4 | calling fetchAndHydrateMe or re-running auth.initialize, or re-fetching /me by hand, after a membership or profile change (docs/claude/ZUSTAND.md § 1. AuthSlice) |
+| change password, store the new JWT and re-authenticate websocket, revoking older JWTs | **auth.changePassword** · primitive packages/ui/src/store/slices/auth.ts — Use instead of calling lib/auth/changePassword; while spoofing stores nothing. Throws API error on wrong current password. | part 4 | — |
+| load the session once when the app boots; the first hydrate on startup, called by the guards; I'll call the profile endpoint in the root layout effect; boot time only, not later refreshes | **auth.initialize** · primitive packages/ui/src/store/slices/auth.ts — App boot only; later re-fetches use auth.refreshMe. Failed hydrate logs out and rethrows. | part 4 | — |
+| sign the user out and clean everything up; clear the key, user, permissions and tenant then go to login; I'll clear each store field and navigate to login by hand; on an auth failure the catch should just call logout; a partial teardown that only clears the token | **auth.logout** · primitive packages/ui/src/store/slices/auth.ts — This browser only, no server call; revoke all devices with POST /api/v1/me/rotateJwts instead. | part 4 | a logout handler that clears the token, user and permissions by hand and navigates to /login (docs/claude/FRONTEND/AUTH.md § Auth Slice) |
+| reload my profile after my membership changed; re-fetch who I am without re-initializing; I'll fetch the profile endpoint again after the update; a later refresh, not the first load | **auth.refreshMe** · primitive packages/ui/src/store/slices/auth.ts — After boot when /me data changed; initial load uses auth.initialize. | part 4 | calling fetchAndHydrateMe or re-running auth.initialize, or re-fetching /me by hand, after a membership or profile change (docs/claude/ZUSTAND.md § 1. AuthSlice) |
 | impersonate a user from the admin app; start or stop acting as someone else across API and socket; I'll set the spoof header on the client manually; unspoof should go through the same path | **auth.setSpoof** · primitive packages/ui/src/store/slices/auth.ts — impersonate or stop impersonating a user across API and websocket | part 4 | — |
-| store-level flag for embedded versus standalone; record the sign-in mode in the store; I'll keep the embed flag in component state | **auth.setStrategy** · primitive packages/ui/src/store/slices/auth.ts — store-level flag; useAuthStrategy for component context | part 4 | — |
-| log the user in from a component; sign in, load the profile and connect the socket in one call; I'll call the sign-in library, then fetch the profile and set the store; the login action should handle the redirect, not the page; starting a login, not finishing a redirect | **auth.signIn** · primitive packages/ui/src/store/slices/auth.ts — from components instead of calling lib/auth/signIn directly | part 4 | a component calling client.signIn.email or lib/auth signIn, then fetching /me and setting store fields itself (docs/claude/FRONTEND/AUTH.md § Auth Slice; Unified Auth Method) |
-| register a new account from a component; sign up and either log in or wait for verification; I'll call the sign-up library and then sign in manually; new accounts, not returning users | **auth.signUp** · primitive packages/ui/src/store/slices/auth.ts — from components instead of calling lib/auth/signUp directly | part 4 | — |
-| the guard instances the apps use on their routes; where the route guards are built; I'll write a new guard for this app | **authGuard** · primitive packages/ui/src/guards/authGuard.ts — appGuards for app-specific gating | part 4 | — |
-| one type for email, OAuth or SAML credentials; describe which way the user is logging in; I'll give sign-in untyped arguments; the discriminated union for login inputs | **AuthMethod** · primitive packages/ui/src/lib/auth/types.ts — describe email, OAuth or SAML credentials as one discriminated union for sign-in/up | part 4 | — |
-| build route guards that initialize the session and redirect; a factory for the protected and public guards; I'll hand-roll a redirect in each route's before-load; guards that wait for auth to load first | **createAuthGuards** · primitive packages/ui/src/guards/authGuard.ts — build route guards that initialize auth and redirect by auth state | part 4 | — |
-| navigate after login without losing the org and space; imperative navigation that keeps the tenant context; I'll call navigate with the path and drop the search params; in-app navigation, not inside a route loader | **navigatePreserving** · primitive packages/ui/src/store navigation.navigatePreserving — in-app navigation; redirectPreservingContext inside beforeLoad guards | part 4 | — |
-| run the auth slice and login form tests; how do I test the login flow | **Run UI tests** · primitive docs/claude/FRONTEND/AUTH.md § Testing — run the packages/ui test suite including auth slice tests | code `LoginForm`, `LoginPage` | — |
-| did sign-up log them in, or is it waiting on email; the outcome of registration: logged in, pending, redirecting; I'll return a boolean from sign-up | **SignUpResult** · primitive packages/ui/src/lib/auth/types.ts — tell the caller whether sign-up logged in, awaits email verification, or is redirecting | part 4 | — |
-| don't put the session in the redirect query string; the one-time code goes in the fragment, not the query; I'll pass the token as a query param to the callback | **Session token never in URL** · rule docs/claude/FRONTEND/AUTH.md → Architecture — Any OAuth or cross-origin token handoff to the frontend. | part 4 | putting the session token in a redirect query string or callback URL instead of the one-time token in the fragment (docs/claude/AUTH.md § Bearer Token Handoff) |
+| store-level flag for embedded versus standalone; record the sign-in mode in the store; I'll keep the embed flag in component state | **auth.setStrategy** · primitive packages/ui/src/store/slices/auth.ts — Store-level setter; components read strategy via useAuthStrategy. | part 4 | — |
+| log the user in from a component; sign in, load the profile and connect the socket in one call; I'll call the sign-in library, then fetch the profile and set the store; the login action should handle the redirect, not the page; starting a login, not finishing a redirect | **auth.signIn** · primitive packages/ui/src/store/slices/auth.ts — Use instead of calling lib/auth/signIn directly so store and websocket stay in sync. | part 4 | a component calling client.signIn.email or lib/auth signIn, then fetching /me and setting store fields itself (docs/claude/FRONTEND/AUTH.md § Auth Slice; Unified Auth Method) |
+| register a new account from a component; sign up and either log in or wait for verification; I'll call the sign-up library and then sign in manually; new accounts, not returning users | **auth.signUp** · primitive packages/ui/src/store/slices/auth.ts — Use instead of lib/auth/signUp directly; returns result to branch on verification-pending. | part 4 | — |
+| the guard instances the apps use on their routes; where the route guards are built; I'll write a new guard for this app | **authGuard** · primitive packages/ui/src/guards/authGuard.ts — redirect unauthenticated route visits to /login?redirectTo=<path> | part 4 | — |
+| one type for email, OAuth or SAML credentials; describe which way the user is logging in; I'll give sign-in untyped arguments; the discriminated union for login inputs | **AuthMethod** · primitive packages/ui/src/lib/auth/types.ts — describe email, OAuth or SAML credentials as one union for sign-in/up | part 4 | — |
+| build route guards that initialize the session and redirect; a factory for the protected and public guards; I'll hand-roll a redirect in each route's before-load; guards that wait for auth to load first | **createAuthGuards** · primitive packages/ui/src/guards/authGuard.ts — Import requireAuth/requirePublic instances rather than building new guards. | part 4 | — |
+| navigate after login without losing the org and space; imperative navigation that keeps the tenant context; I'll call navigate with the path and drop the search params; in-app navigation, not inside a route loader | **navigatePreserving** · primitive packages/ui/src/lib/routeRedirect.ts (store navigation.navigatePreserving) — Imperative navigation; inside beforeLoad throw redirectPreservingContext instead. | part 4 | — |
+| share the API's password length limits with the frontend | **passwordLength** · primitive @template/shared/auth/passwordLength — Use instead of hard-coding min/max password lengths in forms. | part 4 | — |
+| run the auth slice and login form tests; how do I test the login flow | **Run UI tests** · primitive packages/ui/src/store/slices/auth.test.tsx — run the packages/ui test suite including auth slice tests | part 4 | — |
+| did sign-up log them in, or is it waiting on email; the outcome of registration: logged in, pending, redirecting; I'll return a boolean from sign-up | **SignUpResult** · primitive packages/ui/src/lib/auth/types.ts — report whether sign-up authenticated, awaits email verification, or is redirecting | part 4 | — |
+| don't put the session in the redirect query string; the one-time code goes in the fragment, not the query; I'll pass the token as a query param to the callback | **Session token never in URL** · rule docs/claude/FRONTEND/AUTH.md › Architecture — Any auth redirect or handoff between API and frontend. | part 4 | putting the session token in a redirect query string or callback URL instead of the one-time token in the fragment (docs/claude/AUTH.md § Bearer Token Handoff) |
 | the callback effect must not fire twice; a single-use code gets consumed once; I'll let the effect re-run on every render | **Single-run OAuth exchange guard** · rule packages/ui/src/pages/AuthCallbackPage.tsx — Any effect consuming a single-use token. | part 4 | — |
-| only superadmins should see the impersonate button; hide spoofing from normal users | **Spoof controls superadmin-only** · rule docs/claude/FRONTEND/AUTH.md § Security — any UI exposing setSpoof | code `getAllowedOrigins`, `UserMenu`, `Token` | — |
-| login behavior belongs in the store, not the page; keep the page a wrapper and let the form do the work; I'll put the redirect logic in the page component | **Thin auth pages, forms read store** · rule docs/claude/FRONTEND/AUTH.md → Pages and Forms — Building or mounting login, signup or callback screens in any app. | part 4 | — |
-| the login library's trusted origins come from the same allow-list; I'll list the frontend URLs again for auth origins | **Trusted origins from CORS allow-list** · rule docs/claude/FRONTEND/AUTH.md § Security — configuring auth origins | code `getAllowedOrigins`, `UserMenu`, `Token` | — |
+| only superadmins should see the impersonate button; hide spoofing from normal users | **Spoof controls superadmin-only** · rule docs/claude/FRONTEND/AUTH.md § Security — Any UI exposing impersonation. | code `getAllowedOrigins`, `UserMenu`, `Token`, `registry` | — |
+| login behavior belongs in the store, not the page; keep the page a wrapper and let the form do the work; I'll put the redirect logic in the page component | **Thin auth pages, forms read store** · rule docs/claude/FRONTEND/AUTH.md › Pages and Forms — Adding or changing auth pages, forms or app auth routes. | part 4 | — |
+| the login library's trusted origins come from the same allow-list; I'll list the frontend URLs again for auth origins | **Trusted origins from CORS allow-list** · rule docs/claude/FRONTEND/AUTH.md § Security — Configuring BetterAuth origins. | code `getAllowedOrigins`, `UserMenu`, `Token`, `registry` | — |
 
 - *Also here, by name:* AuthDivider (`packages/ui/src/components/auth/AuthDivider.tsx`); SocialAuthButton (`packages/ui/src/components/auth/SocialAuthButton.tsx`)
 
@@ -176,14 +178,14 @@ Each unit is the doc section verbatim, with its headings shifted down two levels
 #### Architecture
 
 - **BetterAuth client** (`better-auth/client`) talks to the API's `/api/auth/*` routes.
-- **Bearer token in localStorage.** Email sign-in and the OAuth callback both end in `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). Every API call sends `Authorization: Bearer <token>`.
+- **User JWT in localStorage.** Email sign-in, sign-up without verification and the OAuth callback all answer with `{ token, expiresAt, user }`; `storeJwtHandoff` (`packages/ui/src/lib/auth/storeJwtHandoff.ts`) checks that shape and calls `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). Every API call and the websocket `authenticate` frame send `Authorization: Bearer <jwt>`. The client never holds a session.
 - **`/me` hydrates the store.** `fetchAndHydrateMe` loads the user, organizations, spaces and space memberships, then runs `permissions.setup(me)`.
 
 **Email/password:**
 ```
 signIn({ type: 'email', email, password })
   ↓
-client.signIn.email → session token → setToken()
+client.signIn.email → { token: jwt, expiresAt } → storeJwtHandoff()
   ↓
 fetchAndHydrateMe() → permissions.setup()
   ↓
@@ -198,12 +200,12 @@ client.signIn.social → provider → API callback
   ↓
 API redirects to /auth/callback#ott=<one-time token>
   ↓
-AuthCallbackPage: completeOAuthSignIn(ott) → setToken()
+AuthCallbackPage: completeOAuthSignIn(ott) → { token: jwt, expiresAt } → storeJwtHandoff()
   ↓
 fetchAndHydrateMe() → navigate(localStorage.authRedirectTo || '/dashboard')
 ```
 
-The session token never travels in a URL; only the single-use `ott` does, in the fragment. See [AUTH.md → Bearer Token Handoff](../AUTH.md#bearer-token-handoff).
+The JWT never travels in a URL; only the single-use `ott` does, in the fragment. See [AUTH.md → One-Time Token Handoff](../AUTH.md#one-time-token-handoff).
 
 ---
 
@@ -301,7 +303,7 @@ const { providers, isLoading, error } = useAuthProviders();
 **Location:** `packages/ui/src/pages/AuthCallbackPage.tsx`, mounted by `apps/{web,admin,superadmin}/app/routes/_public/auth.callback.tsx`.
 
 1. Read `ott` from the URL fragment, then strip the fragment with `history.replaceState`.
-2. `completeOAuthSignIn(ott)` → `client.oneTimeToken.verify` → `setToken(session.token, session.expiresAt)`.
+2. `completeOAuthSignIn(ott)` → `client.oneTimeToken.verify` → `storeJwtHandoff(data)` (the API has already deleted the handshake session).
 3. `fetchAndHydrateMe(useAppStore.setState, useAppStore.getState)`.
 4. Navigate to `localStorage.authRedirectTo` (then remove it) or `/dashboard`.
 5. On failure: log, then navigate to `/login?error=<message>`.
@@ -348,8 +350,9 @@ Initialization errors are swallowed; the redirect handles the unauthenticated ca
 | `signIn(method)` | Calls `lib/auth/signIn`; for non-OAuth methods hydrates `/me` and authenticates the websocket |
 | `signUp(method)` | Calls `lib/auth/signUp`; hydrates on `authenticated`, clears local auth on `verification-pending`; returns the result |
 | `refreshMe()` | Re-hydrate `/me` |
+| `changePassword({ currentPassword, newPassword })` | Calls `lib/auth/changePassword` (`POST /api/v1/me/changePassword` through `apiFetchInternal`, with the current JWT as bearer), stores the new JWT the response carries (`storeJwtHandoff`) and re-authenticates the websocket with it; while spoofing it stores nothing and the superadmin's JWT stays. Every older JWT, including other tabs' and devices', is a 401 from then on ([AUTH.md → Change password](../AUTH.md#change-password)). Throws the API's error on a wrong current password; the stored JWT stays |
 | `setSpoof(email \| null)` | Sets `spoofUserEmail`, re-hydrates `/me` (sent as `x-spoof-user-email`), spoofs/unspoofs the websocket |
-| `logout()` | `client.signOut` with the bearer token; always clears token, user, permissions, tenant (→ public) and navigates to `/login`; rethrows a sign-out error |
+| `logout()` | Signs out of this browser: clears the JWT, user, permissions, websocket identity and tenant (→ public) and navigates to `/login`. No server call: the API keeps no session to end. Ending every JWT on every device is `POST /api/v1/me/rotateJwts` ([AUTH.md → Revocation and sign-out](../AUTH.md#revocation-and-sign-out)) |
 | `setStrategy(strategy)` | `{ type: 'login' }` or `{ type: 'embed', parentOrigin? }`; sets `isEmbedded` |
 
 State: `user`, `organizations`, `spaces`, `spaceUsers` (dicts by id / spaceId), `spoofUserEmail`, `spoofingUserEmail` (from the `x-spoofing-user-email` response header), `isAuthenticated`, `isInitialized`, `strategy`, `client`.
@@ -360,6 +363,15 @@ Logout from a component:
 const logout = useAppStore((state) => state.auth.logout);
 await logout();
 ```
+
+---
+
+<!-- unit doc:docs/claude/FRONTEND/AUTH.md#change-password -->
+**Source:** `docs/claude/FRONTEND/AUTH.md` § Change Password (in "Frontend Authentication")
+
+#### Change Password
+
+`ChangePasswordCard` (`packages/ui/src/components/settings/ChangePasswordCard.tsx`) sits on the personal Profile page (`UserProfilePage`). Current, new and confirm fields; a confirmation that does not match is refused without a call; the button is disabled while a change is in flight, so a double submit can't race two changes; length limits come from `passwordLength` (`@template/shared/auth/passwordLength`), the API's own; the API's message shows in an alert (`Invalid password`, `Credential account not found` for a Google-only account), and a 422's `fieldErrors` through `formatFieldErrors`, and success says every other device is signed out. No cookie and no BetterAuth client are involved; the session BetterAuth needs lives and dies inside the API ([AUTH.md → withThrowawaySession](../AUTH.md#account-changes-through-betterauth-withthrowawaysession)).
 
 ---
 
@@ -408,7 +420,7 @@ GITHUB_CLIENT_ID=<id>          # listed by platformProviders.ts when set
 GITHUB_CLIENT_SECRET=<secret>
 
 # Frontends
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:<api port>   # locally: the registry api port, written by setup / worktree:create
 ```
 
 ---

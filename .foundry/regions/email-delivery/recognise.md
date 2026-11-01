@@ -36,8 +36,10 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the provider rejected it versus the template broke
 - classify why the send failed
 - the endpoint the unsubscribe link hits
+- a source across a bridge needs the far side
 - check the user hasn't opted out before sending
 - the record of every email we tried to send
+- a fragment isn't a full document, don't validate it as one
 - real deliverability checks through Bouncer
 - don't actually send in dev, just log it
 - skip address verification in dev and tests
@@ -56,17 +58,27 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the app's address checker
 - I'll put a timestamp in the idempotency key
 - is this a content problem we shouldn't retry
+- pull the component slugs out of the MJML
+- the template MJML is invalid and the save was rejected
 - I'll pass the list of recipients to send
 - the handler can't say who gets it
 - resolve the sender spec's fields against the entity
+- a referenced model's picker reads its own source
 - just the from email address
+- same MJML means the same component, don't create another
+- name the tag by its fk column
+- update the rule edges when the row they point at changes
 - send the welcome email when a user signs up
 - is the sender the platform, an org, a space or a user
+- don't strand the row in sending when we deploy mid-retry
+- a rule can't reach a relation the lens didn't declare
 - the unsubscribe link for this recipient
 - check the unsubscribe token is genuine
 - where does the opt-out link land
+- which side is the far side of this source
 - I'll check if the kind is in the accepted list inline
 - where do I see whether the email went out
+- component markup has no mjml root tag
 - ask the verification service whether this address bounces
 - I'll branch on NODE_ENV to skip the send
 - a verifier that always passes
@@ -85,16 +97,25 @@ A moment that says any of these, or something close, is this region's. Both voic
 - verify the address before we send
 - the key comes from the event, so a retry is the same send
 - I'll chain instanceof checks for each email error type
+- I'll regex the component tags to get the slugs
+- what error do I get when the markup is broken
 - recipients come from the registry's lens, not the caller
 - handoffs carry template and data only
 - turn a sender declaration into the actual row reference
+- point the path source at the referenced model
 - what address does it go out from
 - load the sending org or user as the sender variable
+- match an existing variant or make a new one
+- reference rows by id, never the fk
+- the hook on the referenced side of a rule link
 - I'll call the email client from the handler
 - the enum for who sends
+- the retry sleep should wake early on shutdown
+- refuse to save a rule reading an undeclared relation
 - I'll store an unsubscribe token in a table
 - validate the signed link when they click it
 - the route handling unsubscribe clicks
+- crossing a bridge without naming the far side
 - does this contact accept marketing
 - one row per recipient per send
 - the production verifier
@@ -115,12 +136,20 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll construct the bouncer client myself
 - to resend on purpose, emit a new event
 - decide retry versus fail from the error
+- derive the refs from the markup on save
+- I'll throw a generic Error when mjml fails to compile
 - the send payload has no to field
 - which field on the entity names the sender
+- options for a referenced row's field
 - the from field, not the display identity
 - I'll read the org name off the template row for the from
+- dedupe identical component bodies on save
+- one spelling per reference
+- stamp the edges when a referenced row is deleted
 - I'll enqueue the send job with the recipient list
 - sender identity type, not template branding
+- back off between provider retries without getting killed mid-wait
+- why was my relation path rejected at save
 - generate the signed one-click link
 - the counterpart that verifies the link in the handler
 - the consent gate shared by email and messaging
@@ -138,6 +167,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - fan out to every provider
 - no-op when there's no verification key
 - render, parse and token errors are final
+- which components does this template reference
 - the sender's identity, separate from the look of the template
 - kick off a templated email from an event
 - build the clickable opt-out url

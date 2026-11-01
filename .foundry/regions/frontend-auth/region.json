@@ -3,7 +3,7 @@
   "title": "Frontend Authentication",
   "routing": "Is this about signing in or out in the browser apps? The store's auth slice (auth.initialize, auth.signIn, auth.signUp, auth.refreshMe, auth.logout, auth.setSpoof, auth.setStrategy), fetchAndHydrateMe, LoginForm/SignupForm and the login/signup pages, useAuthProviders and social buttons, the OAuth callback page, requireAuth/requirePublic/authGuard route guards, redirectTo handling (navigateToLogin, navigateToSignup, navigatePreserving, redirectPreservingContext), or the embed auth strategy (useAuthStrategy)?",
   "concepts": ["frontend-auth"],
-  "tokens": 8018,
+  "tokens": 8720,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 8018
+      "tokens": 8720
     }
   },
   "runsAgreed": 0,
@@ -28,24 +28,27 @@
       "doc:docs/claude/FRONTEND/AUTH.md#oauth-callback",
       "doc:docs/claude/FRONTEND/AUTH.md#guards",
       "doc:docs/claude/FRONTEND/AUTH.md#auth-slice",
+      "doc:docs/claude/FRONTEND/AUTH.md#change-password",
       "doc:docs/claude/FRONTEND/AUTH.md#navigation-helpers",
       "doc:docs/claude/FRONTEND/AUTH.md#security",
       "doc:docs/claude/FRONTEND/AUTH.md#testing",
       "doc:docs/claude/FRONTEND/AUTH.md#key-files"
     ],
     "catalogClusters": [
+      "auth-middleware-validation",
       "authentication-methods",
       "environment-config",
       "error-handling",
       "frontend-app-shells-routes",
       "frontend-navigation-context",
       "frontend-state-api-client",
+      "request-response-schemas",
       "superadmin-operations",
       "testing-helpers",
       "ui-components"
     ],
     "codeEntries": 4,
-    "docMembers": 24
+    "docMembers": 26
   },
   "bypassLines": 7,
   "glossaryTerms": 23

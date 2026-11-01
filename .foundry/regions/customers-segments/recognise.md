@@ -50,13 +50,10 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the response shape when a customer lists their providers
 - the response shape when a provider lists its customers
 - what to do with a segment whose rule is broken
-- a broken rule doesn't empty the audience
 - how many customers would this rule match
 - which customers match this saved audience right now
-- a hand-picked audience is still a rule over customer ids
 - a segment that references itself, directly or through others
 - customers shouldn't see why they're in an audience
-- membership responses never include the conditions or issues
 - load these customer ids for an owner with their linked records
 - load the relationship with both the customer and the provider
 - the provider is looking at its customers
@@ -77,7 +74,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - members are customer relationships, not users
 - refresh the member list live when membership changes
 - preview how many customers a rule reaches
-- keep audiences up to date as data changes
 - validate the rule and its references on create, update and reach
 - switch an audience from static to dynamic
 - the row linking one customer into an audience
@@ -92,7 +88,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the nightly full recompute of every dynamic audience
 - is this rule well-formed and are the fields real
 - the rule only references records the owner may use
-- drop broken audiences from an email's recipient set
 - attach rule problems to one segment
 - return the rows with their rule problems attached
 - write the computed membership changes to the database
@@ -104,13 +99,10 @@ A moment that says any of these, or something close, is this region's. Both voic
 - customer-facing listing of the relationship
 - provider-facing listing with the customer attached
 - skip degraded audiences when reconciling or sending
-- don't clear membership when a reference breaks
 - preview the audience size before saving
 - get the member ids for a segment
-- no segment without conditions
 - detect a loop before saving segment references
 - strip conditions from the customer-facing membership endpoint
-- the segment read for a member omits the rule
 - turn a list of customer ids into full rows
 - I need both sides of the pair
 - load who the customer is, from the provider's side
@@ -131,7 +123,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the audience is over the provider's customers
 - push the change to owners and to the affected user
 - the count endpoint for draft conditions
-- event-driven incremental updates with a nightly full sweep
 - the checks that run before a rule is persisted
 - what happens to membership when the type changes
 - who is currently in the segment
@@ -146,7 +137,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the backstop that catches anything events missed
 - check the shape of the conditions before saving
 - add save gating to the write path
-- don't send to a segment whose rule is degraded
 - annotate this segment with its issues
 - keep every segment but show what's wrong with each
 - I'll compute added and removed sets and do a create-many and delete-many
@@ -158,13 +148,10 @@ A moment that says any of these, or something close, is this region's. Both voic
 - what the customer sees about who serves them
 - what the provider sees about each customer
 - I'll treat a broken rule like an empty one
-- I'll recompute a degraded segment to zero members
 - count for draft conditions that aren't saved yet
 - full recompute of who's in it
-- I'll add a static list type with no rule
 - I'll write a DFS over the conditions to find cycles
 - I'll return the segment with its rule to the member
-- I'll reuse the owner's response schema for members
 - I'll fetch each customer ref one by one
 - the admin view that shows everyone involved
 - attach the customer user, org or space to each row
@@ -185,7 +172,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll put user ids in the membership table
 - I'll poll the member list every few seconds
 - show the audience size before creating it
-- I'll recompute every segment on every write
 - I'll save the conditions and validate later
 - I'll flip the type column without recomputing
 - I'll insert members directly into the join table
@@ -200,7 +186,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll add a cron that re-evaluates all segments
 - reject a condition on a field the lens doesn't expose
 - check referenced tags and segments against the owner
-- filter the live audience set before planning recipients
 - the single-row form of adding issues
 - annotate a list of segments with issues
 - the only thing that writes membership rows
@@ -228,7 +213,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the customer-side and segment-side events from a diff
 - tell the client to refetch after a member joins
 - I'll create the segment first to see the count
-- how membership stays correct over time
 - written only by reconciliation, never by hand
 - redirect the bare segments route to a child
 - segment-of-segment rules need a dependency order
@@ -253,4 +237,5 @@ These mention this region's words but belong elsewhere; the answer is no, and th
 - Is this rule well-formed before I save it → json-rules
 - Where do I get a lens for this model → lenses
 - Save an email template → email-templates
+- Run this every night → cron
 - I need to stop two of these running at once → concurrency-locks

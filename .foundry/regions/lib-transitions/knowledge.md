@@ -210,13 +210,13 @@ else every path's `PathReason`.
 
 The kernel never imports an authorization library. Per-side `permission` is a serializable
 `ActionRule` re-exported straight from [`@inixiative/permissions`](https://github.com/inixiative/permissions)
-(`string` delegation, `{ rel, action }`, `{ self }`, abac `{ rule }`, `any`/`all`, boolean terminals
+(`string` delegation, `{ rel, action }`, abac `{ rule }` (the actor reads as `__actor`), `any`/`all`, boolean terminals
 `true`/`false`, `null`), and you inject an `authorize` callback to evaluate it:
 
 ```ts
 import { checkTransition, createAuthorize } from '@inixiative/transitions';
 
-const authorize = createAuthorize({ schema: rebacSchema })('db:Inquiry');
+const authorize = createAuthorize({ schema: rebacSchema, map: schemaMap })('db:Inquiry');
 checkTransition(rules, 'db:Inquiry', 'approve', record, changes, { actor, authorize });
 ```
 
@@ -234,25 +234,32 @@ Absent = open; `null` (or `false`) = terminal deny. Omit `authorize` to check le
 Authorization is **not** reimplemented here. `createAuthorize` is a thin adapter that bridges
 `@inixiative/permissions`' production rebac `check` onto the `Authorize` seam:
 `createAuthorize(options)(resource)` returns an `Authorize` bound to a (map-qualified) `resource`.
-permissions owns the whole evaluation — `string` delegation with **cycle detection**, intra-map `rel`
-walks (via an injected `resolveRelation`), cross-map bridge walks, `{ self }`, abac `{ rule }`, boolean
-terminals, `any`/`all`, and per-row `permissionRules` overrides. It speaks the same map-qualified
+permissions owns the whole evaluation — `string` delegation with **cycle detection**, `rel` walks
+through the schema map, cross-map bridge walks, abac `{ rule }` reading the actor as `__actor`,
+boolean terminals, `any`/`all`, and per-row `permissionRules` overrides. Acting as yourself is a
+walk to your own entry (`{ rel: 'user', action }` on a row hydrated with its `user`); a row without
+the relation loaded is denied. It speaks the same map-qualified
 `resource` keys as this package.
 
 ```ts
-import type { RebacSchema } from '@inixiative/permissions';
+import type { RebacSchema, SchemaMap } from '@inixiative/permissions';
 import { createAuthorize } from '@inixiative/transitions';
 
 const schema: RebacSchema = { permissions: { 'db:Inquiry': { actions: { /* … */ } } } };
 const authorize = createAuthorize({
   schema,
-  resolveRelation, // optional; default: the relation segment name is the resource key
-  isSuperadmin,    // optional; derived from the actor
+  map,          // permissions' SchemaMap: { resources, fieldMap, polymorphism? }
+  isSuperadmin, // optional; derived from the actor
 })('db:Inquiry');
+checkTransition(rules, 'db:Inquiry', 'cancel', record, changes, {
+  actor: { model: 'User', record: user },
+  authorize,
+});
 ```
 
-`options`: `schema` (permissions' `{ bridges?, permissions }`), optional `resolveRelation`,
-`isSuperadmin`, and `data` (supplemental hydrated rows for bridge walks). A cyclic permission graph —
+`options`: `schema` (permissions' `{ bridges?, permissions }`), `map` (permissions' `SchemaMap`: which
+model each resource is, its relations and foreign keys), optional `isSuperadmin`, and `data`
+(supplemental hydrated rows for bridge walks). The actor is permissions' `{ model, record }`. A cyclic permission graph —
 which permissions surfaces by throwing — is caught and denied (fail closed), so the guard terminates
 cleanly.
 
@@ -336,7 +343,7 @@ but not (`isSerializable(transition)` tells you which).
 
 `validateTransition(t, { lens?, requireSerializable? })` validates predicates (via json-rules
 `validateRule`, plus `validateRuleInLens` when a `lens` scopes referenceable fields), merge
-strategy, and permission shape (via `@inixiative/permissions`' `validateActionRule`) — run it on
+strategy, and permission shape (via `@inixiative/permissions`' `validateActionRule`: every `{ rule }` positive) — run it on
 save before persisting a tenant config. It returns json-rules' `ValidationResult` —
 `{ ok, errors: { path, message, code }[] }` — and never throws, even on malformed input. json-rules'
 issues keep their codes; transitions adds `missing_side`, `missing_predicate`, `invalid_permission`,

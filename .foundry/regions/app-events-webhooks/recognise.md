@@ -42,29 +42,38 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the stored log of every event that fired
 - the typed list of valid event names
 - the backend module for managing a subscription
+- check the user may read the route before letting them subscribe
 - run this only after the transaction actually commits
 - run these tasks together but let each fail on its own
 - wrap these writes in one transaction
 - encrypted columns and position fields are already ignored
+- every send must respect the contact's preferences
+- an org can override the platform's default template
 - the function that actually sends a typed event with the actor attached
 - fields that shouldn't count as a change
 - where the invite's sent and resolved events are defined
 - one side effect failing shouldn't cancel the others
+- after reconnect, refetch the live queries rather than replaying missed hints
 - declare all side effects of an event in one place
 - I'll construct a stream payload literal in the handler
 - I'll add a new websocket payload kind for this
 - I'll call the provider API inline in the controller
 - turn event outcomes into telemetry
 - every event goes to observation, there's no per-handler opt in
+- run this after the transaction commits
+- which email variables and rules this owner may use
+- deliver channel and user messages across API instances
 - add the new event to the handlers index
 - check the URL every time a subscription row is written
 - the job that signs and delivers one webhook
 - the stream payload must look like the route's response
 - any write that triggers email, SMS, analytics or pushes goes through an event
 - the one rule for side effects in business logic
-- the sent and resolved events use the same handoff shapes
+- declare who may receive the stream
 - make sure the user's URL isn't pointing at something internal
 - disable the subscription after it keeps failing
+- delete webhook events older than ninety days
+- what to name a new webhook event
 - after commit, find the subscriptions and queue a send for each
 - the delivery history for a subscription
 - this model changed, which owners could be subscribed
@@ -74,36 +83,46 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the database hook triggers webhooks after the write lands
 - a receiver signed up to be told when this model changes
 - the URL check on the subscription request body
+- authenticate the socket by sending the me frame, not a URL token
 - tell the handler which sockets to notify
 - the bridge between handoffs and actual delivery
 - a registered handler doesn't prove anyone emits the event
 - an append-only diagnostic record of emits that no code reads back
 - which events exist and what payload each carries
 - read, update and delete webhook subscriptions
+- authorize a subscription by probing the HTTP endpoint
 - don't enqueue the job if the transaction rolls back
 - settle all of them, then throw what failed
 - the events fire when this transaction commits
 - I'll add the encrypted fields to the ignore list for this model
+- no email goes without the preference check
+- resolve the stored template by owner tier with versions
 - capture who did it on the envelope when the event fires
 - fire the event once the transaction commits
 - leave the updated timestamp out of payloads and diffs
 - request-type events live with the handler, not in the general folder
 - run the independent effects so each can fail alone
+- hints missed while offline are not delivered later
 - define what happens when this event fires: emails, pushes, jobs
 - always go through the stream append helper
 - a new payload kind needs a client consumer and recovery story
 - nothing in a request should wait on an external service
 - failure visibility rides the observation sink, not a new job
 - I'll add an observe selector to this handler
+- the fact that this has to be manually deferred is the signal
+- scope the template picker options to the sender and recipient
+- publish through Redis so every instance's sockets hear it
 - I'll emit an event that isn't declared anywhere
 - a database hook that rejects unsafe webhook URLs
 - I'll post to the subscriber URL from the controller
 - I'll push a raw database row down the stream
 - I'll call the SMS client from the service after saving
 - I'll enqueue the email job straight from the controller
-- I'll write custom email handoffs for this request type
+- shared or per recipient has to be stated
 - block localhost and private addresses before fetching
 - five failures in a row and it turns off
+- retention on webhook event rows
+- the event name convention for webhooks
 - the fan-out from a mutation to delivery jobs
 - record every terminal failure so delivery health stays visible
 - from the changed model back to who can receive it
@@ -113,34 +132,41 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll send the webhook inline in the request
 - the endpoint config an owner registers for a model
 - I'll use a plain string URL validator in the schema
+- spoofed identity works on the socket the same way
 - channel subscribers, specific users, or append to a stream
 - port the email channel and kill the synchronous sends
 - check that a writer actually fires this event
 - I'll add an activity table to record what happened
 - I'll emit a free-form string as the event name
 - creation goes through the owner's create endpoints, not here
+- I'll write a permission check for the channel
 - I'll keep a list of callbacks to run after commit
 - I'll use a bare promise all for the side effects
 - I'll use the raw database transaction call
 - the ignore registry composes from the other registries
+- per-tenant email overrides with history
 - I'll thread the actor and email through every call site
 - I'll call the email sender right after the insert
 - I'll filter these noisy fields in the webhook code
 - I'll put the invite emails in the global handlers directory
 - I'll wrap every task in its own try catch
+- I'll queue hints while disconnected and send them on reconnect
 - I'll wrap each side effect in its own try catch
 - a hand-built kind stream object
 - don't invent a message type without designing who handles it
 - await a fetch to a third party inside a write path
 - I'll add a job just to make failures visible
 - analytics sees the whole envelope automatically
+- I'll fire the webhook inside the transaction
+- limit email tokens to what the owner's lens allows
+- fall back to local delivery if Redis is down
 - a payload type the index doesn't know about
 - I'll validate the URL only in the create route
 - I'll fetch the receiver with my own retry loop
 - shape the upsert the way the list endpoint returns it
 - business logic never talks to a delivery service directly
 - every notification starts as an emitted event
-- request events reuse the shared contracts
+- I'll skip the audience field
 - I'll write a quick check for ten dot and one two seven
 - I'll add a failure counter and a disabled flag
 - I'll write a parallel service that copies the fan-out
@@ -153,12 +179,14 @@ A moment that says any of these, or something close, is this region's. Both voic
 - never deliver from inside the transaction
 - I'll build a custom pipeline to push changes to the CRM
 - schema-level safety for the target URL
+- I'll put the token in the socket URL
 - I'll build the stream handoff object by hand
 - I'll call the mailer from inside the handler
 - the index of events the system knows
 - where to see which side effects were triggered
 - add the new event to the name union
 - where the subscription routes live
+- drop subscriptions when the user changes
 - defer the cache clear until the write is durable
 - parallel tasks that may each open a transaction
 - nested calls reuse the outer transaction

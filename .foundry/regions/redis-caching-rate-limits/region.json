@@ -3,18 +3,18 @@
   "title": "Redis, caching and rate limits",
   "routing": "Is this about Redis \u2014 a connection (getRedisClient, getRedisPub/getRedisSub, createRedisConnection), a key and its prefix (redisNamespace), Lua scripts \u2014 or about caching a read (cache, cacheKey, upsertCache, clearKey, cacheReference, fetchOne, TTLs, invalidation on mutation), or about request rate limits (rateLimit, apiRateLimit, authRateLimit, identities, rateLimitMax, 429 / Retry-After)?",
   "concepts": ["redis", "caching", "rate-limiting"],
-  "tokens": 15504,
+  "tokens": 17922,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2217,
+      "tokens": 1878,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 15504
+      "tokens": 17922
     }
   },
   "runsAgreed": 2,
@@ -28,22 +28,30 @@
       "doc:docs/claude/REDIS.md#error-handling",
       "doc:docs/claude/HOOKS.md#cache-invalidation",
       "doc:docs/claude/JOBS.md#handler-patterns/rolling-caches-root-branch-leaf",
-      "doc:docs/claude/REDIS.md#cache-utilities"
+      "doc:docs/claude/REDIS.md#cache-utilities",
+      "doc:docs/claude/REDIS.md#cache-utilities/cachekey-builder",
+      "doc:docs/claude/REDIS.md#cache-utilities/cache-get-or-set",
+      "doc:docs/claude/REDIS.md#cache-utilities/checkcache",
+      "doc:docs/claude/REDIS.md#cache-utilities/clearkey",
+      "doc:docs/claude/REDIS.md#cache-utilities/automatic-invalidation",
+      "doc:docs/claude/REDIS.md#cache-utilities/rolling-caches"
     ],
     "catalogClusters": [
       "authentication-methods",
       "caching-and-invalidation",
       "job-definition-and-enqueue",
+      "job-overflow-outbox",
       "locks-and-serialization",
       "module-layout-monorepo",
       "rate-limiting",
       "redis-infrastructure",
+      "supersede-lanes",
       "testing-helpers",
       "testing-rules",
       "websocket-realtime-delivery"
     ],
-    "codeEntries": 45,
-    "docMembers": 31
+    "codeEntries": 52,
+    "docMembers": 42
   },
   "bypassLines": 17,
   "glossaryTerms": 26

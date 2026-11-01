@@ -30,7 +30,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which binds does the lens chain need
 - a child layer needs the parent's bind
 - add a restriction to the lens
-- compile the rule with the lens so it's gated and narrowed
 - the tenant check belongs in the lens, not around it
 - a layer that narrows the parent lens
 - the lens itself can't do this
@@ -38,7 +37,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the persisted form of a lens
 - check the lens layer when I build it
 - AND a where into the lens's first layer
-- I'll pass the map and model and narrow by hand
 - I'll check the org id in application code around the rule
 - restrict fields, enums, relations and rows
 - a clamp reads what its parent hides
@@ -46,7 +44,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - one record per layer with its parents
 - is this narrowing valid against its parents
 - I'll spread the lens and add a where
-- one call that gates, narrows and compiles
 - the narrowing's where is the tenant or brand scope
 - the narrowing carries the row scope
 - the error when the lens refuses, not the input
@@ -54,7 +51,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - save the lens to the database
 - I'll find the bad layer when the query comes back empty
 - scope the lens to live rows
-- a scoped compile of a user rule
 - scope this query to a brand
 - stack another restriction on the lens
 - fix the lens, not the caller

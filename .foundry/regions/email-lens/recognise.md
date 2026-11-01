@@ -42,6 +42,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - references a rule resolves at runtime rather than naming
 - the referenced rows grouped by which lens slot they came from
 - which rows do the rules in this content name
+- the lens segment rules are written against
 - what recipient fields a template can see by default
 - a lens when there's no sender or data context
 - what paths does this component need from its host
@@ -63,9 +64,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the where clause for one owner tier
 - load the recipient and data rows through their lenses at send time
 - follow a loop variable back to its source path
+- the segment lens narrowed per provider
 - rewrite the condition for use inside a loop
 - limit tags and segments to what the owner can see
-- record which rows the template's rules reference on save
 - an org sender should only reach its own members
 - the frontend hook for the template's rule surface
 - which variables are in scope for this rule source
@@ -81,6 +82,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the dynamic refs in the subject and body
 - split the references per sender, recipient, data
 - a flat list of everything the template's rules point at
+- the root lens for segment conditions
 - the default user fields and tag relations exposed to emails
 - the plain lens for a system email
 - derive the fields a shared block relies on
@@ -102,9 +104,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll hand-write the owner, locale and deleted filter per tier
 - build the variables for this recipient
 - rewrite a bound path to what it really points at
+- the membership lens with the provider resolved
 - turn an element rule into an array rule
 - bound the lens's link rows to the row owner
-- keep the reference edges in sync with the content
 - clamp who the message rule can target to the sender's people
 - load what the rule builder may reference, client side
 - the hook for variables available inside a loop binding
@@ -120,6 +122,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - runtime-resolved rows the content points at
 - references by scope, not one flat list
 - the tags and segments this email references
+- bind the segment lens sources myself
 - the baseline recipient projection
 - build a lens with only the defaults
 - list a component's expected paths from its content
@@ -141,9 +144,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - build the owner filters instead of branching per tier
 - fetch what the template needs about the user, filtered
 - what does item.name actually refer to
+- segment narrowing for a given provider
 - the loop version of a rule
 - narrow the lens by owner and sender
-- I'll pre-filter so we only sync when something changed
 - I'll query users by the rule without checking the sender's reach
 - fetch the rule vocabulary in the editor
 - what can I reference here in the editor
@@ -166,7 +169,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the filter for a space, org or default row
 - I'll query the user row directly and pass it in
 - an org's template shouldn't see another org's tags
-- a write that changed nothing produces no edge writes
 - bound the recipient rule by the sender's lens
 - check a path against the narrowing at save
 - walk a path at render time
@@ -174,7 +176,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - what may the template read, given who owns it and who sends it
 - validate the rule at save and again at render
 - get the per-recipient data before filling the template
-- track what this email depends on
 - who may this sender message
 
 ## When this is not your domain

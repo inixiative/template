@@ -42,7 +42,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - how many decimal places does this currency use
 - a model owned by either a user or an org
 - an owner type string plus an owner id
-- constraints and hooks read the FK map from one place
 - which FK column does this owner kind use
 - defaults that must never change after deploy
 - skip the webhook for a record that keeps failing
@@ -65,7 +64,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - group tags into a vocabulary
 - the raw list of timezones for a picker
 - validate a timezone field in the request
-- take a user id, not a plain string
 - what id type for the new model
 - dial code for this country code
 - iterate every country for a picker
@@ -80,7 +78,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - minor units for a currency, yen has none
 - point at one of several entity types safely
 - entity type and entity id pair with runtime lookups
-- hand-declare the FK map in the hook
 - read the polymorphic mapping for a model
 - seeded resources nobody can edit
 - mark a record as poisoned for this integration
@@ -90,7 +87,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the language record for a code
 - a zod field for language codes
 - iterate every language for a picker
-- list the models with typed ids
 - resolve a tenant-customizable resource, org first then default
 - register a model's polymorphic axes
 - given kind and id, which row does it point at
@@ -104,7 +100,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a set of related tags, like status or region
 - every IANA timezone id
 - a zod field for timezone
-- stop mixing up user ids and org ids
 - use a random uuid for the primary key
 - country calling code only
 - the country table itself
@@ -119,7 +114,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - divide by 100 for every currency
 - polymorphic owner that still has real foreign keys
 - discriminator enum plus one nullable FK per kind
-- the registry that validation and immutable fields consult
 - I'll write a switch on the owner type to pick the column
 - lock the built-in defaults from editing
 - stop delivering for this one record
@@ -159,11 +153,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - join table between tags and resources
 - a namespace for tags
 - plain string for the timezone field
-- I'll make my own branded type for this id
 - country must be a valid ISO code
 - look up the model's polymorphic axis config
 - register the new model so the hook enforces its target kinds
-- function argument typed as a plain string id
 - one map of model to column for each discriminator
 
 ## When this is not your domain

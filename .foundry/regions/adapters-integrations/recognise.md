@@ -42,7 +42,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - name module-level private state with two underscores
 - only the wiring file reads the environment
 - report errors to the console locally and to the tracker in prod
-- load the integration but only if this owner owns it
 - the owner's connection to an outside provider
 - the display name and icon for each provider
 - an external item synced under a connection
@@ -90,7 +89,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - single underscore is only for unused parameters
 - provider files take config, they don't look it up
 - I'll import the error tracking SDK in the handler
-- ownership-scoped lookup of a connection
 - I'll add a provider enum on the token instead
 - I'll hardcode provider labels in the component
 - I'll store synced items in a JSON column on the integration
@@ -109,7 +107,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll instantiate the SDK client with region and credentials myself
 - the documented exception to the router rule
 - the error reporting adapter
-- a raw find unique by id leaks other owners' integrations
 - the connection itself, not the records synced through it
 - custom integrations without a provider get their own entry
 - external identity for a customer is a different model

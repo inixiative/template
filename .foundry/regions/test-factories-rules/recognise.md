@@ -49,12 +49,13 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the recording has the API key in it
 - several fields all point at the same parent
 - we have factories in the database, check before redefining them
+- save a draft of the request before sending it
+- make a user for this test
 - why not use these factories, I'm so confused
 - I'll list the user relation in the factory's dependencies
 - I couldn't run the tests so I'll note it
 - export both the in-memory and the persisting variant
 - how do I read the created org from the context
-- run the package tests then the full check
 - DOM tests fail from the repo root
 - make a request against the test app and read the body
 - unique email or slug for each test row
@@ -71,9 +72,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - spying on a global without restoring it
 - don't hit the live API in tests
 - we have factors in the database, what are you doing
-- auth, permissions and CRUD must be production quality
 - make the factory also create the optional related row
-- I changed a shared type, typecheck the consumers
 - type the context entries a custom factory guarantees
 - UI test passes the raw factory entity
 - wrap the provider call so tests replay the recording
@@ -88,12 +87,13 @@ A moment that says any of these, or something close, is this region's. Both voic
 - redact secrets before committing the cassette
 - a compound key that references one dependency
 - make createFactory expect the model types so callers must provide them
+- create the request and send it in the same call
+- seed a test user with defaults
 - call the factory directly without passing a context, it builds the parents
 - plain id fields are inferred, don't declare them
 - try everything before saying you couldn't verify
 - where the factory functions are exported from
 - the context key is the model's accessor name
-- I ran this workspace's tests, calling it validated
 - document is not defined in the UI test
 - I'll construct a Request with headers and stringify the body
 - I'll use Date.now or Math.random for uniqueness
@@ -110,9 +110,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll spyOn fetch and leave it
 - the tests are making real network calls
 - shared DB factories used across packages
-- no placeholder implementations for core features
 - pass an empty object to get the optional parent
-- run tsc in every package that imports it
 - the result type for a factory with known parents
 - cast the serialized entity to any
 - I'll call the SDK directly from the client method
@@ -126,9 +124,10 @@ A moment that says any of these, or something close, is this region's. Both voic
 - add sanitizers to the recorder
 - I'll create the parent and copy its fields into each override
 - add a factory for the new model
+- start a new invite or access request
+- I'll insert the user with a raw prisma create in the test
 - a couldn't-run caveat instead of running it
 - every model gets a build and a create export
-- finish with the whole repo check before reporting
 - run the UI tests from inside the package
 - typed helpers for calling routes in tests
 - a counter that never repeats across tests
@@ -153,6 +152,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll keep a list of tables to wipe in afterAll
 - a non-inferable foreign key named as a string
 - define how test rows of this model get built
+- I'll insert a request row with status draft
 - create a test user and organization in the database
 - I'll import the factory file directly instead of the index
 - unwrap the data and pagination from the response

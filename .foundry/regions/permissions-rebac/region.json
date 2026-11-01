@@ -1,40 +1,50 @@
 {
   "id": "permissions-rebac",
   "title": "ReBAC, owner-polymorphic and row permissions",
-  "routing": "Is this about permission decisions that depend on relationships or rows rather than a role tier: rebacSchema and ActionRule (a string inherits an action, { rel, action } delegates along a relation, dot-path delegation, { rule }, any / all, null), the @inixiative/permissions-roles / permissions-rebac check engine (createPermissions, createRebacCheck, check, createHydrator and hydrating the ownership closure, validateActionRule, PermixLike, typed resource union, bridges), owner-polymorphic models (ownerActions, polymorphicIs / polymorphicBindings), row-level permissionRules that only widen (buildPermissionRulesSchema, read only), space permissions-roles / permissions-rebac delegating to organization (SpaceUser requires OrganizationUser), or inquiry send / resolve rules per type?",
+  "routing": "Is this about permission decisions that depend on relationships or rows rather than a role tier: rebacSchema and ActionRule (a string inherits an action, { rel, action } delegates along a relation, dot-path delegation, { self }, { rule }, any / all, null), the @inixiative/permissions-roles / permissions-rebac check engine (createPermissions, createRebacCheck, check, createHydrator and hydrating the ownership closure, actionRuleSchema, PermixLike, typed resource union, bridges), owner-polymorphic models (ownerActions, polymorphicIs / polymorphicBindings, validateOwnerPermission), row-level permissionRules that only widen (buildPermissionRulesSchema, read only), space permissions-roles / permissions-rebac delegating to organization (SpaceUser requires OrganizationUser), or inquiry send / resolve rules per type?",
   "concepts": ["permissions-rebac"],
-  "tokens": 10130,
+  "tokens": 17801,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1681,
+      "tokens": 1204,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 10130
+      "tokens": 17801
     }
   },
   "runsAgreed": 0,
   "sources": {
     "docs": ["docs/claude/PERMISSIONS.md"],
     "docUnits": [
+      "doc:docs/claude/PERMISSIONS.md#member-rows",
+      "doc:docs/claude/PERMISSIONS.md#full-and-delegatefull",
+      "doc:docs/claude/PERMISSIONS.md#resolution-at-read-time",
+      "doc:docs/claude/PERMISSIONS.md#writing-delegates",
+      "doc:docs/claude/PERMISSIONS.md#adding-a-model",
       "doc:docs/claude/PERMISSIONS.md#rebac",
       "doc:docs/claude/PERMISSIONS.md#owner-polymorphic-models",
       "doc:docs/claude/PERMISSIONS.md#row-level-overrides",
       "doc:docs/claude/PERMISSIONS.md#space-permissions"
     ],
     "catalogClusters": [
-      "inquiry-lifecycle",
+      "authentication-methods",
+      "error-handling",
+      "integrations-records",
       "multi-tenancy-membership",
+      "mutation-hooks",
       "permission-rule-algebra",
       "request-response-schemas",
-      "roles-and-permissions"
+      "roles-and-permissions",
+      "rule-references-registry",
+      "soft-delete-cascade"
     ],
-    "codeEntries": 14,
-    "docMembers": 26
+    "codeEntries": 51,
+    "docMembers": 41
   },
   "bypassLines": 24,
   "glossaryTerms": 13
