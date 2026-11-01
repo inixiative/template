@@ -230,6 +230,28 @@ describe('a member mints tokens as themselves', () => {
   }
 });
 
+describe('a member creates projects as themselves', () => {
+  for (const [label, path] of [
+    ['organization member', () => `/organizationUser/${member.id}/projects`],
+    ['space member', () => `/spaceUser/${spaceMember.id}/projects`],
+  ] as const) {
+    it(`${label}: the member creates one; an admin, another member and an outsider can't`, async () => {
+      const create = async (headers: Headers, name: string) =>
+        (
+          await app.request(`/api/v1${path()}`, {
+            method: 'POST',
+            headers: { ...headers, 'content-type': 'application/json' },
+            body: JSON.stringify({ name }),
+          })
+        ).status;
+      expect(await create(callers.member, `Mine as ${label}`)).toBe(201);
+      expect(await create(callers['organization admin'], 'From an admin')).toBe(403);
+      expect(await create(callers.anotherMember, 'From another member')).toBe(403);
+      expect(await create(callers.outsider, 'From an outsider')).toBe(403);
+    });
+  }
+});
+
 describe('a space member connects an integration as themselves', () => {
   const create = (headers: Headers) =>
     app.request(`/api/v1/spaceUser/${spaceMember.id}/integrations`, {
