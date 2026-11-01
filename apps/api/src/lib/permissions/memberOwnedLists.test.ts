@@ -12,6 +12,7 @@ import {
   createIntegration,
   createOrganization,
   createOrganizationUser,
+  createProject,
   createSpace,
   createSpaceUser,
   createToken,
@@ -76,6 +77,23 @@ beforeAll(async () => {
   rows.organizationIntegration = (
     await createIntegration({ ...at, ownerModel: 'Organization' })
   ).entity.id;
+  rows.memberProject = (
+    await createProject({
+      name: 'Mine',
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: member.userId,
+    })
+  ).entity.id;
+  rows.spaceMemberProject = (
+    await createProject({
+      name: 'Mine in the space',
+      ownerModel: 'SpaceUser',
+      organizationId: organization.id,
+      spaceId: space.id,
+      userId: spaceMember.userId,
+    })
+  ).entity.id;
   rows.memberToken = (
     await createToken(
       { ownerModel: 'OrganizationUser' },
@@ -111,6 +129,8 @@ describe("a member's own rows are listed under the member, and only there", () =
     ['organization member tokens', () => `/organizationUser/${member.id}/tokens`],
     ['space member integrations', () => `/spaceUser/${spaceMember.id}/integrations`],
     ['space member tokens', () => `/spaceUser/${spaceMember.id}/tokens`],
+    ['organization member projects', () => `/organizationUser/${member.id}/projects`],
+    ['space member projects', () => `/spaceUser/${spaceMember.id}/projects`],
   ] as const) {
     it(`${label}: the member and the organization's owner read them; an admin, another member and an outsider can't`, async () => {
       expect(await whoCanList(path())).toEqual({
@@ -134,6 +154,8 @@ describe("a member's own rows are listed under the member, and only there", () =
       rows.spaceMemberIntegration,
     ]);
     expect(await ids(`/spaceUser/${spaceMember.id}/tokens`)).toEqual([rows.spaceMemberToken]);
+    expect(await ids(`/organizationUser/${member.id}/projects`)).toEqual([rows.memberProject]);
+    expect(await ids(`/spaceUser/${spaceMember.id}/projects`)).toEqual([rows.spaceMemberProject]);
   });
 });
 
