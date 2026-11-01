@@ -141,6 +141,13 @@ export const integrationAccess = {
   },
 } satisfies Record<string, ActionRule>;
 
+export const administeredByOwnerKind = {
+  create: integrationAdministering.create,
+  manage: integrationAdministering.manage,
+  delete: integrationAdministering.delete,
+  ...integrationAccess,
+} satisfies Record<string, ActionRule>;
+
 export const integrationRoleWrite: ActionRule = {
   any: [actionOnOwner('delegateFull'), { all: ['manage', roleHeldAtOwner()] }],
 };

@@ -16,6 +16,7 @@ export const CONCEPTS: ConceptRegistry = {
   'primitive:caching': { module: ['cache'], docs: ['REDIS.md'] }, // built on infrastructure:redis
   'feature:webhooks': { module: ['webhookSubscription'], docs: ['HOOKS.md'] },
   'feature:integrations': { module: ['integration'] },
+  'feature:project': { module: ['project'] },
   'feature:email': { package: ['email'], docs: ['COMMUNICATIONS.md'] },
 
   // classless cross-cutting tag (derived): the BE admin surface IS superadmin.

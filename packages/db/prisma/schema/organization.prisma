@@ -17,6 +17,7 @@ model Organization {
   tokens               Token[]
   webhookSubscriptions WebhookSubscription[]
   integrations         Integration[]
+  projects             Project[]
   contacts             Contact[]
   tagAttachments       TagAttachment[]
   tags                 Tag[]

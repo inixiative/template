@@ -21,6 +21,7 @@ model OrganizationUser {
   spaceUsers         SpaceUser[]
   tokens             Token[]
   integrations       Integration[]
+  projects           Project[]
   auditLogsAsSubject AuditLog[]    @relation("AuditLogSubjectOrganizationUser")
 
   // ==========================================================================

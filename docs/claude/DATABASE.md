@@ -786,6 +786,7 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `spaceUser.prisma` - Space memberships (requires organization membership)
 - `token.prisma` - API tokens (user/org/space scoped)
 - `webhookSubscription.prisma` - Webhook configurations
+- `project.prisma` - `Project`: a unit of work an owner organizes things around (name, optional description). False-polymorphic over all five owners (User, OrganizationUser, Organization, Space, SpaceUser); names are unique per owner among live rows, so one repo can be a project in several tenants. Taggable (`TagResource.Project`). Routes: `/{owner}/:id/projects` to create and list, `/project/:id` to read, update and delete
 - `inquiry.prisma` - False polymorphic inquiry system
 - `integrationRecord.prisma` - One record's standing in one integration (false-polymorphic over `WebhookModel`); `poisonedAt` makes sendWebhook skip the record
 - `customerRef.prisma` - Customer references (false-polymorphic customer User/Organization/Space → provider)
