@@ -9,6 +9,7 @@ import { emitAppEvent } from '#/appEvents/emit';
 import { makeError } from '#/lib/errors';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
 import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
+import { validateSpaceSlugFree } from '#/modules/inquiry/validations/validateSpaceSlugFree';
 
 const validate = async (inquiry: Partial<Inquiry>, content: UpdateSpaceContent): Promise<void> => {
   const { slug } = content;
@@ -17,23 +18,17 @@ const validate = async (inquiry: Partial<Inquiry>, content: UpdateSpaceContent):
   const spaceId = inquiry.sourceSpaceId!;
   const space = await db.space.findUniqueOrThrow({ where: { id: spaceId } });
 
-  const [existingSpace, existingInquiry] = await Promise.all([
-    db.space.findFirst({
-      where: { organizationId: space.organizationId, slug, id: { not: spaceId } },
-    }),
-    db.inquiry.findFirst({
-      where: {
-        id: { not: inquiry.id },
-        type: InquiryType.updateSpace,
-        sourceSpaceId: spaceId,
-        status: { notIn: inquiryTerminalStatuses },
-        content: { path: ['slug'], equals: slug },
-      },
-    }),
-  ]);
+  await validateSpaceSlugFree({ organizationId: space.organizationId, slug, spaceId });
 
-  if (existingSpace)
-    throw makeError({ status: 409, message: 'A space with this slug already exists' });
+  const existingInquiry = await db.inquiry.findFirst({
+    where: {
+      id: { not: inquiry.id },
+      type: InquiryType.updateSpace,
+      sourceSpaceId: spaceId,
+      status: { notIn: inquiryTerminalStatuses },
+      content: { path: ['slug'], equals: slug },
+    },
+  });
   if (existingInquiry)
     throw makeError({
       status: 409,

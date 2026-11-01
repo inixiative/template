@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { snapshotHookRegistry } from '@template/db';
+import { cache, cacheKey, checkCache, snapshotHookRegistry } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -185,6 +185,8 @@ describe('handler: transferSpace', () => {
     let dropped: Awaited<ReturnType<typeof memberWithRows>>;
     let removedEarlier: Awaited<ReturnType<typeof memberWithRows>>;
     let leftOldOrg: Awaited<ReturnType<typeof memberWithRows>>;
+    let leftTargetOrg: Awaited<ReturnType<typeof memberWithRows>>;
+    let leftTargetOrgAt: Date;
     let removedEarlierAt: Date;
     let spaceIntegrationId: string;
     let spaceTokenId: string;
@@ -209,6 +211,12 @@ describe('handler: transferSpace', () => {
         where: { id: leftOldOrg.member.id },
         data: { deletedAt: new Date() },
       });
+      leftTargetOrg = await memberWithRows(freshSpace);
+      leftTargetOrgAt = new Date(Date.now() - 120_000);
+      await createOrganizationUser(
+        { role: 'member', deletedAt: leftTargetOrgAt },
+        { user: leftTargetOrg.user, organization: targetOrg1 },
+      );
 
       const { entity: spaceIntegration } = await createIntegration({
         ownerModel: 'Space',
@@ -231,13 +239,28 @@ describe('handler: transferSpace', () => {
         await db.organizationUser.findMany({ where: { organizationId: targetOrg1.id } })
       ).map(({ id }) => id);
 
+      await cache(cacheKey('token', kept.token.id), async () => kept.token);
+      await cache(cacheKey('integration', kept.integration.id), async () => kept.integration);
+
       const response = await resolve(await transferInquiry(freshSpace, targetOrg1), 'approved');
       expect(response.status).toBe(200);
+    });
+
+    it('clears the cached rows the transfer re-keyed', async () => {
+      expect((await checkCache(cacheKey('token', kept.token.id))).state).toBe('empty');
+      expect((await checkCache(cacheKey('integration', kept.integration.id))).state).toBe('empty');
     });
 
     it('moves the space to the target org', async () => {
       const transferred = await db.space.findUniqueOrThrow({ where: { id: freshSpace.id } });
       expect(transferred.organizationId).toBe(targetOrg1.id);
+    });
+
+    it('adds no live member to the target org', async () => {
+      const after = await db.organizationUser.findMany({
+        where: { organizationId: targetOrg1.id },
+      });
+      expect(after.map(({ id }) => id).sort()).toEqual([...liveTargetMembersBefore].sort());
     });
 
     it('keeps a member of the target org, with everything they own as that space member', async () => {
@@ -275,7 +298,7 @@ describe('handler: transferSpace', () => {
       expect(await db.token.findUnique({ where: { id: dropped.token.id } })).toBeNull();
     });
 
-    it('gives each removed member a tombstoned membership in the target org, stamped like their space membership', async () => {
+    it('gives each removed member a tombstoned membership in the target org that revives exactly what it should', async () => {
       const memberships = await withDeleted(() =>
         db.organizationUser.findMany({
           where: {
@@ -286,15 +309,42 @@ describe('handler: transferSpace', () => {
       );
       const stampOf = (userId: string) =>
         memberships.find((membership) => membership.userId === userId)?.deletedAt?.getTime();
-      const droppedStamp = (
-        await withDeleted(() =>
-          db.spaceUser.findUniqueOrThrow({ where: { id: dropped.spaceUser.id } }),
-        )
-      ).deletedAt!.getTime();
+      const spaceStampOf = async (id: string) =>
+        (
+          await withDeleted(() => db.spaceUser.findUniqueOrThrow({ where: { id } }))
+        ).deletedAt!.getTime();
       expect(memberships).toHaveLength(3);
       expect(memberships.every((membership) => membership.role === 'member')).toBe(true);
-      expect(stampOf(dropped.user.id)).toBe(droppedStamp);
-      expect(stampOf(removedEarlier.user.id)).toBe(removedEarlierAt.getTime());
+      expect(stampOf(dropped.user.id)).toBe(await spaceStampOf(dropped.spaceUser.id));
+      expect(stampOf(leftOldOrg.user.id)).toBe(await spaceStampOf(leftOldOrg.spaceUser.id));
+      expect(stampOf(removedEarlier.user.id)).not.toBe(removedEarlierAt.getTime());
+    });
+
+    it('a member who had left the target org is removed with that membership, so rehiring them brings it back', async () => {
+      const spaceUser = await withDeleted(() =>
+        db.spaceUser.findUniqueOrThrow({ where: { id: leftTargetOrg.spaceUser.id } }),
+      );
+      expect(spaceUser.deletedAt?.getTime()).toBe(leftTargetOrgAt.getTime());
+
+      expect((await inviteBack(targetOrg1, leftTargetOrg.user)).status).toBe(200);
+
+      const live = { organizationId: targetOrg1.id, deletedAt: null };
+      expect(
+        await db.spaceUser.findUniqueOrThrow({ where: { id: leftTargetOrg.spaceUser.id } }),
+      ).toMatchObject(live);
+      expect(
+        await db.integration.findUniqueOrThrow({ where: { id: leftTargetOrg.integration.id } }),
+      ).toMatchObject(live);
+    });
+
+    it('hiring someone a space admin had removed before the transfer leaves that removal in place', async () => {
+      expect((await inviteBack(targetOrg1, removedEarlier.user)).status).toBe(200);
+
+      expect(
+        await withDeleted(() =>
+          db.spaceUser.findUniqueOrThrow({ where: { id: removedEarlier.spaceUser.id } }),
+        ),
+      ).toMatchObject({ organizationId: targetOrg1.id, deletedAt: removedEarlierAt });
     });
 
     it('moves what the space owns, and the tokens of its integrations', async () => {
@@ -311,13 +361,6 @@ describe('handler: transferSpace', () => {
       expect(
         await db.emailTemplate.findUniqueOrThrow({ where: { id: spaceEmailTemplateId } }),
       ).toMatchObject(inTarget);
-    });
-
-    it('adds no live member to the target org', async () => {
-      const after = await db.organizationUser.findMany({
-        where: { organizationId: targetOrg1.id },
-      });
-      expect(after.map(({ id }) => id).sort()).toEqual([...liveTargetMembersBefore].sort());
     });
 
     it('an old-org re-invite revives nothing in the moved space', async () => {
