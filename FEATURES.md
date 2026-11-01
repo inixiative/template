@@ -256,7 +256,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories). The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
-- ✅ **25 Database Models** - user, account, session, verification, jwks, authProvider, organization, organizationUser, space, spaceUser, project, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
+- ✅ **34 Database Models** - account, appEvent, auditLog, authProvider, communicationLog, communicationComponentVersion, contact, cronJob, customerRef, emailTemplate, emailComponent, flow, integrationRecord, integration, jobOutbox, inquiry, organizationUser, organization, project, jwks, segment, segmentMember, session, ruleReference, spaceUser, tag, space, tagAttachment, user, token, tagCategory, verification, webhookSubscription, webhookEvent
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 

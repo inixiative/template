@@ -203,7 +203,7 @@ An action in the schema is something you do to the record it is defined on, neve
 `read`, `operate`, `manage` and `own` are the standard actions. On a model that chains them, each one is implied by the one above it on the same record, so holding `own` is holding all four. `chainedStandardActions` builds this, and `ownerActions` uses it. Three kinds of model differ, each declared in `standardActionsChain.test.ts`:
 
 - **Member rows** (`db:organizationUser`, `db:spaceUser`): `manage` and `own` do not imply `operate`. Administering a member row is not being the member.
-- **Integrations** have no `own`; `read`, `operate` and `manage` chain.
+- **Integrations** and **projects** have no `own`; `read`, `operate` and `manage` chain.
 - **Contacts** (`db:contact`): `manage` also requires the contact's `source` not to be `userCreation`, so it does not chain past `manage`.
 
 Actions outside the four (`create`, `delete`, `leave`, `delegateFull`, `send`, `resolve`, `user.redact`, ...) are not part of the chain; they delegate only where their rule says so.
@@ -600,6 +600,7 @@ The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed
 | `memberRowActions(tenant)` | a member row's actions |
 | `memberRoleWrite(tenant)`, `memberRemoval(tenant)` | writing a member's role; removing a member |
 | `integrationAdministering`, `integrationAccess` | `db:integration`'s `create`, `manage`, `delete`, `delegateFull`; its `operate` and `read` |
+| `administeredByOwnerKind` | the same by owner kind without `delegateFull`, for a model owned by any of the five owners (`db:project`) |
 | `integrationRoleWrite`, `roleHeldAtOwner(at?)` | writing an integration's role; the role on the row held at its owner |
 | `tokenAccessIsYours`, `tokenAdministering` | `db:token`'s `create`; its `read` and `delete` |
 | `chainedStandardActions`, `ownerActions(rels?)` | the standard chain; the owner fan-out over it |
@@ -653,7 +654,7 @@ Models with nullable foreign keys to several owners (Contact, WebhookSubscriptio
 
 For each standard action the helper asks the same action of `user`, `organization` and `space`, chained. Only the populated relation is hydrated, so the others fail and the rule follows the actual owner. Integrations and tokens are owner-polymorphic too but follow their own owner-kind rules ([Integrations and Tokens by Owner Kind](#integrations-and-tokens-by-owner-kind)).
 
-`ownerActions()` reads the `user`, `organization` and `space` relations, so it can't tell a member's row from its tenant's: an OrganizationUser-owned row carries `organizationId` too, and `manage` on the organization would reach it. A model owned by any of the five owner kinds (User, OrganizationUser, Organization, Space, SpaceUser) uses `administeredByOwnerKind` instead. It is the integration rules without `delegateFull`, keyed on `ownerModel` ([Integrations](#integrations)): an organization's admin manages its organization's rows but can't reach a member's own, and the organization's owner can.
+`ownerActions()` reads the `user`, `organization` and `space` relations, so it can't tell a member's row from its tenant's: an OrganizationUser-owned row carries `organizationId` too, and `manage` on the organization would reach it. A model owned by any of the five owner kinds (User, OrganizationUser, Organization, Space, SpaceUser) uses `administeredByOwnerKind` instead. It is the integration rules without `delegateFull`, keyed on `ownerModel` ([Integrations](#integrations)): an organization's admin manages its organization's rows but can't reach a member's own; the organization's owner can read and delete a member's row, not change it; only the member manages it.
 
 ```typescript
 'db:project': { actions: administeredByOwnerKind },

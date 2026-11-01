@@ -16,6 +16,7 @@ import {
   createSpace,
   createSpaceUser,
   createTag,
+  createTagAttachment,
   createUser,
   getNextSeq,
 } from '@template/db/test';
@@ -118,6 +119,10 @@ describe('Project', () => {
         expect(listed.map((project) => project.name)).toEqual([`${name} ${owner.ownerModel}`]);
         expect(data.every((project) => project.ownerModel === owner.ownerModel)).toBe(true);
       }
+    });
+
+    it('refuses a blank name (422)', async () => {
+      expect((await app.fetch(post('/api/v1/me/projects', { name: '   ' }))).status).toBe(422);
     });
 
     it('refuses a second live project with the same name under one owner (409)', async () => {
@@ -242,9 +247,10 @@ describe('Project', () => {
     it('a project takes tag attachments like the other tag resources', async () => {
       const { entity: project } = await createProject({ ownerModel: 'User', userId: user.id });
       const { entity: tag } = await createTag();
-      const attachment = await app.db.tagAttachment.create({
-        data: { tagId: tag.id, resourceModel: 'Project', projectId: project.id },
-      });
+      const { entity: attachment } = await createTagAttachment(
+        { resourceModel: 'Project' },
+        { tag, project },
+      );
       const tagged = await app.db.project.findUniqueOrThrow({
         where: { id: project.id },
         include: { tagAttachments: true },
