@@ -293,6 +293,27 @@ describe('rules hook', () => {
       await expect(promise).toThrow('name required');
     });
 
+    it('fail: reviving with a set operation validates it', async () => {
+      const user = await createNamelessUser();
+      await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
+
+      const promise = async () =>
+        db.user.update({ where: { id: user.id }, data: { deletedAt: { set: null } } });
+
+      await expect(promise).toThrow('name required');
+    });
+
+    it('pass: a tombstone written with a set operation', async () => {
+      const user = await createNamelessUser();
+
+      const deleted = await db.user.update({
+        where: { id: user.id },
+        data: { deletedAt: { set: new Date() } },
+      });
+
+      expect(deleted.deletedAt).not.toBeNull();
+    });
+
     it('fail: a tombstone that also changes a field validates', async () => {
       const user = await createNamelessUser();
 

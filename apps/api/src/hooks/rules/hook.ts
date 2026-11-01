@@ -42,8 +42,12 @@ const validateRules = (data: Record<string, unknown>, model: ModelName): void =>
 
 const tombstoneFields = new Set(['deletedAt', 'updatedAt']);
 
+export const writtenDeletedAt = (data: Record<string, unknown>): unknown =>
+  shadowMerge(undefined, { deletedAt: data.deletedAt }).deletedAt;
+
 const isTombstone = (data: Record<string, unknown>): boolean =>
-  !isCleared(data.deletedAt) && Object.keys(data).every((field) => tombstoneFields.has(field));
+  !isCleared(writtenDeletedAt(data)) &&
+  Object.keys(data).every((field) => tombstoneFields.has(field));
 
 const processCreateArgs = (args: unknown, model: ModelName): void => {
   const data = (args as Record<string, unknown>)?.data ?? (args as Record<string, unknown>)?.create;
