@@ -598,6 +598,10 @@ shadowMerge(
 
 Supported Prisma operations: `increment`, `decrement`, `multiply`, `divide`, `set`, `push`
 
+### Tombstones skip the rules
+
+A write that only sets `deletedAt` to a date (plus `updatedAt`), directly or as `{ set }`, is not validated, whether it comes through `update` or the soft-delete cascade's `updateManyAndReturn`. Deleting a row changes nothing the rules describe. Without the skip, a row written before a rule existed could never be deleted, and neither could anything whose cascade reaches it. Reviving a row (`deletedAt: null` or `{ set: null }`, which the cascade also reads as a revive through `writtenDeletedAt`) and a tombstone that changes any other field are validated as usual (`apps/api/src/hooks/rules/hook.test.ts`, "tombstones").
+
 ### Recursive Validation
 
 Create operations validate nested creates recursively:

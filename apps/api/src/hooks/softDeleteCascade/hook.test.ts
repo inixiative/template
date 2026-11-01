@@ -62,6 +62,19 @@ describe('softDeleteCascade hook', () => {
     expect((await contactById(contact.id))?.deletedAt).toBeNull();
   });
 
+  it('a revive written as a set operation restores the subtree too', async () => {
+    const { org, space, contact } = await makeTree();
+
+    await tombstoneOrg(org.id);
+    await db.organization.updateManyAndReturn({
+      where: { id: org.id, deletedAt: { not: null } },
+      data: { deletedAt: { set: null } },
+    });
+
+    expect((await spaceById(space.id))?.deletedAt).toBeNull();
+    expect((await contactById(contact.id))?.deletedAt).toBeNull();
+  });
+
   it('a child deleted independently keeps its own timestamp and stays dead through revive', async () => {
     const { org, space, contact } = await makeTree();
     const { entity: survivor } = await createContact(
