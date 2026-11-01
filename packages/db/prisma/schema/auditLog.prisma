@@ -7,19 +7,19 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   // Actor — who made the change
-  actorUserId         String?      @db.VarChar(36)
-  actorUser           User?        @relation("AuditLogActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
-  actorSpoofUserId    String?      @db.VarChar(36)
-  actorSpoofUser      User?        @relation("AuditLogActorSpoofUser", fields: [actorSpoofUserId], references: [id], onDelete: SetNull)
-  actorTokenId        String?      @db.VarChar(36)
-  actorToken          Token?       @relation("AuditLogActorToken", fields: [actorTokenId], references: [id], onDelete: SetNull)
-  actorJobName        String?
-  actorIntegrationId  String?      @db.VarChar(36)
-  actorIntegration    Integration? @relation("AuditLogOriginIntegration", fields: [actorIntegrationId], references: [id], onDelete: SetNull)
+  actorUserId        String?      @db.VarChar(36)
+  actorUser          User?        @relation("AuditLogActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorSpoofUserId   String?      @db.VarChar(36)
+  actorSpoofUser     User?        @relation("AuditLogActorSpoofUser", fields: [actorSpoofUserId], references: [id], onDelete: SetNull)
+  actorTokenId       String?      @db.VarChar(36)
+  actorToken         Token?       @relation("AuditLogActorToken", fields: [actorTokenId], references: [id], onDelete: SetNull)
+  actorJobName       String?
+  actorIntegrationId String?      @db.VarChar(36)
+  actorIntegration   Integration? @relation("AuditLogOriginIntegration", fields: [actorIntegrationId], references: [id], onDelete: SetNull)
   // Non-PII snapshot of deletable actors (the acting token and its chain); survives SetNull on the FKs above
-  actor               Json?
-  ipAddress           String?
-  userAgent           String?
+  actor              Json?
+  ipAddress          String?
+  userAgent          String?
 
   // What happened
   action       AuditAction

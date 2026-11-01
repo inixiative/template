@@ -676,7 +676,7 @@ Every bulk hook is O(scopes), not O(rows). Importing a 1000-row CSV of Contacts 
 
 ### Cache invalidation
 
-Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `HOOK_IGNORE_FIELDS` (auto-composed from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook queues per-row cache invalidation on commit using the same `fetchCacheKeys` + `clearKey` primitives the cache hook uses. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
+Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `HOOK_IGNORE_FIELDS` (auto-composed from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook queues per-row cache invalidation on commit through `queueCacheClear` (`apps/api/src/hooks/cache/queueCacheClear.ts`), the same call the cache hook makes. Anything else that changes rows outside the lifecycle (a key change that reaches rows by `ON UPDATE CASCADE`) uses it too. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
 
 ### Scope strictness
 

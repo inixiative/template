@@ -3,8 +3,11 @@
  * @kind hook
  * @partOf infrastructure:prisma
  */
+
+import type { Prisma } from '@template/db';
 import { DbAction, HookTiming, registerDbHook } from '@template/db';
-import { extractRows, queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
+import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
+import { extractRows } from '#/hooks/orderedList/utils';
 import { applyOrderedListBatchCreate, applyOrderedListCreate } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListCreateHook = () => {
@@ -21,7 +24,7 @@ export const registerOrderedListCreateHook = () => {
           : rows.length === 1
             ? await applyOrderedListCreate(model, rows[0]!)
             : [];
-      queueOrderedListCacheInvalidation(model, affected);
+      queueCacheClear(model as Prisma.ModelName, affected);
     },
   );
 };

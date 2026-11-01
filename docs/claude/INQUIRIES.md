@@ -299,9 +299,21 @@ const { role } = resolvedContent; // always from original inquiry.content
 | `inviteOrganizationUser` | Organization | User | `targeted` | 30 days | Creates `OrganizationUser`, or revives the user's removed one (`revive`) with the invited role |
 | `createSpace` | Organization | admin | — | 90 days | Creates `Space` under source org |
 | `updateSpace` | Space | admin | `untargeted` | 90 days | Updates `Space` with content fields |
-| `transferSpace` | Space | Organization | `untargeted` | 30 days | Sets `Space.organizationId` to target org |
+| `transferSpace` | Space | Organization | `untargeted` | 30 days | Moves the space and everything keyed to it into the target org; see *Transferring a space* |
 
 All four handlers return `autoApprove: async () => false` — no type currently auto-approves.
+
+### Transferring a space
+
+Approving a transfer moves the space, its members and everything downstream into the target org, in the resolution transaction. A member who already belongs to the target org keeps their membership. Every other member is removed, and their membership is kept as a tombstone in the target org, so hiring them there later brings their space membership and its rows back. Nobody becomes a live member of an org they didn't join.
+
+1. The space, its members and the users' target-org memberships are locked (`db.findForUpdate`). A target org that already has a space with the same slug refuses the transfer with a 409 (`validateSpaceSlugFree`).
+2. Every live `SpaceUser` whose user is not a live member of the target org is tombstoned, the write `spaceUserDelete` makes, so `softDeleteCascade` tombstones what they owned and deletes their tokens.
+3. Each space member with no `OrganizationUser` row in the target org gets one: role `member`, tombstoned with their space membership's stamp. Reviving it (`inviteOrganizationUser` → `revive`) revives the `SpaceUser` and its subtree through `reviveChildren`, which matches the stamp.
+4. `Space.organizationId` is set. Every row keyed to the space or a space member carries the org in a composite key (`SpaceUser`, and Integration, Token, EmailTemplate, EmailComponent, Inquiry and AuditLog rows), so one statement re-keys them all by `ON UPDATE CASCADE`; Postgres runs every cascade of a statement before it checks the keys. `spaceKeys.test.ts` (`packages/db/src/registries`) fails when a Space- or SpaceUser-owned model carries an org column outside such a key.
+5. The rows the cascade re-keyed are cleared from the cache (`clearSpaceRowCaches`, through `queueCacheClear`).
+
+The old org keeps nothing in the space, tombstones included, so reviving a membership there revives nothing in the moved space.
 
 **Send permissions by type:**
 
