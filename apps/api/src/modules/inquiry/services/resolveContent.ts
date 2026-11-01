@@ -13,13 +13,11 @@ export const resolveContent = (
   resolution: Record<string, unknown>,
   resolutionInputSchema: z.ZodTypeAny,
 ): Record<string, unknown> => {
-  // TODO: using .shape introspection breaks for ZodEffects (e.g. .refine()) — consider switching to
-  // parsing the resolution against the schema and using the parsed keys as the allowlist instead.
-  const shape = (resolutionInputSchema as { shape?: z.ZodRawShape }).shape ?? {};
-  const allowedOverrideKeys = Object.keys(shape).filter((k) => !RESOLUTION_METADATA_KEYS.has(k));
-
+  const parsed = resolutionInputSchema.parse(resolution) as Record<string, unknown>;
   const overrides = Object.fromEntries(
-    Object.entries(resolution).filter(([key]) => allowedOverrideKeys.includes(key)),
+    Object.keys(resolution)
+      .filter((key) => key in parsed && !RESOLUTION_METADATA_KEYS.has(key))
+      .map((key) => [key, parsed[key]]),
   );
   return { ...content, ...overrides };
 };
