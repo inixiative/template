@@ -18,5 +18,6 @@ export * from './ignoreFields';
 export * from './materializedIds';
 export * from './orderedList';
 export * from './redactFields';
+export * from './skipRevive';
 export * from './softDeleteModels';
 export * from './webhook';

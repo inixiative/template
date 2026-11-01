@@ -11,7 +11,10 @@ import {
   createWebhookSubscription,
 } from '@template/db/test';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-import { deleteBehaviorViolations } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
+import {
+  deleteBehaviorViolations,
+  skipReviveViolations,
+} from '#/hooks/softDeleteCascade/validateDeleteBehavior';
 
 registerSoftDeleteCascadeHook();
 
@@ -112,6 +115,32 @@ describe('validateDeleteBehavior', () => {
 
   it('refuses a model that is not in the schema', () => {
     expect(deleteBehaviorViolations(['NotAModel']).join('\n')).toContain(
+      'is not a model in the schema',
+    );
+  });
+});
+
+describe('SKIP_REVIVE validation', () => {
+  it('finds the registry consistent with the schema', () => {
+    expect(skipReviveViolations()).toEqual([]);
+  });
+
+  it('accepts a soft-deleted model', () => {
+    expect(skipReviveViolations(['Tag'])).toEqual([]);
+  });
+
+  it('refuses a model that is hard-deleted on tombstone', () => {
+    expect(skipReviveViolations(['Token']).join('\n')).toContain(
+      'both SKIP_REVIVE and HARD_DELETE_ON_TOMBSTONE',
+    );
+  });
+
+  it('refuses a model with no deletedAt column', () => {
+    expect(skipReviveViolations(['AuditLog']).join('\n')).toContain('has no deletedAt column');
+  });
+
+  it('refuses a model that is not in the schema', () => {
+    expect(skipReviveViolations(['NotAModel']).join('\n')).toContain(
       'is not a model in the schema',
     );
   });
