@@ -3,7 +3,6 @@ import {
   DbAction,
   type HookOptions,
   HookTiming,
-  isCleared,
   isPrismaNull,
   type ModelName,
   materializedColumns,
@@ -40,15 +39,6 @@ const validateRules = (data: Record<string, unknown>, model: ModelName): void =>
     });
 };
 
-const tombstoneFields = new Set(['deletedAt', 'updatedAt']);
-
-export const writtenDeletedAt = (data: Record<string, unknown>): unknown =>
-  shadowMerge(undefined, { deletedAt: data.deletedAt }).deletedAt;
-
-const isTombstone = (data: Record<string, unknown>): boolean =>
-  !isCleared(writtenDeletedAt(data)) &&
-  Object.keys(data).every((field) => tombstoneFields.has(field));
-
 const processCreateArgs = (args: unknown, model: ModelName): void => {
   const data = (args as Record<string, unknown>)?.data ?? (args as Record<string, unknown>)?.create;
   if (!data || typeof data !== 'object') return;
@@ -70,7 +60,7 @@ const processUpdateArgs = (
 ): void => {
   const data = ((args as Record<string, unknown>)?.data ??
     (args as Record<string, unknown>)?.update) as Record<string, unknown> | undefined;
-  if (data && typeof data === 'object' && !Array.isArray(data) && !isTombstone(data))
+  if (data && typeof data === 'object' && !Array.isArray(data))
     validateRules(shadowMerge(previous, data), model);
 };
 
@@ -105,11 +95,9 @@ export const registerRulesHook = () => {
     models,
     HookTiming.after,
     [DbAction.updateManyAndReturn],
-    async ({ model, args, result }) => {
+    async ({ model, result }) => {
       const rule = getRule(model);
       if (rule === true) return;
-      const data = (args as { data?: Record<string, unknown> })?.data;
-      if (data && isTombstone(data)) return;
 
       for (const record of result as Record<string, unknown>[]) {
         validateRules(record, model);
