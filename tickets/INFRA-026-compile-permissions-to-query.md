@@ -37,6 +37,7 @@ The same compiled rules answer the reverse question too, *"who can read this rec
 3. **Bridges** — accept the cross-map degradation (prefetch far ids / `check()`-fallback), since a bridged grant can't be one query. Where exactly does the compiler signal "this hop is not compilable" (like `toSql`'s `sql: null` + `error`)?
 4. **Per-record `permissionRules` overrides** — the row-level additive grants: do they compile (an `OR` with the row's stored rule) or stay eval-only? They're the one part that's data-dependent per row.
 5. **Cycle handling at compile time** vs. the eval's object-identity WeakMap.
+6. **Negation in schema rules.** Tentative ruling (Aron, 2026-10-31): schema rules may negate (e.g. "not your own login contact"); stored rules must be positive. "If we end up needing to make this a harder rule for the condition to Prisma chain, maybe we'll do it there." Decide when compiling: does a negated schema condition compile cleanly, or must schemas go positive too?
 
 ## Not in scope
 
