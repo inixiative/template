@@ -18,7 +18,6 @@ import {
 } from '@template/db/test';
 import { app } from '#/app';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
 type Headers = Record<string, string>;
@@ -44,7 +43,6 @@ const rows: Record<string, string> = {};
 
 beforeAll(async () => {
   registerClearCacheHook();
-  registerMemberSelfGrantHook();
   ({ entity: organization } = await createOrganization());
   ({ entity: space } = await createSpace({}, { organization }));
 
@@ -94,7 +92,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   unregisterDbHook('clearCache');
-  unregisterDbHook('memberSelfGrant');
   await cleanupTouchedTables(db);
 });
 

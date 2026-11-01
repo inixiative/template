@@ -495,7 +495,7 @@ A viewer member's token naming `manage` on O1 reads it and does not manage it; a
 
 ### Integrations Are Delegates
 
-An integration has a nullable `role`, `full` and `entitlements`, held over its owner (a user, a member or a tenant), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:delegatedKeys` hook; the keys are tenancy, for scans, list routes, revocation and rate-limit buckets. An integration acts only through its tokens (`integrationDelegate.test.ts`, `packages/permissions/src/rebac/delegation.test.ts`).
+An integration has a nullable `role`, `full` and `entitlements`, held over its owner (a user, a member or a tenant), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:delegatedKeys` hook; the keys are tenancy, for scans, revocation and rate-limit buckets. It is listed only under its integration (`/integration/:id/tokens`), never in its tenant's list. An integration acts only through its tokens (`integrationDelegate.test.ts`, `packages/permissions/src/rebac/delegation.test.ts`).
 
 ### An Integration's Role
 

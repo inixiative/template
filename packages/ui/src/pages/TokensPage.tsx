@@ -41,7 +41,9 @@ type TokenSectionProps = {
 };
 
 const TokenSection = ({ context, scope, title, description, sectionKey }: TokenSectionProps) => {
-  const [isModalOpen, setIsModalOpen] = useSectionOpen(`create-token-${sectionKey}`);
+  const [isModalOpen, setIsModalOpen] = useSectionOpen(
+    sectionKey === 'member' ? 'create-token-member' : 'create-token',
+  );
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const tokenQueries = tokenContextQueries(context, scope);
 
