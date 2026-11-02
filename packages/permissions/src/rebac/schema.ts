@@ -9,6 +9,7 @@ import { ContactSource, InquiryType } from '@template/db/generated/client/enums'
 import {
   actorIsDelegateOfUser,
   actorIsUser,
+  administeredByOwnerKind,
   chainedStandardActions,
   createdByItsUserOrManager,
   highRoles,
@@ -106,6 +107,7 @@ export const rebacSchema: RebacSchema = {
       }),
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
+    'db:project': { actions: administeredByOwnerKind },
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:organizationUser': { actions: memberRowActions('organization') },

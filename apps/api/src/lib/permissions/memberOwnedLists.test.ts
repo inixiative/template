@@ -12,6 +12,7 @@ import {
   createIntegration,
   createOrganization,
   createOrganizationUser,
+  createProject,
   createSpace,
   createSpaceUser,
   createToken,
@@ -76,6 +77,23 @@ beforeAll(async () => {
   rows.organizationIntegration = (
     await createIntegration({ ...at, ownerModel: 'Organization' })
   ).entity.id;
+  rows.memberProject = (
+    await createProject({
+      name: 'Mine',
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: member.userId,
+    })
+  ).entity.id;
+  rows.spaceMemberProject = (
+    await createProject({
+      name: 'Mine in the space',
+      ownerModel: 'SpaceUser',
+      organizationId: organization.id,
+      spaceId: space.id,
+      userId: spaceMember.userId,
+    })
+  ).entity.id;
   rows.memberToken = (
     await createToken(
       { ownerModel: 'OrganizationUser' },
@@ -111,6 +129,8 @@ describe("a member's own rows are listed under the member, and only there", () =
     ['organization member tokens', () => `/organizationUser/${member.id}/tokens`],
     ['space member integrations', () => `/spaceUser/${spaceMember.id}/integrations`],
     ['space member tokens', () => `/spaceUser/${spaceMember.id}/tokens`],
+    ['organization member projects', () => `/organizationUser/${member.id}/projects`],
+    ['space member projects', () => `/spaceUser/${spaceMember.id}/projects`],
   ] as const) {
     it(`${label}: the member and the organization's owner read them; an admin, another member and an outsider can't`, async () => {
       expect(await whoCanList(path())).toEqual({
@@ -134,6 +154,8 @@ describe("a member's own rows are listed under the member, and only there", () =
       rows.spaceMemberIntegration,
     ]);
     expect(await ids(`/spaceUser/${spaceMember.id}/tokens`)).toEqual([rows.spaceMemberToken]);
+    expect(await ids(`/organizationUser/${member.id}/projects`)).toEqual([rows.memberProject]);
+    expect(await ids(`/spaceUser/${spaceMember.id}/projects`)).toEqual([rows.spaceMemberProject]);
   });
 });
 
@@ -204,6 +226,28 @@ describe('a member mints tokens as themselves', () => {
       expect(await mint(callers['organization admin'])).toBe(403);
       expect(await mint(callers.anotherMember)).toBe(403);
       expect(await mint(callers.outsider)).toBe(403);
+    });
+  }
+});
+
+describe('a member creates projects as themselves', () => {
+  for (const [label, path] of [
+    ['organization member', () => `/organizationUser/${member.id}/projects`],
+    ['space member', () => `/spaceUser/${spaceMember.id}/projects`],
+  ] as const) {
+    it(`${label}: the member creates one; an admin, another member and an outsider can't`, async () => {
+      const create = async (headers: Headers, name: string) =>
+        (
+          await app.request(`/api/v1${path()}`, {
+            method: 'POST',
+            headers: { ...headers, 'content-type': 'application/json' },
+            body: JSON.stringify({ name }),
+          })
+        ).status;
+      expect(await create(callers.member, `Mine as ${label}`)).toBe(201);
+      expect(await create(callers['organization admin'], 'From an admin')).toBe(403);
+      expect(await create(callers.anotherMember, 'From another member')).toBe(403);
+      expect(await create(callers.outsider, 'From an outsider')).toBe(403);
     });
   }
 });
