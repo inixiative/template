@@ -41,12 +41,14 @@ export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
     const members = await db.withDeleted(() =>
       db.spaceUser.findMany({ where: { spaceId }, select: { userId: true } }),
     );
+    // why: the space membership's key needs this row; a stamp no space membership carries keeps a hire from reviving them.
+    const keyHeldAt = new Date(transferredAt.getTime() - 1);
     await db.organizationUser.createManyAndReturn({
       data: members.map(({ userId }) => ({
         organizationId,
         userId,
         role: Role.member,
-        deletedAt: transferredAt,
+        deletedAt: keyHeldAt,
       })),
       skipDuplicates: true,
     });

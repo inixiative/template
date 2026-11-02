@@ -324,7 +324,7 @@ describe('handler: transferSpace', () => {
       expect(await db.token.findUnique({ where: { id: dropped.token.id } })).toBeNull();
     });
 
-    it('gives each space member without one a tombstoned target membership that revives only what the transfer removed', async () => {
+    it('gives each space member without one a tombstoned target membership whose stamp no space membership carries', async () => {
       const memberships = await withDeleted(() =>
         db.organizationUser.findMany({
           where: {
@@ -341,7 +341,7 @@ describe('handler: transferSpace', () => {
         ).deletedAt!.getTime();
       expect(memberships).toHaveLength(3);
       expect(memberships.every((membership) => membership.role === 'member')).toBe(true);
-      expect(stampOf(dropped.user.id)).toBe(await spaceStampOf(dropped.spaceUser.id));
+      expect(stampOf(dropped.user.id)).not.toBe(await spaceStampOf(dropped.spaceUser.id));
       expect(stampOf(leftOldOrg.user.id)).not.toBe(await spaceStampOf(leftOldOrg.spaceUser.id));
       expect(stampOf(removedEarlier.user.id)).not.toBe(removedEarlierAt.getTime());
     });
@@ -415,22 +415,29 @@ describe('handler: transferSpace', () => {
       expect(await db.project.findUnique({ where: { id: leftOldOrg.project.id } })).toBeNull();
     });
 
-    it('reviving the target-org membership brings their space membership and its rows back', async () => {
+    it('hiring a removed member into the target org revives their org membership only; the space is a manual re-add', async () => {
+      const removed = await withDeleted(() =>
+        db.spaceUser.findUniqueOrThrow({ where: { id: dropped.spaceUser.id } }),
+      );
+
       expect((await inviteBack(targetOrg1, dropped.user)).status).toBe(200);
 
-      const live = { organizationId: targetOrg1.id, deletedAt: null };
       expect(
-        await db.spaceUser.findUniqueOrThrow({ where: { id: dropped.spaceUser.id } }),
-      ).toMatchObject(live);
+        await db.organizationUser.findFirst({
+          where: { organizationId: targetOrg1.id, userId: dropped.user.id },
+        }),
+      ).toMatchObject({ deletedAt: null });
+      const tombstoned = { organizationId: targetOrg1.id, deletedAt: removed.deletedAt };
       expect(
-        await db.integration.findUniqueOrThrow({ where: { id: dropped.integration.id } }),
-      ).toMatchObject(live);
+        await withDeleted(() =>
+          db.spaceUser.findUniqueOrThrow({ where: { id: dropped.spaceUser.id } }),
+        ),
+      ).toMatchObject(tombstoned);
       expect(
-        await db.emailTemplate.findUniqueOrThrow({ where: { id: dropped.emailTemplate.id } }),
-      ).toMatchObject(live);
-      expect(
-        await db.project.findUniqueOrThrow({ where: { id: dropped.project.id } }),
-      ).toMatchObject(live);
+        await withDeleted(() =>
+          db.project.findUniqueOrThrow({ where: { id: dropped.project.id } }),
+        ),
+      ).toMatchObject(tombstoned);
     });
   });
 
