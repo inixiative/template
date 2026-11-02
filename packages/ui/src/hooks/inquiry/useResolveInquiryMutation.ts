@@ -14,16 +14,17 @@ import { targetMutations } from '@template/ui/lib/inquiries/queryKeys';
 type ResolveVars = {
   inquiry: InquiryMeta;
   status: InquiryResolutionStatus;
+  resolution?: Record<string, unknown>;
 };
 
 export const useResolveInquiryMutation = () => {
   const applyResolutionEffects = useInquiryResolutionEffects();
 
   return useOptimisticMutation<unknown, Error, ResolveVars>({
-    mutationFn: apiMutation(({ inquiry, status }: ResolveVars) =>
+    mutationFn: apiMutation(({ inquiry, status, resolution }: ResolveVars) =>
       inquiryResolve({
         path: { id: inquiry.id },
-        body: { status, expectedUpdatedAt: inquiry.updatedAt },
+        body: { ...resolution, status, expectedUpdatedAt: inquiry.updatedAt },
       }),
     ),
     targets: ({ inquiry, status }) =>

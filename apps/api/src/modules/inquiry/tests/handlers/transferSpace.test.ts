@@ -140,11 +140,16 @@ describe('handler: transferSpace', () => {
       })
     ).entity;
 
-  const resolve = (inquiry: { id: string; updatedAt: Date }, status: 'approved' | 'denied') =>
+  const resolve = (
+    inquiry: { id: string; updatedAt: Date },
+    status: 'approved' | 'denied',
+    resolution: { slug?: string } = {},
+  ) =>
     adminFetch(
       post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         status,
+        ...resolution,
       }),
     );
 
@@ -442,6 +447,37 @@ describe('handler: transferSpace', () => {
     expect(
       await db.spaceUser.findUniqueOrThrow({ where: { id: member.spaceUser.id } }),
     ).toMatchObject({ organizationId: org.id, deletedAt: null });
+  });
+
+  it('an approver renames a space whose slug the target org already holds', async () => {
+    const { entity: freshSpace } = await createSpace({}, { organization: org });
+    await createSpace({ slug: freshSpace.slug }, { organization: targetOrg2 });
+    const slug = `${freshSpace.slug}-moved`;
+
+    const response = await resolve(await transferInquiry(freshSpace, targetOrg2), 'approved', {
+      slug,
+    });
+
+    expect(response.status).toBe(200);
+    expect(await db.space.findUniqueOrThrow({ where: { id: freshSpace.id } })).toMatchObject({
+      organizationId: targetOrg2.id,
+      slug,
+    });
+  });
+
+  it('refuses a rename onto a slug the target org already holds', async () => {
+    const { entity: freshSpace } = await createSpace({}, { organization: org });
+    const { entity: taken } = await createSpace({}, { organization: targetOrg2 });
+
+    const response = await resolve(await transferInquiry(freshSpace, targetOrg2), 'approved', {
+      slug: taken.slug,
+    });
+
+    expect(response.status).toBe(409);
+    expect(await db.space.findUniqueOrThrow({ where: { id: freshSpace.id } })).toMatchObject({
+      organizationId: org.id,
+      slug: freshSpace.slug,
+    });
   });
 
   it('deny changes nothing', async () => {
