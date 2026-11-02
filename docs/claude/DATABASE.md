@@ -333,6 +333,8 @@ userId String @db.VarChar(36)
 
 Always `@db.VarChar(36)` on FK fields.
 
+A row keyed to a space or a space member reaches it through a composite key that carries the organization: `Space` by `(organizationId, spaceId)` → `(organizationId, id)`, `SpaceUser` by `(organizationId, spaceId, userId)`, `OrganizationUser` by `(organizationId, userId)`. The organization is part of the row's tenancy, so a space transfer re-keys all of it in one statement by `ON UPDATE CASCADE` (INQUIRIES.md, *Transferring a space*). `packages/db/src/registries/spaceKeys.test.ts` fails when a Space- or SpaceUser-owned model carries the org outside such a key.
+
 ### DateTime Fields
 
 ```prisma

@@ -21,7 +21,12 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
-import { type AtlasConfigInput, type ConceptRegistry, parseAtlasBlock } from '@inixiative/atlas';
+import {
+  type AtlasConfigInput,
+  COMMENT_STYLES,
+  type ConceptRegistry,
+  parseAtlasBlock,
+} from '@inixiative/atlas';
 import { slugify } from '../../../docs/regenToc';
 
 const ROOT = process.cwd();
@@ -401,7 +406,7 @@ const conceptWarnings = async (): Promise<string[]> => {
   const byConcept = new Map<string, string[]>();
   for (const file of changed) {
     if (isDoc(file) || !/\.(ts|tsx)$/.test(file) || !existsSync(join(ROOT, file))) continue;
-    const block = parseAtlasBlock(readFileSync(join(ROOT, file), 'utf8'));
+    const block = parseAtlasBlock(readFileSync(join(ROOT, file), 'utf8'), COMMENT_STYLES.c);
     for (const concept of block?.partOf ?? [])
       byConcept.set(concept, [...(byConcept.get(concept) ?? []), file]);
   }

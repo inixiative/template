@@ -1,3 +1,4 @@
+import type { Prisma } from '@template/db';
 import {
   DbAction,
   type HookOptions,
@@ -5,7 +6,7 @@ import {
   registerDbHook,
   type SingleAction,
 } from '@template/db';
-import { queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
+import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { applyOrderedListUpdate } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListUpdateHook = () => {
@@ -24,7 +25,7 @@ export const registerOrderedListUpdateHook = () => {
         data,
         previous as Record<string, unknown>,
       );
-      queueOrderedListCacheInvalidation(model, affected);
+      queueCacheClear(model as Prisma.ModelName, affected);
     },
   );
 };

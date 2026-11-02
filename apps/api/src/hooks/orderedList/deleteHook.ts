@@ -1,3 +1,4 @@
+import type { Prisma } from '@template/db';
 import {
   DbAction,
   type HookOptions,
@@ -6,7 +7,7 @@ import {
   registerDbHook,
 } from '@template/db';
 import { castArray } from 'lodash-es';
-import { queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
+import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { applyOrderedListHardDelete } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListDeleteHook = () => {
@@ -20,7 +21,7 @@ export const registerOrderedListDeleteHook = () => {
       if (!previous) return;
       const rows = castArray(previous);
       const affected = await applyOrderedListHardDelete(model, rows as Record<string, unknown>[]);
-      queueOrderedListCacheInvalidation(model, affected);
+      queueCacheClear(model as Prisma.ModelName, affected);
     },
   );
 };
