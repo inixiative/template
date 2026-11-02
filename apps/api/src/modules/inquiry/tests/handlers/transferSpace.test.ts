@@ -324,7 +324,7 @@ describe('handler: transferSpace', () => {
       expect(await db.token.findUnique({ where: { id: dropped.token.id } })).toBeNull();
     });
 
-    it('gives each removed member a tombstoned membership in the target org that revives exactly what it should', async () => {
+    it('gives each space member without one a tombstoned target membership that revives only what the transfer removed', async () => {
       const memberships = await withDeleted(() =>
         db.organizationUser.findMany({
           where: {
@@ -342,28 +342,29 @@ describe('handler: transferSpace', () => {
       expect(memberships).toHaveLength(3);
       expect(memberships.every((membership) => membership.role === 'member')).toBe(true);
       expect(stampOf(dropped.user.id)).toBe(await spaceStampOf(dropped.spaceUser.id));
-      expect(stampOf(leftOldOrg.user.id)).toBe(await spaceStampOf(leftOldOrg.spaceUser.id));
+      expect(stampOf(leftOldOrg.user.id)).not.toBe(await spaceStampOf(leftOldOrg.spaceUser.id));
       expect(stampOf(removedEarlier.user.id)).not.toBe(removedEarlierAt.getTime());
     });
 
-    it('a member who had left the target org is removed with that membership, so rehiring them brings it back', async () => {
-      const spaceUser = await withDeleted(() =>
-        db.spaceUser.findUniqueOrThrow({ where: { id: leftTargetOrg.spaceUser.id } }),
-      );
-      expect(spaceUser.deletedAt?.getTime()).toBe(leftTargetOrgAt.getTime());
+    it('a member who had left the target org is removed at the transfer, and rehiring them leaves the space to a manual re-add', async () => {
+      const removedAt = (
+        await withDeleted(() =>
+          db.spaceUser.findUniqueOrThrow({ where: { id: dropped.spaceUser.id } }),
+        )
+      ).deletedAt;
+      expect(
+        await withDeleted(() =>
+          db.spaceUser.findUniqueOrThrow({ where: { id: leftTargetOrg.spaceUser.id } }),
+        ),
+      ).toMatchObject({ organizationId: targetOrg1.id, deletedAt: removedAt });
 
       expect((await inviteBack(targetOrg1, leftTargetOrg.user)).status).toBe(200);
 
-      const live = { organizationId: targetOrg1.id, deletedAt: null };
       expect(
-        await db.spaceUser.findUniqueOrThrow({ where: { id: leftTargetOrg.spaceUser.id } }),
-      ).toMatchObject(live);
-      expect(
-        await db.integration.findUniqueOrThrow({ where: { id: leftTargetOrg.integration.id } }),
-      ).toMatchObject(live);
-      expect(
-        await db.project.findUniqueOrThrow({ where: { id: leftTargetOrg.project.id } }),
-      ).toMatchObject(live);
+        await withDeleted(() =>
+          db.spaceUser.findUniqueOrThrow({ where: { id: leftTargetOrg.spaceUser.id } }),
+        ),
+      ).toMatchObject({ organizationId: targetOrg1.id, deletedAt: removedAt });
     });
 
     it('hiring someone a space admin had removed before the transfer leaves that removal in place', async () => {

@@ -7,7 +7,6 @@ import {
   transferSpaceContentSchema,
   transferSpaceResolutionInputSchema,
 } from '@template/shared/inquiry';
-import { groupBy } from 'lodash-es';
 import { emitAppEvent } from '#/appEvents/emit';
 import { clearSpaceRowCaches } from '#/modules/inquiry/handlers/transferSpace/clearSpaceRowCaches';
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
@@ -31,55 +30,26 @@ export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
     const slug = content.slug ?? space!.slug;
     await validateSpaceSlugFree({ organizationId, slug });
 
-    const users = await db.withDeleted(() =>
-      db.user.findMany({
-        where: {
-          spaceUsers: { some: { spaceId } },
-          organizationUsers: { none: { organizationId, deletedAt: null } },
-        },
-        select: {
-          id: true,
-          spaceUsers: { where: { spaceId }, select: { deletedAt: true } },
-          organizationUsers: {
-            where: { organizationId: { in: [organizationId, space!.organizationId] } },
-            select: { organizationId: true, deletedAt: true },
-          },
-        },
-      }),
-    );
-    const leaving = users.map(({ id, spaceUsers, organizationUsers }) => ({
-      userId: id,
-      spaceUser: spaceUsers[0]!,
-      target: organizationUsers.find((member) => member.organizationId === organizationId),
-      source: organizationUsers.find((member) => member.organizationId === space!.organizationId),
-    }));
-
     const transferredAt = new Date();
-    // why: a stamp equal to a tombstoned target membership's makes rehiring them revive this space membership.
-    const removals = groupBy(
-      leaving.filter(({ spaceUser }) => !spaceUser.deletedAt),
-      ({ target }) => (target?.deletedAt ?? transferredAt).toISOString(),
+    await db.spaceUser.updateManyAndReturn({
+      where: {
+        spaceId,
+        user: { organizationUsers: { none: { organizationId, deletedAt: null } } },
+      },
+      data: { deletedAt: transferredAt },
+    });
+    const members = await db.withDeleted(() =>
+      db.spaceUser.findMany({ where: { spaceId }, select: { userId: true } }),
     );
-    for (const [stamp, group] of Object.entries(removals))
-      await db.spaceUser.updateManyAndReturn({
-        where: { spaceId, userId: { in: group.map(({ userId }) => userId) } },
-        data: { deletedAt: new Date(stamp) },
-      });
-
-    // why: a stamp equal to the space membership's makes reviving this membership revive it; transferredAt matches nothing.
-    const newMemberships = leaving
-      .filter(({ target }) => !target)
-      .map(({ userId, spaceUser: { deletedAt }, source }) => ({
+    await db.organizationUser.createManyAndReturn({
+      data: members.map(({ userId }) => ({
         organizationId,
         userId,
         role: Role.member,
-        deletedAt:
-          deletedAt && source?.deletedAt?.getTime() === deletedAt.getTime()
-            ? deletedAt
-            : transferredAt,
-      }));
-    if (newMemberships.length)
-      await db.organizationUser.createManyAndReturn({ data: newMemberships });
+        deletedAt: transferredAt,
+      })),
+      skipDuplicates: true,
+    });
 
     await clearSpaceRowCaches(spaceId, organizationId);
     const moved = await db.space.update({ where: { id: spaceId }, data: { organizationId, slug } });
