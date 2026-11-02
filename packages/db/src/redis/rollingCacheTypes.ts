@@ -98,7 +98,8 @@ export type RollingCacheComputeContext<TResults extends RollingCacheResults<neve
 // the spread plus every attempt of a leaf and the backoff between them, so a target's next leaf has
 // made its last attempt at most the longer of an interval and a pass, plus a tick, plus a pass after
 // its entry was written. `ttlSeconds` must be longer than that, so a target whose leaf fails every
-// attempt keeps its last good value through every attempt of the next pass.
+// attempt keeps its last good value through every attempt of the next pass. Time a job spends waiting
+// in the queue (a busy worker, a slow-lane slot, stall recovery) is not in the bound.
 export type RollingCacheConfig<TTarget, TResults extends RollingCacheResults<TTarget>> = {
   name: string;
   intervalSeconds: number;

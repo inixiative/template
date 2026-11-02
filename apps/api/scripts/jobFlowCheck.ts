@@ -320,13 +320,22 @@ const main = async (): Promise<void> => {
       count('rollingCacheCompute', rollingCacheName),
     );
     await waitUntil('rolling cache pass closes', async () => (await branchState()) === undefined);
+    check(
+      'rolling cache: no second pass ran while the first was open',
+      count('rollingCacheCompute', rollingCacheName) === 1,
+      count('rollingCacheCompute', rollingCacheName),
+    );
     await coordinateOnce();
     await waitUntil(
       'next rolling cache pass starts',
       () => count('rollingCacheCompute', rollingCacheName) > 1,
     );
+    await waitUntil(
+      'next rolling cache pass closes',
+      async () => (await branchState()) === undefined,
+    );
     check(
-      'rolling cache: the first tick after the pass closes starts the next one',
+      'rolling cache: the first tick after the pass closes starts exactly one more',
       count('rollingCacheCompute', rollingCacheName) === 2,
       count('rollingCacheCompute', rollingCacheName),
     );

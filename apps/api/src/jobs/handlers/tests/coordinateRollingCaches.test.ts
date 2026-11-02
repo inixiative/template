@@ -5,6 +5,8 @@ import {
   flushRedis,
   getRedisClient,
   makeRollingCache,
+  ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_LEAF_BACKOFF_SECONDS,
   ROLLING_CACHE_TICK_SECONDS,
   unregisterRollingCache,
 } from '@template/db';
@@ -12,6 +14,7 @@ import { cleanupTouchedTables, createOrganization, createSpace } from '@template
 import { WaitingChildrenError } from 'bullmq';
 import { coordinateRollingCaches } from '#/jobs/handlers/coordinateRollingCaches';
 import { refreshRollingCache } from '#/jobs/handlers/refreshRollingCache';
+import { queue } from '#/jobs/queue';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
 import { createTestWorker } from '#tests/createTestWorker';
 
@@ -126,7 +129,9 @@ describe('coordinateRollingCaches', () => {
     );
   });
 
-  it('a tick while a pass is still running does not start another, and the next pass runs once it closes', async () => {
+  // Inline the leaf runs inside the stage, so this is the singleton lock at work; the deduplication that
+  // guards a parked branch under a worker is checked against real Redis by jobFlowCheck.
+  it('the singleton lock skips a second branch while a pass is running inline', async () => {
     const name = uniqueName('Overlap');
     const { entity: acme } = await createOrganization();
     await createSpace({ name: `${name} a` }, { organization: acme });
@@ -135,19 +140,23 @@ describe('coordinateRollingCaches', () => {
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
+    let started = () => {};
+    const isStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
     makeSpaceCountCache(
       name,
       () => '',
       0,
       async () => {
         computes += 1;
+        started();
         if (computes === 1) await held;
       },
     );
 
     const firstPass = coordinate('firstTick');
-    while (computes === 0) await Bun.sleep(5);
-    await makeDue(name);
+    await Promise.race([isStarted, firstPass]);
     await coordinate('secondTick');
     expect(computes).toBe(1);
 
@@ -156,6 +165,18 @@ describe('coordinateRollingCaches', () => {
     await makeDue(name);
     await coordinate('thirdTick');
     expect(computes).toBe(2);
+  });
+
+  it('validates ttl against the queue’s real leaf attempts and retry backoff', () => {
+    const { attempts, backoff } = queue.defaultJobOptions;
+    const { delay } = backoff as { type: string; delay: number };
+    const backoffMs = Array.from({ length: (attempts ?? 1) - 1 }, (_, retry) => delay * 2 ** retry);
+
+    expect(attempts).toBe(ROLLING_CACHE_LEAF_ATTEMPTS);
+    expect(backoff).toMatchObject({ type: 'exponential' });
+    expect(backoffMs.reduce((sum, ms) => sum + ms, 0) / 1000).toBe(
+      ROLLING_CACHE_LEAF_BACKOFF_SECONDS,
+    );
   });
 
   it('spaces a cache’s leaves across its spread, so only the first starts at once', async () => {

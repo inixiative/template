@@ -16,10 +16,11 @@ export type RefreshRollingCachePayload = { name: string };
 // pass is due one interval after this one started, however long its leaves take. The branch then waits
 // in `waiting-children`, holding no worker slot, until every leaf has reported.
 //
-// The timer is set in the stage, after the leaves are added: the stage runs once per pass (its index
-// lives on the job; only a worker that dies mid-stage runs it again, which re-adds the superseding
-// leaves and restarts the timer a moment later). A stage that throws sets no timer, so the cache stays
-// due and the first tick after this branch fails starts another.
+// The timer is set in the stage, after the leaves are added. Once the stage has completed it never runs
+// again (its index lives on the job). A stage that throws, or a worker that dies in it, runs it again
+// on the branch's retry while its deduplication id still holds: that re-adds the superseding leaves
+// and restarts the timer a moment later. A stage that never gets as far as the timer sets none, so the
+// cache stays due and the first tick after the branch has finally failed starts another.
 //
 // Another branch for the same cache cannot start while this one is open: it is added with the
 // singleton's deduplication id, which holds while the branch is parked, and the lock guards each step
