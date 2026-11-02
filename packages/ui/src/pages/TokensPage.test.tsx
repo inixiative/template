@@ -16,7 +16,14 @@ import { buildOrganization, buildOrganizationUser, buildToken, buildUser } from 
 import { meReadManyTokensQueryKey } from '@template/sdk';
 import { TokensPage } from '@template/ui/pages/TokensPage';
 import { useAppStore } from '@template/ui/store';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+} from '@testing-library/react';
 
 const KEY = 'tmpl_once_only_secret';
 const initialState = useAppStore.getState();
@@ -125,7 +132,7 @@ describe('TokensPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Old token' }));
 
-    await waitFor(() => expect(screen.queryByText('Old token')).toBeNull());
+    await waitForElementToBeRemoved(() => screen.queryByText('Old token'));
     await waitFor(() =>
       expect(
         client
