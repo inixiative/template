@@ -41,7 +41,7 @@ describe('every member row carries a self-grant to operate itself, and it cannot
 
   it('a space member row is created with it', async () => {
     const { entity: space } = await createSpace({}, { organization });
-    const { entity: member } = await createSpaceUser({ role: 'member' }, { space });
+    const { entity: member } = await createSpaceUser({ role: 'member' }, { space, organization });
     const stored = await db.spaceUser.findUniqueOrThrow({ where: { id: member.id } });
     expect(stored.entitlements as unknown).toEqual([memberSelfGrant('db:spaceUser', member)]);
   });

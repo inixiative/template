@@ -1,3 +1,4 @@
+import type { Prisma } from '@template/db';
 import {
   DbAction,
   type HookOptions,
@@ -5,7 +6,7 @@ import {
   registerDbHook,
   type SingleAction,
 } from '@template/db';
-import { queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
+import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { applyOrderedListUpsert } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListUpsertHook = () => {
@@ -21,7 +22,7 @@ export const registerOrderedListUpsertHook = () => {
         args as Record<string, unknown>,
         previous as Record<string, unknown> | undefined,
       );
-      queueOrderedListCacheInvalidation(model, affected);
+      queueCacheClear(model as Prisma.ModelName, affected);
     },
   );
 };

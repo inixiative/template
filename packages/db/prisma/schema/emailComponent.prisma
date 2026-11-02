@@ -28,11 +28,13 @@ model EmailComponent {
   // For org-owned: should spaces inherit this component?
   inheritToSpaces Boolean @default(true)
 
-  organization         Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  space                Space?          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  user                 User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization         Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationUser     OrganizationUser? @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  space                Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
+  spaceUser            SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  user                 User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs            AuditLog[]
-  sourceRuleReferences RuleReference[] @relation("RuleReferenceSource")
+  sourceRuleReferences RuleReference[]   @relation("RuleReferenceSource")
 
   communicationComponentVersions CommunicationComponentVersion[]
 

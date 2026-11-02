@@ -299,9 +299,21 @@ const { role } = resolvedContent; // always from original inquiry.content
 | `inviteOrganizationUser` | Organization | User | `targeted` | 30 days | Creates `OrganizationUser`, or revives the user's removed one (`revive`) with the invited role |
 | `createSpace` | Organization | admin | — | 90 days | Creates `Space` under source org |
 | `updateSpace` | Space | admin | `untargeted` | 90 days | Updates `Space` with content fields |
-| `transferSpace` | Space | Organization | `untargeted` | 30 days | Sets `Space.organizationId` to target org |
+| `transferSpace` | Space | Organization | `untargeted` | 30 days | Moves the space and everything keyed to it into the target org; see *Transferring a space* |
 
 All four handlers return `autoApprove: async () => false` — no type currently auto-approves.
+
+### Transferring a space
+
+Approving a transfer moves the space, its members and everything downstream into the target org, in the resolution transaction. A member who already belongs to the target org keeps their membership. Every other member is removed, and their membership is kept as a tombstone in the target org, so hiring them there later brings their space membership and its rows back. Nobody becomes a live member of an org they didn't join.
+
+1. The space is locked (`db.findForUpdate`). Its slug in the target org is the resolution's `slug` when the approver gives one (a rename, merged into content by `resolveContent`), else its current slug. A slug the target org already holds, or an open `createSpace` request for it, refuses the transfer with a 409 (`validateSpaceSlugFree`, shared with `createSpace` and `updateSpace`). The target org's Review dialog offers the rename.
+2. One query reads the users leaving: space members with no live membership in the target org, with their space membership and their memberships in both orgs. Members who stay need nothing; the cascade re-keys them. Every live `SpaceUser` of a leaving user is tombstoned, the write `spaceUserDelete` makes, so `softDeleteCascade` tombstones what they owned and deletes their tokens. The stamp is the user's tombstoned target-org membership's, when they have one, and otherwise the transfer's.
+3. Each space member with no `OrganizationUser` row in the target org gets one: role `member`, tombstoned. Its stamp equals the space membership's when that membership should come back with it (removed by this transfer, or removed together with the old-org membership); otherwise it is the transfer's, which matches nothing. Reviving it (`inviteOrganizationUser` → `revive`) revives the `SpaceUser` and its subtree through `reviveChildren`, which matches the stamp. A space membership a space admin removed before the transfer stays removed.
+4. `Space.organizationId` is set. Every row keyed to the space or a space member carries the org in a composite key (`SpaceUser`; Integration, Token, EmailTemplate and EmailComponent; Inquiry and AuditLog rows keyed to a space member), so one statement re-keys them all by `ON UPDATE CASCADE`; Postgres runs every cascade of a statement before it checks the keys. `spaceKeys.test.ts` (`packages/db/src/registries`) fails when a Space- or SpaceUser-owned model carries an org column outside such a key.
+5. The rows the cascade re-keyed are cleared from the cache (`clearSpaceRowCaches`, through `queueCacheClear`). It finds them through every cached model's composite relation to `Space` or `SpaceUser` (`spaceKeyColumns`), so a prefixed pair such as `sourceSpaceId`/`sourceOrganizationId` counts; a space reference without an org column isn't re-keyed and is left alone.
+
+No row keyed to the space keeps the old org's membership, so reviving a membership in the old org revives nothing in the moved space. Audit rows record their context (`contextOrganizationId`) as it was when written, so the space's earlier history stays filed under the old org.
 
 **Send permissions by type:**
 

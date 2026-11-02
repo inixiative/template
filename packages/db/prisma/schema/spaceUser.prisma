@@ -24,11 +24,13 @@ model SpaceUser {
   userId             String           @db.VarChar(36)
   organizationUser   OrganizationUser @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
   organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  space              Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  space              Space            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
   user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokens             Token[]
   integrations       Integration[]
   projects           Project[]
+  emailTemplates     EmailTemplate[]
+  emailComponents    EmailComponent[]
   auditLogsAsSubject AuditLog[]       @relation("AuditLogSubjectSpaceUser")
 
   // ==========================================================================

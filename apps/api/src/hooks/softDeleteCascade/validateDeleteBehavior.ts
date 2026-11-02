@@ -7,8 +7,10 @@
 import {
   HARD_DELETE_ON_TOMBSTONE,
   hasDeletedAt,
+  isHardDeletedOnTombstone,
   isModelName,
   modelFields,
+  SKIP_REVIVE,
   SOFT_DELETE_MODEL_SET,
 } from '@template/db';
 import { childRelations } from '#/hooks/softDeleteCascade/childRelations';
@@ -54,8 +56,23 @@ export const deleteBehaviorViolations = (
   return violations;
 };
 
+export const skipReviveViolations = (models: readonly string[] = SKIP_REVIVE): string[] =>
+  models.flatMap((model) => {
+    if (!isModelName(model))
+      return [`${model} is listed in SKIP_REVIVE but is not a model in the schema.`];
+    if (isHardDeletedOnTombstone(model))
+      return [
+        `${model} is listed in both SKIP_REVIVE and HARD_DELETE_ON_TOMBSTONE; a hard-deleted row has nothing to skip.`,
+      ];
+    if (!hasDeletedAt(model))
+      return [
+        `${model} is listed in SKIP_REVIVE but has no deletedAt column; it is never tombstoned, so there is no revive to skip.`,
+      ];
+    return [];
+  });
+
 export const validateDeleteBehavior = () => {
-  const violations = deleteBehaviorViolations();
+  const violations = [...deleteBehaviorViolations(), ...skipReviveViolations()];
   if (violations.length)
     throw new Error(
       `[softDeleteCascade] delete behavior is inconsistent:\n  ${violations.join('\n  ')}`,
