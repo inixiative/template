@@ -13,11 +13,11 @@ cd "$ROOT_DIR"
 # Full scan, not diff mode: the property is about the whole set of definitions, and a barrel edit
 # can drop an entry without touching the definition.
 #
-# Exempt: the primitive itself, tests (they register and unregister their own caches), and
-# comment lines.
+# Exempt: the primitive itself, tests and check scripts (they register their own caches for one
+# run), and comment lines.
 BARREL='apps/api/src/lib/rollingCaches.ts'
 PATTERN='makeRollingCache[[:space:]]*(<[^(]*>)?\('
-EXCLUDE='packages/db/src/redis/makeRollingCache\.ts:|/generated/|/node_modules/|\.test\.ts:|/tests?/|/__tests__/'
+EXCLUDE='packages/db/src/redis/makeRollingCache\.ts:|/generated/|/node_modules/|\.test\.ts:|/tests?/|/__tests__/|^apps/api/scripts/'
 
 search_dirs=()
 for d in apps packages; do

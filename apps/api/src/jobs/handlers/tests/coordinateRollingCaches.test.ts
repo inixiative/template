@@ -1,14 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import {
   cacheKey,
   db,
   flushRedis,
   getRedisClient,
   makeRollingCache,
+  ROLLING_CACHE_TICK_SECONDS,
   unregisterRollingCache,
 } from '@template/db';
 import { cleanupTouchedTables, createOrganization, createSpace } from '@template/db/test';
+import { WaitingChildrenError } from 'bullmq';
 import { coordinateRollingCaches } from '#/jobs/handlers/coordinateRollingCaches';
+import { refreshRollingCache } from '#/jobs/handlers/refreshRollingCache';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
 import { createTestWorker } from '#tests/createTestWorker';
 
@@ -22,7 +25,8 @@ const uniqueName = (label: string): string => {
   return name;
 };
 
-const coordinate = () => coordinateRollingCaches(createTestWorker());
+const coordinate = (tick = 'coordinateRollingCaches') =>
+  coordinateRollingCaches(createTestWorker({ name: tick }));
 
 const makeDue = (name: string) => getRedisClient().pexpire(rollingCacheTimerKey(name), 1_000);
 
@@ -31,6 +35,7 @@ const makeSpaceCountCache = (
   name: string,
   failingOrganizationId: () => string = () => '',
   spreadSeconds = 0,
+  beforeCompute: () => Promise<void> = async () => {},
 ) =>
   makeRollingCache({
     name,
@@ -38,6 +43,7 @@ const makeSpaceCountCache = (
     spreadSeconds,
     results: { value: ({ organizationId }) => cacheKey(name, organizationId) },
     compute: async ({ organizationId }, { results, write }) => {
+      await beforeCompute();
       if (organizationId === failingOrganizationId()) throw new Error('compute failed');
       await write(
         results.value({ organizationId }),
@@ -65,7 +71,7 @@ describe('coordinateRollingCaches', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('refreshes every target of a due cache, and the branch starts the timer when it closes', async () => {
+  it('refreshes every target of a due cache, and starts its timer for one interval', async () => {
     const name = uniqueName('Pairs');
     const { entity: acme } = await createOrganization();
     const { entity: globex } = await createOrganization();
@@ -88,6 +94,68 @@ describe('coordinateRollingCaches', () => {
     expect(await getRedisClient().ttl(rollingCacheTimerKey(name))).toBeGreaterThan(
       INTERVAL_SECONDS - 5,
     );
+  });
+
+  // Under a worker the branch parks in `waiting-children` after its stage; the timer is already running.
+  it('starts the timer when the pass starts, while its leaves are still out', async () => {
+    const name = uniqueName('Start');
+    const { entity: acme } = await createOrganization();
+    const { entity: globex } = await createOrganization();
+    await createSpace({ name: `${name} a` }, { organization: acme });
+    await createSpace({ name: `${name} b` }, { organization: globex });
+    const rollingCache = makeSpaceCountCache(name, () => '', INTERVAL_SECONDS / 2);
+    const branch = createTestWorker({
+      name: 'refreshRollingCache',
+      token: 'worker-token',
+      updateData: mock(async () => {}),
+      moveToWaitingChildren: mock(async () => true),
+    });
+
+    await expect(refreshRollingCache(branch, { name })).rejects.toBeInstanceOf(
+      WaitingChildrenError,
+    );
+
+    const states = await Promise.all(
+      [acme, globex].map(
+        async ({ id }) => (await rollingCache.read('value', { organizationId: id })).state,
+      ),
+    );
+    expect(states).toContain('empty');
+    expect(await getRedisClient().ttl(rollingCacheTimerKey(name))).toBeGreaterThan(
+      INTERVAL_SECONDS - 5,
+    );
+  });
+
+  it('a tick while a pass is still running does not start another, and the next pass runs once it closes', async () => {
+    const name = uniqueName('Overlap');
+    const { entity: acme } = await createOrganization();
+    await createSpace({ name: `${name} a` }, { organization: acme });
+    let computes = 0;
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    makeSpaceCountCache(
+      name,
+      () => '',
+      0,
+      async () => {
+        computes += 1;
+        if (computes === 1) await held;
+      },
+    );
+
+    const firstPass = coordinate('firstTick');
+    while (computes === 0) await Bun.sleep(5);
+    await makeDue(name);
+    await coordinate('secondTick');
+    expect(computes).toBe(1);
+
+    release();
+    await firstPass;
+    await makeDue(name);
+    await coordinate('thirdTick');
+    expect(computes).toBe(2);
   });
 
   it('spaces a cache’s leaves across its spread, so only the first starts at once', async () => {
@@ -154,7 +222,7 @@ describe('coordinateRollingCaches', () => {
     });
   });
 
-  it('a leaf that fails keeps its last good value, and inline its failure fails the tick', async () => {
+  it('a leaf that fails keeps its last good value, and inline its failure fails the tick and leaves the cache due', async () => {
     const name = uniqueName('Failing');
     const { entity: broken } = await createOrganization();
     await createSpace({ name: `${name} a` }, { organization: broken });
@@ -170,5 +238,8 @@ describe('coordinateRollingCaches', () => {
     expect(await rollingCache.read('value', { organizationId: broken.id })).toMatchObject({
       value: 1,
     });
+    expect(await getRedisClient().pttl(rollingCacheTimerKey(name))).toBeLessThanOrEqual(
+      ROLLING_CACHE_TICK_SECONDS * 1000,
+    );
   });
 });

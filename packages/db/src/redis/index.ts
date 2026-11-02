@@ -27,6 +27,7 @@ export {
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
   type RegisteredRollingCache,
   ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_LEAF_BACKOFF_SECONDS,
   ROLLING_CACHE_TICK_SECONDS,
   type RollingCache,
   type RollingCacheComputeContext,

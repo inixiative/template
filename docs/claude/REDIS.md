@@ -320,7 +320,7 @@ Correctness here is enforced by **discipline and tests, not by types** — nothi
 A value computed from stored data only to serve it fast — a count, a rollup, a picker vocabulary read
 on every load — is a **rolling cache**, not a table. A table of materialized values needs hand-written
 invalidation for every way its inputs change, and each one missed is a stale read nobody notices. A
-rolling cache recomputes on a fixed interval, and its entries outlive the longest a refresh can take,
+rolling cache recomputes on a fixed interval, and its entries outlive the wait for the next refresh,
 every retry included, so a read always hits. There is no invalidation to write.
 
 One definition declares its **input** (`targets`: what one refresh is for), its **outputs**
@@ -372,12 +372,15 @@ const check = await checkRollingCache(spaceStats, 'total', { id: organizationId 
   is the target's identity: the leaf's supersede key and its single-flight lock.
 - **Every result of a target is computed by one job, under one lock.** Don't split a pass that reads
   the same rows into two caches; give one cache two results.
-- **Four times.** `intervalSeconds` is how often a target is refreshed. `spreadSeconds` (default: half
-  the interval, whole, less than the interval) is the window a branch spreads its leaves' starts
-  across. `timeoutSeconds` (default: one interval) is how long one leaf attempt may run before it
-  reports itself stuck. `ttlSeconds` (default: interval × (`ROLLING_CACHE_LEAF_ATTEMPTS` + 2)) is how
-  long an entry lives; registration throws unless it is longer than interval + spread + every
-  attempt × timeout + one tick.
+- **Four times.** `intervalSeconds` is how often a pass starts: its timer starts with the pass, so
+  passes start one interval apart however long their leaves take, and a pass that outlasts the
+  interval delays the next to the first tick after it closes. `spreadSeconds` (default: half the
+  interval, whole, less than the interval) is the window a pass spreads its leaves' starts across.
+  `timeoutSeconds` (default: one interval) is how long one leaf attempt may run before it reports
+  itself stuck. `ttlSeconds` (default: interval × (2 × `ROLLING_CACHE_LEAF_ATTEMPTS` + 2)) is how long
+  an entry lives; registration throws unless it is longer than max(interval, pass) + one tick + pass,
+  where a pass is spread + every attempt × timeout + the retry backoff
+  (`ROLLING_CACHE_LEAF_BACKOFF_SECONDS`): an entry outlives every attempt of the next pass's leaf.
 - **A read never computes.** `read(result, params)` is `checkCache` on that result's key: `empty`,
   `computing` (the target's lock is held), `fresh`, or `stale` (older than one scheduled refresh,
   with `isComputing` beside it). `checkRollingCache` (`apps/api/src/jobs/checkRollingCache.ts`) is the
