@@ -50,6 +50,7 @@ kanban
     COMM-009-component-slots-passthrough-children
     COMM-016-per-org-sending-domains
     DEV-005-pr-reader
+    DEV-006-adopt-gloss
 ```
 
 ## Tickets
@@ -166,6 +167,7 @@ AUTH-006 is a confirmed isolation defect awaiting assignment and has High priori
 
 **Developer tooling:**
 - [DEV-005: PR reader](./DEV-005-pr-reader.md) - Review tool that groups changed files by atlas concept, hides gloss (toggle before/after per symbol) and replaces test code with an AI summary of the cases; home undecided
+- [DEV-006: Adopt gloss](./DEV-006-adopt-gloss.md) - Template under gloss: comments into `.gloss/` (rare one-line `// why:` stays), harvest at commit, a `run-ci-rules.sh` gate with fail fixtures so it can't pass vacuously (ZLT-4530); backport to Kingdom and Tribe
 
 These features are valuable but not critical for MVP or initial production launch. They're typical "v2.0" enhancements that add polish, enterprise appeal, or alternative monetization strategies.
 
