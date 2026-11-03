@@ -17,26 +17,27 @@
 > One of the [inixiative](https://www.inixiative.com) building blocks. Stop rediscovering what you need to build. See [all the projects](https://github.com/inixiative).
 
 **Template is like shadcn, but for the whole SaaS app: you start a product from it and own the
-code.** It is a decade of lessons from building SaaS products, packaged so a new product starts from
-answers instead of rediscovering them. The API, the web, admin and superadmin apps, a shared UI
-package, authorization, multi-tenancy, field-level encryption, auditing, background jobs, webhooks and
-a generated typed client are already built, tested and documented. When a coding agent writes its own
+code.** Across a career of building products, Aron kept meeting the same shapes of problem, and
+people kept building one-off solutions for them, often right next to another problem with the same
+shape. Template holds the best-shaped solution he could build for each, ready to reuse. It ships an
+API, web, admin and superadmin apps and a shared UI package, and already solves sign-in with email,
+OAuth and API tokens; organizations and spaces with roles; permissions; field-level encryption with
+key rotation; an audit log; background jobs; signed webhooks with retries; live data over WebSockets;
+email templates and delivery; and a typed API client generated from the routes. When a coding agent writes its own
 version of something already here, Foundry points it back: the repo ships its
 [Foundry](https://github.com/inixiative/foundry) setup in `.foundry/`.
 
-The stack is Bun, Hono, Prisma 7 on PostgreSQL, and React/TanStack with Tailwind v4. Most of the
-work is in how the pieces fit together, in about 139,000 curated lines of TypeScript.
+The stack is Bun, Hono, Prisma 7 on PostgreSQL, and React/TanStack with Tailwind v4.
 
 ## At a Glance
 
 | | |
 |---|---|
-| **Curated TypeScript** | About 139,000 lines across `apps/` and `packages/`, tests included (about 72,000 outside tests), excluding generated code |
 | **Structure** | 4 applications (`api`, `web`, `admin`, `superadmin`) + 6 shared packages |
 | **API surface** | 156 route modules, auto-registered, each generating OpenAPI 3.1 |
-| **Tests** | 409 test files across apps and packages |
-| **Documentation** | 41 focused docs in `docs/claude/` (about 16,100 lines) |
-| **Building blocks** | Uses [`json-rules`](https://github.com/inixiative/json-rules), [`permissions`](https://github.com/inixiative/permissions), [`rules-builder`](https://github.com/inixiative/rules-builder), [`prisma-map`](https://github.com/inixiative/prisma-map), [`atlas`](https://github.com/inixiative/atlas) and [`config`](https://github.com/inixiative/config) |
+| **Documentation** | 41 focused docs in `docs/claude/` |
+| **Building blocks** | Uses [`prisma-map`](https://github.com/inixiative/prisma-map), [`json-rules`](https://github.com/inixiative/json-rules), [`permissions`](https://github.com/inixiative/permissions) and [`rules-builder`](https://github.com/inixiative/rules-builder) |
+| **Developer experience** | Uses [`atlas`](https://github.com/inixiative/atlas) and [`config`](https://github.com/inixiative/config); ships worktrees (`bun run worktree:create`), init and CI rules (`bun run check`) |
 
 ## What's Here That Isn't in a Starter Kit
 
