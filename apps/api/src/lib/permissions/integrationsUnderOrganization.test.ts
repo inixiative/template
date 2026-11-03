@@ -214,7 +214,7 @@ describe("the organization's own integrations: an admin adds them, a member uses
     return (
       await app.fetch(
         post(`/api/v1/organization/${organization.id}/integrations`, {
-          name: `i-${crypto.randomUUID()}`,
+          name: `i-${Bun.randomUUIDv7()}`,
           provider: 'slack',
           role: 'viewer',
         }),
@@ -240,7 +240,7 @@ describe('a member adds their own member integration; a viewer does not, nor a r
   const { call } = createTokenProbeApp((hono) =>
     hono.route('/api/v1/organizationUser', organizationUserRouter),
   );
-  const body = () => ({ name: `i-${crypto.randomUUID()}`, provider: 'slack', role: 'viewer' });
+  const body = () => ({ name: `i-${Bun.randomUUIDv7()}`, provider: 'slack', role: 'viewer' });
 
   const addsOwn = async (role: Role) => {
     const { entity: member, context } = await createOrganizationUser({ role }, { organization });
@@ -410,7 +410,7 @@ describe('a full token on your member row is the member', () => {
       (
         await app.fetch(
           post(`/api/v1/organizationUser/${member.id}/integrations`, {
-            name: `i-${crypto.randomUUID()}`,
+            name: `i-${Bun.randomUUIDv7()}`,
             provider: 'slack',
             full: true,
           }),
@@ -433,7 +433,7 @@ describe("a member writes any entitlement on their own member integration, cappe
     });
     const response = await app.fetch(
       post(`/api/v1/organizationUser/${member.id}/integrations`, {
-        name: `i-${crypto.randomUUID()}`,
+        name: `i-${Bun.randomUUIDv7()}`,
         provider: 'slack',
         role: 'viewer',
         entitlements: [

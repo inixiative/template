@@ -163,7 +163,7 @@ describe('data streams (real app)', () => {
     const { entity: flooder } = await createUser();
     const { socket, sent } = connect((await createBearerToken(flooder)).authorization);
     const names = Array.from({ length: WS_MAX_PENDING_FRAMES + 8 }, () =>
-      STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: crypto.randomUUID() }),
+      STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: Bun.randomUUIDv7() }),
     );
     await Promise.all(names.map((name) => websocketHandler.message(socket, openFrame(name))));
 
@@ -447,7 +447,7 @@ describe('data streams (real app)', () => {
       const redis = getRedisClient();
       const { socket, sent } = connect();
       const knownFamily = STREAM_DEFINITIONS.organizationReadManyContacts.name({
-        id: crypto.randomUUID(),
+        id: Bun.randomUUIDv7(),
       });
       const overLong = STREAM_DEFINITIONS.organizationReadManyContacts.name({
         id: 'x'.repeat(WS_MAX_STREAM_NAME_LENGTH),

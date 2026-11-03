@@ -274,7 +274,7 @@ export const organizationCreateAuthProviderController = makeController(
 
     const data = {
       ...body,
-      id: crypto.randomUUID(),
+      id: Bun.randomUUIDv7(),
       organizationId: organizationId(org.id),
       createdBy: userId(user.id),
     };

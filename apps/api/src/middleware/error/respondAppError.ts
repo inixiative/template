@@ -9,7 +9,7 @@ import type { AppError } from '#/lib/errors';
 import type { AppEnv } from '#/types/appEnv';
 
 export const respondAppError = (c: Context<AppEnv>, error: AppError) => {
-  const requestId = c.get('requestId') ?? crypto.randomUUID();
+  const requestId = c.get('requestId') ?? Bun.randomUUIDv7();
   c.header('request-id', requestId);
   error.requestId = requestId;
   const response = error.getResponse();

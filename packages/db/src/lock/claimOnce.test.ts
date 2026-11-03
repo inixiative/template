@@ -3,7 +3,7 @@ import { createLock } from '@template/db/lock/createLock';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 
-const newId = () => `claim-${crypto.randomUUID()}`;
+const newId = () => `claim-${Bun.randomUUIDv7()}`;
 const keyFor = (id: string) => `${redisNamespace.lock}:s:${id}`;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 

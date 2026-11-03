@@ -153,7 +153,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     return;
   }
 
-  const requestId = crypto.randomUUID();
+  const requestId = Bun.randomUUIDv7();
 
   // Database client
   c.set('db', db);

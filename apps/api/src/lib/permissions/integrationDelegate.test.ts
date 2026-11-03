@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { randomUUID } from 'node:crypto';
 import { db, unregisterDbHook } from '@template/db';
 import type {
   Integration,
@@ -160,8 +159,12 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       expect(((await actor.json()) as { actor: { model: string } }).actor.model).toBe('Token');
       expect((await request(key, 'GET', '/api/v1/me/organizations')).status).toBe(401);
       expect(
-        (await request(key, 'POST', '/api/v1/organization', { name: 'o', slug: randomUUID() }))
-          .status,
+        (
+          await request(key, 'POST', '/api/v1/organization', {
+            name: 'o',
+            slug: Bun.randomUUIDv7(),
+          })
+        ).status,
       ).toBe(403);
     });
 

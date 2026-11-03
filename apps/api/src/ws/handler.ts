@@ -37,7 +37,7 @@ export const stopStaleSweep = staleSweep.stop;
 export const acceptWebSocket = (req: Request, server: WSServer): Response | undefined => {
   const now = Date.now();
   const data: WSData = {
-    connectionId: crypto.randomUUID(),
+    connectionId: Bun.randomUUIDv7(),
     userId: null,
     headers: {},
     channels: new Set(),

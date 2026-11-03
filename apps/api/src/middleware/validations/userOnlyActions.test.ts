@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { randomUUID } from 'node:crypto';
 import { db } from '@template/db';
 import type {
   Organization,
@@ -55,7 +54,10 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
     return { key: rawKey, token: entity };
   };
 
-  const webhook = () => ({ model: 'CustomerRef', url: `https://example.com/${randomUUID()}` });
+  const webhook = () => ({
+    model: 'CustomerRef',
+    url: `https://example.com/${Bun.randomUUIDv7()}`,
+  });
 
   beforeAll(async () => {
     ({ entity: user } = await createUser());
@@ -114,7 +116,7 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
   it('any token its user owns creates an organization, a viewer token too (R9)', async () => {
     const { key } = await mint(user, 'viewer');
     expect(
-      (await call(key, 'POST', '/organization', { name: 'o', slug: randomUUID() })).status,
+      (await call(key, 'POST', '/organization', { name: 'o', slug: Bun.randomUUIDv7() })).status,
     ).toBe(201);
   });
 
@@ -122,7 +124,7 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
     const { key } = await mint(user, 'member');
     expect((await call(key, 'POST', '/me/webhookSubscriptions', webhook())).status).toBe(201);
     expect(
-      (await call(key, 'POST', '/organization', { name: 'o', slug: randomUUID() })).status,
+      (await call(key, 'POST', '/organization', { name: 'o', slug: Bun.randomUUIDv7() })).status,
     ).toBe(201);
   });
 });

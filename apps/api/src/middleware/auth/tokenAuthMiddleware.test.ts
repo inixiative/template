@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { randomUUID } from 'node:crypto';
 import {
   type AccessorName,
   cacheKey,
@@ -84,7 +83,7 @@ const rename = (path: string, headers: Record<string, string>) =>
   app.request(path, {
     method: 'PATCH',
     headers: { ...headers, 'content-type': 'application/json' },
-    body: JSON.stringify({ name: `renamed-${randomUUID().slice(0, 6)}` }),
+    body: JSON.stringify({ name: `renamed-${Bun.randomUUIDv7().slice(0, 6)}` }),
   });
 
 describe('an OrganizationUser token follows its member row, not the cached token', () => {

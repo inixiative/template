@@ -139,7 +139,7 @@ const publish = async (
 export const sendToChannel = (channel: string, event: WSOutbound): Promise<void> =>
   publish({ type: 'channel', target: channel, event });
 
-const INSTANCE_ID = crypto.randomUUID();
+const INSTANCE_ID = Bun.randomUUIDv7();
 const pendingResyncs = new Set<string>();
 let publishingResyncs = false;
 
