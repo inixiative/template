@@ -49,7 +49,7 @@ describe('ws data streams across API instances (real Redis, one process per inst
   afterAll(() => cluster?.stop());
 
   it('every holder on every instance hears every append of a shared stream, in one gap-free seq order', async () => {
-    const stream = `shared:${crypto.randomUUID()}`;
+    const stream = `shared:${Bun.randomUUIDv7()}`;
     await Promise.all([
       apiA.send({ op: 'hold', connectionId: 'a1', stream }),
       apiA.send({ op: 'hold', connectionId: 'a2', stream }),
@@ -79,7 +79,7 @@ describe('ws data streams across API instances (real Redis, one process per inst
   }, 30_000);
 
   it('a per-recipient stream keeps one gap-free counter per user across instances', async () => {
-    const stream = `perRecipient:${crypto.randomUUID()}`;
+    const stream = `perRecipient:${Bun.randomUUIDv7()}`;
     await Promise.all([
       apiA.send({ op: 'hold', connectionId: 'alice', stream, userId: 'alice' }),
       apiB.send({ op: 'hold', connectionId: 'bob', stream, userId: 'bob' }),
@@ -103,7 +103,7 @@ describe('ws data streams across API instances (real Redis, one process per inst
   }, 30_000);
 
   it('an instance whose subscriber drops resyncs its holders; the other instance misses nothing', async () => {
-    const stream = `reconnect:${crypto.randomUUID()}`;
+    const stream = `reconnect:${Bun.randomUUIDv7()}`;
     await Promise.all([
       apiA.send({ op: 'hold', connectionId: 'a-reconnect', stream }),
       apiB.send({ op: 'hold', connectionId: 'b-reconnect', stream }),
@@ -126,7 +126,7 @@ describe('ws data streams across API instances (real Redis, one process per inst
   ])(
     'an append Redis cannot sequence on %s resyncs that stream on every instance',
     async (_, origin) => {
-      const stream = `unsequenced:${crypto.randomUUID()}`;
+      const stream = `unsequenced:${Bun.randomUUIDv7()}`;
       await Promise.all([
         apiA.send({ op: 'hold', connectionId: `a-${stream}`, stream }),
         apiB.send({ op: 'hold', connectionId: `b-${stream}`, stream }),

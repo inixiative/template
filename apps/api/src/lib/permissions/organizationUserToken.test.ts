@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { randomUUID } from 'node:crypto';
 import { db } from '@template/db';
 import type {
   Organization,
@@ -67,7 +66,7 @@ describe('a token of an organization member acts as that member, never as the us
     ({ entity: member } = await createOrganizationUser({ role: 'owner' }, { user, organization }));
     await createOrganizationUser({ role: 'owner' }, { user, organization: otherOrganization });
     ({ entity: userToken } = await createToken(
-      { ownerModel: 'User', role: 'owner', keyHash: randomUUID() },
+      { ownerModel: 'User', role: 'owner', keyHash: Bun.randomUUIDv7() },
       { user },
     ));
 
@@ -100,10 +99,12 @@ describe('a token of an organization member acts as that member, never as the us
     expect(
       await status('POST', '/me/webhookSubscriptions', {
         model: 'CustomerRef',
-        url: `https://example.com/${randomUUID()}`,
+        url: `https://example.com/${Bun.randomUUIDv7()}`,
       }),
     ).toBe(401);
-    expect(await status('POST', '/organization', { name: 'o', slug: randomUUID() })).toBe(403);
+    expect(await status('POST', '/organization', { name: 'o', slug: Bun.randomUUIDv7() })).toBe(
+      403,
+    );
     expect(await status('DELETE', `/token/${userToken.id}`)).toBe(403);
 
     expect(await db.token.findUnique({ where: { id: userToken.id } })).not.toBeNull();

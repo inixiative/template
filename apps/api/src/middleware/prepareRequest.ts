@@ -21,7 +21,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     batchContext = getBatchContext(batchId);
   }
 
-  const requestId = batchContext?.baseContext.get('requestId') ?? crypto.randomUUID();
+  const requestId = batchContext?.baseContext.get('requestId') ?? Bun.randomUUIDv7();
 
   c.set('db', db);
   c.set('txn', batchContext ? db : undefined);

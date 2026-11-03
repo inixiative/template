@@ -481,7 +481,7 @@ Internal requests inherit authentication from parent request:
 
 ```typescript
 // Parent request authenticated → all batch requests use same auth
-const batchId = crypto.randomUUID();
+const batchId = Bun.randomUUIDv7();
 registerBatch(batchId, parentContext);
 
 // Internal requests detect batch via X-Batch-Id header

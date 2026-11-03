@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type {
@@ -46,6 +47,7 @@ import {
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
+import { uuidv7 } from 'uuidv7';
 
 const store = new AsyncLocalStorage<Scope>();
 
@@ -116,7 +118,7 @@ const dbMethods = {
     const existing = store.getStore();
     if (existing?.openTransaction) return fn();
 
-    const scope = existing ?? newScope(crypto.randomUUID(), null);
+    const scope = existing ?? newScope(uuidv7(), null);
     // The caller frame is the last point at which async-local storage is reliable.
     const bridgedContext = captureBridgedContext();
 
@@ -222,7 +224,7 @@ const dbMethods = {
     }
     const parent = store.getStore();
     const inOwnScope = (thunk: () => Promise<T>) =>
-      store.run(newScope(crypto.randomUUID(), parent?.scopeContext ?? null), thunk);
+      store.run(newScope(uuidv7(), parent?.scopeContext ?? null), thunk);
     if (options?.resolution === 'allSettled') {
       return resolveAll(
         thunks.map((thunk) => async (): Promise<PromiseSettledResult<T>> => {

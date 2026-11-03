@@ -11,7 +11,7 @@ const patterns = ['17 3 * * *', '19 5 * * *'] as const;
 
 let jobs: Awaited<ReturnType<typeof connectRealJobsQueue>>;
 
-const newJobId = () => `scheduler-test-${crypto.randomUUID()}`;
+const newJobId = () => `scheduler-test-${Bun.randomUUIDv7()}`;
 const createScheduledCronJob = async (pattern: string = patterns[0]) =>
   (await createCronJob({ jobId: newJobId(), handler, pattern })).entity;
 

@@ -11,7 +11,7 @@ import type { RequestResult } from '#/modules/batch/services/strategies/types';
 import type { AppEnv } from '#/types/appEnv';
 
 export const readAsCaller = async (c: Context<AppEnv>, path: string): Promise<RequestResult> => {
-  const batchId = crypto.randomUUID();
+  const batchId = Bun.randomUUIDv7();
   registerBatch(batchId, c);
   try {
     return await executeRequest(c.get('app'), { method: 'GET', path }, batchId, {}, c.req.raw);

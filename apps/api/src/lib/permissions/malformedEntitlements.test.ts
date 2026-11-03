@@ -142,7 +142,7 @@ describe('the API refuses a malformed entitlement; a write prunes the broken one
     const noAction = { ...readOrganization(), actions: { read: false } };
     const response = await (await asOwner())(
       post(`/api/v1/organization/${organization.id}/integrations`, {
-        name: `i-${crypto.randomUUID()}`,
+        name: `i-${Bun.randomUUIDv7()}`,
         provider: 'slack',
         role: 'viewer',
         entitlements: [noAction],
@@ -157,7 +157,7 @@ describe('the API refuses a malformed entitlement; a write prunes the broken one
   it('creating an integration with a malformed entitlement is a 422, and nothing is stored', async () => {
     const response = await (await asOwner())(
       post(`/api/v1/organization/${organization.id}/integrations`, {
-        name: `i-${crypto.randomUUID()}`,
+        name: `i-${Bun.randomUUIDv7()}`,
         provider: 'slack',
         role: 'viewer',
         entitlements: [broken()],

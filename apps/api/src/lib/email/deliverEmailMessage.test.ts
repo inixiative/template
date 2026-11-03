@@ -273,7 +273,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
   it('closes a send whose recipient no longer resolves as not_found, without sending', async () => {
     await saveTemplate('send-time-gone', 'Hello {{recipient.name}}');
 
-    const row = await deliver('send-time-gone', crypto.randomUUID());
+    const row = await deliver('send-time-gone', Bun.randomUUIDv7());
 
     expect(sent).toHaveLength(0);
     expect(row.status).toBe(CommunicationStatus.failed);
@@ -525,7 +525,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
         INVITE,
         user.id,
         { type: 'Organization', organizationId: organization.id },
-        { id: crypto.randomUUID() },
+        { id: Bun.randomUUIDv7() },
       );
 
       expect(sent).toHaveLength(0);

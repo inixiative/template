@@ -10,6 +10,7 @@
 //     + we wake up thinking we hold it. Mitigation: ttlMs >> expected pause duration.
 //   - verify() is point-in-time; the race between verify-returns-true and the next op
 //     completing is microseconds but non-zero. For exactly-once semantics, fence at the resource.
+
 import { createClaim } from '@template/db/lock/createClaim';
 import { lockKeyOf } from '@template/db/lock/lockKeyOf';
 import { LockLostError } from '@template/db/lock/lockLostError';
@@ -28,6 +29,7 @@ import type {
 import { getRedisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import { heartbeat } from '@template/shared/utils';
+import { uuidv7 } from 'uuidv7';
 
 const DEFAULT_POLL_MS = 50;
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,7 +58,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     );
   }
 
-  const processId = crypto.randomUUID();
+  const processId = uuidv7();
   let stop: (() => void) | null = null;
   let missed = 0;
   let hasDeclaredLoss = false;
