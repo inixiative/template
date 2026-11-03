@@ -18,7 +18,7 @@ import {
 } from '#/lib/routeTemplates/utils';
 
 /** The ids a delete-many removes, as the request body. */
-export const deleteManyBodySchema = z.array(z.string().min(1)).min(1);
+const deleteManyBodySchema = z.array(z.string().min(1)).min(1);
 
 const deleteManyBody = {
   content: { 'application/json': { schema: deleteManyBodySchema } },
