@@ -76,7 +76,7 @@ Shared pieces already in `schema.ts` — reuse, don't re-derive:
 
 Other parts of the system (use them, don't parallel them):
 - `placeEntitlement` + `canGrantEntitlement` (library, over `schemaMap`) — the only check for writing entitlements, validity included; entitlements are `Entitlement` rows and change only through the holder's sub-resource (`GET …/:id/entitlements` lists rows with ids, `POST` with entries, `DELETE` with row ids) via the one writer `changeEntitlements`, every added entry and removed row through that check, never a record update;
-- `RulesRegistry` json-rules write rules, enforced by the rules hook — a row's own columns only (`full` takes no role; where `full` may be set). Nothing in a rules object reads an entitlement or its anchor; "a delegate holds something" reads the rows, so it is `assertDelegateHoldsSomething`, run by the writer and the `delegateHoldsSomething` hook. Don't call `validateRules` from controllers;
+- `RulesRegistry` json-rules write rules, enforced by the rules hook — a row's own columns only (`full` takes no role; where `full` may be set). Nothing in a rules object reads an entitlement or its anchor. A non-full delegate with no role and no entitlements is not refused; it holds nothing. Don't call `validateRules` from controllers;
 - hydration / the lens — relations come from hydrating, never from copying keys;
 - the one `full` skip at install (`delegatedPermissions`);
 - the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement row, written after the member is created, backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `permissionsOfUser` routes it to the user and everything else to the tenant.

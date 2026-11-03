@@ -15,7 +15,6 @@ import { type EntitlementEntry, memberSelfGrant, type Permix } from '@template/p
 import { rebacSchema } from '@template/permissions/rebac';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerDelegateHoldsSomethingHook } from '#/hooks/delegateHoldsSomething/hook';
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
@@ -66,7 +65,6 @@ beforeAll(async () => {
   registerRulesHook();
   registerAuditLogHook();
   registerClearCacheHook();
-  registerDelegateHoldsSomethingHook();
   registerImmutableFieldsHook();
   registerPreventHardDeleteHook();
   registerRuleReferenceHook();
@@ -209,7 +207,22 @@ describe('a gone anchor is stamped on the row, like a rule reference target', ()
 });
 
 describe('the writer keeps its invariants under a lock on the target', () => {
-  it('a role-less delegate keeps holding something when two removals race', async () => {
+  it('two writers adding the same entry at once store it once', async () => {
+    const { entity: space } = await createSpace({}, { organization });
+    const { entity: token } = await createToken(
+      { ownerModel: 'Organization', role: 'viewer' },
+      { organization },
+    );
+    const target = { model: 'Token' as const, id: token.id };
+
+    await Promise.all([
+      changeEntitlements(owner.permix, target, { add: [readSpace(space.id)] }),
+      changeEntitlements(owner.permix, target, { add: [readSpace(space.id)] }),
+    ]);
+    expect(await heldEntitlements(target)).toEqual([readSpace(space.id)]);
+  });
+
+  it('a role-less delegate whose last rows are removed at once holds nothing; neither removal is refused', async () => {
     const { entity: space } = await createSpace({}, { organization });
     const { entity: token } = await createToken(
       {
@@ -222,17 +235,11 @@ describe('the writer keeps its invariants under a lock on the target', () => {
     const target = { model: 'Token' as const, id: token.id };
     const [first, second] = (await rowsOf('Token', token.id)).map((row) => row.id);
 
-    const outcomes = await Promise.allSettled([
+    await Promise.all([
       changeEntitlements(owner.permix, target, { remove: [first!] }),
       changeEntitlements(owner.permix, target, { remove: [second!] }),
     ]);
-    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
-    expect(
-      outcomes.flatMap((outcome) =>
-        outcome.status === 'rejected' ? [(outcome.reason as Error).message] : [],
-      ),
-    ).toEqual(['a delegate that is not full has a role, entitlements or both']);
-    expect(await heldEntitlements(target)).toHaveLength(1);
+    expect(await heldEntitlements(target)).toEqual([]);
   });
 
   it("the self-grant is refused to its own user's delete-many; only the member's tombstone takes it", async () => {

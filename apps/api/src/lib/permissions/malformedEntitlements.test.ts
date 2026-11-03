@@ -97,13 +97,17 @@ describe('a malformed stored entitlement is pruned at sign-in, the rest kept (R9
     expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
   });
 
-  it('a token with no role, not full, and nothing left after pruning is signed out (R94)', async () => {
-    expect(await actorModel(await tokenKey(null, [broken()]))).toBeNull();
+  it('a token with no role, not full, and nothing left after pruning signs in and holds nothing', async () => {
+    const key = await tokenKey(null, [broken()]);
+    expect(await actorModel(key)).toBe('Token');
+    for (const action of ['read', 'operate', 'manage', 'own'])
+      expect(await holds(key, 'organization', organization.id, action)).toBe(false);
+    expect(await holds(key, 'integration', integration.id, 'read')).toBe(false);
   });
 });
 
-describe('a token is the narrowing of its chain: a chain that holds nothing signs it out (R108)', () => {
-  it('a token on an integration left with nothing after pruning has no actor', async () => {
+describe('a token is the narrowing of its chain: silence never widens', () => {
+  it('a token on an integration left with nothing after pruning signs in and holds nothing', async () => {
     const { entity: empty } = await createIntegration({
       organizationId: organization.id,
       ownerModel: 'Organization',
@@ -114,7 +118,10 @@ describe('a token is the narrowing of its chain: a chain that holds nothing sign
       { ownerModel: 'Integration', role: 'viewer' },
       { integration: empty },
     );
-    expect(await actorModel(rawKey)).toBeNull();
+    expect(await actorModel(rawKey)).toBe('Token');
+    for (const action of ['read', 'operate', 'manage', 'own'])
+      expect(await holds(rawKey, 'organization', organization.id, action)).toBe(false);
+    expect(await holds(rawKey, 'integration', empty.id, 'read')).toBe(false);
   });
 });
 

@@ -138,7 +138,7 @@ A delegate acts for its owner and never holds more than its owner. Its permissio
 - **`entitlements`** are given by hand and only by hand: `Entitlement` rows targeted at the delegate. A delegate never inherits its owner's entitlements; each one it holds was written on it, and holds only while the owner still allows it.
 - **`full`** is the owner's permissions, whole and in sync: role, entitlements and the owner's own identity, as they are on every request. It is not a permission in the schema; it is resolved when permissions are installed.
 
-A token that is not `full` has a role, entitlements or both; `full` takes neither.
+`full` takes no role and no entitlements. A delegate that is not `full`, with no role and no entitlements, holds nothing; it is not refused (silence never widens: the library's `delegate` installs the role's ceiling and the entitlement rows, and both are empty).
 
 ---
 
@@ -347,7 +347,7 @@ Every create-token route calls `createToken` (`apps/api/src/modules/me/services/
 - for a token on an integration, the same is asked of the integration's owner;
 - the role is any role when the chain ends at a user or a member row (it is capped at use), and otherwise a role you hold at the owner (`roleHeldAtOwner`; for an integration's token, at the integration's owner).
 
-Then `validateDelegateRole` refuses a role on a token whose integration has no role and is not `full` (422: the role would narrow nothing), `validateFullGrant` runs when the body sets `full` ([Full and delegateFull](#full-and-delegatefull)). The token row and its entitlements are written in one transaction: the token first, then the body's entries through the one writer, `changeEntitlements` ([Changing Entitlements](#changing-entitlements)), which checks every entry and that the token holds something. Creating an integration does the same (`apps/api/src/modules/integration/services/createIntegration.ts`).
+Then `validateDelegateRole` refuses a role on a token whose integration has no role and is not `full` (422: the role would narrow nothing), `validateFullGrant` runs when the body sets `full` ([Full and delegateFull](#full-and-delegatefull)). The token row and its entitlements are written in one transaction: the token first, then the body's entries through the one writer, `changeEntitlements` ([Changing Entitlements](#changing-entitlements)), which checks every entry. A token with no role and no entitlements is minted and holds nothing. Creating an integration does the same (`apps/api/src/modules/integration/services/createIntegration.ts`).
 
 `PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`. A token never changes itself.
 
@@ -391,7 +391,7 @@ So U1 mints a full token on M1 and makes I1 full; the owner of O1 mints a full t
 - an integration is `full` only when owned by a User, OrganizationUser or SpaceUser;
 - a token is `full` only when owned by a User, OrganizationUser, SpaceUser or Integration.
 
-"A delegate that is not `full` has a role, entitlements or both" reads other rows, so it is not a row rule. The same condition (`delegateHoldsSomething`) is evaluated over the delegate with its live entitlement entries by `assertDelegateHoldsSomething` (`apps/api/src/lib/permissions/assertDelegateHoldsSomething.ts`), under the delegate's `entitlements` owner lock (`withOwnerLock`), so two removals that race can't both leave it empty. It runs at the end of every write through `changeEntitlements` (create paths included) and from the `delegateHoldsSomething` hook after an update that takes the role or `full` off a live `Token` or `Integration`; a revive is not checked, because its rows come back after the row does. A member row always has a role. A raw create outside the writer (a seed) isn't checked; a token that holds nothing is turned away at sign-in (`loadTokenContext`).
+A delegate that is not `full` and has no role and no entitlements is not refused, on any write or at sign-in: it holds nothing, because the library treats an empty delegate as the empty permissions (`@inixiative/permissions` README, "Silence never widens"). Taking the role off, or removing the last entitlement row, leaves such a delegate. A member row always has a role.
 
 `validateFullGrant` answers first on API writes, so a person is refused with 403. The rules catch what never goes through it: a superadmin (who passes every check, `delegateFull` included) and writes outside the API (seeds, jobs, scripts). They refuse with 422.
 
@@ -501,7 +501,7 @@ An integration has a nullable `role`, `full` and `entitlements`, held over its o
 
 `validateIntegrationRole` (`apps/api/src/modules/integration/validations/validateIntegrationRole.ts`) checks the body on a hydrated pseudo integration: `validateFullGrant` when it is `full`, else `integrationRoleWrite`: `manage` on the integration, and the role being set held at its owner (`roleHeldAtOwner`: `owner` needs `own` there, `admin` `manage`, `member` `operate`, `viewer` or none `read`). On I1 the owner is M1, so U1 sets any role M1's actions allow U1: `member` through `operate` on M1, `admin` or `owner` only when U1 also administers O1.
 
-Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on the row as it is and as it will be. Setting `role` to null is refused (422) unless the integration will be `full` or holds a live entitlement (the `delegateHoldsSomething` hook).
+Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on the row as it is and as it will be. Setting `role` to null is allowed; an integration left with no role and no entitlements holds nothing.
 
 ### Granting an Entitlement
 

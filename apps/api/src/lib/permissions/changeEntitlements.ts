@@ -22,7 +22,6 @@ import {
 import { partition, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
-import { assertDelegateHoldsSomething } from '#/lib/permissions/assertDelegateHoldsSomething';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 
 export type EntitlementChanges = { add?: EntitlementEntry[]; remove?: string[] };
@@ -56,7 +55,7 @@ const uncovered = (held: EntitlementEntry[], added: EntitlementEntry[]): Entitle
 
 /**
  * The one writer of a target's entitlements: every added entry and every removed row passes the
- * grant check, entries already covered are skipped, and the target still holds something after.
+ * grant check, and entries already covered are skipped. A target left with no rows holds nothing.
  * Rows never change; a removal is a soft delete, so each row's audit entry is its own.
  */
 export const changeEntitlements = (
@@ -97,7 +96,6 @@ export const changeEntitlements = (
           data: added.map((entry) => toEntitlementRow(entry, target)),
         });
 
-      await assertDelegateHoldsSomething(target);
       return (await liveRows(target)).targetEntitlements;
     }),
   );

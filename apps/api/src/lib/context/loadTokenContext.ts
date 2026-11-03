@@ -5,7 +5,6 @@
  * @uses infrastructure:prisma, infrastructure:redis, feature:users
  */
 
-import { check } from '@inixiative/json-rules';
 import {
   cache,
   cacheKey,
@@ -19,8 +18,6 @@ import {
   withEntitlementEntries,
 } from '@template/db';
 import type { Token, TokenOwnerModel } from '@template/db/generated/client/client';
-import { wellFormedEntitlements } from '@template/permissions';
-import { delegateHoldsSomething } from '#/hooks/rules/delegatePermissionRules';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
@@ -38,12 +35,6 @@ const ownerIsPresent = (token: HydratedRecord & Token): boolean => {
   const owner = token[toAccessor(token.ownerModel)] as HydratedRecord | undefined;
   return Boolean(owner) && (memberParts[token.ownerModel] ?? []).every((part) => owner?.[part]);
 };
-
-const holdsSomething = (delegate: unknown): boolean =>
-  check(delegateHoldsSomething, {
-    ...(delegate as Record<string, unknown>),
-    entitlements: wellFormedEntitlements((delegate as { entitlements?: unknown }).entitlements),
-  }) === true;
 
 export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | null> => {
   let fetched = false;
@@ -65,7 +56,6 @@ export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | n
 
   const token = await hydrate('token', row);
   if (!ownerIsPresent(token)) return null;
-  if (![token, token.integration].filter(Boolean).every(holdsSomething)) return null;
 
   const user =
     token.ownerModel === 'User' && token.userId ? await findUserWithRelations(token.userId) : null;

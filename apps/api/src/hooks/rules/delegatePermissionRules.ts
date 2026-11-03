@@ -22,16 +22,6 @@ const fullOnlyOn = (owners: string[]): Condition =>
     `full only on a delegate of ${owners.join(', ')}`,
   );
 
-// Read over the delegate with its live entitlement entries beside its columns.
-export const delegateHoldsSomething: Condition = {
-  any: [
-    { field: 'full', operator: Operator.equals, value: true },
-    { field: 'role', operator: Operator.notEmpty, value: true },
-    { field: 'entitlements', operator: Operator.notEmpty, value: true },
-  ],
-  error: 'a delegate that is not full has a role, entitlements or both',
-};
-
 export const delegatePermissionRules = {
   Integration: { all: [fullTakesNoRole, fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser'])] },
   Token: {

@@ -18,7 +18,6 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerDelegateHoldsSomethingHook } from '#/hooks/delegateHoldsSomething/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { integrationRouter } from '#/modules/integration';
@@ -117,7 +116,6 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
     registerClearCacheHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
-    registerDelegateHoldsSomethingHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
     owner = await member('owner');
@@ -177,9 +175,9 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect(minted.status).toBe(422);
     });
 
-    it('an integration that goes from a role to none must keep something: entitlements, or it is a 422 (R114)', async () => {
+    it('an integration that goes from a role to none is not refused: with no entitlements it holds nothing', async () => {
       expect((await update(owner, await orgIntegration('viewer'), { role: null })).status).toBe(
-        422,
+        200,
       );
       const entitled = await orgIntegration('viewer', [
         entry('db:space', ['db:space', space.id], ['read']),

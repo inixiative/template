@@ -299,7 +299,7 @@ foreignKey: 'webhookSubscriptionId'
 Some database rules (`apps/api/src/hooks/rules/registry.ts`) hold only for rows production writes through every hook. A test that turns on the rules hook (`registerRulesHook()`) also turns on the hooks production pairs it with, so factory rows pass the same rules:
 
 - **Members:** every `OrganizationUser` and `SpaceUser` holds its self-grant as an `Entitlement` row, which the `memberSelfGrant` hook writes after create. Call `registerMemberSelfGrantHook()` in a test that reads a member's permissions, or the member has no self-grant.
-- **Integrations and tokens:** a delegate that is not `full` must have a role, entitlements or both. The writer checks it on every entitlement write; the `delegateHoldsSomething` hook (`registerDelegateHoldsSomethingHook()`) checks it on an update that drops the role. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements.
+- **Integrations and tokens:** a delegate that is not `full` may have no role and no entitlements; it is not refused and holds nothing. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements.
 
 ### Entitlements in Tests
 
