@@ -23,5 +23,6 @@ export interface HydratedRecord {
     | Prisma.JsonValue
     | HydratedRecord
     | HydratedRecord[]
+    | Record<string, unknown>[]
     | Record<string, unknown>;
 }

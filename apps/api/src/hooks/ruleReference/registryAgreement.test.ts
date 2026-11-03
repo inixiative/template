@@ -2,7 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import { projectLens } from '@inixiative/json-rules';
 import { getPolymorphismConfig, RULE_REFERENCEABLE_MODELS } from '@template/db';
 import type { EmailOwnerModel } from '@template/db/generated/client/enums';
-import { RuleReferenceTargetModel } from '@template/db/generated/client/enums';
+import {
+  EntitlementResourceModel,
+  RuleReferenceTargetModel,
+} from '@template/db/generated/client/enums';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { EmailOwnerRef } from '@template/email/render';
 import { emailSlotLenses } from '@template/email/rules';
@@ -10,6 +13,7 @@ import type { RuleLens } from '@template/shared/rules';
 import type { RULE_REFERENCE_SURFACES } from '#/hooks/ruleReference/surfaces';
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import { registry } from '#/lib/email/registry';
+import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
 import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
 type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
@@ -33,6 +37,7 @@ const AUTHORED_UNDER = {
   EmailTemplate: emailLenses(Object.keys(registry)),
   EmailComponent: emailLenses([undefined]),
   Segment: [customerRefLens],
+  Entitlement: Object.values(EntitlementResourceModel).map(entitlementWhereLens),
 } satisfies Record<keyof typeof RULE_REFERENCE_SURFACES, RuleLens[]>;
 
 const idSourceModels = (lens: RuleLens): Set<string> => {

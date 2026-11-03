@@ -11,13 +11,10 @@ const notFullOr = (condition: Condition, error: string): Condition => ({
   error,
 });
 
-const fullTakesNothingElse: Condition[] = [
-  notFullOr({ field: 'role', operator: Operator.isEmpty, value: true }, 'full takes no role'),
-  notFullOr(
-    { field: 'entitlements', operator: Operator.isEmpty, value: true },
-    'full takes no entitlements',
-  ),
-];
+const fullTakesNoRole = notFullOr(
+  { field: 'role', operator: Operator.isEmpty, value: true },
+  'full takes no role',
+);
 
 const fullOnlyOn = (owners: string[]): Condition =>
   notFullOr(
@@ -25,6 +22,7 @@ const fullOnlyOn = (owners: string[]): Condition =>
     `full only on a delegate of ${owners.join(', ')}`,
   );
 
+// Read over the delegate with its live entitlement entries beside its columns.
 export const delegateHoldsSomething: Condition = {
   any: [
     { field: 'full', operator: Operator.equals, value: true },
@@ -35,19 +33,8 @@ export const delegateHoldsSomething: Condition = {
 };
 
 export const delegatePermissionRules = {
-  Integration: {
-    all: [
-      ...fullTakesNothingElse,
-      fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser']),
-      delegateHoldsSomething,
-    ],
-  },
+  Integration: { all: [fullTakesNoRole, fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser'])] },
   Token: {
-    all: [
-      ...fullTakesNothingElse,
-      fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser', 'Integration']),
-      delegateHoldsSomething,
-    ],
+    all: [fullTakesNoRole, fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser', 'Integration'])],
   },
-  Member: delegateHoldsSomething,
 } satisfies Record<string, Condition>;

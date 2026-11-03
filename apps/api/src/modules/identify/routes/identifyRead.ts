@@ -5,15 +5,15 @@
  * @uses primitive:routeTemplates
  */
 import { z } from '@hono/zod-openapi';
+import { TokenScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
-import { tokenReadResponseSchema } from '#/modules/token/schemas/tokenSchemas';
 import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
 const responseSchema = z.discriminatedUnion('model', [
   z.object({ model: z.literal('User'), record: userResponseSchema }),
-  z.object({ model: z.literal('Token'), record: tokenReadResponseSchema }),
+  z.object({ model: z.literal('Token'), record: TokenScalarSchema.omit({ keyHash: true }) }),
 ]);
 
 export type IdentifyResponse = z.infer<typeof responseSchema>;

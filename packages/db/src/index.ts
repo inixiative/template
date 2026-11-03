@@ -1,6 +1,8 @@
 // Database client with scope/transaction methods
 export { db } from './client';
 export type { Db, FinallyFn, FindForUpdateOptions } from './clientTypes';
+// Entitlement rows and the entries they hold
+export * from './entitlements';
 // Mutation lifecycle hooks
 export {
   clearHookRegistry,
@@ -119,8 +121,11 @@ export type {
   PolymorphicTarget,
 } from './registries/polymorphicSchemaTypes';
 // User with relations type and schema
-export type { UserWithRelations } from './types/userWithRelations';
-export { UserWithRelationsSchema } from './types/userWithRelations';
+export type {
+  OrganizationUserWithEntitlements,
+  SpaceUserWithEntitlements,
+  UserWithRelations,
+} from './types/userWithRelations';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
 export { carryDelegatedKeys } from './utils/carryDelegatedKeys';

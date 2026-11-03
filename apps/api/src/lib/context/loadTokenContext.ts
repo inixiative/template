@@ -12,8 +12,11 @@ import {
   db,
   type HydratedRecord,
   hydrate,
+  includeTargetEntitlements,
   toAccessor,
   type UserWithRelations,
+  type WithEntitlementEntries,
+  withEntitlementEntries,
 } from '@template/db';
 import type { Token, TokenOwnerModel } from '@template/db/generated/client/client';
 import { wellFormedEntitlements } from '@template/permissions';
@@ -44,11 +47,15 @@ const holdsSomething = (delegate: unknown): boolean =>
 
 export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | null> => {
   let fetched = false;
-  const row = await cache<Token | null>(
+  const row = await cache<WithEntitlementEntries<Token> | null>(
     cacheKey('Token', { keyHash }),
     async () => {
       fetched = true;
-      return db.token.findUnique({ where: { keyHash } });
+      const token = await db.token.findUnique({
+        where: { keyHash },
+        include: includeTargetEntitlements,
+      });
+      return token && withEntitlementEntries(token);
     },
     TOKEN_CACHE_TTL,
   );

@@ -9,6 +9,7 @@ export * from './cronJobFactory';
 export * from './customerRefFactory';
 export * from './emailComponentFactory';
 export * from './emailTemplateFactory';
+export * from './entitlementFactory';
 export * from './flowFactory';
 export * from './inquiryFactory';
 export * from './integrationFactory';

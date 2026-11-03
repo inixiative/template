@@ -14,7 +14,7 @@ import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
-import { patch } from '#tests/utils/request';
+import { patch, post } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
 
@@ -125,19 +125,16 @@ describe('granting inquiry entitlements: the writer could act on the side named'
       mockOrganizationUsers: [seat],
       mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
     });
-    return (
-      await app.fetch(
-        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [granted] }),
-      )
-    ).status;
+    return (await app.fetch(post(`/api/v1/organizationUser/${target.id}/entitlements`, [granted])))
+      .status;
   };
 
   it('an admin grants reading what the organization received: reading it is manage on the organization', async () => {
-    expect(await grant('admin', inquiries('targetOrganization'))).toBe(200);
+    expect(await grant('admin', inquiries('targetOrganization'))).toBe(201);
   });
 
   it("what its spaces received needs the owner: a space's inquiries need own on the organization", async () => {
-    expect(await grant('owner', inquiries('targetSpace.organization'))).toBe(200);
+    expect(await grant('owner', inquiries('targetSpace.organization'))).toBe(201);
     expect(await grant('admin', inquiries('targetSpace.organization'))).toBe(403);
   });
 

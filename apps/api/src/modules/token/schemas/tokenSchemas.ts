@@ -13,12 +13,12 @@ export const tokenCreateBodySchema = z.object({
   name: z.string().min(1).max(100),
   role: z.nativeEnum(Role).nullable().default(null),
   full: z.boolean().default(false),
-  entitlements: entitlementEntriesSchema.nullable().default(null),
+  entitlements: entitlementEntriesSchema.default([]),
   expiresAt: z.coerce.date().optional(),
 });
 
-export const tokenCreateResponseSchema = TokenScalarSchema.omit({ keyHash: true }).extend({
-  key: z.string(),
+export const tokenReadResponseSchema = TokenScalarSchema.omit({ keyHash: true }).extend({
+  entitlements: entitlementEntriesSchema,
 });
 
-export const tokenReadResponseSchema = TokenScalarSchema.omit({ keyHash: true });
+export const tokenCreateResponseSchema = tokenReadResponseSchema.extend({ key: z.string() });

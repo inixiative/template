@@ -83,8 +83,8 @@ The permission system is the rebac schema (`packages/permissions/src/rebac/schem
 |---|---|---|
 | Platform role | `User.platformRole` | `superadmin` passes every check |
 | Tenant role | `OrganizationUser.role`, `SpaceUser.role` | what a member holds at its organization or space |
-| Delegate permissions | `role`, `full`, `entitlements` on `Token` and `Integration` | how much of its owner a delegate holds |
-| Entitlements | `entitlements` JSON on members and delegates | named grants beyond a role, given by hand |
+| Delegate permissions | `role` and `full` on `Token` and `Integration`, plus their entitlement rows | how much of its owner a delegate holds |
+| Entitlements | rows of the `Entitlement` table, one per grant, targeted at a member or a delegate | named grants beyond a role, given by hand |
 
 The rest of this doc follows one cast through every section:
 
@@ -119,7 +119,7 @@ One word per party, used in code and prose alike. Names in code are composed of 
 | **owner** | the row a token or integration belongs to (its `ownerModel`): a user, a member, a tenant, or (for a token) an integration |
 | **delegate** | a token or an integration |
 | **permissions** | a delegate's `{ role, full, entitlements }` |
-| **entitlement** | a named grant `{ resource, anchor: { resource, id, path? }, where?, actions }` |
+| **entitlement** | a named grant `{ resource, anchor: { resource, id, path? }, where?, actions }`, stored as one `Entitlement` row whose **source** is the anchor and whose **target** is the holder ([Entitlements](#entitlements)) |
 | **member self-grant** | the entitlement every member row carries to `operate` on itself, backed by its user ([The Member Self-Grant](#the-member-self-grant)) |
 | **delegateFull** | the person-only action on an owner that lets you set `full` on its delegate ([Full and delegateFull](#full-and-delegatefull)) |
 | **anchor** | the record an entitlement acts from, reached from the entitled record along `path` |
@@ -135,7 +135,7 @@ Things belong to a user (U1's own integrations, tokens, contacts) or to a tenant
 A delegate acts for its owner and never holds more than its owner. Its permissions are three separate things:
 
 - **`role`** is a narrowing of the tenant. It caps what the owner holds at the tenant: a member-role token on M1 holds O1 at `member` or less, live. It says nothing about the owner itself: a role token on M1 does not act as M1.
-- **`entitlements`** are given by hand and only by hand. A delegate never inherits its owner's entitlements; each one it holds was written on it, and holds only while the owner still allows it.
+- **`entitlements`** are given by hand and only by hand: `Entitlement` rows targeted at the delegate. A delegate never inherits its owner's entitlements; each one it holds was written on it, and holds only while the owner still allows it.
 - **`full`** is the owner's permissions, whole and in sync: role, entitlements and the owner's own identity, as they are on every request. It is not a permission in the schema; it is resolved when permissions are installed.
 
 A token that is not `full` has a role, entitlements or both; `full` takes neither.
@@ -263,8 +263,7 @@ memberSelfGrant('db:organizationUser', { id: M1.id, userId: U1.id })
 - **Anchored on the member's user, along `user`, pinned to the row's id.** The anchor is U1 because U1 is what makes M1 operable; the `where` pins it to M1, so it never reaches U1's other member rows (U1's member row in another organization, or SM1).
 - **Backed by the member's user.** A member's stored entitlements are installed with an owner that must still allow each action on each record. Every other entitlement on M1 is backed by O1's owner grant; the self-grant is backed by U1 (`getUserPermissions(U1)`), because O1's owner does not hold `operate` on M1 and would back nothing. At read time U1 still operates M1 through the normal walk, so the self-grant holds exactly as long as M1 is U1's.
 - **Only that exact entry is backed by the user.** `permissionsOfUser` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry whose resource, anchor and `where` equal the self-grant of that very row goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
-- **The `memberSelfGrant` hook writes it; a rule keeps it.** The hook (`apps/api/src/hooks/memberSelfGrant/hook.ts`, before `create`, `createManyAndReturn` and `upsert` on `OrganizationUser` and `SpaceUser`) appends the self-grant on create. The rule `memberSelfGrantRules` (`apps/api/src/hooks/rules/memberSelfGrantRules.ts`, in `RulesRegistry`) requires every stored member row to hold it: the rules hook checks the row as it will be stored on create, update and `updateManyAndReturn`, so a write that removes it, weakens it, swaps in another member's, or clears entitlements in bulk is refused with 422 (`apps/api/src/hooks/memberSelfGrant/hook.test.ts`).
-- **Its id is generated before insert.** The self-grant names the row's own id, and the database would only assign that id on insert, so the hook sets `row.id ??= Bun.randomUUIDv7()` first and builds the self-grant from it.
+- **The `memberSelfGrant` hook writes it; a guard keeps it.** The hook (`apps/api/src/hooks/memberSelfGrant/hook.ts`, after `create`, `createManyAndReturn` and an `upsert` that creates, on `OrganizationUser` and `SpaceUser`) writes the self-grant as an `Entitlement` row targeted at the new member, once the member has its id. A member created tombstoned (a transferred space's dropped people, `transferSpace`) gets its self-grant tombstoned with the member's own `deletedAt`, so reviving the member revives the grant. The guard `memberSelfGrant:kept` (same file, after updates on `Entitlement`) refuses with 422 any write that tombstones a live member's self-grant, by id or in bulk; only the cascade from the member's own tombstone takes it. Rows are immutable, so the grant can't be weakened in place either (`apps/api/src/hooks/memberSelfGrant/hook.test.ts`).
 
 Who holds `operate` on M1, then: U1 through the walk; a `full` delegate of M1 (or of U1), through the self-grant installed with M1's permissions; and a role delegate only when it is given `operate` on M1 by hand.
 
@@ -284,9 +283,9 @@ check(permix, rebacSchema, 'organizationUser', before, memberRoleWrite('organiza
 | member | nothing |
 | viewer | nothing |
 
-The last-owner check stays in code: `validateNotLastOwner(organizationId)` (`apps/api/src/modules/organization/validations/validateNotLastOwner.ts`) answers 400 "Cannot remove last owner" when an organization's only owner is removed (`organizationUserDelete`) or demoted (`organizationUserUpdate`); both controllers call it only when the row being changed is an owner. The same rule gates `PATCH /organizationUser/:id/entitlements` and `/spaceUser/:id/entitlements`.
+The last-owner check stays in code: `validateNotLastOwner(organizationId)` (`apps/api/src/modules/organization/validations/validateNotLastOwner.ts`) answers 400 "Cannot remove last owner" when an organization's only owner is removed (`organizationUserDelete`) or demoted (`organizationUserUpdate`); both controllers call it only when the row being changed is an owner. `memberRoleWrite` also gates writing a member's entitlements (`validateMemberGrant`, `apps/api/src/lib/permissions/validateMemberGrant.ts`).
 
-Removing a member checks `memberRemoval(tenant)` at the route: `leave` (U1 leaves) or `memberRoleWrite` on the row. Removing tombstones the member row: `softDeleteCascade` tombstones what it owned (its integrations) and hard-deletes its tokens, and a later invite revives the row with what died with it (`memberRemoval.test.ts`). A tombstoned member is not found by the routes, so its user mints nothing on it.
+Removing a member checks `memberRemoval(tenant)` at the route: `leave` (U1 leaves) or `memberRoleWrite` on the row. Removing tombstones the member row: `softDeleteCascade` tombstones what it owned (its integrations, its tokens, its entitlement rows), and a later invite revives the row with what died with it, except its tokens: a token never revives (`SKIP_REVIVE`), and neither do its entitlement rows (`memberRemoval.test.ts`, `entitlementRows.test.ts`). A tombstoned member is not found by the routes, so its user mints nothing on it.
 
 ---
 
@@ -317,7 +316,7 @@ Every kind under O1, for the owner and an admin of O1:
 
 ### Creating an Integration
 
-Each create route checks `create` on a pseudo integration placed under the loaded owner (`validateSubmodelPermission('create')`), then the controller checks the body (`validateIntegrationGrant`).
+Each create route checks `create` on a pseudo integration placed under the loaded owner (`validateSubmodelPermission('create')`), then `createIntegration` (`apps/api/src/modules/integration/services/createIntegration.ts`) checks the role with `validateIntegrationRole` and writes the row and its entitlements in one transaction.
 
 | Route | `create` passes when |
 |---|---|
@@ -348,7 +347,7 @@ Every create-token route calls `createToken` (`apps/api/src/modules/me/services/
 - for a token on an integration, the same is asked of the integration's owner;
 - the role is any role when the chain ends at a user or a member row (it is capped at use), and otherwise a role you hold at the owner (`roleHeldAtOwner`; for an integration's token, at the integration's owner).
 
-Then `validateDelegateRole` refuses a role on a token whose integration has no role and is not `full` (422: the role would narrow nothing), `validateFullGrant` runs when the body sets `full` ([Full and delegateFull](#full-and-delegatefull)), and `validateEntitlementGrants` checks every entry ([Granting an Entitlement](#granting-an-entitlement)).
+Then `validateDelegateRole` refuses a role on a token whose integration has no role and is not `full` (422: the role would narrow nothing), `validateFullGrant` runs when the body sets `full` ([Full and delegateFull](#full-and-delegatefull)). The token row and its entitlements are written in one transaction: the token first, then the body's entries through the one writer, `changeEntitlements` ([Changing Entitlements](#changing-entitlements)), which checks every entry and that the token holds something. Creating an integration does the same (`apps/api/src/modules/integration/services/createIntegration.ts`).
 
 `PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`. A token never changes itself.
 
@@ -358,7 +357,7 @@ Then `validateDelegateRole` refuses a role on a token whose integration has no r
 
 ### What Full Is
 
-`full` makes a delegate its owner: the owner's permissions are installed unchanged, on every request (`delegatedPermissions` returns `owner` as is). Writing `full` clears the delegate's role and entitlements (the `fullDelegate` hook, `apps/api/src/hooks/fullDelegate/hook.ts`). The schema never reads `full`, on the record or on the actor (CI rule `no-full-in-rebac-schema`).
+`full` makes a delegate its owner: the owner's permissions are installed unchanged, on every request (`delegatedPermissions` returns `owner` as is). Writing `full` clears the delegate's role before the write and tombstones its live entitlement rows after it (the `fullDelegate` hook, `apps/api/src/hooks/fullDelegate/hook.ts`); the writer refuses to add an entitlement to a `full` delegate (422). The schema never reads `full`, on the record or on the actor (CI rule `no-full-in-rebac-schema`).
 
 ### Who May Set It
 
@@ -388,10 +387,11 @@ So U1 mints a full token on M1 and makes I1 full; the owner of O1 mints a full t
 
 `delegatePermissionRules` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`, enforced on every write by the rules hook through `RulesRegistry`) states where `full` may sit, on the row's own columns:
 
-- `full` takes no role and no entitlements;
+- `full` takes no role;
 - an integration is `full` only when owned by a User, OrganizationUser or SpaceUser;
-- a token is `full` only when owned by a User, OrganizationUser, SpaceUser or Integration;
-- a token, an integration or a member that is not `full` has a role, entitlements or both (`delegateHoldsSomething`); a member row always has a role.
+- a token is `full` only when owned by a User, OrganizationUser, SpaceUser or Integration.
+
+"A delegate that is not `full` has a role, entitlements or both" reads other rows, so it is not a row rule. The same condition (`delegateHoldsSomething`) is evaluated over the delegate with its live entitlement entries by `assertDelegateHoldsSomething` (`apps/api/src/lib/permissions/assertDelegateHoldsSomething.ts`), under the delegate's `entitlements` owner lock (`withOwnerLock`), so two removals that race can't both leave it empty. It runs at the end of every write through `changeEntitlements` (create paths included) and from the `delegateHoldsSomething` hook after an update that takes the role or `full` off a live `Token` or `Integration`; a revive is not checked, because its rows come back after the row does. A member row always has a role. A raw create outside the writer (a seed) isn't checked; a token that holds nothing is turned away at sign-in (`loadTokenContext`).
 
 `validateFullGrant` answers first on API writes, so a person is refused with 403. The rules catch what never goes through it: a superadmin (who passes every check, `delegateFull` included) and writes outside the API (seeds, jobs, scripts). They refuse with 422.
 
@@ -401,7 +401,7 @@ So U1 mints a full token on M1 and makes I1 full; the owner of O1 mints a full t
 
 ### Hydration
 
-`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchOne` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load runs in `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration.
+`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchOne` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load runs in `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchOne` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its live entitlement rows (`includeTargetEntitlements`, ordered by `createdAt`, `id`) and caches it with those rows turned into entries (`withEntitlementEntries`, `packages/db/src/entitlements`), so a hydrated holder carries `entitlements: EntitlementEntry[]`. `findUserWithRelations` and `loadTokenContext` read the same way; readers still pass the entries through `wellFormedEntitlements`. A write to an `Entitlement` row clears its target's cache keys (`cacheTraversal`, [HOOKS.md](HOOKS.md#cache-invalidation)), so a revoked row is gone on the very next request.
 
 ### installPermissions
 
@@ -499,9 +499,9 @@ An integration has a nullable `role`, `full` and `entitlements`, held over its o
 
 ### An Integration's Role
 
-`validateIntegrationRole` (`apps/api/src/modules/integration/validations/validateIntegrationGrant.ts`) checks the body on a hydrated pseudo integration: `validateFullGrant` when it is `full`, else `integrationRoleWrite`: `manage` on the integration, and the role being set held at its owner (`roleHeldAtOwner`: `owner` needs `own` there, `admin` `manage`, `member` `operate`, `viewer` or none `read`). On I1 the owner is M1, so U1 sets any role M1's actions allow U1: `member` through `operate` on M1, `admin` or `owner` only when U1 also administers O1.
+`validateIntegrationRole` (`apps/api/src/modules/integration/validations/validateIntegrationRole.ts`) checks the body on a hydrated pseudo integration: `validateFullGrant` when it is `full`, else `integrationRoleWrite`: `manage` on the integration, and the role being set held at its owner (`roleHeldAtOwner`: `owner` needs `own` there, `admin` `manage`, `member` `operate`, `viewer` or none `read`). On I1 the owner is M1, so U1 sets any role M1's actions allow U1: `member` through `operate` on M1, `admin` or `owner` only when U1 also administers O1.
 
-Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on the row as it is and as it will be. Setting `role` to null is refused (422) unless the integration will be `full` or holds well-formed entitlements.
+Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on the row as it is and as it will be. Setting `role` to null is refused (422) unless the integration will be `full` or holds a live entitlement (the `delegateHoldsSomething` hook).
 
 ### Granting an Entitlement
 
@@ -510,7 +510,7 @@ A grant is an action: the writer must be able to take every action the delegate 
 1. **The writer's role table.** The writer's table alone (no entitlements, no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable.
 2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed, and its granter still backing each action. Held entitlements never combine: to pass on two, grant two.
 
-Every entry goes through this check, whoever writes it and whatever delegate it lands on. A malformed entry or an anchor that does not exist is 422; a refusal is 403.
+Every entry goes through this check, whoever writes it and whatever delegate it lands on, and so does every row being removed: you remove only what you could grant. A malformed entry or an anchor that does not exist is 422; a refusal is 403.
 
 Each pseudo record is built from the anchor down the path: the foreign keys the parent knows, one record per kind the step admits, each with its owner placed under the anchor, ids below the anchor unknown, plus the `where`'s exact `equals` values. The `where`'s root leaves (the `where` itself, or each leaf of its top `all`; nothing nested) on the kind field are checked on each kind the first step admits, and a kind a leaf fails is dropped. So, for the owner and an admin of O1:
 
@@ -527,7 +527,7 @@ Situations: `integrationGrantsUnderOrganization.test.ts`, `entitlementGrants.tes
 
 ## Entitlements
 
-Grants beyond a role, stored as library entries `{ resource, anchor: { resource, id, path? }, where?, actions }` (`entitlementEntriesSchema`). A flat action map is refused (422). Stored entries are pruned to the well-formed ones wherever they are read (`wellFormedEntitlements`, by the library's `entitlementProblem`, dropping entries another one already covers), so a write starts from what is valid. How to write one: [building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md).
+Grants beyond a role. Each is one row of the `Entitlement` table (`packages/db/prisma/schema/entitlement.prisma`, [DATABASE.md](DATABASE.md#entitlement)): its **source** is the anchor (`sourceModel`, `sourceId`, `sourcePath`), its **target** the holder (a `Token`, `Integration`, `OrganizationUser` or `SpaceUser`), `resource` the model its `actions` apply to, `where` a positive json-rules condition. The grantor is never a column: it is the target's owner, re-walked live. The library keeps its own words; `toEntitlementEntry` turns a row into the entry `{ resource, anchor: { resource, id, path? }, where?, actions }` (`entitlementEntriesSchema`), with no `path` or `where` when the row has none and `actions` as a map. A flat action map is refused (422). Readers prune entries to the well-formed ones (`wellFormedEntitlements`, by the library's `entitlementProblem`, dropping entries another one covers). Responses for tokens, integrations, member rows and `/me` keep an `entitlements: EntitlementEntry[]` field built from the rows. Why rows: "who holds what on this record?" is a query, and every grant and revocation is its own audit entry. How to write one: [building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md).
 
 ### How Entitlements Are Applied
 
@@ -541,11 +541,20 @@ The action is checked on the record, never asked of the anchor. Who backs it: fo
 
 ### Changing Entitlements
 
-Entitlements change only through their own endpoint, never through a record update: `PATCH /organizationUser/:id/entitlements`, `/spaceUser/:id/entitlements`, `/integration/:id/entitlements` and `/token/:id/entitlements`, with body `{ add?, remove? }` (`changeEntitlements`, `apps/api/src/lib/permissions/changeEntitlements.ts`).
+Entitlements change only through their holder's `entitlements` sub-resource, never through a record update, and every change goes through one writer, `changeEntitlements` (`apps/api/src/lib/permissions/changeEntitlements.ts`), inside `db.txn()` and the holder's `entitlements` owner lock:
 
-- The writer must be able to change the holder: `memberRoleWrite` on a member row, `validateIntegrationRole` on an integration, `validateTokenWrite` on a token.
-- Every entry in `add`, and every entry in `remove` that matches a stored one, goes through the same grant check: you remove only what you could grant. A removal that matches nothing stored is skipped, unchecked.
-- On a member row the self-grant is put back by the hook whatever the body says.
+| Route | Body | Answer |
+|---|---|---|
+| `GET /{token,integration,organizationUser,spaceUser}/:id/entitlements` | none | 200, every live row as its entry plus its `id` (`read` on the holder) |
+| `POST /{token,integration,organizationUser,spaceUser}/:id/entitlements` | a JSON array of entries | 201, every live row the holder now holds, with ids |
+| `DELETE /{token,integration,organizationUser,spaceUser}/:id/entitlements` | a JSON array of `Entitlement` row ids | 204 |
+
+- The writer must be able to change the holder: `validateMemberGrant` (`memberRoleWrite`) on a member row, `validateIntegrationRole` on an integration (plus `manage` at the route), `validateTokenWrite` on a token.
+- Every added entry and every removed row goes through the same grant check. A removal names rows the holder holds live; any other id is 404 and nothing changes. A removed row whose anchor is gone (`sourceDeletedAt` set, or its typed FK purged) grants nothing and has no anchor to check against, so only the holder check applies to it.
+- An added entry already covered by one the holder holds (`coversEntitlement`) is skipped.
+- Rows are immutable (`immutableFields` refuses a change to any column but the tombstones): a change is a removal plus a grant. A removal is a soft delete, audited per row, as is every created row.
+- A member's self-grant can't be removed ([The Member Self-Grant](#the-member-self-grant)); a `full` holder takes none; the holder must still hold something after ([The Backstop Rules](#the-backstop-rules)).
+- The create body of a token or an integration may carry `entitlements`; they are written by the same writer in the same transaction as the row.
 
 ### The Path Names the Anchor and the Axis; the Where Narrows
 
@@ -867,7 +876,6 @@ model Group {
   organizationId  String
   name            String
   role            Role
-  entitlements    Json?
   members         GroupMember[]
 }
 
@@ -878,5 +886,5 @@ model GroupMember {
 ```
 
 Use cases:
-- assign a role and entitlements to many users at once;
+- assign a role and entitlements to many users at once (a `Group` would be one more `Entitlement` target);
 - an "Engineering" group gets the `member` role plus an entitlement to manage one space.

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { db, snapshotHookRegistry } from '@template/db';
-import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
+import { cleanupTouchedTables, createCronJob, createOrganizationUser } from '@template/db/test';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import {
   clearImmutableFieldsCache,
@@ -104,25 +104,18 @@ describe('immutableFields hook', () => {
     });
 
     it('can lock nested JSON paths via cache', async () => {
-      const initialEntitlements = { canInvite: true, maxProjects: 5 };
-      const { entity: testOrgUser } = await createOrganizationUser({
-        entitlements: initialEntitlements,
+      const { entity: cronJob } = await createCronJob({
+        payload: { canInvite: true, maxProjects: 5 },
       });
 
-      // Lock only the canInvite path, not the whole entitlements object
-      setImmutableFieldsCache('OrganizationUser', [
-        'userId',
-        'organizationId',
-        'entitlements.canInvite',
-      ]);
+      setImmutableFieldsCache('CronJob', ['payload.canInvite']);
 
-      const result = await db.organizationUser.update({
-        where: { id: testOrgUser.id },
-        data: { entitlements: { canInvite: false, maxProjects: 100 } },
+      const result = await db.cronJob.update({
+        where: { id: cronJob.id },
+        data: { payload: { canInvite: false, maxProjects: 100 } },
       });
 
-      // canInvite should be stripped, maxProjects should update
-      expect(result.entitlements).toEqual({ maxProjects: 100 });
+      expect(result.payload).toEqual({ maxProjects: 100 });
     });
   });
 });

@@ -19,6 +19,7 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
+import { registerDelegateHoldsSomethingHook } from '#/hooks/delegateHoldsSomething/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { integrationRouter } from '#/modules/integration';
@@ -109,7 +110,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
   ) =>
     as(writer.user, [writer.organizationUser])(
       entitlements
-        ? patch(`/api/v1/integration/${integration.id}/entitlements`, { add: entitlements })
+        ? post(`/api/v1/integration/${integration.id}/entitlements`, entitlements)
         : patch(`/api/v1/integration/${integration.id}`, permissions),
     );
 
@@ -117,6 +118,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
     registerClearCacheHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
+    registerDelegateHoldsSomethingHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
     owner = await member('owner');

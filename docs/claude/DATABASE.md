@@ -47,6 +47,7 @@
 - [False Polymorphism](#false-polymorphism)
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
   - [Delegated Keys](#delegated-keys)
+- [Entitlement](#entitlement)
 - [Registries](#registries)
 - [Schema Reference](#schema-reference)
 
@@ -743,6 +744,41 @@ See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
 
 ---
 
+## Entitlement
+
+`packages/db/prisma/schema/entitlement.prisma`. One row per entitlement a member or delegate holds. The rules for granting and reading them are in [PERMISSIONS.md](PERMISSIONS.md#entitlements); this is the storage.
+
+A row is a directed edge in the standard names ([NAMING.md](NAMING.md)):
+
+| Column | Holds |
+|---|---|
+| `sourceModel`, `sourceId`, `sourcePath` | the **anchor**: the record the entitlement acts from, reached from the entitled record along `sourcePath`. `sourceModel` is any of the 15 rebac resources (`EntitlementResourceModel`), each with a typed FK (`sourceUserId`, `sourceOrganizationId`, …, `sourceWebhookSubscriptionId`). |
+| `sourceDeletedAt` | a copy of the anchor's `deletedAt`, stamped by `ruleReference:target` |
+| `targetModel`, `targetId` | the **holder**: `Token`, `Integration`, `OrganizationUser` or `SpaceUser` (`EntitlementTargetModel`), each with a typed FK |
+| `resource` | the model the actions apply to (`EntitlementResourceModel`) |
+| `actions` | `String[]`, the actions held, GIN-indexed |
+| `where` | `Json?`, a positive json-rules condition over the entitled record |
+| `lens` | `Json?`, a lens narrowing; kept abstract, unused so far |
+| `deletedAt` | the row's tombstone |
+
+- **No grantor column.** The grantor is the target's owner, re-walked live by the permissions library.
+- **Both ends are false-polymorphic with a materialized id** (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names; `toEntitlementEntry` and `toEntitlementRow` (`packages/db/src/entitlements`) turn a row into the library's entry (`resource: 'db:integration'`, `anchor: { resource, id, path? }`) and back, in one place.
+- **The target owns the row.** Target FKs cascade at the database; `softDeleteCascade` tombstones a target's rows with it and revives them with it. A target that never revives (a `Token`, `SKIP_REVIVE`) keeps its rows dead.
+- **The source only names the row.** Source FKs are `onDelete: SetNull`, and every source relation is in `CASCADE_EXEMPT`: an anchor's tombstone lands in `sourceDeletedAt`, a purge nulls the typed FK and leaves `sourceId` naming what went. The polymorphism rule on a materialized axis accepts that purged state (FK null, plain id set), so the row can still be tombstoned with its target; a create must set the FK, never the plain id alone (`materializedIdConflicts`).
+- **Audited and soft-deleted** (`AUDIT_ENABLED_MODELS`): every created and every removed row is its own audit entry. Rows are immutable (`immutableFields` refuses a change to any column but the tombstones); a change is a removal plus a create.
+- **Partial indexes on live rows** (`deletedAt IS NULL`) on (target), (source) and (resource). Tombstones are kept, never purged.
+- **Its `where` is a rule surface.** `Entitlement` is a `RuleReference` source (the `ruleReference` hook, [HOOKS.md](HOOKS.md#application-hooks)), so the rows a `where` names by id get edges.
+
+Why a table and not the JSON column the holders had: "who holds what on this record?" becomes a query, and each grant and revocation is audited on its own.
+
+### Tokens
+
+A `Token` is soft-deleted and audited, and never revived (`SKIP_REVIVE`; it is no longer in `HARD_DELETE_ON_TOMBSTONE`). Revoking (`DELETE /token/:id`) and `redactUser` tombstone it; a tombstoned token is not found at sign-in. It tombstones with its owner (user, member, tenant or integration) and stays dead when the owner is revived, and so do its entitlement rows. Why: once a token's grants are audited rows, they should stay explainable after it dies, and a revived token would re-grant access nobody decided on now.
+
+### Inquiries and rule references
+
+Every `Inquiry` party relation (source and target, each kind) is in `CASCADE_EXEMPT`: an inquiry never tombstones because a party did, and shows that party as deleted. `RuleReference` gained `Entitlement` as a source and 12 more target models (`User`, `OrganizationUser`, `SpaceUser`, `Integration`, `Project`, `Token`, `Contact`, `SegmentMember`, `Inquiry`, `Flow`, `AuthProvider`, `WebhookSubscription`), so an entitlement's `where` naming any rebac resource by id has a target column.
+
 ## Registries
 
 Schema-level configuration in `packages/db/src/registries/`:
@@ -786,7 +822,8 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `organizationUser.prisma` - Organization memberships and roles
 - `space.prisma` - Flexible containers within organizations
 - `spaceUser.prisma` - Space memberships (requires organization membership)
-- `token.prisma` - API tokens (user/org/space scoped)
+- `token.prisma` - API tokens (user/org/space/member/integration scoped); soft-deleted, never revived ([Tokens](#tokens))
+- `entitlement.prisma` - one row per entitlement a member or delegate holds ([Entitlement](#entitlement))
 - `webhookSubscription.prisma` - Webhook configurations
 - `project.prisma` - `Project`: a unit of work an owner organizes things around (name, optional description). False-polymorphic over all five owners (User, OrganizationUser, Organization, Space, SpaceUser); names are unique per owner among live rows, so one repo can be a project in several tenants. Taggable (`TagResource.Project`). Routes: `/me/projects` and `/{organization,organizationUser,space,spaceUser}/:id/projects` to create and list, `/project/:id` to read, update and delete
 - `inquiry.prisma` - False polymorphic inquiry system

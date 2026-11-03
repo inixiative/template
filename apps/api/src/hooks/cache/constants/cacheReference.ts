@@ -25,6 +25,7 @@ export const cacheReference: CacheReference = {
   Organization: (r) => [cacheKey('organization', r.id), cacheKey('organization', { slug: r.slug })],
 
   OrganizationUser: (r) => [
+    cacheKey('organizationUser', r.id),
     cacheKey('organizationUser', { organizationId: r.organizationId, userId: r.userId }),
     cacheKey('user', r.userId, ['organizationUsers']),
     cacheKey('user', r.userId, ['relations']),
@@ -38,6 +39,7 @@ export const cacheReference: CacheReference = {
   ],
 
   SpaceUser: (r) => [
+    cacheKey('spaceUser', r.id),
     cacheKey('spaceUser', {
       organizationId: r.organizationId,
       spaceId: r.spaceId,
@@ -73,6 +75,22 @@ export const cacheReference: CacheReference = {
     if (!ownerId) return [];
     return [cacheKey('webhookSubscription', { [r.ownerModel]: ownerId }, [r.model])];
   },
+};
+
+type CacheTraversal = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => CachedRow };
+type CachedRow = { model: Prisma.ModelName; id: string };
+
+// A row whose change is a change to another cached row: clearing it clears that row's keys.
+export const cacheTraversal: CacheTraversal = {
+  Entitlement: (r) => ({ model: r.targetModel, id: r.targetId }),
+};
+
+export const traversedRows = (
+  model: Prisma.ModelName,
+  record: Record<string, unknown>,
+): CachedRow[] => {
+  const fn = cacheTraversal[model] as ((r: Record<string, unknown>) => CachedRow) | undefined;
+  return fn ? [fn(record)] : [];
 };
 
 export const fetchCacheKeys = (

@@ -1,30 +1,100 @@
 /**
  * @atlas
- * @kind helper
+ * @kind service
  * @partOf primitive:authz
- * @uses none
+ * @uses infrastructure:prisma, mutex
  */
-import { z } from '@hono/zod-openapi';
-import { type EntitlementEntry, type Permix, wellFormedEntitlements } from '@template/permissions';
-import { entitlementEntriesSchema } from '@template/permissions/rebac';
-import { isEqual } from 'lodash-es';
+import {
+  db,
+  type EntitlementTarget,
+  includeTargetEntitlements,
+  resolveFalsePolymorphismRef,
+  toEntitlementEntry,
+  toEntitlementRow,
+} from '@template/db';
+import type { Entitlement } from '@template/db/generated/client/client';
+import {
+  coversEntitlement,
+  type EntitlementEntry,
+  type Permix,
+  wellFormedEntitlements,
+} from '@template/permissions';
+import { uniq } from 'lodash-es';
+import { makeError } from '#/lib/errors';
+import { withOwnerLock } from '#/lib/locks/withOwnerLock';
+import { assertDelegateHoldsSomething } from '#/lib/permissions/assertDelegateHoldsSomething';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 
-export const entitlementChangesSchema = z.object({
-  add: entitlementEntriesSchema.optional(),
-  remove: entitlementEntriesSchema.optional(),
-});
+export type EntitlementChanges = { add?: EntitlementEntry[]; remove?: string[] };
 
-export type EntitlementChanges = z.infer<typeof entitlementChangesSchema>;
+type Holder = { full?: boolean; targetEntitlements: Entitlement[] };
 
-export const changeEntitlements = async (
-  writer: Permix,
-  stored: unknown,
-  { add = [], remove = [] }: EntitlementChanges,
-): Promise<EntitlementEntry[]> => {
-  const current = wellFormedEntitlements(stored);
-  const removed = current.filter((entry) => remove.some((match) => isEqual(match, entry)));
-  await validateEntitlementGrants(writer, [...add, ...removed] as EntitlementEntry[]);
-  const kept = current.filter((entry) => !removed.includes(entry));
-  return wellFormedEntitlements([...kept, ...add]);
+const anchorIsGone = (row: Entitlement): boolean => {
+  const column = resolveFalsePolymorphismRef({
+    model: 'Entitlement',
+    axis: 'sourceModel',
+    value: row.sourceModel,
+  });
+  return row.sourceDeletedAt != null || !column || row[column as keyof Entitlement] == null;
 };
+
+const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
+  const holder = (await db.delegate(target.model).findUnique({
+    where: { id: target.id },
+    include: includeTargetEntitlements,
+  })) as Holder | null;
+  if (!holder) throw makeError({ status: 404, message: `${target.model} not found` });
+  return holder;
+};
+
+// why: rows are immutable, so a held row a new entry covers stays; only the new entries are filtered.
+const uncovered = (held: EntitlementEntry[], added: EntitlementEntry[]): EntitlementEntry[] =>
+  added.filter(
+    (entry, index) =>
+      ![...held, ...added.slice(0, index)].some((holding) => coversEntitlement(holding, entry)),
+  );
+
+/**
+ * The one writer of a target's entitlements: every added entry and every removed row passes the
+ * grant check, entries already covered are skipped, and the target still holds something after.
+ * Rows never change; a removal is a soft delete, so each row's audit entry is its own.
+ */
+export const changeEntitlements = (
+  writer: Permix,
+  target: EntitlementTarget,
+  { add = [], remove = [] }: EntitlementChanges,
+): Promise<Entitlement[]> =>
+  db.txn(() =>
+    withOwnerLock({ ownerModel: target.model, ownerId: target.id }, 'entitlements', async () => {
+      const holder = await liveRows(target);
+      const removedIds = uniq(remove);
+      const removed = holder.targetEntitlements.filter((row) => removedIds.includes(row.id));
+      if (removed.length !== removedIds.length)
+        throw makeError({ status: 404, message: 'Entitlement not found on this holder' });
+      if (add.length && holder.full)
+        throw makeError({ status: 422, message: 'full takes no entitlements' });
+
+      await validateEntitlementGrants(writer, [
+        ...add,
+        ...removed.filter((row) => !anchorIsGone(row)).map(toEntitlementEntry),
+      ]);
+
+      const kept = holder.targetEntitlements
+        .filter((row) => !removedIds.includes(row.id))
+        .map(toEntitlementEntry);
+      const added = uncovered(wellFormedEntitlements(kept), add);
+
+      if (removed.length)
+        await db.entitlement.updateManyAndReturn({
+          where: { id: { in: removedIds }, deletedAt: null },
+          data: { deletedAt: new Date() },
+        });
+      if (added.length)
+        await db.entitlement.createManyAndReturn({
+          data: added.map((entry) => toEntitlementRow(entry, target)),
+        });
+
+      await assertDelegateHoldsSomething(target);
+      return (await liveRows(target)).targetEntitlements;
+    }),
+  );

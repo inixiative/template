@@ -5,6 +5,7 @@ export {
   type Action,
   type Actor,
   ActorModel,
+  coversEntitlement,
   createPermissions,
   delegate,
   type EntitlementEntry,
