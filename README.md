@@ -16,11 +16,13 @@
 
 > One of the [inixiative](https://www.inixiative.com) building blocks. Stop rediscovering what you need to build. See [all the projects](https://github.com/inixiative).
 
-**Template is like shadcn, but for the whole SaaS backend: you start a product from it and own the
-code.** Authorization, multi-tenancy, field-level encryption, auditing, background jobs, webhooks and
-a generated typed client are already built, tested and documented, so a new product starts from
-working systems instead of TODOs. To get your coding agent to use what is here, use the agentic
-level: the repo ships its [Foundry](https://github.com/inixiative/foundry) setup in `.foundry/`.
+**Template is like shadcn, but for the whole SaaS app: you start a product from it and own the
+code.** It is a decade of lessons from building SaaS products, packaged so a new product starts from
+answers instead of rediscovering them. The API, the web, admin and superadmin apps, a shared UI
+package, authorization, multi-tenancy, field-level encryption, auditing, background jobs, webhooks and
+a generated typed client are already built, tested and documented. When a coding agent writes its own
+version of something already here, Foundry points it back: the repo ships its
+[Foundry](https://github.com/inixiative/foundry) setup in `.foundry/`.
 
 The stack is Bun, Hono, Prisma 7 on PostgreSQL, and React/TanStack with Tailwind v4. Most of the
 work is in how the pieces fit together, in about 139,000 curated lines of TypeScript.
