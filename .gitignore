@@ -147,6 +147,7 @@ dist
 
 # Project-specific Claude instructions
 CLAUDE.local.md
+.foundry/*.local.md
 
 # Claude Code agent worktrees (per-machine; other .claude/ files like
 # settings.json or shared agent prompts can still be tracked).
