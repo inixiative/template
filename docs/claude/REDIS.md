@@ -304,6 +304,8 @@ Cache keys defined in the cache reference map are auto-cleared on mutations via 
 
 A write the hook never sees (a raw-SQL shift in the ordered-list helpers, rows a key change reaches by `ON UPDATE CASCADE` such as a space transfer) queues the same clear itself with `queueCacheClear(model, rows)` (`apps/api/src/hooks/cache/queueCacheClear.ts`), passing the rows as they were and as they are. The hook calls it too.
 
+A row whose change is a change to another cached row is listed in `cacheTraversal` (same file as the cache reference map): an `Entitlement` write loads the row's target (tombstones included) and clears that target's keys, so a token, integration or member reads its entitlements fresh on the very next request.
+
 #### Invalidation conventions
 
 Correctness here is enforced by **discipline and tests, not by types** — nothing compiler-checks that a mutation clears the right keys. These rules are what keep it correct:
