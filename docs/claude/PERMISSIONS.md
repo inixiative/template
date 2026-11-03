@@ -357,7 +357,7 @@ Then `validateDelegateRole` refuses a role on a token whose integration has no r
 
 ### What Full Is
 
-`full` makes a delegate its owner: the owner's permissions are installed unchanged, on every request (`delegatedPermissions` returns `owner` as is). Writing `full` clears the delegate's role before the write and tombstones its live entitlement rows after it (the `fullDelegate` hook, `apps/api/src/hooks/fullDelegate/hook.ts`); the writer refuses to add an entitlement to a `full` delegate (422). The schema never reads `full`, on the record or on the actor (CI rule `no-full-in-rebac-schema`).
+`full` makes a delegate its owner: the owner's permissions are installed unchanged, on every request (`delegatedPermissions` returns `owner` as is). Writing `full` clears the delegate's role before the write and tombstones its live entitlement rows after it (the `fullDelegate` hook, `apps/api/src/hooks/fullDelegate/hook.ts`); the same hook refuses any `Entitlement` row created for a `full` delegate (422), through the writer or not. The schema never reads `full`, on the record or on the actor (CI rule `no-full-in-rebac-schema`).
 
 ### Who May Set It
 
@@ -545,12 +545,12 @@ Entitlements change only through their holder's `entitlements` sub-resource, nev
 
 | Route | Body | Answer |
 |---|---|---|
-| `GET /{token,integration,organizationUser,spaceUser}/:id/entitlements` | none | 200, every live row as its entry plus its `id` (`read` on the holder) |
+| `GET /{token,integration,organizationUser,spaceUser}/:id/entitlements` | none | 200, the live rows as entries plus their `id`, paginated (`read` on the holder) |
 | `POST /{token,integration,organizationUser,spaceUser}/:id/entitlements` | a JSON array of entries | 201, every live row the holder now holds, with ids |
 | `DELETE /{token,integration,organizationUser,spaceUser}/:id/entitlements` | a JSON array of `Entitlement` row ids | 204 |
 
 - The writer must be able to change the holder: `validateMemberGrant` (`memberRoleWrite`) on a member row, `validateIntegrationRole` on an integration (plus `manage` at the route), `validateTokenWrite` on a token.
-- Every added entry and every removed row goes through the same grant check. A removal names rows the holder holds live; any other id is 404 and nothing changes. A removed row whose anchor is gone (`sourceDeletedAt` set, or its typed FK purged) grants nothing and has no anchor to check against, so only the holder check applies to it.
+- Every added entry and every removed row goes through the same grant check, with one exception: a removed row whose anchor was purged (its typed source FK is null) has no anchor left to check against, so only the holder check applies to it. An anchor that is only soft-deleted (`sourceDeletedAt` set) can be revived, and the row would grant again, so its removal is checked like any other, reading the anchor with tombstones (`db.withDeleted`). A removal names rows the holder holds live; any other id is 404 and nothing changes.
 - An added entry already covered by one the holder holds (`coversEntitlement`) is skipped.
 - Rows are immutable (`immutableFields` refuses a change to any column but the tombstones): a change is a removal plus a grant. A removal is a soft delete, audited per row, as is every created row.
 - A member's self-grant can't be removed ([The Member Self-Grant](#the-member-self-grant)); a `full` holder takes none; the holder must still hold something after ([The Backstop Rules](#the-backstop-rules)).

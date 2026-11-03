@@ -4,9 +4,16 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
+import {
+  DbAction,
+  db,
+  HookTiming,
+  registerDbHook,
+  resolveFalsePolymorphismRef,
+} from '@template/db';
 import type { EntitlementTargetModel } from '@template/db/generated/client/enums';
-import { castArray } from 'lodash-es';
+import { castArray, groupBy } from 'lodash-es';
+import { makeError } from '#/lib/errors';
 
 type Row = Record<string, unknown>;
 
@@ -14,6 +21,31 @@ const DELEGATE_MODELS: readonly EntitlementTargetModel[] = ['Token', 'Integratio
 
 const clearRoleBesideFull = (row: Row | undefined) => {
   if (row?.full === true) row.role = null;
+};
+
+const isDelegateModel = (model: unknown): model is EntitlementTargetModel =>
+  DELEGATE_MODELS.includes(model as EntitlementTargetModel);
+
+const targetIdOf = (model: string, row: Row): string =>
+  (row.targetId ??
+    row[
+      resolveFalsePolymorphismRef({ model: 'Entitlement', axis: 'targetModel', value: model }) ??
+        'targetId'
+    ]) as string;
+
+// A full delegate is its owner whole, so no write of any kind gives it a row of its own.
+const refuseRowsOnFull = async (rows: Row[]) => {
+  const byModel = groupBy(
+    rows.filter((row) => isDelegateModel(row.targetModel)),
+    'targetModel',
+  );
+  for (const [model, group] of Object.entries(byModel)) {
+    const full = await db.delegate(model).findFirst({
+      where: { id: { in: group.map((row) => targetIdOf(model, row)) }, full: true },
+      select: { id: true },
+    });
+    if (full) throw makeError({ status: 422, message: 'full takes no entitlements' });
+  }
 };
 
 export const registerFullDelegateHook = () => {
@@ -38,6 +70,14 @@ export const registerFullDelegateHook = () => {
       clearRoleBesideFull(create);
       clearRoleBesideFull(update);
     },
+  );
+
+  registerDbHook(
+    'fullDelegate:refuseEntitlements',
+    'Entitlement',
+    HookTiming.before,
+    [DbAction.create, DbAction.createManyAndReturn],
+    async ({ args }) => refuseRowsOnFull(castArray((args as { data: Row | Row[] }).data) as Row[]),
   );
 
   // A full delegate is its owner whole; the entitlements it held beside that go.

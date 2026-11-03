@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, revive, snapshotHookRegistry, toAccessor } from '@template/db';
+import { cacheKey, checkCache, db, revive, snapshotHookRegistry, toAccessor } from '@template/db';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { EntitlementResourceModel } from '@template/db/generated/client/enums';
 import {
@@ -350,5 +350,46 @@ describe('edges of the lifecycle the review found (2026-11-03)', () => {
     const ids = (await rowsOf('Token', token.id)).map((row) => row.id);
     await changeEntitlements(owner.permix, target, { remove: ids });
     expect(await heldEntitlements(target)).toEqual([]);
+  });
+});
+
+describe("an entitlement's where names rows as rule-reference edges", () => {
+  const selfGrantEdges = (memberId: string) =>
+    db.ruleReference.findMany({
+      where: { sourceModel: 'Entitlement', targetModel: 'OrganizationUser', targetId: memberId },
+    });
+
+  it('a self-grant names its member; the edge goes with the row and comes back with it', async () => {
+    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
+    expect(await selfGrantEdges(member.id)).toHaveLength(1);
+
+    await db.organizationUser.update({ where: { id: member.id }, data: { deletedAt: new Date() } });
+    expect(await selfGrantEdges(member.id)).toHaveLength(0);
+
+    await revive(db.organizationUser, { id: member.id });
+    expect(await selfGrantEdges(member.id)).toHaveLength(1);
+  });
+});
+
+describe('a revoked token is refused at sign-in, even with its sign-in cached', () => {
+  it('the token row cached under its keyHash is cleared when the token is revoked', async () => {
+    const { call } = createTokenProbeApp();
+    const { rawKey, entity: token } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', role: null, entitlements: [readOrganization()] },
+      { organizationUser: owner.member },
+    );
+    const actorOf = async () =>
+      (
+        (await (await call(rawKey, 'GET', '/api/v1/probe/actor')).json()) as {
+          actor: { model: string } | null;
+        }
+      ).actor?.model ?? null;
+    expect(await actorOf()).toBe('Token');
+    expect((await checkCache(cacheKey('Token', { keyHash: token.keyHash }))).state).not.toBe(
+      'empty',
+    );
+
+    await db.token.update({ where: { id: token.id }, data: { deletedAt: new Date() } });
+    expect(await actorOf()).toBeNull();
   });
 });

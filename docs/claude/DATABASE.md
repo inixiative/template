@@ -777,7 +777,7 @@ A `Token` is soft-deleted and audited, and never revived (`SKIP_REVIVE`; it is n
 
 ### Inquiries and rule references
 
-Every `Inquiry` party relation (source and target, each kind) is in `CASCADE_EXEMPT`: an inquiry never tombstones because a party did, and shows that party as deleted. `RuleReference` gained `Entitlement` as a source and 12 more target models (`User`, `OrganizationUser`, `SpaceUser`, `Integration`, `Project`, `Token`, `Contact`, `SegmentMember`, `Inquiry`, `Flow`, `AuthProvider`, `WebhookSubscription`), so an entitlement's `where` naming any rebac resource by id has a target column.
+Every `Inquiry` party relation (source and target, each kind) is in `CASCADE_EXEMPT`: an inquiry never tombstones because a party did, and shows that party as deleted. `RuleReference` gained `Entitlement` as a source and 12 more target models (`User`, `OrganizationUser`, `SpaceUser`, `Integration`, `Project`, `Token`, `Contact`, `SegmentMember`, `Inquiry`, `Flow`, `AuthProvider`, `WebhookSubscription`), so an entitlement's `where` naming any rebac resource by id has a target column. The email lens declares an id source for every referenceable model (`emailLens.ts`, labelled by `name` where the model has one), so the widening reaches email rules too: an email rule naming a recipient by id (`recipient.id equals …`) is now a `User` reference, gets an edge, and must name a live row when saved.
 
 ## Registries
 

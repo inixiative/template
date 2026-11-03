@@ -19,7 +19,7 @@ import {
   type Permix,
   wellFormedEntitlements,
 } from '@template/permissions';
-import { uniq } from 'lodash-es';
+import { partition, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { assertDelegateHoldsSomething } from '#/lib/permissions/assertDelegateHoldsSomething';
@@ -27,15 +27,15 @@ import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlement
 
 export type EntitlementChanges = { add?: EntitlementEntry[]; remove?: string[] };
 
-type Holder = { full?: boolean; targetEntitlements: Entitlement[] };
+type Holder = { targetEntitlements: Entitlement[] };
 
-const anchorIsGone = (row: Entitlement): boolean => {
+const anchorIsPurged = (row: Entitlement): boolean => {
   const column = resolveFalsePolymorphismRef({
     model: 'Entitlement',
     axis: 'sourceModel',
     value: row.sourceModel,
   });
-  return row.sourceDeletedAt != null || !column || row[column as keyof Entitlement] == null;
+  return !column || row[column as keyof Entitlement] == null;
 };
 
 const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
@@ -71,13 +71,16 @@ export const changeEntitlements = (
       const removed = holder.targetEntitlements.filter((row) => removedIds.includes(row.id));
       if (removed.length !== removedIds.length)
         throw makeError({ status: 404, message: 'Entitlement not found on this holder' });
-      if (add.length && holder.full)
-        throw makeError({ status: 422, message: 'full takes no entitlements' });
 
-      await validateEntitlementGrants(writer, [
-        ...add,
-        ...removed.filter((row) => !anchorIsGone(row)).map(toEntitlementEntry),
-      ]);
+      const checked = removed.filter((row) => !anchorIsPurged(row));
+      const [anchoredLive, anchoredDeleted] = partition(
+        checked,
+        (row) => row.sourceDeletedAt == null,
+      );
+      await validateEntitlementGrants(writer, [...add, ...anchoredLive.map(toEntitlementEntry)]);
+      await db.withDeleted(() =>
+        validateEntitlementGrants(writer, anchoredDeleted.map(toEntitlementEntry)),
+      );
 
       const kept = holder.targetEntitlements
         .filter((row) => !removedIds.includes(row.id))

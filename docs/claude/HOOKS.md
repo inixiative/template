@@ -116,7 +116,7 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `cache` | Cache invalidation on mutations (post-commit) |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
 | `delegateHoldsSomething` | After an update that takes the role or `full` off a live `Token` or `Integration` (a revive, or a write to a delegate that was already role-less, is not checked), `assertDelegateHoldsSomething` requires a live entitlement row, read under the delegate's `entitlements` owner lock; 422 otherwise. Creates are checked by the writer that lays their entitlements down (`changeEntitlements`) |
-| `fullDelegate` | On `Token` and `Integration`: a row written `full` gets `role: null` before the write, and its live entitlement rows are tombstoned after it |
+| `fullDelegate` | On `Token` and `Integration`: a row written `full` gets `role: null` before the write, and its live entitlement rows are tombstoned after it. On `Entitlement`, a create whose target is a `full` delegate is refused (422 `full takes no entitlements`), whoever writes it |
 | `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
 | `memberSelfGrant` | After an `OrganizationUser` or `SpaceUser` is created (`create`, `createManyAndReturn`, an `upsert` that creates), writes its self-grant as an `Entitlement` row, tombstoned with the member's own `deletedAt` when the member is created tombstoned. `memberSelfGrant:kept` refuses (422) tombstoning a live member's self-grant; only the member's own tombstone takes it ([PERMISSIONS.md](PERMISSIONS.md#the-member-self-grant)) |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |

@@ -40,7 +40,7 @@ export const toEntitlementEntry = (row: StoredEntitlement): EntitlementEntry => 
     id: row.sourceId,
     ...(row.sourcePath ? { path: row.sourcePath } : {}),
   },
-  ...(row.where != null ? { where: row.where as unknown as Condition } : {}),
+  ...(row.where != null ? { where: row.where as Condition } : {}),
   actions: Object.fromEntries(row.actions.map((action) => [action, true])),
 });
 

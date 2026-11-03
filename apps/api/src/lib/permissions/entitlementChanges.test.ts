@@ -111,7 +111,7 @@ describe("a member's entitlements change only through its entitlement rows: crea
     expect(await stored(target)).toEqual([]);
   });
 
-  it('an admin adds and removes what it could grant, in one change', async () => {
+  it('an admin removes one row and grants another it could grant, in a delete-many then a create-many', async () => {
     const target = await member([ownIntegrations(['read'])]);
     expect(
       (

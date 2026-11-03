@@ -4,7 +4,7 @@
  * @partOf feature:integrations
  * @uses primitive:routeTemplates
  */
-import { withEntitlementEntries } from '@template/db';
+import { includeTargetEntitlements, withEntitlementEntries } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationReadRoute } from '#/modules/integration/routes/integrationRead';
@@ -13,6 +13,10 @@ export const integrationReadController = makeController(
   integrationReadRoute,
   async (c, respond) => {
     const integration = getResource<'integration'>(c);
-    return respond.ok(withEntitlementEntries(integration));
+    const loaded = await c.get('db').integration.findUniqueOrThrow({
+      where: { id: integration.id },
+      include: includeTargetEntitlements,
+    });
+    return respond.ok(withEntitlementEntries(loaded));
   },
 );
