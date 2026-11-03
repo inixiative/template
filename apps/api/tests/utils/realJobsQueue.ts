@@ -10,7 +10,7 @@ export const connectRealJobsQueue = async () => {
     throw new Error('REDIS_BULLMQ_URL must point at a real Redis for the job scheduler tests');
 
   const redis = new Redis(url, { maxRetriesPerRequest: null, connectTimeout: 2_000 });
-  const realQueue = new Queue(`test-jobs-${crypto.randomUUID()}`, { connection: redis });
+  const realQueue = new Queue(`test-jobs-${Bun.randomUUIDv7()}`, { connection: redis });
   await realQueue.waitUntilReady();
 
   const upsertJobScheduler = spyOn(queue, 'upsertJobScheduler').mockImplementation(((

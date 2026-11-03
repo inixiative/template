@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
-import { randomUUID } from 'node:crypto';
 import { clearHookRegistry, db } from '@template/db';
 import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
@@ -169,7 +168,7 @@ describe('webhook hook — tenancy', () => {
 
   it('delivers upserts on both paths to the parties', async () => {
     const { customerUserId, sub } = await subscribedCustomer();
-    const id = randomUUID();
+    const id = Bun.randomUUIDv7();
     const upsert = () =>
       db.customerRef.upsert({
         where: { id },
@@ -432,7 +431,7 @@ describe('webhook hook — tenancy', () => {
     await createRef(customerUserId);
     enqueueSpy.mockClear();
 
-    const email = `changed-${randomUUID()}@example.com`;
+    const email = `changed-${Bun.randomUUIDv7()}@example.com`;
     await db.user.update({ where: { id: customerUserId }, data: { email } });
 
     const [payload] = deliveredTo(providerSub.id);

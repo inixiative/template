@@ -23,7 +23,7 @@ export const failOnRound: StrategyExecutor = async (
   baseContext,
   _timeout,
 ) => {
-  const batchId = crypto.randomUUID();
+  const batchId = Bun.randomUUIDv7();
   registerBatch(batchId, baseContext);
 
   const results: RequestResult[][] = [];

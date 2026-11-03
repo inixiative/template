@@ -35,7 +35,7 @@ export const transactionPerRound: StrategyExecutor = async (
 
       const roundResult = await db.txn(
         async () => {
-          const batchId = crypto.randomUUID();
+          const batchId = Bun.randomUUIDv7();
           registerBatch(batchId, baseContext);
 
           try {
@@ -83,7 +83,7 @@ export const transactionPerRound: StrategyExecutor = async (
       completedRounds++;
 
       if (roundIndex < rounds.length - 1) {
-        const batchId = crypto.randomUUID();
+        const batchId = Bun.randomUUIDv7();
         registerBatch(batchId, baseContext);
         await refreshBatchContext(batchId);
         unregisterBatch(batchId);

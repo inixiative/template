@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { randomUUID } from 'node:crypto';
 import { db, unregisterDbHook } from '@template/db';
 import type {
   Integration,
@@ -97,7 +96,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
   ) =>
     as(writer.user, [writer.organizationUser])(
       post(`/api/v1/organization/${organization.id}/integrations`, {
-        name: `i-${randomUUID()}`,
+        name: `i-${Bun.randomUUIDv7()}`,
         ...permissions,
       }),
     );
@@ -286,10 +285,12 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
         role: 'member',
       });
       expect(
-        (await update(admin, integration, { name: `i-${randomUUID()}` } as Permissions)).status,
+        (await update(admin, integration, { name: `i-${Bun.randomUUIDv7()}` } as Permissions))
+          .status,
       ).toBe(403);
       expect(
-        (await update(owner, integration, { name: `i-${randomUUID()}` } as Permissions)).status,
+        (await update(owner, integration, { name: `i-${Bun.randomUUIDv7()}` } as Permissions))
+          .status,
       ).toBe(200);
     });
 
@@ -334,7 +335,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
     it("its user administers it; the organization's owner and an admin do not", async () => {
       const { m, integration } = await memberIntegration();
       const rename = (writer: { user: User; organizationUser: OrganizationUser }) =>
-        update(writer, integration, { name: `i-${randomUUID()}` } as Permissions);
+        update(writer, integration, { name: `i-${Bun.randomUUIDv7()}` } as Permissions);
       expect((await rename(admin)).status).toBe(403);
       expect((await rename(owner)).status).toBe(403);
       expect((await rename(m)).status).toBe(200);
