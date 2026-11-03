@@ -24,7 +24,7 @@ export const integrationCreateBodySchema = IntegrationScalarInputSchema.omit({
 }).extend({
   role: z.nativeEnum(Role).nullable().default(null),
   full: z.boolean().default(false),
-  entitlements: entitlementEntriesSchema.nullable().default(null),
+  entitlements: entitlementEntriesSchema.default([]),
 });
 
 export const integrationUpdateBodySchema = integrationCreateBodySchema
@@ -35,4 +35,6 @@ export const integrationUpdateBodySchema = integrationCreateBodySchema
   })
   .partial();
 
-export const integrationReadResponseSchema = IntegrationScalarSchema;
+export const integrationReadResponseSchema = IntegrationScalarSchema.extend({
+  entitlements: entitlementEntriesSchema,
+});

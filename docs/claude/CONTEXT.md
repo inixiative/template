@@ -327,22 +327,25 @@ Located in `apps/api/src/lib/context/types.ts`.
 Tokens include all possible relations for permission setup:
 
 ```typescript
-type TokenWithRelations = Token & {
+type TokenWithRelations = WithEntitlementEntries<Token> & {
   user: User | null;
   organization: Organization | null;
-  organizationUser: (OrganizationUser & {
+  organizationUser: (WithEntitlementEntries<OrganizationUser> & {
     organization: Organization;
     user: User
   }) | null;
   space: Space | null;
-  spaceUser: (SpaceUser & {
+  spaceUser: (WithEntitlementEntries<SpaceUser> & {
     organization: Organization;
     organizationUser: OrganizationUser;
     space: Space;
     user: User
   }) | null;
+  integration: WithEntitlementEntries<Integration> | null;
 };
 ```
+
+Every holder carries `entitlements: EntitlementEntry[]`, its live `Entitlement` rows as entries (`withEntitlementEntries`, `packages/db/src/entitlements`). `loadTokenContext` reads the token with them, and `hydrate` loads the member and integration through `fetchOne`, which includes them for every holder. The resource context includes the rows for `token`, `integration`, `organizationUser` and `spaceUser` (`includeTargetEntitlements` in `resourceContextArgs`).
 
 Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 

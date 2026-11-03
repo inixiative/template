@@ -11,7 +11,7 @@ import { z } from 'zod';
 const resources = Object.keys(rebacSchema.permissions) as [string, ...string[]];
 
 /** A stored entitlement: actions on a resource, from an anchor. Its owner is the delegate's owner. */
-const entitlementEntrySchema = z
+export const entitlementEntrySchema = z
   .object({
     resource: z.enum(resources),
     anchor: z
@@ -27,3 +27,6 @@ const entitlementEntrySchema = z
   .strict();
 
 export const entitlementEntriesSchema = z.array(entitlementEntrySchema);
+
+/** A stored entry as the API shows a holder's row: the entry and the row id that removes it. */
+export const entitlementRowSchema = entitlementEntrySchema.extend({ id: z.string() });

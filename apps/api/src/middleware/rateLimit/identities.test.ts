@@ -72,7 +72,7 @@ describe('rate limit identities', () => {
     const viaToken = await who(
       createTestApp({
         mockUser: user,
-        mockToken: { ...token, ...bareRelations, user },
+        mockToken: { ...token, entitlements: [], ...bareRelations, user },
         mount: [echo],
       }).fetch,
     );
@@ -90,8 +90,10 @@ describe('rate limit identities', () => {
     );
 
     const result = await who(
-      createTestApp({ mockToken: { ...token, ...bareRelations, organization }, mount: [echo] })
-        .fetch,
+      createTestApp({
+        mockToken: { ...token, entitlements: [], ...bareRelations, organization },
+        mount: [echo],
+      }).fetch,
     );
 
     expect(result).toEqual({
@@ -109,7 +111,7 @@ describe('rate limit identities', () => {
 
     const result = await who(
       createTestApp({
-        mockToken: { ...token, ...bareRelations, organization, space },
+        mockToken: { ...token, entitlements: [], ...bareRelations, organization, space },
         mount: [echo],
       }).fetch,
     );
@@ -131,7 +133,13 @@ describe('rate limit identities', () => {
 
     const result = await who(
       createTestApp({
-        mockToken: { ...token, ...bareRelations, user, integration },
+        mockToken: {
+          ...token,
+          entitlements: [],
+          ...bareRelations,
+          user,
+          integration: { ...integration, entitlements: [] },
+        },
         mount: [echo],
       }).fetch,
     );

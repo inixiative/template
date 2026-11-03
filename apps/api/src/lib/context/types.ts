@@ -4,6 +4,7 @@
  * @partOf primitive:requestContext
  * @uses infrastructure:prisma
  */
+import type { WithEntitlementEntries } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -14,18 +15,20 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 
-export type TokenWithRelations = Token & {
+export type TokenWithRelations = WithEntitlementEntries<Token> & {
   user: User | null;
   organization: Organization | null;
-  organizationUser: (OrganizationUser & { organization: Organization; user: User }) | null;
+  organizationUser:
+    | (WithEntitlementEntries<OrganizationUser> & { organization: Organization; user: User })
+    | null;
   space: Space | null;
   spaceUser:
-    | (SpaceUser & {
+    | (WithEntitlementEntries<SpaceUser> & {
         organization: Organization;
         organizationUser: OrganizationUser;
         space: Space;
         user: User;
       })
     | null;
-  integration: Integration | null;
+  integration: WithEntitlementEntries<Integration> | null;
 };

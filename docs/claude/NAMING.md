@@ -231,6 +231,27 @@ The typed FKs and relations carry the side too, so both ends read the same way: 
 back-relations do the same, side plus the full model name: `sourceRuleReferences` on a source model,
 `targetRuleReferences` on a target model, both on a model that is both (`Segment`).
 
+### Entitlement: source, target and the library's anchor
+
+An `Entitlement` row is a directed edge, so it uses `source` / `target` like `RuleReference`. The
+**source** is the anchor the entitlement acts from, the **target** the holder (`Token`,
+`Integration`, `OrganizationUser`, `SpaceUser`); `resource` is the model its actions apply to. The
+permissions library keeps its own words, and one mapping (`toEntitlementEntry` / `toEntitlementRow`,
+`packages/db/src/entitlements`) moves between them:
+
+| Library entry | Row |
+|---|---|
+| `anchor.resource` (`db:space`) | `sourceModel` (`Space`) and the typed FK `sourceSpaceId` |
+| `anchor.id` | `sourceId` |
+| `anchor.path` | `sourcePath` |
+| `resource` (`db:integration`) | `resource` (`Integration`) |
+| `actions` (`{ read: true }`) | `actions` (`['read']`) |
+| the holder it is installed on | `targetModel`, `targetId` and the typed FK `targetTokenId`, … |
+
+Back-relations follow the side rule: `targetEntitlements` on a holder, `sourceEntitlements` on every
+model an entitlement can anchor at. An API response's `entitlements` field is the holder's live rows
+as library entries, never rows. The grantor has no name on the row: it is the target's owner.
+
 ### IDs
 
 TODO: Document ID format

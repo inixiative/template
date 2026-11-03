@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { type Db, db } from '@template/db';
+import { type Db, db, includeTargetEntitlements, withEntitlementEntries } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
 import { auth } from '#/lib/auth';
 import { installPermissions } from '#/lib/context/installPermissions';
@@ -42,7 +42,14 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
   app.use('*', async (c, next) => {
     if (options?.mockUser) c.set('user', options.mockUser);
     if (options?.mockOrganizationUsers) {
-      c.set('organizationUsers', options.mockOrganizationUsers);
+      const members = await db.organizationUser.findMany({
+        where: { id: { in: options.mockOrganizationUsers.map((member) => member.id) } },
+        include: includeTargetEntitlements,
+      });
+      c.set(
+        'organizationUsers',
+        members.map((member) => withEntitlementEntries(member)),
+      );
       const orgIds = options.mockOrganizationUsers.map((ou) => ou.organizationId);
       const organizations = await db.organization.findMany({
         where: { id: { in: orgIds } },
@@ -50,7 +57,14 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
       c.set('organizations', organizations);
     }
     if (options?.mockSpaceUsers) {
-      c.set('spaceUsers', options.mockSpaceUsers);
+      const members = await db.spaceUser.findMany({
+        where: { id: { in: options.mockSpaceUsers.map((member) => member.id) } },
+        include: includeTargetEntitlements,
+      });
+      c.set(
+        'spaceUsers',
+        members.map((member) => withEntitlementEntries(member)),
+      );
       const spaceIds = options.mockSpaceUsers.map((su) => su.spaceId);
       const spaces = await db.space.findMany({
         where: { id: { in: spaceIds } },

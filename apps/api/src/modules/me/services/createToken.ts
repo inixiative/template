@@ -5,14 +5,14 @@
  * @uses infrastructure:prisma, feature:auth
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { type HydratedRecord, hydrate, Prisma } from '@template/db';
+import { type HydratedRecord, hydrate, toEntitlementEntry } from '@template/db';
 import type { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { type DelegatePermissions, TokenAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
+import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
-import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 import { validateFullGrant } from '#/lib/permissions/validateFullGrant';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -44,7 +44,6 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
     throw makeError({ status: 403, message: 'Access denied' });
   validateDelegateRole(pseudo);
   if (row.full) validateFullGrant(permix, 'token', pseudo);
-  await validateEntitlementGrants(permix, params.entitlements ?? []);
 
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];
@@ -52,22 +51,27 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   const keyHash = createHash('sha256').update(rawKey).digest('hex');
   const keyPrefix = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex.slice(0, 6)}`;
 
-  const { keyHash: _keyHash, ...token } = await db.token.create({
-    data: {
-      name: params.name,
-      keyHash,
-      keyPrefix,
-      ownerModel: params.ownerModel,
-      userId: params.userId,
-      organizationId: params.organizationId,
-      spaceId: params.spaceId,
-      integrationId: params.integrationId,
-      role: params.role,
-      full: params.full,
-      entitlements: (params.entitlements as Prisma.InputJsonValue | null) ?? Prisma.DbNull,
-      expiresAt: params.expiresAt,
-    },
+  return db.txn(async () => {
+    const { keyHash: _keyHash, ...token } = await db.token.create({
+      data: {
+        name: params.name,
+        keyHash,
+        keyPrefix,
+        ownerModel: params.ownerModel,
+        userId: params.userId,
+        organizationId: params.organizationId,
+        spaceId: params.spaceId,
+        integrationId: params.integrationId,
+        role: params.role,
+        full: params.full,
+        expiresAt: params.expiresAt,
+      },
+    });
+    const entitlements = await changeEntitlements(
+      permix,
+      { model: 'Token', id: token.id },
+      { add: params.entitlements ?? [] },
+    );
+    return { ...token, entitlements: entitlements.map(toEntitlementEntry), key: rawKey };
   });
-
-  return { ...token, key: rawKey };
 };

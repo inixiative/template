@@ -1,6 +1,6 @@
 # Building entitlements
 
-An entitlement is a named grant on a holder: a member row, a token or an integration. It holds the actions it names on a resource, from an anchor, and nothing else. What it lets the holder do beyond those names comes from the schema's action chains, so the chains have to be right for entitlements to work. The system around it (who holds what, full, owner kinds) is in [docs/claude/PERMISSIONS.md](../../../../docs/claude/PERMISSIONS.md).
+An entitlement is a named grant on a holder: a member row, a token or an integration. It is stored as one row of the `Entitlement` table, its anchor as the row's source and its holder as the target ([DATABASE.md](../../../../docs/claude/DATABASE.md#entitlement)); the shape below is the entry that row reads back as. It holds the actions it names on a resource, from an anchor, and nothing else. What it lets the holder do beyond those names comes from the schema's action chains, so the chains have to be right for entitlements to work. The system around it (who holds what, full, owner kinds) is in [docs/claude/PERMISSIONS.md](../../../../docs/claude/PERMISSIONS.md).
 
 The examples use one cast: user U1, organization O1, space S1 under O1, M1 U1's member row in O1, I1 an integration owned by M1, T a token.
 
@@ -18,7 +18,7 @@ The examples use one cast: user U1, organization O1, space S1 under O1, M1 U1's 
 - **`resource`** is the model the action is checked on. The action is always checked on that record, never asked of the anchor.
 - **`anchor`** is the record the entitlement acts from. `path` names the relations from the entitled record up to the anchor, following the Prisma relation names (`'organization'`, `'space.organization'`, `'user'`). A record anchored at itself has no `path`. Only the anchor's id is fixed: a record that moves inside the anchor stays reached, one that moves out stops.
 - **`where`** is a positive json-rules condition over the record: no negation, `isEmpty`, `notExists`, `if`/`then`/`else`, array or aggregate rule. "No value" is `equals null`. A single row is `where: { field: 'id', … }`, never an `id` beside the anchor.
-- **`actions`** are booleans. Stored entries are pruned to the well-formed ones whenever they are read, and an entry another one already covers is dropped.
+- **`actions`** are booleans; a row stores the names of the ones held. Readers prune entries to the well-formed ones, and an entry another one already covers is dropped; the writer skips adding an entry one the holder holds already covers.
 
 ## Writing one
 
@@ -64,7 +64,7 @@ Every entitlement is installed with an owner, and holds an action on a record on
 
 ## Granting one
 
-Entitlements change only through their own endpoints (`PATCH …/:id/entitlements`, body `{ add, remove }`), and every added entry, and every removed entry that matches a stored one, is one check: `placeEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action, or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
+Entitlements change only through their holder's sub-resource: `GET …/:id/entitlements` lists the rows with their ids, `POST …/:id/entitlements` with an array of entries grants them, `DELETE …/:id/entitlements` with an array of row ids removes them, both through the one writer (`changeEntitlements`). Every added entry, and every removed row, is one check: `placeEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action, or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
 
 ## The standard chain
 

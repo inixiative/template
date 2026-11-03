@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { db } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -11,16 +11,17 @@ import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
+import { heldEntitlements } from '#tests/utils/entitlements';
 
-const operate = [
+const operate = (organizationId: string) => [
   {
     resource: 'db:organization',
-    anchor: { resource: 'db:organization', id: 'x' },
+    anchor: { resource: 'db:organization', id: organizationId },
     actions: { operate: true },
   },
 ];
 
-describe('writing full clears the role and entitlements beside it', () => {
+describe('writing full clears the role and tombstones the entitlement rows beside it', () => {
   let organization: Organization;
 
   beforeAll(async () => {
@@ -34,7 +35,7 @@ describe('writing full clears the role and entitlements beside it', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('an integration created full keeps no role or entitlements', async () => {
+  it('an integration created full keeps no role', async () => {
     const { entity: member } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity } = await createIntegration({
       ownerModel: 'OrganizationUser',
@@ -42,18 +43,22 @@ describe('writing full clears the role and entitlements beside it', () => {
       userId: member.userId,
       full: true,
       role: 'admin',
-      entitlements: operate,
     });
-    expect(entity).toMatchObject({ full: true, role: null, entitlements: null });
+    expect(entity).toMatchObject({ full: true, role: null });
   });
 
   it('a token updated to full drops its role and entitlements', async () => {
     const { entity: member } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity: token } = await createKeyedToken(
-      { ownerModel: 'OrganizationUser', role: 'admin', entitlements: operate },
+      { ownerModel: 'OrganizationUser', role: 'admin', entitlements: operate(organization.id) },
       { organizationUser: member },
     );
     const updated = await db.token.update({ where: { id: token.id }, data: { full: true } });
-    expect(updated).toMatchObject({ full: true, role: null, entitlements: null });
+    expect(updated).toMatchObject({ full: true, role: null });
+    expect(await heldEntitlements({ model: 'Token', id: token.id })).toEqual([]);
+    const tombstoned = await db.withDeleted(() =>
+      db.entitlement.findMany({ where: { targetModel: 'Token', targetId: token.id } }),
+    );
+    expect(tombstoned.map((row) => row.deletedAt != null)).toEqual([true]);
   });
 });

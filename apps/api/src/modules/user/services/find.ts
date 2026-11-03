@@ -5,7 +5,14 @@
  * @uses infrastructure:prisma, primitive:caching
  */
 import type { UserWithRelations } from '@template/db';
-import { cache, cacheKey, db, upsertCache } from '@template/db';
+import {
+  cache,
+  cacheKey,
+  db,
+  includeTargetEntitlements,
+  upsertCache,
+  withEntitlementEntries,
+} from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
 
@@ -24,22 +31,27 @@ export const findUserWithRelations = async (userId: string): Promise<UserWithRel
   return cache<UserWithRelations | null>(
     cacheKey('User', userId, ['relations']),
     async () => {
-      const user = await db.user.findUnique({
+      const found = await db.user.findUnique({
         where: { id: userId },
         include: {
           organizationUsers: {
             where: { organization: { deletedAt: null } },
+            include: includeTargetEntitlements,
           },
         },
       });
 
-      if (!user) return null;
+      if (!found) return null;
+      const user = {
+        ...found,
+        organizationUsers: found.organizationUsers.map((row) => withEntitlementEntries(row)),
+      };
 
       const ownedOrgIds = user.organizationUsers
         .filter((ou) => ou.role === Role.owner)
         .map((ou) => ou.organizationId);
 
-      const [organizations, spaceUsers, spaces] = await Promise.all([
+      const [organizations, spaceUserRows, spaces] = await Promise.all([
         db.organization.findMany({
           where: {
             organizationUsers: { some: { userId } },
@@ -51,6 +63,7 @@ export const findUserWithRelations = async (userId: string): Promise<UserWithRel
             userId,
             space: { deletedAt: null },
           },
+          include: includeTargetEntitlements,
         }),
         db.space.findMany({
           where: {
@@ -59,6 +72,8 @@ export const findUserWithRelations = async (userId: string): Promise<UserWithRel
           },
         }),
       ]);
+
+      const spaceUsers = spaceUserRows.map((row) => withEntitlementEntries(row));
 
       const result: UserWithRelations = {
         ...user,

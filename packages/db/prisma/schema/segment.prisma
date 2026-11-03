@@ -19,10 +19,11 @@
 // owner's read, and a degraded rule does nothing new until its author fixes it.
 
 model Segment {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id                 String        @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements Entitlement[] @relation("EntitlementSource")
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?
 
   // Owner — false polymorphism, exactly one FK matches the discriminator.
   ownerModel     ProviderModel

@@ -8,15 +8,17 @@
 // - Audit trail (all Space access traces to Org membership)
 
 model SpaceUser {
-  inquiriesSent     Inquiry[] @relation("InquirySource")
-  inquiriesReceived Inquiry[] @relation("InquiryTarget")
-  id                String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime?
+  inquiriesSent        Inquiry[]       @relation("InquirySource")
+  inquiriesReceived    Inquiry[]       @relation("InquiryTarget")
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetEntitlements   Entitlement[]   @relation("EntitlementTarget")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
 
-  role         Role  @default(member)
-  entitlements Json?
+  role Role @default(member)
 
   // Relations
   organizationId     String           @db.VarChar(36)

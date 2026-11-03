@@ -25,6 +25,7 @@ import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { heldEntitlements } from '#tests/utils/entitlements';
 import { patch, post } from '#tests/utils/request';
 
 const { call: request, holds } = createTokenProbeApp((hono) => {
@@ -243,10 +244,12 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       const member = await memberOf(writerRole, organization, writer);
       const integration = await memberIntegration(member, null);
       const response = await userApp(writer, [member]).fetch(
-        patch(`/api/v1/integration/${integration.id}/entitlements`, { add: entitlements }),
+        post(`/api/v1/integration/${integration.id}/entitlements`, entitlements),
       );
-      const stored = await db.integration.findUniqueOrThrow({ where: { id: integration.id } });
-      return { status: response.status, stored: stored.entitlements };
+      return {
+        status: response.status,
+        stored: await heldEntitlements({ model: 'Integration', id: integration.id }),
+      };
     };
 
     it('its user cannot give their member integration an entitlement they do not hold (Aron, 2026-10-31)', async () => {
@@ -255,7 +258,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       const member = await memberOf('member', organization, writer);
       const integration = await memberIntegration(member, null);
       const response = await userApp(writer, [member]).fetch(
-        patch(`/api/v1/integration/${integration.id}/entitlements`, { add: manage }),
+        post(`/api/v1/integration/${integration.id}/entitlements`, manage),
       );
       expect(response.status).toBe(403);
     });
@@ -275,7 +278,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       expect(
         (
           await userApp(writer, [member]).fetch(
-            patch(`/api/v1/integration/${integration.id}/entitlements`, { add: elsewhere }),
+            post(`/api/v1/integration/${integration.id}/entitlements`, elsewhere),
           )
         ).status,
       ).toBe(403);

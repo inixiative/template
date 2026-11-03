@@ -7,8 +7,10 @@
 // belong to the segment's owner as its provider (segmentMemberOwner hook).
 
 model SegmentMember {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
 
   segmentId String  @db.VarChar(36)
   segment   Segment @relation(fields: [segmentId], references: [id], onDelete: Cascade)

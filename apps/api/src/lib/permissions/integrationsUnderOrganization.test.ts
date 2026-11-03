@@ -476,7 +476,8 @@ describe("a member writes any entitlement on their own member integration, cappe
         role,
       });
       expect(
-        (await app.fetch(patch(`/api/v1/integration/${integration.id}/entitlements`, add))).status,
+        (await app.fetch(post(`/api/v1/integration/${integration.id}/entitlements`, add.add)))
+          .status,
       ).toBe(403);
     }
   });

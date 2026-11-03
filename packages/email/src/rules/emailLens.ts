@@ -32,6 +32,7 @@ import {
   ruleReferences,
 } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { lensFor, live, omitForeignKeys } from '@template/db/lens';
 import { redactLens } from '@template/db/lens/redactLens';
 import {
@@ -127,7 +128,10 @@ export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowin
   sender ? RECIPIENT_NARROWING_BY_SENDER[sender.ownerModel] : undefined;
 
 const referenceableSources = Object.fromEntries(
-  RULE_REFERENCEABLE_MODELS.map((model) => [model, { sources: { id: { label: 'name' } } }]),
+  RULE_REFERENCEABLE_MODELS.map((model) => [
+    model,
+    { sources: { id: 'name' in prismaMap.models[model].fields ? { label: 'name' } : true } },
+  ]),
 );
 
 const scalarPicks = (fields: Record<string, { kind: string }>): ModelNarrowing => ({

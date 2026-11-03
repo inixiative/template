@@ -5,6 +5,12 @@
  * @uses infrastructure:redis
  */
 import { db } from '@template/db/client';
+import {
+  includeTargetEntitlements,
+  isEntitlementTargetAccessor,
+  withEntitlementEntries,
+} from '@template/db/entitlements/targetEntitlements';
+import type { Entitlement } from '@template/db/generated/client/client';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { cache, cacheKey } from '@template/db/redis';
@@ -22,9 +28,17 @@ export const fetchOne = async <T extends HydratedRecord>(
   const delegate = db.delegate(accessor);
 
   const where = typeof identifier === 'string' ? { id: identifier } : identifier;
-  const read = () => delegate.findFirst({ where }) as Promise<T | null>;
+  const read = async (): Promise<HydratedRecord | null> => {
+    if (!isEntitlementTargetAccessor(accessor))
+      return delegate.findFirst({ where }) as Promise<HydratedRecord | null>;
+    const row = (await delegate.findFirst({ where, include: includeTargetEntitlements })) as {
+      id: string;
+      targetEntitlements: Entitlement[];
+    } | null;
+    return row && withEntitlementEntries(row);
+  };
 
   // why: a withDeleted read may return a tombstone, which must never land under the shared live key.
-  if (auditActorContext.isSoftDeleteBypassed()) return read();
-  return cache<T | null>(key, read, ttl);
+  if (auditActorContext.isSoftDeleteBypassed()) return (await read()) as T | null;
+  return (await cache<HydratedRecord | null>(key, read, ttl)) as T | null;
 };

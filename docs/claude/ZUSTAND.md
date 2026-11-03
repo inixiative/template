@@ -227,7 +227,7 @@ await logout();
 Called by `fetchAndHydrateMe`. Sets the Permix user id; a superadmin gets
 `setSuperadmin(true)` and stops there. Otherwise it applies `getUserPermissions`, then
 `getOrgPermissions` per `organizationUsers` row and `getSpacePermissions` per
-`spaceUsers` row (role + entitlements), mirroring the backend setup.
+`spaceUsers` row (role + entitlements, the `/me` response's entries built from each member's Entitlement rows), mirroring the backend setup.
 
 #### check(model, record, action)
 

@@ -298,8 +298,12 @@ foreignKey: 'webhookSubscriptionId'
 
 Some database rules (`apps/api/src/hooks/rules/registry.ts`) hold only for rows production writes through every hook. A test that turns on the rules hook (`registerRulesHook()`) also turns on the hooks production pairs it with, so factory rows pass the same rules:
 
-- **Members:** every `OrganizationUser` and `SpaceUser` must hold its self-grant (`memberSelfGrantRules`), which the `memberSelfGrant` hook writes on create. Call `registerMemberSelfGrantHook()` beside `registerRulesHook()`, and unregister `memberSelfGrant` wherever the file unregisters the rules hook.
-- **Integrations and tokens:** a delegate that is not `full` must have a role, entitlements or both. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements.
+- **Members:** every `OrganizationUser` and `SpaceUser` holds its self-grant as an `Entitlement` row, which the `memberSelfGrant` hook writes after create. Call `registerMemberSelfGrantHook()` in a test that reads a member's permissions, or the member has no self-grant.
+- **Integrations and tokens:** a delegate that is not `full` may have no role and no entitlements; it is not refused and holds nothing. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements.
+
+### Entitlements in Tests
+
+`createToken`, `createIntegration`, `createOrganizationUser` and `createSpaceUser` take an `entitlements` option: a list of entries, written as `Entitlement` rows targeted at the new row (`storeEntitlements`, `packages/db/src/test/factories/entitlementFactory.ts`). Like any factory, it skips the grant check; the writer's own rules are tested through the routes. `createEntitlement` builds a single row. In `apps/api/tests/utils/entitlements.ts`: `heldEntitlements(target)` reads the entries a target holds, `entitlementIds(target, entries)` finds the rows storing entries, and `grantEntitlements` / `revokeEntitlements` / `changeEntitlements` call the `POST` / `DELETE` `…/:id/entitlements` routes.
 
 How a test file turns hooks on and off is not yet uniform across the suite ([TEST-002](../../tickets/TEST-002-hook-registration-in-tests.md)).
 

@@ -98,7 +98,7 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | `model` | Module | Resource name (singular) - **required** |
 | `submodel` | Module | Nested resource (e.g., `token` → `/{id}/tokens`) |
 | `action` | string | Verb action (e.g., `activate` → `/{id}/activate`) |
-| `many` | boolean | List endpoint (affects path, operationId) |
+| `many` | boolean | List endpoint, or a create-many / delete-many over a submodel collection (affects path, body, operationId) |
 | `paginate` | boolean | Add pagination query params (requires `many`) |
 | `admin` | boolean | Adds 'Admin' prefix to operationId and tag |
 | `skipId` | boolean | Omit `:id` param from path |
@@ -122,14 +122,19 @@ readRoute({ model: 'user', many: true, paginate: true, responseSchema })
 // Create
 createRoute({ model: 'user', bodySchema, responseSchema })
 
-// Create many
-createRoute({ model: 'user', many: true, bodySchema: z.array(schema), responseSchema })
+// Create many: bodySchema is one item; the body is an array of them, the 201 an array of responseSchema
+createRoute({ model: 'token', submodel: 'entitlement', many: true, bodySchema, responseSchema })
+// → POST /{id}/entitlements, operationId tokenCreateManyEntitlements
 
 // Update
 updateRoute({ model: 'user', bodySchema, responseSchema })
 
 // Delete
 deleteRoute({ model: 'user' })
+
+// Delete many: the body is a JSON array of ids (deleteManyBodySchema), the answer 204
+deleteRoute({ model: 'token', submodel: 'entitlement', many: true })
+// → DELETE /{id}/entitlements, operationId tokenDeleteManyEntitlements
 
 // Subresource
 createRoute({ model: 'organization', submodel: 'token', bodySchema, responseSchema })
