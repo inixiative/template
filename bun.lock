@@ -17,7 +17,7 @@
       "devDependencies": {
         "@biomejs/biome": "2.5.2",
         "@inixiative/atlas": "^0.5.0",
-        "@inixiative/config": "^0.5.194",
+        "@inixiative/config": "^0.5.195",
         "@lightpanda/browser": "^1.2.0",
         "@mendable/firecrawl-js": "^4.18.1",
         "@tanstack/react-router": "^1.166.2",
@@ -623,7 +623,7 @@
 
     "@inixiative/atlas": ["@inixiative/atlas@0.5.0", "", { "dependencies": { "@inixiative/json-rules": "^3.16.0" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-pGtfREWXiAypTg+b9ZF4Wl2wUiHHeZChLPZK2EwEEsGrz2PdQNfUpo5NacuOhc8JPbFIry/Kga30sXeT+w9gmw=="],
 
-    "@inixiative/config": ["@inixiative/config@0.5.194", "", { "peerDependencies": { "@biomejs/biome": ">=2.5.0", "tsup": ">=8.5.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@biomejs/biome", "tsup", "typescript"], "bin": { "inixiative-config": "dist/cli.js" } }, "sha512-+3el0TWdUSOxH2uWyPe2zS1ZY5rBJoYBgmJ90X+de6D1BPgNHfOrwsf/DtqMuawHqCakBxWxOpP8Xddkx+WKsg=="],
+    "@inixiative/config": ["@inixiative/config@0.5.195", "", { "peerDependencies": { "@biomejs/biome": ">=2.5.0", "tsup": ">=8.5.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@biomejs/biome", "tsup", "typescript"], "bin": { "inixiative-config": "dist/cli.js" } }, "sha512-dxccUeZgAvVRhGXxB0ISg+DLIR0aucjecd6dhcci/y8wv1qo7ksN5YKPedVxx1WGTfLsBNfEB7tmeQEC9Emh/A=="],
 
     "@inixiative/json-rules": ["@inixiative/json-rules@3.18.0", "", { "dependencies": { "dayjs": "^1.11.13", "fastest-levenshtein": "^1.0.16", "re2js": "^2.8.6" }, "peerDependencies": { "@prisma/client": ">=6.0.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@prisma/client", "typescript"] }, "sha512-nALiYjVJsg793lK+RamPZE+Iqjja17k31/AoTUtkd1xIVynFX0DTY+NTGRVlXXi3rkXiDfEusOkHBTPP3m/t9Q=="],
 
