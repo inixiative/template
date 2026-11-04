@@ -607,7 +607,7 @@ filterLens: {
 },
 ```
 
-**Defense in depth — `enumOmits` + `where`:** `enumOmits` hides values from the SDK type surface (consumer types can't even express the omitted enum value). `where` enforces the same filter server-side. **Both are needed**: type narrowing prevents accidental misuse, server `where` enforces under raw API calls.
+**Defense in depth — `enumOmits` + `where`:** `enumOmits` hides values from the SDK type surface (consumer types can't even express the omitted enum value). `where` enforces the same filter server-side. **Both are needed**: type narrowing prevents accidental misuse, server `where` enforces under raw API calls. `paginate()` reads `searchFields` from the raw bracket query, not the schema-validated query, so `buildWhereClause` re-checks enum values against the lens: an omitted or unknown value is a 400, never an empty 200 or a Prisma 500.
 
 ### Per-request scope — bind tokens
 
@@ -667,7 +667,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 1. `prepareRequest` middleware parses bracket notation (`?searchFields[name]=value`) into nested objects
 2. `prepareMiddleware` injects an inline middleware that sets `filterLens` on context from the route's static `filterLens`
 3. `paginate()` binds the narrowing's tokens from its `bindings`, reads bracket-query searchFields, calls `buildWhereClause`
-4. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), translates the lens's wheres via `toPrisma`, AND-merges everything
+4. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), validates enum values against the same lens projection the `searchFields` query schema is built from, translates the lens's wheres via `toPrisma`, AND-merges everything
 
 ### Security
 
