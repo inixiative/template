@@ -552,7 +552,22 @@ outside the transaction. It throws outside `db.txn()`.
 
 `withOwnerLock` (`apps/api/src/lib/locks/withOwnerLock.ts`) uses it whenever it is called inside a
 transaction; outside one it takes and releases a plain `createLock` lock around `fn`. Upserting
-`findForUpdate` holds its keys the same way.
+`findForUpdate` holds its keys the same way, through `holdLockSetUntilSettled`: one lock set over
+the keys the transaction does not hold yet, every key registered against that one acquisition and
+released once when the transaction settles. The keys are the ones `withLockUntilSettled` computes,
+so either one joins a key the other already holds in the same transaction.
+
+A lock set is `createLock({ service, identifiers: [...] })`: one token, one heartbeat and one release
+over `lock:<service>:<identifier>` per identifier, deduplicated and sorted, so a set and a
+single-identifier lock contend on the same key and two sets take their shared keys in the same
+order. Each step is one Lua call over the whole set (`fencedSetPrefix` per poll, `fencedRefreshAll`
+per beat, `fencedDeleteAll` to release), so the cost does not grow with the number of keys. It
+acquires key by key: each poll keeps the run of free keys it won and waits only on the next, so it
+never needs every key free at once. `acquire()` answers true only once every key is held, and one
+that ends false, by timeout or error, gives back the keys it won. A key lost while held is dropped
+from the heartbeat, the rest stay renewed, and `release()` reports `notHeld`. `verify()` answers
+from Redis on every call (true only while every key holds this lock's token); only `release()`
+turns it locally false.
 
 ### Row Locks and Create-If-Missing
 
@@ -571,10 +586,16 @@ await db.txn(async () => {
 plus the where entries sorted by key, hashed) **before** the `SELECT`, and holds it until the
 transaction ends, the same way `db.withLockUntilSettled` does. The where must be scalar
 equalities (no arrays, operator objects, `null` or `undefined`), except that one field may list
-values as `{ in: [...] }`, fencing each value under the key a single-row fence on it takes. A caller that cannot get the lock waits up to
-`waitMs` (default 3000ms, inside Prisma's 5000ms interactive default) and then throws
-`FindForUpdateLockTimeoutError`, rolling its transaction back. Fencing the same key twice in one
-transaction does not wait on itself. The `no-create-race-machinery` CI rule fails a change that
+values as `{ in: [...] }`, fencing each value under the key a single-row fence on it takes. The
+whole call is one lock set and one wait over the keys the transaction does not hold yet; an empty
+list takes no lock and returns `[]`. A caller that cannot get every key waits up to
+`waitMs` (default 3000ms, inside Prisma's 5000ms interactive default, polling every 25ms), gives
+back the keys it won and throws `FindForUpdateLockTimeoutError`, rolling its transaction back. The
+error carries `model`, `waitMs` and `identifier` (`Model:hash`, or `Model:hash (+N)` for a batch,
+naming the first pending key and the count of the rest); the API answers it with a 409, *Another
+request is writing this record; please retry*. Fencing the same key twice in one transaction does
+not wait on itself. Keys taken by separate `findForUpdate` calls in one transaction are separate
+lock sets, ordered by call order, so writers that fence several keys fence them in one fixed order. The `no-create-race-machinery` CI rule fails a change that
 adds a bare `.upsert(` or a unique-violation catch to a file.
 
 ---

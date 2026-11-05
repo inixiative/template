@@ -46,6 +46,7 @@ export {
   type LockOptions,
   type LockRedis,
   type LockReleaseResult,
+  type LockSetTarget,
   maxSafeHeartbeatMs,
   singleFlightLock,
 } from './lock';

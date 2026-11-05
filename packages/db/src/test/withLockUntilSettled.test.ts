@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { createLock, db } from '@template/db';
 import type { OpenTransaction } from '@template/db/clientTypes';
+import { FIND_FOR_UPDATE_LOCK_SERVICE } from '@template/db/lock/acquireFindForUpdateLock';
+import { findForUpdateLockIdentifier } from '@template/db/lock/findForUpdateLockIdentifier';
 import { holdLockUntilSettled } from '@template/db/lock/holdLockUntilSettled';
 import { getNextSeq } from '@template/db/test/factory';
 
@@ -212,5 +214,55 @@ describe('db.withLockUntilSettled', () => {
 
     expect(outcomes.map((outcome) => outcome.status)).toEqual(['rejected', 'fulfilled']);
     expect(await isFree(options)).toBe(true);
+  });
+  describe('sharing keys with a findForUpdate lock set', () => {
+    const emails = () =>
+      [`settled-set-a-${getNextSeq()}@test.com`, `settled-set-b-${getNextSeq()}@test.com`] as const;
+    const fenceOptions = (email: string) => ({
+      service: FIND_FOR_UPDATE_LOCK_SERVICE,
+      identifier: findForUpdateLockIdentifier('User', { email }),
+      ttlMs: 2_000,
+      heartbeatMs: 500,
+    });
+
+    it('joins a key a findForUpdate set in the same transaction already holds', async () => {
+      const [a, b] = emails();
+
+      const result = await db.txn(async () => {
+        await db.findForUpdate('User', { email: { in: [a, b] } }, { upserting: true });
+        return db.withLockUntilSettled(fenceOptions(b), async () => 'joined', { waitMs: 0 });
+      });
+
+      expect(result).toBe('joined');
+      expect(await isFree(fenceOptions(a))).toBe(true);
+      expect(await isFree(fenceOptions(b))).toBe(true);
+    });
+
+    it('a findForUpdate set joins a key withLockUntilSettled already holds and takes only the rest', async () => {
+      const [a, b] = emails();
+      const held = gate();
+      const commit = gate();
+
+      const holding = db.txn(async () => {
+        await db.withLockUntilSettled(fenceOptions(a), async () => {
+          const rows = await db.findForUpdate(
+            'User',
+            { email: { in: [a, b] } },
+            { upserting: true, waitMs: 0 },
+          );
+          expect(rows).toEqual([]);
+        });
+        held.open();
+        await commit.opened;
+      });
+      await held.opened;
+
+      expect(await isFree(fenceOptions(a))).toBe(false);
+      expect(await isFree(fenceOptions(b))).toBe(false);
+      commit.open();
+      await holding;
+      expect(await isFree(fenceOptions(a))).toBe(true);
+      expect(await isFree(fenceOptions(b))).toBe(true);
+    });
   });
 });

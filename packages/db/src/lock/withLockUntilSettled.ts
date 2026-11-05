@@ -8,13 +8,13 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { OpenTransaction } from '@template/db/clientTypes';
 import { holdLockUntilSettled } from '@template/db/lock/holdLockUntilSettled';
 import { lockKeyOf } from '@template/db/lock/lockKeyOf';
-import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
+import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
 
 const keysHeldByCaller = new AsyncLocalStorage<ReadonlySet<string>>();
 
 export const withLockUntilSettled = async <T>(
   openTransaction: OpenTransaction,
-  options: LockOptions,
+  options: LockOptions & LockTarget,
   fn: () => Promise<T>,
   acquireOptions?: AcquireOptions,
 ): Promise<T> => {

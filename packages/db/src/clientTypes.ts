@@ -7,7 +7,7 @@
 
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { PrismaClient } from '@template/db/generated/client/client';
-import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
+import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
 import type { CacheOverlay } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import type { ConcurrencyType, SerializedQueue } from '@template/shared/utils';
@@ -58,7 +58,7 @@ export type DbMethods = {
     options?: FindForUpdateOptions,
   ) => Promise<T[]>;
   withLockUntilSettled: <T>(
-    options: LockOptions,
+    options: LockOptions & LockTarget,
     fn: () => Promise<T>,
     acquireOptions?: AcquireOptions,
   ) => Promise<T>;

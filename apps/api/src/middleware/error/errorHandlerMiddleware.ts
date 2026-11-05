@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma, primitive:shared, infrastructure:observability, primitive:routeTemplates
  */
 import {
+  FindForUpdateLockTimeoutError,
   isUniqueConstraintError,
   isWriteConflictError,
   LockLostError,
@@ -52,6 +53,12 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
 
   if (isWriteConflictError(err))
     return respondAppError(c, makeError({ status: 409, message: 'Write conflict' }));
+
+  if (err instanceof FindForUpdateLockTimeoutError)
+    return respondAppError(
+      c,
+      makeError({ status: 409, message: 'Another request is writing this record; please retry' }),
+    );
 
   if (err instanceof LockLostError)
     return respondAppError(

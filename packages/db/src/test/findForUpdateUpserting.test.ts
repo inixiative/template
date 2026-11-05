@@ -314,6 +314,39 @@ describe('db.findForUpdate upserting mode', () => {
       expect((await lockKeys()).length).toBe(before);
     });
 
+    it('names the model, the first pending identifier and the count of the rest when it times out', async () => {
+      const [taken, ...others] = emails('names', 3) as [string, ...string[]];
+      const single = holdWhile({ email: taken });
+      await single.held;
+
+      const error = await fence({ email: { in: [taken, ...others] } }, 100).catch(
+        (thrown: unknown) => thrown,
+      );
+      expect(error).toBeInstanceOf(FindForUpdateLockTimeoutError);
+      const timeout = error as FindForUpdateLockTimeoutError;
+      expect(timeout.model).toBe('User');
+      expect(timeout.waitMs).toBe(100);
+      expect(timeout.identifier).toMatch(/^User:[0-9a-f]{64} \(\+2\)$/);
+      expect(timeout.message).toBe(
+        'db.findForUpdate(User, { upserting: true }) waited 100ms for the key lock held by another transaction',
+      );
+
+      single.release();
+      await single.done;
+    });
+
+    it('names a single identifier without a count or a lock: prefix', async () => {
+      const [email] = emails('names-one', 1) as [string];
+      const single = holdWhile({ email });
+      await single.held;
+
+      const error = await fence({ email }, 50).catch((thrown: unknown) => thrown);
+      expect((error as FindForUpdateLockTimeoutError).identifier).toMatch(/^User:[0-9a-f]{64}$/);
+
+      single.release();
+      await single.done;
+    });
+
     it('takes no lock for an empty list, which locks nothing', async () => {
       const before = (await lockKeys()).length;
       await expect(fence({ email: { in: [] } }, 0)).resolves.toEqual([]);

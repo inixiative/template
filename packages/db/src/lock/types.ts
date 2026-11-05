@@ -12,7 +12,11 @@ export type LockReleaseResult = 'released' | 'notHeld' | 'unconfirmed';
 
 export type LockTarget = { service: string; identifier: string } | { key: string };
 
-export type LockOptions = LockTarget & {
+// One lock over several keys, `lock:<service>:<identifier>` each: one token, one heartbeat, one
+// release. Duplicates collapse and the keys are sorted. A claim takes a single key only.
+export type LockSetTarget = { service: string; identifiers: readonly string[] };
+
+export type LockOptions = (LockTarget | LockSetTarget) & {
   redis?: LockRedis;
   ttlMs?: number;
   heartbeat?: true;

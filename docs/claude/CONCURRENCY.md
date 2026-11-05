@@ -139,9 +139,9 @@ No cap (or cap ≥ length) → degrades to a plain `Promise.all`. `getConcurrenc
 
 - It is not Redlock: don't rely on it across Redis cluster nodes.
 - A holder suspended longer than `ttlMs` (debugger pause, OS sleep) loses the key to the next holder and wakes up believing it still holds it. Keep `ttlMs` well above any pause you expect.
-- `verify()` is point-in-time. For exactly-once effects, fence at the resource as well.
+- `verify()` is point-in-time: it reads Redis on every call (there is no local loss latch before `release()`). For exactly-once effects, fence at the resource as well.
 
-`heartbeat: false` makes a one-shot claim (`acquire()` returns `{ claimed, holder }`) that is never renewed and expires at its TTL. A `{ service, identifier }` target is keyed under the `lock:*` namespace ([REDIS.md](./REDIS.md#job-coordination-job-lock)); a `{ key }` target is used as given.
+`heartbeat: false` makes a one-shot claim (`acquire()` returns `{ claimed, holder }`) that is never renewed and expires at its TTL. A `{ service, identifier }` target is keyed under the `lock:*` namespace ([REDIS.md](./REDIS.md#job-coordination-job-lock)); a `{ key }` target is used as given. A `{ service, identifiers: [...] }` target is one lock over several keys: one token, one heartbeat, one release ([DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends)); a claim takes a single key only.
 
 ```ts
 import { createLock } from '@template/db';

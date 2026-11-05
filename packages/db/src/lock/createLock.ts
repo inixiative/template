@@ -13,10 +13,14 @@
 
 import { createClaim } from '@template/db/lock/createClaim';
 import { lockKeyOf } from '@template/db/lock/lockKeyOf';
+import { lockKeysOf } from '@template/db/lock/lockKeysOf';
 import { LockLostError } from '@template/db/lock/lockLostError';
 import { TOLERATED_REFRESH_FAILURES } from '@template/db/lock/maxSafeHeartbeatMs';
 import { fencedDelete } from '@template/db/lock/queries/fencedDelete';
+import { fencedDeleteAll } from '@template/db/lock/queries/fencedDeleteAll';
 import { fencedRefresh } from '@template/db/lock/queries/fencedRefresh';
+import { fencedRefreshAll } from '@template/db/lock/queries/fencedRefreshAll';
+import { fencedSetPrefix } from '@template/db/lock/queries/fencedSetPrefix';
 import type {
   AcquireOptions,
   Claim,
@@ -38,12 +42,18 @@ export function createLock(opts: ClaimOptions): Claim;
 export function createLock(opts: LockOptions): Lock;
 export function createLock(opts: LockOptions | ClaimOptions): Lock | Claim {
   const redisClient = opts.redis ?? getRedisClient();
-  const lockKey = lockKeyOf(opts);
-  if (opts.heartbeat === false) return createClaim(opts, redisClient, lockKey);
-  return createRenewingLock(opts, redisClient, lockKey);
+  if (opts.heartbeat === false) return createClaim(opts, redisClient, lockKeyOf(opts));
+  return createRenewingLock(opts, redisClient, lockKeysOf(opts));
 }
 
-const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): Lock => {
+// A lock on one key runs SET NX PX to acquire, fencedRefresh to beat and fencedDelete to release.
+// A lock on several keys runs one command per step over the whole set: fencedSetPrefix per poll,
+// fencedRefreshAll per beat, fencedDeleteAll to release.
+const createRenewingLock = (
+  opts: LockOptions,
+  redis: LockRedis,
+  keys: [string, ...string[]],
+): Lock => {
   const { ttlMs = 30_000, heartbeatMs = 10_000, onLockLost } = opts;
 
   if (heartbeatMs <= 0) {
@@ -55,25 +65,38 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     );
   }
 
+  const [firstKey] = keys;
+  const isSet = keys.length > 1;
+  // A set is labelled in logs and errors by its first key plus the count of the rest.
+  const key = isSet ? `${firstKey} (+${keys.length - 1})` : firstKey;
   const processId = uuidv7();
   let stop: (() => void) | null = null;
-  let hasDeclaredLoss = false;
   let hasReleased = false;
   let hasAcquired = false;
+  let hasObservedMismatch = false;
+  let hasReportedLoss = false;
   let hasLostLease = false;
   let leaseValidUntil = 0;
   let releasePromise: Promise<LockReleaseResult> | null = null;
+  // The keys of a set this lock still holds, and how many of `keys` (in order) it has won.
+  let held: string[] = [];
+  let wonCount = 0;
 
   const stopHeartbeat = () => {
     stop?.();
     stop = null;
   };
 
-  // `unconfirmed`: the delete threw, but ioredis may still send it after a reconnect. The key is
-  // freed if the delete still reaches Redis, otherwise at its TTL — say so, don't stay silent.
+  // A set reports released only when the delete removed every key; the keys still held are deleted
+  // all the same.
+  const deleteKeys = async (): Promise<boolean> =>
+    isSet
+      ? (await fencedDeleteAll(redis, keys, processId)) === keys.length
+      : fencedDelete(redis, firstKey, processId);
+
   const compareAndDelete = async (): Promise<LockReleaseResult> => {
     try {
-      return (await fencedDelete(redis, key, processId)) ? 'released' : 'notHeld';
+      return (await deleteKeys()) ? 'released' : 'notHeld';
     } catch (err) {
       log.error(
         `Lock fenced delete unconfirmed; the key is freed if the delete still reaches Redis, otherwise at its TTL: ${key}`,
@@ -83,10 +106,9 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     }
   };
 
-  // Only a token mismatch is a loss; a Redis error is uncertainty, and the heartbeat keeps refreshing.
   const declareLost = (): void => {
-    if (hasDeclaredLoss || hasReleased) return;
-    hasDeclaredLoss = true;
+    if (hasReportedLoss || hasReleased) return;
+    hasReportedLoss = true;
     log.warn(`Lock lost: ${key}`);
     if (!onLockLost) return;
     try {
@@ -98,11 +120,11 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     }
   };
 
-  const tick = async () => {
+  const tickOne = async () => {
     let renewed: boolean;
     const sentAt = performance.now();
     try {
-      renewed = await fencedRefresh(redis, key, processId, ttlMs);
+      renewed = await fencedRefresh(redis, firstKey, processId, ttlMs);
     } catch (err) {
       log.warn(`Lock refresh failed: ${key}`, err);
       return;
@@ -111,16 +133,43 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
       leaseValidUntil = sentAt + ttlMs;
       return;
     }
+    hasObservedMismatch = true;
     stopHeartbeat();
     declareLost();
   };
 
-  const tryAcquire = async (): Promise<boolean> => {
-    if (hasReleased) {
-      throw new Error('createLock: this lock was released; create a new lock to acquire again');
-    }
+  // A key of a set that expired, was evicted or was taken over is dropped; the beat carries on for
+  // the rest and stops only when none is left.
+  const tickSet = async () => {
+    const beating = [...held];
+    if (beating.length === 0) return;
+    let refreshed: boolean[];
     const sentAt = performance.now();
-    const result = await redis.set(key, processId, 'PX', ttlMs, 'NX');
+    try {
+      refreshed = await fencedRefreshAll(redis, beating, processId, ttlMs);
+    } catch (err) {
+      log.warn(`Lock refresh failed: ${key}`, err);
+      return;
+    }
+    leaseValidUntil = sentAt + ttlMs;
+    const lost = new Set(beating.filter((_, index) => !refreshed[index]));
+    if (lost.size === 0) return;
+    held = held.filter((heldKey) => !lost.has(heldKey));
+    hasObservedMismatch = true;
+    log.warn(`Lock keys lost: ${key} (${lost.size} lost, ${held.length} still held)`);
+    if (held.length === 0) stopHeartbeat();
+    declareLost();
+  };
+
+  const startHeartbeat = (): void => {
+    stop = heartbeat(isSet ? tickSet : tickOne, heartbeatMs, {
+      onError: (err) => log.error(`Lock heartbeat error: ${key}`, err),
+    });
+  };
+
+  const tryAcquireOne = async (): Promise<boolean> => {
+    const sentAt = performance.now();
+    const result = await redis.set(firstKey, processId, 'PX', ttlMs, 'NX');
     if (result !== 'OK') return false;
     if (hasReleased) {
       await compareAndDelete();
@@ -128,42 +177,96 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     }
     hasAcquired = true;
     leaseValidUntil = sentAt + ttlMs;
-    stop = heartbeat(tick, heartbeatMs, {
-      onError: (err) => log.error(`Lock heartbeat error: ${key}`, err),
-    });
+    startHeartbeat();
     return true;
   };
 
-  // The poll is a sleep, not a Redis blocking primitive: a waiter costs one SET per poll and
-  // nothing while asleep. A waiter polling inside an interactive transaction must keep `waitMs`
-  // under that transaction's own timeout, or it expires while still waiting.
+  // Progress is key by key in sorted order: each poll takes the longest run of free keys after the
+  // ones already won and keeps them, so the set never needs every key free at the same moment. The
+  // heartbeat starts with the first key won. A key won and then lost while waiting on a later one
+  // gives the whole set back, and the next poll starts again from the first key.
+  const tryAcquireSet = async (): Promise<boolean> => {
+    const remaining = keys.slice(wonCount);
+    const sentAt = performance.now();
+    const won = await fencedSetPrefix(redis, remaining, processId, ttlMs);
+    if (hasReleased) {
+      await compareAndDelete();
+      return false;
+    }
+    if (won > 0) {
+      held.push(...remaining.slice(0, won));
+      wonCount += won;
+      if (!stop) {
+        leaseValidUntil = sentAt + ttlMs;
+        startHeartbeat();
+      }
+    }
+    if (held.length < wonCount) {
+      await giveBackWon();
+      return false;
+    }
+    if (wonCount < keys.length) return false;
+    hasAcquired = true;
+    return true;
+  };
+
+  const tryAcquire = (): Promise<boolean> => {
+    if (hasReleased) {
+      throw new Error('createLock: this lock was released; create a new lock to acquire again');
+    }
+    return isSet ? tryAcquireSet() : tryAcquireOne();
+  };
+
+  // An acquire that ends false, by timeout or error, holds none of a set's keys.
+  const giveBackWon = async (): Promise<void> => {
+    if (!isSet || wonCount === 0) return;
+    stopHeartbeat();
+    held = [];
+    wonCount = 0;
+    hasObservedMismatch = false;
+    hasReportedLoss = false;
+    leaseValidUntil = 0;
+    try {
+      await deleteKeys();
+    } catch (err) {
+      log.error(`Lock give-back unconfirmed; the keys won are freed at their TTL: ${key}`, err);
+    }
+  };
+
   const acquire = async ({
     waitMs = 0,
     pollMs = DEFAULT_POLL_MS,
     onTimeout,
   }: AcquireOptions = {}): Promise<boolean> => {
     const deadline = Date.now() + waitMs;
-    while (!(await tryAcquire())) {
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) {
-        if (onTimeout) throw onTimeout();
-        return false;
+    try {
+      while (!(await tryAcquire())) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) {
+          await giveBackWon();
+          if (onTimeout) throw onTimeout();
+          return false;
+        }
+        await sleep(Math.min(pollMs, remaining));
       }
-      await sleep(Math.min(pollMs, remaining));
+    } catch (err) {
+      await giveBackWon();
+      throw err;
     }
     return true;
   };
 
+  // Answers from Redis: true only while every key holds this token. There is no local loss latch
+  // before release, so ownership that came back is reported from the current Redis state.
   const verify = async (): Promise<boolean> => {
-    if (hasDeclaredLoss || hasReleased) return false;
-    const current = await redis.get(key);
-    return current === processId;
+    if (hasReleased) return false;
+    const current = await Promise.all(keys.map((lockKey) => redis.get(lockKey)));
+    return current.every((token) => token === processId);
   };
 
-  // Timed from each SET/refresh send so a late reply never extends it; once lapsed it stays lapsed.
   const isWithinLease = (): boolean => {
     if (!hasAcquired || hasLostLease) return false;
-    if (hasReleased || hasDeclaredLoss || performance.now() >= leaseValidUntil) {
+    if (hasReleased || hasObservedMismatch || performance.now() >= leaseValidUntil) {
       hasLostLease = true;
       return false;
     }

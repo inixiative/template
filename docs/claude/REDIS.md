@@ -102,7 +102,7 @@ const key = `cache:User:${id}`;  // Don't do this
 | `otp` | `otp:*` | One-time passwords / verification codes |
 | `session` | `session:*` | BetterAuth sign-in handshake sessions and one-time tokens (via secondaryStorage) |
 | `limit` | `limit:*` | Rate limiting counters |
-| `lock` | `lock:*` | Distributed locks via `createLock` |
+| `lock` | `lock:*` | Distributed locks via `createLock`: `lock:<service>:<identifier>`, one key per identifier for a lock set (`identifiers: [...]`, e.g. upserting `findForUpdate`'s `lock:find-for-update:<Model:hash>`) |
 | `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
 | `cacheWritten` | `cachewritten:*` | When the value under a `cache:` key was written (epoch ms); set and cleared with the value, read by `checkCache` |
 | `cacheGeneration` | `cachegen:*` | A `cache:` key's generation (`cachegen:<key>`); a clear moves it so a compute in flight skips its publish |

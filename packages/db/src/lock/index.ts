@@ -13,4 +13,5 @@ export type {
   LockOptions,
   LockRedis,
   LockReleaseResult,
+  LockSetTarget,
 } from './types';

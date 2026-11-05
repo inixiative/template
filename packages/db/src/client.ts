@@ -34,7 +34,7 @@ import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
-import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
+import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
 import { withLockUntilSettled } from '@template/db/lock/withLockUntilSettled';
 import {
   type CacheOverlay,
@@ -325,7 +325,7 @@ const dbMethods = {
   },
 
   withLockUntilSettled: async <T>(
-    options: LockOptions,
+    options: LockOptions & LockTarget,
     fn: () => Promise<T>,
     acquireOptions?: AcquireOptions,
   ): Promise<T> => {
