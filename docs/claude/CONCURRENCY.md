@@ -139,7 +139,7 @@ No cap (or cap ≥ length) → degrades to a plain `Promise.all`. `getConcurrenc
 
 - It is not Redlock: don't rely on it across Redis cluster nodes.
 - A holder suspended longer than `ttlMs` (debugger pause, OS sleep) loses the key to the next holder and wakes up believing it still holds it. Keep `ttlMs` well above any pause you expect.
-- `verify()` is point-in-time: it reads Redis on every call (there is no local loss latch before `release()`). For exactly-once effects, fence at the resource as well.
+- `verify()` is point-in-time: it reads Redis on every call and answers true only while every key holds this lock's token (there is no local loss latch before `release()`). For exactly-once effects, fence at the resource as well.
 
 `heartbeat: false` makes a one-shot claim (`acquire()` returns `{ claimed, holder }`) that is never renewed and expires at its TTL. A `{ service, identifier }` target is keyed under the `lock:*` namespace ([REDIS.md](./REDIS.md#job-coordination-job-lock)); a `{ key }` target is used as given. A `{ service, identifiers: [...] }` target is one lock over several keys: one token, one heartbeat, one release ([DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends)); a claim takes a single key only.
 
@@ -160,9 +160,11 @@ try {
 }
 ```
 
+`acquire({ waitMs, pollMs, onTimeout })` keeps trying until it wins or `waitMs` runs out; a timed-out wait throws `onTimeout()` if given, else returns false. `heartbeatMs` must leave room for one failed refresh before `ttlMs` (`2 * heartbeatMs < ttlMs`, checked at construction); `maxSafeHeartbeatMs({ ttlMs })` is the tighter ceiling that also budgets the Redis command timeout. `isWithinLease()` is the local lease check, and `assertHeld()` throws `LockLostError` once it is false (the API answers 409). `release()` resolves to `released`, `notHeld` (the key, or any key of a set, was no longer this lock's) or `unconfirmed` (the delete errored; the key frees at its TTL).
+
 Use when multiple processes can race for the same resource (multiple golem instances both wanting to own the same bot session, multiple workers wanting to run a singleton cron, etc.).
 
-**Inside a transaction, release at the end of the transaction, not the critical section.** A lock that guards a check-then-write must stay held until that write commits, or the next holder checks against state from before it. `db.withLockUntilSettled(lockOptions, fn)` holds a `createLock` lock until the open transaction settles, joins a key the transaction already holds instead of waiting on itself, and runs the transaction's own holders of the key one at a time (the lock + serialized-queue pair above, scoped to the transaction). `withOwnerLock` switches to it whenever it runs inside a transaction, which is how a `transactionAll` batch's sub-requests keep the owner lock until the batch commits. See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
+**Inside a transaction, release at the end of the transaction, not the critical section.** A lock that guards a check-then-write must stay held until that write commits, or the next holder checks against state from before it. `db.withLockUntilSettled(lockOptions, fn)` holds a `createLock` lock until the open transaction settles, joins a key the transaction already holds (including one an upserting `findForUpdate` took) instead of waiting on itself, and runs the transaction's own holders of the key one at a time (the lock + serialized-queue pair above, scoped to the transaction). A holder whose turn comes after the transaction settled throws instead of running. `withOwnerLock` switches to it whenever it runs inside a transaction, which is how a `transactionAll` batch's sub-requests keep the owner lock until the batch commits. See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
 
 ---
 

@@ -66,6 +66,7 @@ unless overridden.
 | `Prisma.PrismaClientValidationError` | 400 "Invalid query parameters" |
 | `Prisma P2002` (`isUniqueConstraintError`) | 409 "Resource already exists: …" |
 | `Prisma P2034` (`isWriteConflictError`) | 409 "Write conflict" (deadlock or serialization victim, rolled back whole) |
+| `FindForUpdateLockTimeoutError` (`@template/db`, from upserting `db.findForUpdate` past its `waitMs`) | 409 "Another request is writing this record; please retry" |
 | `LockLostError` (`@template/db`, from `lock.assertHeld()`) | 409 "Lost the lock guarding this write; please retry" |
 | `Prisma P2025` | 404 "Resource not found" |
 | `AppError` | its body |

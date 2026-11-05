@@ -28,7 +28,7 @@ Each patch is a per-call-site answer to a primitive's gap.
    pre-commit state) and before the on-commit callbacks (a release behind slow side effects stalls
    every waiter).
 3. **Waiter timeout < transaction timeout.** A waiter holds an open transaction. It waits
-   `waitMs` (default 3000ms, under Prisma's 5000ms interactive default) and then throws
+   `waitMs` (default 3000ms, under the client's 30s transaction timeout) and then throws
    `FindForUpdateLockTimeoutError`, rolling back rather than letting the transaction timeout fire.
 
 ## What changed
@@ -40,13 +40,16 @@ Each patch is a per-call-site answer to a primitive's gap.
 - `db.findForUpdate(model, where, { upserting: true, waitMs? })` — same return type (0 or 1 rows).
   Validation, key and wait live in `packages/db/src/lock/`:
   - `findForUpdateLockIdentifier.ts` — rejects an empty where and any value that is not a scalar
-    equality (arrays, `{ in }`, operator objects, `null`, `undefined`); identifier is
-    `<Model>:<sha256 of the key-sorted entries>`.
-  - `acquireFindForUpdateLock.ts` — `createLock({ service: 'find-for-update', ttlMs: 10_000,
-    heartbeatMs: 3_000 })`, polls every 25ms until `waitMs`, and holds each key
-    through `holdLockUntilSettled.ts` (released on the transaction's finally queue; a key the same
-    transaction holds is not re-acquired, `OpenTransaction.heldLocks`).
-  - `findForUpdateLockTimeoutError.ts` — exported from `@template/db`.
+    equality (arrays, operator objects, `null`, `undefined`); identifier is
+    `<Model>:<sha256 of the key-sorted entries>`. Since INFRA-034 one field may list values as
+    `{ in: [...] }` (`findForUpdateLockIdentifiers`, one identifier per value).
+  - `acquireFindForUpdateLock.ts` — `{ service: 'find-for-update', ttlMs: 10_000, heartbeatMs:
+    3_000 }`, polls every 25ms until `waitMs`. Since INFRA-048 the identifiers the transaction does
+    not hold yet are one lock set, held through `holdLockSetUntilSettled` in `holdLockUntilSettled.ts`
+    (released on the transaction's finally queue; a key the same transaction holds is joined, not
+    re-acquired, `OpenTransaction.heldLocks`).
+  - `findForUpdateLockTimeoutError.ts` — exported from `@template/db`; `(model, identifier, waitMs)`,
+    and the API answers it 409 since INFRA-048.
 - `makeSingletonJob` already runs on `createLock` (owner-checked refresh, fenced release) — no
   change. `makeSupersedingJob` / lanes keep latest-wins semantics.
 - CI: `scripts/ci/rules/no-create-race-machinery.sh` — per-file ratchet vs the merge base on

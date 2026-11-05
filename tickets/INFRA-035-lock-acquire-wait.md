@@ -15,7 +15,7 @@ The queue-behind-the-holder shape is part of what a lock is.
 acquire(options?: { waitMs?: number; pollMs?: number; onTimeout?: () => Error }): Promise<boolean>
 ```
 
-- No options: one SET NX, true or false at once, as before.
+- No options: one attempt (SET NX, or one `fencedSetPrefix` for a lock set), true or false at once.
 - `waitMs`: keep trying every `pollMs` (default 50) until it wins or the wait runs out.
 - `onTimeout`: the error a timed-out wait throws, so a caller that must fail loudly (a named lock
   error, a 409) does not wrap a boolean in its own if/throw. Without it a timed-out wait returns

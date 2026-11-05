@@ -85,7 +85,7 @@ import { redisNamespace } from '@template/db';
 
 // Good
 const key = `${redisNamespace.cache}:User:${id}`;
-const lockKey = `${redisNamespace.job}:lock:${jobId}`;
+const lockKey = `${redisNamespace.lock}:job-singleton:${handlerName}:${key}`;
 
 // Bad - hardcoded prefixes
 const key = `cache:User:${id}`;  // Don't do this
@@ -155,7 +155,7 @@ with `Retry-After`. Redis down = fail open (warn + report, request allowed).
 ```
 
 Lua scripts are queries: each lives in its module's `queries/` folder (`lanes/queries/`, `lock/queries/`,
-`middleware/rateLimit/queries/`), one script plus the function that evals it per file — the
+`redis/cache/queries/`, `middleware/rateLimit/queries/`), one script plus the function that evals it per file — the
 `lua-in-queries` CI rule holds the line.
 
 These are **identity** limits — abuse protection keyed on who is calling. A batch's sub-requests
@@ -274,9 +274,9 @@ Behavior:
   (the live value would also be missing the deleted rows the caller asked for). Rolling caches are
   still read normally (`checkCache` and the rolling read never compute); only computing through
   `cache()` is skipped
-- Returns cached value if exists (including `null`/`undefined`)
+- Returns the cached value if one exists, `null` included; a stored `undefined` reads as a miss
 - Computes via fn() on cache miss; concurrent misses on one key compute once (single-flight)
-- **Negative caching**: `null`/`undefined` cached with 1 min TTL (prevents thundering herd, allows quick discovery of new records)
+- **Negative caching**: `null` is cached with a 1 min TTL (prevents thundering herd, allows quick discovery of new records). `undefined` is written with the same TTL but reads back as a miss, so it is recomputed every time
 - Real values cached with provided TTL (default 24 hours)
 - **Only the lock holder publishes.** A caller that does not hold the key's single-flight lock waits
   up to 10 seconds for the holder's value, then computes its own and returns it unpublished. A
@@ -293,6 +293,7 @@ Telemetry: each call opens a `cache <accessor>` span labelled with its result, a
 `kept` or `error`. A single-flight wait is timed into
 `cache.lock.wait`; a publish skipped because a clear ran counts into `cache.publish.skipped`. Every
 tag is the accessor, never the key, so cardinality stays bounded.
+
 ### cache() inside a transaction
 
 Each outermost `db.txn` holds a cache overlay (`db.cacheOverlay()`), and `cache()` inside the
@@ -302,30 +303,37 @@ transaction reads through it:
   and a miss computes `fn` on the transaction's client and keeps the value in the overlay with the
   key's generation, read before `fn` runs. Each reader gets its own copy, as from Redis. Nothing reaches Redis before commit, so a rollback leaves
   nothing behind.
-- The clear-cache hook marks the keys a write invalidates (`markCacheWritten`). A marked key skips the
+- The clear-cache hook marks the keys a write invalidates (`queueCacheClear`, which calls
+  `markCacheWritten`). A mark also drops any value the overlay holds for that key. A marked key skips the
   shared cache and recomputes, so the transaction reads its own writes. A marked pattern marks every
-  key it matches.
+  key it matches. `markCacheWritten` throws outside `db.txn()`: there is no overlay to mark.
 - Each key has a serialized queue: a compute and its store run on it, and a mark waits on it. Batch
   sub-requests in one round share the transaction, so a sibling's compute that read before a write
   lands before that write's mark, and the mark removes it.
 - There is no single-flight lock inside a transaction. A cache function only reads; one that writes
   would mark its own key and wait on itself.
 
-When the transaction commits, each key it touched runs one Lua call. A marked key is cleared (value,
-write time, new generation), and a value the transaction computed is published only if the key's
-generation is still the one read before the compute. Another clear in between, from any process, wins
-and leaves a miss. A key the transaction neither wrote nor computed a publishable value for sends
-nothing. The calls run in two groups:
+When the transaction commits, each key it touched runs one Lua call (`publishKey`). A marked key is
+cleared (value, write time, new generation), and a value the transaction computed is published only
+if the key's generation is still the one read before the compute. An exact clear in between, from any
+process, moves the generation, wins and leaves a miss. A pattern clear moves the generation only of
+keys it finds a single-flight lock for, and a compute inside a transaction takes none, so a pattern
+clear in between does not stop that publish. A key the transaction neither wrote nor computed a
+publishable value for sends nothing. A rollback sends nothing. The calls run in two groups:
 
-- Marked keys, before the transaction releases its held locks and before its `db.onCommit` batches, so
-  a waiter on one of those locks never reads the value the write replaced. Marked patterns are cleared
-  afterwards with `clearKey`, and keys under a marked pattern are left to that clear. A failure here is
-  loud: the clear may not have run, so `db.txn` throws it after its `db.onCommit` batches have run. A
-  write that committed then reports an error, so a caller that retries on error must be idempotent.
-- Keys the transaction only read, after the held locks are released, so a large batch does not hold
-  them for one call per key. The generation check makes the late publish safe: a write that commits
-  in between clears the key and wins. A failure leaves Redis as it was and only costs the warm-up, so
-  it counts `cache.publish.failed` and does not throw.
+- Marked keys (`publishWritten`), before the transaction releases its held locks and before its
+  `db.onCommit` batches, so a waiter on one of those locks never reads the value the write replaced.
+  Marked patterns are then cleared with `clearKey`, still before the locks are released, and keys
+  under a marked pattern are left to that clear. A failure here is loud: the clear may not have run,
+  so `db.txn` throws it after its `db.onCommit` batches have run. A write that committed then reports
+  an error, so a caller that retries on error must be idempotent.
+- Keys the transaction only read (`publishWarm`), after the held locks are released, so a large batch
+  does not hold them for one call per key, and before the `db.onCommit` batches. The generation check
+  makes the late publish safe against a write that commits in between and clears the key exactly,
+  which is how the clear-cache hook clears. A failure leaves Redis as it was and only costs the
+  warm-up, so it counts `cache.publish.failed` and does not throw.
+
+The full commit order is in [DATABASE.md § What Runs at Commit](./DATABASE.md#what-runs-at-commit).
 
 `cache()` is for computes that take milliseconds to seconds and that a write hook clears. A compute
 that takes minutes does not belong in a request: it runs in a job and is read directly (a rolling
@@ -383,7 +391,7 @@ every key sent to the client. The locks in each scanned page are cancelled in pa
 
 Cache keys defined in the cache reference map are marked on mutations by a db hook in the transaction's cache overlay and cleared when it commits (see [cache() inside a transaction](#cache-inside-a-transaction)). See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
 
-A write the hook never sees (a raw-SQL shift in the ordered-list helpers, rows a key change reaches by `ON UPDATE CASCADE` such as a space transfer) queues the same clear itself with `queueCacheClear(model, rows)` (`apps/api/src/hooks/cache/queueCacheClear.ts`), passing the rows as they were and as they are. The hook calls it too.
+A write the hook never sees (a raw-SQL shift in the ordered-list helpers, rows a key change reaches by `ON UPDATE CASCADE` such as a space transfer) marks the same keys itself with `queueCacheClear(model, rows)` (`apps/api/src/hooks/cache/queueCacheClear.ts`), passing the rows as they were and as they are. It marks the keys in the transaction's cache overlay, so it must run inside `db.txn()` and the keys are cleared at commit. The hook calls it too.
 
 #### Invalidation conventions
 
@@ -545,8 +553,13 @@ redis.on('connect', () => log.info(`[${name}] Connected`));
 
 Cache operations gracefully degrade when Redis is unavailable:
 
-- **Read errors**: Fall through to compute value (Redis down = cache miss)
-- **Write errors**: Fire-and-forget with error logging (don't block response)
+- **Read errors** in `cache()`: fall through to compute the value (Redis down = cache miss). `checkCache`
+  throws instead, so a caller that queues work on a miss doesn't pile it onto an outage.
+- **Write errors** outside a transaction: the publish is logged and the caller still gets its value.
+  `upsertCache` returns `false`. Inside a transaction, a failed clear of a written key is thrown by
+  `db.txn` after its `db.onCommit` batches, and a failed publish of a read-only key counts
+  `cache.publish.failed` (see [cache() inside a transaction](#cache-inside-a-transaction)).
+- **Clear errors**: an exact `clearKey` logs and returns 0; a pattern `clearKey` throws.
 - **Compute errors**: Propagate normally (not swallowed)
 
 ### Key Validation
@@ -554,9 +567,9 @@ Cache operations gracefully degrade when Redis is unavailable:
 Cache utilities validate keys to catch bugs early:
 
 ```typescript
-function validateKey(key: string): void {
+export const validateKey = (key: string): void => {
   if (key.includes('undefined')) {
     throw new Error(`Cache key contains 'undefined': ${key}`);
   }
-}
+};
 ```

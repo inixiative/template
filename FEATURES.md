@@ -677,7 +677,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
-- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
+- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, cacheGeneration, cacheQueued, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
+
+- ✅ **Transaction Cache Overlay** - `cache()` inside `db.txn` reads through a per-transaction overlay: the transaction reads its own writes, a rollback leaves nothing cached, and at commit each key is one Lua call behind its generation fence. Written keys are cleared before the transaction's locks are released and a failed clear makes `db.txn` throw; read-only keys are published after, and a failure only counts `cache.publish.failed`. [Learn more: REDIS.md](docs/claude/REDIS.md#cache-inside-a-transaction)
+
+- ✅ **Create-If-Missing Fence and Lock Sets** - `db.findForUpdate(model, where, { upserting: true })` fences a row that does not exist yet with a Redis key lock held until the transaction settles; one field may list values to fence a batch as one lock set (one token, one heartbeat, one release, one Lua call per step). A wait past `waitMs` throws `FindForUpdateLockTimeoutError`, answered 409. `db.withLockUntilSettled` holds any `createLock` lock the same way and joins a key the transaction already holds. [Learn more: DATABASE.md](docs/claude/DATABASE.md#row-locks-and-create-if-missing)
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 
