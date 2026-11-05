@@ -26,7 +26,7 @@ export const readInTransaction = <T>(
   onOverlayKey(overlay, key, async () => {
     const held = overlay.values.get(key);
     if (held) {
-      setResult('hit');
+      setResult('overlay');
       return superjson.parse<T>(held.payload);
     }
 

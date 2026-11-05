@@ -18,6 +18,11 @@ export const cache = async <T>(
 ): Promise<T> => {
   validateKey(key);
   if (auditActorContext.isSoftDeleteBypassed()) return fn();
+  if (process.env.PROBE_CACHE_TXN_BYPASS === '1' && db.isInTxn())
+    return withCacheSpan(key, true, (setResult) => {
+      setResult('bypass');
+      return fn();
+    });
   const overlay = db.cacheOverlay();
   return withCacheSpan(key, true, (setResult) =>
     overlay

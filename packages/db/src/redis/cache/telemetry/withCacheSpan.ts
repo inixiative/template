@@ -7,7 +7,7 @@
 import { cacheAccessor } from '@template/db/redis/cache/telemetry/cacheAccessor';
 import { incrementCounter, withSpan } from '@template/shared/telemetry';
 
-export type CacheResult = 'hit' | 'miss' | 'error' | 'written' | 'kept';
+export type CacheResult = 'hit' | 'miss' | 'error' | 'written' | 'kept' | 'overlay' | 'bypass';
 
 export const withCacheSpan = async <T>(
   key: string,
