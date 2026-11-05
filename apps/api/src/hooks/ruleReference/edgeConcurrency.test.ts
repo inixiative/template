@@ -14,6 +14,7 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
+import { gate } from '@template/db/test/gate';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
@@ -33,14 +34,6 @@ const membersOf = (segmentId: string) => ({
 });
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const gate = () => {
-  let open!: () => void;
-  const opened = new Promise<void>((resolve) => {
-    open = resolve;
-  });
-  return { open, opened };
-};
 
 // The contender's blocked FOR UPDATE is observed in pg_stat_activity before the holder mutates, so
 // the contender has provably finished its unlocked reads against the live row; a fixed delay would

@@ -6,6 +6,7 @@
  */
 import type { HeldLock, OpenTransaction } from '@template/db/clientTypes';
 import { createLock } from '@template/db/lock/createLock';
+import { isTransactionOpen } from '@template/db/lock/isTransactionOpen';
 import { lockKeyOf } from '@template/db/lock/lockKeyOf';
 import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
 import { log } from '@template/shared/logger';
@@ -55,7 +56,8 @@ const holdOnce = (
   acquireOptions: AcquireOptions,
 ): HeldLock[] => {
   const label = labelOf(keys);
-  if (openTransaction.settled) throw new Error(`transaction settled before taking lock ${label}`);
+  if (!isTransactionOpen(openTransaction))
+    throw new Error(`transaction settled before taking lock ${label}`);
   const releasing = acquire(label, options, acquireOptions);
   const acquired = releasing.then(() => undefined);
   const registered = keys.map((key) => {
@@ -82,7 +84,7 @@ const awaitHeld = async (
   held: readonly HeldLock[],
 ): Promise<void> => {
   await Promise.all(held.map(({ acquired }) => acquired));
-  if (openTransaction.settled)
+  if (!isTransactionOpen(openTransaction))
     throw new Error(`transaction settled while waiting for lock ${label}`);
 };
 

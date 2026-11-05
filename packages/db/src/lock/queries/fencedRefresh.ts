@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma, infrastructure:redis
  * @uses none
  */
-import type { LockRedis } from '@template/db/lock/types';
+import type { RedisEval } from '@template/db/redis/types';
 
 // Refresh is one compare-and-expire eval. A GET then a separate PEXPIRE lets a key that expired
 // and was re-acquired between the two calls be extended for its new holder.
@@ -12,7 +12,7 @@ const FENCED_REFRESH =
   "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end";
 
 export const fencedRefresh = async (
-  redis: LockRedis,
+  redis: RedisEval,
   key: string,
   token: string,
   ttlMs: number,

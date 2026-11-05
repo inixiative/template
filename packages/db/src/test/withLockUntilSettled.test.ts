@@ -5,16 +5,9 @@ import { FIND_FOR_UPDATE_LOCK_SERVICE } from '@template/db/lock/acquireFindForUp
 import { findForUpdateLockIdentifier } from '@template/db/lock/findForUpdateLockIdentifier';
 import { holdLockUntilSettled } from '@template/db/lock/holdLockUntilSettled';
 import { getNextSeq } from '@template/db/test/factory';
+import { gate } from '@template/db/test/gate';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const gate = () => {
-  let open!: () => void;
-  const opened = new Promise<void>((resolve) => {
-    open = resolve;
-  });
-  return { open, opened };
-};
 
 const settles = (promise: Promise<unknown>, withinMs: number) =>
   Promise.race([
@@ -214,6 +207,37 @@ describe('db.withLockUntilSettled', () => {
 
     expect(outcomes.map((outcome) => outcome.status)).toEqual(['rejected', 'fulfilled']);
     expect(await isFree(options)).toBe(true);
+  });
+
+  it('a queued holder does not run once a sibling has rolled the transaction back', async () => {
+    const options = lockOptions();
+    const firstRunning = gate();
+    const firstDone = gate();
+    let queuedRan = false;
+    let first: Promise<unknown> = Promise.resolve();
+    let queued: Promise<unknown> = Promise.resolve();
+
+    const failure = db.txn(async () => {
+      first = db.withLockUntilSettled(options, async () => {
+        firstRunning.open();
+        await firstDone.opened;
+      });
+      queued = db.withLockUntilSettled(options, async () => {
+        queuedRan = true;
+      });
+      await firstRunning.opened;
+      throw new Error('roll back');
+    });
+    await expect(failure).rejects.toThrow('roll back');
+    expect(await isFree(options)).toBe(true);
+
+    firstDone.open();
+    const [, queuedOutcome] = await Promise.allSettled([first, queued]);
+    expect(queuedOutcome).toMatchObject({ status: 'rejected' });
+    expect(String((queuedOutcome as PromiseRejectedResult).reason)).toContain(
+      'transaction settled while waiting for lock',
+    );
+    expect(queuedRan).toBe(false);
   });
   describe('sharing keys with a findForUpdate lock set', () => {
     const emails = () =>

@@ -331,6 +331,17 @@ describe('upsertCache', () => {
     expect(await cache(key, async () => ({ v: 9 }))).toEqual({ v: 3 });
   });
 
+  it('lets exactly one of two concurrent writes on an empty key win, and keeps its value', async () => {
+    const key = cacheKey('user', 'upsert-race');
+    const [first, second] = await Promise.all([
+      upsertCache(key, { v: 1 }),
+      upsertCache(key, { v: 2 }),
+    ]);
+
+    expect([first, second].filter(Boolean)).toHaveLength(1);
+    expect(await cache(key, async () => ({ v: 9 }))).toEqual({ v: first ? 1 : 2 });
+  });
+
   it('records written when it writes and kept when the key was already there', async () => {
     const key = cacheKey('user', 'upsert-results');
     const results: unknown[] = [];

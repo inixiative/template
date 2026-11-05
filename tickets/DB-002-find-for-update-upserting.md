@@ -43,7 +43,7 @@ Each patch is a per-call-site answer to a primitive's gap.
     equality (arrays, `{ in }`, operator objects, `null`, `undefined`); identifier is
     `<Model>:<sha256 of the key-sorted entries>`.
   - `acquireFindForUpdateLock.ts` — `createLock({ service: 'find-for-update', ttlMs: 10_000,
-    heartbeatMs: 3_000, maxMissed: 1 })`, polls every 25ms until `waitMs`, and holds each key
+    heartbeatMs: 3_000 })`, polls every 25ms until `waitMs`, and holds each key
     through `holdLockUntilSettled.ts` (released on the transaction's finally queue; a key the same
     transaction holds is not re-acquired, `OpenTransaction.heldLocks`).
   - `findForUpdateLockTimeoutError.ts` — exported from `@template/db`.
