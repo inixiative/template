@@ -62,6 +62,6 @@ export const registerClearCacheHook = () => {
       if (previousData) records.push(previousData);
     }
 
-    queueCacheClear(model as Prisma.ModelName, records);
+    await queueCacheClear(model as Prisma.ModelName, records);
   });
 };

@@ -3,7 +3,7 @@ import { db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { fetchOne } from '@template/db/hydrate/fetchOne';
 import { hydrate } from '@template/db/hydrate/hydrate';
-import { cacheKey } from '@template/db/redis/cache';
+import { cacheKey } from '@template/db/redis/cache/cacheKey';
 import { getRedisClient } from '@template/db/redis/client';
 import {
   cleanupTouchedTables,

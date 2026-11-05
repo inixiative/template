@@ -13,12 +13,11 @@ import { lockKeyOf } from '@template/db/lock/lockKeyOf';
 export const FIND_FOR_UPDATE_LOCK_SERVICE = 'find-for-update';
 // why: a holder keeps the key only as long as its transaction, and callers can raise the
 // why: transaction timeout, so the lease is heartbeat-renewed; the TTL is what frees the key when
-// why: a crashed process never reaches its release. (1 + 1) * 3s < 10s passes createLock's check.
+// why: a crashed process never reaches its release. 2 * 3s < 10s passes createLock's check.
 const FIND_FOR_UPDATE_LOCK = {
   service: FIND_FOR_UPDATE_LOCK_SERVICE,
   ttlMs: 10_000,
   heartbeatMs: 3_000,
-  maxMissed: 1,
 };
 // why: the waiter holds an open transaction while it waits. The wait must end, and the waiter roll
 // why: back, well inside Prisma's interactive default of 5s (this client configures 30s), or the

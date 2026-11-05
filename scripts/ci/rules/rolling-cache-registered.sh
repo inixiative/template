@@ -17,7 +17,7 @@ cd "$ROOT_DIR"
 # comment lines.
 BARREL='apps/api/src/lib/rollingCaches.ts'
 PATTERN='makeRollingCache[[:space:]]*(<[^(]*>)?\('
-EXCLUDE='packages/db/src/redis/makeRollingCache\.ts:|/generated/|/node_modules/|\.test\.ts:|/tests?/|/__tests__/'
+EXCLUDE='packages/db/src/redis/cache/rollingCache/makeRollingCache\.ts:|/generated/|/node_modules/|\.test\.ts:|/tests?/|/__tests__/'
 
 search_dirs=()
 for d in apps packages; do

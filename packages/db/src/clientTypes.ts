@@ -4,9 +4,11 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { PrismaClient } from '@template/db/generated/client/client';
 import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
+import type { CacheOverlay } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import type { ConcurrencyType, SerializedQueue } from '@template/shared/utils';
 
@@ -49,6 +51,7 @@ export type DbMethods = {
   getScopeId: () => string | null;
   getScope: () => ScopeContext | null;
   isInTxn: () => boolean;
+  cacheOverlay: () => CacheOverlay | null;
   findForUpdate: <T = unknown>(
     model: string,
     where: Record<string, unknown>,
@@ -93,4 +96,5 @@ export type OpenTransaction = {
   // Set once the transaction has settled, before its finally queue drains.
   settled: boolean;
   bridgedContext: BridgedContext;
+  cacheOverlay: CacheOverlay;
 };

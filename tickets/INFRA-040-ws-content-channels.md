@@ -1,4 +1,4 @@
-# INFRA-039 — Every WebSocket delivery is a content channel
+# INFRA-040 — Every WebSocket delivery is a content channel
 
 **Status:** 🆕 Not Started · **Line:** INFRA · **Priority:** Low · **Related:** #219 (actor, `/identify`), #220 (segment memberships, the `/me` proxy), INFRA-038, AUTH-005
 

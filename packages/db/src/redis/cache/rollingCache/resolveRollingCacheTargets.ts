@@ -8,7 +8,7 @@ import { db } from '@template/db/client';
 import {
   type AnyRollingCacheTargets,
   MAX_ROLLING_CACHE_TARGETS,
-} from '@template/db/redis/rollingCacheTypes';
+} from '@template/db/redis/cache/rollingCache/rollingCacheTypes';
 
 // Runs the selector's findMany args as given, capped one past MAX_ROLLING_CACHE_TARGETS so an
 // oversized selector throws instead of resolving partially.

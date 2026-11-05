@@ -4,7 +4,7 @@
  * @partOf primitive:caching
  * @uses none
  */
-import type { RegisteredRollingCache } from '@template/db/redis/rollingCacheTypes';
+import type { RegisteredRollingCache } from '@template/db/redis/cache/rollingCache/rollingCacheTypes';
 
 // Process-wide registry of rolling caches by name: makeRollingCache registers, the coordinator lists,
 // the jobs look a cache up by the name in their payload.

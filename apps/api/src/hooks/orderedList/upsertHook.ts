@@ -22,7 +22,7 @@ export const registerOrderedListUpsertHook = () => {
         args as Record<string, unknown>,
         previous as Record<string, unknown> | undefined,
       );
-      queueCacheClear(model as Prisma.ModelName, affected);
+      await queueCacheClear(model as Prisma.ModelName, affected);
     },
   );
 };

@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import type { Prisma } from '@template/db/generated/client/client';
-import type { CacheCheck } from '@template/db/redis/cache';
+import type { CacheCheck } from '@template/db/redis/cache/cacheStates';
 import type { ModelName, ModelTypeMap } from '@template/db/utils/modelNames';
 
 // How often the coordinator runs. It must match the `coordinateRollingCaches` cron pattern in
@@ -123,12 +123,22 @@ export type RegisteredRollingCache = {
   results: RollingCacheResults<unknown>;
   channel?: (target: unknown) => string;
   read: (result: string, params: unknown) => Promise<CacheCheck<RollingCacheValue>>;
+  markQueued: (target: unknown) => Promise<boolean>;
+  clearQueued: (target: unknown) => Promise<void>;
   refresh: (target: unknown, options?: RollingCacheRefreshOptions) => Promise<boolean>;
 };
 
 export type RollingCache<TTarget, TResults extends RollingCacheResults<TTarget>> = Omit<
   RegisteredRollingCache,
-  'targets' | 'targetKey' | 'targetOf' | 'results' | 'channel' | 'read' | 'refresh'
+  | 'targets'
+  | 'targetKey'
+  | 'targetOf'
+  | 'results'
+  | 'channel'
+  | 'read'
+  | 'markQueued'
+  | 'clearQueued'
+  | 'refresh'
 > & {
   targets: () => Promise<TTarget[]>;
   targetKey: (target: TTarget) => string;
@@ -144,5 +154,7 @@ export type RollingCache<TTarget, TResults extends RollingCacheResults<TTarget>>
     result: R,
     params: RollingCacheResultParams<TResults, R>,
   ) => Promise<CacheCheck<TValue>>;
+  markQueued: (target: TTarget) => Promise<boolean>;
+  clearQueued: (target: TTarget) => Promise<void>;
   refresh: (target: TTarget, options?: RollingCacheRefreshOptions) => Promise<boolean>;
 };
