@@ -22,6 +22,9 @@ round of a `transactionAll` batch kept the role in the next.
 - At commit, before the `db.onCommit` batches, each touched key runs one Lua call: a marked key is
   cleared, and a computed value is published only if the generation read before the compute is still
   current, so any other clear wins.
+- Marked keys run before the transaction releases its held locks, and a failure throws after the
+  `db.onCommit` batches. Keys it only read run after the locks drop, and a failure counts
+  `cache.publish.failed` without throwing (Alexandre's review, 2026-11-04).
 - Only the cache function sets a value; model writes only mark and clear.
 - Long-lived values no write hook clears are read directly and refreshed asynchronously, never computed
   in a request's transaction.

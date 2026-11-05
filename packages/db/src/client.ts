@@ -39,7 +39,8 @@ import {
   type CacheOverlay,
   newCacheOverlay,
 } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
-import { publishOverlay } from '@template/db/redis/cache/transactionOverlay/publishOverlay';
+import { publishWarm } from '@template/db/redis/cache/transactionOverlay/publishWarm';
+import { publishWritten } from '@template/db/redis/cache/transactionOverlay/publishWritten';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import {
@@ -168,7 +169,7 @@ const dbMethods = {
             ...(options?.maxWait ? { maxWait: options.maxWait } : {}),
           },
         );
-        cacheFailures = await publishOverlay(settled.openTransaction.cacheOverlay);
+        cacheFailures = await publishWritten(settled.openTransaction.cacheOverlay);
       } finally {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a
         // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
@@ -177,6 +178,7 @@ const dbMethods = {
         await drainFinally(opened);
       }
       const { result, openTransaction } = settled;
+      await publishWarm(openTransaction.cacheOverlay);
 
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
       // onCommit handler) drains its own and a rollback discards these with the object.

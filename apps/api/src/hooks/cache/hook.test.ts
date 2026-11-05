@@ -251,6 +251,41 @@ describe('a read through the cache inside a transaction', () => {
     }
     expect(batchRan).toBe(true);
   });
+
+  it('clears a key it wrote before its held locks drop, and publishes one it only read after', async () => {
+    const { entity: written } = await createOrganization();
+    const { entity: read } = await createOrganization();
+    const writtenKey = cacheKey('organization', written.id);
+    const readKey = cacheKey('organization', read.id);
+    await fetchOne('organization', written.id);
+    let atLockRelease: { written?: string; read?: string } = {};
+    await db.txn(async () => {
+      await db.organization.update({ where: { id: written.id }, data: { name: 'renamed' } });
+      await fetchOne('organization', read.id);
+      db.onFinally(async () => {
+        atLockRelease = { written: await cachedName(writtenKey), read: await cachedName(readKey) };
+      });
+    });
+    expect(atLockRelease).toEqual({ written: undefined, read: undefined });
+    expect(await cachedName(readKey)).toBe(read.name);
+  });
+
+  it('does not throw when publishing a value it only read fails at commit', async () => {
+    const { entity: organization } = await createOrganization();
+    const key = cacheKey('organization', organization.id);
+    let evalSpy: ReturnType<typeof spyOn> | undefined;
+    try {
+      await db.txn(async () => {
+        await fetchOne('organization', organization.id);
+        db.onFinally(() => {
+          evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
+        });
+      });
+    } finally {
+      evalSpy?.mockRestore();
+    }
+    expect(await cachedName(key)).toBeUndefined();
+  });
   it('lists a space created in an organization the user owns', async () => {
     const { entity: user } = await createUser();
     const member = await createOrganizationUser({ role: 'owner' }, { user });

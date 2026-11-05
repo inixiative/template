@@ -308,15 +308,21 @@ transaction reads through it:
 - There is no single-flight lock inside a transaction. A cache function only reads; one that writes
   would mark its own key and wait on itself.
 
-When the transaction commits, before it releases its held locks and before its `db.onCommit` batches,
-each key it touched runs one Lua call:
-a marked key is cleared (value, write time, new generation), and a value it computed is published
-only if the key's generation is still the one read before the compute. Another clear in between, from
-any process, wins and leaves a miss. Marked patterns are cleared afterwards with `clearKey`, and keys under a marked pattern are left to that
-clear. A key the transaction neither wrote nor computed a publishable value for sends nothing. A
-failure is loud: `db.txn` throws it after its `db.onCommit` batches have run, so a cache failure never
-skips them. A write that committed then reports an error, so a caller that retries on error must be
-idempotent.
+When the transaction commits, each key it touched runs one Lua call. A marked key is cleared (value,
+write time, new generation), and a value the transaction computed is published only if the key's
+generation is still the one read before the compute. Another clear in between, from any process, wins
+and leaves a miss. A key the transaction neither wrote nor computed a publishable value for sends
+nothing. The calls run in two groups:
+
+- Marked keys, before the transaction releases its held locks and before its `db.onCommit` batches, so
+  a waiter on one of those locks never reads the value the write replaced. Marked patterns are cleared
+  afterwards with `clearKey`, and keys under a marked pattern are left to that clear. A failure here is
+  loud: the clear may not have run, so `db.txn` throws it after its `db.onCommit` batches have run. A
+  write that committed then reports an error, so a caller that retries on error must be idempotent.
+- Keys the transaction only read, after the held locks are released, so a large batch does not hold
+  them for one call per key. The generation check makes the late publish safe: a write that commits
+  in between clears the key and wins. A failure leaves Redis as it was and only costs the warm-up, so
+  it counts `cache.publish.failed` and does not throw.
 
 `cache()` is for computes that take milliseconds to seconds and that a write hook clears. A compute
 that takes minutes does not belong in a request: it runs in a job and is read directly (a rolling
