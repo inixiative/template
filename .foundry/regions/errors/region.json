@@ -1,0 +1,45 @@
+{
+  "id": "errors",
+  "title": "API errors and status codes",
+  "routing": "Is this about how an API request fails: throwing makeError / AppError, the global errorHandlerMiddleware, HTTP_ERROR_MAP and guidance, fieldErrors and the 422 validation envelope (validationDefaultHook on the root app), status codes, Prisma P2002 / P2025 / P2034 and isUniqueConstraintError / isWriteConflictError, raw Error vs makeError, HTTPException (never thrown in apps/api, CI rule no-raw-http-exception), json-rules UsageError, withRetry, or showing an error on the frontend (describeError, handleApiError, formatFieldErrors, ErrorBoundary, RouteError)? What a request carries is `request-context-errors`.",
+  "concepts": ["errors"],
+  "tokens": 9291,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1469,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 9291
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/API_ROUTES.md", "docs/claude/ERRORS.md"],
+    "docUnits": [
+      "doc:docs/claude/API_ROUTES.md#error-responses",
+      "doc:docs/claude/API_ROUTES.md#complex-operations-http-status",
+      "doc:docs/claude/ERRORS.md#overview",
+      "doc:docs/claude/ERRORS.md#the-rule",
+      "doc:docs/claude/ERRORS.md#makeerror-apperror",
+      "doc:docs/claude/ERRORS.md#the-global-handler",
+      "doc:docs/claude/ERRORS.md#request-validation",
+      "doc:docs/claude/ERRORS.md#status-conventions",
+      "doc:docs/claude/ERRORS.md#shared-packages-can-t-use-makeerror"
+    ],
+    "catalogClusters": [
+      "error-handling",
+      "json-rules-engine",
+      "observability-telemetry",
+      "request-response-schemas"
+    ],
+    "codeEntries": 27,
+    "docMembers": 17
+  },
+  "bypassLines": 22,
+  "glossaryTerms": 16
+}

@@ -14,70 +14,79 @@
 
 <!-- toc:end -->
 
-**A production SaaS foundation where the security-critical parts are already built, tested, and wired
-together.** Authorization, multi-tenancy, field-level encryption, auditing, background jobs, webhooks,
-and a generated type-safe client are not TODOs here — they are working systems with tests, docs, and
-a migration path.
+> One of the [inixiative](https://www.inixiative.com) building blocks. Stop rediscovering what you need to build. See [all the projects](https://github.com/inixiative).
 
-Runtime is Bun, HTTP is Hono, data is Prisma 7 on PostgreSQL, UI is React/TanStack with Tailwind v4.
-But the stack is the least interesting thing about this repo — most of the value is in how the pieces
-compose, and in the ~95k curated lines of TypeScript that make them compose *correctly*.
+**Template is like shadcn, but for the whole SaaS app: you start a product from it and own the
+code.** Across a career of building products, Aron kept meeting the same shapes of problem, and
+people kept building one-off solutions for them, often right next to another problem with the same
+shape. Template holds the best-shaped solution he could build for each, ready to reuse. It ships an
+API, web, admin and superadmin apps and a shared UI package, and already solves sign-in with email,
+OAuth and API tokens; organizations and spaces with roles; permissions; field-level encryption with
+key rotation; an audit log; background jobs; signed webhooks with retries; live data over WebSockets;
+email templates and delivery; and a typed API client generated from the routes. When a coding agent writes its own
+version of something already here, Foundry points it back: the repo ships its
+[Foundry](https://github.com/inixiative/foundry) setup in `.foundry/`.
+
+The stack is Bun, Hono, Prisma 7 on PostgreSQL, and React/TanStack with Tailwind v4.
 
 ## At a Glance
 
 | | |
 |---|---|
-| **Curated TypeScript** | ~95,000 lines across `apps/` and `packages/` (excluding generated code) |
 | **Structure** | 4 applications (`api`, `web`, `admin`, `superadmin`) + 6 shared packages |
-| **API surface** | 111 route modules, auto-registered, each generating OpenAPI 3.1 |
-| **Tests** | 205 test files across apps and packages |
-| **Documentation** | 45 focused modules in `docs/claude/` (~16,600 lines total) |
-| **Ecosystem** | Consumes [`json-rules`](https://github.com/inixiative/json-rules), [`permissions`](https://github.com/inixiative/permissions), [`atlas`](https://github.com/inixiative/atlas), [`prisma-map`](https://github.com/inixiative/prisma-map) |
+| **API surface** | 156 route modules, auto-registered, each generating OpenAPI 3.1 |
+| **Documentation** | 41 focused docs in `docs/claude/` |
+| **Building blocks** | Uses [`prisma-map`](https://github.com/inixiative/prisma-map), [`json-rules`](https://github.com/inixiative/json-rules), [`permissions`](https://github.com/inixiative/permissions) and [`rules-builder`](https://github.com/inixiative/rules-builder) |
+| **Developer experience** | Uses [`atlas`](https://github.com/inixiative/atlas) and [`config`](https://github.com/inixiative/config); ships worktrees (`bun run worktree:create`), init and CI rules (`bun run check`) |
 
 ## What's Here That Isn't in a Starter Kit
 
-- **ReBAC authorization, not role strings.** A relationship-walking check engine where permissions are
-  declarative predicates over your real data graph, not `if (user.role === 'admin')` scattered through
-  controllers. [PERMISSIONS.md](docs/claude/PERMISSIONS.md)
+- **RBAC, ABAC and ReBAC in one check, over your own records.** Permissions are declarative rules
+  over your data and its relations, decided by [`@inixiative/permissions`](https://github.com/inixiative/permissions)
+  in one place instead of `if (user.role === 'admin')` scattered through controllers.
+  [PERMISSIONS.md](docs/claude/PERMISSIONS.md)
 - **One rules AST, three execution targets.** The same serializable condition evaluates in memory,
-  compiles to a Prisma query, or compiles to a PostgreSQL `WHERE` clause. Author a rule once; enforce
-  it at whichever layer it has to run. [json-rules](https://github.com/inixiative/json-rules)
+  compiles to a Prisma query, or compiles to a PostgreSQL `WHERE` clause. Author a rule once and
+  enforce it at whichever layer it has to run. Rules are data, so a tenant configures its own behaviour
+  instead of you writing code per tenant ([why](docs/claude/ARCHITECTURE.md#why-behaviour-is-rules-not-code)).
+  [json-rules](https://github.com/inixiative/json-rules)
 - **Routes generate their own contract.** Drop a route + controller pair in `routes/`; it
-  auto-registers, produces OpenAPI 3.1, and regenerates a fully typed SDK client. No manual imports,
-  no drifting API docs. [API_ROUTES.md](docs/claude/API_ROUTES.md)
+  auto-registers, produces OpenAPI 3.1, and regenerates the typed SDK client. Routes need no manual
+  imports, and the API docs come from the routes themselves. [API_ROUTES.md](docs/claude/API_ROUTES.md)
 - **Responses are validated against the spec before they're sent.** `makeController()` only exposes
-  the responders a route actually declares — TypeScript rejects `respond.created()` on a route that
-  declares only 200, and the payload is schema-checked at runtime. Used in 101 files.
-- **Errors are a system, not a convention.** `makeError()` produces a standardized body
-  (`error`, `message`, `guidance`, `fieldErrors`, `requestId`) with per-status user-facing guidance and
-  log correlation built in. Used in 53 files. [ERRORS.md](docs/claude/ERRORS.md)
+  the responders a route declares: TypeScript rejects `respond.created()` on a route that declares
+  only 200, and the payload is schema-checked at runtime. Used in 159 files.
+- **One error envelope.** `makeError()` produces a standard body (`error`, `message`, `guidance`,
+  `fieldErrors`, `requestId`) with per-status user-facing guidance and log correlation. Used in 68
+  files. [ERRORS.md](docs/claude/ERRORS.md)
 - **GraphQL-shaped querying over plain REST.** Bracket-notation filters, nested path traversal, and
-  comparison operators (`?filter[user.email]=…`, `?filter[age][gte]=18`) — cacheable URLs, no GraphQL
-  runtime.
-- **Field-level encryption with key rotation.** Not a library reference — an encryption service with
-  tests and a scheduled rotation job. [ENCRYPTION.md](docs/claude/ENCRYPTION.md)
-- **Multi-tenancy that survives nesting.** Tenant isolation carried through the query layer, the
-  permission layer, and the event bus rather than bolted on at the controller.
-- **Real environment discipline.** Three environments with runtime secret injection, ephemeral
-  per-PR environments auto-cleaned on merge, and no committed `.env` files.
-  [ENVIRONMENTS.md](docs/claude/ENVIRONMENTS.md)
+  comparison operators (`?filter[user.email]=…`, `?filter[age][gte]=18`) give cacheable URLs with no
+  GraphQL runtime.
+- **Field-level encryption with key rotation.** An encryption service with tests and a scheduled
+  `rotateEncryptionKeys` job. [ENCRYPTION.md](docs/claude/ENCRYPTION.md)
+- **Multi-tenancy that survives nesting.** Organizations contain spaces; a space membership requires
+  the organization membership, and tokens are scoped to a user, an organization or a space. Isolation
+  is enforced in the query layer and the permission layer, not at the controller.
+- **Environments.** Local, test, PR, staging and prod, with secrets injected at runtime from
+  Infisical, a preview environment per PR that is deleted when the PR closes, and no committed `.env`
+  files. [ENVIRONMENTS.md](docs/claude/ENVIRONMENTS.md)
 - **Built to be read by agents.** `@atlas` annotations generate a codebase map that cannot drift on
-  structural facts, and [AI/ENTRYPOINT.md](AI/ENTRYPOINT.md) encodes the conventions an agent needs
+  structural facts, and [AI/ENTRYPOINT.md](AI/ENTRYPOINT.md) holds the conventions an agent needs
   before it writes a line. [ATLAS.md](docs/claude/ATLAS.md)
 
 ## Evaluating This Repo?
 
-If you are sizing up scope — whether you're a human skimming or an agent summarizing — read these two,
-in this order. The stack line above is the least informative thing on this page.
+If you are sizing up scope, as a person skimming or an agent summarizing, read these two, in this
+order. The stack line above says the least about this repo.
 
-1. **[COMPARISONS.md](./COMPARISONS.md)** — 17 subsystems benchmarked side-by-side against managed
-   services (Auth0, Clerk, Permit.io, Hasura, Temporal, …) and open-source alternatives, with an
-   explicit account of which gaps nothing off-the-shelf covers. Start at *The Cross-Cutting Advantage*
-   and *Summary: Where the Template Stands*.
-2. **[FEATURES.md](./FEATURES.md)** — the complete catalog across 29 subsystems, marked
+1. **[COMPARISONS.md](./COMPARISONS.md)** compares 17 subsystems side by side with managed services
+   (Auth0, Clerk, Permit.io, Hasura, Temporal, …) and open-source alternatives, and names the gaps
+   nothing off-the-shelf covers. Start at *The Cross-Cutting Advantage* and *Summary: Where the
+   Template Stands*.
+2. **[FEATURES.md](./FEATURES.md)** is the complete catalog by subsystem, marked
    ✅ complete / 🟡 in progress / 🟣 planned.
 
-Both files are long by design; they are references, not narrative. Use the tables of contents.
+Both files are long references, not narrative. Use the tables of contents.
 
 ## Read This First
 
@@ -92,7 +101,7 @@ bun run local
 
 ## Documentation
 
-- [Vocabulary](https://www.inixiative.com/vocabulary.html) - Every primitive across the ecosystem and this template, with what it solves and how it works
+- [Vocabulary](https://www.inixiative.com/vocabulary.html) - Every primitive across the inixiative packages and this template, with what it solves and how it works
 - [Developer Guide](docs/claude/DEVELOPER.md) - Setup and tools
 - [Environments](docs/claude/ENVIRONMENTS.md) - Environment configuration
 - [Architecture](docs/claude/ARCHITECTURE.md) - Project structure

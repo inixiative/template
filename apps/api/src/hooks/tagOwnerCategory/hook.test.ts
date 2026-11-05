@@ -9,11 +9,16 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
+import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
+
+registerMemberSelfGrantHook();
 
 registerRulesHook();
 registerTagOwnerCategoryHook();
+registerSoftDeleteCascadeHook();
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
@@ -90,5 +95,109 @@ describe('tagOwnerCategory hook', () => {
       { organization: org, tagCategory: cat.entity },
     );
     expect(tag.entity.organizationId).toBe(org.id);
+  });
+
+  describe('updateManyAndReturn', () => {
+    const createUserTags = async (count: number) => {
+      const { entity: user } = await createUser();
+      const cat = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
+      const tags = [];
+      for (let i = 0; i < count; i++) {
+        const tag = await createTag(
+          { name: tagName('bulk'), ownerModel: TagOwnerModel.User, resources: [] },
+          { user, tagCategory: cat.entity },
+        );
+        tags.push(tag.entity);
+      }
+      return { user, category: cat.entity, tags };
+    };
+
+    it('soft-deletes multiple tags without re-validating unchanged owners', async () => {
+      const { user, tags } = await createUserTags(3);
+      const deletedAt = new Date();
+      const result = await db.tag.updateManyAndReturn({
+        where: { userId: user.id },
+        data: { deletedAt },
+      });
+      expect(result.map((t) => t.id).sort()).toEqual(tags.map((t) => t.id).sort());
+      expect(result.every((t) => t.deletedAt?.getTime() === deletedAt.getTime())).toBe(true);
+    });
+
+    it('returns no rows when nothing matches', async () => {
+      const result = await db.tag.updateManyAndReturn({
+        where: { name: tagName('absent') },
+        data: { deletedAt: new Date() },
+      });
+      expect(result).toEqual([]);
+    });
+
+    it('returns no rows when nothing matches an owner change', async () => {
+      const { entity: other } = await createUser();
+      const result = await db.tag.updateManyAndReturn({
+        where: { name: tagName('absent') },
+        data: { userId: other.id },
+      });
+      expect(result).toEqual([]);
+    });
+
+    it('rejects moving multiple tags to an owner their category does not have', async () => {
+      const { user, tags } = await createUserTags(2);
+      const { entity: other } = await createUser();
+      const update = async () =>
+        db.tag.updateManyAndReturn({ where: { userId: user.id }, data: { userId: other.id } });
+      await expect(update()).rejects.toThrow(/Tag\.userId .* must match TagCategory\.userId/);
+      const unchanged = await db.tag.findMany({ where: { id: { in: tags.map((t) => t.id) } } });
+      expect(unchanged.every((t) => t.userId === user.id)).toBe(true);
+    });
+
+    it('rejects moving multiple tags into a category with a different ownerModel', async () => {
+      const { user } = await createUserTags(2);
+      const platformCat = await createTagCategory({ ownerModel: TagOwnerModel.platform });
+      const update = async () =>
+        db.tag.updateManyAndReturn({
+          where: { userId: user.id },
+          data: { tagCategoryId: platformCat.entity.id },
+        });
+      await expect(update()).rejects.toThrow(/Tag\.ownerModel \(User\) must match/);
+    });
+
+    it('rejects moving multiple tags into a nonexistent category', async () => {
+      const { user } = await createUserTags(2);
+      const update = async () =>
+        db.tag.updateManyAndReturn({
+          where: { userId: user.id },
+          data: { tagCategoryId: '00000000-0000-0000-0000-000000000000' },
+        });
+      await expect(update()).rejects.toThrow(/TagCategory 0{8}-.* not found/);
+    });
+
+    it('allows moving multiple tags into another category with the same owner', async () => {
+      const { user, tags } = await createUserTags(2);
+      const target = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
+      const result = await db.tag.updateManyAndReturn({
+        where: { userId: user.id },
+        data: { tagCategoryId: target.entity.id },
+      });
+      expect(result).toHaveLength(tags.length);
+      expect(result.every((t) => t.tagCategoryId === target.entity.id)).toBe(true);
+    });
+  });
+
+  it('cascades a user soft delete to its tags and tag categories', async () => {
+    const { entity: user } = await createUser();
+    const cat = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
+    const first = await createTag(
+      { name: tagName('cascade'), ownerModel: TagOwnerModel.User, resources: [] },
+      { user, tagCategory: cat.entity },
+    );
+    const second = await createTag(
+      { name: tagName('cascade'), ownerModel: TagOwnerModel.User, resources: [] },
+      { user, tagCategory: cat.entity },
+    );
+    await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
+    const tags = await db.tag.findMany({
+      where: { id: { in: [first.entity.id, second.entity.id] }, deletedAt: { not: null } },
+    });
+    expect(tags).toHaveLength(2);
   });
 });

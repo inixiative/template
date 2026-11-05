@@ -119,6 +119,22 @@ export const PolymorphismRegistry = {
           User: ['userId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],
+          Project: ['projectId'],
+        },
+      },
+    ],
+  },
+
+  Project: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
+          Organization: ['organizationId'],
+          Space: ['organizationId', 'spaceId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
         },
       },
     ],

@@ -17,7 +17,7 @@ export const validateFullGrant = (
   if (
     !check(writer, rebacSchema, model, delegate, {
       rel: toAccessor(delegate.ownerModel as string),
-      action: 'own',
+      action: 'delegateFull',
     })
   )
     throw makeError({ status: 403, message: 'Access denied' });

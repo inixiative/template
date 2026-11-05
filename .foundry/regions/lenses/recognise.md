@@ -37,15 +37,12 @@ A moment that says any of these, or something close, is this region's. Both voic
 - fill the tenant id into the lens narrowing
 - name a field on the other source
 - options for a field across the bridge
-- compile the rule with the lens so it's gated and narrowed
-- the lens segment rules are written against
 - by default a sender sees its own level only
 - I'll run the projection over the paginated page
 - turn the email's owner reference into the lens owner
 - put the foreign rows on the row before evaluating
 - database-backed picker options
 - load every row the lens matches
-- which map in the set is the root
 - offer every eligible row, not only the linked ones
 - validate the rule against the projected surface
 - a user-written rule must be gated before it runs
@@ -71,11 +68,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - strip the sensitive fields wherever the model appears
 - turn the relation on in picks
 - pass the full user row as template variables
-- the segment lens narrowed per provider
 - name the tag by its fk column
 - does the rule only use fields the lens allows
 - scope the any-row picker to the tenant
-- scope the list to the caller's org per request
 - ship the builder a leak-safe surface
 - fetch the picker's option values for a source
 - just the scoped where for a source query
@@ -89,15 +84,12 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the lens has placeholders for the org, fill them
 - address a column across the bridge
 - a source whose where reads the other database
-- I'll pass the map and model and narrow by hand
-- the root lens for segment conditions
 - the default recipient scope for email
 - the projection drops rows from the page
 - which owner scopes this email's data
 - the evaluator doesn't fetch the far side
 - distinct values for a field from the database
 - all the rows this lens allows, from the database
-- passing a set of maps to the SQL compiler
 - the picker should list rows not yet linked
 - the shipped surface isn't a gate
 - I'll trust the rule the client sent
@@ -123,11 +115,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - redact password hashes and tokens from the lens
 - a relation listed as a field gives wrong kind
 - tokens read fields the lens hides
-- the membership lens with the provider resolved
 - reference rows by id, never the fk
 - lens-only validation at save or render
 - unlinked rows, but only this tenant's
-- a tenant filter that depends on who's asking
 - I'll send the lens to the browser
 - the template's source values, fetched
 - the where a source's options are filtered by
@@ -141,15 +131,12 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll rebuild the narrowing per request with the id spliced in
 - rules that span two field maps
 - picker values across two data sources
-- one call that gates, narrows and compiles
-- bind the segment lens sources myself
 - widen within the organization via a stored lens
 - shape the response with the schema, not the lens
 - the owner for data binding at render
 - I'll fetch the related rows during evaluation
 - options from a query rather than rows in hand
 - I'll compile the where and call findMany myself
-- SQL compile over a lens or a map set
 - a source pointer naming any row of the model
 - coerce against the model projection
 - check the rule's paths against the lens first
@@ -175,11 +162,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll add omits on every relation path to the user
 - enable the relation in the first layer
 - render with projected data only
-- segment narrowing for a given provider
 - one spelling per reference
 - a vocabulary check, not full health
 - tenancy on a pointer source
-- I'll add where org id to paginate in the controller
 - the where-stripped surface for the client
 - values for a sourced field from the database
 - no fetch, only the clause
@@ -189,7 +174,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a non-throwing field map check
 - bind the lens in stages, leaving some tokens open
 - fetch, load the far side, then recheck
-- a scoped compile of a user rule
 - attach the bridged data under the bridge key
 - fetch the segment's members through its lens
 - scope this query to a brand
@@ -203,14 +187,12 @@ A moment that says any of these, or something close, is this region's. Both voic
 - drop the id columns from the lens output
 - options never offer a disallowed value
 - redacted fields hidden on every visit
-- the controller manually merges in tenancy scoping
 - the brand where never reaches the client
 - evaluators don't take the stored shape
 - supply the values the lens layers need
 - every posture enforces the clamp
 - the base lens for sender variables
 - filter the fetched list on the client with real rules
-- a context-dependent scope layer on the route
 
 ## When this is not your domain
 

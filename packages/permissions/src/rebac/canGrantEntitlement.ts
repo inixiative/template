@@ -6,8 +6,8 @@
  */
 import { createCanGrantEntitlement, type EntitlementEntry } from '@inixiative/permissions';
 import type { HydratedRecord } from '@template/db';
+import { schemaMap } from '@template/db/schemaMap';
 import type { Permix } from '@template/permissions/client';
-import { schemaMap } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 
 const canGrant = createCanGrantEntitlement(schemaMap);

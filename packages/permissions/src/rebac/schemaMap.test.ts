@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { type EntitlementEntry, placeEntitlement } from '@inixiative/permissions';
-import { schemaMap } from '@template/permissions/rebac/check';
+import { schemaMap } from '@template/db/schemaMap';
 
 const anchor = { id: 'a1', organizationId: 'o1' };
 

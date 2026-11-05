@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf infrastructure:prisma
+ */
 import {
   DbAction,
   db,
@@ -9,7 +14,8 @@ import {
   type SingleAction,
   withDiscriminatorDefaults,
 } from '@template/db';
-import { castArray } from 'lodash-es';
+import { castArray, isEmpty, pickBy } from 'lodash-es';
+import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { makeError } from '#/lib/errors';
 
 type TagRow = Partial<Prisma.TagGetPayload<Record<string, never>>> & Record<string, unknown>;
@@ -20,6 +26,8 @@ const ownerKeyFields = [
 ];
 
 const ownerSelect: Record<string, true> = Object.fromEntries(ownerKeyFields.map((k) => [k, true]));
+
+const ownerCategoryFields = new Set<string>(['tagCategoryId', 'ownerModel', ...ownerKeyFields]);
 
 type CategoryOwner = { ownerModel: string } & Record<string, unknown>;
 
@@ -131,15 +139,19 @@ export const registerTagOwnerCategoryHook = () => {
     'Tag',
     HookTiming.before,
     [DbAction.update, DbAction.updateManyAndReturn],
-    async (options) => {
-      const { args, previous } = options as HookOptions & { action: SingleAction };
-      if (!args || typeof args !== 'object') return;
-      const a = args as Record<string, unknown>;
-      const data = a.data as TagRow | undefined;
+    async ({ args, previous }) => {
+      const data = (args as { data?: TagRow } | undefined)?.data;
       if (!data) return;
-      const prev = previous as TagRow | undefined;
-      const merged: TagRow = { ...(prev ?? {}), ...data };
-      await validateOwnerMatchesCategory(merged);
+      const ownerCategoryWrites = pickBy(
+        data,
+        (value, field) => value !== undefined && ownerCategoryFields.has(field),
+      );
+      if (isEmpty(ownerCategoryWrites)) return;
+      const rows = (castArray(previous ?? []) as TagRow[]).map(
+        (row) => shadowMerge(row, ownerCategoryWrites) as TagRow,
+      );
+      if (rows.length === 0) return;
+      await validateRowsBatch(rows);
     },
   );
 };

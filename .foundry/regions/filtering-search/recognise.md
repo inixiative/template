@@ -73,18 +73,20 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll silently drop unknown filter fields
 - filter across a relation on this route
 - I'll put the relation name in picks
+- return 200 with the record
 - a fixed filter every request on this route gets
+- scope the list to the caller's org per request
 - which fields can the client filter on
 - limit free-text search to a few columns on a big table
 - search paths not in the lens throw
 - turn a query object into bracket query string params
 - let superadmins search any field
 - assert a row is soft-deleted in a test
+- every list endpoint pages
 - filter state for a list without fetching
 - searchable fields inside a React component
 - I'll interpolate the sort field from the query into orderBy
 - guard a user-supplied dotted field path
-- the type a scope narrowing callback returns
 - bracket values are strings unless marked
 - superadmin should search any field
 - accept search fields when the list isn't known
@@ -123,18 +125,20 @@ A moment that says any of these, or something close, is this region's. Both voic
 - filter on a field the lens doesn't allow
 - relations are off by default for filtering
 - picks hold columns, relations go elsewhere
+- respond from a read or update
 - only show published rows on this list
+- a tenant filter that depends on who's asking
 - I'll keep a searchable fields allowlist on the route
 - the search term hits too many relations
 - every request 500s after I set search paths
 - I'll concatenate searchFields brackets by hand
 - bypass the field whitelist for platform admins
 - read the deleted row in a test
+- this shouldn't return everything
 - manage search and filter values for a view
 - the hook for an endpoint's filter metadata
 - dynamic field names from the client
 - I'll regex check the nested path myself
-- type the per-request narrowing shape
 - how do I filter on true in the URL
 - a lens that only anchors the model
 - the loose search params schema
@@ -173,17 +177,19 @@ A moment that says any of these, or something close, is this region's. Both voic
 - throw, don't ignore, on an unknown filter field
 - turn on the relation for filtering
 - enable a relation filter the right way
+- send the data back with pagination metadata beside it
+- I'll add where org id to paginate in the controller
 - validate filter fields against the lens
 - turn off free-text search for this list
 - search paths must be in the lens
 - serialize the filter object server-side
 - superadmin skips the lens whitelist
 - tests that look at tombstones
+- pass include for relations in the list
 - I'll hold filter state in useState
 - which fields can this table filter in a component
 - untrusted nested paths in filters
 - someone can sort by an internal field
-- what shape does the tenant scope return
 - combinator groups belong in the query builder, not the path strings
 - a where clause into a JSON path
 - sorting for the list query only, not filtering
@@ -199,11 +205,14 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the allowed sort paths outside the templates
 - sorting on a route that has no filter lens
 - nested query params already parsed before the handler
+- just respond ok for everything and let the payload say what happened
 - a static route-wide filter, not per caller
+- the controller manually merges in tenancy scoping
 - the allowed search paths for a list
 - numeric values become strings on the wire
 - limit how deep a field path can go
 - the search param already does a token-split OR across searchable fields
+- a context-dependent scope layer on the route
 
 ## When this is not your domain
 

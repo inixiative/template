@@ -9,13 +9,12 @@ import {
   DbAction,
   HookTiming,
   isNoOpUpdate,
-  markCacheWritten,
   NOOP_FIELDS,
   type Prisma,
   registerDbHook,
 } from '@template/db';
 import { keyBy } from 'lodash-es';
-import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
+import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { isManyAction } from '#/hooks/shared/hookRows';
 
 const isUpdateAction = (action: DbAction): boolean =>
@@ -34,10 +33,7 @@ export const registerClearCacheHook = () => {
 
   registerDbHook('clearCache', '*', HookTiming.after, actions, async (options: HookOptions) => {
     const { model, action } = options;
-    const keys = new Set<string>();
-    const collect = (record: Record<string, unknown>) => {
-      for (const key of fetchCacheKeys(model as Prisma.ModelName, record)) keys.add(key);
-    };
+    const records: Record<string, unknown>[] = [];
 
     if (isManyAction(action)) {
       const { result, previous } = options as HookOptions & { action: ManyAction };
@@ -50,8 +46,8 @@ export const registerClearCacheHook = () => {
         if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData, NOOP_FIELDS))
           continue;
 
-        collect(resultData);
-        if (previousData) collect(previousData);
+        records.push(resultData);
+        if (previousData) records.push(previousData);
       }
     } else {
       const { result, previous } = options as HookOptions & { action: SingleAction };
@@ -62,11 +58,10 @@ export const registerClearCacheHook = () => {
         return;
       }
 
-      collect(resultData);
-      if (previousData) collect(previousData);
+      records.push(resultData);
+      if (previousData) records.push(previousData);
     }
 
-    if (keys.size === 0) return;
-    await markCacheWritten([...keys]);
+    await queueCacheClear(model as Prisma.ModelName, records);
   });
 };

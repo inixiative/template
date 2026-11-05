@@ -204,7 +204,7 @@ The handler's `sources` config is checked by `validateInquiryHandler` to confirm
 
 `resolveInquiryTarget` resolves from `body.targetModel` (already validated by `validateInquiryHandler`):
 
-- `targetModel: User` → `targetUserId` OR `targetEmail` (creates guest if not found)
+- `targetModel: User` → `targetUserId` OR `targetEmail`: `findUserOrCreateGuest` (`apps/api/src/modules/user/services/findOrCreateGuest.ts`) returns the user with that normalized email or creates an unverified guest and emits `user.created` with `isGuest: true`
 - `targetModel: Organization` → `targetOrganizationId` OR `targetOrganizationSlug`
 - `targetModel: Space` → `targetSpaceId` OR `targetOrganizationSlug` + `targetSpaceSlug` (space slugs are org-scoped)
 - `targetModel: OrganizationUser` → `targetOrganizationId` + `targetUserId` (the membership must exist)
@@ -275,7 +275,7 @@ const validate = async (inquiry, content: SpaceContent) => {
 
 ### `resolvedContent` and the Override Pattern
 
-On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution body. Only keys declared in `resolutionInputSchema` can flow into `resolvedContent`. `explanation` is always excluded (resolution-only metadata), so it never overrides content fields.
+On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution body. `resolveContent` (`services/resolveContent.ts`) parses the resolution against `resolutionInputSchema` first and merges the **parsed** values, so defaults and transforms inside an override apply and a refined schema works the same as a plain object. Only keys the resolver actually sent that the schema keeps can flow into `resolvedContent`; a key the schema defaults but the resolver didn't send never overrides content. `explanation` is always excluded (resolution-only metadata), so it never overrides content fields.
 
 **Opt-in to allow resolver overrides** by declaring the field in `resolutionInputSchema`:
 ```typescript
@@ -299,9 +299,21 @@ const { role } = resolvedContent; // always from original inquiry.content
 | `inviteOrganizationUser` | Organization | User | `targeted` | 30 days | Creates `OrganizationUser`, or revives the user's removed one (`revive`) with the invited role |
 | `createSpace` | Organization | admin | — | 90 days | Creates `Space` under source org |
 | `updateSpace` | Space | admin | `untargeted` | 90 days | Updates `Space` with content fields |
-| `transferSpace` | Space | Organization | `untargeted` | 30 days | Sets `Space.organizationId` to target org |
+| `transferSpace` | Space | Organization | `untargeted` | 30 days | Moves the space and everything keyed to it into the target org; see *Transferring a space* |
 
 All four handlers return `autoApprove: async () => false` — no type currently auto-approves.
+
+### Transferring a space
+
+Approving a transfer moves the space, its members and everything downstream into the target org, in the resolution transaction. A member who already belongs to the target org keeps their membership. Every other member is removed; their space membership and its rows move to the target org as tombstones, and hiring them there later does not bring the space back. Nobody becomes a live member of an org they didn't join.
+
+1. The space is locked (`db.findForUpdate`). Its slug in the target org is the resolution's `slug` when the approver gives one (a rename, merged into content by `resolveContent`), else its current slug. A slug the target org already holds, or an open `createSpace` request for it, refuses the transfer with a 409 (`validateSpaceSlugFree`, shared with `createSpace` and `updateSpace`). The target org's Review dialog offers the rename.
+2. One update tombstones every live `SpaceUser` whose user is not a live member of the target org, stamped with the transfer time; `softDeleteCascade` tombstones what they owned and deletes their tokens.
+3. Every space member, live or tombstoned, gets a tombstoned `member` row in the target org unless they already have one (`skipDuplicates`): the `SpaceUser` → `OrganizationUser` key needs it once step 4 re-keys their space membership. Its stamp is one no space membership carries, so hiring the person revives only their org membership. Putting them back in the space is a manual re-add; the transfer revives nothing.
+4. `Space.organizationId` is set. Every row keyed to the space or a space member carries the org in a composite key (`SpaceUser`; Integration, Token, EmailTemplate and EmailComponent; Inquiry and AuditLog rows keyed to a space member), so one statement re-keys them all by `ON UPDATE CASCADE`; Postgres runs every cascade of a statement before it checks the keys. `spaceKeys.test.ts` (`packages/db/src/registries`) fails when a Space- or SpaceUser-owned model carries an org column outside such a key.
+5. The rows the cascade re-keyed are cleared from the cache (`clearSpaceRowCaches`, through `queueCacheClear`). It finds them through every cached model's composite relation to `Space` or `SpaceUser` (`spaceKeyColumns`), so a prefixed pair such as `sourceSpaceId`/`sourceOrganizationId` counts; a space reference without an org column isn't re-keyed and is left alone.
+
+No row keyed to the space keeps the old org's membership, so reviving a membership in the old org revives nothing in the moved space. Audit rows record their context (`contextOrganizationId`) as it was when written, so the space's earlier history stays filed under the old org.
 
 **Send permissions by type:**
 

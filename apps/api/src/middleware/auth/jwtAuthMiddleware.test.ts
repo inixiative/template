@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { randomUUID } from 'node:crypto';
 import { db, unregisterDbHook } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
@@ -207,9 +206,9 @@ describe('JWT verification', () => {
   it('rejects a tampered JWT', async () => {
     const { jwt } = await createUserJwt(user);
     const [header, , signature] = jwt.split('.');
-    const forged = Buffer.from(JSON.stringify({ sub: randomUUID(), iat: nowSeconds() })).toString(
-      'base64url',
-    );
+    const forged = Buffer.from(
+      JSON.stringify({ sub: Bun.randomUUIDv7(), iat: nowSeconds() }),
+    ).toString('base64url');
     expect((await readMe(bearer(`${header}.${forged}.${signature}`))).status).toBe(401);
   });
 
@@ -229,7 +228,7 @@ describe('JWT verification', () => {
   });
 
   it('rejects a JWT whose subject is not a user', async () => {
-    const stranger = await signSelf({ sub: randomUUID() });
+    const stranger = await signSelf({ sub: Bun.randomUUIDv7() });
     expect((await readMe(bearer(stranger))).status).toBe(401);
   });
 
@@ -248,7 +247,7 @@ describe('JWT verification', () => {
 describe('JWTs from a configured external issuer', () => {
   const issuer = 'https://issuer.test';
   const audience = 'https://api.test';
-  const kid = randomUUID();
+  const kid = Bun.randomUUIDv7();
   let user: User;
   let signingKey: CryptoKey;
   let jwksServer: ReturnType<typeof Bun.serve>;
@@ -340,7 +339,7 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
       app.request(`/api/v1/organization/${organization.id}`, {
         method: 'PATCH',
         headers: { ...jwt, 'content-type': 'application/json' },
-        body: JSON.stringify({ name: `renamed-${randomUUID().slice(0, 6)}` }),
+        body: JSON.stringify({ name: `renamed-${Bun.randomUUIDv7().slice(0, 6)}` }),
       });
     expect((await rename()).status).toBe(403);
     await db.organizationUser.update({ where: { id: member.id }, data: { role: 'owner' } });

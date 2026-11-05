@@ -165,17 +165,23 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Authorization & Permissions
 
-**Full RBAC/ABAC/ReBAC Authorization** - Comprehensive permission system supporting Role-Based (RBAC), Attribute-Based (ABAC), and Relationship-Based (ReBAC) access control powered by Permix with JSON-Rules support. This unified system lets you define permissions using simple roles, complex attribute-based rules, or relationship graphs - all within the same framework. JSON-Rules integration enables dynamic permission logic without code deployment.
+**Full RBAC/ABAC/ReBAC Authorization** - Comprehensive permission system supporting Role-Based (RBAC), Attribute-Based (ABAC), and Relationship-Based (ReBAC) access control powered by [`@inixiative/permissions`](https://github.com/inixiative/permissions), with conditions in json-rules. This unified system lets you define permissions using simple roles, complex attribute-based rules, or relationship graphs - all within the same framework. JSON-Rules integration enables dynamic permission logic without code deployment.
 
-- ✅ **Multi-Level RBAC** - Roles at platform (superadmin, user), organization (owner, admin, member), and space (owner, admin, member) levels with clear hierarchies
+- ✅ **Multi-Level RBAC** - Roles at platform (superadmin, user), organization and space (owner, admin, member, viewer), each mapping to one standard action (own, manage, operate, read)
 
-- ✅ **Attribute-Based Control (ABAC)** - JSON-based entitlements at org and space level allow custom permission logic based on user attributes, resource properties, or contextual conditions
+- ✅ **Attribute-Based Control (ABAC)** - Conditions in json-rules over the record and the acting user or token, nested freely with `any` and `all`, inside the same rules as role and relation checks
 
-- ✅ **Relationship-Based Control (ReBAC)** - Google Zanzibar-style relationship graphs (User → OrgUser → Org → Space) for modeling complex permission scenarios like delegated access or inherited permissions
+- ✅ **Relationship-Based Control (ReBAC)** - Relation walks over your own rows through the schema (member row, organization, space), with no separate tuple store to sync
+
+- ✅ **Entitlements** - An owner hands on an action on a resource from an anchor, narrowed by a `where`. Every check asks the grantor again, so demoting anyone up the chain stops what they handed on at the next request
+
+- ✅ **Delegates** - Tokens and integrations act for their owner: `full` (the owner whole, in sync), a role (the owner capped at that role) or entitlements. Setting `full` takes the person-only `delegateFull` action on the owner
+
+- ✅ **Tenant-Authored Record Rules** - A record can carry its own rule for an action (`Contact` for `read` today), validated before it is saved and ORed with the schema, so it can only widen access
 
 - ✅ **JSON-Rules Integration** - Define permission logic declaratively using @inixiative/json-rules without code deployment. Evaluate complex conditions, combine multiple rules, and update permission logic dynamically
 
-- ✅ **Hierarchical Inheritance** - Space permissions automatically inherit from parent organization. Org owners automatically get owner access to all spaces
+- ✅ **Hierarchical Inheritance** - An organization's owners own its spaces. Other organization roles reach a space only through a space member row
 
 - ✅ **Permission Middleware** - validatePermission() and validateSubmodelPermission() enforce checks before controller execution. Routes declare required permissions in OpenAPI definitions
 
@@ -185,9 +191,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Per-Request Isolation** - Fresh Permix client instance per request ensures complete isolation between concurrent requests
 
-- ✅ **Redis Performance Caching** - Permission evaluation results cached in Redis (10min TTL) for sub-millisecond response times
+- ✅ **Redis Caching** - The rows a check loads are cached in Redis (one hour) and cleared on every write, so a check stays in-process and current
 
 - 🟣 Visual permissions builder UX (ticket FEAT-008, depends on INFRA-002)
+
+- 🟣 Listing what you can read as one query: permissions 1.0 compiles the same rules to Prisma and SQL, end of 2026 (ticket INFRA-026)
 
 [Learn more: PERMISSIONS.md](docs/claude/PERMISSIONS.md)
 
@@ -222,9 +230,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Database & ORM
 
-**Prisma 7 with Advanced Patterns** - Latest Prisma ORM with PostgreSQL 18, featuring typed model IDs, mutation hooks, post-transaction queues, robust false polymorphism, and split schema architecture. Built for type safety, testability, and maintainability.
-
-- ✅ **Typed Model IDs** - Branded ID types (OrganizationId, UserId, SpaceId) prevent accidentally mixing IDs from different models. TypeScript catches `function(userId: UserId)` called with `organizationId` at compile time. Eliminates an entire class of bugs
+**Prisma 7 with Advanced Patterns** - Latest Prisma ORM with PostgreSQL 18, featuring mutation hooks, post-transaction queues, robust false polymorphism, and split schema architecture. Built for type safety, testability, and maintainability.
 
 - ✅ **Automatic Transaction Merging** - Database client uses AsyncLocalStorage and Proxy pattern to auto-merge nested transactions. Call `db.txn()` anywhere and it merges into parent transaction if one exists, or creates new one if not. Eliminates manual transaction passing through call stacks. All mutations automatically wrapped in transactions via Prisma extension
 
@@ -250,7 +256,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories). The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
-- ✅ **24 Database Models** - user, account, session, verification, jwks, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
+- ✅ **34 Database Models** - account, appEvent, auditLog, authProvider, communicationLog, communicationComponentVersion, contact, cronJob, customerRef, emailTemplate, emailComponent, flow, integrationRecord, integration, jobOutbox, inquiry, organizationUser, organization, project, jwks, segment, segmentMember, session, ruleReference, spaceUser, tag, space, tagAttachment, user, token, tagCategory, verification, webhookSubscription, webhookEvent
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -260,7 +266,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Runtime Schema Introspection** - Parse Prisma's runtime data model and inline schema to extract FK mappings, relations, and field metadata at runtime. Enables dynamic hydration, validation, and tooling without hardcoded model knowledge
 
-- ✅ **Advanced Constraints** - Helper functions for PostgreSQL features Prisma doesn't support natively: partial unique indexes (`addUniqueWhereNotNull`), CHECK constraints (`addCheckConstraint`), and GIST indexes (`addGistIndex`) for advanced queries
+- ✅ **Advanced Constraints** - Partial unique indexes are declared in the Prisma schema (the `partialIndexes` preview feature: `@@unique([...], where: { ... })`; `CustomerRef` keeps one row per customer/provider pair this way). Row checks the schema can't express are json-rules in `RulesRegistry` (`apps/api/src/hooks/rules/registry.ts`), enforced by the `rules` hook on every write, so the rule lives in the mutation lifecycle with the rest of the write guards instead of in hand-written SQL. [Learn more: HOOKS.md](docs/claude/HOOKS.md#rules-registry)
 
 - ✅ **False Polymorphism Registry** - Centralized configuration (`PolymorphismRegistry`) defining polymorphic patterns across models. Single source of truth for constraints, validation hooks, and FK resolution. Supports multi-axis polymorphism (Token owner + model, CustomerRef customer + provider)
 
@@ -399,8 +405,8 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## User Management
 
-- ✅ **User CRUD** - Create, read, update, delete users. Admin routes for platform-level user management; me routes for self-service operations. Typed IDs prevent accidental cross-model ID mixing
-- ✅ **Me Endpoint System** - Self-service API with 8+ endpoints under `/me`: read profile, update name, change password, list orgs, list spaces, list tokens, manage auth providers, delete account. Authenticated users manage their own data without needing admin access
+- ✅ **Users** - A user is created by sign-up (BetterAuth) or as an unverified guest when an inquiry targets an unknown email (`findUserOrCreateGuest`). Self-service under `/me`; superadmin routes redact a user and rotate their JWTs (`/api/admin/user/:id/redact`, `/rotateJwts`). No route updates a user yet (see Profile Editing)
+- ✅ **Me Endpoint System** - Self-service API under `/me`: read the profile, change password, rotate JWTs, redact (delete) the account; list the caller's organizations, spaces, segment memberships and inquiries received; list and create its tokens, contacts, integrations, inquiries (sent), segments and webhook subscriptions; create flows
 - ✅ **Email Verification** - BetterAuth verification flow: send verification email with signed token, verify token on click, mark email as verified. Verification model persists tokens with expiry
 - ✅ **Password Reset** - BetterAuth reset flow: request reset email, validate signed token, set new password. Tokens are single-use and expire after 1 hour
 - ✅ **User Redaction / GDPR** - Anonymize user PII on account deletion: email → `redacted-{uuid}@redacted.invalid`, name → `Redacted User`, avatar cleared. Preserves record for referential integrity while removing identifying data
@@ -559,7 +565,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **useValidateUniqueness()** - Real-time uniqueness validation for form fields (email, username, slug). Debounces input, calls API to check uniqueness, returns validation error. Integrates with React Hook Form
 
-- ✅ **useEventRefetch()** - Subscribes to custom events and refetches TanStack Query queries when events fire. Use for cross-component data invalidation (user created in modal, refetch user list in table)
+- ✅ **useApiWebsocket()** - Mounted once at each app root. Every mounted query whose family is in `LIVE_QUERIES` subscribes to its channel, and refetches when a business event publishes a refetch to that channel (a `websocket` handoff from the event handler). A change made by any user, request or job then refreshes every open view of that data, with no prop drilling or manual invalidation. [Learn more: WEBSOCKETS.md](docs/claude/WEBSOCKETS.md#publishing-a-refetch)
 
 - ✅ **useBreadcrumbs()** - Generates breadcrumb trail from current route using navigation config. Returns array of `{ label, path }` objects for rendering breadcrumb navigation
 
@@ -572,7 +578,6 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **useMediaQuery()** - Responsive design helper that returns boolean for media query matches. Use for conditional rendering based on screen size. Server-safe (returns false during SSR)
 
 - ✅ **useAuthProviders()** - Fetches available auth providers for current org or platform. Used by login/signup to render correct OAuth buttons, show SSO option, or show password field based on configured providers
-- ✅ **useAppEvents()** - Subscribes to named DOM custom events for cross-component communication. Pair with `useEventRefetch()` to trigger query invalidations without prop drilling or shared state
 - ✅ **useDarkMode()** - Reads and sets theme preference (light/dark/system). Syncs with Zustand ui slice, persists across sessions, applies Tailwind `dark:` class to document root. Returns `{ theme, setTheme, isDark }`
 - ✅ **useLanguage()** - Returns current locale string and setter. Backed by Zustand ui slice. Ready for i18n integration — currently returns `en` as default, locale-aware components read from this hook
 - ✅ **usePageMeta()** - Sets `document.title` and meta description for the current route. Accepts raw strings or template with app name. Called in page components to keep browser tab titles contextual

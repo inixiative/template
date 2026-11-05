@@ -38,7 +38,3 @@ export const getModelRelations = (modelName: ModelName): RelationInfo[] =>
     foreignKey: relation.foreignKey,
     isRequired: models[modelName].fields[relation.relationName].isRequired,
   }));
-
-export const getAccessorRelations = (accessor: AccessorName): RelationInfo[] => {
-  return getModelRelations(toModelName(accessor));
-};

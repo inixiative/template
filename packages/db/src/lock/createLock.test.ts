@@ -6,7 +6,7 @@ import type { LockRedis } from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 
-const newId = () => `test-${crypto.randomUUID()}`;
+const newId = () => `test-${Bun.randomUUIDv7()}`;
 const keyFor = (id: string) => `${redisNamespace.lock}:s:${id}`;
 const fastOpts = { ttlMs: 100, heartbeatMs: 30 };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

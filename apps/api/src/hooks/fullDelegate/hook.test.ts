@@ -8,6 +8,7 @@ import {
   createOrganizationUser,
 } from '@template/db/test';
 import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
@@ -24,29 +25,21 @@ describe('writing full clears the role and entitlements beside it', () => {
 
   beforeAll(async () => {
     registerFullDelegateHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     ({ entity: organization } = await createOrganization());
   });
 
   afterAll(async () => {
-    for (const name of [
-      'fullDelegate',
-      'fullDelegate:upsert',
-      'rules:create',
-      'rules:upsert',
-      'rules:update',
-      'rules:updateManyAndReturn',
-    ])
-      unregisterDbHook(name);
     await cleanupTouchedTables(db);
   });
 
   it('an integration created full keeps no role or entitlements', async () => {
-    const { entity: seat } = await createOrganizationUser({ role: 'owner' }, { organization });
+    const { entity: member } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity } = await createIntegration({
       ownerModel: 'OrganizationUser',
-      organizationId: seat.organizationId,
-      userId: seat.userId,
+      organizationId: member.organizationId,
+      userId: member.userId,
       full: true,
       role: 'admin',
       entitlements: operate,
@@ -55,10 +48,10 @@ describe('writing full clears the role and entitlements beside it', () => {
   });
 
   it('a token updated to full drops its role and entitlements', async () => {
-    const { entity: seat } = await createOrganizationUser({ role: 'owner' }, { organization });
+    const { entity: member } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity: token } = await createKeyedToken(
       { ownerModel: 'OrganizationUser', role: 'admin', entitlements: operate },
-      { organizationUser: seat },
+      { organizationUser: member },
     );
     const updated = await db.token.update({ where: { id: token.id }, data: { full: true } });
     expect(updated).toMatchObject({ full: true, role: null, entitlements: null });

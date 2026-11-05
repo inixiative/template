@@ -7,6 +7,8 @@ const standardActions: string[] = roleHierarchy.map(roleToStandardAction);
 
 const notStandard: Partial<Record<string, string[]>> = {
   'db:contact': ['read → own', 'operate → own', 'manage → own'],
+  'db:organizationUser': ['operate → manage', 'operate → own'],
+  'db:spaceUser': ['operate → manage', 'operate → own'],
 };
 
 describe('on every resource, each standard action reaches every higher one it defines, unless the model declares otherwise (R105)', () => {

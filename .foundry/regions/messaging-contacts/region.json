@@ -3,18 +3,18 @@
   "title": "Messaging and contacts",
   "routing": "Is this about reaching a person outside templated email, or about where their addresses live: the messaging lane (messageUser, messageContact, MessageContent, messageProviderRegistry, getMessageProviderAdapter, MessageProviderAdapter per ContactType, resolveUsers, targetedBySender, SMS/push/chat), or the Contact model (ContactType, ContactRegistry, ContactTypeDef, valueKey, contactRules, emailAddressSchema, canonicalUrl / splitUrl / parseSimpleHandleUrl and the per-network parseXUrl parsers, contact routes, acceptedKinds and deliverability on a Contact)?",
   "concepts": ["messaging", "contacts"],
-  "tokens": 12345,
+  "tokens": 12454,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2353,
+      "tokens": 2329,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12345
+      "tokens": 12454
     }
   },
   "runsAgreed": 0,
@@ -35,16 +35,16 @@
       "data-models",
       "email-composition-rendering",
       "email-delivery-senders",
-      "frontend-state-api-client",
       "immutable-fields",
       "messaging-channels-adapters",
       "mutation-hooks",
       "ordered-lists",
       "permission-rule-algebra",
+      "request-context-access",
       "request-response-schemas",
       "route-templates-controllers"
     ],
-    "codeEntries": 66,
+    "codeEntries": 69,
     "docMembers": 31
   },
   "bypassLines": 11,

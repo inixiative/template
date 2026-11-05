@@ -3,7 +3,7 @@
   "title": "Logging, telemetry, shutdown",
   "routing": "Is this about emitting or shipping logs, traces, metrics or errors, or about process start/stop: the log facade (log, withLogContext, logScope, ctx.log in jobs, frontend loggers, redaction), OpenTelemetry (withSpan, recordDuration, incrementCounter, traceJob, captureTraceContext/withRemoteTrace, telemetryMiddleware, telemetryExtension, browser telemetry, OTEL_* settings), the error reporter (Sentry/console), health checks, or graceful shutdown and in-process loops (initGracefulShutdown, onShutdown, sleepUnlessShuttingDown, makeUnrefInterval)?",
   "concepts": ["logging", "telemetry", "process-lifecycle"],
-  "tokens": 16905,
+  "tokens": 16911,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 16905
+      "tokens": 16911
     }
   },
   "runsAgreed": 3,

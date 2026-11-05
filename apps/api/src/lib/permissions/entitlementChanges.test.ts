@@ -7,6 +7,7 @@ import {
   createOrganization,
   createOrganizationUser,
 } from '@template/db/test';
+import { isMemberSelfGrant, wellFormedEntitlements } from '@template/permissions';
 import { integrationRouter } from '#/modules/integration';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
@@ -26,10 +27,13 @@ afterAll(async () => {
 });
 
 const writer = async (role: Role) => {
-  const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
+  const { entity: organizationUser, context } = await createOrganizationUser(
+    { role },
+    { organization },
+  );
   return createTestApp({
     mockUser: context.user,
-    mockOrganizationUsers: [seat],
+    mockOrganizationUsers: [organizationUser],
     mount: [
       (hono) => {
         hono.route('/api/v1/organizationUser', organizationUserRouter);
@@ -50,8 +54,10 @@ const spaceIntegrations = (actions: string[]) =>
 const member = async (entitlements?: Entry[]) =>
   (await createOrganizationUser({ role: 'member', entitlements }, { organization })).entity;
 
-const stored = async (target: OrganizationUser) =>
-  (await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } })).entitlements;
+const stored = async (target: OrganizationUser): Promise<unknown> =>
+  wellFormedEntitlements(
+    (await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } })).entitlements,
+  ).filter((entry) => !isMemberSelfGrant('db:organizationUser', target)(entry));
 
 const change = async (
   role: Role,
@@ -70,10 +76,10 @@ describe("a member's entitlements change only through add and remove (R78)", () 
 
   it('an owner adds one, and it is stored', async () => {
     const target = await member();
-    expect((await change('owner', target, { add: [spaceIntegrations(['manage'])] })).status).toBe(
+    expect((await change('owner', target, { add: [spaceIntegrations(['delete'])] })).status).toBe(
       200,
     );
-    expect(await stored(target)).toEqual([spaceIntegrations(['manage'])]);
+    expect(await stored(target)).toEqual([spaceIntegrations(['delete'])]);
   });
 
   it('an admin cannot add what it could not grant', async () => {
@@ -81,16 +87,16 @@ describe("a member's entitlements change only through add and remove (R78)", () 
     expect((await change('admin', target, { add: [spaceIntegrations(['manage'])] })).status).toBe(
       403,
     );
-    expect(await stored(target)).toBeNull();
+    expect(await stored(target)).toEqual([]);
   });
 
   it('removing needs the ability to grant it: an admin cannot strip what only an owner gives', async () => {
-    const target = await member([spaceIntegrations(['manage'])]);
+    const target = await member([spaceIntegrations(['delete'])]);
     expect(
-      (await change('admin', target, { remove: [spaceIntegrations(['manage'])] })).status,
+      (await change('admin', target, { remove: [spaceIntegrations(['delete'])] })).status,
     ).toBe(403);
     expect(
-      (await change('owner', target, { remove: [spaceIntegrations(['manage'])] })).status,
+      (await change('owner', target, { remove: [spaceIntegrations(['delete'])] })).status,
     ).toBe(200);
     expect(await stored(target)).toEqual([]);
   });
@@ -157,18 +163,18 @@ describe('integrations and tokens change their entitlements the same way', () =>
     expect((await to([spaceIntegrations(['manage'])])).status).toBe(403);
   });
 
-  it("a member's token: its user adds and removes what the member could grant", async () => {
-    const { entity: seat, context } = await createOrganizationUser(
+  it("a member's token: its user adds and removes only what they hold (Aron, 2026-10-31)", async () => {
+    const { entity: organizationUser, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
     );
     const { entity: token } = await createKeyedToken(
       { ownerModel: 'OrganizationUser', role: 'viewer' },
-      { organizationUser: seat },
+      { organizationUser: organizationUser },
     );
     const app = createTestApp({
       mockUser: context.user,
-      mockOrganizationUsers: [seat],
+      mockOrganizationUsers: [organizationUser],
       mount: [(hono) => hono.route('/api/v1/token', tokenRouter)],
     });
     const to = (body: { add?: Entry[]; remove?: Entry[] }) =>

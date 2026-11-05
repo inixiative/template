@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -12,6 +12,7 @@ import {
 } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { saveEmailTemplate } from '@template/email/render';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -55,6 +56,7 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
   let organization: Organization;
 
   beforeAll(async () => {
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
@@ -259,6 +261,7 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
     });
 
   beforeAll(async () => {
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();

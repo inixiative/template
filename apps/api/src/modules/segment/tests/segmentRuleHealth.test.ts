@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -10,6 +10,7 @@ import {
   createSpace,
 } from '@template/db/test';
 import { RuleDegradedError } from '@template/shared/rules';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -34,6 +35,7 @@ describe('segment rule health — the segments a rule names, as edges', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
@@ -166,6 +168,7 @@ describe('segment rule health — edge upkeep', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();

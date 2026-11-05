@@ -22,7 +22,7 @@ export const transactionAll: StrategyExecutor = async (
   baseContext,
   timeout,
 ) => {
-  const batchId = crypto.randomUUID();
+  const batchId = Bun.randomUUIDv7();
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
   const results: RequestResult[][] = [];
   let completedRounds = 0;

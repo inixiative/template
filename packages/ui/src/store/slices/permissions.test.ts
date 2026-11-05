@@ -54,7 +54,9 @@ describe('permissions slice', () => {
       const member = (role: string) =>
         ({
           id: 'user-1',
-          organizationUsers: [{ role, organizationId: 'org-1', entitlements: null }],
+          organizationUsers: [
+            { id: 'orgUser-1', role, organizationId: 'org-1', entitlements: null },
+          ],
           spaceUsers: [],
         }) as unknown as UserWithRelations;
       const { permissions } = useAppStore.getState();

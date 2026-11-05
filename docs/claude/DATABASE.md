@@ -24,9 +24,7 @@
   - [Foreign Keys](#foreign-keys)
   - [DateTime Fields](#datetime-fields)
   - [Enum Naming](#enum-naming)
-- [Typed Model IDs](#typed-model-ids)
-  - [Usage](#usage)
-  - [Available Types](#available-types)
+  - [Reference Data (Code, Not Rows)](#reference-data-code-not-rows)
 - [Model Utilities](#model-utilities)
   - [PascalCase (ModelName)](#pascalcase-modelname)
   - [camelCase (AccessorName)](#camelcase-accessorname)
@@ -137,7 +135,7 @@ The cut-over is `launched` in `project.config.ts`, flipped by the init script's 
 | `setup.sh` | pushes and seeds the local database | skips push and seed |
 | Migration files | none | start at `0_init`, created by Launch |
 
-`scripts/checkLaunched.ts` reads the flag for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and `push-dev.sh` refuses a non-local `DATABASE_URL`.
+`scripts/checkLaunched.ts` reads the flag for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and both it and `push-dev.sh` push through `scripts/db/push-local.sh`, which refuses a non-local `DATABASE_URL`. Those databases are throwaway per-worktree Docker containers, so `push-local.sh` carries the owner's consent for Prisma's AI-agent guard and agents can run the tests; `release.sh` never does.
 
 **What Launch does** (init → Launch, [#197](https://github.com/inixiative/template/pull/197)): `bun run db:baseline` writes `prisma/migrations/0_init` as the diff from an empty database to `prisma/schema` (once); for prod, and staging when enabled, it checks the deployed database matches `prisma/schema` and otherwise blocks launch ("deploy the current schema there, then launch"); it records `0_init` as applied on each (`prisma migrate resolve --applied 0_init`); then it sets `launched = true`. Commit `prisma/migrations` and `project.config.ts` together.
 
@@ -335,6 +333,8 @@ userId String @db.VarChar(36)
 
 Always `@db.VarChar(36)` on FK fields.
 
+A row keyed to a space or a space member reaches it through a composite key that carries the organization: `Space` by `(organizationId, spaceId)` → `(organizationId, id)`, `SpaceUser` by `(organizationId, spaceId, userId)`, `OrganizationUser` by `(organizationId, userId)`. The organization is part of the row's tenancy, so a space transfer re-keys all of it in one statement by `ON UPDATE CASCADE` (INQUIRIES.md, *Transferring a space*). `packages/db/src/registries/spaceKeys.test.ts` fails when a Space- or SpaceUser-owned model carries the org outside such a key.
+
 ### DateTime Fields
 
 ```prisma
@@ -362,60 +362,13 @@ enum InquiryType {
 }
 ```
 
----
+### Reference Data (Code, Not Rows)
 
-## Typed Model IDs
+Countries, currencies, languages and time zones are constants in `@template/shared/reference` (`packages/shared/src/reference/`), never tables or seed rows.
 
-Phantom types provide compile-time safety for model IDs. Prevents accidentally passing a `UserId` where a `SessionId` is expected.
-
-```typescript
-import { UserId, userId, OrganizationId, organizationId } from '@template/db';
-
-// Type aliases
-type UserId = string & { readonly __model: 'User' };
-type OrganizationId = string & { readonly __model: 'Organization' };
-
-// Constructor functions (cast raw string to typed ID)
-const id: UserId = userId('abc-123');
-const orgId: OrganizationId = organizationId('org-456');
-```
-
-### Usage
-
-```typescript
-// Function signatures enforce correct ID types
-async function loadUser(id: UserId): Promise<User> { ... }
-async function loadOrganization(id: OrganizationId): Promise<Organization> { ... }
-
-// Compile-time error: can't pass UserId where OrganizationId expected
-loadOrganization(userId('abc'));  // ❌ Type error
-
-// Correct usage
-loadOrganization(organizationId('abc'));  // ✓
-```
-
-### Available Types
-
-| Type | Constructor |
-|------|-------------|
-| `UserId` | `userId(id)` |
-| `OrganizationId` | `organizationId(id)` |
-| `OrganizationUserId` | `organizationUserId(id)` |
-| `AccountId` | `accountId(id)` |
-| `SessionId` | `sessionId(id)` |
-| `VerificationId` | `verificationId(id)` |
-| `TokenId` | `tokenId(id)` |
-| `InquiryId` | `inquiryId(id)` |
-| `WebhookSubscriptionId` | `webhookSubscriptionId(id)` |
-| `WebhookEventId` | `webhookEventId(id)` |
-| `CronJobId` | `cronJobId(id)` |
-| `SpaceId` | `spaceId(id)` |
-| `SpaceUserId` | `spaceUserId(id)` |
-| `CustomerRefId` | `customerRefId(id)` |
-| `EmailTemplateId` | `emailTemplateId(id)` |
-| `EmailComponentId` | `emailComponentId(id)` |
-
-Located in `packages/db/src/typedModelIds.ts`.
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| A list of countries, currencies, languages or time zones: "a country dropdown", "how many decimals does this currency have", "the dialing code for this country" | **COUNTRIES**, **CURRENCIES**, **LANGUAGES**, **TIMEZONE_IDS** · primitive `packages/shared/src/reference/index.ts` — each has its code type and Zod schema (`CountryCodeSchema`, `CurrencyCodeSchema`, `LanguageCodeSchema`, `TimezoneIdSchema`), a guard (`isCountryCode`, …) and lookups: `countryByCode`, `callingCodeFor`, `countryNameFor`, `currencyByCode`, `decimalsFor`, `symbolFor`, `languageByCode`, `currentOffsetMinutes` | this section | a `Country` or `Currency` model or seed file; a hand-typed list of ISO codes; an npm country/currency package |
 
 ---
 
@@ -804,6 +757,8 @@ Schema-level configuration in `packages/db/src/registries/`:
 | `delegatedKeys(axis, value)` / `carryDelegatedKeys(model, row)` | The parent keys a delegating value carries; copy them from the parent row (the hook and the test factory both call it) |
 | `polymorphicKeyColumn` / `polymorphicTarget` | The key column for a value; the `{ kind, id }` a row points at |
 | `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
+| `polymorphicBindings(ownerModel, ownerId)` | The bind map `polymorphicIs` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`POLYMORPHIC_BINDS`, `isOwnerKind`) |
+| `isFalsePolymorphismRef(ref)` / `resolveFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart, and resolve returns that value's FK column (null on an unknown model, axis or value) |
 | `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |
 
 ```typescript
@@ -833,6 +788,7 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `spaceUser.prisma` - Space memberships (requires organization membership)
 - `token.prisma` - API tokens (user/org/space scoped)
 - `webhookSubscription.prisma` - Webhook configurations
+- `project.prisma` - `Project`: a unit of work an owner organizes things around (name, optional description). False-polymorphic over all five owners (User, OrganizationUser, Organization, Space, SpaceUser); names are unique per owner among live rows, so one repo can be a project in several tenants. Taggable (`TagResource.Project`). Routes: `/me/projects` and `/{organization,organizationUser,space,spaceUser}/:id/projects` to create and list, `/project/:id` to read, update and delete
 - `inquiry.prisma` - False polymorphic inquiry system
 - `integrationRecord.prisma` - One record's standing in one integration (false-polymorphic over `WebhookModel`); `poisonedAt` makes sendWebhook skip the record
 - `customerRef.prisma` - Customer references (false-polymorphic customer User/Organization/Space → provider)

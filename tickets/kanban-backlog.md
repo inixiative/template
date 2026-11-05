@@ -17,6 +17,7 @@ kanban
     API-001-idempotency-and-safe-retries
     API-003-cursor-pagination-mode
     INFRA-006-tenant-isolation-test-matrix
+    TEST-002-hook-registration-in-tests
     INFRA-007-data-lifecycle-retention-export-delete
     INFRA-008-disaster-recovery-and-restore-drills
     INFRA-005-platform-baseline-hosting-observability
@@ -49,6 +50,7 @@ kanban
     COMM-009-component-slots-passthrough-children
     COMM-016-per-org-sending-domains
     DEV-005-pr-reader
+    DEV-006-adopt-gloss
 ```
 
 ## Tickets
@@ -79,6 +81,7 @@ kanban
 - [OTEL-002: Superadmin Alerts](./OTEL-002-superadmin-alerts.md) - Signal queries, incident lifecycle, superadmin inbox
 - [INFRA-003: CI/CD Pipeline](./INFRA-003-cicd.md) - Decision-first CI/CD baseline, implement after platform selection
 - [INFRA-006: Tenant Isolation Test Matrix](./INFRA-006-tenant-isolation-test-matrix.md) - Prove cross-tenant isolation across auth modes
+- [TEST-002: Hook registration in tests](./TEST-002-hook-registration-in-tests.md) - One way to turn database hooks on and off in tests; today three patterns share one registry and results depend on file order
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md) - Retention, export, and delete/redaction operations
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
 - [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) - Swappable external service pattern (in progress)
@@ -146,7 +149,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 36
+- **Total Backlog Items**: 37
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
@@ -166,6 +169,7 @@ AUTH-006 is a confirmed isolation defect awaiting assignment and has High priori
 
 **Developer tooling:**
 - [DEV-005: PR reader](./DEV-005-pr-reader.md) - Review tool that groups changed files by atlas concept, hides gloss (toggle before/after per symbol) and replaces test code with an AI summary of the cases; home undecided
+- [DEV-006: Adopt gloss](./DEV-006-adopt-gloss.md) - Template under gloss: comments into `.gloss/` (rare one-line `// why:` stays), harvest at commit, a `run-ci-rules.sh` gate with fail fixtures so it can't pass vacuously (ZLT-4530); backport to Kingdom and Tribe
 
 These features are valuable but not critical for MVP or initial production launch. They're typical "v2.0" enhancements that add polish, enterprise appeal, or alternative monetization strategies.
 
@@ -178,4 +182,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-10-23_
+_Last Updated: 2026-10-31_

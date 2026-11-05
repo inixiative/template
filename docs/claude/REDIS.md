@@ -147,7 +147,7 @@ with `Retry-After`. Redis down = fail open (warn + report, request allowed).
 
 ```typescript
 // `${redisNamespace.limit}:${scope}:${windowMs}:${identity}`
-`limit:api:principal:1000:user:${userId}`        // session, or any token owned by / through the user
+`limit:api:principal:1000:user:${userId}`        // the user's JWT, or any token owned by / through the user
 `limit:api:principal:1000:ip:${clientIp}`        // anonymous fallback
 `limit:api:space:1000:space:${spaceId}`          // Space / SpaceUser tokens
 `limit:api:organization:1000:organization:${organizationId}`
@@ -163,8 +163,11 @@ are not counted (the batch request paid once; the skip keys on the registry-reso
 transaction, not the spoofable `x-batch-id` header). A **cost** limit — AI calls, anything that bounds
 spend — is a separate detector that must still run inside a batch; it is not an `apiRateLimit` rule.
 
-Identity comes from the session user or the token (its user, its organization and space keys), the IP from the trusted
-`x-forwarded-for` hop bucketed to /64 (`clientIp`). Maxes resolve through `rateLimitMax(tier, c)`,
+The identity a rule keys on is one of the functions in `apps/api/src/middleware/rateLimit/identities.ts`:
+`userIdentity` (the JWT's user, or the token's `userId`, so a user and every token owned by or through
+them share one bucket and minting tokens buys nothing), `principalIdentity` (`userIdentity`, else the IP),
+`organizationIdentity` / `spaceIdentity` (the token's organization or space) and `ipIdentity` (the trusted
+`x-forwarded-for` hop bucketed to /64, `clientIp`). A new limit picks one of these; it does not build its own key. Maxes resolve through `rateLimitMax(tier, c)`,
 the seam for subscriptions / feature flags (INFRA-027) — never a column on Token, Organization or Space.
 
 ### Job Coordination (`job:*`, `lock:*`)
@@ -379,6 +382,8 @@ every key sent to the client. The locks in each scanned page are cancelled in pa
 ### Automatic Invalidation
 
 Cache keys defined in the cache reference map are marked on mutations by a db hook in the transaction's cache overlay and cleared when it commits (see [cache() inside a transaction](#cache-inside-a-transaction)). See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
+
+A write the hook never sees (a raw-SQL shift in the ordered-list helpers, rows a key change reaches by `ON UPDATE CASCADE` such as a space transfer) queues the same clear itself with `queueCacheClear(model, rows)` (`apps/api/src/hooks/cache/queueCacheClear.ts`), passing the rows as they were and as they are. The hook calls it too.
 
 #### Invalidation conventions
 

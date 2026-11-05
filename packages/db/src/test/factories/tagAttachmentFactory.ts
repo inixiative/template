@@ -24,6 +24,11 @@ const tagAttachmentFactory = createFactory('TagAttachment', {
       foreignKey: { id: 'spaceId' },
       required: false,
     },
+    project: {
+      modelName: 'Project',
+      foreignKey: { id: 'projectId' },
+      required: false,
+    },
   },
 });
 

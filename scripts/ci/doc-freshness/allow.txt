@@ -3,6 +3,7 @@
 # Stale references do not belong here: fix the doc.
 
 # libraries and tools
+docs/claude/PERMISSIONS.md	capAtRole
 ZodEffects
 c.json
 dangerouslySetInnerHTML

@@ -58,6 +58,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the newest one should win and the older run should stop
 - only one process should own this at a time
 - run these one at a time in this process
+- read the row, then update it, without a race
+- these writes need to commit together or not at all
 - big fan-outs shouldn't delay the latency-sensitive jobs
 - how many of these can be in flight at once
 - run this every few seconds in process without overlapping itself
@@ -87,6 +89,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - only the most recent enqueue for this key should finish
 - the first one to get it keeps it
 - several async callers read-modify-write the same in-memory thing
+- lock the row while I update it
+- wrap the whole thing in one transaction
 - mark this job as background so foreground work goes first
 - cap the parallelism on this batch of DB calls
 - a recurring poll that can be stopped
@@ -115,6 +119,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - cancel the older job when a newer one with the same key arrives
 - stop two instances from both running the drain
 - I'll chain promises on a module-level variable so writes don't overlap
+- select for update inside the transaction
+- several related updates must be atomic
 - the lane label on the job data, fast or slow
 - I'll just hardcode five at a time
 - I'll use an interval with an async callback
@@ -139,6 +145,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll store the latest job id in redis and compare inside the job
 - I'll do a set-if-not-exists in redis with an expiry and renew it
 - add a busy flag so the second call waits
+- why isn't this just open a transaction, lock the row, update, commit
+- just use a transaction here
 - this is about ordering, not a lock
 - the concurrency limit should depend on what resource it hits
 - renew the lease periodically while the work runs
@@ -160,6 +168,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - take the baton and bow out when someone newer takes it
 - a distributed lock with a heartbeat and a safe release
 - an in-process mutex, no other process touches this
+- I'll write a raw select for update query
+- write both rows in one go so neither lands alone
 - the tick shouldn't start again if the last one is still running
 - wrong job primitive, every run has to finish, not just the newest
 - re-index after save, but newer saves cancel the older indexing
@@ -168,6 +178,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - don't debounce filtering of a list already in memory
 - a momentary redis blip shouldn't make the job think it lost
 - the lock needs an owner check so nobody else can delete it
+- concurrent accepts read-modify-write one json blob and clobber each other
+- the transition and the delete aren't transactional
 - keyed per source so each source only runs its newest sync
 
 ## When this is not your domain
@@ -175,7 +187,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 These mention this region's words but belong elsewhere; the answer is no, and the region named answers instead.
 
 - Which redis connection do I use → redis-caching-rate-limits
+- Run this every night → cron
 - Which job wrapper do I use → jobs-cron
 - Keep slow jobs from blocking fast ones → job-lanes-outbox
 - Make the page update when this changes → ws-channels
-- Make these writes behave correctly around a transaction → database-client

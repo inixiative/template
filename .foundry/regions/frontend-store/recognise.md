@@ -4,7 +4,7 @@
 
 ## What this region is
 
-Client-only state in one shared Zustand store, from: six typed slices (auth, permissions-roles / permissions-rebac, tenant, client, UI, navigation), how to add or remove a slice, and the access patterns (narrow selectors, outside React, actions that own side effects). Server data never lives here; the SDK and query hooks are the region.
+Client-only state in one shared Zustand store, from: six typed slices (auth, permissions, tenant, client, UI, navigation), how to add or remove a slice, and the access patterns (narrow selectors, outside React, actions that own side effects). Server data never lives here; the SDK and query hooks are the region.
 
 ## What it exists for
 

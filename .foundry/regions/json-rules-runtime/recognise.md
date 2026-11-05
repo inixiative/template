@@ -18,8 +18,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the type of the rule JSON
 - what sources and targets does this rule use
 - set the default time zone for the whole process
-- put the engine defaults back
-- temporarily override an engine default for one call
+- which map in the set is the root
 - a user-written rule must be gated before it runs
 - which base lens is this narrowing built on
 - which operators does a string field take
@@ -31,13 +30,10 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the list of field kinds
 - sort the rows the way the window would
 - OR two compiled wheres together
-- the Prisma null sentinel from a different client
-- compile for a database that isn't Postgres
 - in-memory and database give the same answer
 - read the value a scope reference points at
 - evaluate the rule against a list of rows
 - walk the rule tree to find the bind names
-- typo-tolerant contains on strings
 - the caller forgot to pass now
 - validate the rule from the request body before running it
 - check the field map for bad names
@@ -50,8 +46,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the shape of a stored rule
 - which executor can run this rule
 - process-wide engine defaults
-- undo every global override after the test
-- set the default, run, then reset after
+- passing a set of maps to the SQL compiler
 - I'll trust the rule the client sent
 - find the root of the chain
 - the operator menu for a field type
@@ -63,13 +58,10 @@ A moment that says any of these, or something close, is this region's. Both voic
 - enumerate the compile targets
 - in-memory sort with nulls last and multiple keys
 - combine the compiled where with an extra clause
-- Json null checks with another Prisma client
-- set the provider for one compile call
 - where do the evaluator and the compilers disagree
 - resolve the parent reference against the stack
 - a rule over the whole array in memory
 - I'll write a recursive helper over all and any
-- fuzzy matching in the in-memory filter
 - an unbound placeholder at evaluation
 - a rule from the database straight into the evaluator
 - errors in the field map, returned not thrown
@@ -82,8 +74,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - type the conditions column
 - does the rule cross a bridge
 - change the default provider globally
-- restore the default time zone and provider
-- I'll set the global before and reset it in finally
+- SQL compile over a lens or a map set
 - check the rule's paths against the lens first
 - the lens at the bottom of the layers
 - I'll hard-code a switch from type to operators
@@ -95,13 +86,10 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which kinds count as numeric
 - I'll write a comparator to mimic the rule's ordering
 - I'll wrap them in an OR array by hand
-- pass my own AnyNull instance
-- the default provider for every compile
 - same rule, same result on both rails
 - out of bounds instead of throwing
 - the data is an array, not a row
 - read what a stored rule names
-- approximate match in the search box
 - a bad time zone from the caller
 - I'll trust the rule the editor sent
 - a non-throwing field map check

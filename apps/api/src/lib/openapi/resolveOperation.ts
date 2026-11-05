@@ -36,10 +36,10 @@ export const resolveOperation = async (
   for (const [field, value] of Object.entries(pathParams)) {
     if (DOT_SEGMENTS.has(String(value))) return null;
     const filled = encodeURIComponent(String(value));
-    const next = path.replace(`{${field}}`, filled).replace(`:${field}`, filled);
+    const next = path.replace(`{${field}}`, filled);
     if (next === path) return null;
     path = next;
   }
-  if (path.includes('{') || path.includes('/:')) return null;
+  if (path.includes('{')) return null;
   return { operationId, method: op.method, path };
 };

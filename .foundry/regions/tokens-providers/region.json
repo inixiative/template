@@ -1,0 +1,38 @@
+{
+  "id": "tokens-providers",
+  "title": "API tokens and login providers",
+  "routing": "Is this about an API key or a login provider: minting a token (createToken and the create-token routes), its owner kind (TokenOwnerModel: User, Organization, OrganizationUser, Space, SpaceUser), the SHA-256 keyHash shown once, how tokenAuthMiddleware reads Bearer or ?token= and loadTokenContext signs it in (10-minute row cache, the owner must exist, lastUsedAt on a cache miss), the TokensPage; or which sign-in options exist: platform providers from env vars (getPlatformProviders) vs an organization's AuthProvider rows with encrypted secrets (authProviderReadMany, organizationReadAuthProvider, organizationCreateAuthProvider, authProviderUpdate / authProviderDelete, OrganizationAuthProvidersPage, useAuthProviders), SAML status? The sign-in handshake, user JWTs and OAuth are `authentication`.",
+  "concepts": ["tokens-providers"],
+  "tokens": 6433,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 993,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 6433
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/AUTH.md"],
+    "docUnits": [
+      "doc:docs/claude/AUTH.md#multi-provider-authentication-authprovider",
+      "doc:docs/claude/AUTH.md#token-authentication",
+      "doc:docs/claude/AUTH.md#token-types"
+    ],
+    "catalogClusters": [
+      "authentication-methods",
+      "request-response-schemas",
+      "superadmin-operations"
+    ],
+    "codeEntries": 14,
+    "docMembers": 9
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 21
+}

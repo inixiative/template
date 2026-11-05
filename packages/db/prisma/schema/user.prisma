@@ -32,6 +32,7 @@ model User {
   cronJobsCreated        CronJob[]
   webhookSubscriptions   WebhookSubscription[]
   integrations           Integration[]
+  projects               Project[]
   contacts               Contact[]
   tagAttachments         TagAttachment[]
   tags                   Tag[]

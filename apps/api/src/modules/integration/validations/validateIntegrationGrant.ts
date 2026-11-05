@@ -15,14 +15,12 @@ import { validateFullGrant } from '#/lib/permissions/validateFullGrant';
 export const validateIntegrationRole = async (
   writer: Permix,
   integration: Record<string, unknown>,
-): Promise<void> => {
-  const pseudo = await hydrate('integration', { id: '', ...integration } as HydratedRecord);
-  if (integration.full) validateFullGrant(writer, 'integration', pseudo);
-  else if (
-    integration.role &&
-    !check(writer, rebacSchema, 'integration', pseudo, integrationRoleWrite)
-  )
+): Promise<HydratedRecord> => {
+  const record = await hydrate('integration', { id: '', ...integration } as HydratedRecord);
+  if (integration.full) validateFullGrant(writer, 'integration', record);
+  else if (!check(writer, rebacSchema, 'integration', record, integrationRoleWrite))
     throw makeError({ status: 403, message: 'Access denied' });
+  return record;
 };
 
 export const validateIntegrationGrant = async (

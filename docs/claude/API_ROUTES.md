@@ -16,7 +16,6 @@
   - [AuthProvider Module](#authprovider-module)
     - [Module Structure](#module-structure)
     - [Endpoints](#endpoints)
-    - [Platform vs Organization Providers](#platform-vs-organization-providers)
     - [Example: Read Platform Providers (Public)](#example-read-platform-providers-public)
     - [Example: Create Organization Provider (Encrypted)](#example-create-organization-provider-encrypted)
     - [Example: Read Organization Providers (Permission-Aware)](#example-read-organization-providers-permission-aware)
@@ -49,6 +48,7 @@
   - [Colocation Rule](#colocation-rule)
   - [Cross-Field Validations](#cross-field-validations)
 - [Router Exports](#router-exports)
+  - [Info routes](#info-routes)
 - [File Organization](#file-organization)
   - [Core (always present)](#core-always-present)
   - [Common Folders (as needed)](#common-folders-as-needed)
@@ -85,6 +85,8 @@ Pattern: `resourceActionSubresource`
 
 **Always use templates** from `#/lib/routeTemplates` - never raw `createRoute`.
 
+Route paths write parameters the OpenAPI way, `{id}`. `@hono/zod-openapi` converts them to Hono's `:id` when it registers the route, so the spec, the SDK and every reader of the spec see `{id}`, and Hono's runtime (`c.req.routePath`) sees `:id`. The `openapi-path-params` CI rule refuses a `:param` in a route definition, and any parameter other than `{id}` until a route needs one (the rule says how to widen it). The frontend converts back to `:id` in one place, `@template/ui/lib/toRoutePattern`, for telemetry and MSW handlers.
+
 ```typescript
 import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#/lib/routeTemplates';
 ```
@@ -94,8 +96,8 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | Arg | Type | Description |
 |-----|------|-------------|
 | `model` | Module | Resource name (singular) - **required** |
-| `submodel` | Module | Nested resource (e.g., `token` → `/:id/tokens`) |
-| `action` | string | Verb action (e.g., `activate` → `/:id/activate`) |
+| `submodel` | Module | Nested resource (e.g., `token` → `/{id}/tokens`) |
+| `action` | string | Verb action (e.g., `activate` → `/{id}/activate`) |
 | `many` | boolean | List endpoint (affects path, operationId) |
 | `paginate` | boolean | Add pagination query params (requires `many`) |
 | `admin` | boolean | Adds 'Admin' prefix to operationId and tag |
@@ -135,7 +137,7 @@ createRoute({ model: 'organization', submodel: 'token', bodySchema, responseSche
 // Action
 actionRoute({ model: 'user', action: 'activate', bodySchema, responseSchema })
 
-// Action on a subresource collection → POST /:id/segments/reach
+// Action on a subresource collection → POST /{id}/segments/reach
 actionRoute({ model: 'space', submodel: 'segment', action: 'reach', bodySchema, responseSchema })
 
 // Admin
@@ -200,7 +202,7 @@ Complete real-world examples showing all patterns together.
 
 **Location:** `apps/api/src/modules/authProvider/`
 
-Manages authentication providers (OAuth, SAML) at platform and organization level. Demonstrates encryption, permissions, and public/private endpoints.
+A worked example of the route patterns: encryption, permissions, and public and private endpoints in one module. What the providers are and who may manage them is [AUTH.md § Multi-Provider Authentication](./AUTH.md#multi-provider-authentication-authprovider); this section shows only the code.
 
 #### Module Structure
 
@@ -230,20 +232,6 @@ authProvider/
 | PATCH | `/authProviders/:id` | `own` | Update auth provider |
 | DELETE | `/authProviders/:id` | `own` | Delete auth provider |
 | GET | `/admin/authProviders` | Superadmin | List all providers (admin only) |
-
-#### Platform vs Organization Providers
-
-**Platform providers:**
-- Created by superadmins
-- Available to all users/orgs (Google, GitHub, etc.)
-- Immutable by organization owners
-- No encrypted secrets (OAuth configured at platform level)
-
-**Organization providers:**
-- Created by organization owners
-- Only available to that organization (e.g., custom SAML)
-- Can be updated/deleted by org owners
-- Secrets encrypted using encryption service (see ENCRYPTION.md)
 
 #### Example: Read Platform Providers (Public)
 
@@ -281,7 +269,7 @@ export const organizationCreateAuthProviderController = makeController(
 
     const data = {
       ...body,
-      id: crypto.randomUUID(),
+      id: Bun.randomUUIDv7(),
       organizationId: organizationId(org.id),
       createdBy: userId(user.id),
     };
@@ -548,7 +536,7 @@ The two combinators differ in one place. `AND` is associative with the enclosing
 
 **Bare values default to the field's operator** — `searchFields[email]=foo` is shorthand for the field's default op (String → `contains`, others → `equals`). The leaf schema accepts either the bare value or the operator object.
 
-**JSON fields** filter (not order) via their own operators: `path` (dotted string or array), `string_contains`, `string_starts_with`, `string_ends_with`, `equals`, `not`. The `path` shape is provider-specific (Postgres key array / MySQL JSONPath) — handled by `dialect` (`apps/api/src/lib/prisma/dialect.ts`).
+**JSON fields** filter (not order) via their own operators: `path` (dotted string or array), `string_contains`, `string_starts_with`, `string_ends_with`, `equals`, `not`. The `path` shape is provider-specific (Postgres key array / MySQL JSONPath) — handled by `dialect` (`packages/db/src/lens/dialect.ts`, imported from `@template/db/lens`).
 ```
 GET /api/v1/events?searchFields[meta][path]=user.id&searchFields[meta][string_contains]=abc
 ```
@@ -1180,4 +1168,4 @@ modules/<resource>/
 
 ### Also
 
-- `apps/api/src/integrations/` - External service integrations
+- External services: adapter modules in `apps/api/src/lib/` (`storage/`, `errorReporter/`) and `packages/email/src/client/`, each one interface over swappable providers (see [ADAPTERS.md](ADAPTERS.md)); a single-provider SDK client goes in `apps/api/src/lib/clients/`

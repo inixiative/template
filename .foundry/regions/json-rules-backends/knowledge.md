@@ -14,8 +14,8 @@
   - [Class `lib-json-rules-backends`](#class-lib-json-rules-backends-compiling-rules-to-backends-prisma-query-planning-postgresql-sql-generation-the-backend-support-matrix-readme-tosql-readme)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
-    - `@inixiative/json-rules/README.md`: Prisma Query Planning; PostgreSQL SQL Generation; Backend Support Matrix
-    - `@inixiative/json-rules/src/toSql/README.md`: Usage; Supported Features; Security
+    - `@inixiative/json-rules/README.md`: Prisma Query Planning; PostgreSQL SQL Generation; Inline Predicates — `toWhereSql`, `toLensWhereSql`; Backend Support Matrix
+    - `@inixiative/json-rules/src/toSql/README.md`: Usage; Supported Features; Inline predicates (`whereSql.ts`); Security
   - [4b. Code entries](#4b-code-entries)
 
 ## Glossary
@@ -110,7 +110,18 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | run the compiled plan against Prisma; resolve the plan's steps and field references; I'll spread the plan's where into findMany; the where from the plan, ready for Prisma; at least N related rows compiled as groupBy then id in | **executePrismaPlan** · package `@inixiative/json-rules#executePrismaPlan` — Always read a toPrisma plan's where through this; Prisma rejects unresolved step or field references. | @inixiative/json-rules/README.md § Prisma Query Planning; @inixiative/json-rules/README.md § Backend Support Matrix | Taking toPrisma(rule, ...) output and spreading plan.steps[0].where straight into db.x.findMany instead of resolving it with executePrismaPlan. (@inixiative/json-rules/README.md § Path Semantics ("read a plan's where only through it"), § Prisma Query Planning) |
 | compile the rule to a Prisma where; filter in the database with the rule; I'll hand-write the Prisma where to mirror the rule; the resulting rule compiles like everything else; push the rule down into the query | **toPrisma** · package `@inixiative/json-rules#toPrisma` — Database filtering; for in-memory evaluation use check, for column selection use toLensSelect. | @inixiative/json-rules/README.md § Prisma Query Planning; @inixiative/json-rules/README.md § Backend Support Matrix | A hand-written Prisma where mirroring a stored or user rule, or a hand-rolled groupBy plus `id in` pair for “at least N related rows”, instead of toPrisma + executePrismaPlan. (@inixiative/json-rules/README.md § Prisma Query Planning). throws UsageError (`usage`, json-rules-runtime); LensRefusal (`lens-refusal`, lens-model); json-rules rule-shape Error (`rule-shape`, json-rules-runtime) |
 | compile the rule to a parameterized SQL where; a raw SQL filter from the rule, with joins; I'll concatenate the values into the SQL string; regex or day-of-week filtering in the database; generates parameterized WHERE clauses from the rule | **toSql** · package `@inixiative/json-rules#toSql` — Raw SQL: toSql; Prisma query plan: toPrisma; in-memory data: check(). | @inixiative/json-rules/README.md § Backend Support Matrix; @inixiative/json-rules/README.md § PostgreSQL SQL Generation | Concatenating rule values into a SQL string or hand-quoting identifiers to filter rows by a rule, instead of toSql's parameterized WHERE and joins. (@inixiative/json-rules/src/toSql/README.md § Security). throws UsageError (`usage`, json-rules-runtime); LensRefusal (`lens-refusal`, lens-model); json-rules rule-shape Error (`rule-shape`, json-rules-runtime) |
-| which map in the set is the root; passing a set of maps to the SQL compiler; SQL compile over a lens or a map set | **FieldMapSet requires mapName** · rule @inixiative/json-rules README > PostgreSQL SQL Generation — whenever map is a FieldMapSet/lens rather than a single FieldMap | part 4 | — |
+| treat absent paths as unknown so rules pass only on pinned values | **check absent: 'unknown'** · primitive @inixiative/json-rules/README.md › A value the row doesn't carry — Partial pseudo rows such as grant checks; default absent-as-null for real rows; compilers don't support it. | part 4 | — |
+| reject date rules naming units finer than the caller's clock tick | **clock.finestUnit** · primitive @inixiative/json-rules/README.md › Engine Globals — Set once at boot when the evaluation cadence is coarser than seconds. | part 4 | — |
+| put the engine defaults back; undo every global override after the test; restore the default time zone and provider | **engineGlobals.reset** · primitive @inixiative/json-rules/README.md › Engine Globals — restore all engine defaults to their initial values | part 4 | — |
+| temporarily override an engine default for one call; set the default, run, then reset after; I'll set the global before and reset it in finally; a scoped override of the engine settings; run this with a different default zone | **engineGlobals.with** · primitive @inixiative/json-rules/README.md › Engine Globals — Scoped overrides; boot-time permanent defaults: set instead. Async callbacks throw. | part 4 | engineGlobals.set before a call and reset after it (leaking the override when the call throws) instead of a scoped engineGlobals.with, or an async callback, which throws. (@inixiative/json-rules/README.md § Engine Globals). throws engineGlobals.with async-callback Error (`server-error`, json-rules-runtime) |
+| the Prisma null sentinel from a different client; Json null checks with another Prisma client; pass my own AnyNull instance | **prismaOptions.anyNull** · primitive @inixiative/json-rules/README.md › Engine Globals — Only to use a different client's; default comes from installed @prisma/client. | part 4 | — |
+| compile for a database that isn't Postgres; set the provider for one compile call; the default provider for every compile | **prismaOptions.datasource.provider** · primitive @inixiative/json-rules/README.md › Engine Globals — Process-wide; per call: toPrisma(rule, { datasource: { provider } }). | part 4 | — |
+| choose the SQL dialect toWhereSql and toLensWhereSql write | **sql.dialect** · primitive @inixiative/json-rules/README.md › Engine Globals — choose the SQL dialect toWhereSql and toLensWhereSql write | part 4 | — |
+| default rules to case-insensitive string comparison | **string.caseInsensitive** · primitive @inixiative/json-rules/README.md › Engine Globals — A rule's own caseInsensitive flag wins. | part 4 | — |
+| typo-tolerant contains on strings; fuzzy matching in the in-memory filter; approximate match in the search box; fuzzy only in memory; the compilers refuse it | **string.fuzzy** · primitive @inixiative/json-rules/README.md › Engine Globals — check() only; toSql/toPrisma refuse contains/notContains when fuzzy is on. | part 4 | — |
+| reject rule shapes that can hold on a missing value | **validateRule positive** · primitive @inixiative/json-rules/README.md › A value the row doesn't carry — Rules that must pass only on carried values; express "no value" as equals null. | part 4 | — |
+| Pass either lens or map/mapName/model to toPrisma/toSql, never both, or it throws. | **Compile under a lens, not a map** · rule @inixiative/json-rules/README.md › Compiling under a lens — Whenever a rule is compiled against a lens. | part 4 | — |
+| which map in the set is the root; passing a set of maps to the SQL compiler; SQL compile over a lens or a map set | **FieldMapSet requires mapName** · rule @inixiative/json-rules/README.md > PostgreSQL SQL Generation — whenever map is a FieldMapSet or lens rather than a single FieldMap. | part 4 | — |
 
 
 ## 4. The specifics, in full
@@ -213,6 +224,21 @@ declares: on Json, `contains` / `startsWith` / `endsWith` become `string_contain
 becomes one `equals` per value; on a scalar list, `contains` becomes `has` and emptiness
 `isEmpty`; `caseInsensitive` adds `mode: 'insensitive'` on text only.
 
+##### A value the row doesn't carry
+
+By default `check()` reads an absent path as null, as a column is on the compiled rails.
+`check(rule, row, { absent: 'unknown' })` reads it as unknown instead: `null === null`, and
+`undefined` is not null. Every operator fails on an unknown field or compared `path`, `equals
+null` and `in [null]` included, except the ones that hold on a missing value (`isEmpty`,
+`notExists` and the negations), which keep their meaning. Use it when the row is a partial stand-in
+for real rows (a pseudo record a grant is checked against), so a rule passes only on what the row
+pins. `check()` only; the compilers read real columns.
+
+`validateRule(rule, { positive: true })` refuses every shape that can hold on a missing value —
+`if`/`then`/`else`, array and aggregate rules, the negations, `isEmpty` and `notExists` — so a rule
+checked that way passes only on what the row carries. A rule that means "no value" says `equals
+null`.
+
 <!-- unit doc:@inixiative/json-rules/README.md#postgresql-sql-generation -->
 **Source:** `@inixiative/json-rules/README.md` § PostgreSQL SQL Generation (in "@inixiative/json-rules")
 
@@ -254,6 +280,168 @@ as `toPrisma()` takes it. A set without `mapName` throws.
 ```ts
 toSql(rule, { map: lens, mapName: 'prisma', model: 'Post' });
 ```
+
+<!-- unit doc:@inixiative/json-rules/README.md#inline-predicates-towheresql-tolenswheresql -->
+**Source:** `@inixiative/json-rules/README.md` § Inline Predicates — `toWhereSql`, `toLensWhereSql` (in "@inixiative/json-rules")
+
+#### Inline Predicates — `toWhereSql`, `toLensWhereSql`
+
+Two small helpers write a condition, or a lens's row filters, as a SQL predicate for a caller
+that names its own columns and writes its own joins (an Omni topic, for one). They write the
+engine's `sql.dialect` — `SqlDialect.postgres` by default, `SqlDialect.mysql` the other — and
+are not a second `toSql`: `toSql` and `toPrisma` are unchanged.
+
+```ts
+import { ArrayOperator, engineGlobals, Operator, SqlDialect, toLensWhereSql, toWhereSql } from '@inixiative/json-rules';
+
+engineGlobals.set('sql.dialect', SqlDialect.mysql);
+
+toWhereSql(
+  { field: 'affiliation', operator: Operator.in, value: ['advocate', 'consultant'] },
+  { columns: { affiliation: '${fan_user.affiliation}' }, map, mapName: 'prisma', model: 'FanUser' },
+);
+// => "${fan_user.affiliation} IN ('advocate', 'consultant')"
+
+toWhereSql(
+  {
+    field: 'affiliations',
+    arrayOperator: ArrayOperator.any,
+    condition: { field: 'affiliation', operator: Operator.equals, value: 'advocate' },
+  },
+  {
+    columns: {
+      uuid: '${fan_users.uuid}',
+      'affiliations.fanUserUuid': 'a.fanUserUuid',
+      'affiliations.affiliation': 'a.affiliation',
+    },
+    tables: { affiliations: 'FanUserAffiliation AS a' },
+    map,
+    mapName: 'prisma',
+    model: 'FanUser',
+  },
+);
+// => "EXISTS (SELECT 1 FROM FanUserAffiliation AS a WHERE a.fanUserUuid = ${fan_users.uuid} AND (a.affiliation = 'advocate'))"
+
+toLensWhereSql(lens, { columns, tables });
+// => { root: '…' | null, relations: {}, mapDefaults: { prisma: { models: { BrandReferenceRequestFanUser: "${brand_reference_request_fan_user.affiliation} = 'advocate'" } } } }
+```
+
+- **Operators:** `equals`, `notEquals`, `in`, `notIn`, `exists`, `notExists`, inside `all` / `any`
+  (and `true` / `false`), and `any` / `all` / `none` / `empty` / `notEmpty` over a to-many relation
+  (below). Anything else — another operator, a date rule, a count or windowed array rule, an
+  aggregate, `if` / `then` / `else` — throws, naming it. So do binds, `path` (column-to-column),
+  offsets, `coerceType`, case-insensitivity, a path across a bridge, a field rule through a to-many
+  relation, anything Json (a stored JSON null is a value to SQL and null to `check()`), and a
+  DateTime or list *value*. A DateTime's or list's existence compiles: `deletedAt notExists`, a
+  lens's soft-delete `where`, is `… IS NULL`. A rule with no `value` throws, as on every rail.
+- **To-many relations:** an array rule on a to-many relation of the model is one subquery on the
+  relation's table, keyed to the row: `any` / `notEmpty` is `EXISTS`, `none` / `empty` is
+  `NOT EXISTS`, and `all` is `NOT EXISTS` of a row whose condition `IS NOT TRUE` — a NULL result
+  fails, as in `check()`. The map gives the keys (`relationKeys`; a composite key ANDs every pair):
+  the row's side reads `columns['<key>']`, the related side `columns['<relation>.<key>']`.
+  `tables['<relation>']` is the table, written after `FROM` as given, with the alias its columns
+  read. The condition compiles as above and reads `columns['<relation>.<field>']`; a to-many
+  relation of the related rows nests (`tables['<relation>.<relation>']`). A relation behind
+  another one (`profile.affiliations`), a relation missing from `tables`, `atLeast` / `atMost` /
+  `exactly`, a window (`filter` / `orderBy` / `take` / `skip`) and a fieldless array rule throw.
+- **Map:** `map` / `mapName` / `model` are required. A value is checked against its column's
+  kind (`leafFitViolations`, as `validateNarrowing` checks it) and an undeclared path is refused —
+  MySQL casts a mistyped literal instead of erroring, so `score = TRUE` would match 1 where
+  `check()` matches nothing. The map also finds a to-one relation's key for its `exists`
+  (`columns['<relation>.<key>']`: the related row's key, NULL when there is none), and says which
+  values have no form here.
+- **Columns:** `columns` maps a field path to the caller's SQL, used as written; the engine writes
+  no joins and no identifiers. A path missing from it throws, naming the path — it never falls back
+  to a quoted name, which MySQL's default mode reads as a string literal.
+- **Values** are written inline — there are no placeholders to fill. A string doubles `'`; on
+  MySQL it doubles `\` too (MySQL's default mode reads a backslash as an escape;
+  `NO_BACKSLASH_ESCAPES` is not supported). `in` is `IN (…)`; an enum compares as written, with no
+  cast.
+- **NULL rows:** negations keep them, as on every rail: `notEquals` / `notIn` are ORed with
+  `IS NULL`; `in [x, null]` matches NULL, `notIn [x, null]` doesn't.
+- **Collation:** `=` and `IN` compare under the column's collation. check() compares strings
+  exactly, so a `_ci` column (MySQL's default) also matches `'Advocate'` for `'advocate'`; compare a
+  binary-collated column where that matters.
+
+`toLensWhereSql(lens, { columns, tables?, toMany? })` mirrors the lens: the root path's `where`s under `root` (null
+when it has none), each relation path's own under `relations`, keyed by the path, and each model
+default's (`mapDefaults[map].models[model].where`) under `mapDefaults`, keyed the same way — one
+predicate per model however many paths reach it. Each is the `where` as its layer wrote it: a
+parent layer's clamp on a hop is reported at that hop's path, never folded into what a later
+layer wrote through it. A `where` that reads through a relation the lens hides throws — that
+hop's clamps have no path to report at, and `check()` still carries them. A lens that spans maps
+reports every map's defaults; a caller writing one database reads its own map's. A path `where` reads `columns` by its path from the lens model (`status` at the root,
+`brandReferenceRequestFanUsers.id` below it); a model default by `'<Model>.<field>'`
+(`BrandReferenceRequestFanUser.affiliation`). It does not compile through `toSql`'s `{ lens }`
+path, which would fold the lens's `where`s into the predicate a second time.
+
+An array rule on a to-many relation has no join to put that relation's clamps on, so its subquery
+carries them: the relation path's own `where` and the related model's default, ANDed beside the
+key (outside the `IS NOT TRUE` of an `all`, as `check()` filters the rows before it tests them).
+It carries only the clamps of the layers above the layer that wrote the `where`, which is what
+`check()` reads it through: a layer's clamps narrow the layers after it, never its own conditions.
+A clamp in the same layer or a later one stays out, so a later layer can't widen what a `none` or
+an `empty` admitted. Each clamp reads its own relations through the layers above its own. The
+clamps are still reported at their own path and model. `tables` reads like `columns`: by the
+relation's path from the lens model in a path `where` (`affiliations`), by
+`'<Model>.<relation>'` in a model default (`FanUser.affiliations`). An array rule on a relation
+the lens hides throws, and its condition's fields are checked from the relation, not from the
+model it sits on. A model default compiles to one predicate for every path that reaches its
+model, so it throws when a to-many relation it reads carries different clamps on two of them.
+
+**Join mode — `toMany: 'join'`.** For a caller that can't run a correlated subquery (an Omni
+topic rebuilds one as its own query and loses the correlation), the root's `where` reads a to-many
+relation on the row the caller's join brings instead. Nothing about the join is a new option: the
+caller LEFT JOINs each to-many relation the root's `where` reads (a relation the lens declares),
+ON the map's relation keys (`relationKeys`, the same keys a to-one relation's existence reads) AND
+`relations['<path>']` AND the related model's `mapDefaults` entry, and reads the related columns as
+`columns['<path>.<field>']`. `tables` is not read. A join the `where` does not read only fans the
+rows out (count distinct); a read of a relation the caller did not join fails loudly (a missing
+column).
+
+```ts
+toLensWhereSql(lens, { columns, toMany: 'join' });
+// root: "(${fan_users.deleted_at} IS NULL AND ${fan_user_affiliation.fan_user_uuid} IS NOT NULL)"
+// relations: { affiliations: "(${fan_user_affiliation.affiliation} = 'advocate' AND ${fan_user_affiliation.ended_at} IS NULL)" }
+// the topic: LEFT JOIN fan_user_affiliation ON <keys> AND relations.affiliations [AND its model default]
+```
+
+- **What compiles:** `notEmpty` is `<key> IS NOT NULL`, and `any(cond)` is
+  `(<key> IS NOT NULL AND cond)`, with `cond` on the joined columns. The key is the first key
+  column: a matched row's key equals the parent's and is never NULL, an unmatched row is all NULL,
+  so one column decides. `cond` may hold on a missing value (`endedAt notExists`): the
+  `IS NOT NULL` guard has already dropped the all-NULL row of a parent with no rows.
+- **Positive operators only.** `empty`, `none` and `all` can hold with no rows (the catalog's
+  `holdsOnNoRows`), which takes an anti-join, not the topic's join — `all(cond)` is
+  `none(NOT cond)`, and the join drops the parents with no rows that `all` keeps. They throw, as do
+  the counts, `exists` / `notExists` on the relation (a to-many relation has one spelling, an
+  `arrayOperator` rule) and a field read through it (`affiliations.affiliation`).
+- **The root's `where` only.** A relation path's `where` sits in that relation's ON, ahead of the
+  joins below it, and a model default compiles once for every path that reaches its model, where
+  the join exists only on the paths the lens shows: either one reading a to-many relation throws.
+  So do a to-many relation, or any relation, read inside a joined `any`.
+- **One `any` per relation.** One joined row stands for the relation, so two `any` rules on it
+  (`any advocate AND any prospect`, in one `where` or across layers) would need one row to meet
+  both, where `check()` lets each find its own: it throws. Write one `any` whose condition says
+  which row (`any: [advocate, prospect]` for either). `notEmpty` beside an `any` is fine.
+- **One alias per model default.** `mapDefaults` holds one predicate per model, on
+  `columns['<Model>.<field>']`, so it can sit on one table alias. A joined relation whose model has
+  a default `where` throws when the root's `where` needs that default on a second alias too: a
+  to-many self-relation (the root is that model as well), or two joined relations that reach one
+  model. Compile with `toMany: 'subquery'`, which carries the default inside each `EXISTS`.
+- **The layer guard.** The ON carries every clamp on the relation, from every layer, but `check()`
+  reads a `where` through the clamps of the layers above its own only. So a root `where` that
+  reads a joined relation throws when one of that relation's clamps (its path `where` or its
+  model's default) sits in the `where`'s own layer or a later one, naming the path and both layers.
+  Move the clamp into an earlier narrowing: then the ON is exactly what `check()` reads.
+- **`any(cond)` hides rows.** The rows that fail `cond` are gone from the whole query, not only
+  from the filter; `check()` hides nothing. Where you can, write the condition as the relation's
+  `where` (in a layer above) and have the root read `notEmpty`.
+- **Fan-out.** A joined to-many relation repeats the parent once per related row: count distinct.
+
+**Absent, not hidden.** A row a relation's `where` filters out is absent from the SQL join, so a
+negation through that relation holds for it; `check()` under the lens treats the row as hidden.
+The lens is a projection: the difference is accepted and documented.
 
 <!-- unit doc:@inixiative/json-rules/README.md#backend-support-matrix -->
 **Source:** `@inixiative/json-rules/README.md` § Backend Support Matrix (in "@inixiative/json-rules")
@@ -456,6 +644,32 @@ A relation list (a to-many relation) takes no array or aggregate rule in `toSql(
 ##### Logical Operators
 - `all` (AND), `any` (OR)
 - `if` / `then` / `else`
+
+<!-- unit doc:@inixiative/json-rules/src/toSql/README.md#inline-predicates-wheresql-ts -->
+**Source:** `@inixiative/json-rules/src/toSql/README.md` § Inline predicates (`whereSql.ts`) (in "toSql - PostgreSQL WHERE Clause Generator")
+
+#### Inline predicates (`whereSql.ts`)
+
+`toWhereSql(condition, { columns, tables?, map, mapName?, model })` writes a condition as a predicate in
+the engine's `sql.dialect` (`SqlDialect.postgres` by default, `mysql` the other) with values
+inline and every field read from the caller's `columns` map — no parameters, no identifiers, no
+joins. It is a separate, deliberately small compiler, not a dialect of `toSql` (which stays
+PostgreSQL): `equals`, `notEquals`, `in` (`IN (…)`), `notIn`, `exists`, `notExists`, inside
+`all` / `any`, and `any` / `all` / `none` / `empty` / `notEmpty` on a to-many relation of the
+model — one `EXISTS` / `NOT EXISTS` subquery on the table the caller gives in `tables`, keyed by
+the map's relation keys (`all` tests `IS NOT TRUE`, so a NULL result fails). Every other operator
+or node throws, naming it, as do binds, column `path`s, offsets, `coerceType`, case-insensitivity,
+bridges, a field rule through a to-many relation, an array rule behind another relation, counts,
+windows, anything Json (a stored JSON null is not a SQL NULL) and a DateTime / list *value* (their
+existence compiles). The map is required: a value is checked against its column's
+kind with `leafFitViolations`, as `validateNarrowing` checks it, and an undeclared path is refused —
+MySQL casts a mistyped literal instead of erroring.
+Strings double `'`, and `\` on MySQL; negations carry `IS NULL`. A path missing from `columns`
+throws. `toLensWhereSql` (`src/lens/toLensWhereSql.ts`) runs it over each visit of a lens that has
+`where`s and reports them where the lens wrote them — `root`, `relations` by path, `mapDefaults`
+by map and model, each as its layer wrote it (`VisitEffect.pathWheres` / `modelWheres`, beside the narrowed `whereClauses`); an array rule's subquery carries its relation's clamps, which have no join to sit on (`RelationClamps`): those of the layers above the `where`'s own, as `check()` reads it. With `toMany: 'join'` the root's `where` reads the row the caller's LEFT JOIN brings instead (`ToManyRows`, `JoinedRelation`): `notEmpty` is the first key column `IS NOT NULL`, `any(cond)` that AND `cond` on the joined columns. The caller joins each to-many relation the root's `where` reads (a relation the lens declares), ON its keys AND `relations[path]` AND the model default; a join the `where` does not read only fans the rows out (count distinct), and a read of one not joined fails loudly (a missing column); `tables` is not read. What can hold with no rows (`HOLDS_ON_NO_ROWS_OPERATORS`, from the catalog's `holdsOnNoRows`: `empty`, `none`, `all`, the counts) is refused, as is a to-many read anywhere but the root's `where`, a relation read inside a joined `any`, two `any`s on one joined relation, a joined relation whose model default a second alias in the root's `where` needs too (a to-many self-relation, or two joined relations to one model: `mapDefaults` holds one predicate per model), and a joined relation whose clamps sit in the `where`'s own layer or a later one (the ON carries every layer's; `check()` reads the layers above). See the root README for the absent-vs-hidden semantics and the
+collation caveat. `test/whereSql.mysql.test.ts` and `test/whereSql.postgres.test.ts` run one
+matrix against a real `mysqld` (mysql-memory-server) and PGlite.
 
 <!-- unit doc:@inixiative/json-rules/src/toSql/README.md#security -->
 **Source:** `@inixiative/json-rules/src/toSql/README.md` § Security (in "toSql - PostgreSQL WHERE Clause Generator")

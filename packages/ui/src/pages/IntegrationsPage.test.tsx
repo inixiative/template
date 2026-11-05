@@ -14,7 +14,16 @@ import {
 import { IntegrationsPage } from '@template/ui/pages/IntegrationsPage';
 import { useAppStore } from '@template/ui/store';
 import type { TenantContext } from '@template/ui/store/types/tenant';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+  within,
+} from '@testing-library/react';
 
 const initialState = useAppStore.getState();
 const bucketCount = integrationProviderValues.length + 1;
@@ -404,7 +413,7 @@ describe('IntegrationsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Old chat' }));
 
-    await waitFor(() => expect(screen.queryByText('Old chat')).toBeNull());
+    await waitForElementToBeRemoved(() => screen.queryByText('Old chat'));
     await waitFor(() =>
       expect(within(providerCard('slack')).getByText('Not connected')).toBeTruthy(),
     );

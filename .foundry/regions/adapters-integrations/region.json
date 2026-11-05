@@ -3,18 +3,18 @@
   "title": "Adapters, integrations and storage",
   "routing": "Is this about talking to an external provider behind one interface: adapter modules (ADAPTERS.md), makeAdapterRouter / makeAdapterRegistry / makeBroadcastRegistry, the adapter module layout and naming, env reads in index.ts, never importing a provider SDK in app code, the storage adapter and createS3Client, errorReporter, or owner integrations: Integration, IntegrationRecord, integrationProviders, poisoned records, the integration module and IntegrationsPage?",
   "concepts": ["adapters", "integrations", "object-storage"],
-  "tokens": 8153,
+  "tokens": 8098,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1744,
+      "tokens": 1705,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 8153
+      "tokens": 8098
     }
   },
   "runsAgreed": 0,
@@ -42,9 +42,9 @@
       "storage-clients",
       "testing-rules"
     ],
-    "codeEntries": 21,
+    "codeEntries": 20,
     "docMembers": 13
   },
   "bypassLines": 22,
-  "glossaryTerms": 14
+  "glossaryTerms": 13
 }

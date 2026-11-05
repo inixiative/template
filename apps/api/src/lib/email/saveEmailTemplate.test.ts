@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, RuleReferenceError } from '@template/db';
+import { clearHookRegistry, db, RuleReferenceError, unregisterDbHook } from '@template/db';
 import type { Organization, Segment, Tag } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -8,6 +8,7 @@ import {
   createTag,
   createTagCategory,
 } from '@template/db/test';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
@@ -56,6 +57,7 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
   let theirSegment: Segment;
 
   beforeAll(async () => {
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
     mine = (await createOrganization()).entity;

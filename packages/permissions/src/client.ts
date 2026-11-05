@@ -9,8 +9,16 @@ import {
   type ActionState as EngineActionState,
   type EntitlementEntry as EngineEntitlementEntry,
   type PermissionEntry as EnginePermissionEntry,
+  type Permissions as EnginePermissions,
   type Permix as EnginePermix,
   type PermixLike,
+} from '@inixiative/permissions';
+
+export {
+  delegate,
+  installPermissions,
+  permixOf,
+  wellFormedEntitlements,
 } from '@inixiative/permissions';
 
 // Base actions - most resources use these
@@ -62,6 +70,7 @@ export type Actor = { model: ActorModel; record: Record<string, unknown> };
 export type ActionState = EngineActionState<Action>;
 export type PermissionEntry = EnginePermissionEntry<Action>;
 export type EntitlementEntry = EngineEntitlementEntry<Action>;
+export type Permissions = EnginePermissions<Action>;
 // The engine reads any permix back through PermixLike (string actions); ours narrows them to Action.
 export type Permix = EnginePermix<Action, Actor> & PermixLike;
 

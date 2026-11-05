@@ -50,6 +50,7 @@ scripts/
 │   ├── restore.sh          # Import database
 │   ├── clone.sh            # Clone remote → local (with webhook cleanup)
 │   ├── push-dev.sh         # db:push:dev — worktree-aware, refuses non-local DATABASE_URLs, regenerates the Prisma client after the push
+│   ├── push-local.sh       # the destructive push behind db:push:force and push-dev.sh; local DATABASE_URL only, carries the consent for Prisma's AI-agent guard
 │   ├── release.sh          # Release-time database step
 │   ├── pg-init.sh          # Postgres initialization
 │   ├── minio-init.sh       # MinIO container entrypoint (creates the four base buckets)

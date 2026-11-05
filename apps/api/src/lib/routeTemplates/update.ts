@@ -31,7 +31,7 @@ export const updateRoute = <const T extends RouteArgs>(args: T) => {
   } = args;
 
   const resourceName = submodel || model;
-  const routePath = skipId ? (action ? `/${action}` : '/') : action ? `/:id/${action}` : '/:id';
+  const routePath = skipId ? (action ? `/${action}` : '/') : action ? `/{id}/${action}` : '/{id}';
   const routeTags = buildTags({ model, submodel, tags, admin, internal });
 
   const route = createRoute({

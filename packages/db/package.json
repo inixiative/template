@@ -28,7 +28,7 @@
     "test": "bun run --cwd ../.. with test api env __TEST_REDIRECT__=1 bun test --max-concurrency=1 packages/db/",
     "db:generate": "rm -rf src/generated/zod && PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 bunx prisma generate && bun run scripts/generatePrismaMap.ts && bun run scripts/generateScalarSchemas.ts && echo $(date) > .prisma.gen",
     "db:push": "prisma db push",
-    "db:push:force": "[ \"$ENV\" = 'test' ] || [ \"$ENV\" = 'local' ] && prisma db push --accept-data-loss || echo 'ERROR: db:push:force only allowed in test/local env'",
+    "db:push:force": "if [ \"$ENV\" = \"test\" ] || [ \"$ENV\" = \"local\" ]; then ../../scripts/db/push-local.sh; else echo \"ERROR: db:push:force only allowed in test/local env\" >&2; exit 1; fi",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:baseline": "bun run scripts/createBaselineMigration.ts",
@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@inixiative/json-rules": "^3.6.0",
+    "@inixiative/permissions": "^0.21.1",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@supercharge/promise-pool": "^3.3.0",
@@ -48,11 +49,12 @@
     "ioredis-mock": "^8.13.1",
     "lodash-es": "^4.18.1",
     "pg": "^8.20.0",
-    "superjson": "^2.2.2"
+    "superjson": "^2.2.2",
+    "uuidv7": "^1.1.0"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
-    "@inixiative/prisma-map": "^0.4.0",
+    "@inixiative/prisma-map": "^0.4.1",
     "@types/bcryptjs": "^3.0.0",
     "@types/ioredis-mock": "^8.2.7",
     "@types/lodash-es": "^4.17.12",

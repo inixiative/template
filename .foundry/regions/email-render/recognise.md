@@ -18,7 +18,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - gather every rule the template evaluates
 - list the components this template uses
 - unique slugs from an already-parsed node tree
-- a fragment isn't a full document, don't validate it as one
 - resolve just one shared block for the editor preview
 - resolve the whole email for this sender and fill in its components
 - which referenced components can't be resolved anymore
@@ -63,7 +62,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - write the edited blocks back to MJML text
 - the core block renderer for if, each and text
 - render the subject and body for sending
-- don't strand the row in sending when we deploy mid-retry
 - send a different named template when this one breaks
 - the raw placeholder replacement under the hood
 - a user actor walks the user chain, a tenant walks the org chain
@@ -75,6 +73,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - stop a component from including itself
 - check every placeholder in the template exists in the lens
 - the text a reader actually sees in the html
+- drop broken audiences from an email's recipient set
 - throw on bad conditions instead of shipping a render-time bomb
 - fail hard on unknown tokens
 - I'll prune the leaf when the bind is missing
@@ -83,7 +82,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - list all the if and filter rules in the content
 - which slugs does this MJML reference
 - list referenced components when I already have the nodes
-- component markup has no mjml root tag
 - show this component as the space would see it
 - which version of the template does this org actually get
 - find the component refs that point at nothing
@@ -128,7 +126,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - turn the block tree back into source
 - an unterminated if dumps the rest of the template raw
 - I'll just run mjml to html on the stored template
-- the retry sleep should wake early on shutdown
 - the fallback template for a render failure
 - I'll call the low-level replace directly
 - does a space inherit the org's template
@@ -140,6 +137,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - check for circular component references before saving
 - reject tokens the template isn't allowed to use
 - strip the markup to check the visible copy
+- don't send to a segment whose rule is degraded
 - refuse to save when the if rule reads something unavailable
 - token check that stops the save
 - let a rule input be absent and read as null
@@ -186,7 +184,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the inverse of parsing, after an edit
 - render the blocks and sink one error for a malformed marker
 - resolve the template and render it, collecting problems rather than throwing
-- back off between provider retries without getting killed mid-wait
 - name an alternate email to go out instead
 - which ownership chain applies for this sender
 - match the variable tokens in template text
@@ -196,6 +193,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - reject broken email markup at save time
 - I'll keep a tree scan for cycle checks beside the registry
 - make sure all the curly variables are real fields
+- filter the live audience set before planning recipients
 - hard-stop the save on an invalid condition
 - preview one reusable block, not the whole email
 - assemble the full email and tell me whose row won

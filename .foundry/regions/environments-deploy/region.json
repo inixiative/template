@@ -3,7 +3,7 @@
   "title": "Environments, env vars and deploy",
   "routing": "Is this about which environment code runs in or how env vars reach a process, or about the gate and deploy path: the five environment names (local, test, pr, staging, prod) and isLocal/isTest/isPR/isStaging/isProd, ENVIRONMENT, .env.local/.env.test and their .example files, root-then-app env inheritance, sync-env, with-env.sh / bun run with <env> <app> <cmd>, Infisical (.infisical.json, pr/staging/prod secrets), the app zod env schema and no-inline-env-coercion, adding an env var, common variables (REDIS_BULLMQ_URL, LOG_LEVEL, SENTRY_ENABLED, OTEL_ENABLED), or bun run check / build / typecheck before pushing, check-generated-files.sh, deploy.sh and wait-for-api.sh, start:<service> production runs, branch \u2192 pr \u2192 staging \u2192 prod promotion, what CI exists (INFRA-003, lib-ci.yml), and releasing @inixiative packages with config train?",
   "concepts": ["env-config", "ci-deploy"],
-  "tokens": 12715,
+  "tokens": 12847,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12715
+      "tokens": 12847
     }
   },
   "runsAgreed": 0,
@@ -50,9 +50,9 @@
       "module-layout-monorepo",
       "redis-infrastructure",
       "structured-logging",
-      "testing-rules"
+      "testing-helpers"
     ],
-    "codeEntries": 15,
+    "codeEntries": 16,
     "docMembers": 39
   },
   "bypassLines": 21,

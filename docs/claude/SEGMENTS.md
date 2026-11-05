@@ -106,8 +106,8 @@ can inspect. See [COMMUNICATIONS.md](COMMUNICATIONS.md#the-email-lens).
   every writer emitting an event. `customerRef.created`, `user.updated`, `tag.deleted`,
   `tagAttachment.created` and `tagAttachment.deleted` have handlers without production emitters.
 - Field/model-specific trigger narrowing and hydration of only the affected rule paths are pending.
-- The rule editor, provider-side customer lists for User/Organization, and `CustomerRef.lastActiveAt`
-  remain separate work.
+- The rule editor, provider-side customer lists for User/Organization, and a last-active timestamp
+  on `CustomerRef` (the TODO in `packages/db/prisma/schema/customerRef.prisma`) remain separate work.
 - Whether `customerRefLens` should become a general customer lens is an unresolved design question.
 - Feature flags and flag-selected email variants are not implemented.
 

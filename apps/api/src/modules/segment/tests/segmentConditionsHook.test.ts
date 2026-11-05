@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, Prisma } from '@template/db';
+import { clearHookRegistry, db, Prisma, unregisterDbHook } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -9,6 +9,7 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
@@ -23,6 +24,7 @@ describe('segmentConditions hook', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
     const { context } = await createOrganizationUser({ role: 'admin' });

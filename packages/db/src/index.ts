@@ -91,8 +91,6 @@ export {
 } from './redis';
 // Registries (schema-level configuration)
 export * from './registries';
-// Typed model IDs (phantom types for compile-time safety)
-export * from './typedModelIds';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
 export {

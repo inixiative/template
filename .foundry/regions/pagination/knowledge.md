@@ -14,7 +14,7 @@
   - [Class `pagination`](#class-pagination-offset-and-cursor-pagination-paginate-response-metadata-pagination-hooks)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
-    - `docs/claude/API_ROUTES.md`: Response Format › Pagination; Response Format › paginate() Utility; Response Format › Controller — `paginate()` integration
+    - `docs/claude/API_ROUTES.md`: Response Format › Pagination; Response Format › paginate() Utility; Response Format › Per-request scope — bind tokens; Response Format › Controller — `paginate()` integration
     - `docs/claude/FRONTEND/API_CLIENT.md`: Data Hooks
   - [4b. Code entries](#4b-code-entries)
 
@@ -163,7 +163,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | rows jump between pages when sorted by name; add a stable tiebreaker to the ordering; I'll add createdAt desc as the default order | **Stable id tiebreaker ordering** · pattern § /lib/prisma/paginate — keep page results consistent by appending id desc to non-unique orderings | part 4 | Adding createdAt desc or id desc by hand as a default or tiebreaker ordering in a paginate call, or a page that reorders rows between pages on a non-unique sort. (docs/claude/API_ROUTES.md § paginate() Utility › Stable pagination) |
 | what to name the section ids; section ids become URL hashes | **camelCase section IDs** · rule docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › Section Hash — useSectionHash — Every data-section or sectionId value. | code `makeDataConfig`, `Table`, `useScrollState`, `Pagination` | — |
 | where does the section hash hook go; I'll call the section hash hook in each section | **Mount useSectionHash once at app root** · rule docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › Section Hash — useSectionHash — Any section-hash navigation. | code `makeDataConfig`, `Table`, `useScrollState`, `Pagination` | Calling useSectionHash inside each section or table component instead of once at the app root with data-section attributes. (docs/claude/FRONTEND/API_CLIENT.md § Section Hash — useSectionHash ("Mount once at the app root")) |
-| every list endpoint pages; this shouldn't return everything; pass include for relations in the list | **Use paginate() for list endpoints** · rule docs/claude/API_ROUTES.md § Response Format › paginate() Utility › paginate() Utility — Every list endpoint; pass include for relations before reaching for explicit item types. | code `paginate`, `makeController`, `prepareRequest`, `buildWhereClause` | A list controller returning an unbounded findMany, or hand-assembling data and pagination instead of paginate(c, db.model) and respond.ok(data, { pagination }). (docs/claude/API_ROUTES.md § paginate() Utility ("Use paginate() for list endpoints")) |
+| every list endpoint pages; this shouldn't return everything; pass include for relations in the list | **Use paginate() for list endpoints** · rule docs/claude/API_ROUTES.md § Response Format › paginate() Utility › paginate() Utility — Every list endpoint; pass include for relations before reaching for explicit item types. | code `paginate`, `delegate`, `makeController`, `prepareRequest` | A list controller returning an unbounded findMany, or hand-assembling data and pagination instead of paginate(c, db.model) and respond.ok(data, { pagination }). (docs/claude/API_ROUTES.md § paginate() Utility ("Use paginate() for list endpoints")) |
 
 - *Also here, by name:* assertChainMatches (`apps/api/src/lib/prisma/keysetCursor.ts`); assertFilterMatches (`apps/api/src/lib/prisma/keysetCursor.ts`); buildPageRange (`packages/ui/src/components/primitives/Pagination.tsx`); cursorPaginateResponseSchema (`apps/api/src/lib/routeTemplates/paginationSchemas.ts`); hydrateCursorValues (`apps/api/src/lib/prisma/keysetCursor.ts`); locateItemInPages (`packages/ui/src/hooks/useInfiniteDataQuery.ts`); paginateResponseSchema (`apps/api/src/lib/routeTemplates/paginationSchemas.ts`); withTotalOrder (`apps/api/src/lib/prisma/paginate.ts`)
 
@@ -243,6 +243,27 @@ If you need relation data, pass `include` in the options first. In many cases th
 - Calls `buildWhereClause` to combine search + filters
 
 **Stable pagination**: `paginate()` automatically appends `{ id: desc }` as a tiebreaker if no `id` ordering is specified. This ensures consistent results across pages when sorting by non-unique fields (e.g., `name`). Since IDs are UUIDv7 (time-sortable), this also provides chronological ordering as a fallback.
+
+<!-- unit doc:docs/claude/API_ROUTES.md#response-format/per-request-scope-bind-tokens -->
+**Source:** `docs/claude/API_ROUTES.md` § Response Format › Per-request scope — bind tokens (in "API Routes")
+
+##### Per-request scope — bind tokens
+
+A lens is static: nothing narrows it per request. A ctx-aware condition (tenant scope, user ownership) is a `bind` token in the route's static `filterLens`, and the controller supplies its value to `paginate`, which refuses a lens whose required tokens are missing:
+
+```typescript
+const inquiryReceivedNarrowing: LensNarrowing = {
+  parent: lensFor('Inquiry'),
+  root: {
+    picks: inquiryPicks,
+    where: { field: 'targetOrganizationId', operator: 'equals', bind: 'organizationId' },
+  },
+};
+
+const { data, pagination } = await paginate(c, db.inquiry, {
+  bindings: { organizationId: getResource<'organization'>(c).id },
+});
+```
 
 <!-- unit doc:docs/claude/API_ROUTES.md#response-format/controller-paginate-integration -->
 **Source:** `docs/claude/API_ROUTES.md` § Response Format › Controller — `paginate()` integration (in "API Routes")

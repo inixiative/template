@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { type Condition, Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, ruleReferences, syncRuleReferenceEdges } from '@template/db';
+import {
+  clearHookRegistry,
+  db,
+  ruleReferences,
+  syncRuleReferenceEdges,
+  unregisterDbHook,
+} from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -8,6 +14,7 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
@@ -72,6 +79,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
 
   beforeAll(async () => {
     registerPreventHardDeleteHook();
+    registerMemberSelfGrantHook();
     registerRulesHook();
     registerSegmentConditionsHook();
     registerRuleReferenceHook();

@@ -235,7 +235,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | frontend logs reach the providers as trace events; logging in the UI package; errors in the browser get captured automatically | **frontendLogger** · primitive @template/ui/lib/frontendLogger — Frontend logs; errors reach providers automatically as trace exception events. | part 4 | — |
 | the server accepts browser telemetry; turn on browser telemetry ingestion server-side; browser spans are rejected by the API | **OTEL_BROWSER_ENABLED** · primitive docs/claude/LOGGING.md § Setup › Browser setup — Server side gate; pair with VITE_OTEL_ENABLED in each frontend. | part 4 | — |
 | turn telemetry export on or off; telemetry isn't exporting locally; disable export but keep console logs; is telemetry on in test | **OTEL_ENABLED** · primitive docs/claude/LOGGING.md § Setup › New Relic traces/metrics + Better Stack logs — Required true for local/test; false disables export but keeps console logging. Decided by ENVIRONMENT, not NODE_ENV. | part 4 | — |
-| where to send traces, metrics and logs; one provider for all signals; the collector base URL | **OTEL_EXPORTER_OTLP_ENDPOINT** · primitive FEATURES.md > Logging & Observability > OpenTelemetry Integration — Skipped in local/test; /health excluded. Use instead of adding a new exporter. | part 4 | — |
+| where to send traces, metrics and logs; one provider for all signals; the collector base URL | **OTEL_EXPORTER_OTLP_ENDPOINT** · primitive FEATURES.md › Logging & Observability — use existing auto-instrumentation over new exporters; skipped in local/test | part 4 | — |
 | logs to one provider, traces to another; a different destination per signal; send only logs to Better Stack | **OTEL_EXPORTER_OTLP_{SIGNAL}_ENDPOINT** · primitive docs/claude/LOGGING.md § Setup › New Relic traces/metrics + Better Stack logs — Split destinations only; one provider: leave unset and use OTEL_EXPORTER_OTLP_ENDPOINT base URL. | part 4 | — |
 | what the service is called in the tracing UI; I'll set the service name to template-api; the base name for api and worker services | **OTEL_SERVICE_NAME** · primitive docs/claude/LOGGING.md § Setup › New Relic traces/metrics + Better Stack logs — Must be a base name, not template-api; OTEL_SERVICE_VERSION overrides Railway commit SHA. | part 4 | — |
 | error reporting versus tracing, which goes where; Sentry for exceptions, OTel for spans; the adapter in front of Sentry | **Sentry error-reporter adapter** · primitive docs/claude/LOGGING.md § Following an incident across two services — Error reporting to Sentry; tracing/metrics: OTel helpers instead | part 4 | — |
@@ -435,11 +435,11 @@ The existing Sentry error-reporter adapter remains available independently; enab
 
 ##### Caching & Performance
 
-- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ repeatables) opens its own connection
+- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ job schedulers) opens its own connection
 
-- ✅ **Redis Use Cases** - Session store (BetterAuth `secondaryStorage`, 7-day sliding TTL), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
+- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
-- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, job, ws, otp, session, limit, lock, lane) preventing collisions and enabling selective cache clearing
+- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 

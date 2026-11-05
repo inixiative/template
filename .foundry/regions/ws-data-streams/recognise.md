@@ -21,7 +21,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - declare a new live stream for this route
 - take the handler's websocket outputs and actually deliver them
 - load the initial data for a stream using the socket's credentials
-- does this route return different rows per caller
 - rows keyed by id that update in place
 - append-only entries in the order they arrive
 - the client missed some appends, resend them
@@ -32,7 +31,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a per-user stream append needs to say which users
 - run one pass over every open stream and drop the unauthorized ones
 - recheck one socket's streams and drop the ones it lost access to
-- after reconnect, refetch only once subscriptions are re-granted
 - tell the client its stream subscription was denied and why
 - a late upsert must not resurrect a removed row
 - the contacts stream is placeholder, delete it when a real stream ships
@@ -52,7 +50,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - look up the stream definition from a full channel key
 - tell every instance's holders to reopen a stream after a sequencing error
 - the Redis key holding the stream's sequence counter
-- debounce stream opens and closes so remounts send nothing
 - the frame carrying a stream's full initial state
 - add this socket as a holder of a data stream
 - don't let the authorization sweep eat into rate limits
@@ -72,7 +69,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - set up a stream: kind, params, and who may receive it
 - route stream appends to the sequencer and hints to the publisher
 - run the read route in-process to get the starting state
-- detect a per-request lens scope on the stream's route
 - a live table where rows get replaced or removed
 - stream model output token by token into a transcript
 - I'll buffer recent appends on the server for replay
@@ -83,7 +79,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll broadcast the append and let the client filter
 - recheck all stream subscriptions right now, once
 - after identity changes, prune a connection's stream subscriptions
-- the refetch has to wait for the subscribe re-grants
 - send back a stream denial with the access reason
 - remember removed ids so stale updates don't bring them back
 - the only stream today is scaffolding
@@ -103,7 +98,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I have the whole key, which stream is it
 - force clients to refresh a stream from a fresh snapshot
 - I'll build the sequence key string by hand
-- don't open and close the stream on every rerender
 - build the message that resets the client to a snapshot
 - track that a connection is receiving this stream
 - server-internal probes bypass the rate limiter
@@ -123,7 +117,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll name the stream with a string constant and type the payload separately
 - the step after the handler returns its socket work
 - I'll fetch the first page over HTTP before opening the stream
-- the check that forces a stream to be per-recipient
 - fold upserts and removes into one page of rows
 - a growing log where nothing is edited or removed
 - a gap means reopen for a fresh snapshot, not catch-up
@@ -134,7 +127,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - name the recipients when data differs per caller
 - do a single sweep of stream access across all sockets
 - revalidate what this connection may still receive
-- I'll refetch immediately on reconnect then resubscribe
 - I'll just close the socket if the stream isn't allowed
 - I'll clear removed ids after a moment to save memory
 - don't model new streams on the contacts one
@@ -154,7 +146,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - parse the key and find its definition in one step
 - I'll push the missing appends again from the server
 - derive the seq key with audience scoping from the definition
-- wait a moment before telling the server a stream has no holders
 - the first message a stream subscriber gets
 - the subscription record for stream delivery
 - I'll raise the rate limit so the sweep stops getting 429s
