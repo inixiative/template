@@ -28,6 +28,12 @@ could only stand for one scalar-equality key. A batch writer had no way in short
   same key. Any other field may be the listed one. Two or more listed fields are refused before any
   lock is taken. An empty list names no row and takes no lock, as non-upserting `{ in: [] }` already
   selects nothing.
+> **Superseded by INFRA-048 (2026-11-05).** The keys are now one lock set (`createLock({ service,
+> identifiers })` through `holdLockSetUntilSettled`): one token, one heartbeat, one release, one Lua
+> call per poll, beat and release over the whole set. Acquisition still goes key by key in sorted
+> order and keeps the keys it has won while it waits on the next. The bullet below and the first
+> known cost describe the per-key locks this ticket shipped.
+
 - **A wrapper, not a second lock.** `acquireFindForUpdateLock` takes one ordinary `createLock` per key,
   the same lock a single-row fence takes, one at a time in sorted order, holding each while it waits
   on the next. Two batches that share keys meet on the lowest shared key first and the loser waits
@@ -39,9 +45,9 @@ could only stand for one scalar-equality key. A batch writer had no way in short
 
 ## Known costs
 
-- **Heartbeats scale with the batch.** Each key keeps its own lease alive (3s heartbeat), so a
-  1,000-row batch is ~333 refreshes/s while held. Fine for imports of hundreds; a large sync should
-  fence in chunks.
+- **Heartbeats scale with the batch** (per-key locks; gone since INFRA-048, where the whole set is
+  one `fencedRefreshAll` call per 3s beat). Each key kept its own lease alive, so a 1,000-row batch
+  was ~333 refreshes/s while held.
 - **A waiting batch holds what it has.** Keys sort below the one it waits on stay locked while it
   waits, so single-row writers on those rows wait too, for at most the batch's `waitMs`.
 - **Order across calls is the caller's job.** The sort orders keys within one call; a transaction

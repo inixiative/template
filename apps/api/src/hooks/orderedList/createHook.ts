@@ -24,7 +24,7 @@ export const registerOrderedListCreateHook = () => {
           : rows.length === 1
             ? await applyOrderedListCreate(model, rows[0]!)
             : [];
-      queueCacheClear(model as Prisma.ModelName, affected);
+      await queueCacheClear(model as Prisma.ModelName, affected);
     },
   );
 };

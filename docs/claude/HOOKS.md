@@ -113,7 +113,7 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | Hook | Purpose |
 |------|---------|
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
-| `cache` | Cache invalidation on mutations (post-commit) |
+| `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
 | `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
@@ -338,24 +338,23 @@ Automatic cache clearing on mutations via `cacheReference`.
 ```typescript
 // hooks/cache/constants/cacheReference.ts
 export const cacheReference: CacheReference = {
-  User: (r) => [
-    cacheKey('User', r.id),
-    cacheKey('User', r.email, ['email']),
-  ],
-  Token: (r) => [
-    cacheKey('Token', r.keyHash, ['keyHash']),
-  ],
+  User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
+  Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
+  // ...
 };
 ```
 
-On mutation, all matching cache keys are deleted.
+On mutation, the hook marks the keys of both the previous and the resulting row in the transaction's cache overlay (`queueCacheClear` → `markCacheWritten`). They are cleared when the transaction commits, before its held locks are released and before its `db.onCommit` batches; a failed clear makes `db.txn` throw after those batches run ([REDIS.md - cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)).
 
 ### Wildcard Keys
 
 ```typescript
-// Delete all sessions for a user
-cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
+cacheKey('user', userId, [], true)  // → cache:user:id:abc:*
 ```
+
+A wildcard clear cancels the `cache()` computes in flight under its pattern (found by their
+single-flight locks), then scans and deletes. Prefer exact keys in the reference map: an exact clear
+is one Lua call, a wildcard clear is two scans.
 
 ---
 
@@ -676,7 +675,7 @@ Every bulk hook is O(scopes), not O(rows). Importing a 1000-row CSV of Contacts 
 
 ### Cache invalidation
 
-Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `HOOK_IGNORE_FIELDS` (auto-composed from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook queues per-row cache invalidation on commit through `queueCacheClear` (`apps/api/src/hooks/cache/queueCacheClear.ts`), the same call the cache hook makes. Anything else that changes rows outside the lifecycle (a key change that reaches rows by `ON UPDATE CASCADE`) uses it too. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
+Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `HOOK_IGNORE_FIELDS` (auto-composed from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook marks the affected rows' keys in the transaction's cache overlay through `queueCacheClear` (`apps/api/src/hooks/cache/queueCacheClear.ts`), the same call the cache hook makes, and they are cleared at commit. Anything else that changes rows outside the lifecycle (a key change that reaches rows by `ON UPDATE CASCADE`) uses it too. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
 
 ### Scope strictness
 

@@ -15,7 +15,7 @@ const patterns = ['17 3 * * *', '19 5 * * *'] as const;
 let jobs: Awaited<ReturnType<typeof connectRealJobsQueue>>;
 let fetch: ReturnType<typeof createTestApp>['fetch'];
 
-const newJobId = () => `scheduler-test-${crypto.randomUUID()}`;
+const newJobId = () => `scheduler-test-${Bun.randomUUIDv7()}`;
 
 const createBody = (jobId: string, overrides: Record<string, unknown> = {}) => ({
   name: jobId,

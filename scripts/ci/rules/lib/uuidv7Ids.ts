@@ -8,8 +8,20 @@
  * (attribute order free). Fails on a model with no such field: a v4 `uuid()`/`cuid()` default, a
  * different type or length, an id under another name, or a composite `@@id`. Why: v7 ids are
  * time-ordered, and `paginate()`'s `{ id: desc }` tiebreaker and every cursor depend on that.
+ *
+ * Code mints the same: a call to `randomUUID()` / `crypto.randomUUID()` in apps/ or packages/ (tests
+ * included) fails; use `Bun.randomUUIDv7()` (the `uuidv7` package where Bun's globals are absent).
+ * A secret that is not an id goes in scripts/ci/uuidv7-ids/exempt.txt as `<file>\t<reason>`.
  */
-import { finishFence, lineAt, listFiles, readSource, type Violation } from './fence';
+import ts from 'typescript';
+import {
+  finishFence,
+  lineAt,
+  listFiles,
+  readExemptions,
+  readSource,
+  type Violation,
+} from './fence';
 
 const REQUIRED = ['@id', '@default(dbgenerated("uuidv7()"))', '@db.VarChar(36)'];
 const MODEL = /^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm;
@@ -40,6 +52,8 @@ const attributesOf = (rest: string): string[] => {
   return attributes;
 };
 
+const exemptions = readExemptions('uuidv7-ids');
+const usedExemptions = new Set<string>();
 const violations: Violation[] = [];
 
 for (const file of listFiles(['apps', 'packages'], /\.prisma$/)) {
@@ -82,12 +96,50 @@ for (const file of listFiles(['apps', 'packages'], /\.prisma$/)) {
   }
 }
 
+for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
+  if (file.endsWith('.d.ts')) continue;
+  const source = readSource(file);
+  if (!source.includes('randomUUID')) continue;
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const fileViolations: Violation[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const name = ts.isIdentifier(callee)
+        ? callee.text
+        : ts.isPropertyAccessExpression(callee)
+          ? callee.name.text
+          : '';
+      if (name === 'randomUUID')
+        fileViolations.push({
+          file,
+          line: lineAt(source, node.getStart(sourceFile)),
+          key: callee.getText(sourceFile),
+          detail: `${callee.getText(sourceFile)}() mints a v4; use Bun.randomUUIDv7() (uuidv7 where Bun is absent)`,
+        });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  if (fileViolations.length === 0) continue;
+  if (exemptions.has(file)) usedExemptions.add(file);
+  else violations.push(...fileViolations);
+}
+
 finishFence({
   rule: 'uuidv7-ids',
   violations,
+  usedExemptions,
   explain: [
-    'Prisma models without a uuidv7 primary key. Every model id is:',
+    'Prisma models without a uuidv7 primary key (every model id is:',
     '  id String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)',
+    ') and code that mints ids with randomUUID(): use Bun.randomUUIDv7().',
   ],
-  clean: 'Every Prisma model id is a uuidv7 VarChar(36).',
+  clean: 'Every Prisma model id is a uuidv7 VarChar(36), and no code mints a v4.',
 });

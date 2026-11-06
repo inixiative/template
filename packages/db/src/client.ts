@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type {
@@ -33,8 +34,14 @@ import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
-import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
+import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
 import { withLockUntilSettled } from '@template/db/lock/withLockUntilSettled';
+import {
+  type CacheOverlay,
+  newCacheOverlay,
+} from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
+import { publishWarm } from '@template/db/redis/cache/transactionOverlay/publishWarm';
+import { publishWritten } from '@template/db/redis/cache/transactionOverlay/publishWritten';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import {
@@ -46,6 +53,7 @@ import {
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
+import { uuidv7 } from 'uuidv7';
 
 const store = new AsyncLocalStorage<Scope>();
 
@@ -116,13 +124,14 @@ const dbMethods = {
     const existing = store.getStore();
     if (existing?.openTransaction) return fn();
 
-    const scope = existing ?? newScope(crypto.randomUUID(), null);
+    const scope = existing ?? newScope(uuidv7(), null);
     // The caller frame is the last point at which async-local storage is reliable.
     const bridgedContext = captureBridgedContext();
 
     const run = async () => {
       let opened: OpenTransaction | null = null;
       let settled: { result: T; openTransaction: OpenTransaction };
+      let cacheFailures: unknown[] = [];
       try {
         settled = await db.raw.$transaction(
           async (transactionClient) => {
@@ -135,6 +144,7 @@ const dbMethods = {
               heldLocks: new Map(),
               settled: false,
               bridgedContext,
+              cacheOverlay: newCacheOverlay(),
             };
             opened = openTransaction;
             scope.openTransaction = openTransaction;
@@ -161,6 +171,7 @@ const dbMethods = {
             ...(options?.maxWait ? { maxWait: options.maxWait } : {}),
           },
         );
+        cacheFailures = await publishWritten(settled.openTransaction.cacheOverlay);
       } finally {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a
         // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
@@ -169,21 +180,28 @@ const dbMethods = {
         await drainFinally(opened);
       }
       const { result, openTransaction } = settled;
+      await publishWarm(openTransaction.cacheOverlay);
 
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
       // onCommit handler) drains its own and a rollback discards these with the object.
       const batches = openTransaction.afterCommitBatches;
-      for (const batch of batches) {
-        const results = await db.parallel(
-          batch.fns.map((fn) => () => Promise.resolve(fn())),
-          { concurrency: batch.concurrency, resolution: 'allSettled' },
-        );
+      const failures = [...cacheFailures];
+      try {
+        for (const batch of batches) {
+          const results = await db.parallel(
+            batch.fns.map((fn) => () => Promise.resolve(fn())),
+            { concurrency: batch.concurrency, resolution: 'allSettled' },
+          );
 
-        throwIfFailures(
-          'db.onCommit() callback failed',
-          results.filter((result) => result.status === 'rejected').map((result) => result.reason),
-        );
+          throwIfFailures(
+            'db.onCommit() callback failed',
+            results.filter((result) => result.status === 'rejected').map((result) => result.reason),
+          );
+        }
+      } catch (error) {
+        failures.unshift(error);
       }
+      throwIfFailures('db.txn() after-commit work failed', failures);
       return result;
     };
 
@@ -222,7 +240,7 @@ const dbMethods = {
     }
     const parent = store.getStore();
     const inOwnScope = (thunk: () => Promise<T>) =>
-      store.run(newScope(crypto.randomUUID(), parent?.scopeContext ?? null), thunk);
+      store.run(newScope(uuidv7(), parent?.scopeContext ?? null), thunk);
     if (options?.resolution === 'allSettled') {
       return resolveAll(
         thunks.map((thunk) => async (): Promise<PromiseSettledResult<T>> => {
@@ -252,6 +270,8 @@ const dbMethods = {
   getScope: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
 
   isInTxn: (): boolean => !!store.getStore()?.openTransaction,
+
+  cacheOverlay: (): CacheOverlay | null => store.getStore()?.openTransaction?.cacheOverlay ?? null,
 
   // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
@@ -305,7 +325,7 @@ const dbMethods = {
   },
 
   withLockUntilSettled: async <T>(
-    options: LockOptions,
+    options: LockOptions & LockTarget,
     fn: () => Promise<T>,
     acquireOptions?: AcquireOptions,
   ): Promise<T> => {

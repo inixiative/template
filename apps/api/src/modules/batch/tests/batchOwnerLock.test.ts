@@ -10,6 +10,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
+import { gate } from '@template/db/test/gate';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { batchRouter } from '#/modules/batch';
@@ -31,14 +32,6 @@ const membersOf = (segmentId: string) => ({
 });
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const gate = () => {
-  let open!: () => void;
-  const opened = new Promise<void>((resolve) => {
-    open = resolve;
-  });
-  return { open, opened };
-};
 
 const settles = (promise: Promise<unknown>, withinMs: number) =>
   Promise.race([

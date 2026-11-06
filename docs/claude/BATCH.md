@@ -481,7 +481,7 @@ Internal requests inherit authentication from parent request:
 
 ```typescript
 // Parent request authenticated → all batch requests use same auth
-const batchId = crypto.randomUUID();
+const batchId = Bun.randomUUIDv7();
 registerBatch(batchId, parentContext);
 
 // Internal requests detect batch via X-Batch-Id header
@@ -525,8 +525,9 @@ Under `transactionAll` every sub-request writes into the batch's one transaction
 (`withOwnerLock`, upserting `findForUpdate`) is held until the transaction settles — the batch's
 commit or rollback, or the round's — never released when the sub-request returns, because its writes
 are not yet visible to anyone else. Taking the same lock again later in the batch, or from parallel
-sub-requests of one round, joins the batch's hold and runs after the holders before it instead of
-waiting on itself. A lock wait past its `waitMs` fails that sub-request, which rolls the batch (or
+sub-requests of one round, joins the batch's hold instead of waiting on itself; a `withOwnerLock`
+holder also runs after the holders before it, and one whose turn comes after the transaction
+settled throws instead of running. A lock wait past its `waitMs` fails that sub-request, which rolls the batch (or
 round) back. See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
 
 A round under `transactionAll` or `transactionPerRound` waits for every one of its sub-requests to

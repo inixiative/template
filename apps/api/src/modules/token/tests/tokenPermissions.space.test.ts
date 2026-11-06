@@ -5,7 +5,7 @@
  * @uses primitive:authz, infrastructure:prisma
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createSpace, createToken } from '@template/db/test';
@@ -18,7 +18,7 @@ describe('Space token bearer authentication', () => {
   let space: Space;
   let sibling: Space;
   let unrelated: Space;
-  const key = randomUUID();
+  const key = Bun.randomUUIDv7();
   const { fetch } = createTestApp({
     mount: [
       (app) => app.use('*', tokenAuthMiddleware),

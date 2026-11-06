@@ -24,7 +24,7 @@ describe('s3 storage adapter', () => {
         user: required('STORAGE_BUCKET_USER'),
       },
     });
-    testPrefix = `__test/${crypto.randomUUID()}`;
+    testPrefix = `__test/${Bun.randomUUIDv7()}`;
   });
 
   const uploadObject = async (key: string, body: string, contentType = 'text/plain') => {
