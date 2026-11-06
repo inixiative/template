@@ -1,0 +1,1 @@
+apps/api/src/lib/utils/authProbe.ts	probe secret, not an id
