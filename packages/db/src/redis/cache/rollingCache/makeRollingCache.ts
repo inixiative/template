@@ -17,6 +17,7 @@ import {
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
   type RegisteredRollingCache,
   ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_LEAF_BACKOFF_SECONDS,
   ROLLING_CACHE_TICK_SECONDS,
   type RollingCache,
   type RollingCacheConfig,
@@ -61,7 +62,7 @@ const selectedFields = (selector: AnyRollingCacheTargets | undefined): string[] 
 };
 
 // A rolling cache is a value computed from stored data and kept warm by recomputing it every
-// `intervalSeconds`. Its entries outlive the longest a refresh can take, every retry included, so a
+// `intervalSeconds`. Its entries outlive every attempt of the next pass's leaf, retries included, so a
 // scheduled refresh always lands before the last value expires. It is the shape for "a value served
 // fast": a table of materialized values needs hand-written invalidation for every way its inputs
 // change, and a rolling cache needs none.
@@ -95,7 +96,7 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
     channel,
     spreadSeconds = Math.floor(intervalSeconds / 2),
     timeoutSeconds = intervalSeconds,
-    ttlSeconds = intervalSeconds * (ROLLING_CACHE_LEAF_ATTEMPTS + 2),
+    ttlSeconds = intervalSeconds * (2 * ROLLING_CACHE_LEAF_ATTEMPTS + 2),
   } = config;
   if (!isWholeAtLeast(intervalSeconds, MIN_ROLLING_CACHE_INTERVAL_SECONDS)) {
     throw new Error(
@@ -112,14 +113,15 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
       `Rolling cache "${name}" needs a whole timeoutSeconds of at least 1, got ${timeoutSeconds}`,
     );
   }
-  const longestRefreshSeconds =
-    intervalSeconds +
+  const longestPassSeconds =
     spreadSeconds +
     ROLLING_CACHE_LEAF_ATTEMPTS * timeoutSeconds +
-    ROLLING_CACHE_TICK_SECONDS;
+    ROLLING_CACHE_LEAF_BACKOFF_SECONDS;
+  const longestRefreshSeconds =
+    Math.max(intervalSeconds, longestPassSeconds) + ROLLING_CACHE_TICK_SECONDS + longestPassSeconds;
   if (!Number.isInteger(ttlSeconds) || ttlSeconds <= longestRefreshSeconds) {
     throw new Error(
-      `Rolling cache "${name}" needs ttlSeconds longer than its interval plus every leaf attempt (${longestRefreshSeconds}s), got ${ttlSeconds}`,
+      `Rolling cache "${name}" needs ttlSeconds longer than the gap to the next pass plus every attempt of its leaf (${longestRefreshSeconds}s), got ${ttlSeconds}`,
     );
   }
   if (Object.keys(results).length === 0) {

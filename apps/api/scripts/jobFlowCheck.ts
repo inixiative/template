@@ -11,6 +11,9 @@
 // - superseding a staged job aborts its running children within two seconds, the replaced parent never
 //   runs `finish`, and the aborted children never write;
 // - a cron tick enqueues the real run, and a second tick while that run is going is skipped;
+// - a rolling cache's pass starts its timer while its leaf is still running; a coordinator tick after
+//   that timer has run out, with the pass still open, starts nothing; the first tick after the pass
+//   closes starts the next one;
 // - no job fails unexpectedly.
 //
 // It obliterates the jobs queue before and after, so it refuses to run without ENVIRONMENT=local and
@@ -19,7 +22,13 @@
 //   bun run with local api env JOB_FLOW_CHECK_CONFIRM=wipe \
 //     REDIS_URL=redis://localhost:6379/12 REDIS_BULLMQ_URL=redis://localhost:6379/12 \
 //     bun apps/api/scripts/jobFlowCheck.ts
-import { createRedisConnection } from '@template/db';
+import {
+  cacheKey,
+  createRedisConnection,
+  getRedisClient,
+  listRollingCaches,
+  makeRollingCache,
+} from '@template/db';
 import { type Job, Worker } from 'bullmq';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -29,6 +38,7 @@ import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
+import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
 import { createSlowSlotPool } from '#/jobs/slowSlotPool';
 import { JobLane, JobType, type StageContext } from '#/jobs/types';
 
@@ -123,6 +133,20 @@ const main = async (): Promise<void> => {
 
   const enqueue = (handler: string, payload: unknown) =>
     enqueueJob(handler as never, payload as never);
+
+  const rollingCacheName = name('rollingCache');
+  makeRollingCache({
+    name: rollingCacheName,
+    intervalSeconds: 300,
+    spreadSeconds: 0,
+    timeoutSeconds: 30,
+    results: { value: () => cacheKey(rollingCacheName, 'all') },
+    compute: async (_target, { results, write }) => {
+      record('rollingCacheCompute', rollingCacheName);
+      await sleep(3_000);
+      await write(results.value(), Date.now());
+    },
+  });
 
   const workerRedis = createRedisConnection('check:jobFlowWorker', resolveBullmqRedisUrl(), {
     isBlocking: true,
@@ -257,6 +281,63 @@ const main = async (): Promise<void> => {
       'cron: a tick enqueues the real run, and a second tick while it runs is skipped',
       count('cronRun', 'tick') === 1,
       count('cronRun', 'tick'),
+    );
+
+    check(
+      'rolling cache: the coordinator sees only this run’s cache',
+      listRollingCaches().length === 1,
+      listRollingCaches().map((rollingCache) => rollingCache.name),
+    );
+    const timer = rollingCacheTimerKey(rollingCacheName);
+    const branchState = async () => {
+      const [branch] = (await queue.getJobs(['waiting-children', 'active', 'waiting'])).filter(
+        (job) => job.name === 'refreshRollingCache',
+      );
+      return branch?.getState();
+    };
+    const coordinateOnce = async () => {
+      const { jobId } = await enqueue('coordinateRollingCaches', undefined);
+      await waitUntil('coordinator tick finishes', async () =>
+        Boolean(await (await queue.getJob(jobId))?.isCompleted()),
+      );
+    };
+    await coordinateOnce();
+    await waitUntil(
+      'rolling cache leaf starts',
+      () => count('rollingCacheCompute', rollingCacheName) > 0,
+    );
+    const timerMsWhileLeafRuns = await getRedisClient().pttl(timer);
+    check(
+      'rolling cache: the timer runs from the pass start, while its leaf is still out',
+      timerMsWhileLeafRuns > 290_000 && (await branchState()) === 'waiting-children',
+      timerMsWhileLeafRuns,
+    );
+    await getRedisClient().del(timer);
+    await coordinateOnce();
+    check(
+      'rolling cache: a tick after the timer ran out, with the pass still open, starts nothing',
+      count('rollingCacheCompute', rollingCacheName) === 1 && (await branchState()) !== undefined,
+      count('rollingCacheCompute', rollingCacheName),
+    );
+    await waitUntil('rolling cache pass closes', async () => (await branchState()) === undefined);
+    check(
+      'rolling cache: no second pass ran while the first was open',
+      count('rollingCacheCompute', rollingCacheName) === 1,
+      count('rollingCacheCompute', rollingCacheName),
+    );
+    await coordinateOnce();
+    await waitUntil(
+      'next rolling cache pass starts',
+      () => count('rollingCacheCompute', rollingCacheName) > 1,
+    );
+    await waitUntil(
+      'next rolling cache pass closes',
+      async () => (await branchState()) === undefined,
+    );
+    check(
+      'rolling cache: the first tick after the pass closes starts exactly one more',
+      count('rollingCacheCompute', rollingCacheName) === 2,
+      count('rollingCacheCompute', rollingCacheName),
     );
 
     const failed = events.filter(

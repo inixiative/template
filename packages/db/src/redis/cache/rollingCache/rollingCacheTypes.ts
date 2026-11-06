@@ -12,14 +12,16 @@ import type { ModelName, ModelTypeMap } from '@template/db/utils/modelNames';
 // packages/db/prisma/seeds/cronJob.seed.ts.
 export const ROLLING_CACHE_TICK_SECONDS = 60;
 
-// Five ticks. The coordinator starts a run when the timer would expire before the next tick, so a run
-// can start up to one tick late. A shorter interval would spend more of each interval waiting for the
-// coordinator than refreshing.
+// Five ticks. The coordinator looks once a tick and starts a pass once its timer has a tick or less
+// left, so a pass starts anywhere in the last tick of its interval. At five ticks that jitter is at
+// most a fifth of the interval; a shorter interval would be scheduled more by the tick than by itself.
 export const MIN_ROLLING_CACHE_INTERVAL_SECONDS = 5 * ROLLING_CACHE_TICK_SECONDS;
 
-// How many attempts a leaf gets: the queue's default `attempts` (apps/api/src/jobs/queue.ts). A cache's
-// `ttlSeconds` is validated against it, so it must move with that default.
+// How many attempts a leaf gets, and how long the queue waits between them in all: the queue's default
+// `attempts` and exponential `backoff` from 5 s (5 + 10; apps/api/src/jobs/queue.ts). A cache's
+// `ttlSeconds` is validated against them, so they must move with those defaults.
 export const ROLLING_CACHE_LEAF_ATTEMPTS = 3;
+export const ROLLING_CACHE_LEAF_BACKOFF_SECONDS = 15;
 
 // Every target is one queued job per interval, so a selector that matches far more rows than expected
 // floods the queue. Resolution fails closed above this: a partial target list would leave the missing
@@ -87,12 +89,17 @@ export type RollingCacheComputeContext<TResults extends RollingCacheResults<neve
 // computed by the same job under one lock: a pass that reads the same rows never becomes two caches.
 // `channel` names where a target's refresh is announced.
 //
-// Four times. `intervalSeconds` is how often a target is refreshed. `spreadSeconds` (default: half the
-// interval) is the window a branch spreads its leaves' starts across. `timeoutSeconds` (default: one
-// interval) is how long one leaf attempt may run before it reports itself stuck and retries.
-// `ttlSeconds` (default: ROLLING_CACHE_LEAF_ATTEMPTS + 2 intervals) is how long an entry lives. It must
-// be longer than an interval plus the spread plus every attempt plus a tick, so a target whose leaf
-// fails every attempt still has its last good value when the next branch tries again.
+// Four times. `intervalSeconds` is how often a pass starts: the timer starts with the pass, so passes
+// start one interval apart however long their leaves take, unless a pass outlasts the interval, and
+// then the next starts on the first tick after it closes. `spreadSeconds` (default: half the interval)
+// is the window a pass spreads its leaves' starts across. `timeoutSeconds` (default: one interval) is
+// how long one leaf attempt may run before it reports itself stuck and retries. `ttlSeconds` (default:
+// 2 × ROLLING_CACHE_LEAF_ATTEMPTS + 2 intervals) is how long an entry lives. A pass stays open at most
+// the spread plus every attempt of a leaf and the backoff between them, so a target's next leaf has
+// made its last attempt at most the longer of an interval and a pass, plus a tick, plus a pass after
+// its entry was written. `ttlSeconds` must be longer than that, so a target whose leaf fails every
+// attempt keeps its last good value through every attempt of the next pass. Time a job spends waiting
+// in the queue (a busy worker, a slow-lane slot, stall recovery) is not in the bound.
 export type RollingCacheConfig<TTarget, TResults extends RollingCacheResults<TTarget>> = {
   name: string;
   intervalSeconds: number;

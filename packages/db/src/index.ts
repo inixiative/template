@@ -75,6 +75,7 @@ export {
   type RedisNamespace,
   type RegisteredRollingCache,
   ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_LEAF_BACKOFF_SECONDS,
   ROLLING_CACHE_TICK_SECONDS,
   type RollingCache,
   type RollingCacheComputeContext,

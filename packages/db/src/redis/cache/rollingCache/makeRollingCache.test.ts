@@ -9,6 +9,8 @@ import {
 import {
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
   ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_LEAF_BACKOFF_SECONDS,
+  ROLLING_CACHE_TICK_SECONDS,
   type RollingCacheComputeContext,
 } from '@template/db/redis/cache/rollingCache/rollingCacheTypes';
 import { flushRedis, getRedisClient } from '@template/db/redis/client';
@@ -105,18 +107,41 @@ describe('makeRollingCache', () => {
     ).toThrow('timeoutSeconds');
   });
 
-  it('refuses a ttl that would let an entry expire while its leaf is still on its last attempt', () => {
+  // A pass lasts at most spread + attempts × timeout + backoff. The next pass starts the longer of an
+  // interval and that pass, plus a tick, after this one, and its leaf takes up to a pass again.
+  it('refuses a ttl that would let an entry expire while the next pass’s leaf is still on its last attempt', () => {
     const name = uniqueName('shortTtl');
+    const longestPass =
+      150 + ROLLING_CACHE_LEAF_ATTEMPTS * 300 + ROLLING_CACHE_LEAF_BACKOFF_SECONDS;
+    const longestRefresh = longestPass + ROLLING_CACHE_TICK_SECONDS + longestPass;
 
     expect(() =>
       makeRollingCache({
         name,
         intervalSeconds: 300,
         timeoutSeconds: 300,
-        ttlSeconds: 1260,
+        ttlSeconds: longestRefresh,
         ...single(name, async () => 1),
       }),
-    ).toThrow('ttlSeconds longer than its interval plus every leaf attempt (1410s)');
+    ).toThrow(`every attempt of its leaf (${longestRefresh}s)`);
+  });
+
+  it('measures from the interval when a pass fits inside it', () => {
+    const name = uniqueName('fitsTtl');
+    const longestPass = ROLLING_CACHE_LEAF_ATTEMPTS * 60 + ROLLING_CACHE_LEAF_BACKOFF_SECONDS;
+    const longestRefresh = 600 + ROLLING_CACHE_TICK_SECONDS + longestPass;
+    const define = (ttlSeconds: number) =>
+      makeRollingCache({
+        name,
+        intervalSeconds: 600,
+        spreadSeconds: 0,
+        timeoutSeconds: 60,
+        ttlSeconds,
+        ...single(name, async () => 1),
+      });
+
+    expect(() => define(longestRefresh)).toThrow(`(${longestRefresh}s)`);
+    expect(define(longestRefresh + 1).ttlSeconds).toBe(longestRefresh + 1);
   });
 
   it('throws when asked for a cache nobody registered', () => {
@@ -149,8 +174,8 @@ describe('makeRollingCache', () => {
     await rollingCache.refresh();
     const ttl = await getRedisClient().ttl(cacheKey(name, 'all'));
 
-    expect(rollingCache.ttlSeconds).toBe(600 * (ROLLING_CACHE_LEAF_ATTEMPTS + 2));
-    expect(ttl).toBeGreaterThan(600 * (ROLLING_CACHE_LEAF_ATTEMPTS + 1));
+    expect(rollingCache.ttlSeconds).toBe(600 * (2 * ROLLING_CACHE_LEAF_ATTEMPTS + 2));
+    expect(ttl).toBeGreaterThan(600 * (2 * ROLLING_CACHE_LEAF_ATTEMPTS + 1));
     expect(ttl).toBeLessThanOrEqual(rollingCache.ttlSeconds);
   });
 
