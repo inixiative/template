@@ -4,7 +4,6 @@
  * @partOf primitive:caching, mutex
  * @uses primitive:shared
  */
-import { isPattern, matchesPattern } from '@template/db/redis/cache/cachePattern';
 import type { Generation } from '@template/db/redis/cache/generation/readGeneration';
 import { createSerializedQueue, type SerializedQueue } from '@template/shared/utils';
 
@@ -23,8 +22,7 @@ export const newCacheOverlay = (): CacheOverlay => ({
 });
 
 export const isWrittenInTransaction = (overlay: CacheOverlay, key: string): boolean =>
-  overlay.written.has(key) ||
-  [...overlay.written].some((written) => isPattern(written) && matchesPattern(written, key));
+  overlay.written.has(key);
 
 export const onOverlayKey = <T>(
   overlay: CacheOverlay,

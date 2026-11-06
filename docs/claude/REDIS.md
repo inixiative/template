@@ -304,8 +304,11 @@ transaction reads through it:
   nothing behind.
 - The clear-cache hook marks the keys a write invalidates (`queueCacheClear`, which calls
   `markCacheWritten`). A mark also drops any value the overlay holds for that key. A marked key skips the
-  shared cache and recomputes, so the transaction reads its own writes. A marked pattern marks every
-  key it matches. `markCacheWritten` throws outside `db.txn()`: there is no overlay to mark.
+  shared cache and recomputes, so the transaction reads its own writes. `markCacheWritten` throws
+  outside `db.txn()`, where there is no overlay to mark, and refuses a `*` pattern: a pattern clear at
+  commit cannot find a value another transaction computed and has not yet published, so that value
+  would publish stale. A model whose write invalidates a family of keys lists them exactly. Pattern
+  clears are for the admin clear-cache endpoint only.
 - Each key has a serialized queue: a compute and its store run on it, and a mark waits on it. Batch
   sub-requests in one round share the transaction, so a sibling's compute that read before a write
   lands before that write's mark, and the mark removes it.
@@ -315,22 +318,19 @@ transaction reads through it:
 When the transaction commits, each key it touched runs one Lua call (`publishKey`). A marked key is
 cleared (value, write time, new generation), and a value the transaction computed is published only
 if the key's generation is still the one read before the compute. An exact clear in between, from any
-process, moves the generation, wins and leaves a miss. A pattern clear moves the generation only of
-keys it finds a single-flight lock for, and a compute inside a transaction takes none, so a pattern
-clear in between does not stop that publish. A key the transaction neither wrote nor computed a
+process, moves the generation, wins and leaves a miss. A key the transaction neither wrote nor computed a
 publishable value for sends nothing. A rollback sends nothing. The calls run in two groups:
 
 - Marked keys (`publishWritten`), before the transaction releases its held locks and before its
   `db.onCommit` batches, so a waiter on one of those locks never reads the value the write replaced.
-  Marked patterns are then cleared with `clearKey`, still before the locks are released, and keys
-  under a marked pattern are left to that clear. A failure here is loud: the clear may not have run,
+  A failure here is loud: the clear may not have run,
   so `db.txn` throws it after its `db.onCommit` batches have run. A write that committed then reports
   an error, so a caller that retries on error must be idempotent.
 - Keys the transaction only read (`publishWarm`), after the held locks are released, so a large batch
   does not hold them for one call per key, and before the `db.onCommit` batches. The generation check
   makes the late publish safe against a write that commits in between and clears the key exactly,
   which is how the clear-cache hook clears. A failure leaves Redis as it was and only costs the
-  warm-up, so it counts `cache.publish.failed` and does not throw.
+  warm-up, so it logs the error with the key, counts `cache.publish.failed` and does not throw.
 
 The full commit order is in [DATABASE.md § What Runs at Commit](./DATABASE.md#what-runs-at-commit).
 

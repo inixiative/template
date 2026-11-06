@@ -186,18 +186,11 @@ describe('a read through the cache inside a transaction', () => {
     });
     expect(await cachedName(key)).toBeUndefined();
   });
-  it('treats every key under a written pattern as written, and leaves none of them stale after commit', async () => {
+  it('refuses to mark a pattern, so every clear a write makes is an exact key', async () => {
     const { entity: organization } = await createOrganization();
-    const key = cacheKey('organization', organization.id, ['summary']);
-    await cache(key, async () => 'before');
-    let inside: string | undefined;
-    await db.txn(async () => {
-      await markCacheWritten([cacheKey('organization', organization.id, [], true)]);
-      inside = await cache(key, async () => 'after');
-    });
-    expect(inside).toBe('after');
-    const check = await checkCache<string>(key);
-    expect('value' in check ? check.value : undefined).not.toBe('before');
+    await expect(
+      db.txn(() => markCacheWritten([cacheKey('organization', organization.id, [], true)])),
+    ).rejects.toThrow('markCacheWritten() takes exact keys');
   });
   it('publishes a key whose data holds a star as itself, clearing no other key', async () => {
     const mine = cacheKey('User', 'a*b@example.com', ['email']);
