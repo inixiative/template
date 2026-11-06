@@ -17,11 +17,11 @@ export const cache = async <T>(
   ttl: number | ((value: T) => number) = DEFAULT_TTL,
 ): Promise<T> => {
   validateKey(key);
-  if (auditActorContext.isSoftDeleteBypassed()) return fn();
+  const live = (): Promise<T> => auditActorContext.withoutDeleted(fn) as Promise<T>;
   const overlay = db.cacheOverlay();
   return withCacheSpan(key, true, (setResult) =>
     overlay
-      ? readInTransaction(overlay, key, fn, ttl, setResult)
-      : readThrough(key, fn, ttl, setResult),
+      ? readInTransaction(overlay, key, live, ttl, setResult)
+      : readThrough(key, live, ttl, setResult),
   );
 };

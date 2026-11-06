@@ -213,13 +213,23 @@ describe('a read through the cache inside a transaction', () => {
     expect(await read(other)).toBe('other');
     expect(await read(mine)).toBe('mine');
   });
-  it('neither reads nor writes the shared cache under withDeleted', async () => {
-    const key = cacheKey('organization', 'withDeleted-probe');
-    await cache(key, async () => 'live');
-    const read = await db.withDeleted(() => cache(key, async () => 'tombstone-inclusive'));
-    expect(read).toBe('tombstone-inclusive');
-    const check = await checkCache<string>(key);
-    expect('value' in check ? check.value : undefined).toBe('live');
+  it('computes the live view under withDeleted, and reads and writes the shared key', async () => {
+    const { entity: user } = await createUser();
+    await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
+    expect(
+      await db.withDeleted(() => db.user.findFirst({ where: { id: user.id } })),
+    ).not.toBeNull();
+
+    expect(await db.withDeleted(() => fetchOne('user', user.id))).toBeNull();
+    const check = await checkCache<unknown>(cacheKey('user', user.id));
+    expect('value' in check ? check.value : 'miss').toBeNull();
+
+    const shared = cacheKey('organization', 'withDeleted-shared');
+    await cache(shared, async () => 'live');
+    expect(await db.withDeleted(() => cache(shared, async () => 'recomputed'))).toBe('live');
+    expect(await db.txn(() => db.withDeleted(() => cache(shared, async () => 'in-txn')))).toBe(
+      'live',
+    );
   });
 
   it('drops a member’s cached relations when their organization is soft-deleted', async () => {

@@ -269,11 +269,10 @@ const user = await cache(
 ```
 
 Behavior:
-- Under `db.withDeleted` the cache is neither read nor written: `fn` runs directly, so a
-  tombstone-inclusive result never lands under the shared live key
-  (the live value would also be missing the deleted rows the caller asked for). Rolling caches are
-  still read normally (`checkCache` and the rolling read never compute); only computing through
-  `cache()` is skipped
+- A cached value is always the live view: `fn` runs inside `db.withoutDeleted`, so a caller inside
+  `db.withDeleted` (every superadmin route, any `?includeDeleted=true` request) reads and writes the
+  shared key like any other caller, and nothing tombstone-inclusive is cached under it. A read that
+  needs deleted rows goes to `db` directly, not through `cache()`. Rolling caches are read normally
 - Returns the cached value if one exists, `null` included; a stored `undefined` reads as a miss
 - Computes via fn() on cache miss; concurrent misses on one key compute once (single-flight)
 - **Negative caching**: `null` is cached with a 1 min TTL (prevents thundering herd, allows quick discovery of new records). `undefined` is written with the same TTL but reads back as a miss, so it is recomputed every time

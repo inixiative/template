@@ -129,14 +129,15 @@ describe('fetchOne', () => {
     expect(result).toBeNull();
   });
 
-  it('a withDeleted read returns a tombstone without caching it under the live key', async () => {
+  it('a withDeleted read through fetchOne gets the live view and caches it', async () => {
     const { entity: user } = await createUser();
     await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
+    expect(
+      await db.withDeleted(() => db.user.findFirst({ where: { id: user.id } })),
+    ).not.toBeNull();
 
-    const tombstone = await db.withDeleted(() => fetchOne('user', user.id));
-
-    expect(tombstone?.id).toBe(user.id);
-    expect(await getRedisClient().exists(cacheKey('user', user.id))).toBe(0);
+    expect(await db.withDeleted(() => fetchOne('user', user.id))).toBeNull();
+    expect(await getRedisClient().exists(cacheKey('user', user.id))).toBe(1);
     expect(await fetchOne('user', user.id)).toBeNull();
   });
 
