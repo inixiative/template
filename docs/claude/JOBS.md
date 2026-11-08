@@ -545,7 +545,7 @@ Defined in the env schema (`apps/api/src/config/env.ts`), read lazily through `o
 
 | Env var | Default | Description |
 |---------|---------|-------------|
-| `JOBS_MAX_QUEUE_DEPTH` | `10000` | Depth cap that trips overflow |
+| `JOBS_MAX_QUEUE_DEPTH` | `100000` | Depth cap that trips overflow |
 | (derived) | `0.8 × cap` | Low-water mark for clearing |
 | `JOBS_OUTBOX_FLUSH_MAX_ROWS` | `1000` | Accumulator size-flush threshold |
 | `JOBS_OVERFLOW_TTL_MS` | `60000` | Flag TTL (drain heartbeats it) |
