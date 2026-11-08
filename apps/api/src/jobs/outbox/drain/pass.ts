@@ -14,7 +14,12 @@ import {
   hasPendingSpills,
 } from '#/jobs/outbox/accumulator';
 import { laneDepthCap, lowWater, MAX_DRAIN_ATTEMPTS } from '#/jobs/outbox/config';
-import { clearOverflow, warnIfOverflowStuck, withOverflowRenew } from '#/jobs/outbox/flag';
+import {
+  clearOverflow,
+  tripFromDepths,
+  warnIfOverflowStuck,
+  withOverflowRenew,
+} from '#/jobs/outbox/flag';
 import { runOnOutboxQueue } from '#/jobs/outbox/mutex';
 import { laneDepth, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
@@ -158,6 +163,8 @@ export const runDrainOutboxPass = async (): Promise<void> => {
     const slowRoom = Math.min(room - fastAdmitted, laneDepthCap(JobLane.slow) - depths.slow);
     await admitLaneRows(JobLane.slow, slowRoom);
 
-    await settleFlags((await readSlowLaneState()).depths);
+    const { depths: settled } = await readSlowLaneState();
+    await tripFromDepths(settled);
+    await settleFlags(settled);
   });
 };

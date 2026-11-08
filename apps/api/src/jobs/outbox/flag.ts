@@ -7,13 +7,14 @@
 import { LogScope, log } from '@template/shared/logger';
 import { heartbeat } from '@template/shared/utils';
 import {
+  DEPTH_PROBE_MS,
   flagKey,
   laneDepthCap,
   lowWater,
   overflowStuckMs,
   overflowTtlSec,
 } from '#/jobs/outbox/config';
-import { laneDepth, queueDepths } from '#/jobs/outbox/queueDepth';
+import { laneDepth, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
 import { JobLane } from '#/jobs/types';
 
@@ -38,12 +39,74 @@ export const renewOverflow = (lane: JobLane = JobLane.fast): Promise<unknown> =>
 export const clearOverflow = (lane: JobLane = JobLane.fast): Promise<unknown> =>
   queue.redis.del(flagKey(lane));
 
-// Trip a lane's flag inline when a direct add crosses its cap. Fresh probe (not cached): on a ramp the
-// stale cache would trip late and let the queue overshoot — and tripIfFull only runs pre-overflow.
-export const tripIfFull = async (): Promise<void> => {
-  const depths = await queueDepths(true);
+const isAtCap = (depths: QueueDepths): boolean =>
+  LANES.some((lane) => laneDepth(depths, lane) >= laneDepthCap(lane));
+
+// Trip each lane's flag whose depth has reached its cap, from depths the caller already holds: the
+// enqueue-side estimate, or the drain pass's per-tick read (so the flag turns itself on within a tick
+// even when no single process saw the wave).
+export const tripFromDepths = async (depths: QueueDepths): Promise<void> => {
   for (const lane of LANES)
     if (laneDepth(depths, lane) >= laneDepthCap(lane)) await setOverflow(lane);
+};
+
+// Probe fresh and trip from the result. Several Redis commands, so the enqueue path doesn't call this
+// per job — it goes through the depth estimate below.
+export const tripIfFull = async (): Promise<void> => tripFromDepths(await queueDepths(true));
+
+// A rough, per-process queue depth: the last probe plus every add this process made since. An add that
+// finds the probe older than `probeMs` re-probes (one shared in-flight probe) and the add count resets.
+// The estimate only decides when to look: reaching a cap forces a fresh probe, and the flag trips on what
+// that probe reads, so stale counts never trip it falsely. A wave of 20k or 100k adds therefore turns
+// spilling on part-way through instead of overfilling Redis. Deliberately approximate — it sees only this
+// process's adds, and adds made during a probe are dropped by the reset. It guards against catastrophic
+// overfill, not exact admission: the drain tick trips from the real depth, and the cap sits well below
+// Redis memory, so a small overshoot is harmless.
+export const createDepthEstimator = (
+  probeDepths: () => Promise<QueueDepths> = () => queueDepths(true),
+  probeMs: number = DEPTH_PROBE_MS,
+) => {
+  let probed: { at: number; depths: QueueDepths } | null = null;
+  let added = { total: 0, slow: 0 };
+  let probing: Promise<void> | null = null;
+
+  const probe = (): Promise<void> => {
+    probing ??= probeDepths()
+      .then((depths) => {
+        probed = { at: Date.now(), depths };
+        added = { total: 0, slow: 0 };
+      })
+      .finally(() => {
+        probing = null;
+      });
+    return probing;
+  };
+
+  const estimate = (): QueueDepths | null =>
+    probed && {
+      ...probed.depths,
+      total: probed.depths.total + added.total,
+      slow: probed.depths.slow + added.slow,
+    };
+
+  const recordAdd = async (isSlow: boolean): Promise<void> => {
+    added.total++;
+    if (isSlow) added.slow++;
+    const rough = estimate();
+    const isStale = !probed || Date.now() - probed.at >= probeMs;
+    if (isStale || !rough || isAtCap(rough)) await probe();
+    const confirmed = estimate();
+    if (confirmed) await tripFromDepths(confirmed);
+  };
+
+  return { recordAdd };
+};
+
+let depthEstimator: ReturnType<typeof createDepthEstimator> | null = null;
+// The enqueue path's entry: one estimator over the jobs queue, created on first use.
+export const recordAddAndTripIfFull = (isSlow: boolean): Promise<void> => {
+  depthEstimator ??= createDepthEstimator();
+  return depthEstimator.recordAdd(isSlow);
 };
 
 // Operational alert: overflow that won't clear means the drain can't keep up with arrivals.

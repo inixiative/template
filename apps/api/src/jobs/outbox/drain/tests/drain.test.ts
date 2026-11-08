@@ -4,6 +4,7 @@ import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import {
+  createDepthEstimator,
   flushOutbox,
   hasPendingFastSpills,
   hasPendingSlowSpills,
@@ -31,6 +32,54 @@ const fanRow = (jobId: string): OutboxRow => ({
   dedupeKey: null,
   data: { type: JobType.adhoc, lane: JobLane.fast, payload: { jobId } },
   options: {},
+});
+
+describe('depth estimate', () => {
+  afterEach(async () => {
+    await queue.redis.del(FLAG_KEY, SLOW_FLAG_KEY);
+  });
+
+  const depthsOf = (total: number) => ({ total, slow: 0, slowDeferred: 0 });
+
+  it('trips the flag once the adds since the last probe reach the cap', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+    let depth = 4;
+    const estimator = createDepthEstimator(async () => depthsOf(depth), 60_000);
+    const add = () => {
+      depth++;
+      return estimator.recordAdd(false);
+    };
+
+    for (let i = 0; i < 5; i++) await add();
+    expect(await isOverflowing(JobLane.fast)).toBe(false);
+
+    await add();
+    expect(await isOverflowing(JobLane.fast)).toBe(true);
+  });
+
+  it('trips the slow flag when slow work reaches the slow share, and the budget flag at the total cap', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+    setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
+    let depths = { total: 5, slow: 5, slowDeferred: 0 };
+    const estimator = createDepthEstimator(async () => depths, 0);
+
+    await estimator.recordAdd(true);
+    expect(await isOverflowing(JobLane.slow)).toBe(true);
+    expect(await isOverflowing(JobLane.fast)).toBe(false);
+
+    depths = { total: 10, slow: 5, slowDeferred: 0 };
+    await estimator.recordAdd(false);
+    expect(await isOverflowing(JobLane.fast)).toBe(true);
+  });
+
+  it('never trips on stale add counts: reaching the cap re-probes first', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+    const estimator = createDepthEstimator(async () => depthsOf(4), 60_000);
+
+    for (let i = 0; i < 20; i++) await estimator.recordAdd(false);
+
+    expect(await isOverflowing(JobLane.fast)).toBe(false);
+  });
 });
 
 // Pure routing decision — no DB/queue needed.
@@ -325,9 +374,17 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect(await isOverflowing()).toBe(false);
   });
 
+  it('trips the overflow flag from the depth it reads, with nothing buffered', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '2');
+    for (const id of ['d1', 'd2', 'd3']) queued.set(id, { id, name: 'sendWebhook', data: {} });
+
+    await runDrainOutboxPass();
+
+    expect(await isOverflowing()).toBe(true);
+  });
+
   it('flushOutbox persists rows still buffered at shutdown', async () => {
-    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100'); // no size trip — rows linger in the accumulator
-    setEnvOverride('JOBS_OUTBOX_FLUSH_LINGER_MS', '60000'); // no linger flush inside the test window
+    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100'); // no size trip — sd2 waits behind sd1's write
     const spills = [spillToOutbox(fanRow('sd1')), spillToOutbox(fanRow('sd2'))];
 
     await flushOutbox();
@@ -348,6 +405,50 @@ describe('jobs overflow buffer (spill + drain)', () => {
     };
 
     await expect(spillToOutbox(collide)).rejects.toThrow();
+  });
+
+  describe('group commit', () => {
+    // Resolves true if the promise settles within ms, so a regression fails instead of hanging.
+    const settlesWithin = (promise: Promise<unknown>, ms: number) =>
+      Promise.race([
+        promise.then(() => true),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), ms)),
+      ]);
+
+    it('spills arriving while a write is running wait and go out together as soon as it finishes', async () => {
+      setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '1000');
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const writeInProgress = flushQueue.run(() => gate);
+
+      const first = spillToOutbox(fanRow('gc1'), { flushImmediately: true });
+      const rest = [spillToOutbox(fanRow('gc2')), spillToOutbox(fanRow('gc3'))];
+      try {
+        release();
+        await writeInProgress;
+        expect(await settlesWithin(Promise.all([first, ...rest]), 5_000)).toBe(true);
+
+        const rows = await db.jobOutbox.findMany({
+          orderBy: [{ createdAt: 'asc' }, { jobId: 'asc' }],
+        });
+        expect(rows.map((r) => r.jobId)).toEqual(['gc1', 'gc2', 'gc3']);
+        expect(rows[1]?.createdAt.getTime()).toBe(rows[2]?.createdAt.getTime()); // one batch, one txn
+      } finally {
+        await flushOutbox();
+      }
+    });
+
+    it('a producer that awaits each spill pays one write per spill, with no linger', async () => {
+      setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '1000');
+      const started = performance.now();
+
+      for (let i = 0; i < 10; i += 1) await spillToOutbox(fanRow(`seq${i}`));
+
+      expect(performance.now() - started).toBeLessThan(1_000);
+      expect(await db.jobOutbox.count()).toBe(10);
+    });
   });
 
   describe('lanes', () => {
@@ -443,7 +544,6 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
     it('tracks pending spills per lane', async () => {
       setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100');
-      setEnvOverride('JOBS_OUTBOX_FLUSH_LINGER_MS', '60000');
       const slow = spillToOutbox(slowRow('pending-slow'));
       expect(hasPendingSlowSpills()).toBe(true);
       expect(hasPendingFastSpills()).toBe(false);
@@ -473,15 +573,26 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   it('rejects spills accepted mid-drain when the shutdown flush gives up (no hung awaits)', async () => {
     setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100');
-    setEnvOverride('JOBS_OUTBOX_FLUSH_LINGER_MS', '60000');
+    // Hold a write in flight so `buffered` waits in the accumulator instead of being written on accept.
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const gate = flushQueue.run(() => held);
+    const inFlight = spillToOutbox(fanRow('in-flight'), { flushImmediately: true });
+    const buffered = spillToOutbox(fanRow('buffered')).catch((e) => e);
+
     let straggler: Promise<unknown> | null = null;
     const run = spyOn(flushQueue, 'run').mockImplementation((async () => {
       straggler ??= spillToOutbox(fanRow('mid-drain')).catch((e) => e); // lands while flushOutbox is draining
       throw new Error('db down');
     }) as never);
 
-    const buffered = spillToOutbox(fanRow('buffered')).catch((e) => e);
-    await expect(flushOutbox()).rejects.toThrow('db down');
+    const drained = flushOutbox();
+    release();
+    await gate;
+    await inFlight;
+    await expect(drained).rejects.toThrow('db down');
     run.mockRestore();
 
     expect(String(await buffered)).toContain('db down');

@@ -14,7 +14,6 @@ const jobEnvFields = {
   JOBS_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
   JOBS_MAX_QUEUE_DEPTH: z.coerce.number().int().positive().default(10_000),
   JOBS_OUTBOX_FLUSH_MAX_ROWS: z.coerce.number().int().positive().default(1000),
-  JOBS_OUTBOX_FLUSH_LINGER_MS: z.coerce.number().int().nonnegative().default(200),
   JOBS_OVERFLOW_STUCK_MS: z.coerce.number().int().positive().default(300_000),
   JOBS_OVERFLOW_TTL_MS: z.coerce.number().int().positive().default(60_000),
   JOBS_SLOW_QUEUE_DEPTH_FRACTION: z.coerce.number().min(0).max(1).default(0.5),

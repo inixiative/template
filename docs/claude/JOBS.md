@@ -501,13 +501,13 @@ A durable buffer in front of BullMQ. When queue depth crosses a cap, an overflow
 
 ### Spill Routing
 
-`shouldSpill(type, bypass, overflowing)` is a pure predicate: spill only when `type === 'adhoc' && !bypass && overflowing`. A flow child (an enqueue carrying `parent`, added by a staged job's `enqueueChildJob`) never counts as overflowing and always goes direct: the drain's re-add would lose its parent link. Cron and cronTrigger jobs always go direct — only `adhoc` jobs are ever buffered. On a direct `adhoc` add, `tripIfFull()` flips the flag if that add crossed the cap (fresh, uncached probe to avoid overshoot on a ramp).
+`shouldSpill(type, bypass, overflowing)` is a pure predicate: spill only when `type === 'adhoc' && !bypass && overflowing`. A flow child (an enqueue carrying `parent`, added by a staged job's `enqueueChildJob`) never counts as overflowing and always goes direct: the drain's re-add would lose its parent link. Cron and cronTrigger jobs always go direct — only `adhoc` jobs are ever buffered. On a direct `adhoc` add, `recordAddAndTripIfFull()` counts it into a rough per-process depth estimate (last probe + adds since, re-probed every `DEPTH_PROBE_MS` = 2s); reaching a cap forces a fresh probe and the flag trips on what it reads, so a 20k or 100k wave turns spilling on part-way through. The drain tick also trips the flag from the depths it reads (`tripFromDepths`). If Redis refuses an add as out of memory (`noeviction`), the job spills instead of failing; flow children and `bypass`/cron jobs still throw.
 
 ### Accumulator
 
 `spillToOutbox` routes every spill (fan-out and superseding) through an in-memory accumulator that batches DB writes:
 
-- Flush triggers: size (`flushMaxRows`, default 1000) flushes inline; otherwise a `flushLinger` timer (default 200ms) arms for the partial tail.
+- Flush triggers: a spill with no flush in flight is written at once; while a flush is queued or running, spills wait and go out as one batch when it settles (group commit). Size (`flushMaxRows`, default 1000) still splits a large burst. There is no linger timer.
 - Within a batch, superseding lanes (`handlerName`+`dedupeKey`) collapse to the latest row (`dedupeLatestPerLane`); null-`dedupeKey` rows are all kept.
 - One txn per flush: plain rows via `createManyAndReturn({ skipDuplicates })`, superseding lanes via `upsert` (last-writer-wins, no silent drop).
 - Resolves on COMMIT, never on accumulation — a crash in the flush window must not drop a job.
@@ -535,7 +535,7 @@ One Redis key per lane — `job:overflow` (the whole budget) and `job:overflow:s
 
 ### Queue Depth Probe
 
-`queueDepths()` returns `{ total, slow, slowDeferred }`: `slowDeferred` is the slow lane's deferral list capped at BullMQ's `delayed` count (see [The Deferral List](#the-deferral-list)); `total` counts `waiting + prioritized + active + slowDeferred`; `slow` counts the jobs waiting at `SLOW_LANE_PRIORITY` via BullMQ's `getCountsPerPriority` plus `slowDeferred`. The rest of `delayed` stays out — scheduled cron repeats and backoff retries are a standing floor, not pressure. Cached ~1s (`DEPTH_CACHE_MS`). Pass `fresh = true` to bypass the cache (used by `tripIfFull` and the drain). A job given an explicit priority between the lanes lands in `prioritized` and counts against the whole budget, not the slow share.
+`queueDepths()` returns `{ total, slow, slowDeferred }`: `slowDeferred` is the slow lane's deferral list capped at BullMQ's `delayed` count (see [The Deferral List](#the-deferral-list)); `total` counts `waiting + prioritized + active + slowDeferred`; `slow` counts the jobs waiting at `SLOW_LANE_PRIORITY` via BullMQ's `getCountsPerPriority` plus `slowDeferred`. The rest of `delayed` stays out — scheduled cron repeats and backoff retries are a standing floor, not pressure. Cached ~1s (`DEPTH_CACHE_MS`). Pass `fresh = true` to bypass the cache (used by the depth estimate's probe, `tripIfFull` and the drain). A job given an explicit priority between the lanes lands in `prioritized` and counts against the whole budget, not the slow share.
 
 All `JobOutbox` writes — accumulator flushes AND the drain — run through one shared serialized queue (`flushQueue` / `runOnOutboxQueue`, via `createSerializedQueue`), so a flush and a drain can never touch the table concurrently.
 
@@ -548,7 +548,6 @@ Defined in the env schema (`apps/api/src/config/env.ts`), read lazily through `o
 | `JOBS_MAX_QUEUE_DEPTH` | `10000` | Depth cap that trips overflow |
 | (derived) | `0.8 × cap` | Low-water mark for clearing |
 | `JOBS_OUTBOX_FLUSH_MAX_ROWS` | `1000` | Accumulator size-flush threshold |
-| `JOBS_OUTBOX_FLUSH_LINGER_MS` | `200` | Accumulator partial-batch linger |
 | `JOBS_OVERFLOW_TTL_MS` | `60000` | Flag TTL (drain heartbeats it) |
 | `JOBS_OVERFLOW_STUCK_MS` | `300000` | Age before stuck-overflow warning |
 
