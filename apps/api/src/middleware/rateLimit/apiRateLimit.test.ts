@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { db, getRedisClient } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { apiRateLimit } from '#/middleware/rateLimit/apiRateLimit';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
@@ -38,11 +38,6 @@ const overTheLimit = async (
 describe('apiRateLimit', () => {
   afterEach(async () => {
     await cleanupTouchedTables(db);
-  });
-
-  beforeEach(async () => {
-    const keys = await getRedisClient().keys('limit:api:*');
-    if (keys.length) await getRedisClient().del(...keys);
   });
 
   it('limits an ordinary request past the principal max', async () => {
