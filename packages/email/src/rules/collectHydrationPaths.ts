@@ -6,12 +6,9 @@
  */
 import type { Condition } from '@inixiative/json-rules';
 import {
-  EACH,
-  IF,
-  parseEachBlock,
-  parseIfBlock,
   RESERVED_SCOPE_ROOTS,
   TOKEN_PATTERN,
+  visitTemplateBlocks,
 } from '@template/email/render/conditionParser';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
@@ -94,56 +91,20 @@ const collectTokenPaths = (text: string, bindings: BindingChain, out: Set<string
   }
 };
 
-const collectFromContent = (content: string, bindings: BindingChain, out: CollectedPaths): void => {
-  let i = 0;
-  while (i < content.length) {
-    const ifIdx = content.indexOf(IF, i);
-    const eachIdx = content.indexOf(EACH, i);
-    if (ifIdx === -1 && eachIdx === -1) break;
-
-    const kind: 'if' | 'each' = eachIdx === -1 || (ifIdx !== -1 && ifIdx < eachIdx) ? 'if' : 'each';
-    const openIdx = kind === 'if' ? ifIdx : eachIdx;
-
-    collectTokenPaths(content.slice(i, openIdx), bindings, out.fieldPaths);
-
-    if (kind === 'if') {
-      const block = parseIfBlock(content, openIdx);
-      if (!block) {
-        i = openIdx + IF.length;
-        continue;
+const collectFromContent = (content: string, out: CollectedPaths): void =>
+  visitTemplateBlocks(content, {
+    text: (text, { bindings }) => collectTokenPaths(text, bindings, out.fieldPaths),
+    branch: ({ rule }, _branchIndex, _position, { bindings }) => {
+      if (rule) collectRuleFieldPaths(rule, bindings, out);
+    },
+    loop: ({ filter }, { iterated, bindings }) => {
+      if (iterated) {
+        out.fieldPaths.add(iterated);
+        out.eachLoopPaths.add(iterated);
       }
-      for (const branch of block.branches) {
-        if (branch.kind !== 'else' && branch.rule)
-          collectRuleFieldPaths(branch.rule, bindings, out);
-        collectFromContent(branch.body, bindings, out);
-      }
-      i = block.end;
-      continue;
-    }
-
-    const block = parseEachBlock(content, openIdx);
-    if (!block) {
-      i = openIdx + EACH.length;
-      continue;
-    }
-
-    const resolvedPath = resolveBindingPath(block.path, bindings);
-    if (resolvedPath) {
-      out.fieldPaths.add(resolvedPath);
-      out.eachLoopPaths.add(resolvedPath);
-    }
-
-    const nextBindings: BindingChain = new Map(bindings);
-    if (block.as) nextBindings.set(block.as, resolvedPath);
-    if (block.index) nextBindings.set(block.index, undefined);
-    if (block.filter) collectRuleFieldPaths(block.filter, nextBindings, out);
-    collectFromContent(block.body, nextBindings, out);
-
-    i = block.end;
-  }
-
-  collectTokenPaths(content.slice(i), bindings, out.fieldPaths);
-};
+      if (filter) collectRuleFieldPaths(filter, bindings, out);
+    },
+  });
 
 export const collectHydrationPaths = (
   content: string,
@@ -153,7 +114,7 @@ export const collectHydrationPaths = (
     eachLoopPaths: new Set(),
     rulePaths: new Set(),
   };
-  collectFromContent(content, new Map(), out);
+  collectFromContent(content, out);
   return {
     fieldPaths: [...out.fieldPaths],
     eachLoopPaths: [...out.eachLoopPaths],
