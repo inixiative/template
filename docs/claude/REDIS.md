@@ -321,12 +321,12 @@ if the key's generation is still the one read before the compute. An exact clear
 process, moves the generation, wins and leaves a miss. A key the transaction neither wrote nor computed a
 publishable value for sends nothing. A rollback sends nothing. The calls run in two groups:
 
-- Marked keys (`publishWritten`), before the transaction releases its held locks and before its
+- Marked keys, before the transaction releases its held locks and before its
   `db.onCommit` batches, so a waiter on one of those locks never reads the value the write replaced.
   A failure here is loud: the clear may not have run,
   so `db.txn` throws it after its `db.onCommit` batches have run. A write that committed then reports
   an error, so a caller that retries on error must be idempotent.
-- Keys the transaction only read (`publishWarm`), after the held locks are released, so a large batch
+- Keys the transaction only read, after the held locks are released, so a large batch
   does not hold them for one call per key, and before the `db.onCommit` batches. The generation check
   makes the late publish safe against a write that commits in between and clears the key exactly,
   which is how the clear-cache hook clears. A failure leaves Redis as it was and only costs the

@@ -526,12 +526,12 @@ db.onCommit(async () => {
 The outermost `db.txn` runs its end-of-transaction work in this order:
 
 1. Prisma commits or rolls back the transaction.
-2. On commit, the cache keys the transaction wrote are cleared (`publishWritten`, see
+2. On commit, the cache keys the transaction wrote are cleared through `db.parallel(..., { resolution: 'allSettled' })`, so every key runs (see
    [REDIS.md § cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)). A failure is
    kept, not thrown yet.
 3. The transaction is marked settled and its finally queue drains, commit or rollback. This releases
    every lock held until the transaction settles.
-4. On commit, the values the transaction only read are published (`publishWarm`). A failure counts
+4. On commit, the values the transaction only read are published the same way. A failure counts
    `cache.publish.failed` and is not thrown.
 5. The `db.onCommit` batches run in order.
 6. `db.txn` throws if a batch or a step-2 clear failed (one error, or an `AggregateError` with the
