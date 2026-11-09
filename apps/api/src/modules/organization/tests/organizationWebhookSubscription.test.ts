@@ -1,14 +1,4 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  mock,
-  spyOn,
-} from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import type {
   Organization,
   OrganizationUser,
@@ -32,7 +22,7 @@ describe('organization/webhookSubscriptions', () => {
   let org: Organization;
   let orgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'member' });
     orgUser = entity;
     user = context.user;
@@ -62,7 +52,7 @@ describe('organization/webhookSubscriptions', () => {
     mock.restore();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, revive, unregisterDbHook } from '@template/db';
 import { ContactOwnerModel, InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
@@ -15,10 +15,12 @@ import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 
-registerSoftDeleteCascadeHook();
-registerMemberSelfGrantHook();
-registerRulesHook();
-registerContactRulesHook();
+beforeEach(() => {
+  registerSoftDeleteCascadeHook();
+  registerMemberSelfGrantHook();
+  registerRulesHook();
+  registerContactRulesHook();
+});
 
 const spaceById = (id: string) => db.withDeleted(() => db.space.findUnique({ where: { id } }));
 const contactById = (id: string) => db.withDeleted(() => db.contact.findUnique({ where: { id } }));
@@ -38,7 +40,7 @@ const tombstoneOrg = (id: string) =>
 const reviveOrg = (id: string) => revive(db.organization, { id });
 
 describe('softDeleteCascade hook', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

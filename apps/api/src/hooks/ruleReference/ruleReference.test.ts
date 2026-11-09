@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import {
   cleanupTouchedTables,
@@ -60,14 +60,14 @@ const edgesOf = (where: Record<string, unknown>) =>
 const refKey = (model: string, id: string) => `${model}|${id}`;
 
 describe('ruleReference — the save path writes edges, the target side stamps them', () => {
-  beforeAll(() => {
+  beforeEach(() => {
     registerPreventHardDeleteHook();
     registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     clearHookRegistry();
     await cleanupTouchedTables(db);
   });

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, RuleReferenceError, unregisterDbHook } from '@template/db';
 import type { Organization, Segment, Tag } from '@template/db/generated/client/client';
 import {
@@ -56,7 +56,7 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
   let mySegment: Segment;
   let theirSegment: Segment;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
@@ -91,7 +91,7 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
       .entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

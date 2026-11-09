@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
@@ -8,7 +8,7 @@ import { validateNoCycle } from '@template/email/validations/validateNoCycle';
 const ctx: OwnerScope = { ownerModel: 'default', locale: 'en' };
 
 describe('validateNoCycle', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

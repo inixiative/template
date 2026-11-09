@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { claimLane, db, getJobSupersededBy, laneKey, watchLane } from '@template/db';
 import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
@@ -108,7 +108,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   const poison = new Set<string>(); // handlerNames whose queue.add throws — drives the quarantine path
   let restoreQueueSpies = (): void => {};
 
-  beforeAll(() => {
+  beforeEach(() => {
     ctx = createTestWorker();
 
     const add = spyOn(queue, 'add').mockImplementation((async (
@@ -154,7 +154,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await ctx.queue.redis.flushdb(); // clears the flag
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     restoreQueueSpies();
     await cleanupTouchedTables(db);
     await ctx.queue.redis.flushdb();

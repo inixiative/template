@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { afterAll, afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { DbAction, db, HookTiming, registerDbHook, unregisterDbHook } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createEmailTemplate } from '@template/db/test';
 import { recomputeDegradedComponentRefs } from '@template/email/render/recomputeDegradedComponentRefs';
@@ -12,7 +12,7 @@ import { recomputeDegradedComponentRefs } from '@template/email/render/recompute
 const cardBody = '{{#slot:inner:default}}{{#component:x}}{{/component:x}}{{/slot:inner:default}}';
 
 describe('recomputeDegradedComponentRefs', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

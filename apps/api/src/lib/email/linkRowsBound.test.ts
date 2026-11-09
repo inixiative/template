@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { CommunicationStatus } from '@template/db/generated/client/enums';
 import {
@@ -54,7 +54,7 @@ const fixture = async () => {
   return { mine, user };
 };
 
-beforeAll(() => {
+beforeEach(() => {
   emailRegistry.register(ADAPTER, {
     send: async (options) => {
       sent.push(options);
@@ -69,7 +69,7 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-afterAll(async () => {
+afterEach(async () => {
   emailRegistry.unregister(ADAPTER);
   await cleanupTouchedTables(db);
 });

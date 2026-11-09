@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type {
   Organization,
@@ -58,7 +58,7 @@ describe('a token of an organization member acts as that member, never as the us
   const status = async (method: string, path: string, body?: unknown) =>
     (await call(method, path, body)).status;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: user } = await createUser());
     ({ entity: organization } = await createOrganization());
     ({ entity: otherOrganization } = await createOrganization());
@@ -76,7 +76,7 @@ describe('a token of an organization member acts as that member, never as the us
     ));
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

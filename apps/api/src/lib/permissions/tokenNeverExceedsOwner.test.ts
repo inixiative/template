@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, Role, Space } from '@template/db/generated/client/client';
 import {
@@ -56,12 +56,12 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
     entitlements: Actions = null,
   ) => token('User', organizationUser, role, entitlements);
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

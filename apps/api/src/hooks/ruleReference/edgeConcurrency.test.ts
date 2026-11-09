@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { type Condition, Operator } from '@inixiative/json-rules';
 import {
   clearHookRegistry,
@@ -70,7 +70,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
   let space: Space;
   let owner: { ownerModel: string; ownerId: string };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerPreventHardDeleteHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
@@ -86,7 +86,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
     owner = { ownerModel: 'Space', ownerId: space.id };
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     clearHookRegistry();
     await cleanupTouchedTables(db);
   });

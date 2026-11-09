@@ -1,11 +1,11 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser, createUser } from '@template/db/test';
 import { app } from '#/app';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

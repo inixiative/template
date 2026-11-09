@@ -42,6 +42,16 @@ bun run --cwd apps/api test        # Run API tests only
 bun run --cwd packages/db test     # Run DB package tests only
 ```
 
+### Order
+
+Every suite runs in random order (`randomize = true` under `[test]` in each workspace's `bunfig.toml`): Bun shuffles the test files and the tests inside each file, and prints the seed it used (`--seed=3777827461`). A test may not rely on another test or another file having run first. To replay a failing run, pass its seed: `bun run --cwd apps/api test --seed=3777827461`.
+
+Three things keep a test independent of what ran before it:
+
+- **Rows:** seed in `beforeEach`, clean in `afterEach` ([Cleanup](#cleanup)).
+- **Database hooks:** register in `beforeEach` or `beforeAll`, never at import time, and clear what the file registered ([Hooks in tests](#hooks-in-tests)).
+- **Everything else that outlives a test** (spies, env overrides, timers, cached keys): restore it in the test that changed it.
+
 ### Concurrency
 
 DB-backed tests must run with `--max-concurrency=1` to prevent cross-file interference. Every test process tracks the tables it writes in one shared set (see [Cleanup](#cleanup)); concurrent file execution would let `cleanupTouchedTables` from one file clear tables another file is still using.
@@ -84,14 +94,14 @@ modules/user/
 ### Basic Test
 
 ```typescript
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestApp } from '#tests/createTestApp';
 import { createUser } from '@template/db/test';
 
 describe('userRead', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const harness = createTestApp({ ... });
     fetch = harness.fetch;
   });
@@ -298,10 +308,30 @@ foreignKey: 'webhookSubscriptionId'
 
 Some database rules (`apps/api/src/hooks/rules/registry.ts`) hold only for rows production writes through every hook. A test that turns on the rules hook (`registerRulesHook()`) also turns on the hooks production pairs it with, so factory rows pass the same rules:
 
-- **Members:** every `OrganizationUser` and `SpaceUser` must hold its self-grant (`memberSelfGrantRules`), which the `memberSelfGrant` hook writes on create. Call `registerMemberSelfGrantHook()` beside `registerRulesHook()`, and unregister `memberSelfGrant` wherever the file unregisters the rules hook.
+- **Members:** every `OrganizationUser` and `SpaceUser` must hold its self-grant (`memberSelfGrantRules`), which the `memberSelfGrant` hook writes on create. Call `registerMemberSelfGrantHook()` beside `registerRulesHook()`.
 - **Integrations and tokens:** a delegate that is not `full` must have a role, entitlements or both. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements.
 
-How a test file turns hooks on and off is not yet uniform across the suite ([TEST-002](../../tickets/TEST-002-hook-registration-in-tests.md)).
+### Hooks in tests
+
+The hook registry is one per test process. A test file gets the hooks it registers and no others:
+
+```typescript
+beforeEach(() => {
+  registerMemberSelfGrantHook();
+  registerRulesHook();
+});
+
+afterEach(async () => {
+  await cleanupTouchedTables(db);
+  clearHookRegistry();
+});
+```
+
+- **Register in `beforeEach` or `beforeAll`, never at import time.** A registration at the top of a file runs once, when the module loads, and is gone after the first clear.
+- **Clear with `clearHookRegistry()`** (or restore a `snapshotHookRegistry()`). Unregistering by name is for a hook one test turns on and off inside a `try`/`finally`.
+- `scripts/ci/rules/test-hooks-cleared.sh` fails a test file that registers hooks and never clears them, or registers at import time.
+
+What remains open is a helper that registers a hook with the hooks production pairs it with ([TEST-002](../../tickets/TEST-002-hook-registration-in-tests.md)).
 
 ### Cleanup
 
@@ -310,14 +340,14 @@ Tests are DB-backed: they write real rows through the real client with the facto
 ```typescript
 import { cleanupTouchedTables } from '@template/db/test';
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 ```
 
 - **The tracker is always on.** `packages/db/src/client.ts` calls `registerTestTracker()` when the client loads; in a test environment it records every table a create/update/upsert/delete touches (outside test it's a no-op). Never call `registerTestTracker()` in a test file: `scripts/lint/check-test-tracker-registration.sh` fails it.
 - **`cleanupTouchedTables(db)` empties those tables** and resets the set (`packages/db/src/test/testTracker.ts`). It bypasses the soft-delete scope, so soft-deleted rows go too.
-- **Cleanup is per file.** Most files seed in `beforeAll` and clean in `afterAll`. Clean in `afterEach` only when every test seeds its own rows; a per-test cleanup deletes a `beforeAll` seed.
+- **Cleanup is per test.** Seed in `beforeEach` and clean in `afterEach`, so no test sees another test's rows and the order they run in does not matter. A `beforeAll` seed would be deleted by the first test's cleanup.
 - **Never delete rows by hand** (`delete`/`deleteMany`/`TRUNCATE`/`DELETE FROM`) in an after hook: `scripts/lint/check-test-hand-cleanup.sh` fails it. A hand delete either duplicates the cleanup or hides a write the tracker missed; fix the blind spot instead. Ruling: [DB-004](../../tickets/DB-004-test-tracker-always-on.md).
 
 ### Test Data Patterns

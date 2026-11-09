@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db, snapshotHookRegistry } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
@@ -9,12 +9,12 @@ import {
 
 let restoreHooks: () => void;
 
-beforeAll(() => {
+beforeEach(() => {
   restoreHooks = snapshotHookRegistry();
   registerImmutableFieldsHook();
 });
 
-afterAll(async () => {
+afterEach(async () => {
   restoreHooks();
   await cleanupTouchedTables(db);
 });
@@ -28,7 +28,7 @@ describe('immutableFields hook', () => {
     clearImmutableFieldsCache();
   });
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: orgUser } = await createOrganizationUser();
     userId = orgUser.userId;
     orgId = orgUser.organizationId;

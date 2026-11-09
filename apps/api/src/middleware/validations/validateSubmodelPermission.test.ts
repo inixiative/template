@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { z } from '@hono/zod-openapi';
-import { db, type HydratedRecord, hydrate, unregisterDbHook } from '@template/db';
+import { clearHookRegistry, db, type HydratedRecord, hydrate } from '@template/db';
 import type { Organization, Role, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -22,9 +22,9 @@ import { Modules } from '#/modules/modules';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
-beforeAll(() => registerClearCacheHook());
-afterAll(async () => {
-  unregisterDbHook('clearCache');
+beforeEach(() => registerClearCacheHook());
+afterEach(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 
@@ -65,7 +65,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
 
   const orgRoles = ['owner', 'admin', 'member', 'viewer'] as const;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
     for (const role of orgRoles) {
@@ -221,7 +221,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
     let callers: Record<string, Headers>;
     const memberTokenOutcome = { memberToken: 'unauthenticated' };
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       const { entity: organizationUser } = await createOrganizationUser(
         { role: 'owner' },
         { organization },

@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
+  clearHookRegistry,
   DbAction,
   db,
   getRedisClient,
@@ -19,9 +20,9 @@ import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
-beforeAll(() => registerClearCacheHook());
-afterAll(async () => {
-  unregisterDbHook('clearCache');
+beforeEach(() => registerClearCacheHook());
+afterEach(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

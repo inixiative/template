@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { CommunicationReasonCode } from '@template/db/generated/client/enums';
 import {
@@ -28,7 +28,7 @@ describe('deliverEmail — send-time component version closure', () => {
 
   let fan: { id: string };
 
-  beforeAll(() => {
+  beforeEach(() => {
     registerAuditLogHook();
     registerEmailVersioningHook();
     const recorder: EmailClient = {
@@ -49,7 +49,7 @@ describe('deliverEmail — send-time component version closure', () => {
     fan = (await createUser({ email: 'fan@example.com' })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     emailRegistry.unregister(ADAPTER);
     clearHookRegistry();
     await cleanupTouchedTables(db);

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { CronJobScalarSchema, OrganizationScalarSchema } from '@template/db';
 import type { CronJob, Organization, User } from '@template/db/generated/client/client';
 import {
@@ -92,7 +92,7 @@ describe('resourceContextMiddleware', () => {
   let deletedOrg: Organization;
   let cronJob: CronJob;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
@@ -124,7 +124,7 @@ describe('resourceContextMiddleware', () => {
     });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

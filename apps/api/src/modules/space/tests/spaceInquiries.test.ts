@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   Inquiry,
   Organization,
@@ -37,7 +37,7 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
   let adminSu: SpaceUser;
   let otherSpace: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -64,7 +64,7 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -127,7 +127,7 @@ describe('POST /api/v1/space/:id/inquiries', () => {
   let adminSu: SpaceUser;
   let targetOrg: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -154,7 +154,7 @@ describe('POST /api/v1/space/:id/inquiries', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -205,7 +205,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
   let ownerSu: SpaceUser;
   let otherSpace: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     owner = u;
     const { entity: o } = await createOrganization();
@@ -232,7 +232,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

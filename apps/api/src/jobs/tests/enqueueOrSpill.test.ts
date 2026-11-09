@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
@@ -20,7 +20,7 @@ describe('enqueueOrSpill', () => {
   let refuseNextAdd = false;
   let restore = (): void => {};
 
-  beforeAll(() => {
+  beforeEach(() => {
     const add = spyOn(queue, 'add').mockImplementation((async (
       _name: string,
       _data: unknown,
@@ -65,7 +65,7 @@ describe('enqueueOrSpill', () => {
     await cleanupTouchedTables(db);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     restore();
     await cleanupTouchedTables(db);
   });

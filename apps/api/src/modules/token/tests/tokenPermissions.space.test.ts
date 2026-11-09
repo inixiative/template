@@ -4,7 +4,7 @@
  * @partOf feature:auth
  * @uses primitive:authz, infrastructure:prisma
  */
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
@@ -18,7 +18,7 @@ describe('Space token bearer authentication', () => {
   let space: Space;
   let sibling: Space;
   let unrelated: Space;
-  const key = Bun.randomUUIDv7();
+  let key: string;
   const { fetch } = createTestApp({
     mount: [
       (app) => app.use('*', tokenAuthMiddleware),
@@ -34,7 +34,8 @@ describe('Space token bearer authentication', () => {
       }),
     );
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    key = Bun.randomUUIDv7();
     const created = await createSpace();
     space = created.entity;
     sibling = (await createSpace({}, { organization: created.context.organization })).entity;
@@ -50,7 +51,7 @@ describe('Space token bearer authentication', () => {
     );
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

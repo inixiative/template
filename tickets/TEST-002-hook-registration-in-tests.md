@@ -1,10 +1,10 @@
 # TEST-002: One way to turn database hooks on and off in tests
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 Mostly done (2026-11-09): one pattern, every file moved, documented, CI rule added. The pairing helper is still open.
 **Assignee**: Unassigned
 **Priority**: Medium
 **Created**: 2026-10-31
-**Updated**: 2026-10-31
+**Updated**: 2026-11-09
 
 ---
 
@@ -29,11 +29,11 @@ Found while adding the member self-grant rule (PR #232): the rules hook refuses 
 
 ## Tasks
 
-- [ ] Pick the pattern (likely `snapshotHookRegistry()` in `beforeAll` and the restore in `afterAll`, since it returns the registry exactly as it was).
-- [ ] Move every test file to it, including `orderedList/tests/setup.ts`.
+- [x] Pick the pattern: register in `beforeEach` (or `beforeAll`), clear with `clearHookRegistry()` in the matching after hook; `snapshotHookRegistry()` and its restore stay valid. Chosen with random test order (Aron, 2026-11-09: "tests need to register and clean their hooks").
+- [x] Move every test file to it, including `orderedList/tests/setup.ts` (now `setupOrderedListTests()`, called by each file).
 - [ ] A helper that registers a hook together with the hooks production pairs it with (the rules hook with the member self-grant hook).
-- [ ] Document it in `docs/claude/TESTING.md`.
-- [ ] Optionally, a CI rule that refuses `unregisterDbHook` in test files once the move is done.
+- [x] Document it in `docs/claude/TESTING.md` (Hooks in tests).
+- [x] A CI rule: `scripts/ci/rules/test-hooks-cleared.sh` fails a test file that registers hooks and never clears them, or registers at import time. It still allows `unregisterDbHook` for a hook one test turns on and off.
 
 ---
 

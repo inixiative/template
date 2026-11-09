@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -20,9 +20,9 @@ import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
-beforeAll(() => registerClearCacheHook());
-afterAll(async () => {
-  unregisterDbHook('clearCache');
+beforeEach(() => registerClearCacheHook());
+afterEach(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 
@@ -44,7 +44,7 @@ describe('removing an organization member, through the route', () => {
   };
   const path = (row: OrganizationUser) => `/organizationUser/${row.id}`;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     await member('owner');
   });
@@ -112,7 +112,7 @@ describe('removing a space member, through the route', () => {
   };
   const path = (row: SpaceUser) => `/spaceUser/${row.id}`;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
   });

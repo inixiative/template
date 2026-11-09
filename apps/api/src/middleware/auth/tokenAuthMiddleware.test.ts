@@ -1,11 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   type AccessorName,
   cacheKey,
+  clearHookRegistry,
   db,
   fetchOne,
   getRedisClient,
-  unregisterDbHook,
 } from '@template/db';
 import type {
   Organization,
@@ -31,9 +31,9 @@ import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 // Member and user changes reach the next request through the cache hooks the app registers.
-beforeAll(() => registerClearCacheHook());
-afterAll(async () => {
-  unregisterDbHook('clearCache');
+beforeEach(() => registerClearCacheHook());
+afterEach(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 
@@ -98,7 +98,7 @@ describe('an OrganizationUser token follows its member row, not the cached token
     return entity;
   };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     organizationPath = `/api/v1/organization/${organization.id}`;
   });
@@ -176,7 +176,7 @@ describe('a SpaceUser token follows its member row, not the cached token', () =>
     return { organizationUser, spaceUser };
   };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
     spacePath = `/api/v1/space/${space.id}`;

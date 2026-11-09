@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   Organization,
   OrganizationUser,
@@ -38,7 +38,7 @@ describe('SpaceUser Token Permissions', () => {
   let _viewerOrgUser: OrganizationUser;
   let _viewerSpaceUser: SpaceUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     // Create org and space first
     const { entity: o } = await createOrganization();
     org = o;
@@ -86,7 +86,7 @@ describe('SpaceUser Token Permissions', () => {
     db = createTestApp().db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import {
   clearHookRegistry,
@@ -76,7 +76,7 @@ const revive = (model: 'emailTemplate' | 'segment' | 'tag', id: string) =>
 describe('ruleReference — a source takes its edges with it and brings them back', () => {
   let space: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerPreventHardDeleteHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
@@ -91,7 +91,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     clearHookRegistry();
     await cleanupTouchedTables(db);
   });

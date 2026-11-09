@@ -9,8 +9,11 @@ import {
   phone,
   positions,
   posOf,
+  setupOrderedListTests,
   softDelete,
 } from '#/hooks/orderedList/tests/setup';
+
+setupOrderedListTests();
 
 describe('soft delete', () => {
   it('negates position and compacts siblings', async () => {

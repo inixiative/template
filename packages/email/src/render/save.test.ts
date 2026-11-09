@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import {
@@ -22,7 +22,7 @@ const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
 
 describe('saveEmailTemplate', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -618,7 +618,7 @@ describe('saveEmailTemplate — the lens decides at save', () => {
   const lens = emailLens({ sender: lensFor('Organization') });
   const strict = emailLens();
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

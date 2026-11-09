@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test';
+import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailTemplate } from '@template/db/test';
 import type { SendEmailOptions } from '@template/email/client/types';
@@ -15,7 +15,7 @@ const verifier = spyOn(emailVerifier, 'verify').mockImplementation(async (email)
   status: 'deliverable',
 }));
 
-beforeAll(() => {
+beforeEach(() => {
   for (const { name } of adapters) emailRegistry.unregister(name);
   emailRegistry.register('signup-recorder', {
     send: async (options) => {
@@ -28,7 +28,7 @@ beforeAll(() => {
   });
 });
 
-afterAll(async () => {
+afterEach(async () => {
   verificationEvent.mockRestore();
   verifier.mockRestore();
   emailRegistry.unregister('signup-recorder');

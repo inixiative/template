@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
@@ -55,7 +55,7 @@ const variables = given({
 describe('settleTemplate — the registry entry decides what an issue does', () => {
   let organization: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
@@ -72,7 +72,7 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     );
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });
@@ -260,7 +260,7 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
       data: {},
     });
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerMemberSelfGrantHook();
     registerRulesHook();
     registerRuleReferenceHook();
@@ -319,7 +319,7 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
     await db.tag.update({ where: { id: goneTag.id }, data: { deletedAt: new Date() } });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

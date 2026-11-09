@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
@@ -22,7 +22,7 @@ describe('GET /me/providers', () => {
   let org: Organization;
   let space: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
@@ -40,7 +40,7 @@ describe('GET /me/providers', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

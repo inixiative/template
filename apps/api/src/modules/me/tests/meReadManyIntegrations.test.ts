@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Integration, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -22,7 +22,7 @@ describe('GET /api/v1/me/integrations', () => {
   let names: [string, string, string];
   let customName: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
     const { entity: other } = await createUser();
@@ -80,7 +80,7 @@ describe('GET /api/v1/me/integrations', () => {
     await db.integration.update({ where: { id: removed.id }, data: { deletedAt: new Date() } });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

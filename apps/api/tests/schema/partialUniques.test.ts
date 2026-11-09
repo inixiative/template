@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import {
   ContactType,
@@ -35,15 +35,17 @@ import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 // (tag↔category check). We avoid registerHooks() because it also wires up
 // the outbound webhook hook which signs payloads with PEM keys not present
 // in the test env.
-registerMemberSelfGrantHook();
-registerRulesHook();
-registerContactRulesHook();
-registerTagOwnerCategoryHook();
+beforeEach(() => {
+  registerMemberSelfGrantHook();
+  registerRulesHook();
+  registerContactRulesHook();
+  registerTagOwnerCategoryHook();
+});
 
 const seq = (prefix: string) => `${prefix}-${getNextSeq()}`;
 
 describe('partial unique constraints', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

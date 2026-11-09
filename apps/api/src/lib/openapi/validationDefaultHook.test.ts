@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { z } from '@hono/zod-openapi';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
@@ -46,7 +46,7 @@ const expectValidationEnvelope = async (response: Response) => {
 };
 
 describe('validationDefaultHook', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { db } from '@template/db';
 import { CommunicationReasonCode, CommunicationStatus } from '@template/db/generated/client/enums';
 import {
@@ -48,7 +48,7 @@ describe('deliverEmailMessage — claim policy', () => {
 
   let fan: { id: string };
 
-  beforeAll(() => {
+  beforeEach(() => {
     const recorder: EmailClient = {
       send: async (options) => {
         attempts.push(options);
@@ -80,7 +80,7 @@ describe('deliverEmailMessage — claim policy', () => {
     await cleanupTouchedTables(db);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     emailRegistry.unregister(ADAPTER);
     await cleanupTouchedTables(db);
   });
@@ -206,7 +206,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
   const sleep = async (): Promise<void> => {};
   const RENDER_ADAPTER = 'send-time-recipient';
 
-  beforeAll(() => {
+  beforeEach(() => {
     emailRegistry.register(RENDER_ADAPTER, {
       send: async (options) => {
         sent.push(options);
@@ -221,7 +221,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     await cleanupTouchedTables(db);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     emailRegistry.unregister(RENDER_ADAPTER);
     await cleanupTouchedTables(db);
   });

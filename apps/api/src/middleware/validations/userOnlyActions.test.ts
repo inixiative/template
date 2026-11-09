@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type {
   Organization,
@@ -59,14 +59,14 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
     url: `https://example.com/${Bun.randomUUIDv7()}`,
   });
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: user } = await createUser());
     ({ entity: superadmin } = await createUser({ platformRole: 'superadmin' }));
     ({ entity: organization } = await createOrganization());
     ({ entity: member } = await createOrganizationUser({ role: 'owner' }, { user, organization }));
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

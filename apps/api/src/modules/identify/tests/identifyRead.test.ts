@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createOrganization, createUser } from '@template/db/test';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
@@ -9,7 +9,7 @@ import { createKeyedToken } from '#tests/utils/createKeyedToken';
 type Identified = { data: { model: string; record: Record<string, unknown> } };
 
 describe('GET /identify: who the credential is, for any actor (Aron, 2026-10-26)', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
