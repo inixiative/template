@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
@@ -40,7 +40,7 @@ const createScheduledCronJob = async () => {
   return entity;
 };
 
-beforeAll(async () => {
+beforeEach(async () => {
   registerCronJobSyncHook();
   jobs = await connectRealJobsQueue();
   const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
@@ -54,7 +54,7 @@ afterEach(async () => {
   await jobs.realQueue.obliterate({ force: true });
 });
 
-afterAll(async () => {
+afterEach(async () => {
   clearHookRegistry();
   await jobs.close();
   await cleanupTouchedTables(db);

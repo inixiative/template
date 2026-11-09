@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser, createToken } from '@template/db/test';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
@@ -16,7 +16,7 @@ describe('DELETE /token/:id', () => {
   let org: Organization;
   let orgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = entity;
     user = context.user;
@@ -31,7 +31,7 @@ describe('DELETE /token/:id', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -75,12 +75,12 @@ describe('DELETE /token/:id', () => {
 describe('a token deletes tokens: it only removes access (R84)', () => {
   const { call } = createTokenProbeApp((hono) => hono.route('/api/v1/token', tokenRouter));
 
-  beforeAll(() => {
+  beforeEach(() => {
     registerMemberSelfGrantHook();
   });
 
-  afterAll(async () => {
-    unregisterDbHook('memberSelfGrant');
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

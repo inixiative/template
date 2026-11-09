@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, unregisterDbHook } from '@template/db';
 import { lensFor } from '@template/db/lens';
@@ -25,14 +25,14 @@ import { type EmailEntry, type RecipientTarget, registry } from '#/lib/email/reg
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { createTestApp } from '#tests/createTestApp';
 
-registerMemberSelfGrantHook();
-
-registerRulesHook();
-
-registerRuleReferenceHook();
-registerContactRulesHook();
-registerOrderedListHook();
-registerUserEmailContactHook();
+beforeEach(() => {
+  registerMemberSelfGrantHook();
+  registerRulesHook();
+  registerRuleReferenceHook();
+  registerContactRulesHook();
+  registerOrderedListHook();
+  registerUserEmailContactHook();
+});
 
 const ADAPTER = 'test-recorder';
 
@@ -81,7 +81,7 @@ describe('sendEmail handler', () => {
     added.push(slug);
   };
 
-  beforeAll(() => {
+  beforeEach(() => {
     testDb = createTestApp({}).db;
     const recorder: EmailClient = {
       send: async (options) => {
@@ -93,7 +93,7 @@ describe('sendEmail handler', () => {
     emailRegistry.register(ADAPTER, recorder);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     emailRegistry.unregister(ADAPTER);
     await cleanupTouchedTables(testDb);
     clearHookRegistry();

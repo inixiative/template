@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createContact, createUser } from '@template/db/test';
 import { messageContact } from '#/jobs/handlers/messageContact';
@@ -22,7 +22,7 @@ describe('messageContact handler', () => {
   const dispatched: DispatchedCall[] = [];
   const worker = createTestWorker();
 
-  beforeAll(() => {
+  beforeEach(() => {
     const harness = createTestApp({});
     testDb = harness.db;
 
@@ -36,7 +36,7 @@ describe('messageContact handler', () => {
     );
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     messageProviderRegistry.unregister(ContactType.whatsapp);
     await cleanupTouchedTables(testDb);
   });

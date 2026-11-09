@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type {
   Organization,
@@ -24,7 +24,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   let org: Organization;
   let adminOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     adminOrgUser = entity;
     user = context.user;
@@ -39,7 +39,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

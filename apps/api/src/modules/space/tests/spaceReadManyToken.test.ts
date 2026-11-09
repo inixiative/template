@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, Role, Space, Token } from '@template/db/generated/client/client';
 import {
@@ -30,12 +30,12 @@ describe('GET /api/v1/space/:id/tokens', () => {
     });
   };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ organization } = (await createOrganizationUser({ role: 'member' })).context);
     ({ entity: space } = await createSpace({}, { organization }));
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, hydrate, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db, hydrate } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -65,7 +65,7 @@ describe("a user's permissions, built for a user who is not the requester", () =
   let superadmin: User;
   let situations: Situation[];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerClearCacheHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: otherOrganization } = await createOrganization());
@@ -84,8 +84,8 @@ describe("a user's permissions, built for a user who is not the requester", () =
     ]);
   });
 
-  afterAll(async () => {
-    unregisterDbHook('clearCache');
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

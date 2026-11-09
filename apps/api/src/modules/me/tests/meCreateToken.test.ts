@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
@@ -14,7 +14,7 @@ describe('POST /me/tokens', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser();
     user = entity;
 
@@ -26,7 +26,7 @@ describe('POST /me/tokens', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

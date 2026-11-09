@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import { cleanupTouchedTables, createEmailTemplate, createOrganization } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render/save';
@@ -6,12 +6,13 @@ import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateS
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 
-registerMemberSelfGrantHook();
+beforeEach(() => {
+  registerMemberSelfGrantHook();
+  registerRulesHook();
+  registerEmailTemplateSlugReservationHook();
+});
 
-registerRulesHook();
-registerEmailTemplateSlugReservationHook();
-
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
   clearHookRegistry();
 });

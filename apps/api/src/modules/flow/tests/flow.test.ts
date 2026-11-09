@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -59,12 +59,12 @@ describe('flows', () => {
   let owner: User;
   let harness: Harness;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     owner = (await createUser()).entity;
     harness = harnessFor(owner, []);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(harness.db);
   });
 

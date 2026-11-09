@@ -1,5 +1,6 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { afterEach, describe, expect, it, mock } from 'bun:test';
 import {
+  clearHookRegistry,
   DbAction,
   executeHooks,
   type HookOptions,
@@ -9,6 +10,8 @@ import {
 } from '@template/db/extensions/hookRegistry';
 
 describe('mutationLifeCycle', () => {
+  afterEach(clearHookRegistry);
+
   describe('registerDbHook', () => {
     it('registers a hook for a specific model and action', async () => {
       const hookFn = mock(() => Promise.resolve());

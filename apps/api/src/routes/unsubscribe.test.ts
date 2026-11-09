@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createContact, createUser } from '@template/db/test';
@@ -9,9 +9,11 @@ import { signUnsubscribe } from '#/lib/email/unsubscribe';
 import { unsubscribeRouter } from '#/routes/unsubscribe';
 import { createTestApp } from '#tests/createTestApp';
 
-registerRulesHook();
-registerContactRulesHook();
-registerOrderedListHook();
+beforeEach(() => {
+  registerRulesHook();
+  registerContactRulesHook();
+  registerOrderedListHook();
+});
 
 const { fetch } = createTestApp({ mount: [(app) => app.route('/unsubscribe', unsubscribeRouter)] });
 
@@ -35,7 +37,7 @@ const emailContact = (
     acceptedKinds,
   });
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
   clearHookRegistry();
 });

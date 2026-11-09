@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   Integration,
   Organization,
@@ -29,7 +29,7 @@ describe('POST /api/v1/space/:id/integrations', () => {
   let space: Space;
   let adminSu: SpaceUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -54,7 +54,7 @@ describe('POST /api/v1/space/:id/integrations', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

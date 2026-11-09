@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db } from '@template/db';
@@ -65,7 +65,7 @@ describe('batch sub-requests under the owner lock', () => {
   const conditionsOf = async (segment: Segment) =>
     (await db.segment.findUnique({ where: { id: segment.id } }))?.conditions;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerSegmentConditionsHook();
     const { entity: organizationUser, context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
@@ -104,7 +104,7 @@ describe('batch sub-requests under the owner lock', () => {
     second = (await createSegment({ ownerModel: 'Space', conditions: acmeRule }, { space })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     clearHookRegistry();
     await cleanupTouchedTables(db);
   });

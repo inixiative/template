@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   type Condition,
   executePrismaPlan,
@@ -54,14 +54,14 @@ const createTenant = async (name: 'A' | 'B'): Promise<void> => {
   for (const [kind, id] of Object.entries(tenants[name])) labels.set(id, `${name}.${kind}`);
 };
 
-beforeAll(async () => {
+beforeEach(async () => {
   await createTenant('A');
   await createTenant('B');
   platformTag = (await createTag()).entity.id;
   labels.set(platformTag, 'platform.tag');
 });
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

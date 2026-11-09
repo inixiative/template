@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
@@ -263,7 +263,7 @@ describe('hydrateCascade (DB-backed)', () => {
     `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
   const ctx: OwnerScope = { ownerModel: 'default', locale: 'en' };
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

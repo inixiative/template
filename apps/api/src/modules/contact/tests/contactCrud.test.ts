@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry } from '@template/db';
 import type {
   Contact,
@@ -27,7 +27,7 @@ describe('Contact CRUD', () => {
   let org: Organization;
   let orgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerContactRulesHook();
 
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
@@ -47,7 +47,7 @@ describe('Contact CRUD', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

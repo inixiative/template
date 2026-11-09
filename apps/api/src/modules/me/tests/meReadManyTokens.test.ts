@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, User } from '@template/db/generated/client/client';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
@@ -24,7 +24,7 @@ describe('GET /me/tokens', () => {
   let user: User;
   let org: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
@@ -39,7 +39,7 @@ describe('GET /me/tokens', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -95,6 +95,7 @@ describe('GET /me/tokens', () => {
       { role: 'member' },
       { user, organization: org, organizationUser, space },
     );
+    await createToken({ name: 'User Token', ownerModel: TokenOwnerModel.User }, { user });
     await createToken(
       { name: 'Membership Token', ownerModel: TokenOwnerModel.OrganizationUser },
       { organizationUser, organization: org },
@@ -126,12 +127,13 @@ describe('GET /me/tokens', () => {
   });
 
   it('omits keyHash from response', async () => {
+    await createToken({ name: 'User Token', ownerModel: TokenOwnerModel.User }, { user });
+
     const response = await fetch(get('/api/v1/me/tokens'));
     const { data } = await json<ReadManyTokensResponse>(response);
 
-    if (data.length > 0) {
-      expect((data[0] as Record<string, unknown>).keyHash).toBeUndefined();
-      expect(data[0].keyPrefix).toBeDefined();
-    }
+    expect(data).toHaveLength(1);
+    expect((data[0] as Record<string, unknown>).keyHash).toBeUndefined();
+    expect(data[0].keyPrefix).toBeDefined();
   });
 });

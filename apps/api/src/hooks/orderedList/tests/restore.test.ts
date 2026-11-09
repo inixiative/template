@@ -9,8 +9,11 @@ import {
   positions,
   posOf,
   restore,
+  setupOrderedListTests,
   softDelete,
 } from '#/hooks/orderedList/tests/setup';
+
+setupOrderedListTests();
 
 describe('restore', () => {
   it('appends to end of live list', async () => {

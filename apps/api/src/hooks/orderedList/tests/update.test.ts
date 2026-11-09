@@ -9,8 +9,11 @@ import {
   phoneRow,
   positions,
   posOf,
+  setupOrderedListTests,
   softDelete,
 } from '#/hooks/orderedList/tests/setup';
+
+setupOrderedListTests();
 
 describe('reorder via direct position update', () => {
   it('3→1: shifts [1,3) up', async () => {

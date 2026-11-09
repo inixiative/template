@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
@@ -34,13 +34,13 @@ const invalidTemplate: SeedFile = {
   ],
 };
 
-beforeAll(() => {
+beforeEach(() => {
   registerMemberSelfGrantHook();
   registerRulesHook();
   registerRuleReferenceHook();
 });
 
-afterAll(async () => {
+afterEach(async () => {
   clearHookRegistry();
   await cleanupTouchedTables(db);
 });

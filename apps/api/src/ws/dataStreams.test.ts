@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { db, getRedisClient, redisNamespace, unregisterDbHook } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
@@ -70,7 +70,7 @@ describe('data streams (real app)', () => {
   let memberBearer: string;
   let stream: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'member' });
     member = context.user;
     organization = context.organization;
@@ -84,7 +84,7 @@ describe('data streams (real app)', () => {
 
   afterEach(() => clearRegistry());
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -356,7 +356,7 @@ describe('data streams (real app)', () => {
   describe('sequence numbers', () => {
     // Its own member, so these reads do not spend the shared member's HTTP rate-limit budget.
     let bearer: string;
-    beforeAll(async () => {
+    beforeEach(async () => {
       await initWebSocketPubSub();
       const { context } = await createOrganizationUser({ role: 'member' }, { organization });
       bearer = (await createBearerToken(context.user)).authorization;
@@ -374,6 +374,8 @@ describe('data streams (real app)', () => {
     });
 
     it('an append landing during the snapshot read is delivered once, after the snapshot, one seq past it', async () => {
+      await appendToStream(stream, { type: 'remove', payload: { id: 'before' } });
+      await settle();
       const { socket, sent } = connect(bearer);
       let release = () => {};
       const gate = new Promise<void>((resolve) => {

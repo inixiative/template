@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type { Integration, Organization, Role } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -25,7 +25,7 @@ const kinds: Kind[] = ['Organization', 'Space', 'OrganizationUser', 'SpaceUser']
 let organization: Organization;
 const integrations = {} as Record<Kind, Integration>;
 
-beforeAll(async () => {
+beforeEach(async () => {
   registerClearCacheHook();
   ({ entity: organization } = await createOrganization());
   const { entity: space } = await createSpace({}, { organization });
@@ -54,8 +54,8 @@ beforeAll(async () => {
   ).entity;
 });
 
-afterAll(async () => {
-  unregisterDbHook('clearCache');
+afterEach(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

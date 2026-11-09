@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Token, User } from '@template/db/generated/client/client';
 import {
@@ -32,7 +32,7 @@ const buildApp = (initial: { user: User; token?: Token }) =>
   });
 
 describe('spoofMiddleware via token auth', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

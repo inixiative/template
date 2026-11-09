@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -42,7 +42,7 @@ let spaceMember: SpaceUser;
 const callers: Record<string, Headers> = {};
 const rows: Record<string, string> = {};
 
-beforeAll(async () => {
+beforeEach(async () => {
   registerClearCacheHook();
   ({ entity: organization } = await createOrganization());
   ({ entity: space } = await createSpace({}, { organization }));
@@ -108,8 +108,8 @@ beforeAll(async () => {
   ).entity.id;
 });
 
-afterAll(async () => {
-  unregisterDbHook('clearCache');
+afterEach(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

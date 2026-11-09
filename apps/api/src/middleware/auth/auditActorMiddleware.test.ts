@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import {
   cleanupTouchedTables,
@@ -44,11 +44,10 @@ const echo = async (key: string, headers: Record<string, string> = {}) =>
   ).json()) as Echo;
 
 describe('an integration acts through its token, and the audit names it (Aron, 2026-10-25)', () => {
-  beforeAll(() => registerDelegatedKeysHook());
+  beforeEach(() => registerDelegatedKeysHook());
 
-  afterAll(async () => {
-    unregisterDbHook('falsePolymorphism:delegatedKeys');
-    unregisterDbHook('falsePolymorphism:delegatedKeys:upsert');
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

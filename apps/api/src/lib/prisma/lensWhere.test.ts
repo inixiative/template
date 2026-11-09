@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { lensFor } from '@template/db/lens';
@@ -128,7 +128,7 @@ describe('lensWhere — root wheres (path "")', () => {
 });
 
 describe('lensWhere — query-plan execution (count operators)', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

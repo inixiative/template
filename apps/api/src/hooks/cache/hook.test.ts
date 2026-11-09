@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { createHash } from 'node:crypto';
 import {
   cache,
@@ -42,11 +42,11 @@ const memberKeyOf = (member: { organizationId: string; userId: string }) =>
   cacheKey('organizationUser', { organizationId: member.organizationId, userId: member.userId });
 
 describe('a read through the cache inside a transaction', () => {
-  beforeAll(() => {
+  beforeEach(() => {
     registerClearCacheHook();
     registerSoftDeleteCascadeHook();
   });
-  afterAll(async () => {
+  afterEach(async () => {
     clearHookRegistry();
     await cleanupTouchedTables(db);
   });

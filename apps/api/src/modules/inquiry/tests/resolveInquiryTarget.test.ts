@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -27,7 +27,7 @@ const { fetch, db } = createTestApp({
 
 const resolve = (body: InquiryTargetBody) => fetch(post('/resolve', body));
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

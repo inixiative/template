@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { type AccessorName, db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { type AccessorName, clearHookRegistry, db } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -63,7 +63,7 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
   const mint = async (fields: Record<string, unknown>, owners: Record<string, unknown>) =>
     (await createKeyedToken({ role: 'owner', ...fields }, owners)).rawKey;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: user } = await createUser());
     ({ entity: orgA } = await createOrganization());
     ({ entity: orgB } = await createOrganization());
@@ -75,7 +75,7 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
     await createSpaceUser({ role: 'owner' }, { ...memberB.context, space: spaceB });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -159,9 +159,9 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
 });
 
 describe('a batch signs its token in again between rounds', () => {
-  beforeAll(() => registerClearCacheHook());
-  afterAll(async () => {
-    unregisterDbHook('clearCache');
+  beforeEach(() => registerClearCacheHook());
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

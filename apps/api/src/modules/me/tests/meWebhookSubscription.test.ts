@@ -1,14 +1,4 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  mock,
-  spyOn,
-} from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import type { User, WebhookSubscription } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -25,7 +15,7 @@ describe('me/webhookSubscriptions', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser();
     user = entity;
 
@@ -52,7 +42,7 @@ describe('me/webhookSubscriptions', () => {
     mock.restore();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

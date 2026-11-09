@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db, getRedisClient } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { apiRateLimit } from '#/middleware/rateLimit/apiRateLimit';
@@ -36,7 +36,7 @@ const overTheLimit = async (
 };
 
 describe('apiRateLimit', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

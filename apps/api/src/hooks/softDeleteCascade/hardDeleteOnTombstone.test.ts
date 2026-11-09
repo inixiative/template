@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
@@ -16,7 +16,9 @@ import {
   skipReviveViolations,
 } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
 
-registerSoftDeleteCascadeHook();
+beforeEach(() => {
+  registerSoftDeleteCascadeHook();
+});
 
 const tombstoneUser = (id: string) =>
   db.user.update({ where: { id }, data: { deletedAt: new Date() } });
@@ -26,7 +28,7 @@ const tombstoneIntegration = (id: string) =>
   db.integration.update({ where: { id }, data: { deletedAt: new Date() } });
 
 describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

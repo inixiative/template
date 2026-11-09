@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { cacheKey, clearKey, db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { cacheKey, clearHookRegistry, clearKey, db } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { batchRouter } from '#/modules/batch';
@@ -65,9 +65,9 @@ const memberWithToken = async (role: Role) => {
 };
 
 describe('a batch in one transaction reads its own permission changes, and a rollback leaves none behind', () => {
-  beforeAll(() => registerClearCacheHook());
-  afterAll(async () => {
-    unregisterDbHook('clearCache');
+  beforeEach(() => registerClearCacheHook());
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

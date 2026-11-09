@@ -1,8 +1,10 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 
-registerPreventHardDeleteHook();
+beforeEach(() => {
+  registerPreventHardDeleteHook();
+});
 
 const attempt = async (write: Promise<unknown>) => {
   try {

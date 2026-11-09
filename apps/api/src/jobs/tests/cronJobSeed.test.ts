@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
@@ -14,7 +14,7 @@ const seedFile: SeedFile = { ...cronJobSeeds, records: [systemSeed] };
 describe('cron job seeds sync system rows', () => {
   let jobs: Awaited<ReturnType<typeof connectRealJobsQueue>>;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerCronJobSyncHook();
     jobs = await connectRealJobsQueue();
   });
@@ -24,7 +24,7 @@ describe('cron job seeds sync system rows', () => {
     await cleanupTouchedTables(db);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     clearHookRegistry();
     await jobs.close();
   });
