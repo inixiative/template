@@ -7,7 +7,9 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
-import { isMemberSelfGrant } from '@template/permissions';
+import { memberSelfGrant } from '@template/permissions';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import type { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
@@ -27,6 +29,8 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   let adminOrgUser: OrganizationUser;
 
   beforeAll(async () => {
+    registerMemberSelfGrantHook();
+    registerRulesHook();
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     adminOrgUser = entity;
     user = context.user;
@@ -77,31 +81,34 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       });
     };
 
-    const granted = async (target: OrganizationUser): Promise<unknown[]> =>
-      (await heldEntitlements({ model: 'OrganizationUser', id: target.id })).filter(
-        (held) => !isMemberSelfGrant('db:organizationUser', target)(held),
-      );
+    const heldBy = (target: OrganizationUser): Promise<unknown[]> =>
+      heldEntitlements({ model: 'OrganizationUser', id: target.id });
+
+    const selfGrantOf = (member: OrganizationUser) =>
+      memberSelfGrant('db:organizationUser', member);
 
     const grant = async (app: ReturnType<typeof createTestApp>, entitlements: unknown) => {
       const target = await newMember();
       const response = await app.fetch(
         post(`/api/v1/organizationUser/${target.id}/entitlements`, entitlements),
       );
-      return { status: response.status, stored: await granted(target) };
+      return { status: response.status, stored: await heldBy(target), self: selfGrantOf(target) };
     };
 
     it('an admin grants a member operate on the organization', async () => {
-      expect(await grant(await writer('admin'), onOrganization('operate'))).toEqual({
+      const { status, stored, self } = await grant(
+        await writer('admin'),
+        onOrganization('operate'),
+      );
+      expect({ status, stored }).toEqual({
         status: 201,
-        stored: onOrganization('operate'),
+        stored: [self, ...onOrganization('operate')],
       });
     });
 
     it('an admin cannot grant a member own, and the member is unchanged', async () => {
-      expect(await grant(await writer('admin'), onOrganization('own'))).toEqual({
-        status: 403,
-        stored: [],
-      });
+      const { status, stored, self } = await grant(await writer('admin'), onOrganization('own'));
+      expect({ status, stored }).toEqual({ status: 403, stored: [self] });
     });
 
     it("an admin removes a member's entitlements", async () => {
@@ -115,7 +122,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         { remove: onOrganization('operate') },
       );
       expect(response.status).toBe(204);
-      expect(await granted(target)).toEqual([]);
+      expect(await heldBy(target)).toEqual([selfGrantOf(target)]);
     });
 
     const memberApp = (user: User, organizationUser: OrganizationUser) =>
