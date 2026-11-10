@@ -331,7 +331,7 @@ afterEach(async () => {
 - **Clear with `clearHookRegistry()`** (or restore a `snapshotHookRegistry()`). Unregistering by name is for a hook one test turns on and off inside a `try`/`finally`.
 - `scripts/ci/rules/test-hooks-cleared.sh` fails a test file that registers hooks and never clears them, or registers at import time.
 
-What remains open is a helper that registers a hook with the hooks production pairs it with ([TEST-002](../../tickets/TEST-002-hook-registration-in-tests.md)).
+How this was settled: [TEST-002](../../tickets/archived/TEST-002-hook-registration-in-tests.md).
 
 ### Cleanup
 
