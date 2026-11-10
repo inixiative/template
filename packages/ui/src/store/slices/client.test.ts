@@ -11,6 +11,7 @@ const recordingWebsocket = () => {
   const closes: string[] = [];
   const websocket = {
     connect: () => {},
+    disconnect: () => {},
     authenticate: () => {},
     spoof: () => {},
     unspoof: () => {},

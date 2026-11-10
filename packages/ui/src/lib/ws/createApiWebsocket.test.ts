@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { QueryClient, QueryObserver, skipToken } from '@tanstack/react-query';
 import type { WSFrameErrorFrame, WSStreamAckFrame } from '@template/shared/ws';
 import {
+  type ApiWebsocket,
   type ApiWebsocketTiming,
   createApiWebsocket,
 } from '@template/ui/lib/ws/createApiWebsocket';
@@ -53,9 +54,12 @@ const fastTiming: Partial<ApiWebsocketTiming> = {
 };
 const settled = () => wait(5);
 
-// A client has no teardown: its heartbeat and retry timers would fire into later test files.
-const abortPendingTimers = (): Promise<void> =>
-  (window as typeof window & { happyDOM: { abort: () => Promise<void> } }).happyDOM.abort();
+const clients: ApiWebsocket[] = [];
+const createClient = (...args: Parameters<typeof createApiWebsocket>): ApiWebsocket => {
+  const client = createApiWebsocket(...args);
+  clients.push(client);
+  return client;
+};
 
 describe('createApiWebsocket', () => {
   let wsSpy: ReturnType<typeof spyOn>;
@@ -71,13 +75,33 @@ describe('createApiWebsocket', () => {
       CLOSED: FakeWebSocket.CLOSED,
     });
   });
-  afterEach(async () => {
-    await abortPendingTimers();
+  afterEach(() => {
+    for (const client of clients.splice(0)) client.disconnect();
     wsSpy.mockRestore();
   });
 
+  it('disconnect closes the socket and stays closed until connect is called again', async () => {
+    const api = createClient('ws://x', undefined, {
+      ...fastTiming,
+      heartbeatMs: 2,
+      pongTimeoutMs: 4,
+    });
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    await wait(3);
+
+    api.disconnect();
+    expect(ws.readyState).toBe(FakeWebSocket.CLOSED);
+    await wait(20);
+    expect(instances).toHaveLength(1);
+
+    api.connect();
+    expect(instances).toHaveLength(2);
+  });
+
   it('drops a subscription the server rejects so it is not replayed on reconnect', () => {
-    const api = createApiWebsocket('ws://x');
+    const api = createClient('ws://x');
     api.connect();
     const ws = instances[0] as FakeWebSocket;
     open(ws);
@@ -95,7 +119,7 @@ describe('createApiWebsocket', () => {
   });
 
   it('falls back to real identity when the server rejects a spoof', () => {
-    const api = createApiWebsocket('ws://x');
+    const api = createClient('ws://x');
     api.connect();
     const ws = instances[0] as FakeWebSocket;
     open(ws);
@@ -122,7 +146,7 @@ describe('createApiWebsocket', () => {
 
   it('defers onReconnect until replayed subscriptions are acked', () => {
     let reconnected = 0;
-    const api = createApiWebsocket('ws://x', () => {
+    const api = createClient('ws://x', () => {
       reconnected++;
     });
     api.connect();
@@ -139,7 +163,7 @@ describe('createApiWebsocket', () => {
   });
 
   it('re-sends a subscribe the server dropped for load', async () => {
-    const api = createApiWebsocket('ws://x', undefined, fastTiming);
+    const api = createClient('ws://x', undefined, fastTiming);
     api.connect();
     const ws = instances[0] as FakeWebSocket;
     open(ws);
@@ -158,7 +182,7 @@ describe('createApiWebsocket', () => {
   });
 
   it('re-sends an identity frame the server dropped for load, then replays grants under it', async () => {
-    const api = createApiWebsocket('ws://x', undefined, fastTiming);
+    const api = createClient('ws://x', undefined, fastTiming);
     api.connect();
     const ws = instances[0] as FakeWebSocket;
     open(ws);
@@ -189,7 +213,7 @@ describe('createApiWebsocket', () => {
     });
 
     const connected = (timing: Partial<ApiWebsocketTiming> = fastTiming) => {
-      const api = createApiWebsocket('ws://x', undefined, timing);
+      const api = createClient('ws://x', undefined, timing);
       api.connect();
       const ws = instances[0] as FakeWebSocket;
       open(ws);
@@ -416,7 +440,7 @@ describe('createApiWebsocket', () => {
     });
 
     it('never sends an open ahead of the identity frame on a connection that is not yet open', () => {
-      const api = createApiWebsocket('ws://x', undefined, fastTiming);
+      const api = createClient('ws://x', undefined, fastTiming);
       api.connect();
       const ws = instances[0] as FakeWebSocket;
       api.authenticate('tok');
@@ -755,7 +779,7 @@ describe('createApiWebsocket', () => {
     beforeEach(() => useAppStore.setState({ client: new QueryClient() }));
 
     const connected = (timing: Partial<ApiWebsocketTiming> = fastTiming) => {
-      const api = createApiWebsocket('ws://x', undefined, timing);
+      const api = createClient('ws://x', undefined, timing);
       api.connect();
       const ws = instances[0] as FakeWebSocket;
       open(ws);

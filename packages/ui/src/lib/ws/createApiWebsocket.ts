@@ -31,6 +31,7 @@ const DEFAULT_TIMING: ApiWebsocketTiming = {
 
 export type ApiWebsocket = {
   connect: () => void;
+  disconnect: () => void;
   authenticate: (token: string) => void;
   spoof: (token: string, email: string) => void;
   unspoof: (token: string) => void;
@@ -354,6 +355,17 @@ export const createApiWebsocket = (
         socket.send({ action: 'ping' });
         pongTimer = setTimeout(() => socket.reconnect(), timing.pongTimeoutMs);
       }, timing.heartbeatMs);
+    },
+    disconnect: () => {
+      clearInterval(heartbeat);
+      heartbeat = undefined;
+      clearTimeout(pongTimer);
+      clearTimeout(reconnectAckTimer);
+      clearTimers(openAckTimers);
+      clearTimers(retryTimers);
+      for (const settler of settlers.values()) settler.cancel();
+      settlers.clear();
+      socket.close();
     },
     authenticate: (token) =>
       sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
