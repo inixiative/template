@@ -298,6 +298,9 @@ describe('Contact CRUD', () => {
       });
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(204);
+      expect(await db.contact.findUnique({ where: { id: contact.id } })).toBeNull();
+      const kept = await db.withDeleted(() => db.contact.findUnique({ where: { id: contact.id } }));
+      expect(kept?.deletedAt).toBeInstanceOf(Date);
     });
 
     it('locks deleting the email mirroring the user login (403)', async () => {
