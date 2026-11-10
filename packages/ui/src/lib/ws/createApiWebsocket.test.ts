@@ -7,7 +7,6 @@ import {
   createApiWebsocket,
 } from '@template/ui/lib/ws/createApiWebsocket';
 import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
-import { useAppStore } from '@template/ui/store';
 
 let instances: FakeWebSocket[] = [];
 
@@ -54,9 +53,14 @@ const fastTiming: Partial<ApiWebsocketTiming> = {
 };
 const settled = () => wait(5);
 
+let queryClient: QueryClient | null = null;
 const clients: ApiWebsocket[] = [];
-const createClient = (...args: Parameters<typeof createApiWebsocket>): ApiWebsocket => {
-  const client = createApiWebsocket(...args);
+const createClient = (
+  url: string,
+  onReconnect?: () => void,
+  timing?: Partial<ApiWebsocketTiming>,
+): ApiWebsocket => {
+  const client = createApiWebsocket(url, { getClient: () => queryClient, onReconnect }, timing);
   clients.push(client);
   return client;
 };
@@ -77,6 +81,7 @@ describe('createApiWebsocket', () => {
   });
   afterEach(() => {
     for (const client of clients.splice(0)) client.disconnect();
+    queryClient = null;
     wsSpy.mockRestore();
   });
 
@@ -223,7 +228,7 @@ describe('createApiWebsocket', () => {
     let client: QueryClient;
     beforeEach(() => {
       client = new QueryClient();
-      useAppStore.setState({ client });
+      queryClient = client;
     });
 
     const connected = (timing: Partial<ApiWebsocketTiming> = fastTiming) => {
@@ -790,7 +795,9 @@ describe('createApiWebsocket', () => {
 
   describe('adversarial review', () => {
     const stream = 'organizationReadManyContacts:id:org-1';
-    beforeEach(() => useAppStore.setState({ client: new QueryClient() }));
+    beforeEach(() => {
+      queryClient = new QueryClient();
+    });
 
     const connected = (timing: Partial<ApiWebsocketTiming> = fastTiming) => {
       const api = createClient('ws://x', undefined, timing);

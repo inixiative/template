@@ -4,9 +4,11 @@
  * @partOf primitive:ui, primitive:websockets
  * @uses primitive:shared
  */
+import type { QueryClient } from '@tanstack/react-query';
 import { createWebSocketClient, type WSDataEvent, type WSEvent } from '@template/shared/ws';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
 import { failDataStream } from '@template/ui/lib/ws/failDataStream';
+import type { MessageContext } from '@template/ui/lib/ws/messageContext';
 import { type DebouncedFunc, debounce } from 'lodash-es';
 
 export type ApiWebsocketTiming = {
@@ -52,9 +54,15 @@ type InboundFrame = {
   retryable?: boolean;
 };
 
+// The client is handed the query cache it writes to; it never reaches into the store that owns it.
+export type ApiWebsocketOptions = {
+  getClient: () => QueryClient | null;
+  onReconnect?: () => void;
+};
+
 export const createApiWebsocket = (
   url: string,
-  onReconnect?: () => void,
+  { getClient, onReconnect }: ApiWebsocketOptions,
   timingOverrides: Partial<ApiWebsocketTiming> = {},
 ): ApiWebsocket => {
   const timing = { ...DEFAULT_TIMING, ...timingOverrides };
@@ -107,7 +115,7 @@ export const createApiWebsocket = (
     sentOpens.delete(stream);
     lastSeqs.delete(stream);
     if (!isLive(stream)) return;
-    failDataStream(stream, 'failed');
+    failDataStream(getClient(), stream, 'failed');
     scheduleRetry(stream);
   };
 
@@ -180,14 +188,14 @@ export const createApiWebsocket = (
     lastSeqs.delete(stream);
     if (!streams.has(stream)) return;
     if (retryable) {
-      failDataStream(stream, 'failed');
+      failDataStream(getClient(), stream, 'failed');
       scheduleRetry(stream);
       return;
     }
     console.error(`ws stream open rejected: ${stream}`);
     rejectedStreams.add(stream);
     clearTimers(retryTimers, stream);
-    failDataStream(stream, 'rejected');
+    failDataStream(getClient(), stream, 'rejected');
   };
 
   // Until the next snapshot, appends on the wire are already in it.
@@ -195,6 +203,8 @@ export const createApiWebsocket = (
     lastSeqs.delete(stream);
     if (isLive(stream) && !pendingOpens.has(stream)) sendOpen(stream);
   };
+
+  const context = (): MessageContext => ({ client: getClient(), resync: resyncStream });
 
   const admitDataFrame = (event: WSDataEvent): boolean => {
     if (event.action === 'snapshot') {
@@ -302,10 +312,10 @@ export const createApiWebsocket = (
       const frame = data as InboundFrame;
       if (frame.category === 'data') {
         const event = data as WSDataEvent;
-        if (sentOpens.has(event.stream) && admitDataFrame(event)) dispatchMessage(event);
+        if (sentOpens.has(event.stream) && admitDataFrame(event)) dispatchMessage(event, context());
         return;
       }
-      if (frame.category) dispatchMessage(data as WSEvent);
+      if (frame.category) dispatchMessage(data as WSEvent, context());
       else onControlFrame(frame);
     },
     onOpen: () => {
