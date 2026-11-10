@@ -348,6 +348,7 @@ afterEach(async () => {
 - **The tracker is always on.** `packages/db/src/client.ts` calls `registerTestTracker()` when the client loads; in a test environment it records every table a create/update/upsert/delete touches (outside test it's a no-op). Never call `registerTestTracker()` in a test file: `scripts/lint/check-test-tracker-registration.sh` fails it.
 - **`cleanupTouchedTables(db)` empties those tables** and resets the set (`packages/db/src/test/testTracker.ts`). It bypasses the soft-delete scope, so soft-deleted rows go too.
 - **Cleanup is per test.** Seed in `beforeEach` and clean in `afterEach`, so no test sees another test's rows and the order they run in does not matter. A `beforeAll` seed would be deleted by the first test's cleanup.
+- **The API suite also cleans after every test on its own** (`apps/api/tests/globalSetup.ts`), so a test that writes rows through a shared fixture is covered even when its file has no cleanup.
 - **Never delete rows by hand** (`delete`/`deleteMany`/`TRUNCATE`/`DELETE FROM`) in an after hook: `scripts/lint/check-test-hand-cleanup.sh` fails it. A hand delete either duplicates the cleanup or hides a write the tracker missed; fix the blind spot instead. Ruling: [DB-004](../../tickets/DB-004-test-tracker-always-on.md).
 
 ### Test Data Patterns
