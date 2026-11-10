@@ -100,6 +100,20 @@ describe('createApiWebsocket', () => {
     expect(instances).toHaveLength(2);
   });
 
+  it('replays its subscriptions on the socket opened after a disconnect', () => {
+    const api = createClient('ws://x');
+    api.connect();
+    open(instances[0] as FakeWebSocket);
+    api.subscribe('ch1');
+
+    api.disconnect();
+    api.connect();
+    const second = instances[1] as FakeWebSocket;
+    open(second);
+
+    expect(sends(second)).toContainEqual({ action: 'subscribe', channel: 'ch1' });
+  });
+
   it('drops a subscription the server rejects so it is not replayed on reconnect', () => {
     const api = createClient('ws://x');
     api.connect();
