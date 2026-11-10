@@ -3,6 +3,7 @@ import type { Integration, Organization, User } from '@template/db/generated/cli
 import { Role } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
+  createIntegration,
   createOrganizationUser,
   createUser,
   getNextSeq,
@@ -68,8 +69,11 @@ describe('Integration CRUD', () => {
 
   describe('GET /integration/:id', () => {
     it('reads own user integration', async () => {
-      const integration = await db.integration.create({
-        data: { name: 'Own', role: 'viewer', ownerModel: 'User', userId: user.id },
+      const { entity: integration } = await createIntegration({
+        name: 'Own',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: user.id,
       });
       const response = await fetch(get(`/api/v1/integration/${integration.id}`));
       expect(response.status).toBe(200);
@@ -77,8 +81,11 @@ describe('Integration CRUD', () => {
 
     it('rejects reading another user integration (403)', async () => {
       const { entity: otherUser } = await createUser();
-      const integration = await db.integration.create({
-        data: { name: 'Foreign', role: 'viewer', ownerModel: 'User', userId: otherUser.id },
+      const { entity: integration } = await createIntegration({
+        name: 'Foreign',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: otherUser.id,
       });
       const response = await fetch(get(`/api/v1/integration/${integration.id}`));
       expect(response.status).toBe(403);
@@ -87,8 +94,11 @@ describe('Integration CRUD', () => {
 
   describe('PATCH /integration/:id', () => {
     it('updates own user integration', async () => {
-      const integration = await db.integration.create({
-        data: { name: 'Before', role: 'viewer', ownerModel: 'User', userId: user.id },
+      const { entity: integration } = await createIntegration({
+        name: 'Before',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: user.id,
       });
       const response = await fetch(
         patch(`/api/v1/integration/${integration.id}`, { name: 'After' }),
@@ -100,8 +110,11 @@ describe('Integration CRUD', () => {
 
     it('rejects updating another user integration (403)', async () => {
       const { entity: otherUser } = await createUser();
-      const integration = await db.integration.create({
-        data: { name: 'NoTouch', role: 'viewer', ownerModel: 'User', userId: otherUser.id },
+      const { entity: integration } = await createIntegration({
+        name: 'NoTouch',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: otherUser.id,
       });
       const response = await fetch(
         patch(`/api/v1/integration/${integration.id}`, { name: 'Hacked' }),
@@ -112,8 +125,11 @@ describe('Integration CRUD', () => {
 
   describe('DELETE /integration/:id', () => {
     it('tombstones own user integration — row survives, read 404s', async () => {
-      const integration = await db.integration.create({
-        data: { name: 'Doomed', role: 'viewer', ownerModel: 'User', userId: user.id },
+      const { entity: integration } = await createIntegration({
+        name: 'Doomed',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: user.id,
       });
       const response = await fetch(del(`/api/v1/integration/${integration.id}`));
       expect(response.status).toBe(204);
@@ -133,13 +149,11 @@ describe('Integration CRUD', () => {
       const { entity: memberOrgUser, context: memberContext } = await createOrganizationUser({
         role: Role.member,
       });
-      const integration = await db.integration.create({
-        data: {
-          name: 'OrgOwned',
-          role: 'viewer',
-          ownerModel: 'Organization',
-          organizationId: memberContext.organization.id,
-        },
+      const { entity: integration } = await createIntegration({
+        name: 'OrgOwned',
+        role: 'viewer',
+        ownerModel: 'Organization',
+        organizationId: memberContext.organization.id,
       });
 
       const memberApp = createTestApp({
