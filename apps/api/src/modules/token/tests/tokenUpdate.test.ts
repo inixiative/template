@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -12,9 +12,6 @@ import {
   createOrganization,
   createOrganizationUser,
 } from '@template/db/test';
-import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -24,14 +21,10 @@ import { patch } from '#tests/utils/request';
 let organization: Organization;
 
 beforeEach(async () => {
-  registerFullDelegateHook();
-  registerMemberSelfGrantHook();
-  registerRulesHook();
   ({ entity: organization } = await createOrganization());
 });
 
 afterEach(async () => {
-  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db, unregisterDbHook } from '@template/db';
 import { TagOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -9,21 +9,9 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
-
-beforeEach(() => {
-  registerMemberSelfGrantHook();
-  registerRulesHook();
-  registerTagOwnerCategoryHook();
-  registerSoftDeleteCascadeHook();
-});
 
 afterEach(async () => {
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 const tagName = (prefix: string) => `${prefix}-${getNextSeq()}`;
@@ -173,6 +161,8 @@ describe('tagOwnerCategory hook', () => {
     });
 
     it('allows moving multiple tags into another category with the same owner', async () => {
+      // A tag's category is an immutable field in production, so the move is only reachable without that hook.
+      unregisterDbHook('immutableFields');
       const { user, tags } = await createUserTags(2);
       const target = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
       const result = await db.tag.updateManyAndReturn({

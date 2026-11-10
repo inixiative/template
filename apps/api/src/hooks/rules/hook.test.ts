@@ -1,20 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { db, snapshotHookRegistry } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
-import { registerRulesHook } from '#/hooks/rules/hook';
+import { registerHooks } from '#/hooks';
 import { clearRulesCache, RulesRegistry, setRulesCache } from '#/hooks/rules/registry';
 
-let restoreHooks: () => void;
-
+// The rules hook reads the registry's models when it registers, so it is registered again with User in it.
 beforeEach(() => {
   RulesRegistry.User = true;
-  restoreHooks = snapshotHookRegistry();
-  registerRulesHook();
+  clearHookRegistry();
+  registerHooks();
 });
 
 afterEach(async () => {
-  restoreHooks();
   await cleanupTouchedTables(db);
   delete RulesRegistry.User;
 });

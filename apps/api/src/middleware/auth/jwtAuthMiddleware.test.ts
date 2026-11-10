@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -11,7 +11,6 @@ import {
 import { setEnvOverride } from '@template/shared/utils';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
 import { app } from '#/app';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { auth } from '#/lib/auth';
 import type { UserJwtHandoff } from '#/lib/auth/jwtHandoff';
 import { selfIssuer } from '#/lib/auth/userJwt';
@@ -19,10 +18,6 @@ import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 import { resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
-
-// Revocation and role changes reach the next request through the cache hooks the app registers.
-beforeEach(() => registerClearCacheHook());
-afterEach(() => clearHookRegistry());
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 

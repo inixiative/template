@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
 import { cleanupTouchedTables, createCronJob } from '@template/db/test';
-import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { isValidJobId } from '#/jobs/validateJobId';
 import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
 
@@ -15,7 +14,6 @@ describe('cron job seeds sync system rows', () => {
   let jobs: Awaited<ReturnType<typeof connectRealJobsQueue>>;
 
   beforeEach(async () => {
-    registerCronJobSyncHook();
     jobs = await connectRealJobsQueue();
   });
 
@@ -25,7 +23,6 @@ describe('cron job seeds sync system rows', () => {
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await jobs.close();
   });
 

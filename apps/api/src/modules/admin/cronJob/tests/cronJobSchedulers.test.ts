@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createCronJob, createUser } from '@template/db/test';
-import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { createTestApp } from '#tests/createTestApp';
 import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
@@ -41,7 +40,6 @@ const createScheduledCronJob = async () => {
 };
 
 beforeEach(async () => {
-  registerCronJobSyncHook();
   jobs = await connectRealJobsQueue();
   const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
   ({ fetch } = createTestApp({
@@ -55,7 +53,6 @@ afterEach(async () => {
 });
 
 afterEach(async () => {
-  clearHookRegistry();
   await jobs.close();
   await cleanupTouchedTables(db);
 });

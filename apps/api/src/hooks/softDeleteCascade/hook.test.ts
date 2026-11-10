@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, revive, unregisterDbHook } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db, revive } from '@template/db';
 import { ContactOwnerModel, InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -10,17 +10,6 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-
-beforeEach(() => {
-  registerSoftDeleteCascadeHook();
-  registerMemberSelfGrantHook();
-  registerRulesHook();
-  registerContactRulesHook();
-});
 
 const spaceById = (id: string) => db.withDeleted(() => db.space.findUnique({ where: { id } }));
 const contactById = (id: string) => db.withDeleted(() => db.contact.findUnique({ where: { id } }));
@@ -42,7 +31,6 @@ const reviveOrg = (id: string) => revive(db.organization, { id });
 describe('softDeleteCascade hook', () => {
   afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('tombstones column-bearing descendants recursively with the parent timestamp', async () => {

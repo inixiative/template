@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { ContactOwnerModel, ContactType, PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -9,18 +8,9 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { adminRouter } from '#/routes/admin';
 import { createTestApp } from '#tests/createTestApp';
 import { post } from '#tests/utils/request';
-
-// Redact runs `deleteMany` on a handful of user-owned models. The
-// preventHardDelete hook is the production gate — without registering it
-// here, tests would silently pass against a redactUser that throws in
-// prod the moment a soft-delete model is hit.
-beforeEach(() => {
-  registerPreventHardDeleteHook();
-});
 
 describe('POST /api/admin/user/:id/redact', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -41,7 +31,6 @@ describe('POST /api/admin/user/:id/redact', () => {
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('redacts user data', async () => {

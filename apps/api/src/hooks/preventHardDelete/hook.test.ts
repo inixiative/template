@@ -1,10 +1,5 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-
-beforeEach(() => {
-  registerPreventHardDeleteHook();
-});
+import { describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 
 const attempt = async (write: Promise<unknown>) => {
   try {
@@ -16,10 +11,6 @@ const attempt = async (write: Promise<unknown>) => {
 };
 
 describe('preventHardDelete hook', () => {
-  afterAll(() => {
-    clearHookRegistry();
-  });
-
   it('refuses hard deletes on append-only history models', async () => {
     expect(await attempt(db.auditLog.deleteMany({ where: { id: 'no-such-id' } }))).toMatch(
       /append-only history/,

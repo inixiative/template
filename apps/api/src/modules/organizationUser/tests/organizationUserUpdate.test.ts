@@ -7,6 +7,7 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
+import { memberSelfGrant } from '@template/permissions';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import type { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
@@ -81,21 +82,29 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: entitlements }),
       );
       const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
-      return { status: response.status, stored: stored.entitlements };
+      return {
+        status: response.status,
+        stored: stored.entitlements as unknown,
+        selfGrant: memberSelfGrant('db:organizationUser', target),
+      };
     };
 
     it('an admin grants a member operate on the organization', async () => {
-      expect(await grant(await writer('admin'), onOrganization('operate'))).toEqual({
-        status: 200,
-        stored: onOrganization('operate'),
-      });
+      const { status, stored, selfGrant } = await grant(
+        await writer('admin'),
+        onOrganization('operate'),
+      );
+      expect(status).toBe(200);
+      expect(stored).toEqual([selfGrant, ...onOrganization('operate')]);
     });
 
     it('an admin cannot grant a member own, and the member is unchanged', async () => {
-      expect(await grant(await writer('admin'), onOrganization('own'))).toEqual({
-        status: 403,
-        stored: null,
-      });
+      const { status, stored, selfGrant } = await grant(
+        await writer('admin'),
+        onOrganization('own'),
+      );
+      expect(status).toBe(403);
+      expect(stored).toEqual([selfGrant]);
     });
 
     it("an admin removes a member's entitlements", async () => {
@@ -110,7 +119,9 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       );
       expect(response.status).toBe(200);
       const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
-      expect(stored.entitlements).toEqual([]);
+      expect(stored.entitlements as unknown).toEqual([
+        memberSelfGrant('db:organizationUser', target),
+      ]);
     });
 
     const memberApp = (user: User, organizationUser: OrganizationUser) =>

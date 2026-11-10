@@ -1,20 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerOrderedListHook } from '#/hooks/orderedList/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-
-beforeEach(() => {
-  registerRulesHook();
-  registerContactRulesHook();
-  registerOrderedListHook();
-});
 
 afterEach(async () => {
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 // Pad to a 7-digit national number for E.164 (caller supplies a 4-digit "local" piece)
@@ -357,15 +347,15 @@ describe('contactRules hook — position auto-assign', () => {
         value: { e164: e164(String(getNextSeq())), country: 'US' },
       },
     });
-    const email = await db.contact.create({
+    const whatsapp = await db.contact.create({
       data: {
         ownerModel: ContactOwnerModel.User,
         userId: user.id,
-        type: ContactType.email,
-        value: { address: `sort${getNextSeq()}@example.com` },
+        type: ContactType.whatsapp,
+        value: { jid: `${getNextSeq()}@s.whatsapp.net` },
       },
     });
-    expect(phone.position).toBeGreaterThan(0);
-    expect(email.position).toBe(1); // first email for this user — not 2
+    expect(phone.position).toBe(1);
+    expect(whatsapp.position).toBe(1);
   });
 });

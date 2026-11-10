@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -17,9 +17,6 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -113,9 +110,6 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
     );
 
   beforeEach(async () => {
-    registerClearCacheHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
     owner = await member('owner');
@@ -123,7 +117,6 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

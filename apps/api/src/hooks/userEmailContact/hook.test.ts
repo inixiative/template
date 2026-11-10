@@ -1,21 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerOrderedListHook } from '#/hooks/orderedList/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
-
-beforeEach(() => {
-  registerRulesHook();
-  registerContactRulesHook();
-  registerOrderedListHook();
-  registerUserEmailContactHook();
-});
 
 afterEach(async () => {
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 describe('userEmailContact hook', () => {

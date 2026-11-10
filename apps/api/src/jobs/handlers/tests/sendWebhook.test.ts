@@ -31,7 +31,7 @@ describe('sendWebhook handler', () => {
   let user: User;
   let testCounter = 0;
 
-  const getUniqueUrl = (suffix = '') => `http://test-webhook.local/${++testCounter}${suffix}`;
+  const getUniqueUrl = (suffix = '') => `https://test-webhook.local/${++testCounter}${suffix}`;
   const worker = createTestWorker();
 
   beforeEach(async () => {

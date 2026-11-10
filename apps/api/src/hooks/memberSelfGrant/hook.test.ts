@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, type Prisma } from '@template/db';
+import { db, type Prisma } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -9,8 +9,6 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { memberSelfGrant } from '@template/permissions';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 
 const spaceManage = (spaceId: string) => ({
   resource: 'db:space',
@@ -22,13 +20,10 @@ describe('every member row carries a self-grant to operate itself, and it cannot
   let organization: Organization;
 
   beforeEach(async () => {
-    registerMemberSelfGrantHook();
-    registerRulesHook();
     ({ entity: organization } = await createOrganization());
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

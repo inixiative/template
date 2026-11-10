@@ -1,12 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import {
-  clearHookRegistry,
-  db,
-  type RuleReferenceRow,
-  ruleReferenceTargets,
-  unregisterDbHook,
-} from '@template/db';
+import { db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -16,13 +10,6 @@ import {
   createTag,
 } from '@template/db/test';
 import { referenceKey } from '@template/shared/rules';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 
 const deadTargets = (edges: RuleReferenceRow[]) =>
@@ -77,22 +64,11 @@ describe('ruleReference — a source takes its edges with it and brings them bac
   let space: Space;
 
   beforeEach(async () => {
-    registerPreventHardDeleteHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerSegmentConditionsHook();
-    registerRuleReferenceHook();
-    registerRuleReferenceTargetHook();
-    registerSoftDeleteCascadeHook();
-  });
-
-  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

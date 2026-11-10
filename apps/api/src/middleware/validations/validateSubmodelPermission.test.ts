@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { z } from '@hono/zod-openapi';
-import { clearHookRegistry, db, type HydratedRecord, hydrate } from '@template/db';
+import { db, type HydratedRecord, hydrate } from '@template/db';
 import type { Organization, Role, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -14,7 +14,6 @@ import {
 import { createPermissions } from '@template/permissions/client';
 import { check, placeUnder, rebacSchema, schemaMap } from '@template/permissions/rebac';
 import { app } from '#/app';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { readRoute } from '#/lib/routeTemplates';
 import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET } from '#/lib/utils/authProbe';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
@@ -22,9 +21,7 @@ import { Modules } from '#/modules/modules';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
-beforeEach(() => registerClearCacheHook());
 afterEach(async () => {
-  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

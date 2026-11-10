@@ -2,32 +2,24 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   db,
   materializedIdConflicts,
-  snapshotHookRegistry,
   syncRuleReferenceEdges,
   withMaterializedIds,
 } from '@template/db';
 import type { EmailComponent, Tag } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createEmailComponent, createTag } from '@template/db/test';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 
 describe('materialized ids on a false-polymorphic axis', () => {
   let component: EmailComponent;
   let tag: Tag;
   let other: Tag;
-  let restoreHooks: () => void;
 
   beforeEach(async () => {
-    restoreHooks = snapshotHookRegistry();
-    registerRulesHook();
-    registerImmutableFieldsHook();
     component = (await createEmailComponent()).entity;
     tag = (await createTag()).entity;
     other = (await createTag()).entity;
   });
 
   afterEach(async () => {
-    restoreHooks();
     await cleanupTouchedTables(db);
   });
 

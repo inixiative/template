@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
+import { db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -10,11 +10,6 @@ import {
   createSpace,
 } from '@template/db/test';
 import { RuleDegradedError } from '@template/shared/rules';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 import { deadReferencesOf } from '#tests/utils/deadReferences';
@@ -34,18 +29,12 @@ describe('segment rule health — the segments a rule names, as edges', () => {
   let space: Space;
 
   beforeEach(async () => {
-    registerSegmentConditionsHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerRuleReferenceHook();
-    registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('saving a membership rule writes one Segment → Segment edge, and re-saving set-diffs it', async () => {
@@ -167,18 +156,12 @@ describe('segment rule health — edge upkeep', () => {
   let space: Space;
 
   beforeEach(async () => {
-    registerSegmentConditionsHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerRuleReferenceHook();
-    registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('a write that narrows its result is refused, so the edge sync always sees the full row', async () => {

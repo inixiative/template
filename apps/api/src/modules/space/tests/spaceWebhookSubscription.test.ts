@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import { db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,

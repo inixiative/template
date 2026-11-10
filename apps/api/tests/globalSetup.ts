@@ -1,16 +1,28 @@
 import '#/config/env';
-import { afterEach } from 'bun:test';
-import { db } from '@template/db';
+import { afterEach, beforeEach } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { resetEnvOverrides } from '@template/shared/utils';
 import { SQL } from 'bun';
+import { registerHooks } from '#/hooks';
 
 // Global backstop: clear any env overrides a test registered (setEnvOverride / withEnv)
 // so nothing leaks into the next file in the single-process worker.
 afterEach(resetEnvOverrides);
 
+// Production's hooks, restored on both sides of a test so one a test adds or lifts never reaches the next.
+const restoreProductionHooks = () => {
+  clearHookRegistry();
+  registerHooks();
+};
+restoreProductionHooks();
+beforeEach(restoreProductionHooks);
+
 // Rows too: a test that reaches the database through a fixture has no cleanup of its own to forget.
-afterEach(() => cleanupTouchedTables(db));
+afterEach(async () => {
+  await cleanupTouchedTables(db);
+  restoreProductionHooks();
+});
 
 const isTestDatabase = process.env.NODE_ENV === 'test' || process.env.ENVIRONMENT === 'test';
 
