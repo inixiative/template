@@ -6,6 +6,7 @@
  */
 import { db } from '@template/db/client';
 import {
+  entitlementTargetModelOf,
   includeTargetEntitlements,
   isEntitlementTargetAccessor,
 } from '@template/db/entitlements/targetEntitlements';
@@ -25,7 +26,9 @@ export const fetchOne = async <T extends HydratedRecord>(
   const delegate = db.delegate(accessor);
 
   const where = typeof identifier === 'string' ? { id: identifier } : identifier;
-  const include = isEntitlementTargetAccessor(accessor) ? includeTargetEntitlements : undefined;
+  const include = isEntitlementTargetAccessor(accessor)
+    ? includeTargetEntitlements(entitlementTargetModelOf(accessor))
+    : undefined;
   return cache<T | null>(
     key,
     () => delegate.findFirst({ where, include }) as Promise<T | null>,

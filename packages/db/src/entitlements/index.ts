@@ -5,6 +5,8 @@ export {
   toEntitlementCreateData,
 } from './entitlementRow';
 export {
+  entitlementTargetModelOf,
+  type IncludeTargetEntitlements,
   includeTargetEntitlements,
   isEntitlementTargetAccessor,
   type WithTargetEntitlements,

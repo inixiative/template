@@ -14,6 +14,7 @@
   - [Enabling Audit for a Model](#enabling-audit-for-a-model)
   - [Data Captured](#data-captured)
   - [Field Processing Pipeline](#field-processing-pipeline)
+  - [Reading the Log](#reading-the-log)
   - [Soft Delete Detection](#soft-delete-detection)
   - [Registries](#registries)
   - [Actor Context](#actor-context)
@@ -29,6 +30,7 @@
   - [Related Models](#related-models)
 - [Cache Invalidation](#cache-invalidation)
   - [How It Works](#how-it-works)
+  - [Parent edges](#parent-edges)
   - [Wildcard Keys](#wildcard-keys)
 - [False Polymorphism](#false-polymorphism)
   - [Registry](#registry)
@@ -169,7 +171,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 | `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorOf` sanitized (redact fields removed); survives the token's deletion |
 | `ipAddress` / `userAgent` | Request metadata |
 | `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
-| `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's own tenancy, for filtering the log |
+| `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's tenancy, for filtering the log: its own `organizationId` / `spaceId` / `userId`, or, for a child with none ([parent edges](DATABASE.md#parent-edges)), its parent's (`contextRows`, `apps/api/src/hooks/auditLog/contextRows.ts`). An entitlement row is filed under its holder's tenancy, so an organization's audit view shows the entitlements its members' tokens gained and lost |
 | `subject*Id` | The mutated record, by `subjectModel` |
 
 ### Field Processing Pipeline
@@ -182,6 +184,10 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 4. **Redact** — `redactSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `redactChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
 `processAuditData` (filter + redact) builds the same column-only snapshot for the email-versioning hook.
+
+### Reading the Log
+
+`GET /api/admin/auditLog` (`apps/api/src/modules/admin/auditLog`) pages the log newest first, filtered like any admin list (`searchFields[contextOrganizationId]=…` is an organization's view). `historyModel` + `historyId` narrow it to one record's history: the record's own entries and those of every registered child whose parent it is, in one stream (`auditHistoryWhere`). A child is joined through its row, tombstones included, so a token's history keeps the entitlement rows it lost.
 
 ### Soft Delete Detection
 
@@ -355,9 +361,9 @@ export const cacheReference: CacheReference = {
 
 On mutation, the hook marks the keys of both the previous and the resulting row in the transaction's cache overlay (`queueCacheClear` → `markCacheWritten`). They are cleared when the transaction commits, before its held locks are released and before its `db.onCommit` batches; a failed clear makes `db.txn` throw after those batches run ([REDIS.md - cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)).
 
-### Traversal
+### Parent edges
 
-A row whose change is a change to another cached row names that row in `cacheTraversal` (same file). `Entitlement` traverses to its target: the hook loads the target rows (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheReference` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
+A child whose change is a change to its parent names that parent once, in the parent edge registry (`packages/db/src/registries/parentEdges.ts`, [DATABASE.md](DATABASE.md#parent-edges)). `Entitlement`'s parent is its target: the hook loads the parent rows (`loadParentRows` (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheReference` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
 
 ### Wildcard Keys
 

@@ -34,7 +34,7 @@ const organizationUsersOf = (userId: string): Promise<OrganizationUserWithEntitl
     () =>
       db.organizationUser.findMany({
         where: { userId, organization: { deletedAt: null } },
-        include: includeTargetEntitlements,
+        include: includeTargetEntitlements('OrganizationUser'),
       }),
     USER_CACHE_TTL,
   );
@@ -45,7 +45,7 @@ const spaceUsersOf = (userId: string): Promise<SpaceUserWithEntitlements[]> =>
     () =>
       db.spaceUser.findMany({
         where: { userId, space: { deletedAt: null } },
-        include: includeTargetEntitlements,
+        include: includeTargetEntitlements('SpaceUser'),
       }),
     USER_CACHE_TTL,
   );

@@ -43,15 +43,16 @@ const createdMembers = ({ action, result, previous }: HookOptions): Member[] =>
 // tombstoned with it, so reviving the member revives the grant.
 const writeSelfGrants = async (model: MemberModel, members: Member[]) => {
   if (!members.length) return;
-  await db.entitlement.createManyAndReturn({
-    data: members.map((member) => ({
-      ...toEntitlementCreateData(toEntitlementInput(memberSelfGrant(resourceOf[model], member)), {
-        model,
-        id: member.id,
-      }),
-      deletedAt: member.deletedAt,
-    })),
-  });
+  const rows = await Promise.all(
+    members.map(async (member) => {
+      const [row] = await toEntitlementCreateData(
+        [toEntitlementInput(memberSelfGrant(resourceOf[model], member))],
+        { model, id: member.id },
+      );
+      return { ...row, deletedAt: member.deletedAt };
+    }),
+  );
+  await db.entitlement.createManyAndReturn({ data: rows });
 };
 
 const tombstonedRows = ({ result, previous }: HookOptions): Entitlement[] => {

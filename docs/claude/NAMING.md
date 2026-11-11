@@ -253,7 +253,7 @@ between them, only where a holder is handed to the library:
 | `anchor.path` | `sourcePath` |
 | `resource` (`db:integration`) | `resource` (`Integration`) |
 | `actions` (`{ read: true }`) | `actions` (`['read']`) |
-| the holder it is installed on | `targetModel`, `targetId` and the typed FK `targetTokenId`, … |
+| the holder it is installed on | `targetModel`, `targetId` and the arm's keys: `targetTokenId`, `targetIntegrationId`, or a member's owner chain (`targetOrganizationId`, `targetSpaceId`, `targetUserId`, as `Inquiry`'s) |
 
 Back-relations follow the side rule: `targetEntitlements` on a holder, `sourceEntitlements` on every
 model an entitlement can anchor at. An API response carries the holder's live rows as stored, under

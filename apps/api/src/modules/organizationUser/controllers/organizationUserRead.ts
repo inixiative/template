@@ -15,7 +15,7 @@ export const organizationUserReadController = makeController(
     const orgUser = getResource<'organizationUser'>(c);
     const loaded = await c.get('db').organizationUser.findUniqueOrThrow({
       where: { id: orgUser.id },
-      include: includeTargetEntitlements,
+      include: includeTargetEntitlements('OrganizationUser'),
     });
     return respond.ok(loaded);
   },

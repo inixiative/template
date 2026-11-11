@@ -16,15 +16,23 @@ export const POLYMORPHIC_BINDS = {
 
 export type PolymorphicKind = keyof typeof POLYMORPHIC_BINDS;
 
+/** Every key column a false-polymorphic axis uses for a value; empty when the value carries no key (platform, admin). */
+export const polymorphicKeyColumns = (
+  model: ModelName,
+  axisField: string,
+  value: string,
+): string[] => [
+  ...((polymorphicAxis(model, axisField).fkMap as Record<string, readonly string[] | undefined>)[
+    value
+  ] ?? []),
+];
+
 /** The key column a false-polymorphic axis uses for a value, or null when the value carries no key (platform, admin). */
 export const polymorphicKeyColumn = (
   model: ModelName,
   axisField: string,
   value: string,
-): string | null => {
-  const { fkMap } = polymorphicAxis(model, axisField);
-  return (fkMap as Record<string, readonly string[] | undefined>)[value]?.[0] ?? null;
-};
+): string | null => polymorphicKeyColumns(model, axisField, value)[0] ?? null;
 
 /** The row a false-polymorphic axis points at — its kind and id — or null when it points at nobody. */
 export const polymorphicTarget = (

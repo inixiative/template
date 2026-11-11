@@ -10,7 +10,9 @@ import { fetchOne } from '@template/db/hydrate/fetchOne';
 import {
   cleanupTouchedTables,
   createOrganization,
+  createOrganizationUser,
   createSpace,
+  createSpaceUser,
   createToken,
   storeEntitlements,
 } from '@template/db/test';
@@ -58,9 +60,9 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     ] as ReturnType<typeof stored>[]);
   });
 
-  it('fills the typed and plain ids on both ends', () => {
-    const row = toEntitlementCreateData(
-      { resource: 'Organization', actions: ['read'], sourceModel: 'Organization', sourceId: 'o' },
+  it('fills the typed and plain ids on both ends', async () => {
+    const [row] = await toEntitlementCreateData(
+      [{ resource: 'Organization', actions: ['read'], sourceModel: 'Organization', sourceId: 'o' }],
       { model: 'Integration', id: 'i' },
     );
     expect(row).toEqual({
@@ -73,6 +75,36 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
       targetModel: 'Integration',
       targetIntegrationId: 'i',
       targetId: 'i',
+    });
+  });
+
+  it("a member arm carries the member's whole owner chain, its id materialized", async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: space } = await createSpace({}, { organization });
+    const { entity: spaceUser } = await createSpaceUser({}, { organization, space });
+    const { entity: organizationUser } = await createOrganizationUser({}, { organization });
+
+    const [row] = await toEntitlementCreateData(
+      [
+        {
+          resource: 'Space',
+          actions: ['read'],
+          sourceModel: 'OrganizationUser',
+          sourceId: organizationUser.id,
+        },
+      ],
+      { model: 'SpaceUser', id: spaceUser.id },
+    );
+    expect(row).toMatchObject({
+      sourceModel: 'OrganizationUser',
+      sourceId: organizationUser.id,
+      sourceOrganizationId: organization.id,
+      sourceUserId: organizationUser.userId,
+      targetModel: 'SpaceUser',
+      targetId: spaceUser.id,
+      targetOrganizationId: organization.id,
+      targetSpaceId: space.id,
+      targetUserId: spaceUser.userId,
     });
   });
 

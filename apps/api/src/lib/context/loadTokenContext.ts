@@ -41,7 +41,10 @@ export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | n
     cacheKey('Token', { keyHash }),
     () => {
       fetched = true;
-      return db.token.findUnique({ where: { keyHash }, include: includeTargetEntitlements });
+      return db.token.findUnique({
+        where: { keyHash },
+        include: includeTargetEntitlements('Token'),
+      });
     },
     TOKEN_CACHE_TTL,
   );

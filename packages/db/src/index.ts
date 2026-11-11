@@ -112,6 +112,7 @@ export {
   polymorphicBindings,
   polymorphicIs,
   polymorphicKeyColumn,
+  polymorphicKeyColumns,
   polymorphicTarget,
 } from './registries/polymorphicIs';
 export { polymorphicSchema } from './registries/polymorphicSchema';
@@ -154,6 +155,7 @@ export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './ut
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
 // Rule references: the rows a stored rule names, as edges
+export { loadParentRows } from './utils/loadParentRows';
 export { lockedTargetStates, type TargetState } from './utils/lockedTargetStates';
 // Model name utilities
 export {
@@ -170,6 +172,7 @@ export {
   toModelName,
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
+export { polymorphicArmRelation } from './utils/polymorphicArmKeys';
 export { getModelRelations } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';

@@ -9,7 +9,7 @@ import {
   type EntitlementInput,
   type EntitlementTarget,
   includeTargetEntitlements,
-  resolveFalsePolymorphismRef,
+  polymorphicKeyColumns,
   toEntitlementCreateData,
 } from '@template/db';
 import type { Entitlement } from '@template/db/generated/client/client';
@@ -30,19 +30,15 @@ export type EntitlementChanges = { add?: EntitlementInput[]; remove?: string[] }
 
 type Holder = { targetEntitlements: Entitlement[] };
 
-const anchorIsHardDeleted = (row: Entitlement): boolean => {
-  const column = resolveFalsePolymorphismRef({
-    model: 'Entitlement',
-    axis: 'sourceModel',
-    value: row.sourceModel,
-  });
-  return !column || row[column as keyof Entitlement] == null;
-};
+const anchorIsHardDeleted = (row: Entitlement): boolean =>
+  polymorphicKeyColumns('Entitlement', 'sourceModel', row.sourceModel).some(
+    (column) => row[column as keyof Entitlement] == null,
+  );
 
 const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
   const holder = (await db.delegate(target.model).findUnique({
     where: { id: target.id },
-    include: includeTargetEntitlements,
+    include: includeTargetEntitlements(target.model),
   })) as Holder | null;
   if (!holder) throw makeError({ status: 404, message: `${target.model} not found` });
   return holder;
@@ -99,7 +95,7 @@ export const changeEntitlements = (
         });
       if (added.length)
         await db.entitlement.createManyAndReturn({
-          data: added.map((entry) => toEntitlementCreateData(toEntitlementInput(entry), target)),
+          data: await toEntitlementCreateData(added.map(toEntitlementInput), target),
         });
 
       return (await liveRows(target)).targetEntitlements;

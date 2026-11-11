@@ -39,7 +39,7 @@ export const organizationUserUpdateController = makeController(
 
     const updated = await db.organizationUser.update({
       where: { id: orgUser.id },
-      include: includeTargetEntitlements,
+      include: includeTargetEntitlements('OrganizationUser'),
       data: body,
     });
 

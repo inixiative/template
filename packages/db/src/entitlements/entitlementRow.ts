@@ -9,7 +9,8 @@ import type {
   EntitlementResourceModel,
   EntitlementTargetModel,
 } from '@template/db/generated/client/enums';
-import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
+import { loadPolymorphicArmKeys } from '@template/db/utils/polymorphicArmKeys';
+import { uniqBy } from 'lodash-es';
 
 export type EntitlementTarget = { model: EntitlementTargetModel; id: string };
 
@@ -28,22 +29,37 @@ export type StoredEntitlement = Pick<
   'resource' | 'actions' | 'where' | 'sourceModel' | 'sourceId' | 'sourcePath'
 >;
 
-const foreignKey = (axis: 'sourceModel' | 'targetModel', model: string): string => {
-  const column = resolveFalsePolymorphismRef({ model: 'Entitlement', axis, value: model });
-  if (!column) throw new Error(`Entitlement has no ${axis} column for ${model}`);
-  return column;
-};
+const sourceKeys = (inputs: EntitlementInput[]): Promise<Record<string, Record<string, string>>> =>
+  Promise.all(
+    uniqBy(inputs, ({ sourceModel, sourceId }) => `${sourceModel}:${sourceId}`).map(
+      async ({ sourceModel, sourceId }) =>
+        [
+          `${sourceModel}:${sourceId}`,
+          await loadPolymorphicArmKeys('Entitlement', 'sourceModel', sourceModel, sourceId),
+        ] as const,
+    ),
+  ).then(Object.fromEntries);
 
-/** The row that stores an input on a target, with the typed and plain ids on both ends. */
-export const toEntitlementCreateData = (
-  { where, sourcePath, ...input }: EntitlementInput,
+/** The rows that store inputs on a target, with the arm keys and plain ids on both ends. */
+export const toEntitlementCreateData = async (
+  inputs: EntitlementInput[],
   target: EntitlementTarget,
-): Prisma.EntitlementUncheckedCreateInput => ({
-  ...input,
-  ...(where != null ? { where } : {}),
-  sourcePath: sourcePath ?? null,
-  [foreignKey('sourceModel', input.sourceModel)]: input.sourceId,
-  targetModel: target.model,
-  targetId: target.id,
-  [foreignKey('targetModel', target.model)]: target.id,
-});
+): Promise<Prisma.EntitlementUncheckedCreateInput[]> => {
+  if (!inputs.length) return [];
+  const targetKeys = await loadPolymorphicArmKeys(
+    'Entitlement',
+    'targetModel',
+    target.model,
+    target.id,
+  );
+  const keysBySource = await sourceKeys(inputs);
+  return inputs.map(({ where, sourcePath, ...input }) => ({
+    ...input,
+    ...(where != null ? { where } : {}),
+    sourcePath: sourcePath ?? null,
+    ...keysBySource[`${input.sourceModel}:${input.sourceId}`],
+    targetModel: target.model,
+    targetId: target.id,
+    ...targetKeys,
+  }));
+};

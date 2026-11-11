@@ -69,22 +69,6 @@ export const cacheReference: CacheReference = {
   },
 };
 
-type CacheTraversal = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => CachedRow };
-type CachedRow = { model: Prisma.ModelName; id: string };
-
-// A row whose change is a change to another cached row: clearing it clears that row's keys.
-const cacheTraversal: CacheTraversal = {
-  Entitlement: (r) => ({ model: r.targetModel, id: r.targetId }),
-};
-
-export const traversedRows = (
-  model: Prisma.ModelName,
-  record: Record<string, unknown>,
-): CachedRow[] => {
-  const fn = cacheTraversal[model] as ((r: Record<string, unknown>) => CachedRow) | undefined;
-  return fn ? [fn(record)] : [];
-};
-
 export const fetchCacheKeys = (
   model: Prisma.ModelName,
   record: Record<string, unknown>,

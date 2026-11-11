@@ -277,6 +277,12 @@ describe('handler: transferSpace', () => {
       expect(await db.project.findUniqueOrThrow({ where: { id: kept.project.id } })).toMatchObject(
         live,
       );
+      const entitlements = await db.entitlement.findMany({
+        where: { targetModel: 'SpaceUser', targetId: kept.spaceUser.id },
+      });
+      expect(entitlements.length).toBeGreaterThan(0);
+      for (const row of entitlements)
+        expect(row).toMatchObject({ targetOrganizationId: targetOrg1.id, deletedAt: null });
     });
 
     it('tombstones every other member and everything downstream, keyed to the target org', async () => {

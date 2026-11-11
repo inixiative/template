@@ -24,11 +24,9 @@ export const buildEntitlement = entitlementFactory.build;
 export const createEntitlement = entitlementFactory.create;
 
 /** Stores rows on a target, as the writer would, without its grant check. */
-export const storeEntitlements = (target: EntitlementTarget, inputs: EntitlementInput[]) =>
+export const storeEntitlements = async (target: EntitlementTarget, inputs: EntitlementInput[]) =>
   inputs.length
-    ? db.entitlement.createManyAndReturn({
-        data: inputs.map((input) => toEntitlementCreateData(input, target)),
-      })
-    : Promise.resolve([]);
+    ? db.entitlement.createManyAndReturn({ data: await toEntitlementCreateData(inputs, target) })
+    : [];
 
 export type EntitlementsOverride = { entitlements?: EntitlementInput[] | null };

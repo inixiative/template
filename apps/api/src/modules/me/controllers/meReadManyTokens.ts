@@ -4,7 +4,11 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:auth
  */
-import { includeTargetEntitlements, type Prisma } from '@template/db';
+import {
+  type IncludeTargetEntitlements,
+  includeTargetEntitlements,
+  type Prisma,
+} from '@template/db';
 
 import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
@@ -20,11 +24,11 @@ export const meReadManyTokensController = makeController(
     const { data, pagination } = await paginate<
       typeof db.token,
       Prisma.TokenGetPayload<{
-        include: typeof includeTargetEntitlements & {
+        include: IncludeTargetEntitlements & {
           organization: true;
-          organizationUser: { include: typeof includeTargetEntitlements };
+          organizationUser: { include: IncludeTargetEntitlements };
           space: true;
-          spaceUser: { include: typeof includeTargetEntitlements };
+          spaceUser: { include: IncludeTargetEntitlements };
         };
         omit: { keyHash: true };
       }>
@@ -34,11 +38,11 @@ export const meReadManyTokensController = makeController(
         ownerModel: { in: ['User', 'OrganizationUser', 'SpaceUser'] },
       },
       include: {
-        ...includeTargetEntitlements,
+        ...includeTargetEntitlements('Token'),
         organization: true,
-        organizationUser: { include: includeTargetEntitlements },
+        organizationUser: { include: includeTargetEntitlements('OrganizationUser') },
         space: true,
-        spaceUser: { include: includeTargetEntitlements },
+        spaceUser: { include: includeTargetEntitlements('SpaceUser') },
       },
       omit: { keyHash: true },
     });

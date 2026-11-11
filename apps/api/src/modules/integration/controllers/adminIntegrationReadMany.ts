@@ -14,7 +14,7 @@ export const adminIntegrationReadManyController = makeController(
   async (c, respond) => {
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.integration, {
-      include: includeTargetEntitlements,
+      include: includeTargetEntitlements('Integration'),
     });
     return respond.ok(data, { pagination });
   },

@@ -49,7 +49,10 @@
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
   - [Delegated Keys](#delegated-keys)
 - [Entitlement](#entitlement)
+  - [Tokens](#tokens)
+  - [Inquiries and rule references](#inquiries-and-rule-references)
 - [Registries](#registries)
+  - [Parent Edges](#parent-edges)
 - [Schema Reference](#schema-reference)
 
 <!-- toc:end -->
@@ -795,9 +798,9 @@ A row is a directed edge in the standard names ([NAMING.md](NAMING.md)):
 
 | Column | Holds |
 |---|---|
-| `sourceModel`, `sourceId`, `sourcePath` | the **anchor**: the record the entitlement acts from, reached from the entitled record along `sourcePath`. `sourceModel` is any of the 15 rebac resources (`EntitlementResourceModel`), each with a typed FK (`sourceUserId`, `sourceOrganizationId`, …, `sourceWebhookSubscriptionId`). |
+| `sourceModel`, `sourceId`, `sourcePath` | the **anchor**: the record the entitlement acts from, reached from the entitled record along `sourcePath`. `sourceModel` is any of the 15 rebac resources (`EntitlementResourceModel`), each with a typed FK (`sourceUserId`, `sourceOrganizationId`, …, `sourceWebhookSubscriptionId`); a member anchor keys on its owner chain (`OrganizationUser` → `sourceOrganizationId` + `sourceUserId`, `SpaceUser` → `sourceOrganizationId` + `sourceSpaceId` + `sourceUserId`). |
 | `sourceDeletedAt` | a copy of the anchor's `deletedAt`, stamped by `ruleReference:target` |
-| `targetModel`, `targetId` | the **holder**: `Token`, `Integration`, `OrganizationUser` or `SpaceUser` (`EntitlementTargetModel`), each with a typed FK |
+| `targetModel`, `targetId` | the **holder**: `Token`, `Integration`, `OrganizationUser` or `SpaceUser` (`EntitlementTargetModel`). A delegate by its id (`targetTokenId`, `targetIntegrationId`); a member by its owner chain (`targetOrganizationId` + `targetUserId`, plus `targetSpaceId` for a `SpaceUser`) |
 | `resource` | the model the actions apply to (`EntitlementResourceModel`) |
 | `actions` | `String[]`, the actions held, GIN-indexed |
 | `where` | `Json?`, a positive json-rules condition over the entitled record |
@@ -805,7 +808,8 @@ A row is a directed edge in the standard names ([NAMING.md](NAMING.md)):
 | `deletedAt` | the row's tombstone |
 
 - **No grantor column.** The grantor is the target's owner, re-walked live by the permissions library.
-- **Both ends are false-polymorphic with a materialized id** (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names, and the API reads and writes the rows as stored: a writer gives `EntitlementInput` (`resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`) and `toEntitlementCreateData` (`packages/db/src/entitlements`) fills in the target and the typed FKs. The library's entry shape (`resource: 'db:integration'`, `anchor: { resource, id, path? }`, actions as a map) exists only at the permissions boundary: `toEntitlementEntry`, `toEntitlementInput` and `entitlementsOf` in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`).
+- **Both ends are false-polymorphic with a materialized id** (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names, and the API reads and writes the rows as stored: a writer gives `EntitlementInput` (`resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`) and `toEntitlementCreateData(inputs, target)` (`packages/db/src/entitlements`) fills in the target and each arm's keys (`loadPolymorphicArmKeys`, `packages/db/src/utils/polymorphicArmKeys.ts`, which reads a member's owner chain off its row). The library's entry shape (`resource: 'db:integration'`, `anchor: { resource, id, path? }`, actions as a map) exists only at the permissions boundary: `toEntitlementEntry`, `toEntitlementInput` and `entitlementsOf` in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`).
+- **A member arm carries the member's whole owner chain** (Aron, 2026-11-11), as `Inquiry`'s and the owner axes' do. Why: the row then carries its tenant, so tenant filters and the audit hook read it, and a space transfer re-keys a moved member's rows by `ON UPDATE CASCADE` with the member ([Foreign Keys](#foreign-keys), the `spaceKeyColumns` test). A composite arm holds no single id, so its `sourceId` / `targetId` is the member's id as the writer gives it, and `materializedIdConflicts` requires every key beside it. The keys of an `OrganizationUser` arm are a prefix of a `SpaceUser` arm's, so the relation `OrganizationUser.targetEntitlements` also reaches the member's `SpaceUser` rows: a holder read names its model (`includeTargetEntitlements(model)`), and the soft-delete cascade keeps each relation to its own arm (`childRelations`, the `arm` discriminator).
 - **The target owns the row.** Target FKs cascade at the database; `softDeleteCascade` tombstones a target's rows with it and revives them with it. A target that never revives (a `Token`, `SKIP_REVIVE`) keeps its rows dead.
 - **The source only names the row.** Source FKs are `onDelete: SetNull`, and every source relation is in `CASCADE_EXEMPT`: an anchor's tombstone lands in `sourceDeletedAt`, and a hard-deleted anchor (a `SegmentMember`, `Flow` or `WebhookSubscription`, which have no `deletedAt`) nulls the typed FK and leaves `sourceId` naming what went. The polymorphism rule on a materialized axis accepts that state (FK null, plain id set), so the row can still be tombstoned with its target; a create must set the FK, never the plain id alone (`materializedIdConflicts`).
 - **Audited and soft-deleted** (`AUDIT_ENABLED_MODELS`): every created and every removed row is its own audit entry. Rows are immutable (`immutableFields` refuses a change to any column but the tombstones); a change is a removal plus a create.
@@ -836,7 +840,8 @@ Schema-level configuration in `packages/db/src/registries/`:
 |---|---|
 | `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
 | `delegatedKeys(axis, value)` / `carryDelegatedKeys(model, row)` | The parent keys a delegating value carries; copy them from the parent row (the hook and the test factory both call it) |
-| `polymorphicKeyColumn` / `polymorphicTarget` | The key column for a value; the `{ kind, id }` a row points at |
+| `polymorphicKeyColumns` / `polymorphicKeyColumn` / `polymorphicTarget` | Every key column for a value (a member arm has two or three); the first; the `{ kind, id }` a row points at |
+| `polymorphicArmRelation` / `polymorphicArmKeys` / `loadPolymorphicArmKeys` | The relation an arm's key columns form; the columns an arm sets to point at a row (its id, or a composite arm's owner chain off the row) |
 | `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
 | `polymorphicBindings(ownerModel, ownerId)` | The bind map `polymorphicIs` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`POLYMORPHIC_BINDS`, `isOwnerKind`) |
 | `isFalsePolymorphismRef(ref)` / `resolveFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart, and resolve returns that value's FK column (null on an unknown model, axis or value) |
@@ -850,6 +855,18 @@ const config = getPolymorphismConfig('Token');
 ```
 
 See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.
+
+### Parent Edges
+
+`ParentEdgeRegistry` (`packages/db/src/registries/parentEdges.ts`, Aron, 2026-11-11): a child model names its path to its parent once, either a false-polymorphic axis (`Entitlement: { axis: 'targetModel' }`, the parent read off the axis's materialized id) or one foreign key (`{ parent, foreignKey }`). Three consumers read it:
+
+| Consumer | Reads |
+|---|---|
+| Cache hook (`apps/api/src/hooks/cache/hook.ts`) | `loadParentRows`: a child's write clears its parent's keys ([HOOKS.md](HOOKS.md#parent-edges)) |
+| Audit hook (`contextRows`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
+| Audit history read (`auditHistoryWhere`) | `childrenOf(record)`: a record's entries and its children's in one stream ([HOOKS.md](HOOKS.md#reading-the-log)) |
+
+Why one registry: the cache traversal, the audit tenancy and the history read are the same fact ("this row's change is a change to that row"), and stating it once keeps them from drifting. Register a child only when a consumer would otherwise special-case it; a model with its own tenant columns and its own cache keys needs no edge.
 
 ---
 
