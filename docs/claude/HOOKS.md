@@ -555,6 +555,8 @@ The hook fires for `create`, `createManyAndReturn`, `upsert`, `update`, and `upd
 3. Parses `value` through `inputSchema` → `parseInput` → `valueSchema`.
 4. Sets `valueKey = def.toValueKey(canonical)` so the per-owner unique constraint resolves.
 
+A deleted contact is a tombstone, and the unique key still covers it, so the create routes (`me`, `organization`, `space` → `reviveOrCreateContact`, `apps/api/src/modules/contact/services/`) revive the owner's tombstone with the same `type` and `valueKey` (`revive`, `packages/db/src/utils/revive.ts`) and write the new body onto it instead of answering 409. `organizationCreateAuthProvider` does the same on `(organizationId, provider, type)`.
+
 The `position` column is managed by the separate `orderedList` hook (see below) — Contact is registered against it, so position assignment, shifts, soft-delete sentinels, and bulk re-densification all happen automatically.
 
 Update paths shadow-merge the partial update with `previous` so type-aware validation runs against the merged record, then mirror hook-computed fields (`value`, `valueKey`) back into `args.data`.
