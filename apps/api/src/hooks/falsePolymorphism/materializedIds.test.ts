@@ -73,6 +73,22 @@ describe('materialized ids on a false-polymorphic axis', () => {
     await clearEdges();
   });
 
+  it('a composite arm takes its materialized id as written, with every key it carries', () => {
+    const row = {
+      sourceModel: 'Organization',
+      sourceOrganizationId: 'o-1',
+      targetModel: 'OrganizationUser',
+      targetId: 'ou-1',
+      targetOrganizationId: 'o-1',
+      targetUserId: 'u-1',
+    };
+    expect(materializedIdConflicts('Entitlement', row)).toEqual([]);
+    expect(withMaterializedIds('Entitlement', row)).toMatchObject({ targetId: 'ou-1' });
+    expect(materializedIdConflicts('Entitlement', { ...row, targetUserId: null })).toEqual([
+      'Entitlement.targetId names a OrganizationUser; pass targetOrganizationId, targetUserId',
+    ]);
+  });
+
   it('an axis without a materialized column is left as written', () => {
     const row = { ownerModel: 'User', userId: 'u-1', name: 'token' };
     expect(withMaterializedIds('Token', row)).toEqual(row);

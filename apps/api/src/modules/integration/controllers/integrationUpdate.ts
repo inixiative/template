@@ -23,7 +23,7 @@ export const integrationUpdateController = makeController(
     });
     const updated = await db.integration.findUniqueOrThrow({
       where: { id: integration.id },
-      include: includeTargetEntitlements,
+      include: includeTargetEntitlements('Integration'),
     });
 
     return respond.ok(updated);

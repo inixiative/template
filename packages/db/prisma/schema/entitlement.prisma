@@ -11,6 +11,9 @@
 //
 // The source side mirrors RuleReference's target side: a soft-deleted source lands in
 // `sourceDeletedAt` (ruleReference:target), a purge nulls the typed FK and leaves `sourceId`.
+//
+// A member arm keys on the member's whole owner chain, as Inquiry's do, so the row carries its tenant
+// and a space transfer re-keys it by ON UPDATE CASCADE. Its `sourceId` / `targetId` is the member's id.
 
 model Entitlement {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
@@ -29,9 +32,7 @@ model Entitlement {
   sourceDeletedAt             DateTime?
   sourceUserId                String?                  @db.VarChar(36)
   sourceOrganizationId        String?                  @db.VarChar(36)
-  sourceOrganizationUserId    String?                  @db.VarChar(36)
   sourceSpaceId               String?                  @db.VarChar(36)
-  sourceSpaceUserId           String?                  @db.VarChar(36)
   sourceIntegrationId         String?                  @db.VarChar(36)
   sourceProjectId             String?                  @db.VarChar(36)
   sourceTokenId               String?                  @db.VarChar(36)
@@ -47,15 +48,16 @@ model Entitlement {
   targetId                 String                 @db.VarChar(36)
   targetTokenId            String?                @db.VarChar(36)
   targetIntegrationId      String?                @db.VarChar(36)
-  targetOrganizationUserId String?                @db.VarChar(36)
-  targetSpaceUserId        String?                @db.VarChar(36)
+  targetOrganizationId     String?                @db.VarChar(36)
+  targetSpaceId            String?                @db.VarChar(36)
+  targetUserId             String?                @db.VarChar(36)
 
   // SetNull: purging an anchor leaves the row standing with `sourceId` naming what went.
   sourceUser                User?                @relation("EntitlementSource", fields: [sourceUserId], references: [id], onDelete: SetNull)
   sourceOrganization        Organization?        @relation("EntitlementSource", fields: [sourceOrganizationId], references: [id], onDelete: SetNull)
-  sourceOrganizationUser    OrganizationUser?    @relation("EntitlementSource", fields: [sourceOrganizationUserId], references: [id], onDelete: SetNull)
+  sourceOrganizationUser    OrganizationUser?    @relation("EntitlementSource", fields: [sourceOrganizationId, sourceUserId], references: [organizationId, userId], onDelete: SetNull)
   sourceSpace               Space?               @relation("EntitlementSource", fields: [sourceSpaceId], references: [id], onDelete: SetNull)
-  sourceSpaceUser           SpaceUser?           @relation("EntitlementSource", fields: [sourceSpaceUserId], references: [id], onDelete: SetNull)
+  sourceSpaceUser           SpaceUser?           @relation("EntitlementSource", fields: [sourceOrganizationId, sourceSpaceId, sourceUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
   sourceIntegration         Integration?         @relation("EntitlementSource", fields: [sourceIntegrationId], references: [id], onDelete: SetNull)
   sourceProject             Project?             @relation("EntitlementSource", fields: [sourceProjectId], references: [id], onDelete: SetNull)
   sourceToken               Token?               @relation("EntitlementSource", fields: [sourceTokenId], references: [id], onDelete: SetNull)
@@ -69,8 +71,8 @@ model Entitlement {
 
   targetToken            Token?            @relation("EntitlementTarget", fields: [targetTokenId], references: [id], onDelete: Cascade)
   targetIntegration      Integration?      @relation("EntitlementTarget", fields: [targetIntegrationId], references: [id], onDelete: Cascade)
-  targetOrganizationUser OrganizationUser? @relation("EntitlementTarget", fields: [targetOrganizationUserId], references: [id], onDelete: Cascade)
-  targetSpaceUser        SpaceUser?        @relation("EntitlementTarget", fields: [targetSpaceUserId], references: [id], onDelete: Cascade)
+  targetOrganizationUser OrganizationUser? @relation("EntitlementTarget", fields: [targetOrganizationId, targetUserId], references: [organizationId, userId], onDelete: Cascade)
+  targetSpaceUser        SpaceUser?        @relation("EntitlementTarget", fields: [targetOrganizationId, targetSpaceId, targetUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
 
   sourceRuleReferences RuleReference[] @relation("RuleReferenceSource")
   auditLogsAsSubject   AuditLog[]      @relation("AuditLogSubjectEntitlement")
@@ -79,15 +81,14 @@ model Entitlement {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@index([targetModel, targetId], where: raw("\"deletedAt\" IS NULL"), map: "Entitlement_live_target_idx")
+  // why: full, not live-only: the audit history read joins a target's tombstoned rows too.
+  @@index([targetModel, targetId])
   @@index([sourceModel, sourceId], where: raw("\"deletedAt\" IS NULL"), map: "Entitlement_live_source_idx")
   @@index([resource], where: raw("\"deletedAt\" IS NULL"), map: "Entitlement_live_resource_idx")
   @@index([actions(ops: ArrayOps)], type: Gin)
   @@index([sourceUserId])
   @@index([sourceOrganizationId])
-  @@index([sourceOrganizationUserId])
   @@index([sourceSpaceId])
-  @@index([sourceSpaceUserId])
   @@index([sourceIntegrationId])
   @@index([sourceProjectId])
   @@index([sourceTokenId])
@@ -100,8 +101,7 @@ model Entitlement {
   @@index([sourceWebhookSubscriptionId])
   @@index([targetTokenId])
   @@index([targetIntegrationId])
-  @@index([targetOrganizationUserId])
-  @@index([targetSpaceUserId])
+  @@index([targetOrganizationId, targetUserId, targetSpaceId])
 }
 
 // The rebac resources: what an entitlement's actions apply to, and what it may anchor at.

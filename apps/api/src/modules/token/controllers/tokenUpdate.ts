@@ -23,7 +23,7 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
   await db.token.update({ where: { id: token.id }, data: body });
   const { keyHash: _keyHash, ...updated } = await db.token.findUniqueOrThrow({
     where: { id: token.id },
-    include: includeTargetEntitlements,
+    include: includeTargetEntitlements('Token'),
   });
   return respond.ok(updated);
 });

@@ -5,9 +5,10 @@
  * @uses none
  */
 import { db } from '@template/db/client';
+import { loadEntitlementAnchors } from '@template/db/entitlements/entitlementAnchors';
 import {
+  type EntitlementHolder,
   type EntitlementInput,
-  type EntitlementTarget,
   toEntitlementCreateData,
 } from '@template/db/entitlements/entitlementRow';
 import { EntitlementResourceModel } from '@template/db/generated/client/enums';
@@ -23,12 +24,12 @@ const entitlementFactory = createFactory('Entitlement', {
 export const buildEntitlement = entitlementFactory.build;
 export const createEntitlement = entitlementFactory.create;
 
-/** Stores rows on a target, as the writer would, without its grant check. */
-export const storeEntitlements = (target: EntitlementTarget, inputs: EntitlementInput[]) =>
+/** Stores rows on a holder, as the writer would, without its grant check. */
+export const storeEntitlements = async (holder: EntitlementHolder, inputs: EntitlementInput[]) =>
   inputs.length
     ? db.entitlement.createManyAndReturn({
-        data: inputs.map((input) => toEntitlementCreateData(input, target)),
+        data: toEntitlementCreateData(inputs, holder, await loadEntitlementAnchors(inputs)),
       })
-    : Promise.resolve([]);
+    : [];
 
 export type EntitlementsOverride = { entitlements?: EntitlementInput[] | null };

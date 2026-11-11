@@ -44,7 +44,7 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
     if (options?.mockOrganizationUsers) {
       const members = await db.organizationUser.findMany({
         where: { id: { in: options.mockOrganizationUsers.map((member) => member.id) } },
-        include: includeTargetEntitlements,
+        include: includeTargetEntitlements('OrganizationUser'),
       });
       c.set('organizationUsers', members);
       const orgIds = options.mockOrganizationUsers.map((ou) => ou.organizationId);
@@ -56,7 +56,7 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
     if (options?.mockSpaceUsers) {
       const members = await db.spaceUser.findMany({
         where: { id: { in: options.mockSpaceUsers.map((member) => member.id) } },
-        include: includeTargetEntitlements,
+        include: includeTargetEntitlements('SpaceUser'),
       });
       c.set('spaceUsers', members);
       const spaceIds = options.mockSpaceUsers.map((su) => su.spaceId);

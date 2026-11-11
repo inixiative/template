@@ -18,7 +18,7 @@ export const spaceReadManySpaceUsersController = makeController(
 
     const { data, pagination } = await paginate(c, db.spaceUser, {
       where: { spaceId: space.id },
-      include: { ...includeTargetEntitlements, user: true },
+      include: { ...includeTargetEntitlements('SpaceUser'), user: true },
     });
 
     return respond.ok(data, { pagination });

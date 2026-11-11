@@ -9,7 +9,9 @@ import {
   type EntitlementInput,
   type EntitlementTarget,
   includeTargetEntitlements,
-  resolveFalsePolymorphismRef,
+  loadEntitlementAnchors,
+  missingAnchors,
+  polymorphicKeyColumns,
   toEntitlementCreateData,
 } from '@template/db';
 import type { Entitlement } from '@template/db/generated/client/client';
@@ -28,21 +30,17 @@ import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlement
 
 export type EntitlementChanges = { add?: EntitlementInput[]; remove?: string[] };
 
-type Holder = { targetEntitlements: Entitlement[] };
+type Holder = Record<string, unknown> & { id: string; targetEntitlements: Entitlement[] };
 
-const anchorIsHardDeleted = (row: Entitlement): boolean => {
-  const column = resolveFalsePolymorphismRef({
-    model: 'Entitlement',
-    axis: 'sourceModel',
-    value: row.sourceModel,
-  });
-  return !column || row[column as keyof Entitlement] == null;
-};
+const anchorIsHardDeleted = (row: Entitlement): boolean =>
+  polymorphicKeyColumns('Entitlement', 'sourceModel', row.sourceModel).some(
+    (column) => row[column as keyof Entitlement] == null,
+  );
 
 const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
   const holder = (await db.delegate(target.model).findUnique({
     where: { id: target.id },
-    include: includeTargetEntitlements,
+    include: includeTargetEntitlements(target.model),
   })) as Holder | null;
   if (!holder) throw makeError({ status: 404, message: `${target.model} not found` });
   return holder;
@@ -78,6 +76,14 @@ export const changeEntitlements = (
         checked,
         (row) => row.sourceDeletedAt == null,
       );
+      const anchors = await loadEntitlementAnchors(add);
+      const [missing] = missingAnchors(add, anchors);
+      if (missing)
+        throw makeError({
+          status: 422,
+          message: `${missing.sourceModel} ${missing.sourceId} not found`,
+        });
+
       const addedEntries = add.map(toEntitlementEntry);
       await validateEntitlementGrants(writer, [
         ...addedEntries,
@@ -99,7 +105,11 @@ export const changeEntitlements = (
         });
       if (added.length)
         await db.entitlement.createManyAndReturn({
-          data: added.map((entry) => toEntitlementCreateData(toEntitlementInput(entry), target)),
+          data: toEntitlementCreateData(
+            added.map(toEntitlementInput),
+            { model: target.model, row: holder },
+            anchors,
+          ),
         });
 
       return (await liveRows(target)).targetEntitlements;

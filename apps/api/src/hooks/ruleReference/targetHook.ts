@@ -12,8 +12,8 @@ import {
   type HookOptions,
   HookTiming,
   type ModelName,
+  polymorphicKeyColumns,
   registerDbHook,
-  resolveFalsePolymorphismRef,
 } from '@template/db';
 import { castArray, groupBy, keyBy, map, uniq } from 'lodash-es';
 import type { HookRow } from '#/hooks/shared/hookRows';
@@ -37,14 +37,14 @@ const isLive = (row: HookRow): boolean => row.deletedAt == null;
 const deletedAtStamp = (row: HookRow): number => (row.deletedAt as Date | null)?.getTime() ?? 0;
 
 const stampEdges = async (edge: NamingEdge, model: string, flipped: HookRow[]) => {
-  const column = resolveFalsePolymorphismRef({ model: edge.model, axis: edge.axis, value: model });
-  if (!column) return;
+  const columns = polymorphicKeyColumns(edge.model, edge.axis, model);
+  if (!columns.length) return;
   for (const [stamp, rows] of Object.entries(groupBy(flipped, deletedAtStamp))) {
     await db.delegate(edge.model).updateManyAndReturn({
       where: {
         [edge.axis]: model,
         [edge.id]: { in: map(rows, 'id') as string[] },
-        [column]: { not: null },
+        ...Object.fromEntries(columns.map((column) => [column, { not: null }])),
       },
       data: { [edge.stamp]: stamp === '0' ? null : new Date(Number(stamp)) },
     });

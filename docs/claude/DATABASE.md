@@ -48,8 +48,12 @@
 - [False Polymorphism](#false-polymorphism)
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
   - [Delegated Keys](#delegated-keys)
+  - [Back-Relations Over Shared Key Columns](#back-relations-over-shared-key-columns)
 - [Entitlement](#entitlement)
+  - [Tokens](#tokens)
+  - [Inquiries and rule references](#inquiries-and-rule-references)
 - [Registries](#registries)
+  - [Parent Edges](#parent-edges)
 - [Schema Reference](#schema-reference)
 
 <!-- toc:end -->
@@ -783,6 +787,17 @@ enum EmailOwnerModel {
 
 An axis value can name a parent in `delegates`: the row carries the parent's own owner keys beside its own. A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:delegatedKeys` hook copies them from the parent on create and upsert through `carryDelegatedKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
 
+### Back-Relations Over Shared Key Columns
+
+Arms of one axis share columns: an `OrganizationUser` arm's keys (`organizationId`, `userId`) are a prefix of a `SpaceUser` arm's, and the `Organization`, `Space` and `User` arms reuse the same columns alone. A back-relation is defined by its columns, not by the discriminator, so it also takes in the rows of every deeper arm that carries those keys:
+
+- `OrganizationUser.targetEntitlements` holds the member's `SpaceUser` rows too.
+- `Organization.sourceEntitlements`, `User.sourceEntitlements` and `Space.sourceEntitlements` hold member-anchored rows.
+- `OrganizationUser.auditLogsAsSubject` holds `SpaceUser` subjects.
+- Owner axes behave the same way: `OrganizationUser.tokens` holds the member's `SpaceUser` tokens.
+
+A read, filter or cascade through such a back-relation must carry the arm's discriminator (`targetModel: 'OrganizationUser'`, `subjectModel: …`). The primitives do this for you: `includeTargetEntitlements(model)` for holder reads, `childRelations`' `arm` for the soft-delete cascade, `auditHistoryWhere` for audit history. Use them rather than the bare relation. Nothing enforces this yet. A CI rule has been proposed (a relation filter or include over a shared-column back-relation without its discriminator), pending Aron's decision.
+
 See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
 
 ---
@@ -795,9 +810,9 @@ A row is a directed edge in the standard names ([NAMING.md](NAMING.md)):
 
 | Column | Holds |
 |---|---|
-| `sourceModel`, `sourceId`, `sourcePath` | the **anchor**: the record the entitlement acts from, reached from the entitled record along `sourcePath`. `sourceModel` is any of the 15 rebac resources (`EntitlementResourceModel`), each with a typed FK (`sourceUserId`, `sourceOrganizationId`, …, `sourceWebhookSubscriptionId`). |
+| `sourceModel`, `sourceId`, `sourcePath` | the **anchor**: the record the entitlement acts from, reached from the entitled record along `sourcePath`. `sourceModel` is any of the 15 rebac resources (`EntitlementResourceModel`), each with a typed FK (`sourceUserId`, `sourceOrganizationId`, …, `sourceWebhookSubscriptionId`); a member anchor keys on its owner chain (`OrganizationUser` → `sourceOrganizationId` + `sourceUserId`, `SpaceUser` → `sourceOrganizationId` + `sourceSpaceId` + `sourceUserId`). |
 | `sourceDeletedAt` | a copy of the anchor's `deletedAt`, stamped by `ruleReference:target` |
-| `targetModel`, `targetId` | the **holder**: `Token`, `Integration`, `OrganizationUser` or `SpaceUser` (`EntitlementTargetModel`), each with a typed FK |
+| `targetModel`, `targetId` | the **holder**: `Token`, `Integration`, `OrganizationUser` or `SpaceUser` (`EntitlementTargetModel`). A delegate by its id (`targetTokenId`, `targetIntegrationId`); a member by its owner chain (`targetOrganizationId` + `targetUserId`, plus `targetSpaceId` for a `SpaceUser`) |
 | `resource` | the model the actions apply to (`EntitlementResourceModel`) |
 | `actions` | `String[]`, the actions held, GIN-indexed |
 | `where` | `Json?`, a positive json-rules condition over the entitled record |
@@ -805,11 +820,12 @@ A row is a directed edge in the standard names ([NAMING.md](NAMING.md)):
 | `deletedAt` | the row's tombstone |
 
 - **No grantor column.** The grantor is the target's owner, re-walked live by the permissions library.
-- **Both ends are false-polymorphic with a materialized id** (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names, and the API reads and writes the rows as stored: a writer gives `EntitlementInput` (`resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`) and `toEntitlementCreateData` (`packages/db/src/entitlements`) fills in the target and the typed FKs. The library's entry shape (`resource: 'db:integration'`, `anchor: { resource, id, path? }`, actions as a map) exists only at the permissions boundary: `toEntitlementEntry`, `toEntitlementInput` and `entitlementsOf` in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`).
+- **Both ends are false-polymorphic with a materialized id** (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names, and the API reads and writes the rows as stored: a writer gives `EntitlementInput` (`resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`) and `toEntitlementCreateData(inputs, holder, anchors)` (`packages/db/src/entitlements`) fills in each arm's keys off rows the writer already holds: the holder as read, and the anchors from `loadEntitlementAnchors` (one read per anchor model, tombstones included). It copies each anchor's `deletedAt` into `sourceDeletedAt`, so a row written on a tombstoned anchor (a factory, a hook; the grant check refuses one on the route) is born stamped. The writer refuses an anchor that does not exist with a 422 (`missingAnchors`). Arm keys come from `polymorphicArmKeys` (`packages/db/src/utils/polymorphicArmKeys.ts`). The library's entry shape (`resource: 'db:integration'`, `anchor: { resource, id, path? }`, actions as a map) exists only at the permissions boundary: `toEntitlementEntry`, `toEntitlementInput` and `entitlementsOf` in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`).
+- **A member arm carries the member's whole owner chain** (Aron, 2026-11-11), as `Inquiry`'s and the owner axes' do. Why: the row then carries its tenant, so tenant filters and the audit hook read it, and a space transfer re-keys a moved member's rows by `ON UPDATE CASCADE` with the member ([Foreign Keys](#foreign-keys), the `spaceKeyColumns` test). A composite arm holds no single id, so its `sourceId` / `targetId` is the member's id as the writer gives it, and `materializedIdConflicts` requires every key beside it. The keys of an `OrganizationUser` arm are a prefix of a `SpaceUser` arm's, so the relation `OrganizationUser.targetEntitlements` also reaches the member's `SpaceUser` rows: a holder read names its model (`includeTargetEntitlements(model)`), and the soft-delete cascade keeps each relation to its own arm (`childRelations`, the `arm` discriminator).
 - **The target owns the row.** Target FKs cascade at the database; `softDeleteCascade` tombstones a target's rows with it and revives them with it. A target that never revives (a `Token`, `SKIP_REVIVE`) keeps its rows dead.
 - **The source only names the row.** Source FKs are `onDelete: SetNull`, and every source relation is in `CASCADE_EXEMPT`: an anchor's tombstone lands in `sourceDeletedAt`, and a hard-deleted anchor (a `SegmentMember`, `Flow` or `WebhookSubscription`, which have no `deletedAt`) nulls the typed FK and leaves `sourceId` naming what went. The polymorphism rule on a materialized axis accepts that state (FK null, plain id set), so the row can still be tombstoned with its target; a create must set the FK, never the plain id alone (`materializedIdConflicts`).
 - **Audited and soft-deleted** (`AUDIT_ENABLED_MODELS`): every created and every removed row is its own audit entry. Rows are immutable (`immutableFields` refuses a change to any column but the tombstones); a change is a removal plus a create.
-- **Partial indexes on live rows** (`deletedAt IS NULL`) on (target), (source) and (resource). Tombstones are kept, never purged.
+- **Indexes.** (target) is a full index: live reads filter `deletedAt` on it, and the audit history read joins a target's tombstoned rows through it. One full index costs less than a live one plus a full one. The alternative was filtering the history through each arm's own key column, but a member arm would then need its owner chain read first. (source) and (resource) are partial on live rows (`deletedAt IS NULL`). Tombstones are kept, never purged.
 - **Its `where` is a rule surface.** `Entitlement` is a `RuleReference` source (the `ruleReference` hook, [HOOKS.md](HOOKS.md#application-hooks)), so the rows a `where` names by id get edges.
 
 - **A set-null arm keeps a plain id (CI rule `set-null-polymorphism-materialized`).** Any relation on a false-polymorphic axis with `onDelete: SetNull` requires that axis to be registered with a `materialized` plain id column in `packages/db/src/registries/falsePolymorphism.ts` (as Entitlement's `sourceId`); `Cascade` arms are exempt, since their row goes with the target. Why: when the target is hard-deleted, SetNull nulls the typed key, and without a plain id the row no longer says what it pointed at; the required-FK rule (`requiredForeignKey`, `apps/api/src/hooks/falsePolymorphism/toRules.ts`) accepts that plain id in the key's place, so the row stays valid and can still be tombstoned with its target.
@@ -836,10 +852,11 @@ Schema-level configuration in `packages/db/src/registries/`:
 |---|---|
 | `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
 | `delegatedKeys(axis, value)` / `carryDelegatedKeys(model, row)` | The parent keys a delegating value carries; copy them from the parent row (the hook and the test factory both call it) |
-| `polymorphicKeyColumn` / `polymorphicTarget` | The key column for a value; the `{ kind, id }` a row points at |
+| `polymorphicKeyColumns` / `polymorphicKeyColumn` / `polymorphicTarget` / `isArmColumns` | Every key column for a value (a member arm has two or three); the one column of a single-key arm (throws on a composite arm); the `{ kind, id }` a row points at (throws likewise); whether a relation's columns are exactly an arm's |
+| `polymorphicArmRelation` / `polymorphicArmKeys` | The relation an arm's key columns form (matched by `isArmColumns`, as `childRelations` matches); the columns an arm sets to point at a row (its id, or a composite arm's owner chain off the row) |
 | `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
 | `polymorphicBindings(ownerModel, ownerId)` | The bind map `polymorphicIs` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`POLYMORPHIC_BINDS`, `isOwnerKind`) |
-| `isFalsePolymorphismRef(ref)` / `resolveFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart, and resolve returns that value's FK column (null on an unknown model, axis or value) |
+| `isFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart (its column is `polymorphicKeyColumn(ref.model, ref.axis, ref.value)`) |
 | `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |
 
 ```typescript
@@ -850,6 +867,18 @@ const config = getPolymorphismConfig('Token');
 ```
 
 See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.
+
+### Parent Edges
+
+`ParentEdgeRegistry` (`packages/db/src/registries/parentEdges.ts`, Aron, 2026-11-11): a child model names its path to its parent once, either a false-polymorphic axis (`Entitlement: { axis: 'targetModel' }`, the parent read off the axis's materialized id) or one foreign key (`{ parent, foreignKey }`). Three consumers read it:
+
+| Consumer | Reads |
+|---|---|
+| Cache hook (`apps/api/src/hooks/cache/hook.ts`) | `loadParentRows`: a child's write clears its parent's keys ([HOOKS.md](HOOKS.md#parent-edges)) |
+| Audit hook (`contextRows`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
+| Audit history read (`auditHistoryWhere`) | `childrenOf(record)`: a record's entries and its children's in one stream ([HOOKS.md](HOOKS.md#reading-the-log)) |
+
+Why one registry: the cache traversal, the audit tenancy and the history read are the same fact ("this row's change is a change to that row"), and stating it once keeps them from drifting. Register a child only when a consumer would otherwise special-case it; a model with its own tenant columns and its own cache keys needs no edge.
 
 ---
 

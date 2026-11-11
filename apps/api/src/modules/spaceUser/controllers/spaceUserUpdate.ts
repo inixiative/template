@@ -29,7 +29,7 @@ export const spaceUserUpdateController = makeController(
 
     const updated = await db.spaceUser.update({
       where: { id: spaceUser.id },
-      include: includeTargetEntitlements,
+      include: includeTargetEntitlements('SpaceUser'),
       data: body,
     });
 

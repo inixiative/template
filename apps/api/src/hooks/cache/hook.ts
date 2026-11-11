@@ -7,30 +7,27 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
   DbAction,
-  db,
   HookTiming,
   isNoOpUpdate,
+  loadParentRows,
   NOOP_FIELDS,
   type Prisma,
   registerDbHook,
 } from '@template/db';
 import { groupBy, keyBy } from 'lodash-es';
-import { traversedRows } from '#/hooks/cache/constants/cacheReference';
 import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { isManyAction } from '#/hooks/shared/hookRows';
 
-// The traversed rows are read with tombstones: a target dying in this write still has keys to clear.
-const queueTraversedCacheClear = async (
+const queueParentCacheClear = async (
   model: Prisma.ModelName,
   records: Record<string, unknown>[],
 ) => {
-  const rows = records.flatMap((record) => traversedRows(model, record));
-  for (const [target, group] of Object.entries(groupBy(rows, 'model'))) {
-    const loaded = (await db.withDeleted(() =>
-      db.delegate(target).findMany({ where: { id: { in: group.map((row) => row.id) } } }),
-    )) as Record<string, unknown>[];
-    await queueCacheClear(target as Prisma.ModelName, loaded);
-  }
+  const parents = (await loadParentRows(model, records)).filter((parent) => parent !== null);
+  for (const [parentModel, group] of Object.entries(groupBy(parents, 'model')))
+    await queueCacheClear(
+      parentModel as Prisma.ModelName,
+      group.map((parent) => parent.row),
+    );
 };
 
 const isUpdateAction = (action: DbAction): boolean =>
@@ -79,6 +76,6 @@ export const registerClearCacheHook = () => {
     }
 
     await queueCacheClear(model as Prisma.ModelName, records);
-    await queueTraversedCacheClear(model as Prisma.ModelName, records);
+    await queueParentCacheClear(model as Prisma.ModelName, records);
   });
 };

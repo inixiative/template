@@ -68,6 +68,6 @@ export const createToken = async (
   context?: BuildContext,
 ) => {
   const result = await tokenFactory.create(overrides, context);
-  await storeEntitlements({ model: 'Token', id: result.entity.id }, entitlements ?? []);
+  await storeEntitlements({ model: 'Token', row: result.entity }, entitlements ?? []);
   return result;
 };

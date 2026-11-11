@@ -15,7 +15,7 @@ export const integrationReadController = makeController(
     const integration = getResource<'integration'>(c);
     const loaded = await c.get('db').integration.findUniqueOrThrow({
       where: { id: integration.id },
-      include: includeTargetEntitlements,
+      include: includeTargetEntitlements('Integration'),
     });
     return respond.ok(loaded);
   },

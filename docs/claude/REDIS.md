@@ -392,7 +392,7 @@ Cache keys defined in the cache reference map are marked on mutations by a db ho
 
 A write the hook never sees (a raw-SQL shift in the ordered-list helpers, rows a key change reaches by `ON UPDATE CASCADE` such as a space transfer) marks the same keys itself with `queueCacheClear(model, rows)` (`apps/api/src/hooks/cache/queueCacheClear.ts`), passing the rows as they were and as they are. It marks the keys in the transaction's cache overlay, so it must run inside `db.txn()` and the keys are cleared at commit. The hook calls it too.
 
-A row whose change is a change to another cached row is listed in `cacheTraversal` (same file as the cache reference map): an `Entitlement` write loads the row's target (tombstones included) and clears that target's keys, so a token, integration or member reads its entitlements fresh on the very next request.
+A child whose change is a change to its parent names that parent in the parent edge registry (`packages/db/src/registries/parentEdges.ts`): an `Entitlement` write loads the row's target (tombstones included) and clears that target's keys, so a token, integration or member reads its entitlements fresh on the very next request.
 
 #### Invalidation conventions
 

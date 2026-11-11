@@ -6,7 +6,7 @@
  */
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
-import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
+import { polymorphicKeyColumn } from '@template/db/registries/polymorphicIs';
 import { lockedTargetStates, type TargetState } from '@template/db/utils/lockedTargetStates';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
@@ -22,7 +22,7 @@ type Edge = {
 };
 
 const fkColumn = (axis: 'sourceModel' | 'targetModel', model: string): string => {
-  const column = resolveFalsePolymorphismRef({ model: 'RuleReference', axis, value: model });
+  const column = polymorphicKeyColumn('RuleReference', axis, model);
   if (!column) {
     throw new Error(
       `RuleReference has no ${axis} FK for ${model} — add the column to ruleReference.prisma and PolymorphismRegistry`,

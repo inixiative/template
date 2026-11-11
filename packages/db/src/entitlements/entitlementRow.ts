@@ -4,12 +4,14 @@
  * @partOf infrastructure:prisma, primitive:authz
  * @uses none
  */
+
+import { anchorKey, type EntitlementAnchors } from '@template/db/entitlements/entitlementAnchors';
 import type { Entitlement, Prisma } from '@template/db/generated/client/client';
 import type {
   EntitlementResourceModel,
   EntitlementTargetModel,
 } from '@template/db/generated/client/enums';
-import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
+import { polymorphicArmKeys } from '@template/db/utils/polymorphicArmKeys';
 
 export type EntitlementTarget = { model: EntitlementTargetModel; id: string };
 
@@ -28,22 +30,34 @@ export type StoredEntitlement = Pick<
   'resource' | 'actions' | 'where' | 'sourceModel' | 'sourceId' | 'sourcePath'
 >;
 
-const foreignKey = (axis: 'sourceModel' | 'targetModel', model: string): string => {
-  const column = resolveFalsePolymorphismRef({ model: 'Entitlement', axis, value: model });
-  if (!column) throw new Error(`Entitlement has no ${axis} column for ${model}`);
-  return column;
+/** The holder a row is stored on, as read: a member arm takes its owner chain off it. */
+export type EntitlementHolder = {
+  model: EntitlementTargetModel;
+  row: Record<string, unknown> & { id: string };
 };
 
-/** The row that stores an input on a target, with the typed and plain ids on both ends. */
+/**
+ * The rows that store inputs on a holder, with each arm's keys and plain ids, and the anchor's
+ * tombstone copied. The writer has checked that every anchor exists (`missingAnchors`).
+ */
 export const toEntitlementCreateData = (
-  { where, sourcePath, ...input }: EntitlementInput,
-  target: EntitlementTarget,
-): Prisma.EntitlementUncheckedCreateInput => ({
-  ...input,
-  ...(where != null ? { where } : {}),
-  sourcePath: sourcePath ?? null,
-  [foreignKey('sourceModel', input.sourceModel)]: input.sourceId,
-  targetModel: target.model,
-  targetId: target.id,
-  [foreignKey('targetModel', target.model)]: target.id,
-});
+  inputs: EntitlementInput[],
+  holder: EntitlementHolder,
+  anchors: EntitlementAnchors,
+): Prisma.EntitlementUncheckedCreateInput[] => {
+  const targetKeys = polymorphicArmKeys('Entitlement', 'targetModel', holder.model, holder.row);
+  return inputs.map(({ where, sourcePath, ...input }) => {
+    const anchor = anchors[anchorKey(input)];
+    if (!anchor) throw new Error(`${input.sourceModel} ${input.sourceId} not found`);
+    return {
+      ...input,
+      ...(where != null ? { where } : {}),
+      sourcePath: sourcePath ?? null,
+      ...polymorphicArmKeys('Entitlement', 'sourceModel', input.sourceModel, anchor),
+      sourceDeletedAt: (anchor.deletedAt as Date | null | undefined) ?? null,
+      targetModel: holder.model,
+      targetId: holder.row.id,
+      ...targetKeys,
+    };
+  });
+};

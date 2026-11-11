@@ -13,7 +13,7 @@ export const spaceUserReadController = makeController(spaceUserReadRoute, async 
   const spaceUser = getResource<'spaceUser'>(c);
   const loaded = await c.get('db').spaceUser.findUniqueOrThrow({
     where: { id: spaceUser.id },
-    include: includeTargetEntitlements,
+    include: includeTargetEntitlements('SpaceUser'),
   });
   return respond.ok(loaded);
 });
