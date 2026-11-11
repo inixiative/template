@@ -5,11 +5,9 @@
  * @uses none
  */
 import type { Condition } from '@inixiative/json-rules';
-import { EACH, IF } from '@template/email/render/conditionParser/grammar';
-import { parseEachBlock } from '@template/email/render/conditionParser/parseEachBlock';
-import { parseIfBlock } from '@template/email/render/conditionParser/parseIfBlock';
+import { visitTemplateBlocks } from '@template/email/render/conditionParser/visitTemplateBlocks';
 import type { EmailLens } from '@template/email/rules/emailLens';
-import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
+import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 import { scopedRule } from '@template/email/rules/scopedRule';
 
 const push = (
@@ -34,39 +32,17 @@ export const collectRules = (
   lens?: EmailLens,
 ): Condition[] => {
   const rules: Condition[] = [];
-  let i = 0;
-  while (i < content.length) {
-    const ifIdx = content.indexOf(IF, i);
-    const eachIdx = content.indexOf(EACH, i);
-    if (ifIdx === -1 && eachIdx === -1) break;
-    const kind: 'if' | 'each' = eachIdx === -1 || (ifIdx !== -1 && ifIdx < eachIdx) ? 'if' : 'each';
-    const openIdx = kind === 'if' ? ifIdx : eachIdx;
-
-    if (kind === 'if') {
-      const block = parseIfBlock(content, openIdx);
-      if (!block) {
-        i = openIdx + IF.length;
-        continue;
-      }
-      for (const branch of block.branches) {
-        push(rules, branch.rule, bindings, lens);
-        rules.push(...collectRules(branch.body, bindings, lens));
-      }
-      i = block.end;
-      continue;
-    }
-
-    const block = parseEachBlock(content, openIdx);
-    if (!block) {
-      i = openIdx + EACH.length;
-      continue;
-    }
-    const next: BindingChain = new Map(bindings);
-    if (block.as) next.set(block.as, resolveBindingPath(block.path, bindings));
-    if (block.index) next.set(block.index, undefined);
-    push(rules, block.filter, next, lens);
-    rules.push(...collectRules(block.body, next, lens));
-    i = block.end;
-  }
+  visitTemplateBlocks(
+    content,
+    {
+      branch: ({ rule }, _branchIndex, _position, scope) => {
+        push(rules, rule, scope.bindings, lens);
+      },
+      loop: ({ filter }, loop) => {
+        push(rules, filter, loop.bindings, lens);
+      },
+    },
+    { bindings, state: undefined },
+  );
   return rules;
 };
