@@ -60,7 +60,10 @@ describe('POST /api/v1/space/:id/integrations', () => {
 
   it("creates a space-owned integration carrying the space's organizationId", async () => {
     const response = await fetch(
-      post(`/api/v1/space/${space.id}/integrations`, { name: `Space Integration ${getNextSeq()}` }),
+      post(`/api/v1/space/${space.id}/integrations`, {
+        name: `Space Integration ${getNextSeq()}`,
+        role: 'viewer',
+      }),
     );
     const { data } = await json<Integration>(response);
     expect(response.status).toBe(201);

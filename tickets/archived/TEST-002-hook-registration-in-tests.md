@@ -39,7 +39,7 @@ Found while adding the member self-grant rule (PR #232): the rules hook refuses 
 
 ## Open Questions
 
-- Snapshot and restore everywhere, or one global registration in the test preload that matches production? Answered for now: each file registers and clears its own. Registering every production hook before each test was tried on 2026-11-10: 143 of 2,203 API tests failed, in 35 files (`http` webhook URLs, unit tests with a mocked `db`, cron tests meeting the reconcile lock, factories producing delegates the rules refuse). Doing that is a separate decision.
+- Snapshot and restore everywhere, or one global registration in the test preload that matches production? Answered for now: each file registers and clears its own. Registering every production hook before each test was tried on 2026-11-10: 143 of 2,203 API tests failed, in 35 files (`http` webhook URLs, unit tests with a mocked `db`, cron tests meeting the reconcile lock, factories producing delegates the rules refuse). Doing that is a separate decision. Decided (2026-11-10, PR #284): every API test runs with every production hook, registered and restored around each test in `apps/api/tests/globalSetup.ts`, with those failures fixed; per-file registration remains only outside the API (`packages/db`).
 
 ---
 

@@ -32,7 +32,7 @@ describe('resolveUsers', () => {
     const c = await createUser();
     carol = c.entity;
 
-    // Each user gets one whatsapp contact (so messageUser can fan out later).
+    // Each user gets a whatsapp contact beside the email contact its creation writes.
     await createContact(
       { ownerModel: 'User', type: 'whatsapp', value: { jid: '111' } },
       { user: a.entity },
@@ -90,8 +90,7 @@ describe('resolveUsers', () => {
       operator: Operator.equals,
       value: alice.id,
     });
-    expect(users[0].contacts.length).toBeGreaterThan(0);
-    expect(users[0].contacts[0].type).toBe('whatsapp');
+    expect(users[0].contacts.map((contact) => contact.type).sort()).toEqual(['email', 'whatsapp']);
   });
 
   it('matches users via tag attachment rule', async () => {

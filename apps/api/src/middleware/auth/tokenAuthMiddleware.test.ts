@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   type AccessorName,
   cacheKey,
-  clearHookRegistry,
   db,
   fetchOne,
   getRedisClient,
+  unregisterDbHook,
 } from '@template/db';
 import type {
   Organization,
@@ -25,15 +25,11 @@ import {
   createUser,
 } from '@template/db/test';
 import { app } from '#/app';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
-// Member and user changes reach the next request through the cache hooks the app registers.
-beforeEach(() => registerClearCacheHook());
 afterEach(async () => {
-  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 
@@ -133,6 +129,7 @@ describe('an OrganizationUser token follows its member row, not the cached token
     expect((await rename(organizationPath, headers)).status).toBe(200);
 
     // The FK cascade deletes the token with no Token hook firing, so its cache entry survives.
+    unregisterDbHook('preventHardDelete');
     await db.organizationUser.delete({ where: { id: organizationUser.id } });
     expect((await readMe(headers)).status).toBe(401);
   });
@@ -209,6 +206,7 @@ describe('a SpaceUser token follows its member row, not the cached token', () =>
     const headers = await spaceUserToken(spaceUser);
     expect((await rename(spacePath, headers)).status).toBe(200);
 
+    unregisterDbHook('preventHardDelete');
     await db.spaceUser.delete({ where: { id: spaceUser.id } });
     expect((await readMe(headers)).status).toBe(401);
   });

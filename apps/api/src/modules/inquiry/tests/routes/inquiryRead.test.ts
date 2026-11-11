@@ -6,14 +6,12 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import {
-  AuditSubjectModel,
   InquiryResourceModel,
   InquiryStatus,
   InquiryType,
 } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
-  createAuditLog,
   createInquiry,
   createOrganization,
   createOrganizationUser,
@@ -86,16 +84,14 @@ describe('GET /api/v1/inquiry/:id', () => {
       targetUserId: invitee.id,
       content: { organizationId: org.id, role: 'member' },
     });
-    const { entity: auditLog } = await createAuditLog({
-      subjectModel: AuditSubjectModel.Inquiry,
-      subjectInquiryId: inquiry.id,
-    });
+    const written = await db.auditLog.findMany({ where: { subjectInquiryId: inquiry.id } });
+    expect(written.map(({ action }) => action)).toEqual(['create']);
 
     const response = await fetch(get(`/api/v1/inquiry/${inquiry.id}`));
     const { data } = await json<Inquiry & { auditLogsAsSubject: { id: string }[] }>(response);
 
     expect(response.status).toBe(200);
-    expect(data.auditLogsAsSubject.map(({ id }) => id)).toEqual([auditLog.id]);
+    expect(data.auditLogsAsSubject.map(({ id }) => id)).toEqual([written[0]?.id]);
   });
 
   it('target can read inquiry sent to them', async () => {

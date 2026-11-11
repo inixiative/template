@@ -406,6 +406,10 @@ describe('AuthProvider Endpoints', () => {
 
       const found = await db.authProvider.findUnique({ where: { id: provider.id } });
       expect(found).toBeNull();
+      const kept = await db.withDeleted(() =>
+        db.authProvider.findUnique({ where: { id: provider.id } }),
+      );
+      expect(kept?.deletedAt).toBeInstanceOf(Date);
     });
 
     it('rejects delete without permission', async () => {

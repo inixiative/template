@@ -8,11 +8,8 @@ import {
   positions,
   posOf,
   restore,
-  setupOrderedListTests,
   softDelete,
 } from '#/hooks/orderedList/tests/setup';
-
-setupOrderedListTests();
 
 describe('unique constraint safety', () => {
   it('insert-at shifts before write (no collision)', async () => {

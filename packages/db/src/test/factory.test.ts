@@ -175,6 +175,7 @@ describe('createFactory', () => {
           },
           space: null,
           spaceUser: null,
+          integration: null,
         },
       });
 

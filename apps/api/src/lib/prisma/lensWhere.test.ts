@@ -162,11 +162,11 @@ describe('lensWhere — query-plan execution (count operators)', () => {
   it('counts only live related rows — a soft-deleted child does not satisfy the count', async () => {
     const { entity: onlyTombstoned } = await createUser();
     const { entity: hasLive } = await createUser();
-    const { entity: deadContact } = await createContact(
-      { ownerModel: 'User' },
-      { user: onlyTombstoned },
-    );
-    await db.contact.update({ where: { id: deadContact.id }, data: { deletedAt: new Date() } });
+    await createContact({ ownerModel: 'User' }, { user: onlyTombstoned });
+    await db.contact.updateManyAndReturn({
+      where: { userId: onlyTombstoned.id },
+      data: { deletedAt: new Date() },
+    });
     await createContact({ ownerModel: 'User' }, { user: hasLive });
 
     const lens: LensNarrowing = {

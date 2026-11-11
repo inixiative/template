@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -15,7 +15,6 @@ import {
   createSpaceUser,
   createToken,
 } from '@template/db/test';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { inquiryRouter } from '#/modules/inquiry';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { spaceUserRouter } from '#/modules/spaceUser';
@@ -39,14 +38,12 @@ const rowOf = (id: string) =>
   db.organizationUser.findFirst({ where: { id, deletedAt: { not: null } } });
 
 beforeEach(async () => {
-  registerSoftDeleteCascadeHook();
   const { entity: member, context } = await createOrganizationUser({ role: 'owner' });
   organization = context.organization;
   owner = { user: context.user, member };
 });
 
 afterEach(async () => {
-  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

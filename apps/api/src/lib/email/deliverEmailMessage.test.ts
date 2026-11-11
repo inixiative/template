@@ -553,8 +553,9 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
           },
         },
       );
-      await db.emailComponent.deleteMany({
+      await db.emailComponent.updateManyAndReturn({
         where: { slug: 'bound-promo', organizationId: organization.id },
+        data: { deletedAt: new Date() },
       });
 
       const row = await deliver('bound-fallback', outsider.id, {
@@ -588,8 +589,9 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
         '{{#component:clamp-promo}}<mj-text>promo</mj-text>{{/component:clamp-promo}}',
         { ownerModel: 'Organization', organizationId: organization.id },
       );
-      await db.emailComponent.deleteMany({
+      await db.emailComponent.updateManyAndReturn({
         where: { slug: 'clamp-promo', organizationId: organization.id },
+        data: { deletedAt: new Date() },
       });
 
       const row = await deliver('clamp-fallback', user.id, {

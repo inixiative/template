@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import {
@@ -11,19 +11,10 @@ import {
   createUser,
   createWebhookSubscription,
 } from '@template/db/test';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-import { registerWebhookHook } from '#/hooks/webhooks/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 import { processJob } from '#/jobs/processJob';
 import { JobType } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
-
-beforeEach(() => {
-  registerPreventHardDeleteHook();
-  registerSoftDeleteCascadeHook();
-  registerWebhookHook();
-});
 
 type Enqueued = {
   subscriptionId: string;
@@ -44,7 +35,6 @@ beforeEach(() => {
 afterEach(async () => {
   enqueueSpy.mockRestore();
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 const enqueued = () => enqueueSpy.mock.calls.map(([, payload]) => payload as Enqueued);

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
+import { db } from '@template/db';
 import type {
   CustomerRef,
   Organization,
@@ -21,12 +21,6 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { segmentRouter } from '#/modules/segment';
@@ -61,13 +55,6 @@ describe('segment routes', () => {
   let outsiderRef: CustomerRef;
 
   beforeEach(async () => {
-    registerSegmentConditionsHook();
-    registerSegmentMemberOwnerHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerRuleReferenceHook();
-    registerRuleReferenceTargetHook();
-
     const { entity: ou, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = ou;
     owner = context.user;
@@ -116,7 +103,6 @@ describe('segment routes', () => {
 
   afterEach(async () => {
     await cleanupTouchedTables(testDb);
-    clearHookRegistry();
   });
 
   const createAcmeSegment = async (): Promise<Segment> => {

@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
+import { db } from '@template/db';
 import {
   buildEmailComponent,
   cleanupTouchedTables,
@@ -7,8 +7,6 @@ import {
   createEmailTemplate,
 } from '@template/db/test';
 import { expand, saveEmailTemplate } from '@template/email/render';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 import { recomposeSnapshot } from '#/lib/email/recompose';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -35,13 +33,7 @@ const restampEnqueues = (spy: Mock<typeof enqueueModule.enqueueJob>) =>
   spy.mock.calls.filter(([name]) => name === 'recomputeEmailDependents');
 
 describe('emailVersioning', () => {
-  beforeEach(() => {
-    registerAuditLogHook();
-    registerEmailVersioningHook();
-  });
-
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

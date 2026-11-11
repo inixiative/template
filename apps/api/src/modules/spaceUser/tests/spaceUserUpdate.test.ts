@@ -7,6 +7,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
+import { memberSelfGrant } from '@template/permissions';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
 import { entry } from '#tests/utils/entitlementEntry';
@@ -60,7 +61,10 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
     const { entity: target } = await spaceMember('member');
     expect((await grantTo('admin', target, onSpace('operate'))).status).toBe(200);
     const stored = await db.spaceUser.findUniqueOrThrow({ where: { id: target.id } });
-    expect(stored.entitlements).toEqual(onSpace('operate'));
+    expect(stored.entitlements as unknown).toEqual([
+      memberSelfGrant('db:spaceUser', target),
+      ...onSpace('operate'),
+    ]);
   });
 
   it('a space admin cannot grant own', async () => {

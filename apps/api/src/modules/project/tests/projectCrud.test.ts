@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -66,7 +65,6 @@ describe('Project', () => {
 
   afterEach(async () => {
     await cleanupTouchedTables(app.db);
-    clearHookRegistry();
   });
 
   describe('each of the five owners creates and lists its own projects', () => {

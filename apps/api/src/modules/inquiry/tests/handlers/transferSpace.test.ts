@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { cache, cacheKey, checkCache, snapshotHookRegistry } from '@template/db';
+import { cache, cacheKey, checkCache } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -20,16 +20,6 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
-import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
-import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { inquiryRouter } from '#/modules/inquiry';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -43,21 +33,8 @@ describe('handler: transferSpace', () => {
   let targetOrg2: Organization;
   let ownerFetch: ReturnType<typeof createTestApp>['fetch'];
   let adminFetch: ReturnType<typeof createTestApp>['fetch'];
-  let restoreHooks: () => void;
 
   beforeEach(async () => {
-    restoreHooks = snapshotHookRegistry();
-    registerDelegatedKeysHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerAuditLogHook();
-    registerClearCacheHook();
-    registerEmailVersioningHook();
-    registerEmailTemplateSlugReservationHook();
-    registerImmutableFieldsHook();
-    registerPreventHardDeleteHook();
-    registerSoftDeleteCascadeHook();
-
     const { entity: owner } = await createUser();
     const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
     const { entity: o } = await createOrganization();
@@ -90,7 +67,6 @@ describe('handler: transferSpace', () => {
   });
 
   afterEach(async () => {
-    restoreHooks();
     await cleanupTouchedTables(db);
   });
 

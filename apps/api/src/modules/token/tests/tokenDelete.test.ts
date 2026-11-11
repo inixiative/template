@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser, createToken } from '@template/db/test';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -75,12 +74,7 @@ describe('DELETE /token/:id', () => {
 describe('a token deletes tokens: it only removes access (R84)', () => {
   const { call } = createTokenProbeApp((hono) => hono.route('/api/v1/token', tokenRouter));
 
-  beforeEach(() => {
-    registerMemberSelfGrantHook();
-  });
-
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 
