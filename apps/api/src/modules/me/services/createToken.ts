@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma, feature:auth
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { type HydratedRecord, hydrate, toEntitlementEntry } from '@template/db';
+import { type HydratedRecord, hydrate } from '@template/db';
 import type { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { type DelegatePermissions, TokenAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
@@ -67,11 +67,11 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
         expiresAt: params.expiresAt,
       },
     });
-    const entitlements = await changeEntitlements(
+    const targetEntitlements = await changeEntitlements(
       permix,
       { model: 'Token', id: token.id },
       { add: params.entitlements ?? [] },
     );
-    return { ...token, entitlements: entitlements.map(toEntitlementEntry), key: rawKey };
+    return { ...token, targetEntitlements, key: rawKey };
   });
 };

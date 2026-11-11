@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { WithEntitlementEntries } from '@template/db/entitlements/targetEntitlements';
+import type { WithTargetEntitlements } from '@template/db/entitlements/targetEntitlements';
 import type {
   Organization,
   OrganizationUser,
@@ -13,9 +13,9 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 
-export type OrganizationUserWithEntitlements = WithEntitlementEntries<OrganizationUser>;
+export type OrganizationUserWithEntitlements = WithTargetEntitlements<OrganizationUser>;
 
-export type SpaceUserWithEntitlements = WithEntitlementEntries<SpaceUser>;
+export type SpaceUserWithEntitlements = WithTargetEntitlements<SpaceUser>;
 
 export type UserWithRelations = User & {
   organizationUsers: OrganizationUserWithEntitlements[];

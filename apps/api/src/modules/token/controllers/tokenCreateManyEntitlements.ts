@@ -4,7 +4,7 @@
  * @partOf feature:auth
  * @uses primitive:authz, infrastructure:prisma
  */
-import { type HydratedRecord, hydrate, toEntitlementRowEntry } from '@template/db';
+import { type HydratedRecord, hydrate } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
@@ -26,6 +26,6 @@ export const tokenCreateManyEntitlementsController = makeController(
         add: c.req.valid('json'),
       },
     );
-    return respond.created(entitlements.map(toEntitlementRowEntry));
+    return respond.created(entitlements);
   },
 );

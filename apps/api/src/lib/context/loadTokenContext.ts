@@ -14,8 +14,7 @@ import {
   includeTargetEntitlements,
   toAccessor,
   type UserWithRelations,
-  type WithEntitlementEntries,
-  withEntitlementEntries,
+  type WithTargetEntitlements,
 } from '@template/db';
 import type { Token, TokenOwnerModel } from '@template/db/generated/client/client';
 import type { TokenWithRelations } from '#/lib/context/types';
@@ -38,15 +37,11 @@ const ownerIsPresent = (token: HydratedRecord & Token): boolean => {
 
 export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | null> => {
   let fetched = false;
-  const row = await cache<WithEntitlementEntries<Token> | null>(
+  const row = await cache<WithTargetEntitlements<Token> | null>(
     cacheKey('Token', { keyHash }),
-    async () => {
+    () => {
       fetched = true;
-      const token = await db.token.findUnique({
-        where: { keyHash },
-        include: includeTargetEntitlements,
-      });
-      return token && withEntitlementEntries(token);
+      return db.token.findUnique({ where: { keyHash }, include: includeTargetEntitlements });
     },
     TOKEN_CACHE_TTL,
   );

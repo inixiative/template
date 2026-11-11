@@ -189,7 +189,7 @@ describe('auditLog hook', () => {
     const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
-      entitlements: [],
+      targetEntitlements: [],
       user: tokenOwner,
       organization: null,
       organizationUser: null,
@@ -241,7 +241,7 @@ describe('auditLog hook', () => {
     const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
-      entitlements: [],
+      targetEntitlements: [],
       user: tokenOwner,
       organization: null,
       organizationUser: null,

@@ -4,7 +4,7 @@
  * @partOf feature:integrations
  * @uses primitive:routeTemplates
  */
-import { includeTargetEntitlements, withEntitlementEntries } from '@template/db';
+import { includeTargetEntitlements } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationReadRoute } from '#/modules/integration/routes/integrationRead';
@@ -17,6 +17,6 @@ export const integrationReadController = makeController(
       where: { id: integration.id },
       include: includeTargetEntitlements,
     });
-    return respond.ok(withEntitlementEntries(loaded));
+    return respond.ok(loaded);
   },
 );

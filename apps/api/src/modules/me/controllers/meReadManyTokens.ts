@@ -4,7 +4,7 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:auth
  */
-import { includeTargetEntitlements, type Prisma, withEntitlementEntries } from '@template/db';
+import { includeTargetEntitlements, type Prisma } from '@template/db';
 
 import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
@@ -22,9 +22,9 @@ export const meReadManyTokensController = makeController(
       Prisma.TokenGetPayload<{
         include: typeof includeTargetEntitlements & {
           organization: true;
-          organizationUser: true;
+          organizationUser: { include: typeof includeTargetEntitlements };
           space: true;
-          spaceUser: true;
+          spaceUser: { include: typeof includeTargetEntitlements };
         };
         omit: { keyHash: true };
       }>
@@ -36,16 +36,13 @@ export const meReadManyTokensController = makeController(
       include: {
         ...includeTargetEntitlements,
         organization: true,
-        organizationUser: true,
+        organizationUser: { include: includeTargetEntitlements },
         space: true,
-        spaceUser: true,
+        spaceUser: { include: includeTargetEntitlements },
       },
       omit: { keyHash: true },
     });
 
-    return respond.ok(
-      data.map((row) => withEntitlementEntries(row)),
-      { pagination },
-    );
+    return respond.ok(data, { pagination });
   },
 );

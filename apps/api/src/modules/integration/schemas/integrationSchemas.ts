@@ -5,9 +5,13 @@
  * @uses primitive:authz
  */
 import { z } from '@hono/zod-openapi';
-import { IntegrationScalarInputSchema, IntegrationScalarSchema } from '@template/db';
+import {
+  EntitlementScalarSchema,
+  IntegrationScalarInputSchema,
+  IntegrationScalarSchema,
+} from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
-import { entitlementEntriesSchema } from '@template/permissions/rebac';
+import { entitlementInputsSchema } from '@template/permissions/rebac';
 
 export const INTEGRATION_IMMUTABLE_FIELDS = [
   'ownerModel',
@@ -24,7 +28,7 @@ export const integrationCreateBodySchema = IntegrationScalarInputSchema.omit({
 }).extend({
   role: z.nativeEnum(Role).nullable().default(null),
   full: z.boolean().default(false),
-  entitlements: entitlementEntriesSchema.default([]),
+  entitlements: entitlementInputsSchema.default([]),
 });
 
 export const integrationUpdateBodySchema = integrationCreateBodySchema
@@ -36,5 +40,5 @@ export const integrationUpdateBodySchema = integrationCreateBodySchema
   .partial();
 
 export const integrationReadResponseSchema = IntegrationScalarSchema.extend({
-  entitlements: entitlementEntriesSchema,
+  targetEntitlements: z.array(EntitlementScalarSchema),
 });

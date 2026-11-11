@@ -1,11 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import {
-  cache,
-  cacheKey,
-  checkCache,
-  snapshotHookRegistry,
-  toEntitlementEntry,
-} from '@template/db';
+import { cache, cacheKey, checkCache, snapshotHookRegistry } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -26,7 +20,7 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { memberSelfGrant } from '@template/permissions';
+import { memberSelfGrant, toEntitlementEntry } from '@template/permissions';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';

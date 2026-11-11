@@ -8,7 +8,7 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
-import { memberSelfGrant } from '@template/permissions';
+import { memberSelfGrant, toEntitlementInput } from '@template/permissions';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
@@ -87,7 +87,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       heldEntitlements({ model: 'OrganizationUser', id: target.id });
 
     const selfGrantOf = (member: OrganizationUser) =>
-      memberSelfGrant('db:organizationUser', member);
+      toEntitlementInput(memberSelfGrant('db:organizationUser', member));
 
     const grant = async (app: ReturnType<typeof createTestApp>, entitlements: unknown) => {
       const target = await newMember();

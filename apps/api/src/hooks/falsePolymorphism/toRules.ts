@@ -9,7 +9,7 @@ import {
   toModelName,
 } from '@template/db';
 
-// why: a purge nulls a materialized axis's FK and leaves the plain id naming the row that went.
+// why: a hard-deleted source (SegmentMember, Flow, WebhookSubscription) nulls its SetNull FK; the plain id still names it.
 const requiredForeignKey = (
   model: ModelName,
   axis: PolymorphicAxis,

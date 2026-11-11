@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
-import { includeTargetEntitlements, type Prisma, withEntitlementEntries } from '@template/db';
+import { includeTargetEntitlements, type Prisma } from '@template/db';
 import { paginate } from '#/lib/prisma/paginate';
 import { submodelOwnerWhere } from '#/lib/prisma/submodelOwnerWhere';
 import { makeController } from '#/lib/utils/makeController';
@@ -22,9 +22,6 @@ export const organizationReadManyTokensController = makeController(
       where: submodelOwnerWhere(c),
       omit: { keyHash: true },
     });
-    return respond.ok(
-      data.map((row) => withEntitlementEntries(row)),
-      { pagination },
-    );
+    return respond.ok(data, { pagination });
   },
 );

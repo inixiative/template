@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import { hydrate, includeTargetEntitlements, Prisma, withEntitlementEntries } from '@template/db';
+import { hydrate, includeTargetEntitlements, Prisma } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { memberRoleWrite } from '@template/permissions/rebac/schemaHelpers';
@@ -43,6 +43,6 @@ export const organizationUserUpdateController = makeController(
       data: body,
     });
 
-    return respond.ok(withEntitlementEntries(updated));
+    return respond.ok(updated);
   },
 );

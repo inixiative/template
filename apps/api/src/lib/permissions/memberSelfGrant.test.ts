@@ -6,6 +6,7 @@ import {
   memberSelfGrant,
   type Permissions,
   permissionsOfUser,
+  toEntitlementInput,
 } from '@template/permissions';
 import { check } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
@@ -31,7 +32,7 @@ type Member = typeof m1;
 
 const withSelfGrant = (member: Member) => ({
   ...member,
-  entitlements: [memberSelfGrant('db:organizationUser', member)],
+  targetEntitlements: [toEntitlementInput(memberSelfGrant('db:organizationUser', member))],
 });
 
 const permixOf = async (permissions: Permissions) => {
@@ -71,13 +72,17 @@ describe("only a member's self-grant is backed by its user", () => {
   it("a wider entitlement anchored on M1's user stays backed by the tenant", async () => {
     const wider = {
       ...m1,
-      entitlements: [
-        {
+      targetEntitlements: [
+        toEntitlementInput({
           resource: 'db:organizationUser',
           anchor: { resource: 'db:user', id: u1.id, path: 'user' },
           actions: { operate: true },
-        },
-        { resource: 'db:user', anchor: { resource: 'db:user', id: u1.id }, actions: { own: true } },
+        }),
+        toEntitlementInput({
+          resource: 'db:user',
+          anchor: { resource: 'db:user', id: u1.id },
+          actions: { own: true },
+        }),
       ],
     };
     const full = await permixOf(
@@ -90,7 +95,10 @@ describe("only a member's self-grant is backed by its user", () => {
   });
 
   it("M1's self-grant stored on M2 is backed by the tenant, not U1", async () => {
-    const borrowed = { ...m2, entitlements: [memberSelfGrant('db:organizationUser', m1)] };
+    const borrowed = {
+      ...m2,
+      targetEntitlements: [toEntitlementInput(memberSelfGrant('db:organizationUser', m1))],
+    };
     const table = delegatedPermissions({ full: true }, permissionsOfUser(null, [borrowed], []));
     expect(await operates(table, m1)).toBe(false);
   });

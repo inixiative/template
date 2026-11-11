@@ -221,6 +221,12 @@ A polymorphic slot is named for the role the row plays, as `<side>Model` + typed
 
 Never `referenced*`.
 
+A side whose typed FKs are `onDelete: SetNull` keeps a plain id beside them: register the axis with
+`materialized` (`sourceId`, `targetId`) in `packages/db/src/registries/falsePolymorphism.ts`. Why:
+SetNull nulls the typed key when the row it points at is hard-deleted, and only the plain id still says
+what it was; the required-FK rule accepts it in the key's place. CI rule
+`set-null-polymorphism-materialized` enforces this; `Cascade` arms are exempt.
+
 Each side gets its own enum, named for the question it answers, even when the two lists overlap:
 `TagOwnerModel` (who can own a tag: `Tag.ownerModel`, `TagCategory.ownerModel`) and `TagResource`
 (where a tag can be applied: `TagAttachment.resourceModel`, `Tag.resources`). A value that is only
@@ -236,8 +242,9 @@ back-relations do the same, side plus the full model name: `sourceRuleReferences
 An `Entitlement` row is a directed edge, so it uses `source` / `target` like `RuleReference`. The
 **source** is the anchor the entitlement acts from, the **target** the holder (`Token`,
 `Integration`, `OrganizationUser`, `SpaceUser`); `resource` is the model its actions apply to. The
-permissions library keeps its own words, and one mapping (`toEntitlementEntry` / `toEntitlementRow`,
-`packages/db/src/entitlements`) moves between them:
+permissions library keeps its own words, and one transformer in `@template/permissions`
+(`toEntitlementEntry` / `toEntitlementInput`, `packages/permissions/src/entitlementRows.ts`) moves
+between them, only where a holder is handed to the library:
 
 | Library entry | Row |
 |---|---|
@@ -249,8 +256,9 @@ permissions library keeps its own words, and one mapping (`toEntitlementEntry` /
 | the holder it is installed on | `targetModel`, `targetId` and the typed FK `targetTokenId`, … |
 
 Back-relations follow the side rule: `targetEntitlements` on a holder, `sourceEntitlements` on every
-model an entitlement can anchor at. An API response's `entitlements` field is the holder's live rows
-as library entries, never rows. The grantor has no name on the row: it is the target's owner.
+model an entitlement can anchor at. An API response carries the holder's live rows as stored, under
+`targetEntitlements`; a create body's `entitlements` is a list of `EntitlementInput` rows. Entries
+never cross the API. The grantor has no name on the row: it is the target's owner.
 
 ### IDs
 

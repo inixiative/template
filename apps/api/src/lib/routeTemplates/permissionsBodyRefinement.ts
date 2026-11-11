@@ -28,12 +28,12 @@ const reportWheres = (ctx: z.RefinementCtx, path: (string | number)[], entries: 
     });
 };
 
-const isEntry = (body: unknown): body is { anchor: unknown; where?: unknown } =>
-  typeof body === 'object' && body !== null && 'anchor' in body;
+const isEntitlement = (body: unknown): body is { sourceModel: unknown; where?: unknown } =>
+  typeof body === 'object' && body !== null && 'sourceModel' in body;
 
-/** Entitlement entries carry positive rules only: one entry of a many body, or a delegate's `entitlements`. */
+/** Entitlements carry positive rules only: one row of a many body, or a delegate's `entitlements`. */
 export const permissionsBodyRefinement = (body: unknown, ctx: z.RefinementCtx): void => {
-  if (isEntry(body)) {
+  if (isEntitlement(body)) {
     if (body.where !== undefined)
       report(ctx, ['where'], validateRule(body.where, { positive: true }).errors);
   } else reportWheres(ctx, ['entitlements'], (body as { entitlements?: unknown }).entitlements);

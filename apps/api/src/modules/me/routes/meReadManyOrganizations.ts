@@ -4,15 +4,16 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, feature:tenancy
  */
-import { OrganizationScalarSchema, OrganizationUserScalarSchema } from '@template/db';
+import { OrganizationScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
+import { organizationUserReadResponseSchema } from '#/modules/organizationUser/schemas/organizationUserSchemas';
 import { Tags } from '#/modules/tags';
 
 const responseSchema = OrganizationScalarSchema.extend({
-  organizationUser: OrganizationUserScalarSchema,
+  organizationUser: organizationUserReadResponseSchema,
 });
 
 export const meReadManyOrganizationsRoute = readRoute({

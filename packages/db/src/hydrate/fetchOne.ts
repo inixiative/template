@@ -8,9 +8,7 @@ import { db } from '@template/db/client';
 import {
   includeTargetEntitlements,
   isEntitlementTargetAccessor,
-  withEntitlementEntries,
 } from '@template/db/entitlements/targetEntitlements';
-import type { Entitlement } from '@template/db/generated/client/client';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cache, cacheKey } from '@template/db/redis';
 import type { AccessorName } from '@template/db/utils/modelNames';
@@ -27,15 +25,10 @@ export const fetchOne = async <T extends HydratedRecord>(
   const delegate = db.delegate(accessor);
 
   const where = typeof identifier === 'string' ? { id: identifier } : identifier;
-  const read = async (): Promise<HydratedRecord | null> => {
-    if (!isEntitlementTargetAccessor(accessor))
-      return delegate.findFirst({ where }) as Promise<HydratedRecord | null>;
-    const row = (await delegate.findFirst({ where, include: includeTargetEntitlements })) as {
-      id: string;
-      targetEntitlements: Entitlement[];
-    } | null;
-    return row && withEntitlementEntries(row);
-  };
-
-  return (await cache<HydratedRecord | null>(key, read, ttl)) as T | null;
+  const include = isEntitlementTargetAccessor(accessor) ? includeTargetEntitlements : undefined;
+  return cache<T | null>(
+    key,
+    () => delegate.findFirst({ where, include }) as Promise<T | null>,
+    ttl,
+  );
 };

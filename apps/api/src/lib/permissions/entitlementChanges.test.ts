@@ -7,7 +7,7 @@ import {
   createOrganization,
   createOrganizationUser,
 } from '@template/db/test';
-import { isMemberSelfGrant } from '@template/permissions';
+import { isMemberSelfGrant, toEntitlementEntry } from '@template/permissions';
 import { integrationRouter } from '#/modules/integration';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
@@ -66,7 +66,7 @@ const onMember = (target: OrganizationUser) => ({
 
 const stored = async (target: OrganizationUser): Promise<unknown> =>
   (await heldEntitlements(onMember(target))).filter(
-    (entry) => !isMemberSelfGrant('db:organizationUser', target)(entry),
+    (input) => !isMemberSelfGrant('db:organizationUser', target)(toEntitlementEntry(input)),
   );
 
 const change = async (

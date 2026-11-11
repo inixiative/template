@@ -9,6 +9,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
+import { toEntitlementInput } from '@template/permissions';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { integrationRouter } from '#/modules/integration';
@@ -436,11 +437,11 @@ describe("a member writes any entitlement on their own member integration, cappe
         provider: 'slack',
         role: 'viewer',
         entitlements: [
-          {
+          toEntitlementInput({
             resource: 'db:organization',
             anchor: { resource: 'db:organization', id: organization.id },
             actions: { manage: true },
-          },
+          }),
         ],
       }),
     );
@@ -460,11 +461,11 @@ describe("a member writes any entitlement on their own member integration, cappe
     });
     const add = {
       add: [
-        {
+        toEntitlementInput({
           resource: 'db:organization',
           anchor: { resource: 'db:organization', id: organization.id },
           actions: { read: true },
-        },
+        }),
       ],
     };
     for (const role of [null, 'viewer'] as const) {

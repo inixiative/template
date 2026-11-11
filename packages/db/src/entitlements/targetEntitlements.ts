@@ -4,8 +4,6 @@
  * @partOf infrastructure:prisma, primitive:authz
  * @uses none
  */
-import type { EntitlementEntry } from '@inixiative/permissions';
-import { toEntitlementEntry } from '@template/db/entitlements/entitlementEntry';
 import { type Entitlement, Prisma } from '@template/db/generated/client/client';
 import { EntitlementTargetModel } from '@template/db/generated/client/enums';
 import { type AccessorName, toAccessor } from '@template/db/utils/modelNames';
@@ -24,14 +22,4 @@ export const includeTargetEntitlements = {
   },
 };
 
-export type WithEntitlementEntries<T> = Omit<T, 'targetEntitlements'> & {
-  entitlements: EntitlementEntry[];
-};
-
-/** A target loaded with `includeTargetEntitlements`, its rows turned into the entries it holds. */
-export const withEntitlementEntries = <T extends { targetEntitlements: Entitlement[] }>(
-  row: T,
-): WithEntitlementEntries<T> => {
-  const { targetEntitlements, ...columns } = row;
-  return { ...columns, entitlements: targetEntitlements.map(toEntitlementEntry) };
-};
+export type WithTargetEntitlements<T> = T & { targetEntitlements: Entitlement[] };

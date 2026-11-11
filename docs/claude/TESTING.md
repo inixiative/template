@@ -313,7 +313,7 @@ Some database rules (`apps/api/src/hooks/rules/registry.ts`) hold only for rows 
 
 ### Entitlements in Tests
 
-`createToken`, `createIntegration`, `createOrganizationUser` and `createSpaceUser` take an `entitlements` option: a list of entries, written as `Entitlement` rows targeted at the new row (`storeEntitlements`, `packages/db/src/test/factories/entitlementFactory.ts`). Like any factory, it skips the grant check; the writer's own rules are tested through the routes. `createEntitlement` builds a single row. In `apps/api/tests/utils/entitlements.ts`: `heldEntitlements(target)` reads the entries a target holds, `entitlementIds(target, entries)` finds the rows storing entries, and `grantEntitlements` / `revokeEntitlements` / `changeEntitlements` call the `POST` / `DELETE` `…/:id/entitlements` routes.
+`createToken`, `createIntegration`, `createOrganizationUser` and `createSpaceUser` take an `entitlements` option: a list of `EntitlementInput` rows, written targeted at the new row (`storeEntitlements`, `packages/db/src/test/factories/entitlementFactory.ts`). Like any factory, it skips the grant check; the writer's own rules are tested through the routes. `createEntitlement` builds a single row. In `apps/api/tests/utils/entitlements.ts`: `entry(resource, [anchorResource, id, path?], actions)` builds an input from the library's words, `heldEntitlements(target)` reads the rows a target holds as inputs (`asInput`), `entitlementIds(target, inputs)` finds the rows storing them, and `grantEntitlements` / `revokeEntitlements` / `changeEntitlements` call the `POST` / `DELETE` `…/:id/entitlements` routes.
 
 ### Hooks in tests
 

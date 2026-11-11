@@ -4,9 +4,9 @@
  * @partOf feature:tenancy
  * @uses primitive:authz
  */
-import { SpaceUserScalarSchema } from '@template/db';
-import { entitlementEntriesSchema } from '@template/permissions/rebac';
+import { z } from '@hono/zod-openapi';
+import { EntitlementScalarSchema, SpaceUserScalarSchema } from '@template/db';
 
 export const spaceUserReadResponseSchema = SpaceUserScalarSchema.extend({
-  entitlements: entitlementEntriesSchema,
+  targetEntitlements: z.array(EntitlementScalarSchema),
 });

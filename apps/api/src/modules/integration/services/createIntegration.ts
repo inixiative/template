@@ -4,13 +4,13 @@
  * @partOf feature:integrations
  * @uses primitive:authz, infrastructure:prisma
  */
-import { db, type Prisma, toEntitlementEntry } from '@template/db';
-import type { EntitlementEntry, Permix } from '@template/permissions';
+import { db, type EntitlementInput, type Prisma } from '@template/db';
+import type { Permix } from '@template/permissions';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
 
 type IntegrationCreate = Prisma.IntegrationUncheckedCreateInput & {
-  entitlements?: EntitlementEntry[];
+  entitlements?: EntitlementInput[];
 };
 
 /** The integration and the entitlements it is created with, in one transaction. */
@@ -21,10 +21,10 @@ export const createIntegration = (
   db.txn(async () => {
     await validateIntegrationRole(writer, row);
     const integration = await db.integration.create({ data: row });
-    const granted = await changeEntitlements(
+    const targetEntitlements = await changeEntitlements(
       writer,
       { model: 'Integration', id: integration.id },
       { add: entitlements },
     );
-    return { ...integration, entitlements: granted.map(toEntitlementEntry) };
+    return { ...integration, targetEntitlements };
   });

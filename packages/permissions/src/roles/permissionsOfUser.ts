@@ -5,11 +5,8 @@
  * @uses none
  */
 import type { Role } from '@template/db/generated/client/enums';
-import {
-  type EntitlementEntry,
-  type Permissions,
-  wellFormedEntitlements,
-} from '@template/permissions/client';
+import type { EntitlementEntry, Permissions } from '@template/permissions/client';
+import { type EntitlementFields, entitlementsOf } from '@template/permissions/entitlementRows';
 import {
   isMemberSelfGrant,
   type MemberResource,
@@ -19,7 +16,12 @@ import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
 import { partition } from 'lodash-es';
 
-type Member = { role: Role; id?: string; userId?: string; entitlements?: unknown };
+type Member = {
+  role: Role;
+  id?: string;
+  userId?: string;
+  targetEntitlements?: EntitlementFields[] | null;
+};
 type OrganizationMember = Member & { organizationId: string };
 type SpaceMember = Member & { spaceId: string };
 
@@ -40,7 +42,7 @@ const memberPermissions = (
   tenantOwner: Permissions,
 ): Permissions => {
   const [usersSide, tenantsSide] = partition(
-    wellFormedEntitlements(member.entitlements),
+    entitlementsOf(member),
     isMemberSelfGrant(resource, member),
   );
   return [

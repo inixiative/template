@@ -6,29 +6,31 @@
  */
 import {
   db,
+  type EntitlementInput,
   type EntitlementTarget,
   includeTargetEntitlements,
   resolveFalsePolymorphismRef,
-  toEntitlementEntry,
-  toEntitlementRow,
+  toEntitlementCreateData,
 } from '@template/db';
 import type { Entitlement } from '@template/db/generated/client/client';
 import {
   coversEntitlement,
   type EntitlementEntry,
+  entitlementsOf,
   type Permix,
-  wellFormedEntitlements,
+  toEntitlementEntry,
+  toEntitlementInput,
 } from '@template/permissions';
 import { partition, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 
-export type EntitlementChanges = { add?: EntitlementEntry[]; remove?: string[] };
+export type EntitlementChanges = { add?: EntitlementInput[]; remove?: string[] };
 
 type Holder = { targetEntitlements: Entitlement[] };
 
-const anchorIsPurged = (row: Entitlement): boolean => {
+const anchorIsHardDeleted = (row: Entitlement): boolean => {
   const column = resolveFalsePolymorphismRef({
     model: 'Entitlement',
     axis: 'sourceModel',
@@ -71,20 +73,24 @@ export const changeEntitlements = (
       if (removed.length !== removedIds.length)
         throw makeError({ status: 404, message: 'Entitlement not found on this holder' });
 
-      const checked = removed.filter((row) => !anchorIsPurged(row));
+      const checked = removed.filter((row) => !anchorIsHardDeleted(row));
       const [anchoredLive, anchoredDeleted] = partition(
         checked,
         (row) => row.sourceDeletedAt == null,
       );
-      await validateEntitlementGrants(writer, [...add, ...anchoredLive.map(toEntitlementEntry)]);
+      const addedEntries = add.map(toEntitlementEntry);
+      await validateEntitlementGrants(writer, [
+        ...addedEntries,
+        ...anchoredLive.map(toEntitlementEntry),
+      ]);
       await db.withDeleted(() =>
         validateEntitlementGrants(writer, anchoredDeleted.map(toEntitlementEntry)),
       );
 
-      const kept = holder.targetEntitlements
-        .filter((row) => !removedIds.includes(row.id))
-        .map(toEntitlementEntry);
-      const added = uncovered(wellFormedEntitlements(kept), add);
+      const kept = entitlementsOf({
+        targetEntitlements: holder.targetEntitlements.filter((row) => !removedIds.includes(row.id)),
+      });
+      const added = uncovered(kept, addedEntries);
 
       if (removed.length)
         await db.entitlement.updateManyAndReturn({
@@ -93,7 +99,7 @@ export const changeEntitlements = (
         });
       if (added.length)
         await db.entitlement.createManyAndReturn({
-          data: added.map((entry) => toEntitlementRow(entry, target)),
+          data: added.map((entry) => toEntitlementCreateData(toEntitlementInput(entry), target)),
         });
 
       return (await liveRows(target)).targetEntitlements;

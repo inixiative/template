@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, type EntitlementInput } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -13,11 +13,12 @@ import { registerRulesHook } from '#/hooks/rules/hook';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { heldEntitlements } from '#tests/utils/entitlements';
 
-const operate = (organizationId: string) => [
+const operate = (organizationId: string): EntitlementInput[] => [
   {
-    resource: 'db:organization',
-    anchor: { resource: 'db:organization', id: organizationId },
-    actions: { operate: true },
+    resource: 'Organization',
+    actions: ['operate'],
+    sourceModel: 'Organization',
+    sourceId: organizationId,
   },
 ];
 

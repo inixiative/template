@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
-import { includeTargetEntitlements, withEntitlementEntries } from '@template/db';
+import { includeTargetEntitlements } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationUserReadRoute } from '#/modules/organizationUser/routes/organizationUserRead';
@@ -17,6 +17,6 @@ export const organizationUserReadController = makeController(
       where: { id: orgUser.id },
       include: includeTargetEntitlements,
     });
-    return respond.ok(withEntitlementEntries(loaded));
+    return respond.ok(loaded);
   },
 );

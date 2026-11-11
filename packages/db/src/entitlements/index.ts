@@ -1,12 +1,11 @@
 export {
+  type EntitlementInput,
   type EntitlementTarget,
-  toEntitlementEntry,
-  toEntitlementRow,
-  toEntitlementRowEntry,
-} from './entitlementEntry';
+  type StoredEntitlement,
+  toEntitlementCreateData,
+} from './entitlementRow';
 export {
   includeTargetEntitlements,
   isEntitlementTargetAccessor,
-  type WithEntitlementEntries,
-  withEntitlementEntries,
+  type WithTargetEntitlements,
 } from './targetEntitlements';

@@ -13,7 +13,6 @@ import {
   includeTargetEntitlements,
   type OrganizationUserWithEntitlements,
   type SpaceUserWithEntitlements,
-  withEntitlementEntries,
 } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
@@ -32,26 +31,22 @@ export const findUserByEmail = async (email: string): Promise<User | null> => {
 const organizationUsersOf = (userId: string): Promise<OrganizationUserWithEntitlements[]> =>
   cache(
     cacheKey('user', userId, ['organizationUsers']),
-    async () => {
-      const rows = await db.organizationUser.findMany({
+    () =>
+      db.organizationUser.findMany({
         where: { userId, organization: { deletedAt: null } },
         include: includeTargetEntitlements,
-      });
-      return rows.map((row) => withEntitlementEntries(row));
-    },
+      }),
     USER_CACHE_TTL,
   );
 
 const spaceUsersOf = (userId: string): Promise<SpaceUserWithEntitlements[]> =>
   cache(
     cacheKey('user', userId, ['spaceUsers']),
-    async () => {
-      const rows = await db.spaceUser.findMany({
+    () =>
+      db.spaceUser.findMany({
         where: { userId, space: { deletedAt: null } },
         include: includeTargetEntitlements,
-      });
-      return rows.map((row) => withEntitlementEntries(row));
-    },
+      }),
     USER_CACHE_TTL,
   );
 

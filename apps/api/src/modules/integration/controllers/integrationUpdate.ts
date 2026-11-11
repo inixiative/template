@@ -1,4 +1,4 @@
-import { includeTargetEntitlements, type Prisma, withEntitlementEntries } from '@template/db';
+import { includeTargetEntitlements, type Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationUpdateRoute } from '#/modules/integration/routes/integrationUpdate';
@@ -26,6 +26,6 @@ export const integrationUpdateController = makeController(
       include: includeTargetEntitlements,
     });
 
-    return respond.ok(withEntitlementEntries(updated));
+    return respond.ok(updated);
   },
 );

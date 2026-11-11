@@ -7,10 +7,6 @@ export {
 export { schemaMap } from '@template/db/schemaMap';
 export { canGrantEntitlement } from './canGrantEntitlement';
 export { check } from './check';
-export {
-  entitlementEntriesSchema,
-  entitlementEntrySchema,
-  entitlementRowSchema,
-} from './entitlementEntrySchema';
+export { entitlementInputSchema, entitlementInputsSchema } from './entitlementInputSchema';
 export { rebacSchema } from './schema';
 export type { ActionRule } from './types';

@@ -5,7 +5,6 @@
  * @uses primitive:authz, infrastructure:prisma
  */
 
-import { toEntitlementRowEntry } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateMemberGrant } from '#/lib/permissions/validateMemberGrant';
@@ -25,6 +24,6 @@ export const spaceUserCreateManyEntitlementsController = makeController(
         add: c.req.valid('json'),
       },
     );
-    return respond.created(entitlements.map(toEntitlementRowEntry));
+    return respond.created(entitlements);
   },
 );

@@ -4,7 +4,6 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { EntitlementEntry } from '@inixiative/permissions';
 import type { Prisma } from '@template/db/generated/client/client';
 
 export type HydrateInclude = {
@@ -24,6 +23,5 @@ export interface HydratedRecord {
     | Prisma.JsonValue
     | HydratedRecord
     | HydratedRecord[]
-    | EntitlementEntry[]
     | Record<string, unknown>;
 }

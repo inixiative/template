@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
-import { includeTargetEntitlements, withEntitlementEntries } from '@template/db';
+import { includeTargetEntitlements } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceUserReadRoute } from '#/modules/spaceUser/routes/spaceUserRead';
@@ -15,5 +15,5 @@ export const spaceUserReadController = makeController(spaceUserReadRoute, async 
     where: { id: spaceUser.id },
     include: includeTargetEntitlements,
   });
-  return respond.ok(withEntitlementEntries(loaded));
+  return respond.ok(loaded);
 });

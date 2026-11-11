@@ -1,6 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { cacheKey, checkCache, db, revive, snapshotHookRegistry, toAccessor } from '@template/db';
-import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
+import {
+  cacheKey,
+  checkCache,
+  db,
+  type EntitlementInput,
+  revive,
+  snapshotHookRegistry,
+  toAccessor,
+} from '@template/db';
+import type {
+  Entitlement,
+  Organization,
+  OrganizationUser,
+  User,
+} from '@template/db/generated/client/client';
 import { EntitlementResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -11,7 +24,7 @@ import {
   createSpace,
   createToken,
 } from '@template/db/test';
-import { type EntitlementEntry, memberSelfGrant, type Permix } from '@template/permissions';
+import { memberSelfGrant, type Permix, toEntitlementInput } from '@template/permissions';
 import { rebacSchema } from '@template/permissions/rebac';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
@@ -44,10 +57,10 @@ let restoreHooks: () => void;
 let organization: Organization;
 let owner: { user: User; member: OrganizationUser; permix: Permix };
 
-const readOrganization = (): EntitlementEntry =>
-  entry('db:organization', ['db:organization', organization.id], ['read']) as EntitlementEntry;
-const readSpace = (spaceId: string): EntitlementEntry =>
-  entry('db:space', ['db:space', spaceId], ['read']) as EntitlementEntry;
+const readOrganization = (): EntitlementInput =>
+  entry('db:organization', ['db:organization', organization.id], ['read']);
+const readSpace = (spaceId: string): EntitlementInput =>
+  entry('db:space', ['db:space', spaceId], ['read']);
 
 const rowsOf = (model: 'Token' | 'Integration' | 'OrganizationUser', id: string) =>
   db.withDeleted(() =>
@@ -166,7 +179,7 @@ describe('rows live and die with their target', () => {
     expect(await db.token.findUnique({ where: { id: token.id } })).toBeNull();
     expect((await rowsOf('Token', token.id)).map((row) => row.deletedAt != null)).toEqual([true]);
     expect(await heldEntitlements({ model: 'OrganizationUser', id: member.id })).toEqual([
-      memberSelfGrant('db:organizationUser', member),
+      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
     ]);
   });
 });
@@ -254,11 +267,11 @@ describe('the writer keeps its invariants under a lock on the target', () => {
     });
     const target = { model: 'OrganizationUser' as const, id: member.id };
     const [selfGrant] = await entitlementIds(target, [
-      memberSelfGrant('db:organizationUser', member),
+      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
     ]);
     expect((await revokeEntitlements(app, target, [selfGrant!])).status).toBe(422);
     expect(await heldEntitlements(target)).toEqual([
-      memberSelfGrant('db:organizationUser', member),
+      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
     ]);
   });
 });
@@ -295,7 +308,7 @@ describe('the rows as a sub-resource of their holder', () => {
       mount: [(hono) => hono.route('/api/v1/integration', integrationRouter)],
     });
 
-  it('a holder lists its rows with ids; a listed id is what delete-many removes', async () => {
+  it('the holder is read with its rows as stored; a row id is what delete-many removes', async () => {
     const { entity: integration } = await createIntegration({
       ownerModel: 'Organization',
       organizationId: organization.id,
@@ -305,11 +318,24 @@ describe('the rows as a sub-resource of their holder', () => {
     const app = ownerApp();
     const created = await grantEntitlements(app, target, [readOrganization()]);
     expect(created.status).toBe(201);
-    const listed = (await (
-      await app.fetch(get(`/api/v1/integration/${integration.id}/entitlements`))
-    ).json()) as { data: (EntitlementEntry & { id: string })[] };
-    expect(listed.data.map(({ id: _id, ...held }) => held)).toEqual([readOrganization()]);
-    expect((await revokeEntitlements(app, target, [listed.data[0]!.id])).status).toBe(204);
+    const granted = (await created.json()) as { data: Entitlement[] };
+    const read = (await (await app.fetch(get(`/api/v1/integration/${integration.id}`))).json()) as {
+      data: { targetEntitlements: Entitlement[] };
+    };
+    expect(read.data.targetEntitlements.map(({ id }) => id)).toEqual(
+      granted.data.map(({ id }) => id),
+    );
+    expect(read.data.targetEntitlements[0]).toMatchObject({
+      resource: 'Organization',
+      actions: ['read'],
+      sourceModel: 'Organization',
+      sourceId: organization.id,
+      targetModel: 'Integration',
+      targetId: integration.id,
+    });
+    expect(
+      (await revokeEntitlements(app, target, [read.data.targetEntitlements[0]!.id])).status,
+    ).toBe(204);
     expect(await heldEntitlements(target)).toEqual([]);
   });
 
@@ -326,7 +352,8 @@ describe('the rows as a sub-resource of their holder', () => {
     );
     expect(response.status).toBe(200);
     expect(
-      ((await response.json()) as { data: { entitlements: unknown[] } }).data.entitlements,
+      ((await response.json()) as { data: { targetEntitlements: unknown[] } }).data
+        .targetEntitlements,
     ).toEqual([]);
   });
 });

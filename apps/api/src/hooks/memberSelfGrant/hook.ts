@@ -10,11 +10,16 @@ import {
   type HookOptions,
   HookTiming,
   registerDbHook,
-  toEntitlementEntry,
-  toEntitlementRow,
+  toEntitlementCreateData,
 } from '@template/db';
 import type { Entitlement } from '@template/db/generated/client/client';
-import { isMemberSelfGrant, type MemberResource, memberSelfGrant } from '@template/permissions';
+import {
+  isMemberSelfGrant,
+  type MemberResource,
+  memberSelfGrant,
+  toEntitlementEntry,
+  toEntitlementInput,
+} from '@template/permissions';
 import { castArray, keyBy } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
@@ -40,7 +45,10 @@ const writeSelfGrants = async (model: MemberModel, members: Member[]) => {
   if (!members.length) return;
   await db.entitlement.createManyAndReturn({
     data: members.map((member) => ({
-      ...toEntitlementRow(memberSelfGrant(resourceOf[model], member), { model, id: member.id }),
+      ...toEntitlementCreateData(toEntitlementInput(memberSelfGrant(resourceOf[model], member)), {
+        model,
+        id: member.id,
+      }),
       deletedAt: member.deletedAt,
     })),
   });

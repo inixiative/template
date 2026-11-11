@@ -4,12 +4,7 @@
  * @partOf feature:auth
  * @uses primitive:authz, infrastructure:prisma
  */
-import {
-  type HydratedRecord,
-  hydrate,
-  includeTargetEntitlements,
-  withEntitlementEntries,
-} from '@template/db';
+import { type HydratedRecord, hydrate, includeTargetEntitlements } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
 import { makeController } from '#/lib/utils/makeController';
@@ -30,5 +25,5 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
     where: { id: token.id },
     include: includeTargetEntitlements,
   });
-  return respond.ok(withEntitlementEntries(updated));
+  return respond.ok(updated);
 });

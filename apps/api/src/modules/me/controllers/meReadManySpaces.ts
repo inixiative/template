@@ -4,7 +4,7 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:tenancy
  */
-import type { Prisma } from '@template/db';
+import { includeTargetEntitlements, type Prisma } from '@template/db';
 import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
@@ -13,7 +13,11 @@ import { meReadManySpacesRoute } from '#/modules/me/routes/meReadManySpaces';
 type SpaceWithUsers = Prisma.SpaceGetPayload<{
   include: {
     organization: true;
-    spaceUsers: { include: { organizationUser: true } };
+    spaceUsers: {
+      include: typeof includeTargetEntitlements & {
+        organizationUser: { include: typeof includeTargetEntitlements };
+      };
+    };
   };
 }>;
 
@@ -38,7 +42,10 @@ export const meReadManySpacesController = makeController(
           organization: true,
           spaceUsers: {
             where: { userId: user.id },
-            include: { organizationUser: true },
+            include: {
+              ...includeTargetEntitlements,
+              organizationUser: { include: includeTargetEntitlements },
+            },
           },
         },
       },

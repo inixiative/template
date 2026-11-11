@@ -18,6 +18,7 @@ export {
   UserAction,
   wellFormedEntitlements,
 } from './client';
+export { entitlementsOf, toEntitlementEntry, toEntitlementInput } from './entitlementRows';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';

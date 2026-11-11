@@ -4,6 +4,7 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
+import type { StoredEntitlement } from '@template/db';
 import type {
   IntegrationOwnerModel,
   OrganizationUser,
@@ -13,17 +14,21 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   delegate,
+  entitlementsOf,
   organizationOwnerPermissions,
   type Permissions,
   permissionsOfUser,
   rebacSchema,
   roleToStandardAction,
   spaceOwnerPermissions,
-  wellFormedEntitlements,
 } from '@template/permissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
-type PermissionsRow = { role?: Role | null; full?: boolean; entitlements?: unknown };
+type PermissionsRow = {
+  role?: Role | null;
+  full?: boolean;
+  targetEntitlements?: StoredEntitlement[] | null;
+};
 
 type Delegated = {
   ownerModel: TokenOwnerModel | IntegrationOwnerModel;
@@ -41,7 +46,7 @@ export const delegatedPermissions = (delegated: PermissionsRow, owner: Permissio
   delegate(rebacSchema, owner, {
     full: delegated.full,
     ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
-    entitlements: wellFormedEntitlements(delegated.entitlements),
+    entitlements: entitlementsOf(delegated),
   });
 
 export const ownerPermissions = async (delegated: Delegated): Promise<Permissions> => {

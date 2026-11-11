@@ -11,6 +11,7 @@ import {
   createSpaceUser,
   createUser,
 } from '@template/db/test';
+import { toEntitlementInput } from '@template/permissions';
 import { createPermissions } from '@template/permissions/client';
 import { check, placeUnder, rebacSchema, schemaMap } from '@template/permissions/rebac';
 import { app } from '#/app';
@@ -307,11 +308,11 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         {
           role: 'viewer',
           entitlements: [
-            {
+            toEntitlementInput({
               resource: 'db:organization',
               anchor: { resource: 'db:organization', id: other.id },
               actions: { manage: true },
-            },
+            }),
           ],
         },
         { organization: other },
@@ -326,11 +327,11 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
 
     it("an entitlement stored on one member and anchored at the user's other organization opens nothing there", async () => {
       const { entity: other } = await createOrganization();
-      const contactsHere = {
+      const contactsHere = toEntitlementInput({
         resource: 'db:contact',
         anchor: { resource: 'db:organization', id: organization.id, path: 'organization' },
         actions: { create: true },
-      };
+      });
       const { context } = await createOrganizationUser(
         { role: 'viewer', entitlements: [contactsHere] },
         { organization: other },
@@ -350,11 +351,11 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
           ownerModel: 'User',
           role: 'viewer',
           entitlements: [
-            {
+            toEntitlementInput({
               resource: 'db:contact',
               anchor: { resource: 'db:organization', id: other.id, path: 'organization' },
               actions: { create: true },
-            },
+            }),
           ],
         },
         { user: context.user },

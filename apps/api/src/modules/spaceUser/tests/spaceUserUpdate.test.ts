@@ -7,7 +7,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
-import { isMemberSelfGrant } from '@template/permissions';
+import { isMemberSelfGrant, toEntitlementEntry } from '@template/permissions';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
 import { entry } from '#tests/utils/entitlementEntry';
@@ -63,7 +63,7 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
     expect((await grantTo('admin', target, onSpace('operate'))).status).toBe(201);
     expect(
       (await heldEntitlements({ model: 'SpaceUser', id: target.id })).filter(
-        (held) => !isMemberSelfGrant('db:spaceUser', target)(held),
+        (held) => !isMemberSelfGrant('db:spaceUser', target)(toEntitlementEntry(held)),
       ) as unknown,
     ).toEqual(onSpace('operate'));
   });

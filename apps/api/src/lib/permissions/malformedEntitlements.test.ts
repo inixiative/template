@@ -144,7 +144,7 @@ describe('the API refuses a malformed entitlement; a broken row stored by hand i
   };
 
   it('the 422 names what is wrong with the entry', async () => {
-    const noAction = { ...readOrganization(), actions: { read: false } };
+    const noAction = { ...readOrganization(), actions: [] };
     const response = await (await asOwner())(
       post(`/api/v1/organization/${organization.id}/integrations`, {
         name: `i-${Bun.randomUUIDv7()}`,

@@ -8,7 +8,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
-import { memberSelfGrant } from '@template/permissions';
+import { memberSelfGrant, toEntitlementInput } from '@template/permissions';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -46,7 +46,7 @@ describe('every member row carries a self-grant to operate itself, and it cannot
   it('an organization member row is created with it, as a row', async () => {
     const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
     expect(await heldEntitlements(onMember(member))).toEqual([
-      memberSelfGrant('db:organizationUser', member),
+      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
     ]);
   });
 
@@ -54,7 +54,7 @@ describe('every member row carries a self-grant to operate itself, and it cannot
     const { entity: space } = await createSpace({}, { organization });
     const { entity: member } = await createSpaceUser({ role: 'member' }, { space, organization });
     expect(await heldEntitlements({ model: 'SpaceUser', id: member.id })).toEqual([
-      memberSelfGrant('db:spaceUser', member),
+      toEntitlementInput(memberSelfGrant('db:spaceUser', member)),
     ]);
   });
 
@@ -72,7 +72,7 @@ describe('every member row carries a self-grant to operate itself, and it cannot
     const created = await upsert();
     await upsert();
     expect(await heldEntitlements(onMember(created))).toEqual([
-      memberSelfGrant('db:organizationUser', created),
+      toEntitlementInput(memberSelfGrant('db:organizationUser', created)),
     ]);
   });
 
@@ -107,7 +107,7 @@ describe('every member row carries a self-grant to operate itself, and it cannot
 
     await revive(db.organizationUser, { id: member.id });
     expect(await heldEntitlements(onMember(member))).toEqual([
-      memberSelfGrant('db:organizationUser', member),
+      toEntitlementInput(memberSelfGrant('db:organizationUser', member)),
     ]);
   });
 
