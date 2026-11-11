@@ -36,6 +36,7 @@ import { heartbeat } from '@template/shared/utils';
 import { uuidv7 } from 'uuidv7';
 
 const DEFAULT_POLL_MS = 50;
+const FIRST_POLL_MS = 1;
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function createLock(opts: ClaimOptions): Claim;
@@ -239,6 +240,7 @@ const createRenewingLock = (
     onTimeout,
   }: AcquireOptions = {}): Promise<boolean> => {
     const deadline = Date.now() + waitMs;
+    let pause = Math.min(FIRST_POLL_MS, pollMs);
     try {
       while (!(await tryAcquire())) {
         const remaining = deadline - Date.now();
@@ -247,7 +249,8 @@ const createRenewingLock = (
           if (onTimeout) throw onTimeout();
           return false;
         }
-        await sleep(Math.min(pollMs, remaining));
+        await sleep(Math.min(pause, remaining));
+        pause = Math.min(pause * 2, pollMs);
       }
     } catch (err) {
       await giveBackWon();

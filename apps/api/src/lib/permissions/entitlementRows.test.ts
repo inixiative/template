@@ -1,13 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import {
-  cacheKey,
-  checkCache,
-  db,
-  type EntitlementInput,
-  revive,
-  snapshotHookRegistry,
-  toAccessor,
-} from '@template/db';
+import { cacheKey, checkCache, db, type EntitlementInput, revive, toAccessor } from '@template/db';
 import type {
   Entitlement,
   Organization,
@@ -26,17 +18,6 @@ import {
 } from '@template/db/test';
 import { memberSelfGrant, type Permix, toEntitlementInput } from '@template/permissions';
 import { rebacSchema } from '@template/permissions/rebac';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
-import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { userPermissions } from '#/lib/permissions/userPermissions';
 import { integrationRouter } from '#/modules/integration';
@@ -53,7 +34,6 @@ import {
 } from '#tests/utils/entitlements';
 import { get, patch } from '#tests/utils/request';
 
-let restoreHooks: () => void;
 let organization: Organization;
 let owner: { user: User; member: OrganizationUser; permix: Permix };
 
@@ -71,18 +51,6 @@ const rowsOf = (model: 'Token' | 'Integration' | 'OrganizationUser', id: string)
   );
 
 beforeEach(async () => {
-  restoreHooks = snapshotHookRegistry();
-  registerDelegatedKeysHook();
-  registerFullDelegateHook();
-  registerMemberSelfGrantHook();
-  registerRulesHook();
-  registerAuditLogHook();
-  registerClearCacheHook();
-  registerImmutableFieldsHook();
-  registerPreventHardDeleteHook();
-  registerRuleReferenceHook();
-  registerRuleReferenceTargetHook();
-  registerSoftDeleteCascadeHook();
   ({ entity: organization } = await createOrganization());
   const { entity: member, context } = await createOrganizationUser(
     { role: 'owner' },
@@ -92,7 +60,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  restoreHooks();
   await cleanupTouchedTables(db);
 });
 

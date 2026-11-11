@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { Integration, Organization, Role } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -10,8 +10,6 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { toEntitlementInput } from '@template/permissions';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { integrationRouter } from '#/modules/integration';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
@@ -35,8 +33,6 @@ let organization: Organization;
 const integrations = {} as Record<Kind, Integration>;
 
 beforeEach(async () => {
-  registerClearCacheHook();
-  registerMemberSelfGrantHook();
   ({ entity: organization } = await createOrganization());
   const { entity: space } = await createSpace({}, { organization });
   const { entity: member, context } = await createOrganizationUser(
@@ -65,7 +61,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 
@@ -468,12 +463,12 @@ describe("a member writes any entitlement on their own member integration, cappe
         }),
       ],
     };
-    for (const role of [null, 'viewer'] as const) {
+    for (const held of [{ role: null, entitlements: add.add }, { role: 'viewer' }] as const) {
       const { entity: integration } = await createIntegration({
         ownerModel: 'OrganizationUser',
         organizationId: organization.id,
         userId: member.userId,
-        role,
+        ...held,
       });
       expect(
         (await app.fetch(post(`/api/v1/integration/${integration.id}/entitlements`, add.add)))

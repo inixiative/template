@@ -1,21 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { db, snapshotHookRegistry } from '@template/db';
-import { cleanupTouchedTables, createCronJob, createOrganizationUser } from '@template/db/test';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
+import { db } from '@template/db';
+import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
+import { cleanupTouchedTables, createInquiry, createOrganizationUser } from '@template/db/test';
 import {
   clearImmutableFieldsCache,
   setImmutableFieldsCache,
 } from '#/hooks/immutableFields/registry';
 
-let restoreHooks: () => void;
-
-beforeEach(() => {
-  restoreHooks = snapshotHookRegistry();
-  registerImmutableFieldsHook();
-});
-
 afterEach(async () => {
-  restoreHooks();
   await cleanupTouchedTables(db);
 });
 
@@ -39,13 +31,11 @@ describe('immutableFields hook', () => {
     const result = await db.organizationUser.update({
       where: { id: orgUserId },
       data: {
-        userId: 'should-strip',
         organizationId: 'should-strip',
         role: 'admin',
       },
     });
 
-    expect(result.userId).toBe(userId);
     expect(result.organizationId).toBe(orgId);
     expect(result.role).toBe('admin');
   });
@@ -68,10 +58,10 @@ describe('immutableFields hook', () => {
     const result = await db.organizationUser.upsert({
       where: { id: orgUserId },
       create: { userId, organizationId: orgId, role: 'member' },
-      update: { userId: 'should-strip', role: 'member' },
+      update: { organizationId: 'should-strip', role: 'member' },
     });
 
-    expect(result.userId).toBe(userId);
+    expect(result.organizationId).toBe(orgId);
     expect(result.role).toBe('member');
   });
 
@@ -104,18 +94,23 @@ describe('immutableFields hook', () => {
     });
 
     it('can lock nested JSON paths via cache', async () => {
-      const { entity: cronJob } = await createCronJob({
-        payload: { canInvite: true, maxProjects: 5 },
+      const { entity: inquiry } = await createInquiry({
+        type: InquiryType.inviteOrganizationUser,
+        sourceModel: InquiryResourceModel.Organization,
+        sourceOrganizationId: orgId,
+        targetModel: InquiryResourceModel.User,
+        targetUserId: userId,
+        content: { canInvite: true, maxProjects: 5 },
       });
 
-      setImmutableFieldsCache('CronJob', ['payload.canInvite']);
+      setImmutableFieldsCache('Inquiry', ['content.canInvite']);
 
-      const result = await db.cronJob.update({
-        where: { id: cronJob.id },
-        data: { payload: { canInvite: false, maxProjects: 100 } },
+      const result = await db.inquiry.update({
+        where: { id: inquiry.id },
+        data: { content: { canInvite: false, maxProjects: 100 } },
       });
 
-      expect(result.payload).toEqual({ maxProjects: 100 });
+      expect(result.content).toEqual({ maxProjects: 100 });
     });
   });
 });

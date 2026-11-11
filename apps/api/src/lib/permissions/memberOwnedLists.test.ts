@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -18,7 +18,6 @@ import {
   createToken,
 } from '@template/db/test';
 import { app } from '#/app';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
 type Headers = Record<string, string>;
@@ -43,7 +42,6 @@ const callers: Record<string, Headers> = {};
 const rows: Record<string, string> = {};
 
 beforeEach(async () => {
-  registerClearCacheHook();
   ({ entity: organization } = await createOrganization());
   ({ entity: space } = await createSpace({}, { organization }));
 
@@ -109,7 +107,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createCronJob } from '@template/db/test';
-import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import { withCronJobsLock } from '#/jobs/withCronJobsLock';
 import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
@@ -16,7 +15,6 @@ const createScheduledCronJob = async (pattern: string = patterns[0]) =>
   (await createCronJob({ jobId: newJobId(), handler, pattern })).entity;
 
 beforeEach(async () => {
-  registerCronJobSyncHook();
   jobs = await connectRealJobsQueue();
 });
 
@@ -26,7 +24,6 @@ afterEach(async () => {
 });
 
 afterEach(async () => {
-  clearHookRegistry();
   await jobs.close();
 });
 

@@ -17,7 +17,7 @@ export type TargetState = { deletedAt: Date | null };
  *
  * Models are locked in name order, never in the order the rule lists them: two saves that name a
  * Segment and a Tag in opposite orders would otherwise each hold one and wait on the other. Within
- * a model the order is already canonical — `id IN (...) FOR UPDATE` locks along the primary key.
+ * a model the order is already canonical — a lock on `id IN (...)` is taken along the primary key.
  */
 export const lockedTargetStates = async (
   references: RuleReference[],

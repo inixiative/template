@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -18,10 +18,6 @@ import {
   createSpaceUser,
   createUser,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -30,6 +26,7 @@ import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { heldEntitlements } from '#tests/utils/entitlements';
 import { del, patch, post } from '#tests/utils/request';
 
 type Permissions = { role?: Role | null; full?: boolean; entitlements?: Entry[] | null };
@@ -107,10 +104,6 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
   ) => mint(user, organizationUsers, `/api/v1/integration/${integration.id}/tokens`, permissions);
 
   beforeEach(async () => {
-    registerClearCacheHook();
-    registerDelegatedKeysHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: otherOrganization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
@@ -118,7 +111,6 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 
@@ -189,10 +181,16 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
     it('full takes no role and no entitlements beside it', async () => {
       const { user, organizationUser } = await asMember('owner');
       const integration = await memberIntegration(organizationUser, { role: 'owner' });
-      expect(
-        (await mintOn(integration, user, [organizationUser], { full: true, role: 'member' }))
-          .status,
-      ).toBe(422);
+      const minted = await mintOn(integration, user, [organizationUser], {
+        full: true,
+        role: 'member',
+      });
+      expect(minted.status).toBe(201);
+      expect(await db.token.findUniqueOrThrow({ where: { id: minted.id } })).toMatchObject({
+        full: true,
+        role: null,
+      });
+      expect(await heldEntitlements({ model: 'Token', id: minted.id! })).toEqual([]);
     });
   });
 

@@ -108,7 +108,7 @@ Where two or more things do neighbouring jobs (lock vs lane vs queue; readRoute 
 |---|---|---|
 | **createLock** | one process owns a resource; first holder keeps it | newest should win (claimLane); rows read-then-written in a txn (db.findForUpdate) |
 | **claimLane / watchLane** | newest job per (handlerName, dedupeKey) wins | first holder must keep it (createLock) |
-| **db.findForUpdate** | SELECT … FOR UPDATE inside db.txn; upserting: true for create-if-missing | non-row ownership (createLock) |
+| **db.findForUpdate** | SELECT … FOR NO KEY UPDATE inside db.txn; upserting: true for create-if-missing | non-row ownership (createLock) |
 
 - Good: every row's *Not when* names the sibling to use instead, so a wrong pick is one hop from the right one.
 - Bad: a table that lists members with a description each and no *Not when*: that is a glossary, and the Warden still cannot choose.

@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -10,15 +10,10 @@ import {
   createUser,
   createWebhookSubscription,
 } from '@template/db/test';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import {
   deleteBehaviorViolations,
   skipReviveViolations,
 } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
-
-beforeEach(() => {
-  registerSoftDeleteCascadeHook();
-});
 
 const tokenStamp = async (id: string) =>
   (await db.withDeleted(() => db.token.findUniqueOrThrow({ where: { id } }))).deletedAt;
@@ -33,7 +28,6 @@ const tombstoneIntegration = (id: string) =>
 describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () => {
   afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('tombstones a tombstoned user’s tokens, keeping their rows (Aron, 2026-11-02)', async () => {

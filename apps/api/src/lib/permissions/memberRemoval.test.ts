@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -16,13 +16,10 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { app } from '#/app';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
-beforeEach(() => registerClearCacheHook());
 afterEach(async () => {
-  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

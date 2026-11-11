@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import { clearHookRegistry } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -9,8 +8,6 @@ import type {
 } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { memberSelfGrant, toEntitlementInput } from '@template/permissions';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import type { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
@@ -30,8 +27,6 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   let adminOrgUser: OrganizationUser;
 
   beforeEach(async () => {
-    registerMemberSelfGrantHook();
-    registerRulesHook();
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     adminOrgUser = entity;
     user = context.user;
@@ -47,7 +42,6 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

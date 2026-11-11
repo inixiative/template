@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, type EntitlementInput } from '@template/db';
+import { db, type EntitlementInput } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -7,9 +7,6 @@ import {
   createOrganization,
   createOrganizationUser,
 } from '@template/db/test';
-import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { heldEntitlements } from '#tests/utils/entitlements';
 
@@ -26,14 +23,10 @@ describe('writing full clears the role and tombstones the entitlement rows besid
   let organization: Organization;
 
   beforeEach(async () => {
-    registerFullDelegateHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
     ({ entity: organization } = await createOrganization());
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

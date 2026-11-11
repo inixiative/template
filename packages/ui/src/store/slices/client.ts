@@ -27,10 +27,13 @@ export const createClientSlice: StateCreator<AppStore, [], [], ClientSlice> = (s
   return {
     client: null, // set at the app root via setClient (see main.tsx)
     // On reconnect, refetch live queries to recover any invalidations missed while disconnected.
-    websocket: createApiWebsocket(wsUrl, () => {
-      get().client?.invalidateQueries({
-        predicate: (query) => liveChannel(query.queryKey) !== null,
-      });
+    websocket: createApiWebsocket(wsUrl, {
+      getClient: () => get().client,
+      onReconnect: () => {
+        get().client?.invalidateQueries({
+          predicate: (query) => liveChannel(query.queryKey) !== null,
+        });
+      },
     }),
 
     setClient: (client) => {

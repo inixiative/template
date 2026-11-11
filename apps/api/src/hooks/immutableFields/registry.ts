@@ -30,6 +30,10 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
       'sourcePath',
     ],
   },
+  CommunicationLog: {
+    ...polymorphismImmutableFields.CommunicationLog,
+    exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],
+  },
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {

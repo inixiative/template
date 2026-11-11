@@ -16,8 +16,8 @@ kanban
     FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
     API-003-cursor-pagination-mode
+    API-005-route-permission-tags
     INFRA-006-tenant-isolation-test-matrix
-    TEST-002-hook-registration-in-tests
     INFRA-007-data-lifecycle-retention-export-delete
     INFRA-008-disaster-recovery-and-restore-drills
     INFRA-005-platform-baseline-hosting-observability
@@ -81,7 +81,6 @@ kanban
 - [OTEL-002: Superadmin Alerts](./OTEL-002-superadmin-alerts.md) - Signal queries, incident lifecycle, superadmin inbox
 - [INFRA-003: CI/CD Pipeline](./INFRA-003-cicd.md) - Decision-first CI/CD baseline, implement after platform selection
 - [INFRA-006: Tenant Isolation Test Matrix](./INFRA-006-tenant-isolation-test-matrix.md) - Prove cross-tenant isolation across auth modes
-- [TEST-002: Hook registration in tests](./TEST-002-hook-registration-in-tests.md) - One way to turn database hooks on and off in tests; today three patterns share one registry and results depend on file order
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md) - Retention, export, and delete/redaction operations
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
 - [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) - Swappable external service pattern (in progress)
@@ -116,6 +115,7 @@ kanban
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
 - API-002: Admin Ad-Hoc Filtering - Make admin list routes exempt from requiring `searchableFields`; allow arbitrary field filtering for internal/superadmin use
 - [API-003: Cursor Pagination Mode](./API-003-cursor-pagination-mode.md) - Opt-in keyset pagination (signed opaque tokens, no count, write-stable) for feeds/logs/exports; offset stays default
+- [API-005: Route permission tags](./API-005-route-permission-tags.md) - A route declares `permission` / `submodelPermission` and the route template runs the check, as Zealot #2859 does; deferred until after #267 and its backport
 
 **Documentation & API Discovery:**
 - [DOC-001: Scalar API Docs UI](./DOC-001-scalar-api-docs-ui.md) - Interactive API docs via Scalar, mounted on existing OpenAPI spec
@@ -183,4 +183,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-10-31_
+_Last Updated: 2026-11-10_

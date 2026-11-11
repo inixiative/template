@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { Integration, Organization, Role } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -9,7 +9,6 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -26,7 +25,6 @@ let organization: Organization;
 const integrations = {} as Record<Kind, Integration>;
 
 beforeEach(async () => {
-  registerClearCacheHook();
   ({ entity: organization } = await createOrganization());
   const { entity: space } = await createSpace({}, { organization });
   const { entity: member, context } = await createOrganizationUser(
@@ -55,7 +53,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

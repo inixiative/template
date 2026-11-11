@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, RuleReferenceError, unregisterDbHook } from '@template/db';
+import { db, RuleReferenceError } from '@template/db';
 import type { Organization, Segment, Tag } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -8,9 +8,6 @@ import {
   createTag,
   createTagCategory,
 } from '@template/db/test';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { deadReferencesOf } from '#tests/utils/deadReferences';
 
@@ -57,9 +54,6 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
   let theirSegment: Segment;
 
   beforeEach(async () => {
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerRuleReferenceHook();
     mine = (await createOrganization()).entity;
     theirs = (await createOrganization()).entity;
     platformTag = (await createTag()).entity;
@@ -93,7 +87,6 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it("platform tags and the owner's own tags and segments are admitted", async () => {

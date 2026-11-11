@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, hydrate } from '@template/db';
+import { db, hydrate } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -12,7 +12,6 @@ import {
 } from '@template/db/test';
 import type { Permix } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { userPermissions } from '#/lib/permissions/userPermissions';
 import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
@@ -66,7 +65,6 @@ describe("a user's permissions, built for a user who is not the requester", () =
   let situations: Situation[];
 
   beforeEach(async () => {
-    registerClearCacheHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: otherOrganization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
@@ -85,7 +83,6 @@ describe("a user's permissions, built for a user who is not the requester", () =
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

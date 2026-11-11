@@ -491,7 +491,7 @@ db.scope(id, fn)        // Create AsyncLocalStorage context
 db.txn(fn)              // Start transaction
 db.onCommit(fns)        // Queue callbacks for after commit
 db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or rollback
-db.findForUpdate(model, where, opts?) // SELECT ... FOR UPDATE; { upserting: true } fences a missing row
+db.findForUpdate(model, where, opts?) // SELECT ... FOR NO KEY UPDATE; { upserting: true } fences a missing row
 db.withLockUntilSettled(lockOptions, fn, acquireOptions?) // Redis lock held until the txn ends
 db.cacheOverlay()       // The open transaction's cache overlay, or null outside one
 db.getScopeId()         // Get current scope ID
@@ -594,7 +594,7 @@ turns it locally false.
 
 ### Row Locks and Create-If-Missing
 
-`db.findForUpdate(model, where)` runs `SELECT * ... FOR UPDATE` inside `db.txn()`. A row that does
+`db.findForUpdate(model, where)` runs `SELECT * ... FOR NO KEY UPDATE` inside `db.txn()` (`changesKey: true` takes `FOR UPDATE`; see [CONCURRENCY.md § Row Locks](./CONCURRENCY.md#row-locks-dbfindforupdate)). A row that does
 not exist yet locks nothing, so find-then-create races: two callers both see nothing and both
 insert. Do not answer that with a bare `upsert` or a caught unique violation — fence the key:
 

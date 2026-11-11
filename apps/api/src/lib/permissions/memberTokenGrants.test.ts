@@ -1,16 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { Organization, Role, Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createIntegration,
   createOrganization,
   createOrganizationUser,
-  createSegment,
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -44,7 +42,6 @@ let space: Space;
 let otherSpace: Space;
 
 beforeEach(async () => {
-  registerClearCacheHook();
   ({ entity: organization } = await createOrganization());
   ({ entity: space } = await createSpace({}, { organization }));
   const { entity: otherOrganization } = await createOrganization();
@@ -52,7 +49,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

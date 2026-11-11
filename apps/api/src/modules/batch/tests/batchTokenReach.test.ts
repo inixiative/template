@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { type AccessorName, clearHookRegistry, db } from '@template/db';
+import { type AccessorName, db } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -9,7 +9,6 @@ import {
   createSpaceUser,
   createUser,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -159,9 +158,7 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
 });
 
 describe('a batch signs its token in again between rounds', () => {
-  beforeEach(() => registerClearCacheHook());
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

@@ -77,7 +77,6 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   });
 
   it('the row narrows the data lens the registry entry declares', async () => {
-    await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
     await createEmailTemplate({
       slug: 'inquiry-invite-organization-user',
       ownerModel: 'default',
@@ -100,11 +99,9 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     });
     expect(fieldsOf(data, 'Inquiry')).toEqual(['content', 'sourceOrganization']);
     expect(fieldsOf(data, 'Organization')).toEqual(['id', 'name']);
-    await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
   });
 
   it('falls back to the engine default lens when no default-tier row declares one', async () => {
-    await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
     const { data } = await json<Surface>(
       await fetch(
         post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' }),

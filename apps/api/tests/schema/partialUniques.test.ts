@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db, unregisterDbHook } from '@template/db';
 import {
   ContactType,
   TagOwnerModel,
@@ -25,29 +25,12 @@ import {
   createWebhookSubscription,
   getNextSeq,
 } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
-
-// Register only the hooks that affect data shape during create — the rules
-// hook (polymorphism), contactRules (computes valueKey), tagOwnerCategory
-// (tag↔category check). We avoid registerHooks() because it also wires up
-// the outbound webhook hook which signs payloads with PEM keys not present
-// in the test env.
-beforeEach(() => {
-  registerMemberSelfGrantHook();
-  registerRulesHook();
-  registerContactRulesHook();
-  registerTagOwnerCategoryHook();
-});
 
 const seq = (prefix: string) => `${prefix}-${getNextSeq()}`;
 
 describe('partial unique constraints', () => {
   afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   describe('Contact: per-(userId, type, valueKey)', () => {
@@ -358,6 +341,8 @@ describe('partial unique constraints', () => {
     });
 
     it("allows the same (slug, locale) across 'default' and 'admin'", async () => {
+      // The index allows it; the slug reservation hook is the one that refuses.
+      unregisterDbHook('emailTemplateSlugReservation');
       const slug = seq('tpl-cross-platform');
       await createEmailTemplate({ slug, locale: 'en', ownerModel: 'default' });
       const second = await createEmailTemplate({ slug, locale: 'en', ownerModel: 'admin' });

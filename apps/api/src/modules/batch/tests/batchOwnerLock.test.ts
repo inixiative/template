@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { Segment, Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -11,7 +11,6 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { gate } from '@template/db/test/gate';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { batchRouter } from '#/modules/batch';
 import type { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';
@@ -66,7 +65,6 @@ describe('batch sub-requests under the owner lock', () => {
     (await db.segment.findUnique({ where: { id: segment.id } }))?.conditions;
 
   beforeEach(async () => {
-    registerSegmentConditionsHook();
     const { entity: organizationUser, context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
     const { entity: spaceUser } = await createSpaceUser({ role: 'admin' }, { ...context, space });
@@ -105,7 +103,6 @@ describe('batch sub-requests under the owner lock', () => {
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

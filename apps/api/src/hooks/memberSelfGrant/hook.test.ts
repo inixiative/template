@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, revive } from '@template/db';
+import { db, revive } from '@template/db';
 import type { Organization, OrganizationUser } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -9,10 +9,6 @@ import {
   createSpaceUser,
 } from '@template/db/test';
 import { memberSelfGrant, toEntitlementInput } from '@template/permissions';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { heldEntitlements } from '#tests/utils/entitlements';
 
 const onMember = (member: { id: string }) => ({
@@ -31,15 +27,10 @@ describe('every member row carries a self-grant to operate itself, and it cannot
   let organization: Organization;
 
   beforeEach(async () => {
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerImmutableFieldsHook();
-    registerSoftDeleteCascadeHook();
     ({ entity: organization } = await createOrganization());
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

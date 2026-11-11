@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import {
   cleanupTouchedTables,
   createEmailComponent,
@@ -8,10 +8,6 @@ import {
   createTag,
 } from '@template/db/test';
 import { ConditionValidationError } from '@template/email/errors';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { deadReferencesOf } from '#tests/utils/deadReferences';
 
@@ -60,15 +56,7 @@ const edgesOf = (where: Record<string, unknown>) =>
 const refKey = (model: string, id: string) => `${model}|${id}`;
 
 describe('ruleReference — the save path writes edges, the target side stamps them', () => {
-  beforeEach(() => {
-    registerPreventHardDeleteHook();
-    registerRulesHook();
-    registerRuleReferenceHook();
-    registerRuleReferenceTargetHook();
-  });
-
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

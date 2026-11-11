@@ -1,20 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerOrderedListHook } from '#/hooks/orderedList/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-
-beforeEach(() => {
-  registerRulesHook();
-  registerContactRulesHook();
-  registerOrderedListHook();
-});
+import { cleanupTouchedTables, createContact, createUser, getNextSeq } from '@template/db/test';
 
 afterEach(async () => {
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 // Pad to a 7-digit national number for E.164 (caller supplies a 4-digit "local" piece)
@@ -25,13 +15,11 @@ describe('contactRules hook — phone (per-owner unique)', () => {
   it('computes valueKey from e164 on create', async () => {
     const { entity: user } = await createUser();
     const phone = e164(String(getNextSeq()));
-    const contact = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        value: { e164: phone, country: 'US' },
-      },
+    const { entity: contact } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      value: { e164: phone, country: 'US' },
     });
     expect(contact.valueKey).toBe(phone);
   });
@@ -39,13 +27,11 @@ describe('contactRules hook — phone (per-owner unique)', () => {
   it('rejects invalid country code (422)', async () => {
     const { entity: user } = await createUser();
     const create = async () =>
-      db.contact.create({
-        data: {
-          ownerModel: ContactOwnerModel.User,
-          userId: user.id,
-          type: ContactType.phone,
-          value: { e164: e164(String(getNextSeq())), country: 'ZZ' },
-        },
+      createContact({
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        value: { e164: e164(String(getNextSeq())), country: 'ZZ' },
       });
     await expect(create()).rejects.toThrow();
   });
@@ -53,13 +39,11 @@ describe('contactRules hook — phone (per-owner unique)', () => {
   it('rejects malformed e164 (422)', async () => {
     const { entity: user } = await createUser();
     const create = async () =>
-      db.contact.create({
-        data: {
-          ownerModel: ContactOwnerModel.User,
-          userId: user.id,
-          type: ContactType.phone,
-          value: { e164: '5551110003', country: 'US' },
-        },
+      createContact({
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        value: { e164: '5551110003', country: 'US' },
       });
     await expect(create()).rejects.toThrow();
   });
@@ -68,21 +52,17 @@ describe('contactRules hook — phone (per-owner unique)', () => {
     const { entity: a } = await createUser();
     const { entity: b } = await createUser();
     const phone = e164(String(getNextSeq()));
-    await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: a.id,
-        type: ContactType.phone,
-        value: { e164: phone, country: 'US' },
-      },
+    await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: a.id,
+      type: ContactType.phone,
+      value: { e164: phone, country: 'US' },
     });
-    const second = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: b.id,
-        type: ContactType.phone,
-        value: { e164: phone, country: 'US' },
-      },
+    const { entity: second } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: b.id,
+      type: ContactType.phone,
+      value: { e164: phone, country: 'US' },
     });
     expect(second.valueKey).toBe(phone);
   });
@@ -93,13 +73,11 @@ describe('contactRules hook — email (lowercase normalization)', () => {
     const { entity: user } = await createUser();
     const seq = getNextSeq();
     const upper = `Mixed.Case${seq}@Example.COM`;
-    const contact = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.email,
-        value: { address: upper },
-      },
+    const { entity: contact } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.email,
+      value: { address: upper },
     });
     expect(contact.value).toEqual({ address: upper.toLowerCase() });
     expect(contact.valueKey).toBe(upper.toLowerCase());
@@ -110,13 +88,11 @@ describe('contactRules hook — linkedin (URL normalization, per-owner uniquenes
   it('normalizes a pasted URL into {classifier, handle}', async () => {
     const { entity: user } = await createUser();
     const handle = seqHandle('sample');
-    const contact = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.linkedin,
-        value: { url: `https://www.linkedin.com/in/${handle}?trk=ref` },
-      },
+    const { entity: contact } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.linkedin,
+      value: { url: `https://www.linkedin.com/in/${handle}?trk=ref` },
     });
     expect(contact.value).toEqual({ classifier: 'personal', handle });
     expect(contact.valueKey).toBe(`personal:${handle.toLowerCase()}`);
@@ -126,21 +102,17 @@ describe('contactRules hook — linkedin (URL normalization, per-owner uniquenes
     const { entity: a } = await createUser();
     const { entity: b } = await createUser();
     const handle = seqHandle('shared');
-    await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: a.id,
-        type: ContactType.linkedin,
-        value: { classifier: 'personal', handle },
-      },
+    await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: a.id,
+      type: ContactType.linkedin,
+      value: { classifier: 'personal', handle },
     });
-    const second = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: b.id,
-        type: ContactType.linkedin,
-        value: { classifier: 'personal', handle: handle.toUpperCase() },
-      },
+    const { entity: second } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: b.id,
+      type: ContactType.linkedin,
+      value: { classifier: 'personal', handle: handle.toUpperCase() },
     });
     expect(second.valueKey).toBe(`personal:${handle.toLowerCase()}`);
   });
@@ -150,28 +122,24 @@ describe('contactRules hook — subtype enforcement', () => {
   it('rejects subtype on linkedin (forbidden)', async () => {
     const { entity: user } = await createUser();
     const create = async () =>
-      db.contact.create({
-        data: {
-          ownerModel: ContactOwnerModel.User,
-          userId: user.id,
-          type: ContactType.linkedin,
-          subtype: 'personal',
-          value: { classifier: 'personal', handle: seqHandle('sub') },
-        },
+      createContact({
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.linkedin,
+        subtype: 'personal',
+        value: { classifier: 'personal', handle: seqHandle('sub') },
       });
     await expect(create()).rejects.toThrow();
   });
 
   it('accepts known phone subtype', async () => {
     const { entity: user } = await createUser();
-    const contact = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        subtype: 'mobile',
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+    const { entity: contact } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      subtype: 'mobile',
+      value: { e164: e164(String(getNextSeq())), country: 'US' },
     });
     expect(contact.subtype).toBe('mobile');
   });
@@ -179,14 +147,12 @@ describe('contactRules hook — subtype enforcement', () => {
   it('rejects unknown phone subtype', async () => {
     const { entity: user } = await createUser();
     const create = async () =>
-      db.contact.create({
-        data: {
-          ownerModel: ContactOwnerModel.User,
-          userId: user.id,
-          type: ContactType.phone,
-          subtype: 'pager',
-          value: { e164: e164(String(getNextSeq())), country: 'US' },
-        },
+      createContact({
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        subtype: 'pager',
+        value: { e164: e164(String(getNextSeq())), country: 'US' },
       });
     await expect(create()).rejects.toThrow();
   });
@@ -195,78 +161,64 @@ describe('contactRules hook — subtype enforcement', () => {
 describe('contactRules hook — position auto-assign', () => {
   it('appends MAX+1 per (owner, type) when position omitted', async () => {
     const { entity: user } = await createUser();
-    const first = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+    const { entity: first } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      value: { e164: e164(String(getNextSeq())), country: 'US' },
     });
     expect(first.position).toBe(1);
 
-    const second = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+    const { entity: second } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      value: { e164: e164(String(getNextSeq())), country: 'US' },
     });
     expect(second.position).toBe(2);
   });
 
   it('clamps explicit position above MAX+1 on single create', async () => {
     const { entity: user } = await createUser();
-    const first = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        position: 42,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+    const { entity: first } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      position: 42,
+      value: { e164: e164(String(getNextSeq())), country: 'US' },
     });
     expect(first.position).toBe(1);
 
-    const second = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        position: 99,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+    const { entity: second } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      position: 99,
+      value: { e164: e164(String(getNextSeq())), country: 'US' },
     });
     expect(second.position).toBe(2);
   });
 
   it('honors explicit in-range position on single create and shifts siblings up', async () => {
     const { entity: user } = await createUser();
-    const a = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+    const { entity: a } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      value: { e164: e164(String(getNextSeq())), country: 'US' },
     });
-    const b = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+    const { entity: b } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      value: { e164: e164(String(getNextSeq())), country: 'US' },
     });
-    const c = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        position: 1,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+    const { entity: c } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      position: 1,
+      value: { e164: e164(String(getNextSeq())), country: 'US' },
     });
     expect(c.position).toBe(1);
     const aAfter = await db.contact.findUniqueOrThrow({ where: { id: a.id } });
@@ -349,23 +301,19 @@ describe('contactRules hook — position auto-assign', () => {
 
   it('scopes ordering by (owner, type) — different types start fresh', async () => {
     const { entity: user } = await createUser();
-    const phone = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+    const { entity: phone } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.phone,
+      value: { e164: e164(String(getNextSeq())), country: 'US' },
     });
-    const email = await db.contact.create({
-      data: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.email,
-        value: { address: `sort${getNextSeq()}@example.com` },
-      },
+    const { entity: whatsapp } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: user.id,
+      type: ContactType.whatsapp,
+      value: { jid: `${getNextSeq()}@s.whatsapp.net` },
     });
-    expect(phone.position).toBeGreaterThan(0);
-    expect(email.position).toBe(1); // first email for this user — not 2
+    expect(phone.position).toBe(1);
+    expect(whatsapp.position).toBe(1);
   });
 });

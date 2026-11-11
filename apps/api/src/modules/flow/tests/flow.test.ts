@@ -173,7 +173,7 @@ describe('flows', () => {
     expect(advanced.currentStep).toBe(2);
     expect(advanced.stepStates).toEqual(['done', 'done', 'pending']);
 
-    await harness.db.token.delete({ where: { id: ciToken.id } });
+    await harness.db.token.update({ where: { id: ciToken.id }, data: { deletedAt: new Date() } });
     const back = await readIn(app, flow.id);
     expect(back.currentStep).toBe(1);
     expect(back.stepStates).toEqual(['done', 'pending', 'pending']);

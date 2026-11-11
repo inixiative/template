@@ -1,12 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { type Condition, Operator } from '@inixiative/json-rules';
-import {
-  clearHookRegistry,
-  db,
-  ruleReferences,
-  syncRuleReferenceEdges,
-  unregisterDbHook,
-} from '@template/db';
+import { db, ruleReferences, syncRuleReferenceEdges } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -15,13 +9,6 @@ import {
   createSpace,
 } from '@template/db/test';
 import { gate } from '@template/db/test/gate';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
@@ -39,7 +26,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 // the contender has provably finished its unlocked reads against the live row; a fixed delay would
 // only guess at that and make the race flaky in both directions.
 const waitForBlockedLockOn = async (table: string): Promise<void> => {
-  const pattern = `%"${table}"%FOR UPDATE%`;
+  const pattern = `%"${table}"%FOR NO KEY UPDATE%`;
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const rows = await db.$queryRaw<{ n: bigint | number }[]>`
@@ -71,23 +58,12 @@ describe('ruleReference — edges under concurrency and repair', () => {
   let owner: { ownerModel: string; ownerId: string };
 
   beforeEach(async () => {
-    registerPreventHardDeleteHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerSegmentConditionsHook();
-    registerRuleReferenceHook();
-    registerRuleReferenceTargetHook();
-    registerSoftDeleteCascadeHook();
-  });
-
-  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
     owner = { ownerModel: 'Space', ownerId: space.id };
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

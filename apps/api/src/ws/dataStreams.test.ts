@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { db, getRedisClient, redisNamespace, unregisterDbHook } from '@template/db';
+import { db, getRedisClient, redisNamespace } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
@@ -15,7 +15,6 @@ import {
   WS_MAX_STREAM_NAME_LENGTH,
 } from '@template/shared/ws';
 import { app } from '#/app';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { streamAppendFrame } from '#/ws/dataFrame';
 import { sendToStreamLocal } from '#/ws/delivery';
 import { websocketHandler } from '#/ws/handler';
@@ -549,13 +548,13 @@ describe('data streams (real app)', () => {
       revocable.sent.length = 0;
       staying.sent.length = 0;
 
-      registerClearCacheHook();
-      try {
-        await db.txn(() => db.organizationUser.delete({ where: { id: membership.id } }));
-        await settle();
-      } finally {
-        unregisterDbHook('clearCache');
-      }
+      await db.txn(() =>
+        db.organizationUser.update({
+          where: { id: membership.id },
+          data: { deletedAt: new Date() },
+        }),
+      );
+      await settle();
       await reauthorizeOpenStreams();
       const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'x' } });
       sendToStreamLocal(stream, () => JSON.stringify(append));
@@ -588,6 +587,21 @@ describe('data streams (real app)', () => {
       } finally {
         probe.mockRestore();
       }
+    });
+
+    it('evicts the connection when the recheck itself throws', async () => {
+      const { socket, closeInfo } = connect(memberBearer);
+      await websocketHandler.message(socket, openFrame(stream));
+      const run = spyOn(socket.data.queue, 'run').mockRejectedValue(new Error('recheck broke'));
+      try {
+        await reauthorizeOpenStreams();
+      } finally {
+        run.mockRestore();
+      }
+
+      expect(closeInfo()?.code).toBe(1011);
+      expect(byId.has(socket.data.connectionId)).toBe(false);
+      expect(byStream.has(stream)).toBe(false);
     });
   });
   describe('adversarial review', () => {

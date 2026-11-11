@@ -9,10 +9,7 @@ import {
   phoneRow,
   positions,
   posOf,
-  setupOrderedListTests,
 } from '#/hooks/orderedList/tests/setup';
-
-setupOrderedListTests();
 
 describe('create', () => {
   it('appends to end when position omitted', async () => {
@@ -53,7 +50,7 @@ describe('create', () => {
     const { entity: u2 } = await createUser();
     await phone(u1.id);
     await phone(u1.id);
-    expect((await email(u1.id)).position).toBe(1); // different type
+    expect((await email(u1.id)).position).toBe(2); // different type, after the user's own email
     expect((await phone(u2.id)).position).toBe(1); // different owner
   });
 });
@@ -164,6 +161,6 @@ describe('multi-scope isolation — createManyAndReturn', () => {
     });
 
     expect(positions(await liveOrders(u.id, ContactType.phone))).toEqual([1, 2, 3]);
-    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1]);
+    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2]);
   });
 });

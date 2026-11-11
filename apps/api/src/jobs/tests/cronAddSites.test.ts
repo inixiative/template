@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createCronJob } from '@template/db/test';
-import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import { JobLane, JobType } from '#/jobs/types';
 import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
@@ -13,7 +12,6 @@ describe('cron schedulers stamp the resolved lane and the row retry settings', (
     (await jobs.realQueue.getJobScheduler(jobId))?.template;
 
   beforeEach(async () => {
-    registerCronJobSyncHook();
     jobs = await connectRealJobsQueue();
   });
 
@@ -23,7 +21,6 @@ describe('cron schedulers stamp the resolved lane and the row retry settings', (
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await jobs.close();
   });
 

@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry } from '@template/db';
 import type {
   Contact,
   Organization,
@@ -14,7 +13,6 @@ import {
   getNextSeq,
   upsertContact,
 } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { contactRouter } from '#/modules/contact';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
@@ -28,8 +26,6 @@ describe('Contact CRUD', () => {
   let orgUser: OrganizationUser;
 
   beforeEach(async () => {
-    registerContactRulesHook();
-
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = entity;
     user = context.user;
@@ -49,7 +45,6 @@ describe('Contact CRUD', () => {
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   const e164 = () => `+1555${String(getNextSeq()).padStart(7, '0').slice(-7)}`;
@@ -303,6 +298,9 @@ describe('Contact CRUD', () => {
       });
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(204);
+      expect(await db.contact.findUnique({ where: { id: contact.id } })).toBeNull();
+      const kept = await db.withDeleted(() => db.contact.findUnique({ where: { id: contact.id } }));
+      expect(kept?.deletedAt).toBeInstanceOf(Date);
     });
 
     it('locks deleting the email mirroring the user login (403)', async () => {

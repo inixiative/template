@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -16,7 +16,6 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { batchRouter } from '#/modules/batch';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
@@ -74,7 +73,6 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     }).then(({ entity }) => entity);
 
   beforeEach(async () => {
-    registerClearCacheHook();
     ({ entity: user } = await createUser());
     ({ entity: organization } = await createOrganization());
     ({ entity: otherOrganization } = await createOrganization());
@@ -84,7 +82,6 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
   });
 
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 
@@ -242,7 +239,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     const grant = async (writerRole: Role, entitlements: Entry[]) => {
       const { entity: writer } = await createUser();
       const member = await memberOf(writerRole, organization, writer);
-      const integration = await memberIntegration(member, null);
+      const integration = await memberIntegration(member, 'viewer');
       const response = await userApp(writer, [member]).fetch(
         post(`/api/v1/integration/${integration.id}/entitlements`, entitlements),
       );
@@ -256,7 +253,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       const manage = [entry('db:organization', ['db:organization', organization.id], ['manage'])];
       const { entity: writer } = await createUser();
       const member = await memberOf('member', organization, writer);
-      const integration = await memberIntegration(member, null);
+      const integration = await memberIntegration(member, 'viewer');
       const response = await userApp(writer, [member]).fetch(
         post(`/api/v1/integration/${integration.id}/entitlements`, manage),
       );
@@ -274,7 +271,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       ];
       const { entity: writer } = await createUser();
       const member = await memberOf('owner', organization, writer);
-      const integration = await memberIntegration(member, null);
+      const integration = await memberIntegration(member, 'viewer');
       expect(
         (
           await userApp(writer, [member]).fetch(
@@ -287,7 +284,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     it("another member's admin sets no role on an owner's integration; its user does", async () => {
       const { entity: owner } = await createUser();
       const ownerMember = await memberOf('owner', organization, owner);
-      const integration = await memberIntegration(ownerMember, null);
+      const integration = await memberIntegration(ownerMember, 'viewer');
       const { entity: admin } = await createUser();
       const adminMember = await memberOf('admin', organization, admin);
       const raise = (by: User, member: OrganizationUser, role: Role) =>
@@ -301,7 +298,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     it("a member's integration is capped by the member: its user sets any role, it holds the member's (R91)", async () => {
       const { entity: writer } = await createUser();
       const member = await memberOf('member', organization, writer);
-      const integration = await memberIntegration(member, null);
+      const integration = await memberIntegration(member, 'viewer');
       const set = (role: Role) =>
         userApp(writer, [member]).fetch(patch(`/api/v1/integration/${integration.id}`, { role }));
       expect((await set('admin')).status).toBe(200);

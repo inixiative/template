@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { ContactRegistry } from '@template/shared/contact';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { contactRouter } from '#/modules/contact';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
@@ -23,7 +21,6 @@ describe('GET /api/v1/contact/info', () => {
   let db: ReturnType<typeof createTestApp>['db'];
 
   beforeEach(async () => {
-    registerContactRulesHook();
     user = (await createUser()).entity;
     const harness = createTestApp({
       mockUser: user,
@@ -38,7 +35,6 @@ describe('GET /api/v1/contact/info', () => {
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   const loadInfo = async () => {

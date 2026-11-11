@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import {
   buildToken,
   cleanupTouchedTables,
@@ -8,13 +8,9 @@ import {
   createOrganizationUser,
   createToken,
 } from '@template/db/test';
-import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 
 describe("an integration's token carries its integration's keys (Aron, 2026-10-25)", () => {
-  beforeEach(() => registerDelegatedKeysHook());
-
   afterEach(async () => {
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 
