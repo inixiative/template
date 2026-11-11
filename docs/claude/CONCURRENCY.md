@@ -160,7 +160,7 @@ try {
 }
 ```
 
-`acquire({ waitMs, pollMs, onTimeout })` keeps trying until it wins or `waitMs` runs out; a timed-out wait throws `onTimeout()` if given, else returns false. `heartbeatMs` must leave room for one failed refresh before `ttlMs` (`2 * heartbeatMs < ttlMs`, checked at construction); `maxSafeHeartbeatMs({ ttlMs })` is the tighter ceiling that also budgets the Redis command timeout. `isWithinLease()` is the local lease check, and `assertHeld()` throws `LockLostError` once it is false (the API answers 409). `release()` resolves to `released`, `notHeld` (the key, or any key of a set, was no longer this lock's) or `unconfirmed` (the delete errored; the key frees at its TTL).
+`acquire({ waitMs, pollMs, onTimeout })` keeps trying until it wins or `waitMs` runs out, first after 1 ms and then doubling up to `pollMs` (default 50 ms), so a lock held for a few milliseconds is taken over within a millisecond or two of its release; a timed-out wait throws `onTimeout()` if given, else returns false. `heartbeatMs` must leave room for one failed refresh before `ttlMs` (`2 * heartbeatMs < ttlMs`, checked at construction); `maxSafeHeartbeatMs({ ttlMs })` is the tighter ceiling that also budgets the Redis command timeout. `isWithinLease()` is the local lease check, and `assertHeld()` throws `LockLostError` once it is false (the API answers 409). `release()` resolves to `released`, `notHeld` (the key, or any key of a set, was no longer this lock's) or `unconfirmed` (the delete errored; the key frees at its TTL).
 
 Use when multiple processes can race for the same resource (multiple golem instances both wanting to own the same bot session, multiple workers wanting to run a singleton cron, etc.).
 

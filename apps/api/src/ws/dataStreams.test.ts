@@ -588,6 +588,21 @@ describe('data streams (real app)', () => {
         probe.mockRestore();
       }
     });
+
+    it('evicts the connection when the recheck itself throws', async () => {
+      const { socket, closeInfo } = connect(memberBearer);
+      await websocketHandler.message(socket, openFrame(stream));
+      const run = spyOn(socket.data.queue, 'run').mockRejectedValue(new Error('recheck broke'));
+      try {
+        await reauthorizeOpenStreams();
+      } finally {
+        run.mockRestore();
+      }
+
+      expect(closeInfo()?.code).toBe(1011);
+      expect(byId.has(socket.data.connectionId)).toBe(false);
+      expect(byStream.has(stream)).toBe(false);
+    });
   });
   describe('adversarial review', () => {
     const withIdentifyStatus = async (

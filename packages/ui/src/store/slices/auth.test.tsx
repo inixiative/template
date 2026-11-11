@@ -60,6 +60,7 @@ beforeEach(() => {
   socketLogout = mock(() => {});
   const websocket = {
     connect: () => {},
+    disconnect: () => {},
     authenticate,
     logout: socketLogout,
     spoof: () => {},

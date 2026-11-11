@@ -337,6 +337,8 @@ try {
 
 Outside the API (`packages/db`), there is no production set: a test file registers the hooks it needs in `beforeEach` and clears them with `clearHookRegistry()` in `afterEach`.
 
+Why every API test runs with every production hook: a test that registers only the hooks it thinks it needs writes rows production would refuse or rewrite, and passes for the wrong reason. [TEST-002](../../tickets/archived/TEST-002-hook-registration-in-tests.md) first settled on each file registering and clearing its own hooks; registering the production set around every test replaced that once the failures it exposed were fixed.
+
 ### Cleanup
 
 Tests are DB-backed: they write real rows through the real client with the factories, and reset with `cleanupTouchedTables`. Mocks stay minimal.

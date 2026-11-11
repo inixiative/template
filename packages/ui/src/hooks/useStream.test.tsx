@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { STREAM_DEFINITIONS } from '@template/shared/ws';
+import { STREAM_DEFINITIONS, type WSEvent } from '@template/shared/ws';
 import type { OrganizationContactsStream } from '@template/ui/hooks/useOrganizationContactsStream';
 import { useOrganizationContactsStream } from '@template/ui/hooks/useOrganizationContactsStream';
 import { useStream } from '@template/ui/hooks/useStream';
@@ -20,6 +20,8 @@ describe('useStream / useStreamAction', () => {
   let opens: string[];
   let closes: string[];
   let client: QueryClient;
+
+  const dispatch = (event: WSEvent) => dispatchMessage(event, { client, resync: () => {} });
 
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -62,7 +64,7 @@ describe('useStream / useStreamAction', () => {
     const { result } = renderHook(() => useOrganizationContactsStream(organizationId), { wrapper });
 
     act(() =>
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'snapshot',
         seq: 1,
@@ -73,7 +75,7 @@ describe('useStream / useStreamAction', () => {
     await waitFor(() => expect(result.current.data?.data).toEqual([existing]));
 
     act(() =>
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'append',
         seq: 1,
@@ -85,7 +87,7 @@ describe('useStream / useStreamAction', () => {
     await waitFor(() => expect(result.current.data?.data).toEqual([created, existing]));
 
     act(() =>
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'append',
         seq: 1,
@@ -115,7 +117,7 @@ describe('useStream / useStreamAction', () => {
     const existing = await contactStreamRow({ id: '0001' });
 
     act(() =>
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'snapshot',
         seq: 1,
@@ -124,7 +126,7 @@ describe('useStream / useStreamAction', () => {
       }),
     );
     act(() =>
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'append',
         seq: 1,
@@ -146,7 +148,7 @@ describe('useStream / useStreamAction', () => {
     const { result } = renderHook(() => useOrganizationContactsStream(organizationId), { wrapper });
 
     act(() =>
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'snapshot',
         seq: 1,
@@ -156,7 +158,7 @@ describe('useStream / useStreamAction', () => {
     );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    act(() => failDataStream(stream, 'rejected'));
+    act(() => failDataStream(client, stream, 'rejected'));
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.data).toBeUndefined();
   });

@@ -112,6 +112,11 @@ before the per-connection queue, so a slow snapshot read or the re-authorization
 delays `pong` into a spurious reconnect. The server sweeps connections idle for more than 5
 minutes.
 
+`disconnect()` closes the socket and clears the client's heartbeat, acknowledgement, retry and
+settle timers; `connect()` starts it again and replays identity, subscriptions and opens on the
+new socket. `useApiWebsocket()` connects when an app root mounts and disconnects when it unmounts;
+a test that creates a client disconnects it when the test ends.
+
 On reconnect, `createApiWebsocket` sends identity first, then replays subscribes, then opens. A
 replay that overruns the server's pending-frame cap or the HTTP rate limit (snapshot reads and
 subscribe probes count against it) gets retryable errors, and the client re-sends with backoff. It

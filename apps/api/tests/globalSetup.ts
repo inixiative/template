@@ -1,6 +1,6 @@
 import '#/config/env';
 import { afterEach, beforeEach } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, getRedisClient, redisNamespace } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { resetEnvOverrides } from '@template/shared/utils';
 import { SQL } from 'bun';
@@ -17,6 +17,14 @@ const restoreProductionHooks = () => {
 };
 restoreProductionHooks();
 beforeEach(restoreProductionHooks);
+
+// Rate-limit windows are keyed by client IP and last a real minute, so they would leak too.
+const clearRateLimitWindows = async () => {
+  const redis = getRedisClient();
+  const keys = await redis.keys(`${redisNamespace.limit}:*`);
+  if (keys.length) await redis.del(...keys);
+};
+afterEach(clearRateLimitWindows);
 
 // Rows too: a test that reaches the database through a fixture has no cleanup of its own to forget.
 afterEach(async () => {
