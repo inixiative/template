@@ -89,7 +89,7 @@ describe('emailTemplateSlugReservation hook', () => {
     expect(french.template.ownerModel).toBe('admin');
   });
 
-  it('refuses moving a row onto the admin tier while another tier holds the slug', async () => {
+  it('keeps a row on its tier when an update names the admin tier', async () => {
     await saveEmailTemplate({ ...templateInput('welcome'), ownerModel: 'default' });
     const { entity: org } = await createOrganization();
     const tenant = await saveEmailTemplate({
@@ -98,14 +98,14 @@ describe('emailTemplateSlugReservation hook', () => {
       organizationId: org.id,
     });
 
-    await expectConflict(
-      db.txn(() =>
-        db.emailTemplate.update({
-          where: { id: tenant.template.id },
-          data: { ownerModel: 'admin', organizationId: null },
-        }),
-      ),
+    const result = await db.txn(() =>
+      db.emailTemplate.update({
+        where: { id: tenant.template.id },
+        data: { ownerModel: 'admin', organizationId: null },
+      }),
     );
+    expect(result.ownerModel).toBe('Organization');
+    expect(result.organizationId).toBe(org.id);
   });
 
   it('guards writes that bypass saveEmailTemplate', async () => {

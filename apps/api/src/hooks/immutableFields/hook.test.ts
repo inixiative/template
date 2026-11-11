@@ -31,11 +31,13 @@ describe('immutableFields hook', () => {
     const result = await db.organizationUser.update({
       where: { id: orgUserId },
       data: {
+        userId: 'should-strip',
         organizationId: 'should-strip',
         role: 'admin',
       },
     });
 
+    expect(result.userId).toBe(userId);
     expect(result.organizationId).toBe(orgId);
     expect(result.role).toBe('admin');
   });
@@ -58,9 +60,10 @@ describe('immutableFields hook', () => {
     const result = await db.organizationUser.upsert({
       where: { id: orgUserId },
       create: { userId, organizationId: orgId, role: 'member' },
-      update: { organizationId: 'should-strip', role: 'member' },
+      update: { userId: 'should-strip', organizationId: 'should-strip', role: 'member' },
     });
 
+    expect(result.userId).toBe(userId);
     expect(result.organizationId).toBe(orgId);
     expect(result.role).toBe('member');
   });

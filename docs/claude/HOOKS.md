@@ -8,6 +8,7 @@
   - [Hook Options](#hook-options)
   - [Action Types](#action-types)
 - [Registering Hooks](#registering-hooks)
+  - [Run order](#run-order)
 - [Application Hooks](#application-hooks)
 - [Audit Log](#audit-log)
   - [Enabling Audit for a Model](#enabling-audit-for-a-model)
@@ -104,6 +105,10 @@ registerDbHook(
 );
 ```
 
+### Run order
+
+Global (`'*'`) hooks wrap model hooks. Before a write, global hooks run first, then model hooks: `immutableFields` strips or refuses the fields an update may not change before any model hook validates the write, so a validator (`rules:update`, `contactRules:update`) only ever sees fields that will be written, and the outcome never depends on which validators read a stripped field. After a write, model hooks run first, then global hooks: `emailVersioning` (global) reads the audit row `auditLog` (model) has just written. Within each group, hooks run in registration order (`registerHooks()` in `apps/api/src/hooks/index.ts`). The rule is `orderHooks` in `packages/db/src/extensions/hookRegistry.ts`.
+
 ---
 
 ## Application Hooks
@@ -122,7 +127,7 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `segmentConditions` | Segment `conditions` required, validated by `validateSegmentConditions` (against `customerRefLens`, compiled with `resolvedCustomerRefLens(ownerModel, …)`) + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
 | `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
 | `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). Each delete behavior has its own registry, keyed by the child model: `HARD_DELETE_ON_TOMBSTONE` (`@template/db` registries) hard-deletes ephemeral grants that must not survive a revive — `Session`, `Token`, `WebhookSubscription`; `REGENERATE_ON_REVIVE` rebuilds the derived ones (`RuleReference`) when the parent is revived; `SKIP_REVIVE` (`@template/db` registries, empty in template) tombstones a grant with its parent and never revives it, so a new one has to be issued; `validateDeleteBehavior` refuses an inconsistent registry at boot |
-| `tagOwnerCategory` | Tag.ownerModel + FK must match its TagCategory's owner |
+| `tagOwnerCategory` | A created Tag's ownerModel + FK must match its TagCategory's owner. A tag never moves: `tagCategoryId` is refused on update (422) and the owner fields are stripped |
 | `webhooks` | Webhook delivery on mutations (post-commit) |
 
 `apps/api/src/hooks/falsePolymorphism/` lives under `hooks/` but is **not** a runtime hook — it's a pair of transformers (`toRules.ts`, `toImmutableFields.ts`) that inject polymorphism constraints into the rules and immutableFields registries at module load time.
@@ -714,6 +719,9 @@ export const ImmutableFieldsOverrides = {
   // Space.organizationId is normally immutable (it's a FK) but must be
   // updatable for the transferSpace inquiry handler
   Space: { exclude: ['organizationId'] },
+
+  // A tag never moves between categories: naming another one is a 422.
+  Tag: { ...polymorphismImmutableFields.Tag, refuse: ['tagCategoryId'] },
 
   // Other examples:
   // SomeModel: { exclude: ['categoryId'] },  // Allow this FK to change

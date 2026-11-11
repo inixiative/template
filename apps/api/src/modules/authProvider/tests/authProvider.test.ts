@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { AuthProviderType, PlatformRole } from '@template/db/generated/client/enums';
+import { type DecryptFieldInput, decryptField } from '@template/db/lib/encryption/helpers';
 import {
   cleanupTouchedTables,
   createAuthProvider,
@@ -314,6 +315,44 @@ describe('AuthProvider Endpoints', () => {
       expect(data).not.toHaveProperty('encryptedSecrets');
       expect(data).not.toHaveProperty('encryptedSecretsMetadata');
       expect(data).not.toHaveProperty('encryptedSecretsKeyVersion');
+    });
+    it('re-adding a deleted provider revives it with the new body', async () => {
+      const body = {
+        type: 'OAUTH',
+        provider: 'gitlab',
+        name: 'GitLab',
+        config: { clientId: 'gitlab-old' },
+        secrets: { clientSecret: 'gitlab-old-secret' },
+      };
+      const first = await json<AuthProvider>(
+        await userFetch(post(`/api/v1/organization/${org.id}/authProviders`, body)),
+      );
+      expect((await userFetch(del(`/api/v1/authProvider/${first.data.id}`))).status).toBe(204);
+
+      const response = await userFetch(
+        post(`/api/v1/organization/${org.id}/authProviders`, {
+          ...body,
+          name: 'GitLab Again',
+          config: { clientId: 'gitlab-new' },
+          secrets: { clientSecret: 'gitlab-new-secret' },
+        }),
+      );
+      const { data } = await json<AuthProvider>(response);
+
+      expect(response.status).toBe(201);
+      expect(data.id).toBe(first.data.id);
+      expect(data.name).toBe('GitLab Again');
+      expect(data.config).toEqual({ clientId: 'gitlab-new' });
+      const raw = await db.authProvider.findUniqueOrThrow({ where: { id: data.id } });
+      expect(raw.deletedAt).toBeNull();
+      const secrets = await decryptField('authProvider', 'secrets', {
+        ...raw,
+        encryptedSecretsMetadata: raw.encryptedSecretsMetadata as DecryptFieldInput<
+          'authProvider',
+          'secrets'
+        >['encryptedSecretsMetadata'],
+      });
+      expect(secrets).toEqual({ clientSecret: 'gitlab-new-secret' });
     });
   });
 

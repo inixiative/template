@@ -223,6 +223,73 @@ describe('createApiWebsocket', () => {
     expect(sends(ws)).toContainEqual({ action: 'subscribe', channel: 'ch1' });
   });
 
+  it('leaves no frame-error retry pending after disconnect', () => {
+    const api = createClient('ws://x', undefined, fastTiming);
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    api.subscribe('ch1');
+
+    const live = new Set<unknown>();
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    const setSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((
+      callback: () => void,
+      ms?: number,
+    ) => {
+      const id = realSetTimeout(() => {
+        live.delete(id);
+        callback();
+      }, ms);
+      live.add(id);
+      return id;
+    }) as never);
+    const clearSpy = spyOn(globalThis, 'clearTimeout').mockImplementation(((
+      id: ReturnType<typeof setTimeout>,
+    ) => {
+      live.delete(id);
+      realClearTimeout(id);
+    }) as never);
+
+    try {
+      for (const frame of [
+        { action: 'authenticate' },
+        { action: 'subscribe', channel: 'ch1' },
+        { action: 'unsubscribe', channel: 'ch2' },
+        { action: 'close', stream: 'gone' },
+      ])
+        receive(ws, { type: 'error', retryable: true, ...frame });
+      expect(live.size).toBe(4);
+
+      api.disconnect();
+      expect(live.size).toBe(0);
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
+  });
+
+  it('does not report a reconnect when the socket closes before the replayed subscriptions are acked', async () => {
+    let reconnected = 0;
+    const api = createClient(
+      'ws://x',
+      () => {
+        reconnected++;
+      },
+      { reconnectAckTimeoutMs: 5 },
+    );
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    api.subscribe('ch1');
+    open(ws);
+
+    ws.close();
+    await wait(20);
+
+    expect(reconnected).toBe(0);
+  });
+
   describe('data streams', () => {
     const stream = 'organizationReadManyContacts:id:org-1';
     let client: QueryClient;

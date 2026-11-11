@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { db } from '@template/db';
+import { db, revive } from '@template/db';
 import { encryptField } from '@template/db/lib/encryption/helpers';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
@@ -16,20 +16,31 @@ export const organizationCreateAuthProviderController = makeController(
     const org = getResource<'organization'>(c);
     const { secrets, ...body } = c.req.valid('json');
 
+    const [revived] = await revive(db.authProvider, {
+      organizationId: org.id,
+      provider: body.provider,
+      type: body.type,
+    });
+
     const data = {
       ...body,
-      id: Bun.randomUUIDv7(),
+      id: revived?.id ?? Bun.randomUUIDv7(),
       organizationId: org.id,
     };
 
     const encryptedData = await encryptField('authProvider', 'secrets', { ...data, secrets });
 
-    const provider = await db.authProvider.create({
-      data: {
-        ...data,
-        ...encryptedData,
-      },
-    });
+    const provider = revived
+      ? await db.authProvider.update({
+          where: { id: revived.id },
+          data: { ...body, ...encryptedData },
+        })
+      : await db.authProvider.create({
+          data: {
+            ...data,
+            ...encryptedData,
+          },
+        });
 
     const {
       encryptedSecrets,

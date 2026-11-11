@@ -5,6 +5,7 @@
  * @uses none
  */
 
+export { bindsAs } from './bindsAs';
 export { collectRules } from './collectRules';
 export { findJsonEnd } from './findJsonEnd';
 export {

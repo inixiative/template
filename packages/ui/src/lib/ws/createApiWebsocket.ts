@@ -72,6 +72,7 @@ export const createApiWebsocket = (
   const pendingOpens = new Map<string, number>();
   const openAckTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const frameRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const retryAttempts = new Map<string, number>();
   const settlers = new Map<string, DebouncedFunc<() => void>>();
   const sentOpens = new Set<string>();
@@ -107,6 +108,17 @@ export const createApiWebsocket = (
       clearTimeout(timer);
       timers.delete(held);
     }
+  };
+
+  const retryFrame = (key: string, delay: number, retry: () => void): void => {
+    clearTimers(frameRetryTimers, key);
+    frameRetryTimers.set(
+      key,
+      setTimeout(() => {
+        frameRetryTimers.delete(key);
+        retry();
+      }, delay),
+    );
   };
 
   const onOpenAckTimeout = (stream: string): void => {
@@ -246,28 +258,28 @@ export const createApiWebsocket = (
   const onFrameError = (frame: InboundFrame): void => {
     if (frame.action === 'authenticate' || frame.action === 'logout') {
       identityAttempts++;
-      setTimeout(() => {
+      retryFrame('identity', backoffDelay(identityAttempts), () => {
         if (socket.status() === 'open') sendIdentity(identityFrame);
-      }, backoffDelay(identityAttempts));
+      });
       return;
     }
     const { channel, stream } = frame;
     if (frame.action === 'subscribe' && channel) {
-      setTimeout(() => {
+      retryFrame(`subscribe:${channel}`, timing.retryBaseMs, () => {
         if (channels.has(channel) && socket.status() === 'open') sendSubscribe(channel);
-      }, timing.retryBaseMs);
+      });
       return;
     }
     if (frame.action === 'unsubscribe' && channel) {
-      setTimeout(() => {
+      retryFrame(`unsubscribe:${channel}`, timing.retryBaseMs, () => {
         if (!channels.has(channel)) sendRelease({ action: 'unsubscribe', channel });
-      }, timing.retryBaseMs);
+      });
       return;
     }
     if (frame.action === 'close' && stream) {
-      setTimeout(() => {
+      retryFrame(`close:${stream}`, timing.retryBaseMs, () => {
         if (!streams.has(stream)) sendRelease({ action: 'close', stream });
-      }, timing.retryBaseMs);
+      });
       return;
     }
     if (frame.action !== 'open' || !frame.stream || !isFinalOpenAnswer(frame.stream)) return;
@@ -331,12 +343,15 @@ export const createApiWebsocket = (
     },
     onClose: () => {
       clearTimeout(pongTimer);
+      clearTimeout(reconnectAckTimer);
+      pendingAcks = null;
       pendingOpens.clear();
       sentOpens.clear();
       sentSubscribes.clear();
       lastSeqs.clear();
       clearTimers(openAckTimers);
       clearTimers(retryTimers);
+      clearTimers(frameRetryTimers);
     },
   });
 
@@ -373,6 +388,7 @@ export const createApiWebsocket = (
       clearTimeout(reconnectAckTimer);
       clearTimers(openAckTimers);
       clearTimers(retryTimers);
+      clearTimers(frameRetryTimers);
       for (const settler of settlers.values()) settler.cancel();
       settlers.clear();
       socket.close();

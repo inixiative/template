@@ -1,10 +1,10 @@
-import { spyOn } from 'bun:test';
+import { afterEach, beforeEach, spyOn } from 'bun:test';
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { queue } from '#/jobs/queue';
 
 // Tests get an in-memory Redis mock, which cannot run BullMQ's Lua scripts; a random queue name keeps parallel runs apart.
-export const connectRealJobsQueue = async () => {
+const connectRealJobsQueue = async () => {
   const url = process.env.REDIS_BULLMQ_URL;
   if (!url)
     throw new Error('REDIS_BULLMQ_URL must point at a real Redis for the job scheduler tests');
@@ -38,4 +38,21 @@ export const connectRealJobsQueue = async () => {
   };
 
   return { realQueue, upsertJobScheduler, removeJobScheduler, schedulerOf, close };
+};
+
+export type RealJobsQueue = Awaited<ReturnType<typeof connectRealJobsQueue>>;
+
+export const useRealJobsQueue = (): (() => RealJobsQueue) => {
+  let jobs: RealJobsQueue | undefined;
+  beforeEach(async () => {
+    jobs = await connectRealJobsQueue();
+  });
+  afterEach(async () => {
+    await jobs?.close();
+    jobs = undefined;
+  });
+  return () => {
+    if (!jobs) throw new Error('useRealJobsQueue: the queue is only connected inside a test');
+    return jobs;
+  };
 };

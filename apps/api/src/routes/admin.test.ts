@@ -9,16 +9,10 @@ import {
 } from '@template/db/test';
 import { adminRouter } from '#/routes/admin';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 import { get, json } from '#tests/utils/request';
 
-let jobsQueue: Awaited<ReturnType<typeof connectRealJobsQueue>>;
-
-beforeEach(async () => {
-  jobsQueue = await connectRealJobsQueue();
-});
-
-afterEach(() => jobsQueue.close());
+useRealJobsQueue();
 
 describe('adminRouter', () => {
   let memberFetch: ReturnType<typeof createTestApp>['fetch'];
