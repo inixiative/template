@@ -327,6 +327,7 @@ describe('AuthProvider Endpoints', () => {
       const first = await json<AuthProvider>(
         await userFetch(post(`/api/v1/organization/${org.id}/authProviders`, body)),
       );
+      await db.authProvider.update({ where: { id: first.data.id }, data: { enabled: false } });
       expect((await userFetch(del(`/api/v1/authProvider/${first.data.id}`))).status).toBe(204);
 
       const response = await userFetch(
@@ -342,6 +343,7 @@ describe('AuthProvider Endpoints', () => {
       expect(response.status).toBe(201);
       expect(data.id).toBe(first.data.id);
       expect(data.name).toBe('GitLab Again');
+      expect(data.enabled).toBe(true);
       expect(data.config).toEqual({ clientId: 'gitlab-new' });
       const raw = await db.authProvider.findUniqueOrThrow({ where: { id: data.id } });
       expect(raw.deletedAt).toBeNull();

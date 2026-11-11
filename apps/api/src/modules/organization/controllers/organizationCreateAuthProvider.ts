@@ -16,31 +16,29 @@ export const organizationCreateAuthProviderController = makeController(
     const org = getResource<'organization'>(c);
     const { secrets, ...body } = c.req.valid('json');
 
-    const [revived] = await revive(db.authProvider, {
-      organizationId: org.id,
-      provider: body.provider,
-      type: body.type,
-    });
+    const provider = await db.txn(async () => {
+      const [revived] = await revive(db.authProvider, {
+        organizationId: org.id,
+        provider: body.provider,
+        type: body.type,
+      });
 
-    const data = {
-      ...body,
-      id: revived?.id ?? Bun.randomUUIDv7(),
-      organizationId: org.id,
-    };
+      const data = {
+        enabled: true,
+        ...body,
+        id: revived?.id ?? Bun.randomUUIDv7(),
+        organizationId: org.id,
+      };
 
-    const encryptedData = await encryptField('authProvider', 'secrets', { ...data, secrets });
+      const encryptedData = await encryptField('authProvider', 'secrets', { ...data, secrets });
 
-    const provider = revived
-      ? await db.authProvider.update({
+      if (revived)
+        return db.authProvider.update({
           where: { id: revived.id },
-          data: { ...body, ...encryptedData },
-        })
-      : await db.authProvider.create({
-          data: {
-            ...data,
-            ...encryptedData,
-          },
+          data: { enabled: data.enabled, ...body, ...encryptedData },
         });
+      return db.authProvider.create({ data: { ...data, ...encryptedData } });
+    });
 
     const {
       encryptedSecrets,
