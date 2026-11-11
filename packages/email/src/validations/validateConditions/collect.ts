@@ -6,15 +6,14 @@
  */
 import { validateRule } from '@inixiative/json-rules';
 import type { ConditionIssue } from '@template/email/errors/ConditionValidationError';
-import { visitTemplateBlocks } from '@template/email/render/conditionParser';
+import { bindsAs, visitTemplateBlocks } from '@template/email/render/conditionParser';
 import { EACH_MAX_DEPTH } from '@template/email/render/limits';
-import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
-import { bindsAs } from '@template/email/validations/validateConditions/bindsAs';
+import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 import type { ValidateConditionsOptions } from '@template/email/validations/validateConditions/types';
 import { validateEachAttributes } from '@template/email/validations/validateConditions/validateEachAttributes';
 import { validateFieldRoots } from '@template/email/validations/validateConditions/validateFieldRoots';
 
-type ConditionScope = { at: string; bindingScope: BindingChain; eachDepth: number };
+type ConditionScope = { at: string; eachDepth: number };
 
 export const collect = (
   content: string,
@@ -51,7 +50,7 @@ export const collect = (
           });
         }
       },
-      branch: (branch, branchIndex, { blockIndex }, { state }) => {
+      branch: (branch, branchIndex, { blockIndex }, { bindings, state }) => {
         const path = `${state.at}[${blockIndex}].${branch.kind}${branchIndex}`;
         if (branch.kind !== 'else') {
           if (branch.ruleError !== undefined) {
@@ -61,12 +60,12 @@ export const collect = (
             for (const err of result.errors)
               issues.push({ path: `${path}:${err.path}`, message: err.message });
             if (result.errors.length === 0)
-              validateFieldRoots(branch.rule!, options.lens, state.bindingScope, path, issues);
+              validateFieldRoots(branch.rule!, options.lens, bindings, path, issues);
           }
         }
         return { ...state, at: path };
       },
-      loop: (block, _loop, { blockIndex }, { state }) => {
+      loop: (block, loop, { blockIndex }, { bindings, state }) => {
         const path = `${state.at}[${blockIndex}]`;
         if (options.isSubject) {
           issues.push({
@@ -83,9 +82,7 @@ export const collect = (
           });
         }
 
-        validateEachAttributes(block, state.bindingScope, path, issues);
-
-        const elementPath = resolveBindingPath(block.path, state.bindingScope);
+        validateEachAttributes(block, bindings, path, issues);
 
         if (block.filterError !== undefined) {
           issues.push({
@@ -97,17 +94,14 @@ export const collect = (
           for (const err of result.errors)
             issues.push({ path: `${path}.filter:${err.path}`, message: err.message });
           if (result.errors.length === 0) {
-            const filterScope: BindingChain = new Map(state.bindingScope);
-            if (bindsAs(block.as)) filterScope.set(block.as, elementPath);
+            const filterScope: BindingChain = new Map(bindings);
+            if (bindsAs(block.as)) filterScope.set(block.as, loop.iterated);
             validateFieldRoots(block.filter, options.lens, filterScope, `${path}.filter`, issues);
           }
         }
 
-        const bodyScope: BindingChain = new Map(state.bindingScope);
-        if (bindsAs(block.as)) bodyScope.set(block.as, elementPath);
-        if (bindsAs(block.index)) bodyScope.set(block.index, undefined);
-        return { at: `${path}.each`, bindingScope: bodyScope, eachDepth: blockDepth };
+        return { at: `${path}.each`, eachDepth: blockDepth };
       },
     },
-    { bindings: new Map(), state: { at, bindingScope, eachDepth } },
+    { bindings: bindingScope, state: { at, eachDepth } },
   );

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { db } from '@template/db';
 import { TagOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -60,7 +60,7 @@ describe('tagOwnerCategory hook', () => {
     await expect(create()).rejects.toThrow(/userId/);
   });
 
-  it('rejects updating a tag to mismatch its category', async () => {
+  it('keeps the owner when an update names another one', async () => {
     const { entity: a } = await createUser();
     const { entity: b } = await createUser();
     const cat = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user: a });
@@ -68,9 +68,44 @@ describe('tagOwnerCategory hook', () => {
       { name: tagName('update-target'), ownerModel: TagOwnerModel.User, resources: [] },
       { user: a, tagCategory: cat.entity },
     );
-    const update = async () =>
-      db.tag.update({ where: { id: tag.entity.id }, data: { userId: b.id } });
-    await expect(update()).rejects.toThrow(/userId/);
+    const result = await db.tag.update({ where: { id: tag.entity.id }, data: { userId: b.id } });
+    expect(result.userId).toBe(a.id);
+  });
+
+  it('refuses moving a tag to another category (422)', async () => {
+    const { entity: user } = await createUser();
+    const cat = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
+    const target = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
+    const tag = await createTag(
+      { name: tagName('move'), ownerModel: TagOwnerModel.User, resources: [] },
+      { user, tagCategory: cat.entity },
+    );
+    const move = async () =>
+      db.tag.update({ where: { id: tag.entity.id }, data: { tagCategoryId: target.entity.id } });
+    await expect(move()).rejects.toMatchObject({ status: 422 });
+    await expect(move()).rejects.toThrow(/Tag\.tagCategoryId cannot change after create/);
+  });
+
+  it('refuses an upsert whose update arm moves the tag to another category (422)', async () => {
+    const { entity: user } = await createUser();
+    const cat = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
+    const target = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
+    const tag = await createTag(
+      { name: tagName('upsert-move'), ownerModel: TagOwnerModel.User, resources: [] },
+      { user, tagCategory: cat.entity },
+    );
+    const move = async () =>
+      db.tag.upsert({
+        where: { id: tag.entity.id },
+        create: {
+          name: tag.entity.name,
+          ownerModel: TagOwnerModel.User,
+          userId: user.id,
+          tagCategoryId: cat.entity.id,
+        },
+        update: { tagCategoryId: target.entity.id },
+      });
+    await expect(move()).rejects.toMatchObject({ status: 422 });
   });
 
   it('allows an Organization tag in a matching Organization category', async () => {
@@ -129,48 +164,25 @@ describe('tagOwnerCategory hook', () => {
       expect(result).toEqual([]);
     });
 
-    it('rejects moving multiple tags to an owner their category does not have', async () => {
+    it('keeps the owner when a bulk update names another one', async () => {
       const { user, tags } = await createUserTags(2);
       const { entity: other } = await createUser();
-      const update = async () =>
-        db.tag.updateManyAndReturn({ where: { userId: user.id }, data: { userId: other.id } });
-      await expect(update()).rejects.toThrow(/Tag\.userId .* must match TagCategory\.userId/);
+      await db.tag.updateManyAndReturn({ where: { userId: user.id }, data: { userId: other.id } });
       const unchanged = await db.tag.findMany({ where: { id: { in: tags.map((t) => t.id) } } });
       expect(unchanged.every((t) => t.userId === user.id)).toBe(true);
     });
 
-    it('rejects moving multiple tags into a category with a different ownerModel', async () => {
-      const { user } = await createUserTags(2);
-      const platformCat = await createTagCategory({ ownerModel: TagOwnerModel.platform });
-      const update = async () =>
-        db.tag.updateManyAndReturn({
-          where: { userId: user.id },
-          data: { tagCategoryId: platformCat.entity.id },
-        });
-      await expect(update()).rejects.toThrow(/Tag\.ownerModel \(User\) must match/);
-    });
-
-    it('rejects moving multiple tags into a nonexistent category', async () => {
-      const { user } = await createUserTags(2);
-      const update = async () =>
-        db.tag.updateManyAndReturn({
-          where: { userId: user.id },
-          data: { tagCategoryId: '00000000-0000-0000-0000-000000000000' },
-        });
-      await expect(update()).rejects.toThrow(/TagCategory 0{8}-.* not found/);
-    });
-
-    it('allows moving multiple tags into another category with the same owner', async () => {
-      // A tag's category is an immutable field in production, so the move is only reachable without that hook.
-      unregisterDbHook('immutableFields');
-      const { user, tags } = await createUserTags(2);
+    it('refuses moving multiple tags to another category (422)', async () => {
+      const { user, category, tags } = await createUserTags(2);
       const target = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
-      const result = await db.tag.updateManyAndReturn({
-        where: { userId: user.id },
-        data: { tagCategoryId: target.entity.id },
-      });
-      expect(result).toHaveLength(tags.length);
-      expect(result.every((t) => t.tagCategoryId === target.entity.id)).toBe(true);
+      const move = async () =>
+        db.tag.updateManyAndReturn({
+          where: { userId: user.id },
+          data: { tagCategoryId: target.entity.id },
+        });
+      await expect(move()).rejects.toThrow(/Tag\.tagCategoryId cannot change after create/);
+      const unchanged = await db.tag.findMany({ where: { id: { in: tags.map((t) => t.id) } } });
+      expect(unchanged.every((t) => t.tagCategoryId === category.id)).toBe(true);
     });
   });
 

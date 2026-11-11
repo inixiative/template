@@ -6,19 +6,13 @@ import {
   registerDbHook,
   type SingleAction,
 } from '@template/db';
-import type { ContactType } from '@template/db/generated/client/enums';
 import { ContactRegistry } from '@template/shared/contact';
 import { castArray } from 'lodash-es';
+import { normalizeContactValue } from '#/hooks/contactRules/normalizeContactValue';
 import { makeError } from '#/lib/errors';
 
 type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> &
   Record<string, unknown>;
-
-const normalizeContactValue = <K extends ContactType>(type: K, value: unknown) => {
-  const def = ContactRegistry[type];
-  const canonical = def.valueSchema.parse(def.parseInput(def.inputSchema.parse(value)));
-  return { value: canonical, valueKey: def.toValueKey(canonical) };
-};
 
 // Validate + normalize a single Contact row in place. The row mutation makes
 // `valueKey` and the canonical `value` shape persist when Prisma writes.

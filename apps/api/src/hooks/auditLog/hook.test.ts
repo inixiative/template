@@ -19,15 +19,9 @@ import { saveEmailTemplate } from '@template/email/render';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { createTestApp } from '#tests/createTestApp';
-import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 
-let jobsQueue: Awaited<ReturnType<typeof connectRealJobsQueue>>;
-
-beforeEach(async () => {
-  jobsQueue = await connectRealJobsQueue();
-});
-
-afterEach(() => jobsQueue.close());
+useRealJobsQueue();
 
 afterEach(async () => {
   await cleanupTouchedTables(db);

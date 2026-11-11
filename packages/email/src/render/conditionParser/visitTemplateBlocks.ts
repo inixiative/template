@@ -4,6 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
+import { bindsAs } from '@template/email/render/conditionParser/bindsAs';
 import { EACH, IF } from '@template/email/render/conditionParser/grammar';
 import { parseEachBlock } from '@template/email/render/conditionParser/parseEachBlock';
 import { parseIfBlock } from '@template/email/render/conditionParser/parseIfBlock';
@@ -80,8 +81,8 @@ export const visitTemplateBlocks = <S = undefined>(
     }
     const iterated = resolveBindingPath(block.path, scope.bindings);
     const bindings: BindingChain = new Map(scope.bindings);
-    if (block.as) bindings.set(block.as, iterated);
-    if (block.index) bindings.set(block.index, undefined);
+    if (bindsAs(block.as)) bindings.set(block.as, iterated);
+    if (bindsAs(block.index)) bindings.set(block.index, undefined);
     const state = visitor.loop?.(block, { iterated, bindings }, position, scope) ?? scope.state;
     visitTemplateBlocks(block.body, visitor, { bindings, state });
     i = block.end;

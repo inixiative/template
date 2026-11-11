@@ -6,16 +6,13 @@
 import {
   DbAction,
   db,
-  type HookOptions,
   HookTiming,
   PolymorphismRegistry,
   type Prisma,
   registerDbHook,
-  type SingleAction,
   withDiscriminatorDefaults,
 } from '@template/db';
-import { castArray, isEmpty, pickBy } from 'lodash-es';
-import { shadowMerge } from '#/hooks/rules/shadowMerge';
+import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
 type TagRow = Partial<Prisma.TagGetPayload<Record<string, never>>> & Record<string, unknown>;
@@ -26,8 +23,6 @@ const ownerKeyFields = [
 ];
 
 const ownerSelect: Record<string, true> = Object.fromEntries(ownerKeyFields.map((k) => [k, true]));
-
-const ownerCategoryFields = new Set<string>(['tagCategoryId', 'ownerModel', ...ownerKeyFields]);
 
 type CategoryOwner = { ownerModel: string } & Record<string, unknown>;
 
@@ -119,39 +114,9 @@ export const registerTagOwnerCategoryHook = () => {
     'Tag',
     HookTiming.before,
     [DbAction.upsert],
-    async (options) => {
-      const { args, previous } = options as HookOptions & { action: SingleAction };
-      if (!args || typeof args !== 'object') return;
-      const a = args as Record<string, unknown>;
-      const create = a.create as TagRow | undefined;
-      const update = a.update as TagRow | undefined;
+    async ({ args }) => {
+      const create = (args as { create?: TagRow } | undefined)?.create;
       if (create) await validateOwnerMatchesCategory(create);
-      if (update) {
-        const prev = previous as TagRow | undefined;
-        const merged: TagRow = { ...(prev ?? {}), ...update };
-        await validateOwnerMatchesCategory(merged);
-      }
-    },
-  );
-
-  registerDbHook(
-    'tagOwnerCategory:update',
-    'Tag',
-    HookTiming.before,
-    [DbAction.update, DbAction.updateManyAndReturn],
-    async ({ args, previous }) => {
-      const data = (args as { data?: TagRow } | undefined)?.data;
-      if (!data) return;
-      const ownerCategoryWrites = pickBy(
-        data,
-        (value, field) => value !== undefined && ownerCategoryFields.has(field),
-      );
-      if (isEmpty(ownerCategoryWrites)) return;
-      const rows = (castArray(previous ?? []) as TagRow[]).map(
-        (row) => shadowMerge(row, ownerCategoryWrites) as TagRow,
-      );
-      if (rows.length === 0) return;
-      await validateRowsBatch(rows);
     },
   );
 };

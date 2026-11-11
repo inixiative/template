@@ -221,37 +221,29 @@ describe('mutationLifeCycle', () => {
   });
 
   describe('executeHooks', () => {
-    it('executes model-specific hooks before global hooks', async () => {
+    const recordOrder = async (timing: HookTiming) => {
       const callOrder: string[] = [];
-
-      registerDbHook(
-        'test-hook-global-order',
-        '*',
-        HookTiming.before,
-        [DbAction.update],
-        async () => {
-          callOrder.push('global');
-        },
-      );
-
-      registerDbHook(
-        'test-hook-model-order',
-        'User',
-        HookTiming.before,
-        [DbAction.update],
-        async () => {
-          callOrder.push('model');
-        },
-      );
-
-      await executeHooks(HookTiming.before, {
+      registerDbHook(`test-hook-global-${timing}`, '*', timing, [DbAction.update], async () => {
+        callOrder.push('global');
+      });
+      registerDbHook(`test-hook-model-${timing}`, 'User', timing, [DbAction.update], async () => {
+        callOrder.push('model');
+      });
+      await executeHooks(timing, {
         model: 'User',
         operation: 'update',
         action: DbAction.update,
         args: {},
       });
+      return callOrder;
+    };
 
-      expect(callOrder).toEqual(['model', 'global']);
+    it('runs global before-hooks ahead of model before-hooks', async () => {
+      expect(await recordOrder(HookTiming.before)).toEqual(['global', 'model']);
+    });
+
+    it('runs model after-hooks ahead of global after-hooks', async () => {
+      expect(await recordOrder(HookTiming.after)).toEqual(['model', 'global']);
     });
 
     it('does not execute hooks for different models', async () => {

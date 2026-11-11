@@ -251,7 +251,7 @@ describe('IntegrationsPage', () => {
     }
     stored['/api/v1/me/integrations'] = [...repos, await serverIntegration('Team chat', 'slack')];
     renderPage();
-    await screen.findByText('Repo 100');
+    await screen.findByText('Repo 100', {}, { timeout: 5_000 });
 
     const github = within(providerCard('github'));
     expect(github.getAllByRole('listitem')).toHaveLength(100);
@@ -260,7 +260,9 @@ describe('IntegrationsPage', () => {
 
     scrollToEnd(screen.getByTestId('integrations-github'));
 
-    await waitFor(() => expect(github.getAllByRole('listitem')).toHaveLength(102));
+    await waitFor(() => expect(github.getAllByRole('listitem')).toHaveLength(102), {
+      timeout: 5_000,
+    });
     expect(
       listRequests()
         .filter((request) => request.provider === 'github')

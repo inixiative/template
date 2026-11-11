@@ -18,6 +18,10 @@ type ImmutableFieldsOverride = {
 export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
   ...polymorphismImmutableFields,
   Space: { exclude: ['organizationId'] },
+  Tag: {
+    ...polymorphismImmutableFields.Tag,
+    refuse: [...(polymorphismImmutableFields.Tag?.refuse ?? []), 'tagCategoryId'],
+  },
   CommunicationLog: {
     ...polymorphismImmutableFields.CommunicationLog,
     exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],

@@ -9,12 +9,16 @@ import {
   cleanupTouchedTables,
   createContact,
   createOrganizationUser,
+  createSpace,
+  createSpaceUser,
   createUser,
   getNextSeq,
   upsertContact,
 } from '@template/db/test';
 import { contactRouter } from '#/modules/contact';
 import { meRouter } from '#/modules/me';
+import { organizationRouter } from '#/modules/organization';
+import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { del, get, json, patch, post } from '#tests/utils/request';
 
@@ -334,6 +338,67 @@ describe('Contact CRUD', () => {
       });
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(403);
+    });
+  });
+
+  describe('re-adding a deleted contact', () => {
+    const readd = async (fetchFor: typeof fetch, createPath: string) => {
+      const address = `readd${getNextSeq()}@example.com`;
+      const first = await json<Contact>(
+        await fetchFor(post(createPath, { type: 'email', value: { address }, label: 'Old' })),
+      );
+      await db.contact.update({
+        where: { id: first.data.id },
+        data: { verifiedAt: new Date(), acceptedKinds: ['marketing'] },
+      });
+      expect((await fetchFor(del(`/api/v1/contact/${first.data.id}`))).status).toBe(204);
+
+      const response = await fetchFor(
+        post(createPath, { type: 'email', value: { address }, label: 'New' }),
+      );
+      const { data } = await json<Contact>(response);
+      expect(response.status).toBe(201);
+      expect(data.id).toBe(first.data.id);
+      expect(data.label).toBe('New');
+      expect(data.deletedAt).toBeNull();
+      expect(data.verifiedAt).toBeNull();
+      expect(data.acceptedKinds).toEqual(['platform', 'activity']);
+    };
+
+    it('revives a user contact', async () => {
+      await readd(fetch, '/api/v1/me/contacts');
+    });
+
+    it('revives an organization contact', async () => {
+      const { entity: owner, context } = await createOrganizationUser({ role: 'owner' });
+      const { fetch: ownerFetch } = createTestApp({
+        mockUser: context.user,
+        mockOrganizationUsers: [owner],
+        mount: [
+          (app) => app.route('/api/v1/contact', contactRouter),
+          (app) => app.route('/api/v1/organization', organizationRouter),
+        ],
+      });
+      await readd(ownerFetch, `/api/v1/organization/${context.organization.id}/contacts`);
+    });
+
+    it('revives a space contact', async () => {
+      const { entity: owner, context } = await createOrganizationUser({ role: 'owner' });
+      const { entity: space } = await createSpace({}, { organization: context.organization });
+      const { entity: spaceOwner } = await createSpaceUser(
+        { role: 'owner' },
+        { ...context, organizationUser: owner, space },
+      );
+      const { fetch: ownerFetch } = createTestApp({
+        mockUser: context.user,
+        mockOrganizationUsers: [owner],
+        mockSpaceUsers: [spaceOwner],
+        mount: [
+          (app) => app.route('/api/v1/contact', contactRouter),
+          (app) => app.route('/api/v1/space', spaceRouter),
+        ],
+      });
+      await readd(ownerFetch, `/api/v1/space/${space.id}/contacts`);
     });
   });
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { clearHookRegistry, DbAction, db, HookTiming, registerDbHook } from '@template/db';
+import { DbAction, db, HookTiming, registerDbHook, unregisterDbHook } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
 
@@ -74,7 +74,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  clearHookRegistry();
+  unregisterDbHook('probeMatrixA');
+  unregisterDbHook('probeMatrixB');
   await cleanupTouchedTables(db);
 });
 
