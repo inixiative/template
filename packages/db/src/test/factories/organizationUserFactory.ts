@@ -33,6 +33,6 @@ export const createOrganizationUser = async (
   context?: BuildContext,
 ): Promise<Result> => {
   const result = (await organizationUserFactory.create(overrides, context)) as Result;
-  await storeEntitlements({ model: 'OrganizationUser', id: result.entity.id }, entitlements ?? []);
+  await storeEntitlements({ model: 'OrganizationUser', row: result.entity }, entitlements ?? []);
   return result;
 };

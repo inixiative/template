@@ -4,9 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { db } from '@template/db/client';
-import { polymorphicKeyColumns } from '@template/db/registries/polymorphicIs';
-import { type ModelName, toModelName } from '@template/db/utils/modelNames';
+import { isArmColumns } from '@template/db/registries/polymorphicIs';
+import type { ModelName } from '@template/db/utils/modelNames';
 import { getModelRelations, type RelationInfo } from '@template/db/utils/prismaMapRelations';
 
 type Row = Record<string, unknown>;
@@ -17,17 +16,18 @@ export const polymorphicArmRelation = (
   axisField: string,
   value: string,
 ): RelationInfo => {
-  const keys = polymorphicKeyColumns(model, axisField, value);
-  const relation = getModelRelations(model).find(({ targetModel, foreignKey }) => {
-    const columns = typeof foreignKey === 'string' ? [foreignKey] : Object.values(foreignKey ?? {});
-    return (
+  const relation = getModelRelations(model).find(
+    ({ targetModel, foreignKey }) =>
       targetModel === value &&
-      columns.length === keys.length &&
-      keys.every((key) => columns.includes(key))
-    );
-  });
+      isArmColumns(
+        model,
+        axisField,
+        value,
+        typeof foreignKey === 'string' ? [foreignKey] : Object.values(foreignKey ?? {}),
+      ),
+  );
   if (!relation)
-    throw new Error(`${model}.${axisField}=${value} has no relation on ${keys.join(', ')}`);
+    throw new Error(`${model}.${axisField}=${value} has no relation on its key columns`);
   return relation;
 };
 
@@ -49,19 +49,3 @@ export const polymorphicArmKeys = (
       row[rowColumn] as string,
     ]),
   );
-
-/** `polymorphicArmKeys` for a row known by id; only a composite arm reads the row, tombstones included. */
-export const loadPolymorphicArmKeys = async (
-  model: ModelName,
-  axisField: string,
-  value: string,
-  id: string,
-): Promise<Record<string, string>> => {
-  if (polymorphicKeyColumns(model, axisField, value).length <= 1)
-    return polymorphicArmKeys(model, axisField, value, { id });
-  const row = (await db.withDeleted(() =>
-    db.delegate(toModelName(value)).findUnique({ where: { id } }),
-  )) as Row | null;
-  if (!row) throw new Error(`${value} ${id} not found`);
-  return polymorphicArmKeys(model, axisField, value, row);
-};

@@ -11,7 +11,6 @@ export {
   type PolymorphicValue,
   PolymorphismRegistry,
   polymorphicAxis,
-  resolveFalsePolymorphismRef,
 } from './falsePolymorphism';
 export * from './hardDeleteOnTombstone';
 export * from './ignoreFields';

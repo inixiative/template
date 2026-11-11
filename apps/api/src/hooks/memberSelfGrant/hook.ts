@@ -9,6 +9,7 @@ import {
   db,
   type HookOptions,
   HookTiming,
+  loadEntitlementAnchors,
   registerDbHook,
   toEntitlementCreateData,
 } from '@template/db';
@@ -24,7 +25,7 @@ import { castArray, keyBy } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
 type MemberModel = 'OrganizationUser' | 'SpaceUser';
-type Member = { id: string; userId: string; deletedAt: Date | null };
+type Member = Record<string, unknown> & { id: string; userId: string; deletedAt: Date | null };
 
 const MEMBER_MODELS: readonly MemberModel[] = ['OrganizationUser', 'SpaceUser'];
 
@@ -43,16 +44,19 @@ const createdMembers = ({ action, result, previous }: HookOptions): Member[] =>
 // tombstoned with it, so reviving the member revives the grant.
 const writeSelfGrants = async (model: MemberModel, members: Member[]) => {
   if (!members.length) return;
-  const rows = await Promise.all(
-    members.map(async (member) => {
-      const [row] = await toEntitlementCreateData(
-        [toEntitlementInput(memberSelfGrant(resourceOf[model], member))],
-        { model, id: member.id },
-      );
-      return { ...row, deletedAt: member.deletedAt };
-    }),
-  );
-  await db.entitlement.createManyAndReturn({ data: rows });
+  const grants = members.map((member) => ({
+    member,
+    input: toEntitlementInput(memberSelfGrant(resourceOf[model], member)),
+  }));
+  const anchors = await loadEntitlementAnchors(grants.map(({ input }) => input));
+  await db.entitlement.createManyAndReturn({
+    data: grants.flatMap(({ member, input }) =>
+      toEntitlementCreateData([input], { model, row: member }, anchors).map((row) => ({
+        ...row,
+        deletedAt: member.deletedAt,
+      })),
+    ),
+  });
 };
 
 const tombstonedRows = ({ result, previous }: HookOptions): Entitlement[] => {

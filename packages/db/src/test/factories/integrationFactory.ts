@@ -25,6 +25,6 @@ export const createIntegration = async (
   context?: BuildContext,
 ) => {
   const result = await integrationFactory.create(overrides, context);
-  await storeEntitlements({ model: 'Integration', id: result.entity.id }, entitlements ?? []);
+  await storeEntitlements({ model: 'Integration', row: result.entity }, entitlements ?? []);
   return result;
 };

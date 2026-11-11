@@ -9,6 +9,8 @@ import {
   type EntitlementInput,
   type EntitlementTarget,
   includeTargetEntitlements,
+  loadEntitlementAnchors,
+  missingAnchors,
   polymorphicKeyColumns,
   toEntitlementCreateData,
 } from '@template/db';
@@ -28,7 +30,7 @@ import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlement
 
 export type EntitlementChanges = { add?: EntitlementInput[]; remove?: string[] };
 
-type Holder = { targetEntitlements: Entitlement[] };
+type Holder = Record<string, unknown> & { id: string; targetEntitlements: Entitlement[] };
 
 const anchorIsHardDeleted = (row: Entitlement): boolean =>
   polymorphicKeyColumns('Entitlement', 'sourceModel', row.sourceModel).some(
@@ -74,6 +76,14 @@ export const changeEntitlements = (
         checked,
         (row) => row.sourceDeletedAt == null,
       );
+      const anchors = await loadEntitlementAnchors(add);
+      const [missing] = missingAnchors(add, anchors);
+      if (missing)
+        throw makeError({
+          status: 422,
+          message: `${missing.sourceModel} ${missing.sourceId} not found`,
+        });
+
       const addedEntries = add.map(toEntitlementEntry);
       await validateEntitlementGrants(writer, [
         ...addedEntries,
@@ -95,7 +105,11 @@ export const changeEntitlements = (
         });
       if (added.length)
         await db.entitlement.createManyAndReturn({
-          data: await toEntitlementCreateData(added.map(toEntitlementInput), target),
+          data: toEntitlementCreateData(
+            added.map(toEntitlementInput),
+            { model: target.model, row: holder },
+            anchors,
+          ),
         });
 
       return (await liveRows(target)).targetEntitlements;

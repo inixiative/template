@@ -38,6 +38,6 @@ export const createSpaceUser = async (
   context?: BuildContext,
 ): Promise<Result> => {
   const result = (await spaceUserFactory.create(overrides, context)) as Result;
-  await storeEntitlements({ model: 'SpaceUser', id: result.entity.id }, entitlements ?? []);
+  await storeEntitlements({ model: 'SpaceUser', row: result.entity }, entitlements ?? []);
   return result;
 };

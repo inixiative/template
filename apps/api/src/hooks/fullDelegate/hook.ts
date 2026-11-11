@@ -4,13 +4,7 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import {
-  DbAction,
-  db,
-  HookTiming,
-  registerDbHook,
-  resolveFalsePolymorphismRef,
-} from '@template/db';
+import { DbAction, db, HookTiming, polymorphicKeyColumn, registerDbHook } from '@template/db';
 import type { EntitlementTargetModel } from '@template/db/generated/client/enums';
 import { castArray, groupBy } from 'lodash-es';
 import { makeError } from '#/lib/errors';
@@ -28,10 +22,7 @@ const isDelegateModel = (model: unknown): model is EntitlementTargetModel =>
 
 const targetIdOf = (model: string, row: Row): string =>
   (row.targetId ??
-    row[
-      resolveFalsePolymorphismRef({ model: 'Entitlement', axis: 'targetModel', value: model }) ??
-        'targetId'
-    ]) as string;
+    row[polymorphicKeyColumn('Entitlement', 'targetModel', model) ?? 'targetId']) as string;
 
 // A full delegate is its owner whole, so no write of any kind gives it a row of its own.
 const refuseRowsOnFull = async (rows: Row[]) => {

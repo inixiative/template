@@ -7,6 +7,7 @@
 import {
   getPolymorphismConfig,
   hasDeletedAt,
+  isArmColumns,
   type ModelName,
   modelFields,
   modelNames,
@@ -27,10 +28,10 @@ const armOf = (
   parent: string,
   fromFields: readonly string[],
 ): Record<string, string> => {
-  const axis = getPolymorphismConfig(child)?.axes.find((candidate) => {
-    const keys = (candidate.fkMap as Partial<Record<string, readonly string[]>>)[parent];
-    return keys?.length === fromFields.length && keys.every((key) => fromFields.includes(key));
-  });
+  const axis = getPolymorphismConfig(child)?.axes.find(
+    (candidate) =>
+      parent in candidate.fkMap && isArmColumns(child, candidate.field, parent, fromFields),
+  );
   return axis ? { [axis.field]: parent } : {};
 };
 

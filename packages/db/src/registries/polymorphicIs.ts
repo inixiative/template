@@ -27,14 +27,35 @@ export const polymorphicKeyColumns = (
   ] ?? []),
 ];
 
+/** Whether `columns` are exactly the key columns an axis uses for a value, in any order. */
+export const isArmColumns = (
+  model: ModelName,
+  axisField: string,
+  value: string,
+  columns: readonly string[],
+): boolean => {
+  const keys = polymorphicKeyColumns(model, axisField, value);
+  return keys.length === columns.length && keys.every((key) => columns.includes(key));
+};
+
 /** The key column a false-polymorphic axis uses for a value, or null when the value carries no key (platform, admin). */
 export const polymorphicKeyColumn = (
   model: ModelName,
   axisField: string,
   value: string,
-): string | null => polymorphicKeyColumns(model, axisField, value)[0] ?? null;
+): string | null => {
+  const columns = polymorphicKeyColumns(model, axisField, value);
+  if (columns.length > 1)
+    throw new Error(
+      `${model}.${axisField} value ${value} keys on ${columns.join('+')}; ask for polymorphicKeyColumns instead`,
+    );
+  return columns[0] ?? null;
+};
 
-/** The row a false-polymorphic axis points at — its kind and id — or null when it points at nobody. */
+/**
+ * The row a false-polymorphic axis points at — its kind and id — or null when it points at nobody.
+ * A composite kind has no single id, so asking for one is a bug.
+ */
 export const polymorphicTarget = (
   row: Record<string, unknown>,
   model: ModelName,

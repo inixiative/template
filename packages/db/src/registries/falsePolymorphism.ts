@@ -52,19 +52,6 @@ export type FlexibleRef = ModelName | FalsePolymorphismRef;
 export const isFalsePolymorphismRef = (ref: FlexibleRef): ref is FalsePolymorphismRef =>
   typeof ref === 'object' && 'model' in ref;
 
-// Resolve FalsePolymorphismRef to FK field using the registry
-export const resolveFalsePolymorphismRef = (ref: FalsePolymorphismRef): string | null => {
-  const config = getPolymorphismConfig(ref.model);
-  if (!config) return null;
-
-  const axis = config.axes.find((a) => a.field === ref.axis);
-  if (!axis) return null;
-
-  const fkFields = (axis.fkMap as Partial<Record<string, readonly string[]>>)[ref.value];
-  // Return the first FK field (usually there's just one per type)
-  return fkFields?.[0] ?? null;
-};
-
 export const PolymorphismRegistry = {
   Token: {
     axes: [
