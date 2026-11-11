@@ -96,7 +96,6 @@ describe('makeSingletonJob', () => {
     expect(errorSpy).toHaveBeenCalledWith('singletonJob.lockLost', {
       jobId: 'holder-job',
       identifier: SINGLETON_ID,
-      reason: 'token_mismatch',
     });
     expect(errorSpy).toHaveBeenCalledWith('singletonJob.completedAfterLockLoss', {
       jobId: 'holder-job',

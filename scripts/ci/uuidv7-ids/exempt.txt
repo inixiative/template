@@ -1,0 +1,3 @@
+# Files that call randomUUID() for something that is not an id.
+# One per line: <file>\t<reason>. An entry that no longer matches fails.
+apps/api/src/lib/utils/authProbe.ts	AUTH_PROBE_SECRET and SYSTEM_PROBE_SECRET are secrets, not ids

@@ -1,10 +1,15 @@
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import { buildUser } from '@template/db/test';
+import { db } from '@template/db';
+import { buildUser, cleanupTouchedTables } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import type { meReadRoute } from '#/modules/me/routes/meRead';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
+
+afterEach(async () => {
+  await cleanupTouchedTables(db);
+});
 
 type MeReadResponse = z.infer<typeof meReadRoute.responseSchema>;
 

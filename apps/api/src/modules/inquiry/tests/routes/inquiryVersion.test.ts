@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Inquiry, Organization, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -39,7 +39,7 @@ describe('acting on an inquiry carries the version the actor saw', () => {
 
   const stale = new Date('2000-01-01T00:00:00.000Z').toISOString();
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     owner = (await createUser()).entity;
     organization = (await createOrganization()).entity;
     const { entity: membership } = await createOrganizationUser(
@@ -51,7 +51,7 @@ describe('acting on an inquiry carries the version the actor saw', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

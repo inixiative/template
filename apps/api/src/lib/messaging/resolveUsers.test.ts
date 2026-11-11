@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { ArrayOperator, Operator } from '@inixiative/json-rules';
 import type { User } from '@template/db/generated/client/client';
 import { TagResource } from '@template/db/generated/client/enums';
@@ -21,7 +21,7 @@ describe('resolveUsers', () => {
   let foundersTag: { id: string };
   let testDb: ReturnType<typeof createTestApp>['db'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const harness = createTestApp({});
     testDb = harness.db;
 
@@ -62,7 +62,7 @@ describe('resolveUsers', () => {
     );
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
   });
 

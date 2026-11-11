@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -73,7 +73,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       entitlements: entitlements ?? undefined,
     }).then(({ entity }) => entity);
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerClearCacheHook();
     ({ entity: user } = await createUser());
     ({ entity: organization } = await createOrganization());
@@ -83,8 +83,8 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     await memberOf('owner', otherOrganization);
   });
 
-  afterAll(async () => {
-    unregisterDbHook('clearCache');
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

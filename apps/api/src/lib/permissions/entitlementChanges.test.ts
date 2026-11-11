@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, OrganizationUser, Role } from '@template/db/generated/client/client';
 import {
@@ -23,11 +23,11 @@ import { patch } from '#tests/utils/request';
 
 let organization: Organization;
 
-beforeAll(async () => {
+beforeEach(async () => {
   ({ entity: organization } = await createOrganization());
 });
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

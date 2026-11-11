@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
 import {
@@ -11,7 +11,7 @@ import {
 import { poisonIntegrationRecord } from '#/modules/integration/services/poisonIntegrationRecord';
 
 describe('poisonIntegrationRecord', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

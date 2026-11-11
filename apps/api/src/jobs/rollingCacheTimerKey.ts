@@ -10,6 +10,8 @@ import { redisNamespace } from '@template/db';
 // itself while a refresh is running. No table and no BullMQ scheduler. The timer is not under `cache:`,
 // so a cache flush clears the values but not the timer: readers compute on a cold miss until the next
 // interval, the same as the first read after a deploy. Its TTL is one interval, set by the branch when
-// it closes (once every leaf has reported); more than a tick left on it means the cache is not due.
+// its pass starts (once its leaves are added); more than a tick left on it means the cache is not due.
+// A pass that outlasts the interval leaves it expired, and the open branch's deduplication holds the
+// next pass back until that one closes.
 export const rollingCacheTimerKey = (name: string): string =>
   `${redisNamespace.rollingCache}:timer:${name}`;

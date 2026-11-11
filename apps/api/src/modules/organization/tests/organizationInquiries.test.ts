@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   Inquiry,
   Organization,
@@ -32,7 +32,7 @@ describe('GET /api/v1/organization/:id/inquiries/sent', () => {
   let adminOrgUser: OrganizationUser;
   let otherOrg: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -54,7 +54,7 @@ describe('GET /api/v1/organization/:id/inquiries/sent', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -112,7 +112,7 @@ describe('POST /api/v1/organization/:id/inquiries — create and send with autoA
   let org: Organization;
   const origAutoApprove = inquiryHandlers.inviteOrganizationUser.autoApprove;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: adminUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
@@ -134,7 +134,7 @@ describe('POST /api/v1/organization/:id/inquiries — create and send with autoA
     inquiryHandlers.inviteOrganizationUser.autoApprove = origAutoApprove;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -221,7 +221,7 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (lo
   let db: ReturnType<typeof createTestApp>['db'];
   let org: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: adminUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
@@ -235,7 +235,7 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (lo
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -354,7 +354,7 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (hi
   let db: ReturnType<typeof createTestApp>['db'];
   let org: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: ownerUser } = await createUser();
     const { entity: adminUser } = await createUser();
     const { entity: o } = await createOrganization();
@@ -382,7 +382,7 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (hi
     }).fetch;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -455,7 +455,7 @@ describe('POST /api/v1/organization/:id/inquiries — createSpace', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let org: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: ownerUser } = await createUser();
     const { entity: adminUser } = await createUser();
     const { entity: o } = await createOrganization();
@@ -483,7 +483,7 @@ describe('POST /api/v1/organization/:id/inquiries — createSpace', () => {
     }).fetch;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -525,7 +525,7 @@ describe('GET /api/v1/organization/:id/inquiries/received', () => {
   let adminOu: OrganizationUser;
   let otherOrg: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -543,7 +543,7 @@ describe('GET /api/v1/organization/:id/inquiries/received', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

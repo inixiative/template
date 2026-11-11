@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -24,7 +24,7 @@ describe('handler: createSpace — approve', () => {
   let org: Organization;
   let adminFetch: ReturnType<typeof createTestApp>['fetch'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: owner } = await createUser();
     const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
     const { entity: o } = await createOrganization();
@@ -36,7 +36,7 @@ describe('handler: createSpace — approve', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

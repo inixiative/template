@@ -19,9 +19,12 @@ export {
 } from '#/jobs/outbox/config';
 export {
   clearOverflow,
+  createDepthEstimator,
   isLaneOverflowing,
   isOverflowing,
+  recordAddAndTripIfFull,
   renewOverflow,
+  tripFromDepths,
   tripIfFull,
   warnIfOverflowStuck,
   withOverflowRenew,

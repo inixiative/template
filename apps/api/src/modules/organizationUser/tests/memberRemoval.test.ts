@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -38,15 +38,15 @@ const asOwner = () =>
 const rowOf = (id: string) =>
   db.organizationUser.findFirst({ where: { id, deletedAt: { not: null } } });
 
-beforeAll(async () => {
+beforeEach(async () => {
   registerSoftDeleteCascadeHook();
   const { entity: member, context } = await createOrganizationUser({ role: 'owner' });
   organization = context.organization;
   owner = { user: context.user, member };
 });
 
-afterAll(async () => {
-  unregisterDbHook('softDeleteCascade');
+afterEach(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

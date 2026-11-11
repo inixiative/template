@@ -105,12 +105,13 @@ Controller
         ├─► Prisma INSERT
         │
         ├─► afterCreate hooks
-        │     ├─► Queue cache invalidation (onCommit)
+        │     ├─► Mark cache keys in the transaction's cache overlay
         │     └─► Queue webhook delivery (onCommit)
         │
         └─► [Transaction commits]
+              ├─► Clear the marked cache keys
+              ├─► Release locks held until the transaction settles
               └─► onCommit callbacks fire
-                    ├─► Clear cache keys
                     └─► Enqueue sendWebhook job
 ```
 

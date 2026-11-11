@@ -9,7 +9,10 @@ import {
   phoneRow,
   positions,
   posOf,
+  setupOrderedListTests,
 } from '#/hooks/orderedList/tests/setup';
+
+setupOrderedListTests();
 
 describe('create', () => {
   it('appends to end when position omitted', async () => {

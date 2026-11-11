@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
@@ -60,7 +60,7 @@ describe('segment routes', () => {
   let outsider: User;
   let outsiderRef: CustomerRef;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
     registerMemberSelfGrantHook();
@@ -114,14 +114,12 @@ describe('segment routes', () => {
     customerFetch = createTestApp({ mockUser: customer, mount }).fetch;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
     clearHookRegistry();
   });
 
-  let segment: Segment;
-
-  it('the space owner creates a dynamic segment and it is reconciled on commit', async () => {
+  const createAcmeSegment = async (): Promise<Segment> => {
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments`, {
         name: `acme-${getNextSeq()}`,
@@ -130,7 +128,11 @@ describe('segment routes', () => {
       }),
     );
     expect(response.status).toBe(201);
-    segment = (await json<Segment>(response)).data;
+    return (await json<Segment>(response)).data;
+  };
+
+  it('the space owner creates a dynamic segment and it is reconciled on commit', async () => {
+    const segment = await createAcmeSegment();
     expect(segment.ownerModel).toBe('Space');
     expect(segment.spaceId).toBe(space.id);
 
@@ -141,6 +143,7 @@ describe('segment routes', () => {
   });
 
   it('the space lists the segments it owns', async () => {
+    const segment = await createAcmeSegment();
     const response = await ownerFetch(get(`/api/v1/space/${space.id}/segments`));
     const { data } = await json<(Segment & { ruleIssues: unknown[] })[]>(response);
     expect(response.status).toBe(200);
@@ -179,6 +182,7 @@ describe('segment routes', () => {
   });
 
   it('the customer sees the segment they belong to and cannot read the owner view', async () => {
+    const segment = await createAcmeSegment();
     const mine = await customerFetch(get('/api/v1/me/segmentMemberships'));
     const { data } = await json<Membership[]>(mine);
     expect(mine.status).toBe(200);
@@ -191,6 +195,7 @@ describe('segment routes', () => {
   });
 
   it('the user context reads a user’s own segments and memberships and refuses everyone else', async () => {
+    const segment = await createAcmeSegment();
     const memberships = await customerFetch(get(`/api/v1/user/${customer.id}/segmentMemberships`));
     expect(memberships.status).toBe(200);
     const { data } = await json<Membership[]>(memberships);
@@ -292,6 +297,7 @@ describe('segment routes', () => {
   });
 
   it('deleting a segment tells its members: the member-side removal event names the segment', async () => {
+    const segment = await createAcmeSegment();
     const response = await ownerFetch(del(`/api/v1/segment/${segment.id}`));
     expect(response.status).toBe(204);
 

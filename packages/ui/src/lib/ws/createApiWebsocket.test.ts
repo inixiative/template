@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import '@template/ui/store';
 import { QueryClient, QueryObserver, skipToken } from '@tanstack/react-query';
 import type { WSFrameErrorFrame, WSStreamAckFrame } from '@template/shared/ws';
 import {
@@ -54,6 +53,10 @@ const fastTiming: Partial<ApiWebsocketTiming> = {
 };
 const settled = () => wait(5);
 
+// A client has no teardown: its heartbeat and retry timers would fire into later test files.
+const abortPendingTimers = (): Promise<void> =>
+  (window as typeof window & { happyDOM: { abort: () => Promise<void> } }).happyDOM.abort();
+
 describe('createApiWebsocket', () => {
   let wsSpy: ReturnType<typeof spyOn>;
   beforeEach(() => {
@@ -68,7 +71,8 @@ describe('createApiWebsocket', () => {
       CLOSED: FakeWebSocket.CLOSED,
     });
   });
-  afterEach(() => {
+  afterEach(async () => {
+    await abortPendingTimers();
     wsSpy.mockRestore();
   });
 

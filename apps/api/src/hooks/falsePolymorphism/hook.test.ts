@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db, snapshotHookRegistry, unregisterDbHook } from '@template/db';
 import {
   cleanupTouchedTables,
@@ -15,13 +15,13 @@ import { registerRulesHook } from '#/hooks/rules/hook';
 
 let restoreHooks: () => void;
 
-beforeAll(() => {
+beforeEach(() => {
   restoreHooks = snapshotHookRegistry();
   registerMemberSelfGrantHook();
   registerRulesHook();
 });
 
-afterAll(async () => {
+afterEach(async () => {
   restoreHooks();
   await cleanupTouchedTables(db);
 });

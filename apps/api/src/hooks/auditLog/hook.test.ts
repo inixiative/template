@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { AuditAction } from '@template/db/generated/client/enums';
 import {
@@ -21,9 +21,11 @@ import type { TokenWithRelations } from '#/lib/context/types';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { createTestApp } from '#tests/createTestApp';
 
-registerAuditLogHook();
+beforeEach(() => {
+  registerAuditLogHook();
+});
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
   clearHookRegistry();
 });
@@ -31,7 +33,7 @@ afterAll(async () => {
 describe('auditLog hook', () => {
   let userId: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: user } = await createUser();
     userId = user.id;
   });

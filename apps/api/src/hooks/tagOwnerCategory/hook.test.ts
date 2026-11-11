@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { TagOwnerModel } from '@template/db/generated/client/enums';
 import {
@@ -14,13 +14,14 @@ import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 
-registerMemberSelfGrantHook();
+beforeEach(() => {
+  registerMemberSelfGrantHook();
+  registerRulesHook();
+  registerTagOwnerCategoryHook();
+  registerSoftDeleteCascadeHook();
+});
 
-registerRulesHook();
-registerTagOwnerCategoryHook();
-registerSoftDeleteCascadeHook();
-
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
   clearHookRegistry();
 });

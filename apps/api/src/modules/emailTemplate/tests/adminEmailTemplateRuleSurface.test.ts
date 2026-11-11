@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -40,7 +40,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let superadmin: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     superadmin = (await createUser({ platformRole: PlatformRole.superadmin })).entity;
     const harness = createTestApp({
       mockUser: superadmin,
@@ -50,7 +50,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -147,7 +147,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const superadmin = (await createUser({ platformRole: PlatformRole.superadmin })).entity;
     const harness = createTestApp({
       mockUser: superadmin,
@@ -157,7 +157,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

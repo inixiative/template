@@ -1,11 +1,11 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createContact, createUser, getNextSeq } from '@template/db/test';
 import { resolveUserByContact } from '#/lib/identity/resolveUserByContact';
 
 describe('resolveUserByContact', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

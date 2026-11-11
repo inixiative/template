@@ -69,7 +69,7 @@ describe('recomposeFromSnapshots', () => {
   });
 });
 
-import { afterAll, afterEach, beforeAll } from 'bun:test';
+import { afterEach, beforeEach } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { cleanupTouchedTables, createCommunicationLog } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
@@ -81,12 +81,12 @@ const documentMjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
 
 describe('recomposeCommunication (DB-backed)', () => {
-  beforeAll(() => {
+  beforeEach(() => {
     registerAuditLogHook();
     registerEmailVersioningHook();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     clearHookRegistry();
     await cleanupTouchedTables(db);
   });

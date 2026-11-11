@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, revive } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db, revive } from '@template/db';
 import type { Organization, OrganizationUser } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -30,7 +30,7 @@ const selfGrantRow = async (member: OrganizationUser) =>
 describe('every member row carries a self-grant to operate itself, and it cannot be removed (Aron, 2026-10-30)', () => {
   let organization: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerMemberSelfGrantHook();
     registerRulesHook();
     registerImmutableFieldsHook();
@@ -38,7 +38,8 @@ describe('every member row carries a self-grant to operate itself, and it cannot
     ({ entity: organization } = await createOrganization());
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

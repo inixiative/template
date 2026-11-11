@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db } from '@template/db';
@@ -10,6 +10,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
+import { gate } from '@template/db/test/gate';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { batchRouter } from '#/modules/batch';
@@ -31,14 +32,6 @@ const membersOf = (segmentId: string) => ({
 });
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const gate = () => {
-  let open!: () => void;
-  const opened = new Promise<void>((resolve) => {
-    open = resolve;
-  });
-  return { open, opened };
-};
 
 const settles = (promise: Promise<unknown>, withinMs: number) =>
   Promise.race([
@@ -72,7 +65,7 @@ describe('batch sub-requests under the owner lock', () => {
   const conditionsOf = async (segment: Segment) =>
     (await db.segment.findUnique({ where: { id: segment.id } }))?.conditions;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerSegmentConditionsHook();
     const { entity: organizationUser, context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
@@ -111,7 +104,7 @@ describe('batch sub-requests under the owner lock', () => {
     second = (await createSegment({ ownerModel: 'Space', conditions: acmeRule }, { space })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     clearHookRegistry();
     await cleanupTouchedTables(db);
   });

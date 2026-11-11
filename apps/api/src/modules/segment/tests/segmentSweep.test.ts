@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
@@ -27,7 +27,7 @@ const membersOf = (segmentId: string) => ({
 describe('sweepable segments — what the nightly sweep enqueues', () => {
   let space: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerSegmentConditionsHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
@@ -37,7 +37,7 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

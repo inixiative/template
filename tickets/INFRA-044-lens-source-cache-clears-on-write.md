@@ -25,9 +25,11 @@ Zealot follow-up: ZLT-6047.
 2. **Register source models in `cacheReference`.** A write to a model any lens sources (segments,
    missions, tags, maps, …) clears that tenant's entries for that model. This is the existing hook,
    with no new registry.
-3. **Cancel in-flight rebuilds on pattern clears.** Exact-key clears already cancel through the
-   generation key; pattern clears do not, so a rebuild started before the commit can write the old
-   list back.
+3. **Cancel in-flight rebuilds on pattern clears.** Done in the template by INFRA-046: an exact
+   clear moves the key's generation, and a pattern clear first finds the computes in flight by their
+   single-flight locks and moves each one's generation, so a rebuild started before the commit skips
+   its publish. A compute inside a transaction takes no single-flight lock, so a pattern clear does
+   not reach it; its commit-time publish checks only the generation it read.
 4. **Rebuild instead of clear, where asked.** Some caches are expensive to rebuild on the next read
    (the rolling dictionary). A cache declares `onWrite: 'clear' | 'rebuild'`. `rebuild` enqueues the
    existing refresh job (singleton per key) on commit instead of deleting the key, so a reader never

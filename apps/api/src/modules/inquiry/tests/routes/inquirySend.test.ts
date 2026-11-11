@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   Inquiry,
   Organization,
@@ -31,7 +31,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
   let org: Organization;
   let adminOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -51,7 +51,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -214,7 +214,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
   let adminOrgUser: OrganizationUser;
   const origAutoApprove = inquiryHandlers.inviteOrganizationUser.autoApprove;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -242,7 +242,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
     inquiryHandlers.inviteOrganizationUser.autoApprove = origAutoApprove;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

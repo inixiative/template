@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -24,14 +24,15 @@ const operate = (organizationId: string) => [
 describe('writing full clears the role and tombstones the entitlement rows beside it', () => {
   let organization: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerFullDelegateHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
     ({ entity: organization } = await createOrganization());
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

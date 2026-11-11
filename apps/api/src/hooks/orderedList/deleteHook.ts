@@ -21,7 +21,7 @@ export const registerOrderedListDeleteHook = () => {
       if (!previous) return;
       const rows = castArray(previous);
       const affected = await applyOrderedListHardDelete(model, rows as Record<string, unknown>[]);
-      queueCacheClear(model as Prisma.ModelName, affected);
+      await queueCacheClear(model as Prisma.ModelName, affected);
     },
   );
 };

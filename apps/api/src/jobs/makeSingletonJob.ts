@@ -5,14 +5,13 @@
  * @uses infrastructure:redis
  * @constructs jobHandler
  */
-import { createLock, type LockLostReason } from '@template/db';
+import { createLock } from '@template/db';
 import { log } from '@template/shared/logger';
 import { toJobHandler } from '#/jobs/toJobHandler';
 import type { JobData, JobHandler, JobHandlerArgs, StagedJob } from '#/jobs/types';
 
 const SINGLETON_LOCK_TTL_MS = 300_000;
 const SINGLETON_LOCK_HEARTBEAT_MS = 60_000;
-const SINGLETON_LOCK_MAX_MISSED = 3;
 
 export type SingletonJobOptions<TPayload> = {
   lockKey?: (payload: TPayload) => string;
@@ -49,10 +48,10 @@ export const makeSingletonJob = <TPayload = void>(
     const scope = { jobId: ctx.job.id, identifier };
     let hasLostLock = false;
     let hasHandlerSucceeded = false;
-    const markLockLost = (reason: LockLostReason): void => {
+    const markLockLost = (): void => {
       if (hasLostLock) return;
       hasLostLock = true;
-      log.error('singletonJob.lockLost', { ...scope, reason });
+      log.error('singletonJob.lockLost', scope);
     };
 
     // The lock lives on the queue's connection, not the shared cache client: an evicted cache
@@ -63,7 +62,6 @@ export const makeSingletonJob = <TPayload = void>(
       redis: ctx.queue.redis,
       ttlMs: SINGLETON_LOCK_TTL_MS,
       heartbeatMs: SINGLETON_LOCK_HEARTBEAT_MS,
-      maxMissed: SINGLETON_LOCK_MAX_MISSED,
       onLockLost: markLockLost,
     });
     if (!(await lock.acquire())) return;
@@ -77,7 +75,7 @@ export const makeSingletonJob = <TPayload = void>(
       hasHandlerSucceeded = true;
     } finally {
       const releaseResult = await lock.release();
-      if (releaseResult === 'notHeld') markLockLost('token_mismatch');
+      if (releaseResult === 'notHeld') markLockLost();
       if (releaseResult === 'unconfirmed') {
         log.warn('singletonJob.releaseUnconfirmed', {
           ...scope,

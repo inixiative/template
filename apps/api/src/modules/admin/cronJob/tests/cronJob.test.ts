@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { CronJob, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createCronJob, createUser, getNextSeq } from '@template/db/test';
@@ -11,7 +11,7 @@ describe('admin/cronJob', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let superadmin: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: admin } = await createUser({ platformRole: PlatformRole.superadmin });
     superadmin = admin;
 
@@ -23,7 +23,7 @@ describe('admin/cronJob', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

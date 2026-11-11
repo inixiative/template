@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, type Mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import {
   buildEmailComponent,
@@ -35,12 +35,12 @@ const restampEnqueues = (spy: Mock<typeof enqueueModule.enqueueJob>) =>
   spy.mock.calls.filter(([name]) => name === 'recomputeEmailDependents');
 
 describe('emailVersioning', () => {
-  beforeAll(() => {
+  beforeEach(() => {
     registerAuditLogHook();
     registerEmailVersioningHook();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     clearHookRegistry();
     await cleanupTouchedTables(db);
   });

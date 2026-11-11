@@ -10,17 +10,24 @@ import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
 
 export type RefreshRollingCachePayload = { name: string };
 
-// The branch for one cache: a keyed staged singleton. Its one stage resolves the cache's targets and
-// adds one refreshRollingCacheTarget per target as a child, keyed by `targetKey` and with their starts
-// spread across the cache's `spreadSeconds`. The branch then waits in
-// `waiting-children`, holding no worker slot, until every leaf has reported, and `finish` starts the
-// cache's timer, so the next refresh is one interval after the data was fresh, not after it was
-// requested.
+// The branch for one cache: one pass. A keyed staged singleton. Its one stage resolves the cache's
+// targets, adds one refreshRollingCacheTarget per target as a child, keyed by `targetKey` and with
+// their starts spread across the cache's `spreadSeconds`, and then starts the cache's timer. The next
+// pass is due one interval after this one started, however long its leaves take. The branch then waits
+// in `waiting-children`, holding no worker slot, until every leaf has reported.
+//
+// The timer is set in the stage, after the leaves are added. Once the stage has completed it never runs
+// again (its index lives on the job). A stage that throws, or a worker that dies in it, runs it again
+// on the branch's retry while its deduplication id still holds: that re-adds the superseding leaves
+// and restarts the timer a moment later. A stage that never gets as far as the timer sets none, so the
+// cache stays due and the first tick after the branch has finally failed starts another.
 //
 // Another branch for the same cache cannot start while this one is open: it is added with the
 // singleton's deduplication id, which holds while the branch is parked, and the lock guards each step
-// it runs. A leaf that fails all its retries keeps its last good value and still lets the branch close
-// (enqueueChildJob sets `ignoreDependencyOnFailure`); the next interval tries it again. An unregistered
+// it runs. A pass that outlasts its interval is never overlapped: its timer runs out while it is open,
+// each tick's enqueue is a no-op, and the next pass starts on the first tick after it closes. A leaf
+// that fails all its retries keeps its last good value and still lets the branch close
+// (enqueueChildJob sets `ignoreDependencyOnFailure`); the next pass tries it again. An unregistered
 // name throws (getRollingCache).
 export const refreshRollingCache = makeSingletonJob<RefreshRollingCachePayload>(
   {
@@ -33,17 +40,15 @@ export const refreshRollingCache = makeSingletonJob<RefreshRollingCachePayload>(
           targets.map((target) => ({ name, key: rollingCache.targetKey(target), target })),
           { spreadSeconds: rollingCache.spreadSeconds },
         );
+        await getRedisClient().set(
+          rollingCacheTimerKey(name),
+          new Date().toISOString(),
+          'EX',
+          rollingCache.intervalSeconds,
+        );
       },
     ],
-    finish: async (_ctx, { name }) => {
-      const { intervalSeconds } = getRollingCache(name);
-      await getRedisClient().set(
-        rollingCacheTimerKey(name),
-        new Date().toISOString(),
-        'EX',
-        intervalSeconds,
-      );
-    },
+    finish: async () => {},
   },
   { lockKey: ({ name }) => name },
 );

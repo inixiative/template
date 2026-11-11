@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -112,7 +112,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
         : patch(`/api/v1/integration/${integration.id}`, permissions),
     );
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerClearCacheHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
@@ -122,8 +122,8 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
     admin = await member('admin');
   });
 
-  afterAll(async () => {
-    unregisterDbHook('clearCache');
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

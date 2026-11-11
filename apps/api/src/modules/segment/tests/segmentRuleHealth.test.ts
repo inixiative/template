@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, unregisterDbHook } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
@@ -33,7 +33,7 @@ const edgesOf = (sourceSegmentId: string) =>
 describe('segment rule health — the segments a rule names, as edges', () => {
   let space: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerSegmentConditionsHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
@@ -43,7 +43,7 @@ describe('segment rule health — the segments a rule names, as edges', () => {
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });
@@ -166,7 +166,7 @@ describe('segment rule health — the segments a rule names, as edges', () => {
 describe('segment rule health — edge upkeep', () => {
   let space: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerSegmentConditionsHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
@@ -176,7 +176,7 @@ describe('segment rule health — edge upkeep', () => {
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { AuthProviderType, PlatformRole } from '@template/db/generated/client/enums';
@@ -33,7 +33,7 @@ describe('AuthProvider Endpoints', () => {
   let org: Organization;
   let orgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: sa } = await createUser({ platformRole: PlatformRole.superadmin });
     superadmin = sa;
 
@@ -69,7 +69,7 @@ describe('AuthProvider Endpoints', () => {
     publicFetch = publicHarness.fetch;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, type Prisma, unregisterDbHook } from '@template/db';
 import type {
@@ -87,7 +87,7 @@ describe('segment reconcile', () => {
       })
     ).entity;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
     registerMemberSelfGrantHook();
@@ -103,7 +103,7 @@ describe('segment reconcile', () => {
     otherRef = await customerOf(other);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

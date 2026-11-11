@@ -173,6 +173,7 @@ describe('createFactory', () => {
             foreignKey: { organizationId: 'organizationId', userId: 'userId' },
             required: false,
           },
+          integration: null,
           space: null,
           spaceUser: null,
         },

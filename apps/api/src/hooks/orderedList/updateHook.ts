@@ -25,7 +25,7 @@ export const registerOrderedListUpdateHook = () => {
         data,
         previous as Record<string, unknown>,
       );
-      queueCacheClear(model as Prisma.ModelName, affected);
+      await queueCacheClear(model as Prisma.ModelName, affected);
     },
   );
 };

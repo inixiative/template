@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, Prisma, unregisterDbHook } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
@@ -22,7 +22,7 @@ describe('segmentConditions hook', () => {
   let organization: Organization;
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerSegmentConditionsHook();
     registerMemberSelfGrantHook();
     registerRulesHook();
@@ -33,7 +33,7 @@ describe('segmentConditions hook', () => {
     space = (await createSpace({}, { organization })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

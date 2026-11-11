@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db, revive } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createEmailTemplate } from '@template/db/test';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -53,7 +53,7 @@ const seedLogoConsumers = async () => {
 };
 
 describe('recomputeEmailDependents handler', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

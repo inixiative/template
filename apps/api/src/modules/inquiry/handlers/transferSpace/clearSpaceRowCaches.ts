@@ -16,7 +16,7 @@ export const clearSpaceRowCaches = async (spaceId: string, organizationId: strin
       const rows = (await db.withDeleted(() =>
         db.delegate(model).findMany({ where: { [spaceField]: spaceId } }),
       )) as Record<string, unknown>[];
-      queueCacheClear(model, [
+      await queueCacheClear(model, [
         ...rows,
         ...rows.map((row) => ({ ...row, [organizationField]: organizationId })),
       ]);

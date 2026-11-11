@@ -2024,7 +2024,7 @@ Class: BullMQ background jobs: the makeJob wrappers, the handler registry, enque
 Gauge of how long slow work has been queued without a slow job finishing; climbing means a stuck lane. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **JOBS_MAX_QUEUE_DEPTH**  
-Shared depth budget (default 10000) that trips overflow; low-water is 0.8 of it. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
+Shared depth budget (default 100000) that trips overflow; low-water is 0.8 of it. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **JOBS_SLOW_QUEUE_DEPTH_FRACTION**  
 Share of the depth budget slow jobs may fill before spilling. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)

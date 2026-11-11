@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { cleanupTouchedTables, createCronJob } from '@template/db/test';
 import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
@@ -15,7 +15,7 @@ const newJobId = () => `scheduler-test-${Bun.randomUUIDv7()}`;
 const createScheduledCronJob = async (pattern: string = patterns[0]) =>
   (await createCronJob({ jobId: newJobId(), handler, pattern })).entity;
 
-beforeAll(async () => {
+beforeEach(async () => {
   registerCronJobSyncHook();
   jobs = await connectRealJobsQueue();
 });
@@ -25,7 +25,7 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-afterAll(async () => {
+afterEach(async () => {
   clearHookRegistry();
   await jobs.close();
 });

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   db,
   materializedIdConflicts,
@@ -17,7 +17,7 @@ describe('materialized ids on a false-polymorphic axis', () => {
   let other: Tag;
   let restoreHooks: () => void;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     restoreHooks = snapshotHookRegistry();
     registerRulesHook();
     registerImmutableFieldsHook();
@@ -26,7 +26,7 @@ describe('materialized ids on a false-polymorphic axis', () => {
     other = (await createTag()).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     restoreHooks();
     await cleanupTouchedTables(db);
   });

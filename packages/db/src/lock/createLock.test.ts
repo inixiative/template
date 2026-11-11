@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { createLock } from '@template/db/lock/createLock';
 import { LockLostError } from '@template/db/lock/lockLostError';
 import { maxSafeHeartbeatMs } from '@template/db/lock/maxSafeHeartbeatMs';
@@ -8,7 +8,7 @@ import { redisNamespace } from '@template/db/redis/namespaces';
 
 const newId = () => `test-${Bun.randomUUIDv7()}`;
 const keyFor = (id: string) => `${redisNamespace.lock}:s:${id}`;
-const fastOpts = { ttlMs: 100, heartbeatMs: 30, maxMissed: 1 };
+const fastOpts = { ttlMs: 100, heartbeatMs: 30 };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const waitFor = async (
   condition: () => boolean | Promise<boolean>,
@@ -29,27 +29,15 @@ const stubRedis = (eval_: (...args: unknown[]) => Promise<unknown>): LockRedis =
 
 describe('createLock', () => {
   describe('construction validation', () => {
-    it('throws when maxMissed < 1', () => {
-      expect(() => createLock({ service: 's', identifier: newId(), maxMissed: 0 })).toThrow(
-        'maxMissed must be >= 1',
-      );
-    });
-
     it('throws when heartbeatMs <= 0', () => {
       expect(() => createLock({ service: 's', identifier: newId(), heartbeatMs: 0 })).toThrow(
         'heartbeatMs must be > 0',
       );
     });
 
-    it('throws when (maxMissed + 1) * heartbeatMs >= ttlMs', () => {
+    it('throws when 2 * heartbeatMs >= ttlMs', () => {
       expect(() =>
-        createLock({
-          service: 's',
-          identifier: newId(),
-          ttlMs: 100,
-          heartbeatMs: 50,
-          maxMissed: 1,
-        }),
+        createLock({ service: 's', identifier: newId(), ttlMs: 100, heartbeatMs: 50 }),
       ).toThrow('unsafe config');
     });
 
@@ -61,12 +49,7 @@ describe('createLock', () => {
 
   describe('maxSafeHeartbeatMs', () => {
     it('is the timeout-aware ceiling and passes the constructor', () => {
-      expect(maxSafeHeartbeatMs({ ttlMs: 300_000, maxMissed: 1, commandTimeoutMs: 5_000 })).toBe(
-        142_499,
-      );
-      expect(maxSafeHeartbeatMs({ ttlMs: 300_000, maxMissed: 2, commandTimeoutMs: 5_000 })).toBe(
-        93_333,
-      );
+      expect(maxSafeHeartbeatMs({ ttlMs: 300_000, commandTimeoutMs: 5_000 })).toBe(142_499);
       expect(maxSafeHeartbeatMs({ ttlMs: 30_000 })).toBe(7_499);
       expect(() => maxSafeHeartbeatMs({ ttlMs: 10_000, commandTimeoutMs: 5_000 })).toThrow(
         'createLock: ttlMs 10000 leaves no room for a heartbeat with a 5000 ms command timeout',
@@ -76,12 +59,7 @@ describe('createLock', () => {
           service: 's',
           identifier: newId(),
           ttlMs: 300_000,
-          heartbeatMs: maxSafeHeartbeatMs({
-            ttlMs: 300_000,
-            maxMissed: 1,
-            commandTimeoutMs: 5_000,
-          }),
-          maxMissed: 1,
+          heartbeatMs: maxSafeHeartbeatMs({ ttlMs: 300_000, commandTimeoutMs: 5_000 }),
         }),
       ).not.toThrow();
     });
@@ -269,7 +247,6 @@ describe('createLock', () => {
         }),
         ttlMs: 300,
         heartbeatMs: 100,
-        maxMissed: 1,
       });
       await lock.acquire();
       await sleep(350);
@@ -401,15 +378,14 @@ describe('createLock', () => {
     it('declares a stolen lock lost on the first tick without extending the new holder', async () => {
       const id = newId();
       const redis = getRedisClient();
-      let lostReason: unknown;
+      let lostCount = 0;
       const lock = createLock({
         service: 's',
         identifier: id,
         ttlMs: 2_000,
         heartbeatMs: 25,
-        maxMissed: 20,
-        onLockLost: (reason) => {
-          lostReason = reason;
+        onLockLost: () => {
+          lostCount += 1;
         },
       });
 
@@ -417,15 +393,39 @@ describe('createLock', () => {
       await redis.set(keyFor(id), 'new-holder', 'PX', 1_000);
       const foreignTtl = await redis.pttl(keyFor(id));
 
-      // The missed-beat budget would take 525 ms here; a token mismatch bypasses it.
-      await waitFor(() => lostReason !== undefined, 250);
-      expect(lostReason).toBe('token_mismatch');
+      await waitFor(() => lostCount === 1, 250);
       expect(await lock.verify()).toBe(false);
       expect(await redis.get(keyFor(id))).toBe('new-holder');
       expect(await redis.pttl(keyFor(id))).toBeLessThanOrEqual(foreignTtl);
 
       await redis.del(keyFor(id));
       expect(await lock.release()).toBe('notHeld');
+    });
+
+    it('verify answers from Redis after an observed loss: a key holding our token again reads true', async () => {
+      const id = newId();
+      const redis = getRedisClient();
+      let lostCount = 0;
+      const lock = createLock({
+        service: 's',
+        identifier: id,
+        ttlMs: 2_000,
+        heartbeatMs: 25,
+        onLockLost: () => {
+          lostCount += 1;
+        },
+      });
+
+      expect(await lock.acquire()).toBe(true);
+      await redis.set(keyFor(id), 'new-holder', 'PX', 1_000);
+      await waitFor(() => lostCount === 1, 250);
+      expect(await lock.verify()).toBe(false);
+
+      await redis.set(keyFor(id), lock.holder, 'PX', 1_000);
+      expect(await lock.verify()).toBe(true);
+      expect(lock.isWithinLease()).toBe(false);
+      expect(await lock.release()).toBe('released');
+      expect(await lock.verify()).toBe(false);
     });
 
     it('does not fire onLockLost while heartbeats succeed', async () => {
@@ -444,35 +444,9 @@ describe('createLock', () => {
       await lock.release();
     });
 
-    it('resets the missed-beat budget on a successful refresh', async () => {
+    it('refresh errors never fire onLockLost, keep refreshing and never delete before release', async () => {
       let refreshAttempts = 0;
-      const lostReasons: unknown[] = [];
-      const redis = stubRedis(async (...args) => {
-        if (!isRefresh(args)) return 1;
-        refreshAttempts += 1;
-        if (refreshAttempts % 2 === 1) throw new Error('intermittent refresh failure');
-        return 1;
-      });
-      const lock = createLock({
-        key: 'lock:test:intermittent-refresh',
-        redis,
-        ttlMs: 1_000,
-        heartbeatMs: 10,
-        maxMissed: 1,
-        onLockLost: (reason) => {
-          lostReasons.push(reason);
-        },
-      });
-
-      expect(await lock.acquire()).toBe(true);
-      await waitFor(() => refreshAttempts >= 6);
-      expect(lostReasons).toHaveLength(0);
-      await expect(lock.release()).resolves.toBe('released');
-    });
-
-    it('spent refresh budget declares loss but keeps refreshing and never deletes before release', async () => {
-      let refreshAttempts = 0;
-      const lostReasons: unknown[] = [];
+      let lostCount = 0;
       const deleteEvals: unknown[][] = [];
       const redis = stubRedis(async (...args) => {
         if (!isRefresh(args)) {
@@ -480,58 +454,48 @@ describe('createLock', () => {
           return 1;
         }
         refreshAttempts += 1;
-        if (refreshAttempts <= 2) throw new Error('refresh unavailable');
-        return 1;
+        throw new Error('refresh unavailable');
       });
       const lock = createLock({
-        key: 'lock:test:error-budget',
+        key: 'lock:test:refresh-errors',
         redis,
         ttlMs: 1_000,
         heartbeatMs: 10,
-        maxMissed: 1,
-        onLockLost: (reason) => {
-          lostReasons.push(reason);
+        onLockLost: () => {
+          lostCount += 1;
         },
       });
 
       expect(await lock.acquire()).toBe(true);
-      await waitFor(() => lostReasons.length === 1);
       await waitFor(() => refreshAttempts >= 4);
-      expect(lostReasons).toEqual(['refresh_errors']);
+      expect(lostCount).toBe(0);
       expect(deleteEvals).toHaveLength(0);
-      expect(await lock.verify()).toBe(false);
 
       await expect(lock.release()).resolves.toBe('released');
       expect(deleteEvals).toHaveLength(1);
     });
 
-    it('keeps refreshing while an async onLockLost callback is pending', async () => {
+    it('verify follows Redis ownership once refresh errors recover', async () => {
       let refreshAttempts = 0;
-      let resolveCallback: () => void = () => {};
-      const callback = new Promise<void>((resolve) => {
-        resolveCallback = resolve;
-      });
-      const redis = stubRedis(async (...args) => {
-        if (!isRefresh(args)) return 1;
-        refreshAttempts += 1;
-        if (refreshAttempts <= 2) throw new Error('refresh unavailable');
-        return 1;
-      });
-      const lock = createLock({
-        key: 'lock:test:pending-loss-callback',
-        redis,
-        ttlMs: 1_000,
-        heartbeatMs: 10,
-        maxMissed: 1,
-        onLockLost: () => callback,
-      });
+      let token = '';
+      const redis = {
+        set: async (...args: unknown[]) => {
+          token = String(args[1]);
+          return 'OK';
+        },
+        get: async () => token,
+        eval: async (...args: unknown[]) => {
+          if (!isRefresh(args)) return 1;
+          refreshAttempts += 1;
+          if (refreshAttempts <= 2) throw new Error('refresh unavailable');
+          return 1;
+        },
+      } as unknown as LockRedis;
+      const lock = createLock({ key: 'lock:test:recovered', redis, ttlMs: 1_000, heartbeatMs: 10 });
 
       expect(await lock.acquire()).toBe(true);
-      try {
-        await waitFor(() => refreshAttempts >= 4);
-      } finally {
-        resolveCallback();
-      }
+      await waitFor(() => refreshAttempts >= 3);
+      expect(await lock.verify()).toBe(true);
       await expect(lock.release()).resolves.toBe('released');
     });
 
@@ -540,52 +504,23 @@ describe('createLock', () => {
       const redis = stubRedis(async (...args) => {
         if (!isRefresh(args)) return 1;
         refreshAttempts += 1;
-        if (refreshAttempts <= 2) throw new Error('refresh unavailable');
-        return 1;
+        return 0;
       });
       const lock = createLock({
         key: 'lock:test:throwing-loss-callback',
         redis,
         ttlMs: 1_000,
         heartbeatMs: 10,
-        maxMissed: 1,
         onLockLost: () => {
           throw new Error('callback failed');
         },
       });
 
       expect(await lock.acquire()).toBe(true);
-      await waitFor(() => refreshAttempts >= 4);
-      await expect(lock.release()).resolves.toBe('released');
-    });
-
-    it('a token mismatch after a spent budget stops the heartbeat', async () => {
-      let refreshAttempts = 0;
-      const lostReasons: unknown[] = [];
-      const redis = stubRedis(async (...args) => {
-        if (!isRefresh(args)) return 0;
-        refreshAttempts += 1;
-        if (refreshAttempts <= 2) throw new Error('refresh unavailable');
-        return 0;
-      });
-      const lock = createLock({
-        key: 'lock:test:error-budget-then-mismatch',
-        redis,
-        ttlMs: 1_000,
-        heartbeatMs: 10,
-        maxMissed: 1,
-        onLockLost: (reason) => {
-          lostReasons.push(reason);
-        },
-      });
-
-      expect(await lock.acquire()).toBe(true);
-      await waitFor(() => refreshAttempts === 3);
-      await sleep(100);
-
-      expect(refreshAttempts).toBe(3);
-      expect(lostReasons).toEqual(['refresh_errors']);
-      await expect(lock.release()).resolves.toBe('notHeld');
+      await waitFor(() => refreshAttempts === 1);
+      await sleep(50);
+      expect(refreshAttempts).toBe(1);
+      await lock.release();
     });
 
     it('stops on release', async () => {
@@ -595,6 +530,349 @@ describe('createLock', () => {
       await lock.release();
       await sleep(fastOpts.ttlMs + 50);
       expect(await getRedisClient().get(keyFor(id))).toBeNull();
+    });
+  });
+  describe('release', () => {
+    it('a released lock cannot acquire again', async () => {
+      const lock = createLock({ service: 's', identifier: newId() });
+
+      expect(await lock.acquire()).toBe(true);
+      expect(await lock.release()).toBe('released');
+      await expect(lock.acquire()).rejects.toThrow(/released.*new lock/i);
+    });
+
+    it('a release during a pending SET deletes the key that SET wrote and never starts a heartbeat', async () => {
+      let finishSet: () => void = () => {};
+      const setPending = new Promise<void>((resolve) => {
+        finishSet = resolve;
+      });
+      let currentToken: string | null = null;
+      const evalCalls: unknown[][] = [];
+      const redis = {
+        set: async (...args: unknown[]) => {
+          await setPending;
+          currentToken = String(args[1]);
+          return 'OK';
+        },
+        get: async () => currentToken,
+        eval: async (...args: unknown[]) => {
+          evalCalls.push(args);
+          if (currentToken !== args[3]) return 0;
+          currentToken = null;
+          return 1;
+        },
+      } as unknown as LockRedis;
+      const lock = createLock({
+        key: `lock:test:${newId()}`,
+        redis,
+        ttlMs: 1_000,
+        heartbeatMs: 10,
+      });
+
+      const acquiring = lock.acquire();
+      expect(await lock.release()).toBe('notHeld');
+      finishSet();
+      expect(await acquiring).toBe(false);
+      expect(currentToken).toBeNull();
+      await sleep(40);
+      expect(evalCalls.filter(isRefresh)).toHaveLength(0);
+    });
+
+    it('a repeated release shares the first result and sends one fenced delete', async () => {
+      let deletes = 0;
+      const lock = createLock({
+        key: `lock:test:${newId()}`,
+        redis: stubRedis(async () => {
+          deletes += 1;
+          return 1;
+        }),
+      });
+
+      expect(await lock.acquire()).toBe(true);
+      const first = lock.release();
+      const second = lock.release();
+      expect(second).toBe(first);
+      expect(await second).toBe('released');
+      expect(await lock.release()).toBe('released');
+      expect(deletes).toBe(1);
+    });
+
+    it('a second release never deletes the key of the holder that took it after the first', async () => {
+      const identifier = newId();
+      const first = createLock({ service: 's', identifier });
+      expect(await first.acquire()).toBe(true);
+      expect(await first.release()).toBe('released');
+
+      const successor = createLock({ service: 's', identifier });
+      expect(await successor.acquire()).toBe(true);
+      expect(await first.release()).toBe('released');
+      expect(await getRedisClient().exists(keyFor(identifier))).toBe(1);
+      await successor.release();
+    });
+  });
+  describe('a lock on several identifiers', () => {
+    const run = newId();
+    const redis = getRedisClient();
+    const id = (name: string) => `${run}-${name}`;
+    const key = (name: string) => keyFor(id(name));
+    const opts = (name: string) => ({
+      service: 's',
+      identifier: id(name),
+      ttlMs: 60_000,
+      heartbeatMs: 10_000,
+    });
+    const batch = (
+      names: string[],
+      overrides: Partial<{ ttlMs: number; heartbeatMs: number }> = {},
+    ) =>
+      createLock({
+        service: 's',
+        identifiers: names.map(id),
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+        ...overrides,
+      });
+
+    afterEach(async () => {
+      const keys = await redis.keys(`${keyFor(run)}*`);
+      if (keys.length) await redis.del(...keys);
+    });
+
+    it('takes every key under one token, and each key is the one a single-identifier lock takes', async () => {
+      const lock = batch(['m1', 'm2', 'm3']);
+
+      expect(await lock.acquire()).toBe(true);
+      const tokens = await Promise.all(['m1', 'm2', 'm3'].map((name) => redis.get(key(name))));
+      expect(new Set(tokens).size).toBe(1);
+      expect(await createLock(opts('m2')).acquire()).toBe(false);
+
+      expect(await lock.release()).toBe('released');
+      expect(await Promise.all(['m1', 'm2', 'm3'].map((name) => redis.exists(key(name))))).toEqual([
+        0, 0, 0,
+      ]);
+    });
+
+    it('an acquire that does not get every key ends holding none of them', async () => {
+      const holder = createLock(opts('n2'));
+      expect(await holder.acquire()).toBe(true);
+
+      expect(await batch(['n1', 'n2', 'n3']).acquire()).toBe(false);
+      expect(await redis.exists(key('n1'))).toBe(0);
+      expect(await redis.exists(key('n3'))).toBe(0);
+
+      await holder.release();
+      const lock = batch(['n1', 'n2', 'n3']);
+      expect(await lock.acquire()).toBe(true);
+      await lock.release();
+    });
+
+    it('heartbeat refreshes every key in one eval', async () => {
+      const lock = batch(['h1', 'h2', 'h3'], { ttlMs: 200, heartbeatMs: 25 });
+      expect(await lock.acquire()).toBe(true);
+      const evalScript = spyOn(redis, 'eval');
+      try {
+        await waitFor(() => evalScript.mock.calls.length > 0, 250);
+        expect(evalScript.mock.calls[0]?.[1]).toBe(3);
+        await sleep(300);
+        expect(await lock.verify()).toBe(true);
+      } finally {
+        evalScript.mockRestore();
+      }
+      expect(await lock.release()).toBe('released');
+    });
+
+    const lostCounter = () => {
+      const counter = { lost: 0 };
+      return {
+        counter,
+        onLockLost: () => {
+          counter.lost++;
+        },
+      };
+    };
+    const outlive = (ms: number) => {
+      const until = Date.now() + ms;
+      return waitFor(() => Date.now() >= until, ms + 5_000);
+    };
+
+    it('a key taken over by another holder is dropped from the set, and the rest stay held', async () => {
+      const { counter, onLockLost } = lostCounter();
+      const lock = createLock({
+        service: 's',
+        identifiers: [id('l1'), id('l2')],
+        ttlMs: 200,
+        heartbeatMs: 25,
+        onLockLost,
+      });
+      expect(await lock.acquire()).toBe(true);
+      const token = await redis.get(key('l1'));
+      await redis.set(key('l2'), 'new-holder', 'PX', 60_000);
+      const foreignTtl = await redis.pttl(key('l2'));
+
+      await waitFor(() => counter.lost === 1, 1_000);
+      await outlive(400);
+
+      expect(counter.lost).toBe(1);
+      expect(await lock.verify()).toBe(false);
+      expect(await redis.get(key('l1'))).toBe(token);
+      expect(await redis.pttl(key('l2'))).toBeLessThanOrEqual(foreignTtl);
+      expect(await lock.release()).toBe('notHeld');
+      expect(await redis.exists(key('l1'))).toBe(0);
+      expect(await redis.get(key('l2'))).toBe('new-holder');
+    });
+
+    it('an evicted key un-protects only itself: the rest are kept alive past their TTL', async () => {
+      const { counter, onLockLost } = lostCounter();
+      const lock = createLock({
+        service: 's',
+        identifiers: [id('e1'), id('e2'), id('e3')],
+        ttlMs: 200,
+        heartbeatMs: 25,
+        onLockLost,
+      });
+      expect(await lock.acquire()).toBe(true);
+      const token = await redis.get(key('e1'));
+      await redis.del(key('e2'));
+
+      await waitFor(() => counter.lost === 1, 1_000);
+      await outlive(400);
+
+      expect(await redis.get(key('e1'))).toBe(token);
+      expect(await redis.get(key('e3'))).toBe(token);
+      expect(await redis.exists(key('e2'))).toBe(0);
+      expect(await lock.release()).toBe('notHeld');
+      expect(await redis.exists(key('e1'))).toBe(0);
+      expect(await redis.exists(key('e3'))).toBe(0);
+    });
+
+    it('losing every key reports the loss once and stops the heartbeat', async () => {
+      const { counter, onLockLost } = lostCounter();
+      const lock = createLock({
+        service: 's',
+        identifiers: [id('gone-1'), id('gone-2')],
+        ttlMs: 200,
+        heartbeatMs: 25,
+        onLockLost,
+      });
+      expect(await lock.acquire()).toBe(true);
+      await redis.del(key('gone-1'), key('gone-2'));
+      const evalScript = spyOn(redis, 'eval');
+
+      try {
+        await waitFor(() => counter.lost === 1, 1_000);
+        const beatsAtLoss = evalScript.mock.calls.length;
+        await outlive(200);
+        expect(evalScript.mock.calls.length).toBe(beatsAtLoss);
+      } finally {
+        evalScript.mockRestore();
+      }
+      expect(await lock.verify()).toBe(false);
+      expect(await lock.release()).toBe('notHeld');
+    });
+
+    it('makes progress under churn: keys that each free up are taken even if never all free at once', async () => {
+      const names = Array.from({ length: 20 }, (_, n) => `churn-${String(n).padStart(2, '0')}`);
+      const lanes = [0, 1, 2, 3].map((lane) => names.filter((_, n) => n % 4 === lane));
+      let isChurning = true;
+      const churn = async (lane: string[]) => {
+        let step = 0;
+        let current = createLock(opts(lane[0] as string));
+        await current.acquire();
+        while (isChurning) {
+          await sleep(20);
+          step += 1;
+          const next = createLock(opts(lane[step % lane.length] as string));
+          const isNextHeld = await next.acquire();
+          await current.release();
+          if (isNextHeld) current = next;
+          else current = createLock(opts(lane[step % lane.length] as string));
+        }
+        await current.release();
+      };
+      const churners = lanes.map(churn);
+      const lock = batch(names);
+
+      try {
+        expect(await lock.acquire({ waitMs: 10_000 })).toBe(true);
+        expect(await lock.verify()).toBe(true);
+      } finally {
+        isChurning = false;
+        await lock.release();
+        await Promise.all(churners);
+      }
+    }, 20_000);
+
+    it('two overlapping sets acquired at once both finish: one waits for the other', async () => {
+      const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+      const first = batch(letters.slice(0, 13).map((letter) => `overlap-${letter}`));
+      const second = batch(letters.slice(7).map((letter) => `overlap-${letter}`));
+      const holdBriefly = async (lock: ReturnType<typeof batch>) => {
+        const isAcquired = await lock.acquire({ waitMs: 10_000 });
+        await sleep(30);
+        await lock.release();
+        return isAcquired;
+      };
+
+      expect(await Promise.all([holdBriefly(first), holdBriefly(second)])).toEqual([true, true]);
+    }, 20_000);
+
+    it('keeps the keys it has won alive while it waits on a held one', async () => {
+      const holder = createLock(opts('wait-2'));
+      expect(await holder.acquire()).toBe(true);
+      const lock = batch(['wait-1', 'wait-2', 'wait-3'], { ttlMs: 200, heartbeatMs: 25 });
+
+      const acquiring = lock.acquire({ waitMs: 10_000 });
+      await waitFor(async () => (await redis.get(key('wait-1'))) !== null, 2_000);
+      const token = await redis.get(key('wait-1'));
+      await outlive(400);
+
+      expect(await redis.get(key('wait-1'))).toBe(token);
+      expect(await redis.exists(key('wait-3'))).toBe(0);
+      await holder.release();
+      expect(await acquiring).toBe(true);
+      expect(await redis.get(key('wait-1'))).toBe(token);
+      expect(await redis.get(key('wait-2'))).toBe(token);
+      expect(await redis.get(key('wait-3'))).toBe(token);
+      expect(await lock.release()).toBe('released');
+    }, 20_000);
+
+    it('a key won and then lost while waiting on another restarts the acquire from the first key', async () => {
+      const holder = createLock(opts('restart-2'));
+      expect(await holder.acquire()).toBe(true);
+      const { counter, onLockLost } = lostCounter();
+      const lock = createLock({
+        service: 's',
+        identifiers: [id('restart-1'), id('restart-2'), id('restart-3')],
+        ttlMs: 200,
+        heartbeatMs: 25,
+        onLockLost,
+      });
+
+      const acquiring = lock.acquire({ waitMs: 10_000 });
+      await waitFor(async () => (await redis.get(key('restart-1'))) !== null, 2_000);
+      await redis.del(key('restart-1'));
+      await waitFor(() => counter.lost === 1, 1_000);
+      await holder.release();
+
+      expect(await acquiring).toBe(true);
+      expect(await lock.verify()).toBe(true);
+      await redis.del(key('restart-3'));
+      await waitFor(() => counter.lost === 2, 1_000);
+      expect(await lock.release()).toBe('notHeld');
+    }, 20_000);
+
+    it('release is fenced per key and reports notHeld unless it removed every key', async () => {
+      const lock = batch(['r1', 'r2']);
+      expect(await lock.acquire()).toBe(true);
+      await redis.set(key('r2'), 'other-holder');
+
+      expect(await lock.release()).toBe('notHeld');
+      expect(await redis.exists(key('r1'))).toBe(0);
+      expect(await redis.get(key('r2'))).toBe('other-holder');
+    });
+
+    it('rejects an empty identifier list', () => {
+      expect(() => batch([])).toThrow('identifiers must name at least one key');
     });
   });
 });

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, type ModelName, unregisterDbHook } from '@template/db';
 import type { CustomerRef, Segment, Space, Tag, User } from '@template/db/generated/client/client';
@@ -69,7 +69,7 @@ describe('reconcile triggers — membership follows the events', () => {
     return entity;
   };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
     registerMemberSelfGrantHook();
@@ -83,7 +83,7 @@ describe('reconcile triggers — membership follows the events', () => {
     memberRef = await customerOf(member);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

@@ -276,6 +276,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 
 **uuidv7-ids.sh:**
 - Fails on a Prisma model whose primary key is not exactly `id String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)` (attribute order free), including a composite `@@id`
+- Fails on a `randomUUID()` / `crypto.randomUUID()` call in `apps/` or `packages/` source, tests included: mint ids with `Bun.randomUUIDv7()` (the `uuidv7` package where Bun's globals are absent, such as `packages/db` and browser code). A call that makes a secret rather than an id goes in `scripts/ci/uuidv7-ids/exempt.txt` as `<file>\t<reason>` (template: `apps/api/src/lib/utils/authProbe.ts`)
 - Why: ids are time-ordered, and `paginate()`'s `{ id: desc }` tiebreaker and cursors depend on it
 
 **one-middleware-chain.sh:**

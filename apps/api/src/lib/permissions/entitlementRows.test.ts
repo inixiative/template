@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { cacheKey, checkCache, db, revive, snapshotHookRegistry, toAccessor } from '@template/db';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { EntitlementResourceModel } from '@template/db/generated/client/enums';
@@ -57,7 +57,7 @@ const rowsOf = (model: 'Token' | 'Integration' | 'OrganizationUser', id: string)
     }),
   );
 
-beforeAll(async () => {
+beforeEach(async () => {
   restoreHooks = snapshotHookRegistry();
   registerDelegatedKeysHook();
   registerFullDelegateHook();
@@ -78,7 +78,7 @@ beforeAll(async () => {
   owner = { user: context.user, member, permix: (await userPermissions(context.user.id))! };
 });
 
-afterAll(async () => {
+afterEach(async () => {
   restoreHooks();
   await cleanupTouchedTables(db);
 });

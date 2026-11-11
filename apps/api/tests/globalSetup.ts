@@ -1,12 +1,16 @@
 import '#/config/env';
 import { afterEach } from 'bun:test';
 import { db } from '@template/db';
+import { cleanupTouchedTables } from '@template/db/test';
 import { resetEnvOverrides } from '@template/shared/utils';
 import { SQL } from 'bun';
 
 // Global backstop: clear any env overrides a test registered (setEnvOverride / withEnv)
 // so nothing leaks into the next file in the single-process worker.
 afterEach(resetEnvOverrides);
+
+// Rows too: a test that reaches the database through a fixture has no cleanup of its own to forget.
+afterEach(() => cleanupTouchedTables(db));
 
 const isTestDatabase = process.env.NODE_ENV === 'test' || process.env.ENVIRONMENT === 'test';
 

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   cache,
   cacheKey,
@@ -52,7 +52,7 @@ describe('handler: transferSpace', () => {
   let adminFetch: ReturnType<typeof createTestApp>['fetch'];
   let restoreHooks: () => void;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     restoreHooks = snapshotHookRegistry();
     registerDelegatedKeysHook();
     registerMemberSelfGrantHook();
@@ -96,7 +96,7 @@ describe('handler: transferSpace', () => {
     }).fetch;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     restoreHooks();
     await cleanupTouchedTables(db);
   });
@@ -214,7 +214,7 @@ describe('handler: transferSpace', () => {
     let spaceProjectId: string;
     let liveTargetMembersBefore: string[];
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       const { entity: s } = await createSpace({}, { organization: org });
       freshSpace = s;
       kept = await memberWithRows(freshSpace, targetOrg1);

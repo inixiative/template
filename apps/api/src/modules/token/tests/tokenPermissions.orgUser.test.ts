@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -25,7 +25,7 @@ describe('OrganizationUser Token Permissions', () => {
   let _viewerUser: User;
   let _viewerOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: o } = await createOrganization();
     org = o;
 
@@ -61,7 +61,7 @@ describe('OrganizationUser Token Permissions', () => {
     db = createTestApp().db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

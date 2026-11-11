@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
@@ -50,7 +50,7 @@ const bareRelations = {
 };
 
 describe('rate limit identities', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

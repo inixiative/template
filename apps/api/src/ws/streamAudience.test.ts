@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import {
   cleanupTouchedTables,
@@ -45,7 +45,7 @@ const STREAM_AUDIENCE_FIXTURES: { [F in StreamFamily]: AudienceFixture<F> } = {
 };
 
 describe('stream audience', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

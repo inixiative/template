@@ -37,6 +37,7 @@
 - [Transactions](#transactions)
   - [Manual Transaction](#manual-transaction)
   - [After Commit Callbacks](#after-commit-callbacks)
+  - [What Runs at Commit](#what-runs-at-commit)
   - [Finally Callbacks](#finally-callbacks)
   - [Redis Locks Held Until the Transaction Ends](#redis-locks-held-until-the-transaction-ends)
   - [Row Locks and Create-If-Missing](#row-locks-and-create-if-missing)
@@ -492,6 +493,7 @@ db.onCommit(fns)        // Queue callbacks for after commit
 db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or rollback
 db.findForUpdate(model, where, opts?) // SELECT ... FOR UPDATE; { upserting: true } fences a missing row
 db.withLockUntilSettled(lockOptions, fn, acquireOptions?) // Redis lock held until the txn ends
+db.cacheOverlay()       // The open transaction's cache overlay, or null outside one
 db.getScopeId()         // Get current scope ID
 db.isInTxn()            // Check if in transaction
 ```
@@ -520,6 +522,22 @@ db.onCommit(async () => {
 });
 ```
 
+### What Runs at Commit
+
+The outermost `db.txn` runs its end-of-transaction work in this order:
+
+1. Prisma commits or rolls back the transaction.
+2. On commit, the cache keys the transaction wrote are cleared through `db.parallel(..., { resolution: 'allSettled' })`, so every key runs (see
+   [REDIS.md § cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)). A failure is
+   kept, not thrown yet.
+3. The transaction is marked settled and its finally queue drains, commit or rollback. This releases
+   every lock held until the transaction settles.
+4. On commit, the values the transaction only read are published the same way. A failure counts
+   `cache.publish.failed` and is not thrown.
+5. The `db.onCommit` batches run in order.
+6. `db.txn` throws if a batch or a step-2 clear failed (one error, or an `AggregateError` with the
+   batch failure first); otherwise it returns `fn`'s result. The commit has landed either way.
+
 ### Finally Callbacks
 
 `db.onFinally(fns)` queues callbacks that run when the transaction ends, whether it commits or rolls
@@ -537,23 +555,42 @@ lock (same options; `acquireOptions` is `{ waitMs, pollMs, onTimeout }`), runs `
 lock on the transaction's finally queue (the one `db.onFinally` feeds) once the transaction settles,
 commit or rollback. The release is queued before the wait starts, so an acquisition that finishes
 after the transaction ended is still released, and that late holder throws instead of running `fn`
-outside the transaction. It throws outside `db.txn()`.
+outside the transaction. A transaction counts as settled from the moment `db.txn`'s callback returns
+or throws (`isTransactionOpen`), so a take that starts after that throws at once. It throws outside
+`db.txn()`.
 
 - **One acquisition per transaction.** A second take of a key the transaction holds, or is still
   waiting for, joins it instead of waiting on itself: a nested `db.txn()`, later rounds of a
   `transactionAll` batch, parallel sub-requests of one round.
 - **Holders inside the transaction still run one at a time**, in call order (a per-key
   `createSerializedQueue` on the transaction), so parallel branches each see what the one before
-  wrote. A take from inside a holder's own `fn` runs straight through. The queue wait has no
+  wrote. A take from inside a holder's own `fn` runs straight through. A holder whose turn comes
+  after the transaction settled throws instead of running `fn`, so its writes cannot escape the
+  rolled-back transaction and the released lock. The queue wait has no
   deadline (`waitMs` bounds only the Redis wait), so a holder must not await a sibling holder of the
   same key, and a transaction taking several keys takes them in one fixed order everywhere.
-- **Timeouts.** A wait past `waitMs` throws `onTimeout()` (or an error naming the key) and the
-  transaction rolls back. Keep `waitMs` under the transaction's own timeout. The lease is
+- **Timeouts.** A wait past `waitMs` throws `onTimeout()` (or `transaction lock <key> is held by
+  another holder`) and the transaction rolls back. Keep `waitMs` under the transaction's own timeout. The lease is
   heartbeat-renewed, so a long transaction keeps it.
 
 `withOwnerLock` (`apps/api/src/lib/locks/withOwnerLock.ts`) uses it whenever it is called inside a
 transaction; outside one it takes and releases a plain `createLock` lock around `fn`. Upserting
-`findForUpdate` holds its keys the same way.
+`findForUpdate` holds its keys the same way, through `holdLockSetUntilSettled`: one lock set over
+the keys the transaction does not hold yet, every key registered against that one acquisition and
+released once when the transaction settles. The keys are the ones `withLockUntilSettled` computes,
+so either one joins a key the other already holds in the same transaction.
+
+A lock set is `createLock({ service, identifiers: [...] })`: one token, one heartbeat and one release
+over `lock:<service>:<identifier>` per identifier, deduplicated and sorted, so a set and a
+single-identifier lock contend on the same key and two sets take their shared keys in the same
+order. Each step is one Lua call over the whole set (`fencedSetPrefix` per poll, `fencedRefreshAll`
+per beat, `fencedDeleteAll` to release), so the cost does not grow with the number of keys. It
+acquires key by key: each poll keeps the run of free keys it won and waits only on the next, so it
+never needs every key free at once. `acquire()` answers true only once every key is held, and one
+that ends false, by timeout or error, gives back the keys it won. A key lost while held is dropped
+from the heartbeat, the rest stay renewed, and `release()` reports `notHeld`. `verify()` answers
+from Redis on every call (true only while every key holds this lock's token); only `release()`
+turns it locally false.
 
 ### Row Locks and Create-If-Missing
 
@@ -572,10 +609,16 @@ await db.txn(async () => {
 plus the where entries sorted by key, hashed) **before** the `SELECT`, and holds it until the
 transaction ends, the same way `db.withLockUntilSettled` does. The where must be scalar
 equalities (no arrays, operator objects, `null` or `undefined`), except that one field may list
-values as `{ in: [...] }`, fencing each value under the key a single-row fence on it takes. A caller that cannot get the lock waits up to
-`waitMs` (default 3000ms, inside Prisma's 5000ms interactive default) and then throws
-`FindForUpdateLockTimeoutError`, rolling its transaction back. Fencing the same key twice in one
-transaction does not wait on itself. The `no-create-race-machinery` CI rule fails a change that
+values as `{ in: [...] }`, fencing each value under the key a single-row fence on it takes. The
+whole call is one lock set and one wait over the keys the transaction does not hold yet; an empty
+list takes no lock and returns `[]`. A caller that cannot get every key waits up to
+`waitMs` (default 3000ms, well inside the client's 30s transaction timeout, polling every 25ms), gives
+back the keys it won and throws `FindForUpdateLockTimeoutError`, rolling its transaction back. The
+error carries `model`, `waitMs` and `identifier` (`Model:hash`, or `Model:hash (+N)` for a batch,
+naming the first pending key and the count of the rest); the API answers it with a 409, *Another
+request is writing this record; please retry*. Fencing the same key twice in one transaction does
+not wait on itself. Keys taken by separate `findForUpdate` calls in one transaction are separate
+lock sets, ordered by call order, so writers that fence several keys fence them in one fixed order. The `no-create-race-machinery` CI rule fails a change that
 adds a bare `.upsert(` or a unique-violation catch to a file.
 
 ---

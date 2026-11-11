@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type { Organization, Role, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -13,9 +13,9 @@ import { app } from '#/app';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
-beforeAll(() => registerClearCacheHook());
-afterAll(async () => {
-  unregisterDbHook('clearCache');
+beforeEach(() => registerClearCacheHook());
+afterEach(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 
@@ -49,7 +49,7 @@ describe('assigning an organization member a role needs manage and the role you 
     return send(user, 'DELETE', `/api/v1/organizationUser/${row.id}`);
   };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     await member('owner');
   });
@@ -126,7 +126,7 @@ describe('assigning a space member a role needs manage and the role you set (Aro
     return send(writer, 'DELETE', `/api/v1/spaceUser/${row.id}`);
   };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
   });

@@ -1,6 +1,6 @@
 // canSubscribe/resolveIdentity dry-run the REAL app: real session auth, real spoof middleware,
 // real permissions. Route auth IS channel auth, end to end.
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import {
@@ -27,7 +27,7 @@ describe('ws subscribe probe (real app)', () => {
   let inquiryId: string;
   let organizationBearer: { authorization: string };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin }));
     adminBearer = { authorization: (await createBearerToken(superadmin)).authorization };
 
@@ -64,7 +64,7 @@ describe('ws subscribe probe (real app)', () => {
     );
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

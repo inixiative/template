@@ -29,7 +29,7 @@ const queueTraversedCacheClear = async (
     const loaded = (await db.withDeleted(() =>
       db.delegate(target).findMany({ where: { id: { in: group.map((row) => row.id) } } }),
     )) as Record<string, unknown>[];
-    queueCacheClear(target as Prisma.ModelName, loaded);
+    await queueCacheClear(target as Prisma.ModelName, loaded);
   }
 };
 
@@ -78,7 +78,7 @@ export const registerClearCacheHook = () => {
       if (previousData) records.push(previousData);
     }
 
-    queueCacheClear(model as Prisma.ModelName, records);
+    await queueCacheClear(model as Prisma.ModelName, records);
     await queueTraversedCacheClear(model as Prisma.ModelName, records);
   });
 };

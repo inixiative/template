@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
@@ -6,11 +6,13 @@ import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 
-registerRulesHook();
-registerContactRulesHook();
-registerOrderedListHook();
+beforeEach(() => {
+  registerRulesHook();
+  registerContactRulesHook();
+  registerOrderedListHook();
+});
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
   clearHookRegistry();
 });

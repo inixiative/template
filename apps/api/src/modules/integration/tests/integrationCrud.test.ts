@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry } from '@template/db';
 import type { Integration, Organization, User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
@@ -21,7 +21,7 @@ describe('Integration CRUD', () => {
   let user: User;
   let org: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: orgUser, context } = await createOrganizationUser({ role: Role.admin });
     user = context.user;
     org = context.organization;
@@ -39,7 +39,7 @@ describe('Integration CRUD', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
   });

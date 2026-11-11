@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -106,7 +106,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
     permissions: Permissions,
   ) => mint(user, organizationUsers, `/api/v1/integration/${integration.id}/tokens`, permissions);
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerClearCacheHook();
     registerDelegatedKeysHook();
     registerMemberSelfGrantHook();
@@ -117,9 +117,8 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
     ({ entity: otherSpace } = await createSpace({}, { organization }));
   });
 
-  afterAll(async () => {
-    unregisterDbHook('clearCache');
-    unregisterDbHook('falsePolymorphism:delegatedKeys');
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

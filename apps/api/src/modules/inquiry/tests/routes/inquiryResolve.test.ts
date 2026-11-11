@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Inquiry, Organization, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -23,7 +23,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
   let org: Organization;
   let targetUser: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: sourceUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
@@ -35,7 +35,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
     db = createTestApp({ mockUser: targetUser, mount }).db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import {
   InquiryResourceModel,
@@ -13,7 +13,7 @@ import {
 } from '@template/db/test';
 import { validateUniqueInquiry } from '#/modules/inquiry/validations/validateUniqueInquiry';
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { db, snapshotHookRegistry } from '@template/db';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
@@ -7,13 +7,13 @@ import { clearRulesCache, RulesRegistry, setRulesCache } from '#/hooks/rules/reg
 
 let restoreHooks: () => void;
 
-beforeAll(() => {
+beforeEach(() => {
   RulesRegistry.User = true;
   restoreHooks = snapshotHookRegistry();
   registerRulesHook();
 });
 
-afterAll(async () => {
+afterEach(async () => {
   restoreHooks();
   await cleanupTouchedTables(db);
   delete RulesRegistry.User;
@@ -81,7 +81,7 @@ describe('rules hook', () => {
   describe('update validation with previous merging', () => {
     let userId: string;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       const { entity: user } = await createUser({
         name: 'Original',
         email: `merge${getNextSeq()}@example.com`,

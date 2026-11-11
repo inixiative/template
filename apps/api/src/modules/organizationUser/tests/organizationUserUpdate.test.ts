@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
+import { clearHookRegistry } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -28,7 +29,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   let org: Organization;
   let adminOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     registerMemberSelfGrantHook();
     registerRulesHook();
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
@@ -45,7 +46,8 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
+    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 
