@@ -3,21 +3,23 @@
 // ============================================================================
 
 model Integration {
-  inquiriesSent     Inquiry[] @relation("InquirySource")
-  inquiriesReceived Inquiry[] @relation("InquiryTarget")
-  id                String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime?
+  inquiriesSent        Inquiry[]       @relation("InquirySource")
+  inquiriesReceived    Inquiry[]       @relation("InquiryTarget")
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetEntitlements   Entitlement[]   @relation("EntitlementTarget")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
 
   name String
 
   provider Provider?
 
   // A delegate: its permissions, capped live by its direct owner
-  role         Role?
-  full         Boolean @default(false)
-  entitlements Json?
+  role Role?
+  full Boolean @default(false)
 
   // Owner (fake polymorphism: User, OrganizationUser, Organization, Space, or SpaceUser)
   ownerModel     IntegrationOwnerModel

@@ -9,6 +9,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
+import { toEntitlementInput } from '@template/permissions';
 import { integrationRouter } from '#/modules/integration';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
@@ -431,11 +432,11 @@ describe("a member writes any entitlement on their own member integration, cappe
         provider: 'slack',
         role: 'viewer',
         entitlements: [
-          {
+          toEntitlementInput({
             resource: 'db:organization',
             anchor: { resource: 'db:organization', id: organization.id },
             actions: { manage: true },
-          },
+          }),
         ],
       }),
     );
@@ -455,11 +456,11 @@ describe("a member writes any entitlement on their own member integration, cappe
     });
     const add = {
       add: [
-        {
+        toEntitlementInput({
           resource: 'db:organization',
           anchor: { resource: 'db:organization', id: organization.id },
           actions: { read: true },
-        },
+        }),
       ],
     };
     for (const held of [{ role: null, entitlements: add.add }, { role: 'viewer' }] as const) {
@@ -470,7 +471,8 @@ describe("a member writes any entitlement on their own member integration, cappe
         ...held,
       });
       expect(
-        (await app.fetch(patch(`/api/v1/integration/${integration.id}/entitlements`, add))).status,
+        (await app.fetch(post(`/api/v1/integration/${integration.id}/entitlements`, add.add)))
+          .status,
       ).toBe(403);
     }
   });

@@ -20,11 +20,13 @@ const setTypedId = (axis: ReturnType<typeof materializedAxes>[number], row: Row)
   return foreignKey ? row[foreignKey] : undefined;
 };
 
-/** Each materialized column that already holds an id other than the one its set typed FK points at. */
+/** Each materialized column written without its typed FK, or holding an id other than the one it points at. */
 export const materializedIdConflicts = (model: ModelName, row: Row): string[] =>
   materializedAxes(model).flatMap((axis) => {
     const id = setTypedId(axis, row);
     const written = row[axis.materialized];
+    if (written != null && id == null)
+      return [`${model}.${axis.materialized} is set from its typed FK; pass the FK`];
     return id != null && written != null && written !== id
       ? [`${model}.${axis.materialized} must equal the ${String(row[axis.field])} id ${String(id)}`]
       : [];

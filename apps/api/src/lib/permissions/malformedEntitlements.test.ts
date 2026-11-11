@@ -13,6 +13,7 @@ import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { heldEntitlements } from '#tests/utils/entitlements';
 import { patch, post } from '#tests/utils/request';
 
 const { call, holds } = createTokenProbeApp();
@@ -93,16 +94,17 @@ describe('a malformed stored entitlement is pruned at sign-in, the rest kept (R9
     expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
   });
 
-  it('a token with no role, not full, and nothing left after pruning is signed out (R94)', async () => {
-    expect(await actorModel(await tokenKey(null, [broken()]))).toBeNull();
-    expect(
-      await actorModel(await tokenKey(null, { 'db:organization': { read: true } } as never)),
-    ).toBeNull();
+  it('a token with no role, not full, and nothing left after pruning signs in and holds nothing', async () => {
+    const key = await tokenKey(null, [broken()]);
+    expect(await actorModel(key)).toBe('Token');
+    for (const action of ['read', 'operate', 'manage', 'own'])
+      expect(await holds(key, 'organization', organization.id, action)).toBe(false);
+    expect(await holds(key, 'integration', integration.id, 'read')).toBe(false);
   });
 });
 
-describe('a token is the narrowing of its chain: a chain that holds nothing signs it out (R108)', () => {
-  it('a token on an integration left with nothing after pruning has no actor', async () => {
+describe('a token is the narrowing of its chain: silence never widens', () => {
+  it('a token on an integration left with nothing after pruning signs in and holds nothing', async () => {
     const { entity: empty } = await createIntegration({
       organizationId: organization.id,
       ownerModel: 'Organization',
@@ -113,11 +115,14 @@ describe('a token is the narrowing of its chain: a chain that holds nothing sign
       { ownerModel: 'Integration', role: 'viewer' },
       { integration: empty },
     );
-    expect(await actorModel(rawKey)).toBeNull();
+    expect(await actorModel(rawKey)).toBe('Token');
+    for (const action of ['read', 'operate', 'manage', 'own'])
+      expect(await holds(rawKey, 'organization', organization.id, action)).toBe(false);
+    expect(await holds(rawKey, 'integration', empty.id, 'read')).toBe(false);
   });
 });
 
-describe('the API refuses a malformed entitlement; a write prunes the broken ones stored (R94)', () => {
+describe('the API refuses a malformed entitlement; a broken row stored by hand is ignored, never rewritten (R94)', () => {
   const asOwner = async () => {
     const { entity: seat, context } = await createOrganizationUser(
       { role: 'owner' },
@@ -136,7 +141,7 @@ describe('the API refuses a malformed entitlement; a write prunes the broken one
   };
 
   it('the 422 names what is wrong with the entry', async () => {
-    const noAction = { ...readOrganization(), actions: { read: false } };
+    const noAction = { ...readOrganization(), actions: [] };
     const response = await (await asOwner())(
       post(`/api/v1/organization/${organization.id}/integrations`, {
         name: `i-${Bun.randomUUIDv7()}`,
@@ -163,7 +168,7 @@ describe('the API refuses a malformed entitlement; a write prunes the broken one
     expect(response.status).toBe(422);
   });
 
-  it('adding to an integration that stores a broken entry writes the good ones only', async () => {
+  it('adding to an integration that stores a broken entry adds the good one beside it; rows are never rewritten', async () => {
     const { entity: stored } = await createIntegration({
       organizationId: organization.id,
       ownerModel: 'Organization',
@@ -171,12 +176,13 @@ describe('the API refuses a malformed entitlement; a write prunes the broken one
       entitlements: [broken()],
     });
     const response = await (await asOwner())(
-      patch(`/api/v1/integration/${stored.id}/entitlements`, { add: [readOrganization()] }),
+      post(`/api/v1/integration/${stored.id}/entitlements`, [readOrganization()]),
     );
-    expect(response.status).toBe(200);
-    expect(
-      (await db.integration.findUniqueOrThrow({ where: { id: stored.id } })).entitlements,
-    ).toEqual([readOrganization()]);
+    expect(response.status).toBe(201);
+    expect((await heldEntitlements({ model: 'Integration', id: stored.id })) as unknown).toEqual([
+      broken(),
+      readOrganization(),
+    ]);
   });
 });
 

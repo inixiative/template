@@ -5,6 +5,10 @@
  * @uses infrastructure:redis
  */
 import { db } from '@template/db/client';
+import {
+  includeTargetEntitlements,
+  isEntitlementTargetAccessor,
+} from '@template/db/entitlements/targetEntitlements';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cache, cacheKey } from '@template/db/redis';
 import type { AccessorName } from '@template/db/utils/modelNames';
@@ -21,5 +25,10 @@ export const fetchOne = async <T extends HydratedRecord>(
   const delegate = db.delegate(accessor);
 
   const where = typeof identifier === 'string' ? { id: identifier } : identifier;
-  return cache<T | null>(key, () => delegate.findFirst({ where }) as Promise<T | null>, ttl);
+  const include = isEntitlementTargetAccessor(accessor) ? includeTargetEntitlements : undefined;
+  return cache<T | null>(
+    key,
+    () => delegate.findFirst({ where, include }) as Promise<T | null>,
+    ttl,
+  );
 };

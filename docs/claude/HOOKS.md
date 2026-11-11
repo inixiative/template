@@ -120,13 +120,17 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
 | `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
+| `fullDelegate` | On `Token` and `Integration`: a row written `full` gets `role: null` before the write, and its live entitlement rows are tombstoned after it. On `Entitlement`, a create whose target is a `full` delegate is refused (422 `full takes no entitlements`), whoever writes it |
 | `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
+| `memberSelfGrant` | After an `OrganizationUser` or `SpaceUser` is created (`create`, `createManyAndReturn`, an `upsert` that creates), writes its self-grant as an `Entitlement` row, tombstoned with the member's own `deletedAt` when the member is created tombstoned. `memberSelfGrant:kept` refuses (422) tombstoning a live member's self-grant; only the member's own tombstone takes it ([PERMISSIONS.md](PERMISSIONS.md#the-member-self-grant)) |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
+| `ruleReference` | Keeps `RuleReference` edges in step with each rule-bearing column (`RULE_REFERENCE_SURFACES`, `apps/api/src/hooks/ruleReference/surfaces.ts`: email templates and components, segment `conditions`, `Entitlement.where` read through `entitlementWhereLens`, which names the entitled record by id) |
+| `ruleReference:target` | Copies a named row's `deletedAt` onto the edges that name it, for every edge in `NAMING_EDGES` (`targetHook.ts`): `RuleReference.targetDeletedAt` and `Entitlement.sourceDeletedAt`. A purged row is left to the null FK |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
 | `segmentConditions` | Segment `conditions` required, validated by `validateSegmentConditions` (against `customerRefLens`, compiled with `resolvedCustomerRefLens(ownerModel, …)`) + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
 | `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
-| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). Each delete behavior has its own registry, keyed by the child model: `HARD_DELETE_ON_TOMBSTONE` (`@template/db` registries) hard-deletes ephemeral grants that must not survive a revive — `Session`, `Token`, `WebhookSubscription`; `REGENERATE_ON_REVIVE` rebuilds the derived ones (`RuleReference`) when the parent is revived; `SKIP_REVIVE` (`@template/db` registries, empty in template) tombstones a grant with its parent and never revives it, so a new one has to be issued; `validateDeleteBehavior` refuses an inconsistent registry at boot |
+| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). Each delete behavior has its own registry, keyed by the child model: `HARD_DELETE_ON_TOMBSTONE` (`@template/db` registries) hard-deletes ephemeral rows that must not survive a revive — `Session`, `WebhookSubscription`, `WebhookEvent`, `RuleReference`, `Flow`; `REGENERATE_ON_REVIVE` rebuilds the derived ones (`RuleReference`) when the parent is revived; `SKIP_REVIVE` (`@template/db` registries: `Token`) tombstones a grant with its parent and never revives it, so a new one has to be issued, and the cascade never reaches its children (a token's entitlement rows stay dead); `CASCADE_EXEMPT` lists the reference relations that never cascade (every `Entitlement` source, every `Inquiry` party, every `RuleReference` target); `validateDeleteBehavior` refuses an inconsistent registry at boot |
 | `tagOwnerCategory` | A created Tag's ownerModel + FK must match its TagCategory's owner. A tag never moves: `tagCategoryId` is refused on update (422) and the owner fields are stripped |
 | `webhooks` | Webhook delivery on mutations (post-commit) |
 
@@ -350,6 +354,10 @@ export const cacheReference: CacheReference = {
 ```
 
 On mutation, the hook marks the keys of both the previous and the resulting row in the transaction's cache overlay (`queueCacheClear` → `markCacheWritten`). They are cleared when the transaction commits, before its held locks are released and before its `db.onCommit` batches; a failed clear makes `db.txn` throw after those batches run ([REDIS.md - cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)).
+
+### Traversal
+
+A row whose change is a change to another cached row names that row in `cacheTraversal` (same file). `Entitlement` traverses to its target: the hook loads the target rows (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheReference` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
 
 ### Wildcard Keys
 
@@ -733,7 +741,9 @@ export const ImmutableFieldsOverrides = {
 
 **Important:** When a new inquiry handler needs to update a FK field (e.g. moving a resource between owners), add an `exclude` override here. The silent-strip behavior would otherwise make the `handleApprove` update a no-op with a 200 response, with no error.
 
-Supports dot notation for JSON paths: `'entitlements.canInvite'`
+Supports dot notation for JSON paths: `'payload.canInvite'` on a `CronJob` locks one key of the JSON column.
+
+`Entitlement` rows are immutable: an update naming `resource`, `actions`, `where`, `lens`, `sourcePath` or either axis is a 422; only `deletedAt` and `sourceDeletedAt` move.
 
 `getImmutableFields(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with materialized columns, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`getRefusedFields`).
 

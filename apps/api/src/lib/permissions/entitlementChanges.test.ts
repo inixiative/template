@@ -7,13 +7,18 @@ import {
   createOrganization,
   createOrganizationUser,
 } from '@template/db/test';
-import { isMemberSelfGrant, wellFormedEntitlements } from '@template/permissions';
+import { isMemberSelfGrant, toEntitlementEntry } from '@template/permissions';
 import { integrationRouter } from '#/modules/integration';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import {
+  changeEntitlements,
+  heldEntitlements,
+  revokeEntitlements,
+} from '#tests/utils/entitlements';
 import { patch } from '#tests/utils/request';
 
 let organization: Organization;
@@ -54,30 +59,35 @@ const spaceIntegrations = (actions: string[]) =>
 const member = async (entitlements?: Entry[]) =>
   (await createOrganizationUser({ role: 'member', entitlements }, { organization })).entity;
 
+const onMember = (target: OrganizationUser) => ({
+  model: 'OrganizationUser' as const,
+  id: target.id,
+});
+
 const stored = async (target: OrganizationUser): Promise<unknown> =>
-  wellFormedEntitlements(
-    (await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } })).entitlements,
-  ).filter((entry) => !isMemberSelfGrant('db:organizationUser', target)(entry));
+  (await heldEntitlements(onMember(target))).filter(
+    (input) => !isMemberSelfGrant('db:organizationUser', target)(toEntitlementEntry(input)),
+  );
 
 const change = async (
   role: Role,
   target: OrganizationUser,
   body: { add?: Entry[]; remove?: Entry[] },
-) => (await writer(role)).fetch(patch(`/api/v1/organizationUser/${target.id}/entitlements`, body));
+) => changeEntitlements(await writer(role), onMember(target), body);
 
-describe("a member's entitlements change only through add and remove (R78)", () => {
+describe("a member's entitlements change only through its entitlement rows: create-many and delete-many (Aron, 2026-11-02)", () => {
   it("an admin cannot change an owner's entitlements, even with what it could grant; another owner can", async () => {
     const target = (await createOrganizationUser({ role: 'owner' }, { organization })).entity;
     const response = await change('admin', target, { add: [ownIntegrations(['read'])] });
     expect(response.status).toBe(403);
     expect(((await response.json()) as { message: string }).message).toBe('Access denied');
-    expect((await change('owner', target, { add: [ownIntegrations(['read'])] })).status).toBe(200);
+    expect((await change('owner', target, { add: [ownIntegrations(['read'])] })).status).toBe(201);
   });
 
   it('an owner adds one, and it is stored', async () => {
     const target = await member();
     expect((await change('owner', target, { add: [spaceIntegrations(['delete'])] })).status).toBe(
-      200,
+      201,
     );
     expect(await stored(target)).toEqual([spaceIntegrations(['delete'])]);
   });
@@ -97,11 +107,11 @@ describe("a member's entitlements change only through add and remove (R78)", () 
     ).toBe(403);
     expect(
       (await change('owner', target, { remove: [spaceIntegrations(['delete'])] })).status,
-    ).toBe(200);
+    ).toBe(204);
     expect(await stored(target)).toEqual([]);
   });
 
-  it('an admin adds and removes what it could grant, in one change', async () => {
+  it('an admin removes one row and grants another it could grant, in a delete-many then a create-many', async () => {
     const target = await member([ownIntegrations(['read'])]);
     expect(
       (
@@ -110,24 +120,38 @@ describe("a member's entitlements change only through add and remove (R78)", () 
           remove: [ownIntegrations(['read'])],
         })
       ).status,
-    ).toBe(200);
+    ).toBe(201);
     expect(await stored(target)).toEqual([ownIntegrations(['manage'])]);
   });
 
-  it('a removal that matches nothing stored is skipped unchecked, even one the writer could not grant', async () => {
+  it('a removal names rows of this holder: an id it does not hold is a 404, and nothing goes', async () => {
     const target = await member([ownIntegrations(['read'])]);
-    expect(
-      (await change('admin', target, { remove: [spaceIntegrations(['manage'])] })).status,
-    ).toBe(200);
+    const other = await member([ownIntegrations(['read'])]);
+    const [othersRow] = await db.entitlement.findMany({
+      where: { targetModel: 'OrganizationUser', targetId: other.id, actions: { has: 'read' } },
+    });
+    const app = await writer('owner');
+    expect((await revokeEntitlements(app, onMember(target), [othersRow!.id])).status).toBe(404);
+    expect(await stored(target)).toEqual([ownIntegrations(['read'])]);
+    expect(await stored(other)).toEqual([ownIntegrations(['read'])]);
+  });
+
+  it('an entry already covered by one held is not stored twice', async () => {
+    const target = await member([ownIntegrations(['read'])]);
+    expect((await change('owner', target, { add: [ownIntegrations(['read'])] })).status).toBe(201);
     expect(await stored(target)).toEqual([ownIntegrations(['read'])]);
   });
 
-  it('a removal that matches nothing stored is filtered out', async () => {
-    const target = await member([ownIntegrations(['read'])]);
-    expect((await change('admin', target, { remove: [ownIntegrations(['manage'])] })).status).toBe(
-      200,
-    );
-    expect(await stored(target)).toEqual([ownIntegrations(['read'])]);
+  it('each entry of a create-many body carries a positive where, checked before the grant', async () => {
+    const target = await member();
+    const negated = {
+      ...ownIntegrations(['read']),
+      where: { field: 'name', operator: 'isEmpty', value: true },
+    };
+    const response = await change('owner', target, { add: [negated] });
+    expect(response.status).toBe(422);
+    expect(JSON.stringify(await response.json())).toContain('isEmpty can hold on a missing value');
+    expect(await stored(target)).toEqual([]);
   });
 
   it('a malformed entry is refused before anything is saved', async () => {
@@ -158,8 +182,8 @@ describe('integrations and tokens change their entitlements the same way', () =>
     });
     const app = await writer('admin');
     const to = (add: Entry[]) =>
-      app.fetch(patch(`/api/v1/integration/${integration.id}/entitlements`, { add }));
-    expect((await to([ownIntegrations(['manage'])])).status).toBe(200);
+      changeEntitlements(app, { model: 'Integration', id: integration.id }, { add });
+    expect((await to([ownIntegrations(['manage'])])).status).toBe(201);
     expect((await to([spaceIntegrations(['manage'])])).status).toBe(403);
   });
 
@@ -177,13 +201,12 @@ describe('integrations and tokens change their entitlements the same way', () =>
       mockOrganizationUsers: [organizationUser],
       mount: [(hono) => hono.route('/api/v1/token', tokenRouter)],
     });
+    const onToken = { model: 'Token' as const, id: token.id };
     const to = (body: { add?: Entry[]; remove?: Entry[] }) =>
-      app.fetch(patch(`/api/v1/token/${token.id}/entitlements`, body));
-    expect((await to({ add: [ownIntegrations(['manage'])] })).status).toBe(200);
+      changeEntitlements(app, onToken, body);
+    expect((await to({ add: [ownIntegrations(['manage'])] })).status).toBe(201);
     expect((await to({ add: [spaceIntegrations(['manage'])] })).status).toBe(403);
-    expect((await to({ remove: [ownIntegrations(['manage'])] })).status).toBe(200);
-    expect((await db.token.findUniqueOrThrow({ where: { id: token.id } })).entitlements).toEqual(
-      [],
-    );
+    expect((await to({ remove: [ownIntegrations(['manage'])] })).status).toBe(204);
+    expect(await heldEntitlements(onToken)).toEqual([]);
   });
 });

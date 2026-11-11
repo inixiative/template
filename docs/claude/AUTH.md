@@ -470,9 +470,9 @@ model Token {
   space            Space?
   spaceUser        SpaceUser?
 
-  // Permissions
-  role         Role @default(member)
-  entitlements Json?
+  // Permissions (entitlements are Entitlement rows targeted at the token: targetEntitlements)
+  role         Role?
+  full         Boolean @default(false)
 
   integrationId String?   // optional link to an Integration
 

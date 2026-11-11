@@ -15,6 +15,9 @@ import {
   skipReviveViolations,
 } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
 
+const tokenStamp = async (id: string) =>
+  (await db.withDeleted(() => db.token.findUniqueOrThrow({ where: { id } }))).deletedAt;
+
 const tombstoneUser = (id: string) =>
   db.user.update({ where: { id }, data: { deletedAt: new Date() } });
 const tombstoneOrg = (id: string) =>
@@ -27,13 +30,14 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
     await cleanupTouchedTables(db);
   });
 
-  it('hard-deletes a tombstoned user’s tokens', async () => {
+  it('tombstones a tombstoned user’s tokens, keeping their rows (Aron, 2026-11-02)', async () => {
     const { entity: user } = await createUser();
     const { entity: token } = await createToken({ ownerModel: 'User' }, { user });
 
     await tombstoneUser(user.id);
 
     expect(await db.token.findUnique({ where: { id: token.id } })).toBeNull();
+    expect(await tokenStamp(token.id)).not.toBeNull();
   });
 
   it('hard-deletes a tombstoned user’s webhook subscriptions', async () => {
@@ -57,7 +61,7 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
     expect(await db.flow.findUnique({ where: { id: flow.id } })).toBeNull();
   });
 
-  it('hard-deletes an organization’s tokens when the organization is tombstoned', async () => {
+  it('tombstones an organization’s tokens when the organization is tombstoned', async () => {
     const { entity: org } = await createOrganization();
     const { entity: token } = await createToken(
       { ownerModel: TokenOwnerModel.Organization },
@@ -66,10 +70,10 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
 
     await tombstoneOrg(org.id);
 
-    expect(await db.token.findUnique({ where: { id: token.id } })).toBeNull();
+    expect(await tokenStamp(token.id)).not.toBeNull();
   });
 
-  it('hard-deletes a tombstoned integration’s tokens and webhook subscriptions', async () => {
+  it('tombstones a tombstoned integration’s tokens and hard-deletes its webhook subscriptions', async () => {
     const { entity: user, context } = await createUser();
     const { entity: integration } = await createIntegration({
       ownerModel: 'User',
@@ -83,7 +87,7 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
 
     await tombstoneIntegration(integration.id);
 
-    expect(await db.token.findUnique({ where: { id: token.id } })).toBeNull();
+    expect(await tokenStamp(token.id)).not.toBeNull();
     expect(await db.webhookSubscription.findUnique({ where: { id: subscription.id } })).toBeNull();
   });
 });
@@ -126,7 +130,7 @@ describe('SKIP_REVIVE validation', () => {
   });
 
   it('refuses a model that is hard-deleted on tombstone', () => {
-    expect(skipReviveViolations(['Token']).join('\n')).toContain(
+    expect(skipReviveViolations(['Session']).join('\n')).toContain(
       'both SKIP_REVIVE and HARD_DELETE_ON_TOMBSTONE',
     );
   });

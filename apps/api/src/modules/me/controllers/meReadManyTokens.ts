@@ -4,6 +4,7 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:auth
  */
+import { includeTargetEntitlements, type Prisma } from '@template/db';
 
 import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
@@ -16,16 +17,28 @@ export const meReadManyTokensController = makeController(
     const user = me(c)!;
     const db = c.get('db');
 
-    const { data, pagination } = await paginate(c, db.token, {
+    const { data, pagination } = await paginate<
+      typeof db.token,
+      Prisma.TokenGetPayload<{
+        include: typeof includeTargetEntitlements & {
+          organization: true;
+          organizationUser: { include: typeof includeTargetEntitlements };
+          space: true;
+          spaceUser: { include: typeof includeTargetEntitlements };
+        };
+        omit: { keyHash: true };
+      }>
+    >(c, db.token, {
       where: {
         userId: user.id,
         ownerModel: { in: ['User', 'OrganizationUser', 'SpaceUser'] },
       },
       include: {
+        ...includeTargetEntitlements,
         organization: true,
-        organizationUser: true,
+        organizationUser: { include: includeTargetEntitlements },
         space: true,
-        spaceUser: true,
+        spaceUser: { include: includeTargetEntitlements },
       },
       omit: { keyHash: true },
     });

@@ -5,14 +5,14 @@
  */
 import type { OpenAPIHono, RouteConfig } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
-import type { AccessorName, Db, Prisma } from '@template/db';
 import type {
-  Organization,
-  OrganizationUser,
-  Space,
-  SpaceUser,
-  User,
-} from '@template/db/generated/client/client';
+  AccessorName,
+  Db,
+  OrganizationUserWithEntitlements,
+  Prisma,
+  SpaceUserWithEntitlements,
+} from '@template/db';
+import type { Organization, Space, User } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions';
 import type { TokenWithRelations } from '#/lib/context/types';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
@@ -23,9 +23,9 @@ export type AppVars = {
   db: Db;
   txn: Prisma.TransactionClient | undefined;
   user: User | null;
-  organizationUsers: OrganizationUser[] | null;
+  organizationUsers: OrganizationUserWithEntitlements[] | null;
   organizations: Organization[] | null;
-  spaceUsers: SpaceUser[] | null;
+  spaceUsers: SpaceUserWithEntitlements[] | null;
   spaces: Space[] | null;
   token: TokenWithRelations | null;
   spoofedBy: User | null;

@@ -26,6 +26,7 @@ import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { heldEntitlements } from '#tests/utils/entitlements';
 import { del, patch, post } from '#tests/utils/request';
 
 type Permissions = { role?: Role | null; full?: boolean; entitlements?: Entry[] | null };
@@ -152,16 +153,16 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       expect(await holds(key!, 'organization', otherOrganization.id, 'read')).toBe(false);
     });
 
-    it('a token that is not full has a role, entitlements or both', async () => {
+    it('a token that is not full, with no role and no entitlements, is minted and holds nothing', async () => {
       const { user, organizationUser } = await asMember('owner');
       const integration = await memberIntegration(organizationUser, { role: 'owner' });
-      expect((await mintOn(integration, user, [organizationUser], {})).status).toBe(422);
-      expect(
-        (await mintOn(integration, user, [organizationUser], { entitlements: [] })).status,
-      ).toBe(422);
-      expect((await mintOn(integration, user, [organizationUser], { role: 'viewer' })).status).toBe(
-        201,
-      );
+      for (const permissions of [{}, { entitlements: [] }]) {
+        const { status, key } = await mintOn(integration, user, [organizationUser], permissions);
+        expect(status).toBe(201);
+        for (const action of ['read', 'operate', 'manage', 'own'])
+          expect(await holds(key!, 'organization', organization.id, action)).toBe(false);
+        expect(await holds(key!, 'integration', integration.id, 'read')).toBe(false);
+      }
     });
 
     it('an entitlement from a record that does not exist is malformed, not forbidden', async () => {
@@ -188,8 +189,8 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       expect(await db.token.findUniqueOrThrow({ where: { id: minted.id } })).toMatchObject({
         full: true,
         role: null,
-        entitlements: null,
       });
+      expect(await heldEntitlements({ model: 'Token', id: minted.id! })).toEqual([]);
     });
   });
 
@@ -579,14 +580,18 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
         post(`/api/v1/organizationUser/${row.id}/integrations`, { name: 'i', ...body }),
       );
 
-    it('an integration that is not full has a role, entitlements or both, like a token (Aron, 2026-10-31)', async () => {
+    it('an integration that is not full, with no role and no entitlements, is created and holds nothing', async () => {
       const { user, organizationUser } = await asMember('member');
-      expect((await create(user, [organizationUser], organizationUser, {})).status).toBe(422);
       expect(
-        (await create(user, [organizationUser], organizationUser, { entitlements: [] })).status,
-      ).toBe(422);
+        (await create(user, [organizationUser], organizationUser, { name: 'empty' })).status,
+      ).toBe(201);
       expect(
-        (await create(user, [organizationUser], organizationUser, { role: 'viewer' })).status,
+        (
+          await create(user, [organizationUser], organizationUser, {
+            name: 'emptyList',
+            entitlements: [],
+          })
+        ).status,
       ).toBe(201);
     });
 

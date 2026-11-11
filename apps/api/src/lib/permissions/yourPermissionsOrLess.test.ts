@@ -105,7 +105,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
   ) =>
     as(writer.user, [writer.organizationUser])(
       entitlements
-        ? patch(`/api/v1/integration/${integration.id}/entitlements`, { add: entitlements })
+        ? post(`/api/v1/integration/${integration.id}/entitlements`, entitlements)
         : patch(`/api/v1/integration/${integration.id}`, permissions),
     );
 
@@ -168,9 +168,9 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect(minted.status).toBe(422);
     });
 
-    it('an integration that goes from a role to none must keep something: entitlements, or it is a 422 (R114)', async () => {
+    it('an integration that goes from a role to none is not refused: with no entitlements it holds nothing', async () => {
       expect((await update(owner, await orgIntegration('viewer'), { role: null })).status).toBe(
-        422,
+        200,
       );
       const entitled = await orgIntegration('viewer', [
         entry('db:space', ['db:space', space.id], ['read']),

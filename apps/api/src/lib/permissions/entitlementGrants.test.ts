@@ -10,7 +10,7 @@ import {
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
 import { entry } from '#tests/utils/entitlementEntry';
-import { patch } from '#tests/utils/request';
+import { patch, post } from '#tests/utils/request';
 
 describe('granting entitlements from the organization (Aron, 2026-10-26)', () => {
   let organization: Organization;
@@ -35,7 +35,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
   const grant = async (by: 'owner' | 'admin' | 'member', granted: Record<string, unknown>) => {
     const { entity: target } = await createOrganizationUser({ role: 'member' }, { organization });
     return (await writer(by)).fetch(
-      patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [granted] }),
+      post(`/api/v1/organizationUser/${target.id}/entitlements`, [granted]),
     );
   };
 
@@ -47,7 +47,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
 
   it("via organization: every Slack integration under the organization; its owner grants deleting them, not managing them, since members' are not the owner's to manage", async () => {
     expect((await grant('owner', integrations('organization', ['delete'], slack))).status).toBe(
-      200,
+      201,
     );
     expect((await grant('owner', integrations('organization', ['manage'], slack))).status).toBe(
       403,
@@ -67,7 +67,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
           }),
         )
       ).status,
-    ).toBe(200);
+    ).toBe(201);
   });
 
   it("a member does not: it cannot change a member's entitlements at all", async () => {
@@ -80,7 +80,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     const theSpaces = { field: 'ownerModel', operator: 'equals', value: 'Space' };
     expect(
       (await grant('owner', integrations('space.organization', ['manage'], theSpaces))).status,
-    ).toBe(200);
+    ).toBe(201);
     expect(
       (await grant('admin', integrations('space.organization', ['manage'], theSpaces))).status,
     ).toBe(403);
@@ -89,7 +89,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
   it("via organizationUser.organization: members' integrations, which the owner reads and deletes but does not manage, and an admin does not touch", async () => {
     expect(
       (await grant('owner', integrations('organizationUser.organization', ['delete']))).status,
-    ).toBe(200);
+    ).toBe(201);
     expect(
       (await grant('owner', integrations('organizationUser.organization', ['manage']))).status,
     ).toBe(403);
@@ -121,7 +121,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       value: elsewhere.id,
     });
     const response = await app.fetch(
-      patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [pinnedElsewhere] }),
+      post(`/api/v1/organizationUser/${target.id}/entitlements`, [pinnedElsewhere]),
     );
     expect(response.status).toBe(403);
     expect(((await response.json()) as { message: string }).message).toBe(
@@ -167,7 +167,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       ['send'],
     );
     const response = await app.fetch(
-      patch(`/api/v1/organizationUser/${writerMember.id}/entitlements`, { add: [sendAtOther] }),
+      post(`/api/v1/organizationUser/${writerMember.id}/entitlements`, [sendAtOther]),
     );
     expect(response.status).toBe(403);
   });
@@ -177,7 +177,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     const { entity: space } = await createSpace({}, { organization });
     const offTree = entry('db:organization', ['db:space', space.id, 'spaces'], ['read']);
     const response = await (await writer('owner')).fetch(
-      patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [offTree] }),
+      post(`/api/v1/organizationUser/${target.id}/entitlements`, [offTree]),
     );
     expect(response.status).toBe(422);
   });
@@ -190,7 +190,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
         ...(where ? { where } : {}),
       };
       return (await writer('admin')).fetch(
-        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [mint] }),
+        post(`/api/v1/organizationUser/${target.id}/entitlements`, [mint]),
       );
     };
 

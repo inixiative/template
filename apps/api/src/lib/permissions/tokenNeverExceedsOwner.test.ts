@@ -7,6 +7,7 @@ import {
   createOrganizationUser,
   createSpace,
 } from '@template/db/test';
+import { toEntitlementInput } from '@template/permissions';
 import { organizationRouter } from '#/modules/organization';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
@@ -24,11 +25,11 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   const onOrganization = (actions: Actions) =>
     actions
       ? [
-          {
+          toEntitlementInput({
             resource: 'db:organization',
             anchor: { resource: 'db:organization', id: organization.id },
             actions,
-          },
+          }),
         ]
       : undefined;
 

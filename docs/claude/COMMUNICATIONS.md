@@ -740,8 +740,8 @@ edges are persisted so that "who references X" is an index and a stale rule is n
 
 - **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
   (source row → target row), false-polymorphic on both ends — `sourceModel` + one typed FK per
-  rule-bearing model (`sourceEmailTemplateId` / `sourceEmailComponentId` / `sourceSegmentId`), `targetModel` + one typed FK per
-  referenceable model (`targetTagId` / `targetOrganizationId` / `targetSpaceId` / `targetSegmentId`), both axes in `PolymorphismRegistry`.
+  rule-bearing model (`sourceEmailTemplateId` / `sourceEmailComponentId` / `sourceSegmentId` / `sourceEntitlementId`), `targetModel` + one typed FK per
+  referenceable model (`targetTagId`, `targetOrganizationId`, `targetSpaceId`, `targetSegmentId`, and one per rebac resource an entitlement's `where` can name), both axes in `PolymorphismRegistry`.
   Real relations on both ends: the source side cascades, the target side is left to `SET NULL` on a
   purge. Edges are written by the sync (create, delete, restamp) and stamped by `ruleReference:target`.
 - **Which models are referenceable is the registry's answer, not any surface's.**
@@ -752,8 +752,9 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
   itself in it and declares its own id sources. Each model-rooted lens of the email lens
   (`emailLens`, `packages/email/src/rules/emailLens.ts`) wraps in `omitForeignKeys` and declares
-  `sources: { id: { label: 'name' } }` as a `mapDefaults` entry for each of
-  `RULE_REFERENCEABLE_MODELS`, so the id answers on every path to the model. The default
+  `sources: { id: { label: 'name' } }` (or `sources: { id: true }` for a model without a
+  `name`) as a `mapDefaults` entry for each of `RULE_REFERENCEABLE_MODELS`, so the id answers on
+  every path to the model. The default
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
   and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the

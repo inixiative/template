@@ -308,13 +308,17 @@ foreignKey: 'webhookSubscriptionId'
 
 Every API test runs with every production hook ([Hooks in tests](#hooks-in-tests)), so a row a test writes passes the same hooks and rules (`apps/api/src/hooks/rules/registry.ts`) as a row production writes:
 
-- **Members:** every `OrganizationUser` and `SpaceUser` holds its self-grant, which the `memberSelfGrant` hook writes on create. Expect it in a member's stored entitlements: `memberSelfGrant('db:organizationUser', member)`.
-- **Integrations and tokens:** a delegate that is not `full` must have a role, entitlements or both. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements. A `full` delegate keeps no role and no entitlements.
+- **Members:** every `OrganizationUser` and `SpaceUser` holds its self-grant as an `Entitlement` row, which the `memberSelfGrant` hook writes after create. Expect it among a member's rows: `toEntitlementInput(memberSelfGrant('db:organizationUser', member))` beside `heldEntitlements`.
+- **Integrations and tokens:** a delegate that is not `full` may have no role and no entitlement rows; it is not refused and holds nothing. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements. A `full` delegate keeps no role, and writing `full` tombstones its rows (`fullDelegate`).
 - **Users:** every user gets an email contact, first in its email list (`userEmailContact`).
 - **Soft-delete models:** `delete` and `deleteMany` are refused (`preventHardDelete`). Remove a row the way production does, with `deletedAt`.
 - **Foreign keys:** an update drops a change to a foreign key, `id` or `createdAt` (`immutableFields`, with its overrides in `apps/api/src/hooks/immutableFields/registry.ts`).
 - **Cron jobs:** a `CronJob` write syncs its BullMQ scheduler, which the Redis mock cannot run. A file that writes one calls `useRealJobsQueue()` from `#tests/utils/realJobsQueue` at its top level: it connects the real queue before each test and tears it down after, and returns a getter for the queue (`jobs().realQueue`, `jobs().schedulerOf(jobId)`).
 - **Audit:** an audited model's create writes its audit row.
+
+### Entitlements in Tests
+
+`createToken`, `createIntegration`, `createOrganizationUser` and `createSpaceUser` take an `entitlements` option: a list of `EntitlementInput` rows, written targeted at the new row (`storeEntitlements`, `packages/db/src/test/factories/entitlementFactory.ts`). Like any factory, it skips the grant check; the writer's own rules are tested through the routes. `createEntitlement` builds a single row. `entry(resource, [anchorResource, id, path?], actions)` (`apps/api/tests/utils/entitlementEntry.ts`) builds an input from the library's words. In `apps/api/tests/utils/entitlements.ts`: `heldEntitlements(target)` reads the rows a target holds as inputs (`asInput`), `entitlementIds(target, inputs)` finds the rows storing them, and `grantEntitlements` / `revokeEntitlements` / `changeEntitlements` call the `POST` / `DELETE` `…/:id/entitlements` routes.
 
 ### Hooks in tests
 

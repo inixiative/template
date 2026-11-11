@@ -20,6 +20,7 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
+import { memberSelfGrant, toEntitlementEntry } from '@template/permissions';
 import { inquiryRouter } from '#/modules/inquiry';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -320,6 +321,28 @@ describe('handler: transferSpace', () => {
       expect(stampOf(dropped.user.id)).not.toBe(await spaceStampOf(dropped.spaceUser.id));
       expect(stampOf(leftOldOrg.user.id)).not.toBe(await spaceStampOf(leftOldOrg.spaceUser.id));
       expect(stampOf(removedEarlier.user.id)).not.toBe(removedEarlierAt.getTime());
+    });
+
+    it('writes each tombstoned target membership its self-grant, tombstoned with the same stamp', async () => {
+      const memberships = await withDeleted(() =>
+        db.organizationUser.findMany({
+          where: {
+            organizationId: targetOrg1.id,
+            userId: { in: [dropped.user.id, removedEarlier.user.id, leftOldOrg.user.id] },
+          },
+        }),
+      );
+      for (const membership of memberships) {
+        const rows = await withDeleted(() =>
+          db.entitlement.findMany({
+            where: { targetModel: 'OrganizationUser', targetId: membership.id },
+          }),
+        );
+        expect(rows.map(toEntitlementEntry)).toEqual([
+          memberSelfGrant('db:organizationUser', membership),
+        ]);
+        expect(rows.map((row) => row.deletedAt)).toEqual([membership.deletedAt]);
+      }
     });
 
     it('a member who had left the target org is removed at the transfer, and rehiring them leaves the space to a manual re-add', async () => {

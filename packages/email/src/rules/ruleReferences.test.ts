@@ -35,6 +35,11 @@ describe('ruleReferences — the rows an email rule names', () => {
     ]);
   });
 
+  it('a recipient named by id is a User reference: every rebac resource is referenceable, for entitlement wheres (2026-11-03)', () => {
+    const rule: Condition = { field: 'recipient.id', operator: 'equals', value: 'user-1' };
+    expect(emailRuleReferences(defaultEmailLens, rule)).toEqual([{ model: 'User', id: 'user-1' }]);
+  });
+
   it('vocabulary values, plain recipient fields, sender and data name no rows', () => {
     const rule: Condition = {
       all: [

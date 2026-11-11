@@ -11,7 +11,12 @@ import {
   type ReferenceScope,
   ruleReferences,
 } from '@template/db';
-import type { EmailComponent, EmailTemplate, Segment } from '@template/db/generated/client/client';
+import type {
+  EmailComponent,
+  EmailTemplate,
+  Entitlement,
+  Segment,
+} from '@template/db/generated/client/client';
 import type { RuleReferenceSourceModel } from '@template/db/generated/client/enums';
 import { rowOwner, templateLens } from '@template/email/render';
 import {
@@ -25,6 +30,7 @@ import {
 } from '@template/email/rules';
 import type { RuleLens, RuleReference } from '@template/shared/rules';
 import { emailLensFor } from '#/lib/email/emailLensFor';
+import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
@@ -67,17 +73,19 @@ const storedAsMjml =
     };
   };
 
-const storedAsCondition: RuleColumnStorage<RuleLens> = (row, lens, columns) => {
-  const tree = columns.includes('conditions')
-    ? (row.conditions as Condition | null | undefined)
-    : undefined;
-  const references = tree ? ruleReferences(lens, tree) : [];
-  return {
-    references,
-    scopes: [{ lens, references }],
-    dynamic: tree ? dynamicRuleReferences(lens, tree) : [],
+const storedAsCondition =
+  (column: string): RuleColumnStorage<RuleLens> =>
+  (row, lens, columns) => {
+    const tree = columns.includes(column)
+      ? (row[column] as Condition | null | undefined)
+      : undefined;
+    const references = tree ? ruleReferences(lens, tree) : [];
+    return {
+      references,
+      scopes: [{ lens, references }],
+      dynamic: tree ? dynamicRuleReferences(lens, tree) : [],
+    };
   };
-};
 
 const declare = <Lens>(declaration: RuleReferenceDeclaration<Lens>): RuleReferenceSurface => ({
   columns: declaration.columns,
@@ -116,7 +124,13 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
     label: (row) => `segment '${row.name ?? row.id}'`,
     lens: (row) =>
       resolvedCustomerRefLens((row as Segment).ownerModel, segmentOwnerId(row as Segment)),
-    storage: storedAsCondition,
+    storage: storedAsCondition('conditions'),
+  }),
+  Entitlement: declare({
+    columns: ['where'],
+    label: (row) => `entitlement '${row.id}'`,
+    lens: (row) => entitlementWhereLens((row as Entitlement).resource),
+    storage: storedAsCondition('where'),
   }),
 };
 

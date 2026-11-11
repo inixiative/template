@@ -4,6 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
+import { includeTargetEntitlements } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
@@ -17,7 +18,7 @@ export const spaceReadManySpaceUsersController = makeController(
 
     const { data, pagination } = await paginate(c, db.spaceUser, {
       where: { spaceId: space.id },
-      include: { user: true },
+      include: { ...includeTargetEntitlements, user: true },
     });
 
     return respond.ok(data, { pagination });

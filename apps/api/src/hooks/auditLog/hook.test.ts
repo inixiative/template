@@ -186,6 +186,7 @@ describe('auditLog hook', () => {
     const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
+      targetEntitlements: [],
       user: tokenOwner,
       organization: null,
       organizationUser: null,
@@ -237,6 +238,7 @@ describe('auditLog hook', () => {
     const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
+      targetEntitlements: [],
       user: tokenOwner,
       organization: null,
       organizationUser: null,
@@ -264,14 +266,14 @@ describe('auditLog hook', () => {
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
     const { id } = (await res.json()) as { id: string };
 
-    await db.token.delete({ where: { id: token.id } });
+    await db.token.update({ where: { id: token.id }, data: { deletedAt: new Date() } });
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
       orderBy: { id: 'desc' },
     });
 
-    expect(log?.actorTokenId).toBeNull();
+    expect(log?.actorTokenId).toBe(token.id);
     expect(log?.actor).toMatchObject({
       model: 'Token',
       record: { id: token.id, name: token.name, keyPrefix: token.keyPrefix },

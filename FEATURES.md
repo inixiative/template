@@ -173,7 +173,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Relationship-Based Control (ReBAC)** - Relation walks over your own rows through the schema (member row, organization, space), with no separate tuple store to sync
 
-- ✅ **Entitlements** - An owner hands on an action on a resource from an anchor, narrowed by a `where`. Every check asks the grantor again, so demoting anyone up the chain stops what they handed on at the next request
+- ✅ **Entitlements** - An owner hands on an action on a resource from an anchor, narrowed by a `where`. Every check asks the grantor again, so demoting anyone up the chain stops what they handed on at the next request. Each entitlement is a row of one `Entitlement` table (anchor as source, holder as target), so "who holds what on this record?" is a query and every grant and revocation is audited on its own
 
 - ✅ **Delegates** - Tokens and integrations act for their owner: `full` (the owner whole, in sync), a role (the owner capped at that role) or entitlements. Setting `full` takes the person-only `delegateFull` action on the owner
 

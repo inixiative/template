@@ -4,14 +4,14 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:tenancy
  */
-import type { Prisma } from '@template/db';
+import { includeTargetEntitlements, type Prisma } from '@template/db';
 import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManyOrganizationsRoute } from '#/modules/me/routes/meReadManyOrganizations';
 
 type OrgWithUsers = Prisma.OrganizationGetPayload<{
-  include: { organizationUsers: true };
+  include: { organizationUsers: { include: typeof includeTargetEntitlements } };
 }>;
 
 export const meReadManyOrganizationsController = makeController(
@@ -30,7 +30,9 @@ export const meReadManyOrganizationsController = makeController(
         where: {
           organizationUsers: { some: { userId: user.id, deletedAt: null } },
         },
-        include: { organizationUsers: { where: { userId: user.id } } },
+        include: {
+          organizationUsers: { where: { userId: user.id }, include: includeTargetEntitlements },
+        },
       },
     );
 

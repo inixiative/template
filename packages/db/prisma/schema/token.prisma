@@ -3,11 +3,15 @@
 // ============================================================================
 
 model Token {
-  inquiriesSent     Inquiry[] @relation("InquirySource")
-  inquiriesReceived Inquiry[] @relation("InquiryTarget")
-  id                String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  inquiriesSent        Inquiry[]       @relation("InquirySource")
+  inquiriesReceived    Inquiry[]       @relation("InquiryTarget")
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetEntitlements   Entitlement[]   @relation("EntitlementTarget")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
 
   name      String
   keyHash   String @unique
@@ -31,9 +35,8 @@ model Token {
   auditLogsAsSubject AuditLog[]        @relation("AuditLogSubjectToken")
 
   // Permissions: capped live by the owner; full passes the owner through whole
-  role         Role?
-  full         Boolean @default(false)
-  entitlements Json?
+  role Role?
+  full Boolean @default(false)
 
   // TODO: Replace with a proper rate limiting system (tiers, quotas, etc.)
   // For now, simple per-second limit. Null = use default (10/s).

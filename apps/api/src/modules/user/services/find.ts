@@ -5,14 +5,16 @@
  * @uses infrastructure:prisma, primitive:caching
  */
 import type { UserWithRelations } from '@template/db';
-import { cache, cacheKey, db, fetchOne } from '@template/db';
-import type {
-  Organization,
-  OrganizationUser,
-  Space,
-  SpaceUser,
-  User,
-} from '@template/db/generated/client/client';
+import {
+  cache,
+  cacheKey,
+  db,
+  fetchOne,
+  includeTargetEntitlements,
+  type OrganizationUserWithEntitlements,
+  type SpaceUserWithEntitlements,
+} from '@template/db';
+import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
 import { compact, uniqBy } from 'lodash-es';
 
@@ -26,17 +28,25 @@ export const findUserByEmail = async (email: string): Promise<User | null> => {
   );
 };
 
-const organizationUsersOf = (userId: string): Promise<OrganizationUser[]> =>
+const organizationUsersOf = (userId: string): Promise<OrganizationUserWithEntitlements[]> =>
   cache(
     cacheKey('user', userId, ['organizationUsers']),
-    () => db.organizationUser.findMany({ where: { userId, organization: { deletedAt: null } } }),
+    () =>
+      db.organizationUser.findMany({
+        where: { userId, organization: { deletedAt: null } },
+        include: includeTargetEntitlements,
+      }),
     USER_CACHE_TTL,
   );
 
-const spaceUsersOf = (userId: string): Promise<SpaceUser[]> =>
+const spaceUsersOf = (userId: string): Promise<SpaceUserWithEntitlements[]> =>
   cache(
     cacheKey('user', userId, ['spaceUsers']),
-    () => db.spaceUser.findMany({ where: { userId, space: { deletedAt: null } } }),
+    () =>
+      db.spaceUser.findMany({
+        where: { userId, space: { deletedAt: null } },
+        include: includeTargetEntitlements,
+      }),
     USER_CACHE_TTL,
   );
 

@@ -11,6 +11,7 @@
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
     "./actorOf": "./src/actorOf.ts",
+    "./entitlementRows": "./src/entitlementRows.ts",
     "./types": "./src/types.ts",
     "./rebac/*": "./src/rebac/*",
     "./roles/*": "./src/roles/*"

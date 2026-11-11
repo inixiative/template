@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import { hydrate, Prisma } from '@template/db';
+import { hydrate, includeTargetEntitlements, Prisma } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { memberRoleWrite } from '@template/permissions/rebac/schemaHelpers';
@@ -39,6 +39,7 @@ export const organizationUserUpdateController = makeController(
 
     const updated = await db.organizationUser.update({
       where: { id: orgUser.id },
+      include: includeTargetEntitlements,
       data: body,
     });
 

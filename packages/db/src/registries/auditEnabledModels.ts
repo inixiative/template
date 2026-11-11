@@ -19,7 +19,9 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
   AuditSubjectModel.EmailComponent,
   AuditSubjectModel.Integration,
   AuditSubjectModel.Segment,
-  // Token, Account, Session excluded — ephemeral auth state, hard-deleted on redact.
+  AuditSubjectModel.Token,
+  AuditSubjectModel.Entitlement,
+  // Account, Session excluded — ephemeral auth state, hard-deleted on redact.
 ];
 
 export const isAuditEnabled = (model: string): model is AuditSubjectModel =>

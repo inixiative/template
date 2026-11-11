@@ -4,14 +4,14 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
-import type { Prisma } from '@template/db';
+import { includeTargetEntitlements, type Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationReadManyUsersRoute } from '#/modules/organization/routes/organizationReadManyUsers';
 
 type UserWithOrgUsers = Prisma.UserGetPayload<{
-  include: { organizationUsers: true };
+  include: { organizationUsers: { include: typeof includeTargetEntitlements } };
 }>;
 
 export const organizationReadManyUsersController = makeController(
@@ -25,7 +25,12 @@ export const organizationReadManyUsersController = makeController(
       db.user,
       {
         where: { organizationUsers: { some: { organizationId: org.id } } },
-        include: { organizationUsers: { where: { organizationId: org.id } } },
+        include: {
+          organizationUsers: {
+            where: { organizationId: org.id },
+            include: includeTargetEntitlements,
+          },
+        },
       },
     );
 
