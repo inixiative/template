@@ -1,6 +1,6 @@
 import '#/config/env';
 import { afterEach } from 'bun:test';
-import { db } from '@template/db';
+import { db, getRedisClient, redisNamespace } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { resetEnvOverrides } from '@template/shared/utils';
 import { SQL } from 'bun';
@@ -8,6 +8,14 @@ import { SQL } from 'bun';
 // Global backstop: clear any env overrides a test registered (setEnvOverride / withEnv)
 // so nothing leaks into the next file in the single-process worker.
 afterEach(resetEnvOverrides);
+
+// Rate-limit windows are keyed by client IP and last a real minute, so they would leak too.
+const clearRateLimitWindows = async () => {
+  const redis = getRedisClient();
+  const keys = await redis.keys(`${redisNamespace.limit}:*`);
+  if (keys.length) await redis.del(...keys);
+};
+afterEach(clearRateLimitWindows);
 
 // Rows too: a test that reaches the database through a fixture has no cleanup of its own to forget.
 afterEach(() => cleanupTouchedTables(db));
