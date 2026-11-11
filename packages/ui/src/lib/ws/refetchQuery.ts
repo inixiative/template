@@ -5,8 +5,8 @@
  * @uses primitive:shared
  */
 import type { WSQueryEvent } from '@template/shared/ws';
-import { useAppStore } from '@template/ui/store';
+import type { MessageContext } from '@template/ui/lib/ws/messageContext';
 
-export const refetchQuery = (event: WSQueryEvent): void => {
-  useAppStore.getState().client?.invalidateQueries({ queryKey: [event.key] });
+export const refetchQuery = (event: WSQueryEvent, { client }: MessageContext): void => {
+  client?.invalidateQueries({ queryKey: [event.key] });
 };
