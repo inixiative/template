@@ -65,7 +65,7 @@ jobs/
 ├── outbox/             # Durable overflow buffer (see Overflow Buffer)
 │   ├── drain/          # Per-worker drain loop + pass
 │   ├── accumulator.ts  # Batched outbox writes (spillToOutbox/flushOutbox)
-│   ├── config.ts       # Caps, linger, TTLs (from the env schema)
+│   ├── config.ts       # Caps, TTLs (from the env schema)
 │   ├── flag.ts         # Redis overflow flag (set-once + TTL/heartbeat)
 │   ├── mutex.ts        # Serialized queue shared by flush + drain
 │   ├── queueDepth.ts   # Cached waiting+active depth probe
