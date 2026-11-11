@@ -1,10 +1,10 @@
 # TEST-002: One way to turn database hooks on and off in tests
 
-**Status**: 🚧 Mostly done (2026-11-09): one pattern, every file moved, documented, CI rule added. The pairing helper is still open.
+**Status**: ✅ Done (2026-11-10): one pattern, every file moved, documented, CI rule added. The pairing helper was dropped.
 **Assignee**: Unassigned
 **Priority**: Medium
 **Created**: 2026-10-31
-**Updated**: 2026-11-09
+**Updated**: 2026-11-10
 
 ---
 
@@ -31,7 +31,7 @@ Found while adding the member self-grant rule (PR #232): the rules hook refuses 
 
 - [x] Pick the pattern: register in `beforeEach` (or `beforeAll`), clear with `clearHookRegistry()` in the matching after hook; `snapshotHookRegistry()` and its restore stay valid. Chosen with random test order (Aron, 2026-11-09: "tests need to register and clean their hooks").
 - [x] Move every test file to it, including `orderedList/tests/setup.ts` (now `setupOrderedListTests()`, called by each file).
-- [ ] A helper that registers a hook together with the hooks production pairs it with (the rules hook with the member self-grant hook).
+- Dropped (2026-11-10): a helper that registers a hook together with the hooks production pairs it with. It would wrap two calls that 24 test files already make side by side, and `docs/claude/TESTING.md` says to make them together.
 - [x] Document it in `docs/claude/TESTING.md` (Hooks in tests).
 - [x] A CI rule: `scripts/ci/rules/test-hooks-cleared.sh` fails a test file that registers hooks and never clears them, or registers at import time. It still allows `unregisterDbHook` for a hook one test turns on and off.
 
@@ -39,7 +39,7 @@ Found while adding the member self-grant rule (PR #232): the rules hook refuses 
 
 ## Open Questions
 
-- Snapshot and restore everywhere, or one global registration in the test preload that matches production?
+- Snapshot and restore everywhere, or one global registration in the test preload that matches production? Answered for now: each file registers and clears its own. Registering every production hook before each test was tried on 2026-11-10: 143 of 2,203 API tests failed, in 35 files (`http` webhook URLs, unit tests with a mocked `db`, cron tests meeting the reconcile lock, factories producing delegates the rules refuse). Doing that is a separate decision.
 
 ---
 
