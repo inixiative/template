@@ -16,6 +16,7 @@ kanban
     FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
     API-003-cursor-pagination-mode
+    API-005-route-permission-tags
     INFRA-006-tenant-isolation-test-matrix
     TEST-002-hook-registration-in-tests
     INFRA-007-data-lifecycle-retention-export-delete
@@ -116,6 +117,7 @@ kanban
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
 - API-002: Admin Ad-Hoc Filtering - Make admin list routes exempt from requiring `searchableFields`; allow arbitrary field filtering for internal/superadmin use
 - [API-003: Cursor Pagination Mode](./API-003-cursor-pagination-mode.md) - Opt-in keyset pagination (signed opaque tokens, no count, write-stable) for feeds/logs/exports; offset stays default
+- [API-005: Route permission tags](./API-005-route-permission-tags.md) - A route declares `permission` / `submodelPermission` and the route template runs the check, as Zealot #2859 does; deferred until after #267 and its backport
 
 **Documentation & API Discovery:**
 - [DOC-001: Scalar API Docs UI](./DOC-001-scalar-api-docs-ui.md) - Interactive API docs via Scalar, mounted on existing OpenAPI spec
