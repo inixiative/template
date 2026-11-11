@@ -13,16 +13,10 @@ import { makeController } from '#/lib/utils/makeController';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 import { Modules } from '#/modules/modules';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 import { get, json, patch } from '#tests/utils/request';
 
-let jobsQueue: Awaited<ReturnType<typeof connectRealJobsQueue>>;
-
-beforeEach(async () => {
-  jobsQueue = await connectRealJobsQueue();
-});
-
-afterEach(() => jobsQueue.close());
+useRealJobsQueue();
 
 // Drives resourceContextMiddleware via the real readRoute template (which
 // auto-attaches the middleware via prepareMiddleware) so the test surface

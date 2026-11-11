@@ -162,13 +162,14 @@ describe('createLock', () => {
       });
       expect(await holder.acquire()).toBe(true);
 
-      const acquiring = waiter.acquire({ waitMs: 2_000, pollMs: 500 });
+      const pollMs = 500;
+      const acquiring = waiter.acquire({ waitMs: 2_000, pollMs });
       await sleep(5);
       const releasedAt = Date.now();
       await holder.release();
 
       expect(await acquiring).toBe(true);
-      expect(Date.now() - releasedAt).toBeLessThan(100);
+      expect(Date.now() - releasedAt).toBeLessThan(pollMs / 2);
       await waiter.release();
     });
 

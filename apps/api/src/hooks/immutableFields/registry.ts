@@ -30,6 +30,10 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
       'sourcePath',
     ],
   },
+  Tag: {
+    ...polymorphismImmutableFields.Tag,
+    refuse: [...(polymorphismImmutableFields.Tag?.refuse ?? []), 'tagCategoryId'],
+  },
   CommunicationLog: {
     ...polymorphismImmutableFields.CommunicationLog,
     exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],

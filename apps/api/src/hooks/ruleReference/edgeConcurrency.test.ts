@@ -22,9 +22,9 @@ const membersOf = (segmentId: string) => ({
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-// The contender's blocked FOR UPDATE is observed in pg_stat_activity before the holder mutates, so
-// the contender has provably finished its unlocked reads against the live row; a fixed delay would
-// only guess at that and make the race flaky in both directions.
+// The contender's blocked FOR NO KEY UPDATE is observed in pg_stat_activity before the holder
+// mutates, so the contender has provably finished its unlocked reads against the live row; a fixed
+// delay would only guess at that and make the race flaky in both directions.
 const waitForBlockedLockOn = async (table: string): Promise<void> => {
   const pattern = `%"${table}"%FOR NO KEY UPDATE%`;
   const deadline = Date.now() + 10_000;

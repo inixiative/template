@@ -4,16 +4,10 @@ import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createCronJob, createUser, getNextSeq } from '@template/db/test';
 import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { createTestApp } from '#tests/createTestApp';
-import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 import { del, get, json, jsonError, patch, post } from '#tests/utils/request';
 
-let jobsQueue: Awaited<ReturnType<typeof connectRealJobsQueue>>;
-
-beforeEach(async () => {
-  jobsQueue = await connectRealJobsQueue();
-});
-
-afterEach(() => jobsQueue.close());
+useRealJobsQueue();
 
 describe('admin/cronJob', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

@@ -313,7 +313,7 @@ Every API test runs with every production hook ([Hooks in tests](#hooks-in-tests
 - **Users:** every user gets an email contact, first in its email list (`userEmailContact`).
 - **Soft-delete models:** `delete` and `deleteMany` are refused (`preventHardDelete`). Remove a row the way production does, with `deletedAt`.
 - **Foreign keys:** an update drops a change to a foreign key, `id` or `createdAt` (`immutableFields`, with its overrides in `apps/api/src/hooks/immutableFields/registry.ts`).
-- **Cron jobs:** a `CronJob` write syncs its BullMQ scheduler, which the Redis mock cannot run. A file that writes one connects the real queue (`connectRealJobsQueue()` from `#tests/utils/realJobsQueue`).
+- **Cron jobs:** a `CronJob` write syncs its BullMQ scheduler, which the Redis mock cannot run. A file that writes one calls `useRealJobsQueue()` from `#tests/utils/realJobsQueue` at its top level: it connects the real queue before each test and tears it down after, and returns a getter for the queue (`jobs().realQueue`, `jobs().schedulerOf(jobId)`).
 - **Audit:** an audited model's create writes its audit row.
 
 ### Entitlements in Tests

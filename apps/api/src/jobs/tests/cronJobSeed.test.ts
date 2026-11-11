@@ -1,29 +1,20 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
 import { cleanupTouchedTables, createCronJob } from '@template/db/test';
 import { isValidJobId } from '#/jobs/validateJobId';
-import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 
 const cronJobSeeds = seeds.find((file) => file.model === 'cronJob')!;
 const systemSeed = cronJobSeeds.records.find((record) => record.handler === 'sweepSegments')!;
 const seedFile: SeedFile = { ...cronJobSeeds, records: [systemSeed] };
 
 describe('cron job seeds sync system rows', () => {
-  let jobs: Awaited<ReturnType<typeof connectRealJobsQueue>>;
-
-  beforeEach(async () => {
-    jobs = await connectRealJobsQueue();
-  });
+  const jobs = useRealJobsQueue();
 
   afterEach(async () => {
-    await jobs.realQueue.obliterate({ force: true });
     await cleanupTouchedTables(db);
-  });
-
-  afterEach(async () => {
-    await jobs.close();
   });
 
   it('gives every seeded row a jobId BullMQ accepts as a scheduler key', () => {
@@ -41,7 +32,7 @@ describe('cron job seeds sync system rows', () => {
       description: 'Legacy description.',
       pattern: '0 4 * * *',
     });
-    expect(await jobs.schedulerOf('sweepSegmentsLegacy')).toEqual({
+    expect(await jobs().schedulerOf('sweepSegmentsLegacy')).toEqual({
       name: 'cleanStaleData',
       pattern: '0 4 * * *',
     });
@@ -55,8 +46,8 @@ describe('cron job seeds sync system rows', () => {
       handler: 'sweepSegments',
       description: systemSeed.description,
     });
-    expect(await jobs.schedulerOf('sweepSegmentsLegacy')).toBeNull();
-    expect(await jobs.schedulerOf('sweepSegments')).toEqual({
+    expect(await jobs().schedulerOf('sweepSegmentsLegacy')).toBeNull();
+    expect(await jobs().schedulerOf('sweepSegments')).toEqual({
       name: 'sweepSegments',
       pattern: '0 4 * * *',
     });
@@ -86,14 +77,14 @@ describe('cron job seeds sync system rows', () => {
       maxAttempts: 7,
       backoffMs: 1234,
     });
-    expect(await jobs.schedulerOf('sweepSegments')).toBeNull();
+    expect(await jobs().schedulerOf('sweepSegments')).toBeNull();
   });
 
   it('inserts a missing row and leaves one scheduler on an unchanged re-seed', async () => {
     await seedTable(seedFile);
     await seedTable(seedFile);
 
-    const schedulers = await jobs.realQueue.getJobSchedulers();
+    const schedulers = await jobs().realQueue.getJobSchedulers();
     expect(schedulers.map(({ key, pattern }) => ({ key, pattern }))).toEqual([
       { key: 'sweepSegments', pattern: systemSeed.pattern as string },
     ]);

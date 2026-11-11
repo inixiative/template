@@ -5,13 +5,13 @@ import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createCronJob, createUser } from '@template/db/test';
 import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { createTestApp } from '#tests/createTestApp';
-import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 import { del, patch, post } from '#tests/utils/request';
 
 const handler = 'sweepSegments';
 const patterns = ['17 3 * * *', '19 5 * * *'] as const;
 
-let jobs: Awaited<ReturnType<typeof connectRealJobsQueue>>;
+const jobs = useRealJobsQueue();
 let fetch: ReturnType<typeof createTestApp>['fetch'];
 
 const newJobId = () => `scheduler-test-${Bun.randomUUIDv7()}`;
@@ -40,7 +40,6 @@ const createScheduledCronJob = async () => {
 };
 
 beforeEach(async () => {
-  jobs = await connectRealJobsQueue();
   const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
   ({ fetch } = createTestApp({
     mockUser: superadmin as User,
@@ -49,11 +48,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await jobs.realQueue.obliterate({ force: true });
-});
-
-afterEach(async () => {
-  await jobs.close();
   await cleanupTouchedTables(db);
 });
 
@@ -62,19 +56,21 @@ describe('admin cron writes keep the job scheduler in step with the row', () => 
     const jobId = newJobId();
     expect((await fetch(post('/api/admin/cronJob', createBody(jobId)))).status).toBe(201);
     const { id } = await db.cronJob.findUniqueOrThrow({ where: { jobId } });
-    expect(await jobs.schedulerOf(jobId)).toEqual({ name: handler, pattern: patterns[0] });
+    expect(await jobs().schedulerOf(jobId)).toEqual({ name: handler, pattern: patterns[0] });
 
     expect((await fetch(patch(`/api/admin/cronJob/${id}`, { pattern: patterns[1] }))).status).toBe(
       200,
     );
-    expect(await jobs.schedulerOf(jobId)).toEqual({ name: handler, pattern: patterns[1] });
+    expect(await jobs().schedulerOf(jobId)).toEqual({ name: handler, pattern: patterns[1] });
 
     expect((await fetch(patch(`/api/admin/cronJob/${id}`, { enabled: false }))).status).toBe(200);
-    expect(await jobs.schedulerOf(jobId)).toBeNull();
+    expect(await jobs().schedulerOf(jobId)).toBeNull();
 
     expect((await fetch(patch(`/api/admin/cronJob/${id}`, { enabled: true }))).status).toBe(200);
-    expect(await jobs.schedulerOf(jobId)).toEqual({ name: handler, pattern: patterns[1] });
-    const delayed = (await jobs.realQueue.getDelayed()).filter((job) => job.repeatJobKey === jobId);
+    expect(await jobs().schedulerOf(jobId)).toEqual({ name: handler, pattern: patterns[1] });
+    const delayed = (await jobs().realQueue.getDelayed()).filter(
+      (job) => job.repeatJobKey === jobId,
+    );
     expect(delayed).toHaveLength(1);
   });
 
@@ -86,8 +82,8 @@ describe('admin cron writes keep the job scheduler in step with the row', () => 
       (await fetch(patch(`/api/admin/cronJob/${cronJob.id}`, { jobId: renamed }))).status,
     ).toBe(200);
 
-    expect(await jobs.schedulerOf(cronJob.jobId)).toBeNull();
-    expect(await jobs.schedulerOf(renamed)).toEqual({ name: handler, pattern: patterns[0] });
+    expect(await jobs().schedulerOf(cronJob.jobId)).toBeNull();
+    expect(await jobs().schedulerOf(renamed)).toEqual({ name: handler, pattern: patterns[0] });
   });
 
   it('creates a disabled row without a scheduler', async () => {
@@ -96,7 +92,7 @@ describe('admin cron writes keep the job scheduler in step with the row', () => 
     const response = await fetch(post('/api/admin/cronJob', createBody(jobId, { enabled: false })));
 
     expect(response.status).toBe(201);
-    expect(await jobs.schedulerOf(jobId)).toBeNull();
+    expect(await jobs().schedulerOf(jobId)).toBeNull();
   });
 
   it('removes the scheduler on delete', async () => {
@@ -104,7 +100,7 @@ describe('admin cron writes keep the job scheduler in step with the row', () => 
 
     expect((await fetch(del(`/api/admin/cronJob/${cronJob.id}`))).status).toBe(204);
 
-    expect(await jobs.schedulerOf(cronJob.jobId)).toBeNull();
+    expect(await jobs().schedulerOf(cronJob.jobId)).toBeNull();
     expect(await db.cronJob.findUnique({ where: { id: cronJob.id } })).toBeNull();
   });
 });
@@ -121,7 +117,7 @@ describe('admin cron writes refuse what BullMQ cannot schedule', () => {
 
     expect(response.status).toBe(422);
     expect(await db.cronJob.findUnique({ where: { jobId } })).toBeNull();
-    expect(await jobs.schedulerOf(jobId)).toBeNull();
+    expect(await jobs().schedulerOf(jobId)).toBeNull();
   });
 
   it.each([
@@ -138,7 +134,10 @@ describe('admin cron writes refuse what BullMQ cannot schedule', () => {
       handler,
       pattern: patterns[0],
     });
-    expect(await jobs.schedulerOf(cronJob.jobId)).toEqual({ name: handler, pattern: patterns[0] });
+    expect(await jobs().schedulerOf(cronJob.jobId)).toEqual({
+      name: handler,
+      pattern: patterns[0],
+    });
   });
 
   it('rejects a create whose jobId BullMQ would read as a legacy repeatable key', async () => {
@@ -158,45 +157,51 @@ describe('admin cron writes refuse what BullMQ cannot schedule', () => {
       (await fetch(patch(`/api/admin/cronJob/${cronJob.id}`, { enabled: false }))).status,
     ).toBe(200);
 
-    expect(await jobs.schedulerOf(cronJob.jobId)).toBeNull();
+    expect(await jobs().schedulerOf(cronJob.jobId)).toBeNull();
   });
 });
 
 describe('a failed scheduler sync is repaired by sending the same request again', () => {
   it('update', async () => {
     const cronJob = await createScheduledCronJob();
-    jobs.upsertJobScheduler.mockImplementationOnce(() =>
+    jobs().upsertJobScheduler.mockImplementationOnce(() =>
       Promise.reject(new Error('Redis unavailable')),
     );
 
     expect(
       (await fetch(patch(`/api/admin/cronJob/${cronJob.id}`, { pattern: patterns[1] }))).status,
     ).toBe(500);
-    expect(await jobs.schedulerOf(cronJob.jobId)).toEqual({ name: handler, pattern: patterns[0] });
+    expect(await jobs().schedulerOf(cronJob.jobId)).toEqual({
+      name: handler,
+      pattern: patterns[0],
+    });
 
     expect(
       (await fetch(patch(`/api/admin/cronJob/${cronJob.id}`, { pattern: patterns[1] }))).status,
     ).toBe(200);
-    expect(await jobs.schedulerOf(cronJob.jobId)).toEqual({ name: handler, pattern: patterns[1] });
+    expect(await jobs().schedulerOf(cronJob.jobId)).toEqual({
+      name: handler,
+      pattern: patterns[1],
+    });
   });
 
   it('create', async () => {
     const jobId = newJobId();
-    jobs.upsertJobScheduler.mockImplementationOnce(() =>
+    jobs().upsertJobScheduler.mockImplementationOnce(() =>
       Promise.reject(new Error('Redis unavailable')),
     );
 
     expect((await fetch(post('/api/admin/cronJob', createBody(jobId)))).status).toBe(500);
-    expect(await jobs.schedulerOf(jobId)).toBeNull();
+    expect(await jobs().schedulerOf(jobId)).toBeNull();
 
     expect((await fetch(post('/api/admin/cronJob', createBody(jobId)))).status).toBe(201);
-    expect(await jobs.schedulerOf(jobId)).toEqual({ name: handler, pattern: patterns[0] });
+    expect(await jobs().schedulerOf(jobId)).toEqual({ name: handler, pattern: patterns[0] });
     expect(await db.cronJob.count({ where: { jobId } })).toBe(1);
   });
 
   it('delete', async () => {
     const cronJob = await createScheduledCronJob();
-    jobs.removeJobScheduler.mockImplementationOnce(() =>
+    jobs().removeJobScheduler.mockImplementationOnce(() =>
       Promise.reject(new Error('Redis unavailable')),
     );
 
@@ -204,7 +209,7 @@ describe('a failed scheduler sync is repaired by sending the same request again'
     expect(await db.cronJob.findUnique({ where: { id: cronJob.id } })).not.toBeNull();
 
     expect((await fetch(del(`/api/admin/cronJob/${cronJob.id}`))).status).toBe(204);
-    expect(await jobs.schedulerOf(cronJob.jobId)).toBeNull();
+    expect(await jobs().schedulerOf(cronJob.jobId)).toBeNull();
     expect(await db.cronJob.findUnique({ where: { id: cronJob.id } })).toBeNull();
   });
 });
