@@ -217,7 +217,11 @@ This is the primitive under both `createLock` (lease renewal) and `watchLane` (u
 
 ## Row Locks (`db.findForUpdate`)
 
-The one way to lock rows. `db.findForUpdate(model, where, { upserting? })` runs `SELECT * ... FOR UPDATE` inside `db.txn()`; `upserting: true` also fences a row that does not exist yet. Full contract: [DATABASE.md § Row Locks and Create-If-Missing](./DATABASE.md#row-locks-and-create-if-missing).
+The one way to lock rows. `db.findForUpdate(model, where, { upserting?, changesKey? })` runs `SELECT * ... FOR NO KEY UPDATE` inside `db.txn()`; `upserting: true` also fences a row that does not exist yet. Full contract: [DATABASE.md § Row Locks and Create-If-Missing](./DATABASE.md#row-locks-and-create-if-missing).
+
+**What the lock holds off.** `FOR NO KEY UPDATE` is the lock a plain `UPDATE` takes. Every other locker, updater and deleter of the row waits. An insert of a row that *references* the locked row does not wait: its foreign-key check takes `KEY SHARE`, which this lock allows. That is deliberate. Under `FOR UPDATE` such an insert waited, so a transaction that inserted children while another walked a chain of locked parents could deadlock, and unrelated creates queued behind any held parent. A transaction that counts or reads a parent's children and relies on none appearing must have every writer of those children take the same lock first; the lock alone no longer keeps them out.
+
+**`changesKey: true`** takes `FOR UPDATE`. Use it only when the transaction will delete the row or change a column other rows reference (the primary key, or a unique column a foreign key targets), as `transferSpace` does to `Space.organizationId`. Postgres would upgrade the lock at that write anyway; taking it up front keeps a child insert from slipping in between and deadlocking the upgrade.
 
 **Exclusive only; there is no shared mode.** No `FOR SHARE`, `FOR KEY SHARE` or `LOCK IN SHARE MODE`, in the primitive or around it. The `no-raw-locks` CI rule fails on raw row-lock SQL anywhere but the primitive, and on a shared lock anywhere ([SCRIPTS.md § CI Rule Scripts](./SCRIPTS.md#ci-rule-scripts)).
 

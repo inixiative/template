@@ -300,7 +300,9 @@ const dbMethods = {
 
   cacheOverlay: (): CacheOverlay | null => store.getStore()?.openTransaction?.cacheOverlay ?? null,
 
-  // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
+  // Raw SELECT * FOR NO KEY UPDATE (the lock an UPDATE takes): other lockers, updaters and deleters of
+  // the row wait, inserts of rows that reference it do not. `changesKey: true` takes FOR UPDATE.
+  // Scalar columns only, no relations/includes; load related data separately.
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
   // the where-key itself (see acquireFindForUpdateLock) and returns the rows it currently names. One
   // field may list values as `{ in: [...] }` to fence a batch of such rows, each under the key a
@@ -347,7 +349,7 @@ const dbMethods = {
     if (options?.upserting)
       await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
     return db.$queryRaw<T[]>(
-      Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
+      Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} ${Prisma.raw(options?.changesKey ? 'FOR UPDATE' : 'FOR NO KEY UPDATE')}`,
     );
   },
 

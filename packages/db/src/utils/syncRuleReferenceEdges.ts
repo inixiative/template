@@ -45,7 +45,7 @@ const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: Target
 const stampOf = (state: TargetState | undefined): number | null =>
   state?.deletedAt ? state.deletedAt.getTime() : null;
 
-// Targets are read FOR UPDATE so an edge is never written unstamped against an uncommitted delete.
+// Targets are locked before the edges are written, so one is never written unstamped against an uncommitted delete.
 export const syncRuleReferenceEdges = async (
   source: RuleReferenceSource,
   references: RuleReference[],

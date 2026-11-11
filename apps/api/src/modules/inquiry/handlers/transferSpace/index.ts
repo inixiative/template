@@ -26,7 +26,7 @@ export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
     const spaceId = inquiry.sourceSpaceId!;
     const organizationId = inquiry.targetOrganizationId!;
 
-    const [space] = await db.findForUpdate<Space>('Space', { id: spaceId });
+    const [space] = await db.findForUpdate<Space>('Space', { id: spaceId }, { changesKey: true });
     const slug = content.slug ?? space!.slug;
     await validateSpaceSlugFree({ organizationId, slug });
 
