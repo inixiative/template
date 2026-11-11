@@ -72,6 +72,24 @@ describe('depth estimate', () => {
     expect(await isOverflowing(JobLane.fast)).toBe(true);
   });
 
+  it('does not probe again on a fast add because the slow lane is full', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+    setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
+    let probes = 0;
+    const estimator = createDepthEstimator(async () => {
+      probes++;
+      return { total: 6, slow: 5, slowDeferred: 0 };
+    }, 60_000);
+
+    await estimator.recordAdd(false);
+    expect(await isOverflowing(JobLane.slow)).toBe(true);
+    await estimator.recordAdd(false);
+    await estimator.recordAdd(false);
+
+    expect(probes).toBe(1);
+    expect(await isOverflowing(JobLane.fast)).toBe(false);
+  });
+
   it('never trips on stale add counts: reaching the cap re-probes first', async () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
     const estimator = createDepthEstimator(async () => depthsOf(4), 60_000);
@@ -190,7 +208,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('superseding spills within one batch collapse to the latest', async () => {
-    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '3'); // hold all three; flush on the 3rd (size trip)
+    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '3'); // the 1st writes at once; the 2nd and 3rd wait and share a batch
     const supRow = (n: number): OutboxRow => ({
       handlerName: 'cleanStaleData',
       jobId: `b-${n}`,
