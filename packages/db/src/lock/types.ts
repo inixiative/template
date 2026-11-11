@@ -33,7 +33,8 @@ export type ClaimOptions = LockTarget & {
 
 export type ClaimResult = { claimed: boolean; holder: string };
 
-// With `waitMs` acquire keeps trying every `pollMs` until it wins or the wait runs out; without
+// With `waitMs` acquire keeps trying until it wins or the wait runs out: first after 1 ms, then
+// doubling up to `pollMs`, so a lock held briefly is taken over within a millisecond or two; without
 // it acquire is one attempt: SET NX, or one fencedSetPrefix for a lock set. `onTimeout` returns the error a timed-out wait should throw, so a
 // caller that must fail loudly does not wrap a boolean in its own if/throw; without it a
 // timed-out wait returns false like a plain contended acquire.
