@@ -17,8 +17,10 @@ export type AfterCommitFn = () => Promise<void> | void;
 export type FinallyFn = () => Promise<void> | void;
 
 // `upserting` fences a where-key whose rows may not exist yet: a Redis lock on it is taken before
-// the SELECT ... FOR UPDATE and dropped when the transaction ends. `waitMs` bounds the wait for it.
-export type FindForUpdateOptions = { upserting?: boolean; waitMs?: number };
+// the row lock and dropped when the transaction ends. `waitMs` bounds the wait for it.
+// `changesKey` is for a transaction that will delete the row or change a column other rows reference:
+// it also holds off inserts of rows that point at the locked row.
+export type FindForUpdateOptions = { upserting?: boolean; waitMs?: number; changesKey?: boolean };
 
 export type ScopeContext = 'api' | 'worker';
 

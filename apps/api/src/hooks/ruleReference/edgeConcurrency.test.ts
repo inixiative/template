@@ -26,7 +26,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 // the contender has provably finished its unlocked reads against the live row; a fixed delay would
 // only guess at that and make the race flaky in both directions.
 const waitForBlockedLockOn = async (table: string): Promise<void> => {
-  const pattern = `%"${table}"%FOR UPDATE%`;
+  const pattern = `%"${table}"%FOR NO KEY UPDATE%`;
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const rows = await db.$queryRaw<{ n: bigint | number }[]>`
