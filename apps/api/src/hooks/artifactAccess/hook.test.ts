@@ -1,20 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createArtifact, createUser } from '@template/db/test';
-import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
+import { createArtifact, createUser } from '@template/db/test';
 
 describe('artifactAccess hook', () => {
   let owner: User;
 
-  beforeAll(async () => {
-    registerArtifactAccessHook();
+  beforeEach(async () => {
     owner = (await createUser()).entity;
-  });
-
-  afterAll(async () => {
-    await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   const folder = async (access?: 'inherit' | 'public' | 'private') =>
