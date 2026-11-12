@@ -132,20 +132,20 @@ Run from repo root or `packages/db`:
 
 ### Schema Changes: Push Before Launch, Migrations After
 
-The cut-over is `launched` in `project.config.ts`, flipped by the init script's Launch step. **Before launch a deployed database is disposable:** schema reaches it by `prisma db push --accept-data-loss`, which drops whatever no longer fits. **After launch nothing may clobber a database:** schema reaches it only through committed migrations, applied by `prisma migrate deploy`, and the push paths close.
+The cut-over is `database.strategy` in `cicd.config.ts` (`schema-push` before launch, `migrations` after), set to `migrations` by the init script's Launch step together with `launched = true` in `project.config.ts`. **Before launch a deployed database is disposable:** schema reaches it by `prisma db push`. **After launch nothing may clobber a database:** schema reaches it only through committed migrations, applied by `prisma migrate deploy`, and the push paths close.
 
-| | Pre-launch (`launched: false`, the default) | Launched |
+| | Pre-launch (`database.strategy: 'schema-push'`, the default) | Launched (`'migrations'`) |
 |---|---|---|
-| Release step (`scripts/db/release.sh`) | `prisma db push --accept-data-loss`, then the non-prime seed | `prisma migrate deploy`, then the non-prime seed |
+| Release step (`scripts/db/release.ts`) | `prisma db push` (no `--accept-data-loss`: a destructive change fails the release), then the seed when `database.seedOnRelease` | `prisma migrate deploy`, then the seed when `database.seedOnRelease` |
 | Changing the schema | edit `prisma/schema/`, `bun run db:generate && bun run db:push` (`db:push:dev` in a worktree) | `bun run db:migrate` creates a migration under `packages/db/prisma/migrations/`; review and commit it |
 | `setup.sh` | pushes and seeds the local database | skips push and seed |
-| Migration files | none | start at `0_init`, created by Launch |
+| Migration files | none (the release refuses to push when migration SQL exists) | start at `0_init`, created by Launch (the release refuses to run without one) |
 
-`scripts/checkLaunched.ts` reads the flag for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and both it and `push-dev.sh` push through `scripts/db/push-local.sh`, which refuses a non-local `DATABASE_URL`. Those databases are throwaway per-worktree Docker containers, so `push-local.sh` carries the owner's consent for Prisma's AI-agent guard and agents can run the tests; `release.sh` never does.
+`scripts/cicd/databaseStrategy.ts` reads the strategy for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and both it and `push-dev.sh` push through `scripts/db/push-local.sh`, which refuses a non-local `DATABASE_URL`. Those databases are throwaway per-worktree Docker containers, so `push-local.sh` carries the owner's consent for Prisma's AI-agent guard and agents can run the tests; the release never does.
 
-**What Launch does** (init → Launch, [#197](https://github.com/inixiative/template/pull/197)): `bun run db:baseline` writes `prisma/migrations/0_init` as the diff from an empty database to `prisma/schema` (once); for prod, and staging when enabled, it checks the deployed database matches `prisma/schema` and otherwise blocks launch ("deploy the current schema there, then launch"); it records `0_init` as applied on each (`prisma migrate resolve --applied 0_init`); then it sets `launched = true`. Commit `prisma/migrations` and `project.config.ts` together.
+**What Launch does** (init → Launch, [#197](https://github.com/inixiative/template/pull/197)): `bun run db:baseline` writes `prisma/migrations/0_init` as the diff from an empty database to `prisma/schema` (once); for prod, and staging when enabled, it checks the deployed database matches `prisma/schema` and otherwise blocks launch ("deploy the current schema there, then launch"); it records `0_init` as applied on each (`prisma migrate resolve --applied 0_init`); then it sets `database.strategy = 'migrations'` in `cicd.config.ts` and `launched = true`. Commit `prisma/migrations`, `cicd.config.ts` and `project.config.ts` together.
 
-**Not built:** nothing invokes `scripts/db/release.sh`. The Railway services the init creates run only `db:generate` at build and start the API/worker, and `scripts/deployment/deploy.sh` is a stub. Until a deploy hook runs it, the release step is run by hand against the target database.
+**Not built:** nothing invokes `scripts/db/release.sh` (which runs `release.ts`). The Railway services the init creates run only `db:generate` at build and start the API/worker, and `scripts/deployment/deploy.sh` is a stub. Until a deploy hook runs it, the release step is run by hand against the target database.
 
 ### Development Workflow
 
