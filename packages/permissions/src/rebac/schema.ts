@@ -110,12 +110,12 @@ export const rebacSchema: RebacSchema = {
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
     'db:featureFlag': { actions: ownerActions() },
     'db:featureFlagVariant': {
-      actions: {
+      actions: chainedStandardActions({
         own: { rel: 'featureFlag', action: 'own' },
         manage: { rel: 'featureFlag', action: 'manage' },
         operate: { rel: 'featureFlag', action: 'operate' },
         read: { rel: 'featureFlag', action: 'read' },
-      },
+      }),
     },
 
     'db:organizationUser': { actions: memberRowActions('organization') },
