@@ -17,13 +17,12 @@ import {
 import type { Entitlement } from '@template/db/generated/client/client';
 import {
   coversEntitlement,
-  type EntitlementEntry,
   entitlementsOf,
   type Permix,
   toEntitlementEntry,
   toEntitlementInput,
 } from '@template/permissions';
-import { partition, uniq } from 'lodash-es';
+import { isEqual, partition, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
@@ -46,12 +45,26 @@ const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
   return holder;
 };
 
+type Granted = Pick<
+  EntitlementInput,
+  'resource' | 'actions' | 'where' | 'sourceModel' | 'sourceId' | 'sourcePath' | 'lens'
+>;
+
+const covers = (holding: Granted, input: Granted) =>
+  (holding.lens == null || isEqual(holding.lens, input.lens ?? null)) &&
+  coversEntitlement(toEntitlementEntry(holding), toEntitlementEntry(input));
+
 // why: rows are immutable, so a held row a new entry covers stays; only the new entries are filtered.
-const uncovered = (held: EntitlementEntry[], added: EntitlementEntry[]): EntitlementEntry[] =>
+const uncovered = (held: Granted[], added: EntitlementInput[]): EntitlementInput[] =>
   added.filter(
-    (entry, index) =>
-      ![...held, ...added.slice(0, index)].some((holding) => coversEntitlement(holding, entry)),
+    (input, index) =>
+      ![...held, ...added.slice(0, index)].some((holding) => covers(holding, input)),
   );
+
+const asStored = (input: EntitlementInput): EntitlementInput => ({
+  ...toEntitlementInput(toEntitlementEntry(input)),
+  ...(input.lens != null ? { lens: input.lens } : {}),
+});
 
 /**
  * The one writer of a target's entitlements: every added entry and every removed row passes the
@@ -93,10 +106,11 @@ export const changeEntitlements = (
         validateEntitlementGrants(writer, anchoredDeleted.map(toEntitlementEntry)),
       );
 
-      const kept = entitlementsOf({
-        targetEntitlements: holder.targetEntitlements.filter((row) => !removedIds.includes(row.id)),
-      });
-      const added = uncovered(kept, addedEntries);
+      const kept = holder.targetEntitlements.filter(
+        (row) =>
+          !removedIds.includes(row.id) && entitlementsOf({ targetEntitlements: [row] }).length > 0,
+      );
+      const added = uncovered(kept, add);
 
       if (removed.length)
         await db.entitlement.updateManyAndReturn({
@@ -106,7 +120,7 @@ export const changeEntitlements = (
       if (added.length)
         await db.entitlement.createManyAndReturn({
           data: toEntitlementCreateData(
-            added.map(toEntitlementInput),
+            added.map(asStored),
             { model: target.model, row: holder },
             anchors,
           ),
