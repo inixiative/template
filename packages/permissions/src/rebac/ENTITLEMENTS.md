@@ -18,7 +18,13 @@ The examples use one cast: user U1, organization O1, space S1 under O1, M1 U1's 
 - **`resource`** is the model the action is checked on. The action is always checked on that record, never asked of the anchor.
 - **`anchor`** is the record the entitlement acts from. `path` names the relations from the entitled record up to the anchor, following the Prisma relation names (`'organization'`, `'space.organization'`, `'user'`). A record anchored at itself has no `path`. Only the anchor's id is fixed: a record that moves inside the anchor stays reached, one that moves out stops.
 - **`where`** is a positive json-rules condition over the record: no negation, `isEmpty`, `notExists`, `if`/`then`/`else`, array or aggregate rule. "No value" is `equals null`. A single row is `where: { field: 'id', … }`, never an `id` beside the anchor.
-- **`actions`** are booleans; a row stores the names of the ones held. Readers prune entries to the well-formed ones, and an entry another one already covers is dropped; the writer skips adding an entry one the holder holds already covers.
+- **`actions`** are booleans; a row stores the names of the ones held. Readers prune entries to the well-formed ones, and an entry another one already covers is dropped; the writer skips adding an entry a held row with the same lens already covers.
+
+## The lens
+
+A stored row may also carry a `lens` (`Entitlement.lens`, a json-rules lens narrowing). It is not part of the entry above and the library never reads it: the check decides what the grant reaches, and the lens shapes what the holder gets from what it reaches. It is one narrowing and one surface at once: it limits the records the holder sees (root `where` filters) and the shape they come back in (picks and omits, to drop sensitive keys). No lens means the resource's full surface.
+
+**One grant holds one lens** (Aron, 2026-11-12). Two rows that are equal but for their lens (same holder, `resource`, anchor and path, `where` and `actions`) never coexist: writing one with a new lens replaces the held row, a soft delete of the old one plus a create, in the same write. No lens and a lens are different lenses, so either replaces the other. A held row covers a new entry (and the new entry is skipped) only when their lenses are the same. Why: two lenses on one grant have no defined meaning; neither their union nor the broader one is right.
 
 ## Writing one
 

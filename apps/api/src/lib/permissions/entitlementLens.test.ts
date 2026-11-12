@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { db, type EntitlementInput } from '@template/db';
+import { db, type EntitlementInput, revive } from '@template/db';
 import {
   cleanupTouchedTables,
   createOrganization,
@@ -12,6 +12,12 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
+type Grant = {
+  actions?: string[];
+  where?: EntitlementInput['where'];
+  lens?: EntitlementInput['lens'];
+};
+
 const scene = async () => {
   const { entity: organization } = await createOrganization();
   const { context } = await createOrganizationUser({ role: 'owner' }, { organization });
@@ -19,37 +25,98 @@ const scene = async () => {
   const writer = await userPermissions(context.user.id);
   if (!writer) throw new Error('no writer');
   const target = { model: 'OrganizationUser' as const, id: member.id };
-  const onOrganization = (lens?: EntitlementInput['lens']): EntitlementInput => ({
+  const onOrganization = ({ actions = ['read'], where, lens }: Grant = {}): EntitlementInput => ({
     resource: 'Organization',
-    actions: ['read'],
+    actions,
     sourceModel: 'Organization',
     sourceId: organization.id,
+    ...(where !== undefined ? { where } : {}),
     ...(lens !== undefined ? { lens } : {}),
   });
-  const lensed = async () =>
+  const write = (...add: EntitlementInput[]) => changeEntitlements(writer, target, { add });
+  const rows = async () =>
     (
-      await db.entitlement.findMany({
-        where: { targetModel: 'OrganizationUser', targetId: member.id },
-      })
-    )
-      .filter((row) => row.resource === 'Organization')
-      .map((row) => row.lens);
-  return { writer, target, onOrganization, lensed };
+      await db.withDeleted(() =>
+        db.entitlement.findMany({
+          where: { targetModel: 'OrganizationUser', targetId: member.id, resource: 'Organization' },
+          orderBy: { createdAt: 'asc' },
+        }),
+      )
+    ).map((row) => ({ actions: row.actions, lens: row.lens, live: row.deletedAt == null }));
+  const live = async () => (await rows()).filter((row) => row.live);
+  return { member, onOrganization, write, rows, live };
 };
 
-describe('an entitlement row keeps its lens', () => {
-  it('stores the lens it was written with, and a different lens on the same grant is its own row', async () => {
-    const { writer, target, onOrganization, lensed } = await scene();
-    await changeEntitlements(writer, target, { add: [onOrganization({ fields: ['name'] })] });
-    await changeEntitlements(writer, target, { add: [onOrganization({ fields: ['slug'] })] });
-    expect(await lensed()).toEqual([{ fields: ['name'] }, { fields: ['slug'] }]);
+describe('one lens per entitlement: an equal entitlement with a new lens replaces the held row (Aron, 2026-11-12)', () => {
+  it('a lens change tombstones the old row and leaves one live row with the new lens', async () => {
+    const { onOrganization, write, rows } = await scene();
+    await write(onOrganization({ lens: { fields: ['name'] } }));
+    await write(onOrganization({ lens: { fields: ['slug'] } }));
+    expect(await rows()).toEqual([
+      { actions: ['read'], lens: { fields: ['name'] }, live: false },
+      { actions: ['read'], lens: { fields: ['slug'] }, live: true },
+    ]);
   });
 
-  it('a held row with no lens covers the same grant with a lens; a lensed row does not cover one without', async () => {
-    const { writer, target, onOrganization, lensed } = await scene();
-    await changeEntitlements(writer, target, { add: [onOrganization({ fields: ['name'] })] });
-    await changeEntitlements(writer, target, { add: [onOrganization()] });
-    await changeEntitlements(writer, target, { add: [onOrganization({ fields: ['slug'] })] });
-    expect(await lensed()).toEqual([{ fields: ['name'] }, null]);
+  it('the same lens again is skipped', async () => {
+    const { onOrganization, write, rows } = await scene();
+    await write(onOrganization({ lens: { fields: ['name'] } }));
+    await write(onOrganization({ lens: { fields: ['name'] } }));
+    expect(await rows()).toEqual([{ actions: ['read'], lens: { fields: ['name'] }, live: true }]);
+  });
+
+  it('no lens to a lens replaces, and a lens to no lens replaces', async () => {
+    const { onOrganization, write, rows } = await scene();
+    await write(onOrganization());
+    await write(onOrganization({ lens: { fields: ['name'] } }));
+    await write(onOrganization());
+    expect(await rows()).toEqual([
+      { actions: ['read'], lens: null, live: false },
+      { actions: ['read'], lens: { fields: ['name'] }, live: false },
+      { actions: ['read'], lens: null, live: true },
+    ]);
+  });
+
+  it('of equal entries in one write, the last is the one written', async () => {
+    const { onOrganization, write, rows } = await scene();
+    await write(
+      onOrganization({ lens: { fields: ['name'] } }),
+      onOrganization({ lens: { fields: ['slug'] } }),
+    );
+    expect(await rows()).toEqual([{ actions: ['read'], lens: { fields: ['slug'] }, live: true }]);
+  });
+
+  it('different actions or a different where are not equal: coverage applies, and only with the same lens', async () => {
+    const { onOrganization, write, live } = await scene();
+    const name = { fields: ['name'] };
+    const named = { field: 'name', operator: 'equals', value: 'Acme' };
+    await write(onOrganization({ actions: ['operate', 'read'], lens: name }));
+    await write(onOrganization({ lens: name }));
+    expect(await live()).toEqual([{ actions: ['operate', 'read'], lens: name, live: true }]);
+
+    await write(onOrganization({ lens: { fields: ['slug'] } }));
+    await write(
+      onOrganization({ actions: ['operate', 'read'], where: named, lens: { fields: ['slug'] } }),
+    );
+    await write(onOrganization({ actions: ['read'], where: named, lens: { fields: ['slug'] } }));
+    expect(await live()).toEqual([
+      { actions: ['operate', 'read'], lens: name, live: true },
+      { actions: ['read'], lens: { fields: ['slug'] }, live: true },
+      { actions: ['operate', 'read'], lens: { fields: ['slug'] }, live: true },
+    ]);
+  });
+
+  it('reviving the holder brings back only the new-lens row; the replaced row stays tombstoned', async () => {
+    const { member, onOrganization, write, rows } = await scene();
+    await write(onOrganization({ lens: { fields: ['name'] } }));
+    await write(onOrganization({ lens: { fields: ['slug'] } }));
+    await db.organizationUser.update({ where: { id: member.id }, data: { deletedAt: new Date() } });
+    expect((await rows()).map((row) => row.live)).toEqual([false, false]);
+
+    await revive(db.organizationUser, { id: member.id });
+    expect(await rows()).toEqual([
+      { actions: ['read'], lens: { fields: ['name'] }, live: false },
+      { actions: ['read'], lens: { fields: ['slug'] }, live: true },
+    ]);
   });
 });
