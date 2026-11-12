@@ -52,7 +52,7 @@ model User {
   segments               Segment[]
   flows                  Flow[]
 
-  featureFlags           FeatureFlag[]
+  featureFlags FeatureFlag[]
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================

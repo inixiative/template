@@ -20,14 +20,15 @@ model FeatureFlag {
 
   subjectModel CustomerModel
   valueType    FeatureFlagValueType
-  sampleOffset Int @default(dbgenerated("floor(random() * 13)::int"))
+  sampleOffset Int                  @default(dbgenerated("floor(random() * 13)::int"))
 
   segmentId String?  @db.VarChar(36)
   /// @permissions(hydrate: false)
   segment   Segment? @relation("FeatureFlagGate", fields: [segmentId], references: [id], onDelete: SetNull)
 
-  variants  FeatureFlagVariant[]
-  auditLogs AuditLog[]
+  variants           FeatureFlagVariant[]
+  auditLogs          AuditLog[]
+  sourceEntitlements Entitlement[]        @relation("EntitlementSource")
 
   @@unique([userId, slug], where: { userId: { not: null }, deletedAt: null })
   @@unique([organizationId, slug], where: { organizationId: { not: null }, deletedAt: null })
@@ -61,7 +62,8 @@ model FeatureFlagVariant {
   valueNumber  Float?
   valueJson    Json?
 
-  auditLogs AuditLog[]
+  auditLogs          AuditLog[]
+  sourceEntitlements Entitlement[] @relation("EntitlementSource")
 
   @@unique([featureFlagId, label], where: { deletedAt: null })
   @@unique([featureFlagId], where: { isDefault: true, deletedAt: null })

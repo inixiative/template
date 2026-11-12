@@ -46,7 +46,7 @@ model Space {
   communicationsSent   CommunicationLog[]    @relation("CommunicationSenderSpace")
   segments             Segment[]
 
-  featureFlags         FeatureFlag[]
+  featureFlags FeatureFlag[]
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================

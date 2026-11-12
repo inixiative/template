@@ -37,7 +37,7 @@ model Organization {
   communicationsSent   CommunicationLog[]    @relation("CommunicationSenderOrganization")
   segments             Segment[]
 
-  featureFlags         FeatureFlag[]
+  featureFlags FeatureFlag[]
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
