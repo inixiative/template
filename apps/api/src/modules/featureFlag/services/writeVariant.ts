@@ -5,7 +5,11 @@
  * @uses infrastructure:prisma, feature:segment, primitive:appEvents
  */
 import { db, type Prisma, polymorphicKeyColumn } from '@template/db';
-import type { FeatureFlag, FeatureFlagVariant, Segment } from '@template/db/generated/client/client';
+import type {
+  FeatureFlag,
+  FeatureFlagVariant,
+  Segment,
+} from '@template/db/generated/client/client';
 import type { SegmentType } from '@template/db/generated/client/enums';
 import { emitAppEvent } from '#/appEvents/emit';
 import { makeError } from '#/lib/errors';
@@ -26,7 +30,11 @@ const ownerColumns = (
 
 const internalName = (flag: FeatureFlag, label: string): string => `${flag.slug}/${label}`;
 
-const createInternal = (flag: FeatureFlag, label: string, data: InternalSegment): Promise<Segment> =>
+const createInternal = (
+  flag: FeatureFlag,
+  label: string,
+  data: InternalSegment,
+): Promise<Segment> =>
   db.segment.create({
     data: {
       ...ownerColumns(flag),
@@ -70,40 +78,62 @@ const audienceFor = async (
   variant: FeatureFlagVariant,
   audience: VariantAudience,
 ): Promise<string | null | undefined> => {
-  const current = variant.segmentId ? await db.segment.findUnique({ where: { id: variant.segmentId } }) : null;
-  if (audience.internalSegment) return (await writeInternal(flag, variant, current, audience.internalSegment)).id;
+  const current = variant.segmentId
+    ? await db.segment.findUnique({ where: { id: variant.segmentId } })
+    : null;
+  if (audience.internalSegment)
+    return (await writeInternal(flag, variant, current, audience.internalSegment)).id;
   return audience.segmentId;
 };
 
 const ownInternal = async (variant: FeatureFlagVariant): Promise<Segment | null> =>
-  variant.segmentId ? db.segment.findFirst({ where: { id: variant.segmentId, featureFlagInternal: true } }) : null;
+  variant.segmentId
+    ? db.segment.findFirst({ where: { id: variant.segmentId, featureFlagInternal: true } })
+    : null;
 
 const memberIdsOf = async (segment: Segment): Promise<string[]> =>
-  (await db.segmentMember.findMany({ where: { segmentId: segment.id } })).map((member) => member.customerRefId);
+  (await db.segmentMember.findMany({ where: { segmentId: segment.id } })).map(
+    (member) => member.customerRefId,
+  );
 
-const detachInternal = async (variant: FeatureFlagVariant, nextSegmentId: string | null | undefined): Promise<void> => {
-  if (!variant.segmentId || nextSegmentId === undefined || nextSegmentId === variant.segmentId) return;
+const detachInternal = async (
+  variant: FeatureFlagVariant,
+  nextSegmentId: string | null | undefined,
+): Promise<void> => {
+  if (!variant.segmentId || nextSegmentId === undefined || nextSegmentId === variant.segmentId)
+    return;
   const current = await ownInternal(variant);
   if (!current) return;
   const customerRefIds = await memberIdsOf(current);
-  const deleted = await db.segment.update({ where: { id: current.id }, data: { deletedAt: new Date() } });
+  const deleted = await db.segment.update({
+    where: { id: current.id },
+    data: { deletedAt: new Date() },
+  });
   await emitAppEvent('segment.deleted', { segment: deleted, customerRefIds });
 };
 
 const assertOneAudience = (audience: VariantAudience): void => {
   if (audience.segmentId != null && audience.internalSegment) {
-    throw makeError({ status: 422, message: 'a variant takes one audience: segmentId or internalSegment' });
+    throw makeError({
+      status: 422,
+      message: 'a variant takes one audience: segmentId or internalSegment',
+    });
   }
 };
 
-export const createVariant = async (flag: FeatureFlag, write: VariantWrite): Promise<FeatureFlagVariant> => {
+export const createVariant = async (
+  flag: FeatureFlag,
+  write: VariantWrite,
+): Promise<FeatureFlagVariant> => {
   const { segmentId, internalSegment, ...columns } = write;
   assertOneAudience({ segmentId, internalSegment });
   if (!columns.isDefault && !segmentId && !internalSegment) {
     throw makeError({ status: 422, message: 'a rule variant names the segment it serves' });
   }
   return db.txn(async () => {
-    const segment = internalSegment ? await createInternal(flag, columns.label ?? '', internalSegment) : null;
+    const segment = internalSegment
+      ? await createInternal(flag, columns.label ?? '', internalSegment)
+      : null;
     const variant = await db.featureFlagVariant.create({
       data: {
         ...columns,
@@ -128,9 +158,15 @@ export const updateVariant = async (
     const nextSegmentId = await audienceFor(flag, next, { segmentId, internalSegment });
     await detachInternal(variant, nextSegmentId);
     if (columns.label !== undefined && columns.label !== variant.label) {
-      const internal = await ownInternal({ ...variant, segmentId: nextSegmentId ?? variant.segmentId });
+      const internal = await ownInternal({
+        ...variant,
+        segmentId: nextSegmentId ?? variant.segmentId,
+      });
       if (internal) {
-        await db.segment.update({ where: { id: internal.id }, data: { name: internalName(flag, next.label) } });
+        await db.segment.update({
+          where: { id: internal.id },
+          data: { name: internalName(flag, next.label) },
+        });
       }
     }
     return db.featureFlagVariant.update({
@@ -149,5 +185,6 @@ export const deleteVariant = async (variant: FeatureFlagVariant): Promise<void> 
   const customerRefIds = internal ? await memberIdsOf(internal) : [];
   const deletedAt = new Date();
   await db.featureFlagVariant.update({ where: { id: variant.id }, data: { deletedAt } });
-  if (internal) await emitAppEvent('segment.deleted', { segment: { ...internal, deletedAt }, customerRefIds });
+  if (internal)
+    await emitAppEvent('segment.deleted', { segment: { ...internal, deletedAt }, customerRefIds });
 };

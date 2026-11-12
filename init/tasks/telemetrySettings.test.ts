@@ -22,7 +22,9 @@ describe('monitoring init settings', () => {
       });
     }
     expect(
-      settings.filter((setting) => /ENDPOINT$/.test(setting.key)).every((setting) => setting.value.length > 0),
+      settings
+        .filter((setting) => /ENDPOINT$/.test(setting.key))
+        .every((setting) => setting.value.length > 0),
     ).toBe(true);
   });
 
@@ -56,26 +58,44 @@ describe('monitoring init settings', () => {
       value: 'https://otlp.nr-data.net/v1/metrics',
     });
     expect(
-      settings.filter((setting) => /ENDPOINT$/.test(setting.key)).every((setting) => setting.value.length > 0),
+      settings
+        .filter((setting) => /ENDPOINT$/.test(setting.key))
+        .every((setting) => setting.value.length > 0),
     ).toBe(true);
     expect(
-      settings.filter((setting) => setting.path !== '/api').every((setting) => !/secret/.test(setting.value)),
+      settings
+        .filter((setting) => setting.path !== '/api')
+        .every((setting) => !/secret/.test(setting.value)),
     ).toBe(true);
-    expect(settings).toContainEqual({ path: '/superadmin', key: 'VITE_OTEL_ENABLED', value: 'true' });
+    expect(settings).toContainEqual({
+      path: '/superadmin',
+      key: 'VITE_OTEL_ENABLED',
+      value: 'true',
+    });
   });
   it('disabling clears all destinations and credentials and disables browser capture', () => {
     const settings = telemetrySettings('tribe', { mode: 'off' });
     expect(
-      settings.filter((setting) => /ENDPOINT|HEADERS/.test(setting.key)).every((setting) => setting.value === ''),
+      settings
+        .filter((setting) => /ENDPOINT|HEADERS/.test(setting.key))
+        .every((setting) => setting.value === ''),
     ).toBe(true);
     expect(
-      settings.filter((setting) => /ENABLED/.test(setting.key)).every((setting) => setting.value === 'false'),
+      settings
+        .filter((setting) => /ENABLED/.test(setting.key))
+        .every((setting) => setting.value === 'false'),
     ).toBe(true);
   });
   it('rejects invalid URLs, headers, and sample ratios before writing secrets', () => {
-    expect(() => telemetrySettings('tribe', { mode: 'otlp', endpoint: 'https://user:secret@host' })).toThrow();
-    expect(() => telemetrySettings('tribe', { mode: 'otlp', endpoint: 'https://host', headers: 'invalid' })).toThrow();
-    expect(() => telemetrySettings('tribe', { mode: 'otlp', endpoint: 'https://host', sampleRatio: '2' })).toThrow();
+    expect(() =>
+      telemetrySettings('tribe', { mode: 'otlp', endpoint: 'https://user:secret@host' }),
+    ).toThrow();
+    expect(() =>
+      telemetrySettings('tribe', { mode: 'otlp', endpoint: 'https://host', headers: 'invalid' }),
+    ).toThrow();
+    expect(() =>
+      telemetrySettings('tribe', { mode: 'otlp', endpoint: 'https://host', sampleRatio: '2' }),
+    ).toThrow();
     expect(() => telemetrySettings('tribe', { mode: 'split', endpoint: 'https://host' })).toThrow();
   });
 });

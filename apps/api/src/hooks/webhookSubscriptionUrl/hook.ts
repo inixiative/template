@@ -15,9 +15,19 @@ export const registerWebhookSubscriptionUrlHook = () => {
     'webhookSubscriptionUrl',
     'WebhookSubscription',
     HookTiming.before,
-    [DbAction.create, DbAction.createManyAndReturn, DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
+    [
+      DbAction.create,
+      DbAction.createManyAndReturn,
+      DbAction.update,
+      DbAction.updateManyAndReturn,
+      DbAction.upsert,
+    ],
     async ({ args }) => {
-      const { data, create, update } = (args ?? {}) as { data?: unknown; create?: unknown; update?: unknown };
+      const { data, create, update } = (args ?? {}) as {
+        data?: unknown;
+        create?: unknown;
+        update?: unknown;
+      };
       for (const payload of [data, create, update].flatMap((d) => castArray(d))) {
         const url = (payload as { url?: unknown } | undefined)?.url;
         if (typeof url === 'string') validateWebhookUrl(url);

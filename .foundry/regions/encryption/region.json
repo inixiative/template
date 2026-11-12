@@ -1,0 +1,54 @@
+{
+  "id": "encryption",
+  "title": "Field encryption and key rotation",
+  "routing": "Is this about encrypting a field at rest or reading it back: encryptField / decryptField, the ENCRYPTED_MODELS registry (envPrefix, buildAAD), the encrypted{Key} / \u2026Metadata / \u2026KeyVersion columns, createEncryption / encryptionService, the keyring env schema (encryptionEnv), rotating keys (rotateEncryptionKeys, the version-guarded update), validateEncryptionVersions, or the Jwks signing keys under field encryption? Where secret values live per environment (Infisical, env files) is `secrets`.",
+  "concepts": ["encryption"],
+  "tokens": 12470,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1807,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 12470
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/ENCRYPTION.md"],
+    "docUnits": [
+      "doc:docs/claude/ENCRYPTION.md#overview",
+      "doc:docs/claude/ENCRYPTION.md#field-scoped-encryption",
+      "doc:docs/claude/ENCRYPTION.md#adding-encrypted-fields",
+      "doc:docs/claude/ENCRYPTION.md#key-rotation",
+      "doc:docs/claude/ENCRYPTION.md#environment-variables",
+      "doc:docs/claude/ENCRYPTION.md#deploy-time-validation",
+      "doc:docs/claude/ENCRYPTION.md#implementation-details",
+      "doc:docs/claude/ENCRYPTION.md#deployment-checklist",
+      "doc:docs/claude/ENCRYPTION.md#faq",
+      "doc:FEATURES.md#encryption-security"
+    ],
+    "catalogClusters": [
+      "authentication-methods",
+      "build-deploy-ci",
+      "data-access-rules",
+      "encryption-key-rotation",
+      "environment-config",
+      "job-definition-and-enqueue",
+      "locks-and-serialization",
+      "naming-vocabulary",
+      "prisma-schema-introspection",
+      "rate-limiting",
+      "route-templates-controllers",
+      "ui-components"
+    ],
+    "codeEntries": 12,
+    "docMembers": 35
+  },
+  "bypassLines": 25,
+  "glossaryTerms": 20
+}

@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, Prisma } from '@template/db';
+import { db, Prisma } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -11,7 +11,7 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 
@@ -20,31 +20,36 @@ describe('segmentConditions hook', () => {
   let organization: Organization;
   let user: User;
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     user = context.user;
     organization = context.organization;
     space = (await createSpace({}, { organization })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('refuses a segment without conditions, whatever its type', async () => {
     for (const type of [SegmentType.static, SegmentType.dynamic]) {
-      await expect(createSegment({ type, conditions: Prisma.DbNull as never }, { space })).rejects.toThrow(
-        'requires conditions',
-      );
+      await expect(
+        createSegment({ ownerModel: 'Space', type, conditions: Prisma.DbNull as never }, { space }),
+      ).rejects.toThrow('requires conditions');
     }
   });
 
   it('refuses conditions outside the segment lens vocabulary', async () => {
     await expect(
       createSegment(
-        { conditions: { field: 'customerUser.platformRole', operator: Operator.equals, value: 'user' } },
+        {
+          ownerModel: 'Space',
+          conditions: {
+            field: 'customerUser.platformRole',
+            operator: Operator.equals,
+            value: 'user',
+          },
+        },
         { space },
       ),
     ).rejects.toThrow('Invalid segment conditions');
@@ -61,15 +66,27 @@ describe('segmentConditions hook', () => {
       createSegment({ ownerModel: ProviderModel.platform, conditions: naming(theirs.id) }, {}),
     ).rejects.toThrow('this platform does not own');
 
-    const { entity: ours } = await createSegment({ ownerModel: ProviderModel.platform, conditions: acmeRule }, {});
-    const { entity } = await createSegment({ ownerModel: ProviderModel.platform, conditions: naming(ours.id) }, {});
+    const { entity: ours } = await createSegment(
+      { ownerModel: ProviderModel.platform, conditions: acmeRule },
+      {},
+    );
+    const { entity } = await createSegment(
+      { ownerModel: ProviderModel.platform, conditions: naming(ours.id) },
+      {},
+    );
     expect(entity.ownerModel).toBe('platform');
   });
 
   it('a rule may not name an internal segment, even the owner’s own', async () => {
-    const { entity: flag } = await createFeatureFlag({ slug: 'custom:x', ownerModel: ProviderModel.Space, space });
-    const { entity: internal } = await createSegment({ conditions: acmeRule, featureFlagInternal: true }, { space });
-    await createFeatureFlagVariant({ segment: internal }, { featureFlag: flag });
+    const { entity: flag } = await createFeatureFlag(
+      { slug: 'custom:x', ownerModel: ProviderModel.Space },
+      { space },
+    );
+    const { entity: internal } = await createSegment(
+      { conditions: acmeRule, featureFlagInternal: true },
+      { space },
+    );
+    await createFeatureFlagVariant({}, { segment: internal, featureFlag: flag });
     const naming = {
       field: 'segmentMembers',
       arrayOperator: 'any',
@@ -80,22 +97,34 @@ describe('segmentConditions hook', () => {
 
   it('accepts a valid rule and writes the normalized tree back', async () => {
     const { entity } = await createSegment(
-      { conditions: { all: [acmeRule, { field: 'customerUser.contacts', arrayOperator: 'any' }] } },
+      {
+        ownerModel: 'Space',
+        conditions: { all: [acmeRule, { field: 'customerUser.contacts', arrayOperator: 'any' }] },
+      },
       { space },
     );
     expect(entity.conditions).toEqual({
-      all: [acmeRule, { field: 'customerUser.contacts', arrayOperator: 'any', condition: { all: [] } }],
+      all: [
+        acmeRule,
+        { field: 'customerUser.contacts', arrayOperator: 'any', condition: { all: [] } },
+      ],
     });
   });
 
   it('refuses an empty arm inside any', async () => {
-    await expect(createSegment({ conditions: { any: [acmeRule, { all: [] }] } }, { space })).rejects.toThrow(
-      'matches every row',
-    );
+    await expect(
+      createSegment(
+        { ownerModel: 'Space', conditions: { any: [acmeRule, { all: [] }] } },
+        { space },
+      ),
+    ).rejects.toThrow('matches every row');
   });
 
   it('refuses a segment that references its own membership', async () => {
-    const { entity } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
     await expect(
       db.segment.update({
         where: { id: entity.id },
@@ -114,6 +143,7 @@ describe('segmentConditions hook', () => {
     await expect(
       createSegment(
         {
+          ownerModel: 'Space',
           conditions: {
             field: 'segmentMembers',
             arrayOperator: 'any',
@@ -125,28 +155,63 @@ describe('segmentConditions hook', () => {
     ).rejects.toThrow('Invalid segment conditions');
   });
 
+  it('refuses a rule naming a segment by a value read at evaluation: no save can check which rows it names', async () => {
+    await expect(
+      createSegment(
+        {
+          ownerModel: 'Space',
+          conditions: {
+            field: 'segmentMembers',
+            arrayOperator: 'any',
+            condition: { field: 'segment.id', operator: Operator.startsWith, value: '0' },
+          },
+        },
+        { space },
+      ),
+    ).rejects.toThrow('names a Segment by a value read at evaluation');
+  });
+
   it('refuses a rule naming a segment that does not exist or belongs to another owner', async () => {
     const membersOf = (id: string) => ({
       field: 'segmentMembers',
       arrayOperator: 'any',
       condition: { field: 'segment.id', operator: Operator.equals, value: id },
     });
-    await expect(
-      createSegment({ conditions: membersOf('00000000-0000-7000-8000-00000000dead') }, { space }),
-    ).rejects.toThrow('does not own');
+    const absent = '00000000-0000-7000-8000-00000000dead';
+    expect(
+      await deadReferencesOf(
+        createSegment({ ownerModel: 'Space', conditions: membersOf(absent) }, { space }),
+      ),
+    ).toEqual([{ model: 'Segment', id: absent, state: 'missing' }]);
 
     const { context } = await createOrganizationUser();
     const elsewhere = (await createSpace({}, { organization: context.organization })).entity;
-    const { entity: foreign } = await createSegment({ conditions: acmeRule }, { space: elsewhere });
-    await expect(createSegment({ conditions: membersOf(foreign.id) }, { space })).rejects.toThrow('does not own');
+    const { entity: foreign } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space: elsewhere },
+    );
+    expect(
+      await deadReferencesOf(
+        createSegment({ ownerModel: 'Space', conditions: membersOf(foreign.id) }, { space }),
+      ),
+    ).toEqual([{ model: 'Segment', id: foreign.id, state: 'missing' }]);
 
-    const { entity: own } = await createSegment({ conditions: acmeRule }, { space });
-    const { entity } = await createSegment({ conditions: membersOf(own.id) }, { space });
+    const { entity: own } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
+    const { entity } = await createSegment(
+      { ownerModel: 'Space', conditions: membersOf(own.id) },
+      { space },
+    );
     expect(entity.id).toBeTruthy();
   });
 
   it('validates a user-owned and an organization-owned segment against their own customer lens', async () => {
-    const mine = await createSegment({ ownerModel: ProviderModel.User, conditions: acmeRule }, { user });
+    const mine = await createSegment(
+      { ownerModel: ProviderModel.User, conditions: acmeRule },
+      { user },
+    );
     expect(mine.entity.userId).toBe(user.id);
     const ours = await createSegment(
       { ownerModel: ProviderModel.Organization, conditions: acmeRule },
@@ -156,11 +221,17 @@ describe('segmentConditions hook', () => {
   });
 
   it('refuses clearing conditions on update and leaves an untouched rule alone', async () => {
-    const { entity } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
     await expect(
       db.segment.update({ where: { id: entity.id }, data: { conditions: Prisma.DbNull as never } }),
     ).rejects.toThrow('requires conditions');
-    const renamed = await db.segment.update({ where: { id: entity.id }, data: { type: SegmentType.dynamic } });
+    const renamed = await db.segment.update({
+      where: { id: entity.id },
+      data: { type: SegmentType.dynamic },
+    });
     expect(renamed.conditions).toEqual(acmeRule);
   });
 });

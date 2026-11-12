@@ -22,6 +22,7 @@ export const cliVersion = async (cmd: string, opts: CliVersionOptions = {}): Pro
   const { stdout, stderr } = await execAsync(`${cmd} ${command}`);
   const output = `${stdout}\n${stderr}`;
   const match = output.match(regex);
-  if (!match) throw new Error(`cliVersion("${cmd} ${command}"): no version match in "${output.trim()}"`);
+  if (!match)
+    throw new Error(`cliVersion("${cmd} ${command}"): no version match in "${output.trim()}"`);
   return match[1];
 };

@@ -12,6 +12,7 @@ export {
   DEFAULT_RECIPIENT_NARROWING,
   declaredFields,
   defaultEmailLens,
+  defaultRecipientNarrowing,
   EMAIL_DATA_MODEL,
   EMAIL_MAP_NAME,
   EMAIL_SURFACE_ROOT,
@@ -21,6 +22,8 @@ export {
   type EmailRuleDecoration,
   type EmailRuleFacet,
   type EmailSlotLenses,
+  type EmailSurface,
+  emailDynamicRuleReferences,
   emailLens,
   emailRuleDecoration,
   emailRuleReferences,
@@ -28,8 +31,8 @@ export {
   emailRuleVocabulary,
   emailRuleVocabularyIssues,
   emailSlotLenses,
-  emailSourceQueries,
   emailSurface,
+  emailSurfaceSourceValues,
   evaluateScopedRule,
   fieldsLens,
   narrowEmailLens,
@@ -49,9 +52,13 @@ export {
   type RailProvidedSystemField,
 } from './railProvidedSystemFields';
 export { type BindingChain, resolveBindingPath } from './resolveBindingPath';
-export { contentRuleReferences } from './ruleReferences';
+export { componentRuleContents, type RuleContents, templateRuleContents } from './ruleContents';
+export {
+  contentDynamicRuleReferences,
+  contentReferenceScopes,
+  contentRuleReferences,
+} from './ruleReferences';
 export { type LoopFrame, loopFrames, narrowToElements, scopedRule } from './scopedRule';
 export { type EmailLensOwner, scopeEmailLens } from './scopeEmailLens';
-export { syncRuleReferences } from './syncRuleReferences';
 export { type ConditionTreeChild, walkConditionTree } from './walkConditionTree';
 export { type LensPathWalk, lensPathFields, walkLensPath } from './walkLensPath';

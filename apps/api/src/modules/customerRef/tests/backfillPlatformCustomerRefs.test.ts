@@ -22,8 +22,8 @@ describe('backfillPlatformCustomerRefs', () => {
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'platform',
-      customerUser: tombstoned,
       deletedAt: new Date(),
+      customerUserId: tombstoned.id,
     });
 
     const first = await backfillPlatformCustomerRefs();

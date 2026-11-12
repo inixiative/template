@@ -22,10 +22,16 @@ const NESTED_WRITE_OPS = new Set([
 
 // Nested relation writes run in the parent's SQL and skip the related model's hooks; connect/disconnect/set are pure links and allowed.
 export const assertNoNestedWrites = (model: Prisma.ModelName, args: unknown): void => {
-  const fields = prismaMap.models[model]?.fields as Record<string, { kind: string; type: string }> | undefined;
+  const fields = prismaMap.models[model]?.fields as
+    | Record<string, { kind: string; type: string }>
+    | undefined;
   if (!fields) return;
 
-  const { data, create, update } = (args ?? {}) as { data?: unknown; create?: unknown; update?: unknown };
+  const { data, create, update } = (args ?? {}) as {
+    data?: unknown;
+    create?: unknown;
+    update?: unknown;
+  };
   for (const payload of [data, create, update].flatMap((d) => castArray(d))) {
     if (!payload || typeof payload !== 'object') continue;
     for (const [field, value] of Object.entries(payload)) {

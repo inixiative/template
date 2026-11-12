@@ -5,11 +5,21 @@
  * @uses feature:customer
  */
 import { z } from '@hono/zod-openapi';
-import { SegmentMemberScalarSchema, SegmentScalarInputSchema, SegmentScalarSchema } from '@template/db';
+import {
+  RuleReferenceScalarSchema,
+  SegmentMemberScalarSchema,
+  SegmentScalarInputSchema,
+  SegmentScalarSchema,
+} from '@template/db';
 import { customerRefAsProviderSchema } from '#/modules/customerRef/schemas/customerRefSchemas';
 import { selectSegmentForCustomer } from '#/modules/segment/queries/segmentIncludes';
 
-export const SEGMENT_CREATE_IMMUTABLE_FIELDS = ['ownerModel', 'userId', 'organizationId', 'spaceId'] as const;
+export const SEGMENT_CREATE_IMMUTABLE_FIELDS = [
+  'ownerModel',
+  'userId',
+  'organizationId',
+  'spaceId',
+] as const;
 
 export const segmentCreateBodySchema = SegmentScalarInputSchema.omit({
   ownerModel: true,
@@ -18,6 +28,10 @@ export const segmentCreateBodySchema = SegmentScalarInputSchema.omit({
   spaceId: true,
   featureFlagInternal: true,
   deletedAt: true,
+}).extend({
+  conditions: z
+    .unknown()
+    .describe('A json-rules condition over CustomerRef; see GET /api/v1/segment/info.'),
 });
 
 export const segmentUpdateBodySchema = segmentCreateBodySchema.partial();
@@ -32,7 +46,16 @@ export const ruleIssueSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const segmentReadResponseSchema = SegmentScalarSchema.extend({ ruleIssues: z.array(ruleIssueSchema) });
+export const segmentRuleReferenceSchema = RuleReferenceScalarSchema.pick({
+  targetModel: true,
+  targetId: true,
+  targetDeletedAt: true,
+});
+
+export const segmentReadResponseSchema = SegmentScalarSchema.extend({
+  ruleIssues: z.array(ruleIssueSchema),
+  ruleReferences: z.array(segmentRuleReferenceSchema),
+});
 
 export const segmentMemberWithCustomerSchema = SegmentMemberScalarSchema.extend({
   customerRef: customerRefAsProviderSchema,

@@ -1,14 +1,23 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
-import { ContactType, TagResource, WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db, unregisterDbHook } from '@template/db';
+import {
+  ContactType,
+  TagOwnerModel,
+  TagResource,
+  WebhookModel,
+  WebhookOwnerModel,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createContact,
   createCustomerRef,
   createEmailComponent,
   createEmailTemplate,
+  createIntegration,
   createOrganization,
+  createProject,
   createSpace,
+  createSpaceUser,
   createTag,
   createTagAttachment,
   createTagCategory,
@@ -16,25 +25,12 @@ import {
   createWebhookSubscription,
   getNextSeq,
 } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
-
-// Register only the hooks that affect data shape during create — the rules
-// hook (polymorphism), contactRules (computes valueKey), tagOwnerCategory
-// (tag↔category check). We avoid registerHooks() because it also wires up
-// the outbound webhook hook which signs payloads with PEM keys not present
-// in the test env.
-registerRulesHook();
-registerContactRulesHook();
-registerTagOwnerCategoryHook();
 
 const seq = (prefix: string) => `${prefix}-${getNextSeq()}`;
 
 describe('partial unique constraints', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   describe('Contact: per-(userId, type, valueKey)', () => {
@@ -42,12 +38,20 @@ describe('partial unique constraints', () => {
       const { entity: user } = await createUser();
       const handle = seq('shared');
       await createContact(
-        { ownerModel: 'User', type: ContactType.linkedin, value: { classifier: 'personal', handle } },
+        {
+          ownerModel: 'User',
+          type: ContactType.linkedin,
+          value: { classifier: 'personal', handle },
+        },
         { user },
       );
       const dupe = async () =>
         createContact(
-          { ownerModel: 'User', type: ContactType.linkedin, value: { classifier: 'personal', handle } },
+          {
+            ownerModel: 'User',
+            type: ContactType.linkedin,
+            value: { classifier: 'personal', handle },
+          },
           { user },
         );
       await expect(dupe()).rejects.toThrow();
@@ -58,11 +62,19 @@ describe('partial unique constraints', () => {
       const { entity: b } = await createUser();
       const handle = seq('cross-user');
       await createContact(
-        { ownerModel: 'User', type: ContactType.linkedin, value: { classifier: 'personal', handle } },
+        {
+          ownerModel: 'User',
+          type: ContactType.linkedin,
+          value: { classifier: 'personal', handle },
+        },
         { user: a },
       );
       const second = await createContact(
-        { ownerModel: 'User', type: ContactType.linkedin, value: { classifier: 'personal', handle } },
+        {
+          ownerModel: 'User',
+          type: ContactType.linkedin,
+          value: { classifier: 'personal', handle },
+        },
         { user: b },
       );
       expect(second.entity.userId).toBe(b.id);
@@ -72,13 +84,14 @@ describe('partial unique constraints', () => {
   describe('TagAttachment: per-(userId, tagId)', () => {
     it('blocks two attachments of the same tag to the same user', async () => {
       const { entity: user } = await createUser();
-      const cat = await createTagCategory({ ownerModel: TagResource.platform });
+      const cat = await createTagCategory({ ownerModel: TagOwnerModel.platform });
       const tag = await createTag(
-        { name: seq('attach'), ownerModel: TagResource.platform, resources: [] },
+        { name: seq('attach'), ownerModel: TagOwnerModel.platform, resources: [] },
         { tagCategory: cat.entity },
       );
       await createTagAttachment({ resourceModel: TagResource.User }, { user, tag: tag.entity });
-      const dupe = async () => createTagAttachment({ resourceModel: TagResource.User }, { user, tag: tag.entity });
+      const dupe = async () =>
+        createTagAttachment({ resourceModel: TagResource.User }, { user, tag: tag.entity });
       await expect(dupe()).rejects.toThrow();
     });
   });
@@ -87,15 +100,16 @@ describe('partial unique constraints', () => {
     it('blocks two user-scoped categories with the same name on the same user', async () => {
       const { entity: user } = await createUser();
       const name = seq('audience');
-      await createTagCategory({ name, ownerModel: TagResource.User }, { user });
-      const dupe = async () => createTagCategory({ name, ownerModel: TagResource.User }, { user });
+      await createTagCategory({ name, ownerModel: TagOwnerModel.User }, { user });
+      const dupe = async () =>
+        createTagCategory({ name, ownerModel: TagOwnerModel.User }, { user });
       await expect(dupe()).rejects.toThrow();
     });
 
     it('blocks two platform categories with the same name', async () => {
       const name = seq('global-cat');
-      await createTagCategory({ name, ownerModel: TagResource.platform });
-      const dupe = async () => createTagCategory({ name, ownerModel: TagResource.platform });
+      await createTagCategory({ name, ownerModel: TagOwnerModel.platform });
+      const dupe = async () => createTagCategory({ name, ownerModel: TagOwnerModel.platform });
       await expect(dupe()).rejects.toThrow();
     });
 
@@ -103,8 +117,8 @@ describe('partial unique constraints', () => {
       const { entity: a } = await createUser();
       const { entity: b } = await createUser();
       const name = seq('audience-cross');
-      await createTagCategory({ name, ownerModel: TagResource.User }, { user: a });
-      const second = await createTagCategory({ name, ownerModel: TagResource.User }, { user: b });
+      await createTagCategory({ name, ownerModel: TagOwnerModel.User }, { user: a });
+      const second = await createTagCategory({ name, ownerModel: TagOwnerModel.User }, { user: b });
       expect(second.entity.userId).toBe(b.id);
     });
   });
@@ -112,11 +126,17 @@ describe('partial unique constraints', () => {
   describe('Tag: per-(userId, tagCategoryId, name)', () => {
     it('blocks two tags with the same name in the same category for the same user', async () => {
       const { entity: user } = await createUser();
-      const cat = await createTagCategory({ ownerModel: TagResource.User }, { user });
+      const cat = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
       const name = seq('dup-tag');
-      await createTag({ name, ownerModel: TagResource.User, resources: [] }, { user, tagCategory: cat.entity });
+      await createTag(
+        { name, ownerModel: TagOwnerModel.User, resources: [] },
+        { user, tagCategory: cat.entity },
+      );
       const dupe = async () =>
-        createTag({ name, ownerModel: TagResource.User, resources: [] }, { user, tagCategory: cat.entity });
+        createTag(
+          { name, ownerModel: TagOwnerModel.User, resources: [] },
+          { user, tagCategory: cat.entity },
+        );
       await expect(dupe()).rejects.toThrow();
     });
   });
@@ -126,22 +146,19 @@ describe('partial unique constraints', () => {
       const { entity: customer } = await createUser();
       const { entity: org } = await createOrganization();
       const { entity: providerSpace } = await createSpace({}, { organization: org });
-      // Pass relations in overrides (keyed by relation name) — context (ctx)
-      // is keyed by depAccessor (lowerFirst(ModelName)), so it can't
-      // disambiguate two FKs to the same model (e.g. customerSpace +
-      // providerSpace both map to ctx.space).
+      // Context is keyed by model accessor, so it can't disambiguate customerSpace from providerSpace; pass FKs.
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: customer,
-        providerSpace,
+        customerUserId: customer.id,
+        providerSpaceId: providerSpace.id,
       });
       const dupe = async () =>
         createCustomerRef({
           customerModel: 'User',
           providerModel: 'Space',
-          customerUser: customer,
-          providerSpace,
+          customerUserId: customer.id,
+          providerSpaceId: providerSpace.id,
         });
       await expect(dupe()).rejects.toThrow();
     });
@@ -164,6 +181,126 @@ describe('partial unique constraints', () => {
     });
   });
 
+  describe('Project: one partial unique per ownerModel', () => {
+    it('allows the same name across all five owner kinds', async () => {
+      const { context } = await createSpaceUser();
+      const { user, organization, space } = context;
+      const name = seq('project');
+      await createProject({ name, ownerModel: 'User', userId: user.id });
+      await createProject({
+        name,
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: user.id,
+      });
+      await createProject({ name, ownerModel: 'Organization', organizationId: organization.id });
+      await createProject({
+        name,
+        ownerModel: 'Space',
+        organizationId: organization.id,
+        spaceId: space.id,
+      });
+      await createProject({
+        name,
+        ownerModel: 'SpaceUser',
+        organizationId: organization.id,
+        spaceId: space.id,
+        userId: user.id,
+      });
+      expect(await db.project.count({ where: { name } })).toBe(5);
+    });
+
+    it('blocks two projects with the same name on the same space member', async () => {
+      const { context } = await createSpaceUser();
+      const { user, organization, space } = context;
+      const name = seq('project-dupe');
+      const row = {
+        name,
+        ownerModel: 'SpaceUser' as const,
+        organizationId: organization.id,
+        spaceId: space.id,
+        userId: user.id,
+      };
+      await createProject(row);
+      await expect(createProject(row)).rejects.toThrow();
+    });
+
+    it('allows the same name again once the first is soft-deleted', async () => {
+      const { entity: user } = await createUser();
+      const name = seq('project-revived');
+      const first = await createProject({ name, ownerModel: 'User', userId: user.id });
+      await db.project.update({ where: { id: first.entity.id }, data: { deletedAt: new Date() } });
+      const second = await createProject({ name, ownerModel: 'User', userId: user.id });
+      expect(second.entity.deletedAt).toBeNull();
+    });
+  });
+
+  describe('Integration: one partial unique per ownerModel', () => {
+    it('allows the same name across all five owner kinds', async () => {
+      const { context } = await createSpaceUser();
+      const { user, organization, space } = context;
+      const name = seq('integration');
+      await createIntegration({ name, ownerModel: 'User', userId: user.id });
+      await createIntegration({
+        name,
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: user.id,
+      });
+      await createIntegration({
+        name,
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+      });
+      await createIntegration({
+        name,
+        ownerModel: 'Space',
+        organizationId: organization.id,
+        spaceId: space.id,
+      });
+      await createIntegration({
+        name,
+        ownerModel: 'SpaceUser',
+        organizationId: organization.id,
+        spaceId: space.id,
+        userId: user.id,
+      });
+      expect(await db.integration.count({ where: { name } })).toBe(5);
+    });
+
+    it('blocks two integrations with the same name on the same organization member', async () => {
+      const { context } = await createSpaceUser();
+      const { user, organization } = context;
+      const name = seq('integration-dupe');
+      await createIntegration({
+        name,
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: user.id,
+      });
+      const dupe = async () =>
+        createIntegration({
+          name,
+          ownerModel: 'OrganizationUser',
+          organizationId: organization.id,
+          userId: user.id,
+        });
+      await expect(dupe()).rejects.toThrow();
+    });
+
+    it('allows the same name again once the first is soft-deleted', async () => {
+      const { entity: user } = await createUser();
+      const name = seq('integration-revived');
+      const first = await createIntegration({ name, ownerModel: 'User', userId: user.id });
+      await db.integration.update({
+        where: { id: first.entity.id },
+        data: { deletedAt: new Date() },
+      });
+      const second = await createIntegration({ name, ownerModel: 'User', userId: user.id });
+      expect(second.entity.deletedAt).toBeNull();
+    });
+  });
+
   describe('EmailComponent: platform / org / space partials', () => {
     it('blocks two components with the same (slug, locale) within ownerModel=default', async () => {
       const slug = seq('comp-default');
@@ -183,7 +320,10 @@ describe('partial unique constraints', () => {
       const { entity: org1 } = await createOrganization();
       const { entity: org2 } = await createOrganization();
       const slug = seq('comp-cross-org');
-      await createEmailComponent({ slug, locale: 'en', ownerModel: 'Organization' }, { organization: org1 });
+      await createEmailComponent(
+        { slug, locale: 'en', ownerModel: 'Organization' },
+        { organization: org1 },
+      );
       const second = await createEmailComponent(
         { slug, locale: 'en', ownerModel: 'Organization' },
         { organization: org2 },
@@ -201,6 +341,8 @@ describe('partial unique constraints', () => {
     });
 
     it("allows the same (slug, locale) across 'default' and 'admin'", async () => {
+      // The index allows it; the slug reservation hook is the one that refuses.
+      unregisterDbHook('emailTemplateSlugReservation');
       const slug = seq('tpl-cross-platform');
       await createEmailTemplate({ slug, locale: 'en', ownerModel: 'default' });
       const second = await createEmailTemplate({ slug, locale: 'en', ownerModel: 'admin' });

@@ -5,8 +5,15 @@
  * @uses infrastructure:prisma, feature:auth
  */
 import { createHash, randomBytes } from 'node:crypto';
-import type { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
+import { type HydratedRecord, hydrate } from '@template/db';
+import type { TokenOwnerModel } from '@template/db/generated/client/enums';
+import { type DelegatePermissions, TokenAction } from '@template/permissions';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import type { Context } from 'hono';
+import { makeError } from '#/lib/errors';
+import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
+import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
+import { validateFullGrant } from '#/lib/permissions/validateFullGrant';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
@@ -15,39 +22,56 @@ const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
   OrganizationUser: 'orgUser',
   Space: 'space',
   SpaceUser: 'spaceUser',
+  Integration: 'integration',
 };
 
-type CreateTokenParams = {
+type CreateTokenParams = DelegatePermissions & {
   name: string;
   ownerModel: TokenOwnerModel;
   userId?: string;
   organizationId?: string;
   spaceId?: string;
-  role: Role;
+  integrationId?: string;
   expiresAt?: Date;
 };
 
 export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams) => {
   const db = c.get('db');
+  const { name: _name, expiresAt: _expiresAt, ...row } = params;
+  const permix = c.get('permix');
+  const pseudo = await hydrate('token', { id: '', ...row } as HydratedRecord);
+  if (!check(permix, rebacSchema, 'token', pseudo, TokenAction.create))
+    throw makeError({ status: 403, message: 'Access denied' });
+  validateDelegateRole(pseudo);
+  if (row.full) validateFullGrant(permix, 'token', pseudo);
+
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];
   const rawKey = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex}`;
   const keyHash = createHash('sha256').update(rawKey).digest('hex');
   const keyPrefix = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex.slice(0, 6)}`;
 
-  const { keyHash: _keyHash, ...token } = await db.token.create({
-    data: {
-      name: params.name,
-      keyHash,
-      keyPrefix,
-      ownerModel: params.ownerModel,
-      userId: params.userId,
-      organizationId: params.organizationId,
-      spaceId: params.spaceId,
-      role: params.role,
-      expiresAt: params.expiresAt,
-    },
+  return db.txn(async () => {
+    const { keyHash: _keyHash, ...token } = await db.token.create({
+      data: {
+        name: params.name,
+        keyHash,
+        keyPrefix,
+        ownerModel: params.ownerModel,
+        userId: params.userId,
+        organizationId: params.organizationId,
+        spaceId: params.spaceId,
+        integrationId: params.integrationId,
+        role: params.role,
+        full: params.full,
+        expiresAt: params.expiresAt,
+      },
+    });
+    const targetEntitlements = await changeEntitlements(
+      permix,
+      { model: 'Token', id: token.id },
+      { add: params.entitlements ?? [] },
+    );
+    return { ...token, targetEntitlements, key: rawKey };
   });
-
-  return { ...token, key: rawKey };
 };

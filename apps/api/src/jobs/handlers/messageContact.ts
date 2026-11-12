@@ -8,7 +8,11 @@ import { db } from '@template/db';
 import type { CommunicationKind } from '@template/db/generated/client/enums';
 import { makeJob } from '#/jobs/makeJob';
 import { canDeliver } from '#/lib/messaging/canDeliver';
-import { getMessageProviderAdapter, type MessageContent, type MessageDispatchOptions } from '#/lib/messaging/providers';
+import {
+  getMessageProviderAdapter,
+  type MessageContent,
+  type MessageDispatchOptions,
+} from '#/lib/messaging/providers';
 
 export type MessageContactPayload = {
   contactId: string;

@@ -61,5 +61,7 @@ const absoluteNode = (condition: Condition, bindings: BindingChain): Condition |
  * The rule with every loop binding replaced by the absolute path it stands for, so the lens can judge
  * it. `undefined` when a leaf reads an index binding, which has no path in the lens.
  */
-export const absoluteRule = (rule: Condition, bindings: BindingChain | undefined): Condition | undefined =>
-  bindings?.size ? absoluteNode(rule, bindings) : rule;
+export const absoluteRule = (
+  rule: Condition,
+  bindings: BindingChain | undefined,
+): Condition | undefined => (bindings?.size ? absoluteNode(rule, bindings) : rule);

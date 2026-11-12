@@ -4,22 +4,25 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import type { SourceQuery } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
-import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
-import { admitRuleReferences } from '@template/db/utils/admitRuleReferences';
-import { lockedLiveReferences } from '@template/db/utils/lockedLiveReferences';
+import { polymorphicKeyColumn } from '@template/db/registries/polymorphicIs';
+import { lockedTargetStates, type TargetState } from '@template/db/utils/lockedTargetStates';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
+import { groupBy } from 'lodash-es';
 
-export type RuleReferenceOwner = { model: ModelName; id: string };
+export type RuleReferenceSource = { model: ModelName; id: string };
 
-type Edge = { id: string; referencedModel: string; referencedId: string };
+type Edge = {
+  id: string;
+  targetModel: string;
+  targetId: string;
+  targetDeletedAt: Date | null;
+};
 
-const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string => {
-  const column = resolveFalsePolymorphismRef({ model: 'RuleReference', axis, value: model as ModelName });
+const fkColumn = (axis: 'sourceModel' | 'targetModel', model: string): string => {
+  const column = polymorphicKeyColumn('RuleReference', axis, model);
   if (!column) {
     throw new Error(
       `RuleReference has no ${axis} FK for ${model} — add the column to ruleReference.prisma and PolymorphismRegistry`,
@@ -28,47 +31,59 @@ const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string
   return column;
 };
 
-const edgeKey = (edge: Edge): string => referenceKey({ model: edge.referencedModel, id: edge.referencedId });
+const edgeKey = (edge: Edge): string =>
+  referenceKey({ model: edge.targetModel, id: edge.targetId });
 
-/**
- * Recompute one owner's edges from the rows its rules name, inside the caller's transaction. The
- * gate is delta-only and fenced: a reference already held is not re-admitted (a save may keep or drop it),
- * a newly named row must be live, and the lock stops a concurrent delete landing between the
- * check and the edge it admits.
- */
+const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: TargetState) => ({
+  sourceModel: source.model,
+  [fkColumn('sourceModel', source.model)]: source.id,
+  targetModel: ref.model,
+  [fkColumn('targetModel', ref.model)]: ref.id,
+  targetDeletedAt: state.deletedAt,
+});
+
+const stampOf = (state: TargetState | undefined): number | null =>
+  state?.deletedAt ? state.deletedAt.getTime() : null;
+
+// Targets are locked before the edges are written, so one is never written unstamped against an uncommitted delete.
 export const syncRuleReferenceEdges = async (
-  owner: RuleReferenceOwner,
+  source: RuleReferenceSource,
   references: RuleReference[],
-  sources?: SourceQuery[],
 ): Promise<void> => {
-  const ownerColumn = fkColumn('ownerModel', owner.model);
   const existing = (await db.ruleReference.findMany({
-    where: { [ownerColumn]: owner.id } as Prisma.RuleReferenceWhereInput,
+    where: { sourceModel: source.model, sourceId: source.id } as Prisma.RuleReferenceWhereInput,
   })) as Edge[];
-  const held = new Set(existing.map(edgeKey));
 
-  const live = await lockedLiveReferences(references);
-  const added = references.filter((ref) => !held.has(referenceKey(ref)));
-  const fresh = added.find((ref) => !live.has(referenceKey(ref)));
-  if (fresh) throw new RuleReferenceError(`rule names a ${fresh.model} that does not exist or is deleted: ${fresh.id}`);
-  if (sources) {
-    const [outside] = (await admitRuleReferences(sources, added)).unadmitted;
-    if (outside) throw new RuleReferenceError(`rule names a ${outside.model} outside this owner's view: ${outside.id}`);
+  const referenced = new Map(references.map((ref) => [referenceKey(ref), ref]));
+  const held = new Map(
+    existing.filter((edge) => referenced.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
+  );
+  const added = [...referenced.values()].filter((ref) => !held.has(referenceKey(ref)));
+  const states = referenced.size ? await lockedTargetStates([...referenced.values()]) : new Map();
+
+  const toDelete = existing.filter((edge) => !referenced.has(edgeKey(edge)));
+  if (toDelete.length)
+    await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
+
+  const drifted = [...held.values()].filter((edge) => {
+    const target = states.get(edgeKey(edge));
+    return target && (edge.targetDeletedAt?.getTime() ?? null) !== stampOf(target);
+  });
+  for (const [stamp, group] of Object.entries(
+    groupBy(drifted, (edge) => stampOf(states.get(edgeKey(edge))) ?? 0),
+  )) {
+    await db.ruleReference.updateManyAndReturn({
+      where: { id: { in: group.map((edge) => edge.id) } },
+      data: { targetDeletedAt: stamp === '0' ? null : new Date(Number(stamp)) },
+    });
   }
 
-  const named = new Set(references.map(referenceKey));
-  const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
-  const toCreate = references
-    .filter((ref) => !held.has(referenceKey(ref)))
-    .map((ref) => ({
-      ownerModel: owner.model,
-      [ownerColumn]: owner.id,
-      referencedModel: ref.model,
-      referencedId: ref.id,
-      [fkColumn('referencedModel', ref.model)]: ref.id,
-    }));
-
-  if (toDelete.length) await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
+  const toCreate = added.flatMap((ref) => {
+    const target = states.get(referenceKey(ref));
+    return target ? [edgeData(source, ref, target)] : [];
+  });
   if (toCreate.length)
-    await db.ruleReference.createManyAndReturn({ data: toCreate as Prisma.RuleReferenceCreateManyInput[] });
+    await db.ruleReference.createManyAndReturn({
+      data: toCreate as Prisma.RuleReferenceCreateManyInput[],
+    });
 };

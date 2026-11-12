@@ -4,7 +4,17 @@
  * @partOf feature:email
  * @uses none
  */
-import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
+import type {
+  EmailComponent,
+  EmailOwnerModel,
+  EmailTemplate,
+} from '@template/db/generated/client/client';
+
+import type { EmailRenderError } from '@template/email/errors/EmailRenderError';
+
+export type RenderObserver = {
+  onRenderFailure?: (error: EmailRenderError) => void;
+};
 
 export type OwnerScope = {
   ownerModel: EmailOwnerModel;

@@ -13,7 +13,13 @@ import {
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 
 export const validateEachAttributes = (
-  block: { as?: string; asMissing?: boolean; index?: string; path: string; attributeErrors?: string[] },
+  block: {
+    as?: string;
+    asMissing?: boolean;
+    index?: string;
+    path: string;
+    attributeErrors?: string[];
+  },
   bindingScope: BindingChain,
   path: string,
   issues: ConditionIssue[],
@@ -24,12 +30,18 @@ export const validateEachAttributes = (
     issues.push({ path, message: 'missing as= attribute on {{#each}} block' });
   } else {
     if (!isValidBindingIdentifier(block.as)) {
-      issues.push({ path, message: `as= "${block.as}" is not a valid identifier — must match ^[a-z][a-z0-9-]*$` });
+      issues.push({
+        path,
+        message: `as= "${block.as}" is not a valid identifier — must match ^[a-z][a-z0-9-]*$`,
+      });
     }
     if (RESERVED_BINDING_NAMES.has(block.as)) {
       issues.push({ path, message: `as= "${block.as}" collides with a reserved word` });
     } else if (bindingScope.has(block.as)) {
-      issues.push({ path, message: `as= "${block.as}" collides with an enclosing {{#each}}'s binding` });
+      issues.push({
+        path,
+        message: `as= "${block.as}" collides with an enclosing {{#each}}'s binding`,
+      });
     }
   }
 
@@ -43,7 +55,10 @@ export const validateEachAttributes = (
     if (RESERVED_BINDING_NAMES.has(block.index)) {
       issues.push({ path, message: `index= "${block.index}" collides with a reserved word` });
     } else if (bindingScope.has(block.index)) {
-      issues.push({ path, message: `index= "${block.index}" collides with an enclosing {{#each}}'s binding` });
+      issues.push({
+        path,
+        message: `index= "${block.index}" collides with an enclosing {{#each}}'s binding`,
+      });
     } else if (block.index === block.as) {
       issues.push({ path, message: `index= "${block.index}" collides with this block's own as=` });
     }

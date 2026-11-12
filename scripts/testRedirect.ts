@@ -20,7 +20,11 @@ if (process.env.__TEST_REDIRECT__) {
 
   if (!file) {
     for (const script of ['test', 'test:fe']) {
-      const r = Bun.spawnSync({ cmd: ['bun', 'run', script], env, stdio: ['inherit', 'inherit', 'inherit'] });
+      const r = Bun.spawnSync({
+        cmd: ['bun', 'run', script],
+        env,
+        stdio: ['inherit', 'inherit', 'inherit'],
+      });
       if ((r.exitCode ?? 1) !== 0) process.exit(r.exitCode ?? 1);
     }
     process.exit(0);

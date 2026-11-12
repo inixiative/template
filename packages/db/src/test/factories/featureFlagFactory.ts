@@ -5,7 +5,11 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { CustomerModel, FeatureFlagValueType, ProviderModel } from '@template/db/generated/client/enums';
+import {
+  CustomerModel,
+  FeatureFlagValueType,
+  ProviderModel,
+} from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const featureFlagFactory = createFactory('FeatureFlag', {

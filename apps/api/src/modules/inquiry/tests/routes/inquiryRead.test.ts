@@ -1,6 +1,15 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, Organization, OrganizationUser, User } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type {
+  Inquiry,
+  Organization,
+  OrganizationUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -21,20 +30,27 @@ describe('GET /api/v1/inquiry/:id', () => {
   let org: Organization;
   let adminOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: admin, organization: org },
+    );
     adminOrgUser = ou;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOrgUser],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -55,6 +71,27 @@ describe('GET /api/v1/inquiry/:id', () => {
 
     expect(response.status).toBe(200);
     expect(data.id).toBe(inquiry.id);
+  });
+
+  it('returns the inquiry with its audit history', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+    const written = await db.auditLog.findMany({ where: { subjectInquiryId: inquiry.id } });
+    expect(written.map(({ action }) => action)).toEqual(['create']);
+
+    const response = await fetch(get(`/api/v1/inquiry/${inquiry.id}`));
+    const { data } = await json<Inquiry & { auditLogsAsSubject: { id: string }[] }>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.auditLogsAsSubject.map(({ id }) => id)).toEqual([written[0]?.id]);
   });
 
   it('target can read inquiry sent to them', async () => {

@@ -3,12 +3,14 @@
 // ============================================================================
 
 model Inquiry {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  sentAt    DateTime?
-  expiresAt DateTime?
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+  sentAt               DateTime?
+  expiresAt            DateTime?
 
   type   InquiryType
   status InquiryStatus @default(draft)
@@ -21,22 +23,34 @@ model Inquiry {
   sourceUserId         String?              @db.VarChar(36)
   sourceOrganizationId String?              @db.VarChar(36)
   sourceSpaceId        String?              @db.VarChar(36)
+  sourceIntegrationId  String?              @db.VarChar(36)
+  sourceTokenId        String?              @db.VarChar(36)
 
-  sourceUser         User?         @relation("InquirySource", fields: [sourceUserId], references: [id], onDelete: Cascade)
-  sourceOrganization Organization? @relation("InquirySource", fields: [sourceOrganizationId], references: [id], onDelete: Cascade)
-  sourceSpace        Space?        @relation("InquirySource", fields: [sourceSpaceId], references: [id], onDelete: Cascade)
+  sourceUser             User?             @relation("InquirySource", fields: [sourceUserId], references: [id], onDelete: Cascade)
+  sourceOrganization     Organization?     @relation("InquirySource", fields: [sourceOrganizationId], references: [id], onDelete: Cascade)
+  sourceSpace            Space?            @relation("InquirySource", fields: [sourceSpaceId], references: [id], onDelete: Cascade)
+  sourceOrganizationUser OrganizationUser? @relation("InquirySource", fields: [sourceOrganizationId, sourceUserId], references: [organizationId, userId], onDelete: Cascade)
+  sourceSpaceUser        SpaceUser?        @relation("InquirySource", fields: [sourceOrganizationId, sourceSpaceId, sourceUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  sourceIntegration      Integration?      @relation("InquirySource", fields: [sourceIntegrationId], references: [id], onDelete: Cascade)
+  sourceToken            Token?            @relation("InquirySource", fields: [sourceTokenId], references: [id], onDelete: Cascade)
 
   // Target (who receives/resolves) - fake polymorphism
   targetModel          InquiryResourceModel
   targetUserId         String?              @db.VarChar(36)
   targetOrganizationId String?              @db.VarChar(36)
   targetSpaceId        String?              @db.VarChar(36)
+  targetIntegrationId  String?              @db.VarChar(36)
+  targetTokenId        String?              @db.VarChar(36)
 
-  targetUser         User?         @relation("InquiryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
-  targetOrganization Organization? @relation("InquiryTarget", fields: [targetOrganizationId], references: [id], onDelete: Cascade)
-  targetSpace        Space?        @relation("InquiryTarget", fields: [targetSpaceId], references: [id], onDelete: Cascade)
-  auditLogsAsSubject AuditLog[]    @relation("AuditLogSubjectInquiry")
-  auditLogsAsSource  AuditLog[]    @relation("AuditLogSourceInquiry")
+  targetUser             User?             @relation("InquiryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetOrganization     Organization?     @relation("InquiryTarget", fields: [targetOrganizationId], references: [id], onDelete: Cascade)
+  targetSpace            Space?            @relation("InquiryTarget", fields: [targetSpaceId], references: [id], onDelete: Cascade)
+  targetOrganizationUser OrganizationUser? @relation("InquiryTarget", fields: [targetOrganizationId, targetUserId], references: [organizationId, userId], onDelete: Cascade)
+  targetSpaceUser        SpaceUser?        @relation("InquiryTarget", fields: [targetOrganizationId, targetSpaceId, targetUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  targetIntegration      Integration?      @relation("InquiryTarget", fields: [targetIntegrationId], references: [id], onDelete: Cascade)
+  targetToken            Token?            @relation("InquiryTarget", fields: [targetTokenId], references: [id], onDelete: Cascade)
+  auditLogsAsSubject     AuditLog[]        @relation("AuditLogSubjectInquiry")
+  auditLogsAsSource      AuditLog[]        @relation("AuditLogSourceInquiry")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -46,10 +60,14 @@ model Inquiry {
   @@index([sourceUserId])
   @@index([sourceOrganizationId])
   @@index([sourceSpaceId])
+  @@index([sourceIntegrationId])
+  @@index([sourceTokenId])
   @@index([targetModel])
   @@index([targetUserId])
   @@index([targetOrganizationId])
   @@index([targetSpaceId])
+  @@index([targetIntegrationId])
+  @@index([targetTokenId])
   @@index([type, status])
   @@index([expiresAt])
 }
@@ -73,6 +91,10 @@ enum InquiryStatus {
 enum InquiryResourceModel {
   admin
   User
+  OrganizationUser
   Organization
   Space
+  SpaceUser
+  Integration
+  Token
 }

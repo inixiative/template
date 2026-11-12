@@ -1,6 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type {
   CustomerRef,
   Organization,
@@ -22,11 +23,10 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { segmentRouter } from '#/modules/segment';
+import type { segmentMemberWithCustomerSchema } from '#/modules/segment/schemas/segmentSchemas';
 import { spaceRouter } from '#/modules/space';
 import { userRouter } from '#/modules/user';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
@@ -41,6 +41,7 @@ const membersOf = (segmentId: string) => ({
 });
 
 type Membership = SegmentMember & { segment: Segment };
+type SegmentMemberWithCustomer = z.infer<typeof segmentMemberWithCustomerSchema>;
 
 describe('segment routes', () => {
   let ownerFetch: ReturnType<typeof createTestApp>['fetch'];
@@ -55,10 +56,7 @@ describe('segment routes', () => {
   let outsider: User;
   let outsiderRef: CustomerRef;
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
-    registerSegmentMemberOwnerHook();
-
+  beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = ou;
     owner = context.user;
@@ -71,16 +69,16 @@ describe('segment routes', () => {
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: customer,
-        providerSpace: space,
+        customerUserId: customer.id,
+        providerSpaceId: space.id,
       })
     ).entity;
     outsiderRef = (
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: outsider,
-        providerSpace: space,
+        customerUserId: outsider.id,
+        providerSpaceId: space.id,
       })
     ).entity;
 
@@ -105,14 +103,11 @@ describe('segment routes', () => {
     customerFetch = createTestApp({ mockUser: customer, mount }).fetch;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
-    clearHookRegistry();
   });
 
-  let segment: Segment;
-
-  it('the space owner creates a dynamic segment and it is reconciled on commit', async () => {
+  const createAcmeSegment = async (): Promise<Segment> => {
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments`, {
         name: `acme-${getNextSeq()}`,
@@ -121,29 +116,42 @@ describe('segment routes', () => {
       }),
     );
     expect(response.status).toBe(201);
-    segment = (await json<Segment>(response)).data;
+    return (await json<Segment>(response)).data;
+  };
+
+  it('the space owner creates a dynamic segment and it is reconciled on commit', async () => {
+    const segment = await createAcmeSegment();
     expect(segment.ownerModel).toBe('Space');
     expect(segment.spaceId).toBe(space.id);
 
     const members = await ownerFetch(get(`/api/v1/segment/${segment.id}/segmentMembers`));
-    const { data } = await json<(SegmentMember & { customerRef: CustomerRef })[]>(members);
+    const { data } = await json<SegmentMemberWithCustomer[]>(members);
     expect(data.map((member) => member.customerRefId)).toEqual([customerRef.id]);
     expect(data[0]!.customerRef.customerUser).toBeTruthy();
   });
 
   it('an internal segment stays out of the owner’s list and is edited only through its variant', async () => {
-    const { entity: flag } = await createFeatureFlag({ slug: 'custom:x', ownerModel: 'Space', space });
-    const { entity: internal } = await createSegment({ conditions: acmeRule, featureFlagInternal: true }, { space });
-    await createFeatureFlagVariant({ segment: internal }, { featureFlag: flag });
+    const { entity: flag } = await createFeatureFlag(
+      { slug: 'custom:x', ownerModel: 'Space' },
+      { space },
+    );
+    const { entity: internal } = await createSegment(
+      { conditions: acmeRule, featureFlagInternal: true },
+      { space },
+    );
+    await createFeatureFlagVariant({}, { segment: internal, featureFlag: flag });
 
     const listed = await ownerFetch(get(`/api/v1/space/${space.id}/segments`));
     expect((await json<Segment[]>(listed)).data.map((each) => each.id)).not.toContain(internal.id);
 
-    expect((await ownerFetch(patch(`/api/v1/segment/${internal.id}`, { name: 'renamed' }))).status).toBe(422);
+    expect(
+      (await ownerFetch(patch(`/api/v1/segment/${internal.id}`, { name: 'renamed' }))).status,
+    ).toBe(422);
     expect((await ownerFetch(del(`/api/v1/segment/${internal.id}`))).status).toBe(422);
   });
 
   it('the space lists the segments it owns', async () => {
+    const segment = await createAcmeSegment();
     const response = await ownerFetch(get(`/api/v1/space/${space.id}/segments`));
     const { data } = await json<(Segment & { ruleIssues: unknown[] })[]>(response);
     expect(response.status).toBe(200);
@@ -151,7 +159,38 @@ describe('segment routes', () => {
     expect(data.find((each) => each.id === segment.id)!.ruleIssues).toEqual([]);
   });
 
+  it('the read carries the rows its rule names, so a degraded rule can say which and why', async () => {
+    const { entity: target } = await createSegment(
+      { ownerModel: 'Space', name: `target-${getNextSeq()}`, conditions: acmeRule },
+      { space },
+    );
+    const { entity: dependent } = await createSegment(
+      { ownerModel: 'Space', conditions: membersOf(target.id) },
+      { space },
+    );
+    const read = async () =>
+      (
+        await json<{ ruleReferences: Record<string, unknown>[] }>(
+          await ownerFetch(get(`/api/v1/segment/${dependent.id}`)),
+        )
+      ).data.ruleReferences;
+
+    expect(await read()).toEqual([
+      {
+        targetModel: 'Segment',
+        targetId: target.id,
+        targetDeletedAt: null,
+      },
+    ]);
+
+    await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
+    const [degraded] = await read();
+    expect(degraded).toMatchObject({ targetModel: 'Segment', targetId: target.id });
+    expect(degraded?.targetDeletedAt).toBeTruthy();
+  });
+
   it('the customer sees the segment they belong to and cannot read the owner view', async () => {
+    const segment = await createAcmeSegment();
     const mine = await customerFetch(get('/api/v1/me/segmentMemberships'));
     const { data } = await json<Membership[]>(mine);
     expect(mine.status).toBe(200);
@@ -164,6 +203,7 @@ describe('segment routes', () => {
   });
 
   it('the user context reads a user’s own segments and memberships and refuses everyone else', async () => {
+    const segment = await createAcmeSegment();
     const memberships = await customerFetch(get(`/api/v1/user/${customer.id}/segmentMemberships`));
     expect(memberships.status).toBe(200);
     const { data } = await json<Membership[]>(memberships);
@@ -183,8 +223,8 @@ describe('segment routes', () => {
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: outsider,
-        providerSpace: elsewhere,
+        customerUserId: outsider.id,
+        providerSpaceId: elsewhere.id,
       })
     ).entity;
     const response = await ownerFetch(
@@ -207,7 +247,11 @@ describe('segment routes', () => {
       post(`/api/v1/space/${space.id}/segments`, {
         name: `bad-${getNextSeq()}`,
         type: 'dynamic',
-        conditions: { field: 'customerUser.platformRole', operator: Operator.equals, value: 'superadmin' },
+        conditions: {
+          field: 'customerUser.platformRole',
+          operator: Operator.equals,
+          value: 'superadmin',
+        },
       }),
     );
     expect(response.status).toBe(422);
@@ -215,7 +259,9 @@ describe('segment routes', () => {
 
   it('reach counts the customers a candidate rule would match, without saving anything', async () => {
     const before = await db.segment.count();
-    const response = await ownerFetch(post(`/api/v1/space/${space.id}/segments/reach`, { conditions: acmeRule }));
+    const response = await ownerFetch(
+      post(`/api/v1/space/${space.id}/segments/reach`, { conditions: acmeRule }),
+    );
     expect(response.status).toBe(200);
     expect((await json<{ count: number }>(response)).data).toEqual({ count: 1 });
     expect(await db.segment.count()).toBe(before);
@@ -224,7 +270,11 @@ describe('segment routes', () => {
   it('reach refuses a rule the save gate would refuse', async () => {
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments/reach`, {
-        conditions: { field: 'customerUser.platformRole', operator: Operator.equals, value: 'superadmin' },
+        conditions: {
+          field: 'customerUser.platformRole',
+          operator: Operator.equals,
+          value: 'superadmin',
+        },
       }),
     );
     expect(response.status).toBe(422);
@@ -232,7 +282,10 @@ describe('segment routes', () => {
 
   it('reach refuses a rule naming a segment the owner does not have', async () => {
     const elsewhere = (await createSpace({}, { organization: org })).entity;
-    const { entity: foreign } = await createSegment({ conditions: acmeRule }, { space: elsewhere });
+    const { entity: foreign } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space: elsewhere },
+    );
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments/reach`, { conditions: membersOf(foreign.id) }),
     );
@@ -244,12 +297,15 @@ describe('segment routes', () => {
     expect(mine.status).toBe(200);
     expect((await json<{ count: number }>(mine)).data).toEqual({ count: 0 });
 
-    const orgs = await ownerFetch(post(`/api/v1/organization/${org.id}/segments/reach`, { conditions: acmeRule }));
+    const orgs = await ownerFetch(
+      post(`/api/v1/organization/${org.id}/segments/reach`, { conditions: acmeRule }),
+    );
     expect(orgs.status).toBe(200);
     expect((await json<{ count: number }>(orgs)).data).toEqual({ count: 0 });
   });
 
   it('deleting a segment tells its members: the member-side removal event names the segment', async () => {
+    const segment = await createAcmeSegment();
     const response = await ownerFetch(del(`/api/v1/segment/${segment.id}`));
     expect(response.status).toBe(204);
 
@@ -259,8 +315,13 @@ describe('segment routes', () => {
     expect(deleted).toHaveLength(1);
 
     const removed = await db.appEvent.findMany({
-      where: { name: 'customerRef.segmentsRemoved', data: { path: ['customerRefId'], equals: customerRef.id } },
+      where: {
+        name: 'customerRef.segmentsRemoved',
+        data: { path: ['customerRefId'], equals: customerRef.id },
+      },
     });
-    expect(removed.map((event) => (event.data as { segmentIds: string[] }).segmentIds)).toContainEqual([segment.id]);
+    expect(
+      removed.map((event) => (event.data as { segmentIds: string[] }).segmentIds),
+    ).toContainEqual([segment.id]);
   });
 });

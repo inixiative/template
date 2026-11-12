@@ -1,5 +1,5 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, revive } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db, revive } from '@template/db';
 import { ContactOwnerModel, InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -10,31 +10,27 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 
-registerSoftDeleteCascadeHook();
-registerRulesHook();
-registerContactRulesHook();
-
-const spaceById = (id: string) => db.space.findUnique({ where: { id } });
-const contactById = (id: string) => db.contact.findUnique({ where: { id } });
+const spaceById = (id: string) => db.withDeleted(() => db.space.findUnique({ where: { id } }));
+const contactById = (id: string) => db.withDeleted(() => db.contact.findUnique({ where: { id } }));
 
 const makeTree = async () => {
   const { entity: org } = await createOrganization();
   const { entity: space } = await createSpace({}, { organization: org });
-  const { entity: contact } = await createContact({ ownerModel: ContactOwnerModel.Space }, { space });
+  const { entity: contact } = await createContact(
+    { ownerModel: ContactOwnerModel.Space },
+    { space },
+  );
   return { org, space, contact };
 };
 
-const tombstoneOrg = (id: string) => db.organization.update({ where: { id }, data: { deletedAt: new Date() } });
+const tombstoneOrg = (id: string) =>
+  db.organization.update({ where: { id }, data: { deletedAt: new Date() } });
 const reviveOrg = (id: string) => revive(db.organization, { id });
 
 describe('softDeleteCascade hook', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('tombstones column-bearing descendants recursively with the parent timestamp', async () => {
@@ -56,9 +52,25 @@ describe('softDeleteCascade hook', () => {
     expect((await contactById(contact.id))?.deletedAt).toBeNull();
   });
 
+  it('a revive written as a set operation restores the subtree too', async () => {
+    const { org, space, contact } = await makeTree();
+
+    await tombstoneOrg(org.id);
+    await db.organization.updateManyAndReturn({
+      where: { id: org.id, deletedAt: { not: null } },
+      data: { deletedAt: { set: null } },
+    });
+
+    expect((await spaceById(space.id))?.deletedAt).toBeNull();
+    expect((await contactById(contact.id))?.deletedAt).toBeNull();
+  });
+
   it('a child deleted independently keeps its own timestamp and stays dead through revive', async () => {
     const { org, space, contact } = await makeTree();
-    const { entity: survivor } = await createContact({ ownerModel: ContactOwnerModel.Space }, { space });
+    const { entity: survivor } = await createContact(
+      { ownerModel: ContactOwnerModel.Space },
+      { space },
+    );
 
     const independent = await db.contact.update({
       where: { id: contact.id },
@@ -79,7 +91,12 @@ describe('softDeleteCascade hook', () => {
     await tombstoneOrg(org.id);
     const spaceDeletedAt = (await spaceById(space.id))?.deletedAt;
 
-    await db.organization.update({ where: { id: org.id }, data: { deletedAt: new Date('2027-01-01T00:00:00Z') } });
+    await db.withDeleted(() =>
+      db.organization.update({
+        where: { id: org.id },
+        data: { deletedAt: new Date('2027-01-01T00:00:00Z') },
+      }),
+    );
 
     expect((await spaceById(space.id))?.deletedAt).toEqual(spaceDeletedAt);
   });
@@ -114,7 +131,9 @@ describe('softDeleteCascade hook', () => {
     await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
     expect(await db.session.findUnique({ where: { id: session.id } })).toBeNull();
 
-    await db.user.update({ where: { id: user.id }, data: { deletedAt: null } });
+    await db.withDeleted(() =>
+      db.user.update({ where: { id: user.id }, data: { deletedAt: null } }),
+    );
     expect(await db.session.findUnique({ where: { id: session.id } })).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { ArrayOperator, Operator } from '@inixiative/json-rules';
+import type { User } from '@template/db/generated/client/client';
 import { TagResource } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -7,6 +8,7 @@ import {
   createOrganization,
   createTag,
   createTagAttachment,
+  createTagCategory,
   createUser,
 } from '@template/db/test';
 import { resolveUsers } from '#/lib/messaging/resolveUsers';
@@ -15,11 +17,11 @@ import { createTestApp } from '#tests/createTestApp';
 describe('resolveUsers', () => {
   let alice: { id: string };
   let bob: { id: string };
-  let carol: { id: string };
+  let carol: User;
   let foundersTag: { id: string };
   let testDb: ReturnType<typeof createTestApp>['db'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const harness = createTestApp({});
     testDb = harness.db;
 
@@ -30,10 +32,19 @@ describe('resolveUsers', () => {
     const c = await createUser();
     carol = c.entity;
 
-    // Each user gets one whatsapp contact (so messageUser can fan out later).
-    await createContact({ ownerModel: 'User', type: 'whatsapp', value: { jid: '111' } }, { user: a.entity });
-    await createContact({ ownerModel: 'User', type: 'whatsapp', value: { jid: '222' } }, { user: b.entity });
-    await createContact({ ownerModel: 'User', type: 'whatsapp', value: { jid: '333' } }, { user: c.entity });
+    // Each user gets a whatsapp contact beside the email contact its creation writes.
+    await createContact(
+      { ownerModel: 'User', type: 'whatsapp', value: { jid: '111' } },
+      { user: a.entity },
+    );
+    await createContact(
+      { ownerModel: 'User', type: 'whatsapp', value: { jid: '222' } },
+      { user: b.entity },
+    );
+    await createContact(
+      { ownerModel: 'User', type: 'whatsapp', value: { jid: '333' } },
+      { user: c.entity },
+    );
 
     // alice + bob are tagged "founders" (resource: userMessages).
     const tag = await createTag({
@@ -41,11 +52,17 @@ describe('resolveUsers', () => {
       resources: [TagResource.userMessages],
     });
     foundersTag = tag.entity;
-    await createTagAttachment({ resourceModel: TagResource.User }, { user: a.entity, tag: tag.entity });
-    await createTagAttachment({ resourceModel: TagResource.User }, { user: b.entity, tag: tag.entity });
+    await createTagAttachment(
+      { resourceModel: TagResource.User },
+      { user: a.entity, tag: tag.entity },
+    );
+    await createTagAttachment(
+      { resourceModel: TagResource.User },
+      { user: b.entity, tag: tag.entity },
+    );
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
   });
 
@@ -73,8 +90,7 @@ describe('resolveUsers', () => {
       operator: Operator.equals,
       value: alice.id,
     });
-    expect(users[0].contacts.length).toBeGreaterThan(0);
-    expect(users[0].contacts[0].type).toBe('whatsapp');
+    expect(users[0].contacts.map((contact) => contact.type).sort()).toEqual(['email', 'whatsapp']);
   });
 
   it('matches users via tag attachment rule', async () => {
@@ -88,7 +104,14 @@ describe('resolveUsers', () => {
 
   it("targets through the platform recipient lens: an organization's tag is outside its view", async () => {
     const { entity: organization } = await createOrganization();
-    const { entity: orgTag } = await createTag({ ownerModel: 'Organization' }, { organization });
+    const { entity: orgTag } = await createTag(
+      { ownerModel: 'Organization' },
+      {
+        organization,
+        tagCategory: (await createTagCategory({ ownerModel: 'Organization' }, { organization }))
+          .entity,
+      },
+    );
     await createTagAttachment({ resourceModel: TagResource.User }, { user: carol, tag: orgTag });
     const users = await resolveUsers({
       field: 'tagAttachments',

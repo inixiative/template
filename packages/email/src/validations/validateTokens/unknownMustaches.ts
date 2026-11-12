@@ -5,7 +5,15 @@
  * @uses none
  */
 import { componentTagPattern } from '@template/email/render/blockTags';
-import { EACH, ELSE, ELSE_IF, END, END_EACH, IF, TOKEN_PATTERN } from '@template/email/render/conditionParser';
+import {
+  EACH,
+  ELSE,
+  ELSE_IF,
+  END,
+  END_EACH,
+  IF,
+  TOKEN_PATTERN,
+} from '@template/email/render/conditionParser';
 
 const MARKERS = [IF, ELSE_IF, ELSE, END, EACH, END_EACH];
 

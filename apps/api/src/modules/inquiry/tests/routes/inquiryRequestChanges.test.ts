@@ -1,6 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Inquiry, Organization, User } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -20,7 +24,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
   let org: Organization;
   let targetUser: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: sourceUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
@@ -34,7 +38,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -51,6 +55,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
 
     const response = await fetch(
       post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         status: InquiryStatus.changesRequested,
         explanation: 'Please change the role',
       }),
@@ -75,6 +80,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
 
     const response = await fetch(
       post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         status: InquiryStatus.changesRequested,
         explanation: 'Too late',
       }),
@@ -96,6 +102,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
 
     const response = await fetch(
       post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         status: InquiryStatus.changesRequested,
         explanation: 'Needs review',
       }),

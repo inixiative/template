@@ -15,7 +15,7 @@
   - [Never](#never)
 - [TypeScript](#typescript)
   - [Prefer `type` Over `interface`](#prefer-type-over-interface)
-  - [No Enums](#no-enums)
+  - [No TypeScript `enum`](#no-typescript-enum)
   - [Infer Types](#infer-types)
 - [Comments & Logging](#comments--logging)
   - [No Comments](#no-comments)
@@ -39,7 +39,7 @@
 ### Single-Line Early Exits
 
 ```typescript
-if (!user) throw new HTTPException(404, { message: 'Not found' });
+if (!user) throw makeError({ status: 404, message: 'Not found' });
 if (!valid) return null;
 ```
 
@@ -78,8 +78,8 @@ packages/db/src/index.ts
 
 | Prefix | Meaning |
 |--------|---------|
-| `_` | Unused parameter |
-| `__` | Module-private state (not exported) |
+| `_` | Unused binding (parameter, destructured field) |
+| `__` | Private / internal: class privates, module-private state, object-literal internals ([NAMING.md → Underscore Prefix](NAMING.md#underscore-prefix)) |
 
 ```typescript
 // Unused parameter
@@ -128,9 +128,9 @@ import { z } from '@hono/zod-openapi';
 type User = { id: string; name: string };
 ```
 
-### No Enums
+### No TypeScript `enum`
 
-Use const assertions or Prisma enums:
+The rule is about the TS `enum` keyword. Use Prisma enums for domain values (see [DATABASE.md](DATABASE.md#enum-naming)) or a const object:
 
 ```typescript
 const Status = { active: 'active', inactive: 'inactive' } as const;

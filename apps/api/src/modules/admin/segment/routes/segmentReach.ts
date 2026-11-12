@@ -6,7 +6,10 @@
  */
 import { actionRoute } from '#/lib/routeTemplates/action';
 import { Modules } from '#/modules/modules';
-import { segmentReachBodySchema, segmentReachResponseSchema } from '#/modules/segment/schemas/segmentSchemas';
+import {
+  segmentReachBodySchema,
+  segmentReachResponseSchema,
+} from '#/modules/segment/schemas/segmentSchemas';
 
 export const segmentReachRoute = actionRoute({
   model: Modules.segment,
@@ -15,5 +18,6 @@ export const segmentReachRoute = actionRoute({
   skipId: true,
   bodySchema: segmentReachBodySchema,
   responseSchema: segmentReachResponseSchema,
-  description: 'Counts the platform’s customers a candidate segment rule matches today. Nothing is saved.',
+  description:
+    'Counts the platform’s customers a candidate segment rule matches today. Nothing is saved.',
 });

@@ -4,26 +4,22 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import type { Prisma } from '@template/db';
 import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
+import { reviveOrCreateContact } from '#/modules/contact/services/reviveOrCreateContact';
 import { organizationCreateContactRoute } from '#/modules/organization/routes/organizationCreateContact';
 
 export const organizationCreateContactController = makeController(
   organizationCreateContactRoute,
   async (c, respond) => {
-    const db = c.get('db');
     const organization = getResource<'organization'>(c);
     const body = c.req.valid('json');
 
-    const contact = await db.contact.create({
-      data: {
-        ...body,
-        ownerModel: 'Organization',
-        organizationId: organization.id,
-      } as Prisma.ContactUncheckedCreateInput,
-    });
+    const contact = await reviveOrCreateContact(
+      { ownerModel: 'Organization', organizationId: organization.id },
+      body,
+    );
 
     await emitAppEvent('contact.created', { contact });
 

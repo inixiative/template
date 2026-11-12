@@ -1,0 +1,9 @@
+model Mention {
+  id            String  @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  subjectModel  String
+  subjectId     String  @db.VarChar(36)
+  subjectUserId String? @db.VarChar(36)
+  subjectUser   User?   @relation(fields: [subjectUserId], references: [id], onDelete: Cascade)
+  subjectFlowId String? @db.VarChar(36)
+  subjectFlow   Flow?   @relation(fields: [subjectFlowId], references: [id], onDelete: SetNull)
+}

@@ -4,39 +4,242 @@
  * @partOf primitive:ui, primitive:websockets
  * @uses primitive:shared
  */
-import { createWebSocketClient, type WSEvent } from '@template/shared/ws';
+import type { QueryClient } from '@tanstack/react-query';
+import { createWebSocketClient, type WSDataEvent, type WSEvent } from '@template/shared/ws';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
+import { failDataStream } from '@template/ui/lib/ws/failDataStream';
+import type { MessageContext } from '@template/ui/lib/ws/messageContext';
+import { type DebouncedFunc, debounce } from 'lodash-es';
 
-const HEARTBEAT_MS = 30_000;
-const PONG_TIMEOUT_MS = 5_000;
-const RECONNECT_ACK_TIMEOUT_MS = 5_000;
+export type ApiWebsocketTiming = {
+  heartbeatMs: number;
+  pongTimeoutMs: number;
+  reconnectAckTimeoutMs: number;
+  openAckTimeoutMs: number;
+  retryBaseMs: number;
+  retryMaxMs: number;
+  streamSettleMs: number;
+};
+
+const DEFAULT_TIMING: ApiWebsocketTiming = {
+  heartbeatMs: 30_000,
+  pongTimeoutMs: 5_000,
+  reconnectAckTimeoutMs: 5_000,
+  openAckTimeoutMs: 10_000,
+  retryBaseMs: 1_000,
+  retryMaxMs: 30_000,
+  streamSettleMs: 100,
+};
 
 export type ApiWebsocket = {
   connect: () => void;
+  disconnect: () => void;
   authenticate: (token: string) => void;
   spoof: (token: string, email: string) => void;
   unspoof: (token: string) => void;
   logout: () => void;
   subscribe: (channel: string) => void;
   unsubscribe: (channel: string) => void;
+  open: (stream: string) => void;
+  close: (stream: string) => void;
+  resync: (stream: string) => void;
 };
 
-export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWebsocket => {
-  // The channels this socket is subscribed to, refcounted across callers. Single source of truth —
-  // replayed on every (re)open since the BE forgets subscriptions when a connection drops.
+type InboundFrame = {
+  type?: string;
+  action?: string;
+  channel?: string;
+  stream?: string;
+  category?: string;
+  retryable?: boolean;
+};
+
+// The client is handed the query cache it writes to; it never reaches into the store that owns it.
+export type ApiWebsocketOptions = {
+  getClient: () => QueryClient | null;
+  onReconnect?: () => void;
+};
+
+export const createApiWebsocket = (
+  url: string,
+  { getClient, onReconnect }: ApiWebsocketOptions,
+  timingOverrides: Partial<ApiWebsocketTiming> = {},
+): ApiWebsocket => {
+  const timing = { ...DEFAULT_TIMING, ...timingOverrides };
   const channels = new Map<string, number>();
-  // Last identity frame (authenticate/spoof/unspoof; null after logout) — a (re)opened connection
-  // starts anonymous on the BE, so identity must be replayed before anything identity-dependent.
+  const streams = new Map<string, number>();
+  const rejectedStreams = new Set<string>();
+  const pendingOpens = new Map<string, number>();
+  const openAckTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const frameRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const retryAttempts = new Map<string, number>();
+  const settlers = new Map<string, DebouncedFunc<() => void>>();
+  const sentOpens = new Set<string>();
+  const sentSubscribes = new Set<string>();
+  const lastSeqs = new Map<string, number>();
+  let identityAttempts = 0;
   let identityFrame: Record<string, unknown> | null = null;
   let everOpened = false;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   let pongTimer: ReturnType<typeof setTimeout> | undefined;
-  // Replayed subscribes still awaiting ack after a reconnect; onReconnect waits for this to drain so a refetch can't outrun the regrant.
   let pendingAcks: Set<string> | null = null;
   let reconnectAckTimer: ReturnType<typeof setTimeout> | undefined;
 
+  const isLive = (stream: string): boolean => streams.has(stream) && !rejectedStreams.has(stream);
+
+  const backoffDelay = (attempt: number): number => {
+    const ceiling = Math.min(timing.retryMaxMs, timing.retryBaseMs * 2 ** (attempt - 1));
+    return ceiling / 2 + Math.random() * (ceiling / 2);
+  };
+
+  const sendSubscribe = (channel: string): void => {
+    socket.send({ action: 'subscribe', channel });
+    sentSubscribes.add(channel);
+  };
+
+  const sendRelease = (frame: Record<string, unknown>): void => {
+    if (socket.status() === 'open') socket.send(frame);
+  };
+
+  const clearTimers = (timers: Map<string, ReturnType<typeof setTimeout>>, key?: string): void => {
+    for (const [held, timer] of timers) {
+      if (key !== undefined && held !== key) continue;
+      clearTimeout(timer);
+      timers.delete(held);
+    }
+  };
+
+  const retryFrame = (key: string, delay: number, retry: () => void): void => {
+    clearTimers(frameRetryTimers, key);
+    frameRetryTimers.set(
+      key,
+      setTimeout(() => {
+        frameRetryTimers.delete(key);
+        retry();
+      }, delay),
+    );
+  };
+
+  const onOpenAckTimeout = (stream: string): void => {
+    openAckTimers.delete(stream);
+    if (!pendingOpens.delete(stream)) return;
+    sentOpens.delete(stream);
+    lastSeqs.delete(stream);
+    if (!isLive(stream)) return;
+    failDataStream(getClient(), stream, 'failed');
+    scheduleRetry(stream);
+  };
+
+  const sendOpen = (stream: string): void => {
+    if (socket.status() !== 'open') return;
+    socket.send({ action: 'open', stream });
+    sentOpens.add(stream);
+    clearTimers(retryTimers, stream);
+    pendingOpens.set(stream, (pendingOpens.get(stream) ?? 0) + 1);
+    clearTimers(openAckTimers, stream);
+    openAckTimers.set(
+      stream,
+      setTimeout(() => onOpenAckTimeout(stream), timing.openAckTimeoutMs),
+    );
+  };
+
+  const scheduleRetry = (stream: string): void => {
+    if (retryTimers.has(stream)) return;
+    const attempt = (retryAttempts.get(stream) ?? 0) + 1;
+    retryAttempts.set(stream, attempt);
+    const delay = backoffDelay(attempt);
+    retryTimers.set(
+      stream,
+      setTimeout(() => {
+        retryTimers.delete(stream);
+        if (isLive(stream) && !pendingOpens.has(stream)) sendOpen(stream);
+      }, delay),
+    );
+  };
+
+  const reconcileStream = (stream: string): void => {
+    if (isLive(stream)) {
+      const awaitingResync = !lastSeqs.has(stream) && !pendingOpens.has(stream);
+      if (!sentOpens.has(stream) || awaitingResync) sendOpen(stream);
+      return;
+    }
+    if (streams.has(stream)) return;
+    clearTimers(retryTimers, stream);
+    retryAttempts.delete(stream);
+    lastSeqs.delete(stream);
+    if (sentOpens.delete(stream)) sendRelease({ action: 'close', stream });
+  };
+
+  // Holder churn inside the window nets out, so a stream opened and released in passing sends no frames.
+  const settle = (stream: string): void => {
+    const settler =
+      settlers.get(stream) ??
+      debounce(() => {
+        settlers.delete(stream);
+        reconcileStream(stream);
+      }, timing.streamSettleMs);
+    settlers.set(stream, settler);
+    settler();
+  };
+
+  const isFinalOpenAnswer = (stream: string): boolean => {
+    const outstanding = pendingOpens.get(stream);
+    if (outstanding === undefined) return true;
+    if (outstanding > 1) {
+      pendingOpens.set(stream, outstanding - 1);
+      return false;
+    }
+    pendingOpens.delete(stream);
+    clearTimers(openAckTimers, stream);
+    return true;
+  };
+
+  const failOpen = (stream: string, retryable: boolean): void => {
+    sentOpens.delete(stream);
+    lastSeqs.delete(stream);
+    if (!streams.has(stream)) return;
+    if (retryable) {
+      failDataStream(getClient(), stream, 'failed');
+      scheduleRetry(stream);
+      return;
+    }
+    console.error(`ws stream open rejected: ${stream}`);
+    rejectedStreams.add(stream);
+    clearTimers(retryTimers, stream);
+    failDataStream(getClient(), stream, 'rejected');
+  };
+
+  // Until the next snapshot, appends on the wire are already in it.
+  const resyncStream = (stream: string): void => {
+    lastSeqs.delete(stream);
+    if (isLive(stream) && !pendingOpens.has(stream)) sendOpen(stream);
+  };
+
+  const context = (): MessageContext => ({ client: getClient(), resync: resyncStream });
+
+  const admitDataFrame = (event: WSDataEvent): boolean => {
+    if (event.action === 'snapshot') {
+      lastSeqs.set(event.stream, event.seq);
+      return true;
+    }
+    const lastSeq = lastSeqs.get(event.stream);
+    if (lastSeq === undefined || event.seq <= lastSeq) return false;
+    if (event.seq > lastSeq + 1) {
+      console.error(
+        `ws stream ${event.stream}: seq ${event.seq} after ${lastSeq}; requesting a fresh snapshot`,
+      );
+      resyncStream(event.stream);
+      return false;
+    }
+    lastSeqs.set(event.stream, event.seq);
+    return true;
+  };
+
   const replaySubscriptions = (): void => {
-    for (const channel of channels.keys()) socket.send({ action: 'subscribe', channel });
+    if (socket.status() !== 'open') return;
+    for (const channel of channels.keys()) sendSubscribe(channel);
+    for (const stream of streams.keys()) if (!rejectedStreams.has(stream)) sendOpen(stream);
   };
 
   const finishReconnect = (): void => {
@@ -52,49 +255,114 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
     if (pendingAcks.size === 0) finishReconnect();
   };
 
+  const onFrameError = (frame: InboundFrame): void => {
+    if (frame.action === 'authenticate' || frame.action === 'logout') {
+      identityAttempts++;
+      retryFrame('identity', backoffDelay(identityAttempts), () => {
+        if (socket.status() === 'open') sendIdentity(identityFrame);
+      });
+      return;
+    }
+    const { channel, stream } = frame;
+    if (frame.action === 'subscribe' && channel) {
+      retryFrame(`subscribe:${channel}`, timing.retryBaseMs, () => {
+        if (channels.has(channel) && socket.status() === 'open') sendSubscribe(channel);
+      });
+      return;
+    }
+    if (frame.action === 'unsubscribe' && channel) {
+      retryFrame(`unsubscribe:${channel}`, timing.retryBaseMs, () => {
+        if (!channels.has(channel)) sendRelease({ action: 'unsubscribe', channel });
+      });
+      return;
+    }
+    if (frame.action === 'close' && stream) {
+      retryFrame(`close:${stream}`, timing.retryBaseMs, () => {
+        if (!streams.has(stream)) sendRelease({ action: 'close', stream });
+      });
+      return;
+    }
+    if (frame.action !== 'open' || !frame.stream || !isFinalOpenAnswer(frame.stream)) return;
+    failOpen(frame.stream, !!frame.retryable);
+  };
+
+  const onControlFrame = (frame: InboundFrame): void => {
+    switch (frame.type) {
+      case 'pong':
+        return void clearTimeout(pongTimer);
+      case 'spoofRejected':
+        return void recoverFromRejectedSpoof();
+      case 'subscribeRejected':
+        console.error(`ws subscribe rejected: ${frame.channel}`);
+        channels.delete(frame.channel as string);
+        return void settleReconnectAck(frame.channel as string);
+      case 'subscribed':
+        return void settleReconnectAck(frame.channel as string);
+      case 'unsubscribed':
+      case 'closed':
+        return;
+      case 'identity':
+        identityAttempts = 0;
+        return;
+      case 'opened':
+        isFinalOpenAnswer(frame.stream as string);
+        return void retryAttempts.delete(frame.stream as string);
+      case 'openRejected':
+        if (isFinalOpenAnswer(frame.stream as string)) failOpen(frame.stream as string, false);
+        return;
+      case 'resync':
+        return void resyncStream(frame.stream as string);
+      case 'error':
+        onFrameError(frame);
+        return;
+    }
+  };
+
   const socket = createWebSocketClient({
     url,
     onMessage: (data) => {
-      const frame = data as { type?: string; channel?: string };
-      switch (frame.type) {
-        case 'pong':
-          return void clearTimeout(pongTimer);
-        case 'spoofRejected':
-          return void recoverFromRejectedSpoof();
-        case 'subscribeRejected':
-          console.error(`ws subscribe rejected: ${frame.channel}`);
-          channels.delete(frame.channel as string);
-          return void settleReconnectAck(frame.channel as string);
-        case 'subscribed':
-          return void settleReconnectAck(frame.channel as string);
+      const frame = data as InboundFrame;
+      if (frame.category === 'data') {
+        const event = data as WSDataEvent;
+        if (sentOpens.has(event.stream) && admitDataFrame(event)) dispatchMessage(event, context());
+        return;
       }
-      dispatchMessage(data as WSEvent);
+      if (frame.category) dispatchMessage(data as WSEvent, context());
+      else onControlFrame(frame);
     },
     onOpen: () => {
-      // Identity first — the BE processes each connection's frames in order.
       if (identityFrame) socket.send(identityFrame);
       replaySubscriptions();
       const reconnecting = everOpened;
       everOpened = true;
       if (!reconnecting) return;
-      // Re-open only: recover missed events, but wait for the regranted subscriptions to ack (or timeout) first.
       if (channels.size === 0) return void onReconnect?.();
       clearTimeout(reconnectAckTimer);
       pendingAcks = new Set(channels.keys());
-      reconnectAckTimer = setTimeout(finishReconnect, RECONNECT_ACK_TIMEOUT_MS);
+      reconnectAckTimer = setTimeout(finishReconnect, timing.reconnectAckTimeoutMs);
     },
-    // A pong pending from the previous connection must not tear down the next one.
-    onClose: () => clearTimeout(pongTimer),
+    onClose: () => {
+      clearTimeout(pongTimer);
+      clearTimeout(reconnectAckTimer);
+      pendingAcks = null;
+      pendingOpens.clear();
+      sentOpens.clear();
+      sentSubscribes.clear();
+      lastSeqs.clear();
+      clearTimers(openAckTimers);
+      clearTimers(retryTimers);
+      clearTimers(frameRetryTimers);
+    },
   });
 
-  // Any identity change drops every grant on the BE — resubscribe, re-authorized as the new one.
   const sendIdentity = (frame: Record<string, unknown> | null): void => {
     identityFrame = frame;
+    rejectedStreams.clear();
+    clearTimers(retryTimers);
     socket.send(frame ?? { action: 'logout' });
     replaySubscriptions();
   };
 
-  // A refused spoof would replay every reconnect and stay anonymous; drop it and re-auth as the real identity.
   const recoverFromRejectedSpoof = (): void => {
     const headers = identityFrame?.headers as Record<string, string> | undefined;
     if (!headers?.['x-spoof-user-email']) return;
@@ -106,38 +374,62 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
     connect: () => {
       socket.connect();
       if (heartbeat) return;
-      // Bidirectional heartbeat: ping, expect a pong within PONG_TIMEOUT_MS; otherwise the
-      // connection is dead (half-open) — drop it and let auto-reconnect + replay recover.
       heartbeat = setInterval(() => {
         clearTimeout(pongTimer);
         if (socket.status() !== 'open') return;
         socket.send({ action: 'ping' });
-        pongTimer = setTimeout(() => socket.reconnect(), PONG_TIMEOUT_MS);
-      }, HEARTBEAT_MS);
+        pongTimer = setTimeout(() => socket.reconnect(), timing.pongTimeoutMs);
+      }, timing.heartbeatMs);
     },
-    // Credentials ride as the same headers an HTTP request carries; spoofing is just a header.
-    authenticate: (token) => sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
+    disconnect: () => {
+      clearInterval(heartbeat);
+      heartbeat = undefined;
+      clearTimeout(pongTimer);
+      clearTimeout(reconnectAckTimer);
+      clearTimers(openAckTimers);
+      clearTimers(retryTimers);
+      clearTimers(frameRetryTimers);
+      for (const settler of settlers.values()) settler.cancel();
+      settlers.clear();
+      socket.close();
+    },
+    authenticate: (token) =>
+      sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
     spoof: (token, email) =>
       sendIdentity({
         action: 'authenticate',
         headers: { authorization: `Bearer ${token}`, 'x-spoof-user-email': email },
       }),
-    unspoof: (token) => sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
+    unspoof: (token) =>
+      sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
     logout: () => sendIdentity(null),
     subscribe: (channel) => {
       const refs = channels.get(channel) ?? 0;
       channels.set(channel, refs + 1);
-      if (refs === 0) socket.send({ action: 'subscribe', channel });
+      if (refs === 0 && socket.status() === 'open') sendSubscribe(channel);
     },
     unsubscribe: (channel) => {
       const refs = channels.get(channel) ?? 0;
       if (refs === 0) return;
-      if (refs === 1) {
-        channels.delete(channel);
-        socket.send({ action: 'unsubscribe', channel });
-      } else {
-        channels.set(channel, refs - 1);
-      }
+      if (refs > 1) return void channels.set(channel, refs - 1);
+      channels.delete(channel);
+      if (sentSubscribes.delete(channel)) sendRelease({ action: 'unsubscribe', channel });
     },
+    open: (stream) => {
+      const refs = streams.get(stream) ?? 0;
+      streams.set(stream, refs + 1);
+      if (refs > 0 && !rejectedStreams.has(stream)) return;
+      if (rejectedStreams.delete(stream)) retryAttempts.delete(stream);
+      settle(stream);
+    },
+    close: (stream) => {
+      const refs = streams.get(stream) ?? 0;
+      if (refs === 0) return;
+      if (refs > 1) return void streams.set(stream, refs - 1);
+      streams.delete(stream);
+      rejectedStreams.delete(stream);
+      settle(stream);
+    },
+    resync: resyncStream,
   };
 };

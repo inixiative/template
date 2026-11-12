@@ -9,7 +9,10 @@ import type { CustomerModel } from '@template/db/generated/client/enums';
 import { emitAppEvent } from '#/appEvents/emit';
 import { provisionPlatformCustomerRef } from '#/modules/customerRef/services/provisionPlatformCustomerRef';
 
-export type BackfillCounts = Record<CustomerModel, { created: number; revived: number; present: number }>;
+export type BackfillCounts = Record<
+  CustomerModel,
+  { created: number; revived: number; present: number }
+>;
 
 const PAGE = 500;
 
@@ -20,7 +23,9 @@ const customerDelegates = {
 } as const;
 
 const liveIdsOf = async (customerModel: CustomerModel): Promise<string[]> => {
-  const delegate = customerDelegates[customerModel]() as { findMany: (args: unknown) => Promise<{ id: string }[]> };
+  const delegate = customerDelegates[customerModel]() as {
+    findMany: (args: unknown) => Promise<{ id: string }[]>;
+  };
   const ids: string[] = [];
   let cursor: string | undefined;
   for (;;) {

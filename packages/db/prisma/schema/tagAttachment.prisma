@@ -6,20 +6,21 @@
 // columns; exactly one FK populated per row, enforced via the
 // falsePolymorphism hook + registry. New attachment models = add a FK column
 // here, add the PascalCase enum value to TagResource, register in
-// `apps/api/src/hooks/falsePolymorphism/registry.ts`.
+// `packages/db/src/registries/falsePolymorphism.ts`.
 
 model TagAttachment {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime  @default(now())
   deletedAt DateTime?
 
-  // Resource — false polymorphism. resourceModel restricts to PascalCase
-  // entries of TagResource (the model names); camelCase entries
-  // (use-cases) are not valid attachment resources.
+  // Resource — false polymorphism. Only the PascalCase entries of
+  // TagResource (the model names) are valid here; camelCase entries are
+  // use-cases for Tag.resources.
   resourceModel  TagResource
   userId         String?     @db.VarChar(36)
   organizationId String?     @db.VarChar(36)
   spaceId        String?     @db.VarChar(36)
+  projectId      String?     @db.VarChar(36)
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific resource FKs below (e.g. chatGroupId)
   // ==========================================================================
@@ -29,6 +30,7 @@ model TagAttachment {
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tag          Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   // Per-resource uniqueness — partial uniques (see Contact for rationale).
@@ -36,22 +38,20 @@ model TagAttachment {
   @@unique([userId, tagId], where: { userId: { not: null } })
   @@unique([organizationId, tagId], where: { organizationId: { not: null } })
   @@unique([spaceId, tagId], where: { spaceId: { not: null } })
+  @@unique([projectId, tagId], where: { projectId: { not: null } })
   @@index([tagId])
 }
 
-// Mixed enum: PascalCase = physical attachment models, camelCase = use-case
-// concepts (only valid for `Tag.resources`, not `TagAttachment.ownerModel`).
+// Where a tag can be applied. PascalCase = physical attachment models (valid
+// for TagAttachment.resourceModel and Tag.resources); camelCase = use-case
+// concepts (only valid in Tag.resources). Who owns a tag is TagOwnerModel.
 enum TagResource {
-  // SPECIAL — lowercase, no FK. Used as `Tag.ownerModel` for tags that
-  // aren't owned by any specific row (visible everywhere).
-  platform
-
   // PHYSICAL MODELS — PascalCase. Each pairs to one FK column on
-  // TagAttachment (and Tag, when used as the tag's owner) via the
-  // falsePolymorphism registry.
+  // TagAttachment via the falsePolymorphism registry.
   User
   Organization
   Space
+  Project
 
   // USE-CASE CONCEPTS — camelCase. Only valid in `Tag.resources`.
   userMessages

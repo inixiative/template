@@ -5,9 +5,9 @@
  * @uses infrastructure:redis, infrastructure:prisma
  */
 import '#/config/env';
+import '#/lib/rollingCaches';
 import { createRedisConnection, db } from '@template/db';
-import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
-import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
+import { LogScope, log } from '@template/shared/logger';
 import { metrics } from '@template/shared/telemetry';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
@@ -15,13 +15,14 @@ import { initializeOpenTelemetry, shutdownOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
 import { enqueueJob } from '#/jobs/enqueue';
-import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { flushOutbox } from '#/jobs/outbox';
 import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
+import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
+import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
-import { traceJob } from '#/jobs/traceJob';
-import type { WorkerContext } from '#/jobs/types';
+import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { warmRollingCaches } from '#/jobs/warmRollingCaches';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -37,69 +38,41 @@ export const initializeWorker = async (): Promise<void> => {
   }
 
   // BullMQ Worker needs its own connection (separate from Queue)
-  workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl());
+  workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl(), {
+    isBlocking: true,
+  });
 
-  jobsWorker = new Worker(
-    'jobs',
-    async (job: Job) => {
-      if (!isValidHandlerName(job.name)) {
-        log.error(`Unknown job handler: ${job.name}`, LogScope.worker);
-        throw new Error(`Unknown job handler: ${job.name}`);
-      }
+  const slowSlots = createSlowSlotPool(process.env.JOBS_WORKER_CONCURRENCY);
+  jobsWorker = new Worker('jobs', (job: Job) => processJob(job, { slowSlots }), {
+    connection: workerRedis,
+    concurrency: process.env.JOBS_WORKER_CONCURRENCY,
+    lockDuration: 5 * 60 * 1000,
+  });
 
-      const handler = jobHandlers[job.name];
-
-      const scopeId = `${job.name}:${job.id}`;
-      await traceJob(job, () =>
-        logScope(LogScope.worker, () =>
-          logScope(scopeId, () =>
-            db.scope(
-              scopeId,
-              async () => {
-                addLogBroadcast((_level, msg) => job.log(msg));
-
-                const ctx: WorkerContext = { db, queue, job };
-
-                log.info(`Processing job ${job.name} (${job.id})`);
-
-                const payload = (job.data as { payload?: unknown }).payload;
-                await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
-                  if (payload === undefined) {
-                    await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
-                  } else {
-                    await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(
-                      ctx,
-                      payload,
-                    );
-                  }
-                });
-                log.info(`Completed job ${job.name} (${job.id})`);
-              },
-              'worker',
-            ),
-          ),
-        ),
-      );
+  const meter = metrics.getMeter('template.worker');
+  meter.createObservableGauge('messaging.queue.messages').addCallback(async (result) => {
+    const counts = await queue.getJobCounts('wait', 'prioritized', 'active', 'delayed', 'failed');
+    for (const [state, count] of Object.entries(counts))
+      result.observe(count, { 'messaging.destination.name': 'jobs', state });
+  });
+  const slowQueued = meter.createObservableGauge('jobs.slow.queued');
+  const slowDeferred = meter.createObservableGauge('jobs.slow.deferred');
+  const slowIdle = meter.createObservableGauge('jobs.slow.idle_ms', { unit: 'ms' });
+  meter.addBatchObservableCallback(
+    async (result) => {
+      const slowLane = await readSlowLaneState();
+      const attributes = { 'messaging.destination.name': 'jobs' };
+      result.observe(slowQueued, slowLane.queued, attributes);
+      result.observe(slowDeferred, slowLane.deferred, attributes);
+      result.observe(slowIdle, slowLane.idleMs, attributes);
     },
-    {
-      connection: workerRedis,
-      concurrency: 10,
-      lockDuration: 5 * 60 * 1000,
-    },
+    [slowQueued, slowDeferred, slowIdle],
   );
-
-  metrics
-    .getMeter('template.worker')
-    .createObservableGauge('messaging.queue.messages')
-    .addCallback(async (result) => {
-      const counts = await queue.getJobCounts('wait', 'active', 'delayed', 'failed');
-      for (const [state, count] of Object.entries(counts))
-        result.observe(count, { 'messaging.destination.name': 'jobs', state });
-    });
 
   log.info('Job worker initialized', LogScope.worker);
 
   await registerCronJobs();
+  await warmRollingCaches();
 
   // Per-worker in-process drain, not a queued cron — see outbox/drain/loop.ts.
   startOutboxDrainLoop();

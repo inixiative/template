@@ -1,3 +1,4 @@
+import type { Prisma } from '@template/db';
 import {
   DbAction,
   type HookOptions,
@@ -6,7 +7,7 @@ import {
   orderedListRegistry,
   registerDbHook,
 } from '@template/db';
-import { queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
+import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { applyOrderedListBulkDeletedAtChange } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListUpdateManyHook = () => {
@@ -50,8 +51,12 @@ export const registerOrderedListUpdateManyHook = () => {
       if (!data || !previous || !Array.isArray(previous)) return;
       if (data.deletedAt === undefined) return;
 
-      const affected = await applyOrderedListBulkDeletedAtChange(model, data, previous as Record<string, unknown>[]);
-      queueOrderedListCacheInvalidation(model, affected);
+      const affected = await applyOrderedListBulkDeletedAtChange(
+        model,
+        data,
+        previous as Record<string, unknown>[],
+      );
+      await queueCacheClear(model as Prisma.ModelName, affected);
     },
   );
 };

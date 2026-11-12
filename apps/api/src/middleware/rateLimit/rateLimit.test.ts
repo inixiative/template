@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import { getRedisClient } from '@template/db';
 import { clientIp } from '#/lib/clientIp';
 import { type RateLimitRule, rateLimit } from '#/middleware/rateLimit/rateLimit';
@@ -18,15 +18,13 @@ const ipRule = (over: Partial<RateLimitRule> = {}): RateLimitRule => ({
   ...over,
 });
 
-const hit = (fetchFromApp: (req: Request) => Promise<Response>, xff: string, extra: Record<string, string> = {}) =>
-  fetchFromApp(new Request('http://t/rl', { headers: { 'x-forwarded-for': xff, ...extra } }));
+const hit = (
+  fetchFromApp: (req: Request) => Promise<Response>,
+  xff: string,
+  extra: Record<string, string> = {},
+) => fetchFromApp(new Request('http://t/rl', { headers: { 'x-forwarded-for': xff, ...extra } }));
 
 describe('rateLimit', () => {
-  beforeEach(async () => {
-    const keys = await getRedisClient().keys('limit:test:*');
-    if (keys.length) await getRedisClient().del(...keys);
-  });
-
   it('allows up to max, then 429s with Retry-After and the error envelope', async () => {
     const { fetch } = createTestApp({ mount: [mount([ipRule({ max: 2 })])] });
 
@@ -51,7 +49,8 @@ describe('rateLimit', () => {
           app.get(
             '/rl',
             rateLimit([ipRule({ max: 1 })], {
-              onLimited: (c, retryAfterSeconds) => c.redirect(`http://t/limited?after=${retryAfterSeconds}`, 302),
+              onLimited: (c, retryAfterSeconds) =>
+                c.redirect(`http://t/limited?after=${retryAfterSeconds}`, 302),
             }),
             (c) => c.text('ok'),
           );
@@ -75,7 +74,12 @@ describe('rateLimit', () => {
 
   it('AND-checks every rule so the strictest wins', async () => {
     const { fetch } = createTestApp({
-      mount: [mount([ipRule({ max: 100 }), { scope: 'test:global', windowMs: 60_000, max: 1, key: () => 'all' }])],
+      mount: [
+        mount([
+          ipRule({ max: 100 }),
+          { scope: 'test:global', windowMs: 60_000, max: 1, key: () => 'all' },
+        ]),
+      ],
     });
 
     expect((await hit(fetch, '4.4.4.4')).status).toBe(200);

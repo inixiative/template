@@ -1,16 +1,12 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "@inixiative/config/tsconfig/base.json",
   "compilerOptions": {
-    "rootDir": "..",
-    "outDir": "./dist",
-    "baseUrl": ".",
     "paths": {
       "@template/db/*": ["../db/src/*"],
       "@template/permissions/*": ["../permissions/src/*"],
       "@template/shared/*": ["./src/*"],
       "@template/ui/*": ["../ui/src/*"]
-    },
-    "skipLibCheck": true
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

@@ -8,7 +8,10 @@ import { db, polymorphicKeyColumn } from '@template/db';
 import type { CustomerRef } from '@template/db/generated/client/client';
 import type { CustomerModel } from '@template/db/generated/client/enums';
 
-export type PlatformCustomerRefOutcome = { customerRef: CustomerRef; outcome: 'created' | 'revived' | 'present' };
+export type PlatformCustomerRefOutcome = {
+  customerRef: CustomerRef;
+  outcome: 'created' | 'revived' | 'present';
+};
 
 export const provisionPlatformCustomerRef = async (
   customerModel: CustomerModel,
@@ -20,7 +23,10 @@ export const provisionPlatformCustomerRef = async (
   });
   if (existing && !existing.deletedAt) return { customerRef: existing, outcome: 'present' };
   if (existing) {
-    const customerRef = await db.customerRef.update({ where: { id: existing.id }, data: { deletedAt: null } });
+    const customerRef = await db.customerRef.update({
+      where: { id: existing.id },
+      data: { deletedAt: null },
+    });
     return { customerRef, outcome: 'revived' };
   }
   const customerRef = await db.customerRef.create({

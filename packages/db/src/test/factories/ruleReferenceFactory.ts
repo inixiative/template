@@ -1,26 +1,49 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import { RuleReferenceOwnerModel, RuleReferenceReferencedModel } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const ruleReferenceFactory = createFactory('RuleReference', {
-  defaults: () => ({
-    ownerModel: RuleReferenceOwnerModel.EmailTemplate,
-    referencedModel: RuleReferenceReferencedModel.Tag,
-    referencedId: '',
-  }),
+  defaults: () => ({}),
   dependencies: {
-    emailTemplate: { modelName: 'EmailTemplate', foreignKey: { id: 'emailTemplateId' }, required: false },
-    emailComponent: { modelName: 'EmailComponent', foreignKey: { id: 'emailComponentId' }, required: false },
-    segment: { modelName: 'Segment', foreignKey: { id: 'segmentId' }, required: false },
-    tag: { modelName: 'Tag', foreignKey: { id: 'tagId' }, required: false },
-    organization: { modelName: 'Organization', foreignKey: { id: 'organizationId' }, required: false },
-    space: { modelName: 'Space', foreignKey: { id: 'spaceId' }, required: false },
-    referencedSegment: { modelName: 'Segment', foreignKey: { id: 'referencedSegmentId' }, required: false },
+    sourceEmailTemplate: {
+      modelName: 'EmailTemplate',
+      foreignKey: { id: 'sourceEmailTemplateId' },
+      required: false,
+    },
+    sourceEmailComponent: {
+      modelName: 'EmailComponent',
+      foreignKey: { id: 'sourceEmailComponentId' },
+      required: false,
+    },
+    sourceSegment: {
+      modelName: 'Segment',
+      foreignKey: { id: 'sourceSegmentId' },
+      required: false,
+    },
+    targetTag: {
+      modelName: 'Tag',
+      foreignKey: { id: 'targetTagId' },
+      required: false,
+    },
+    targetOrganization: {
+      modelName: 'Organization',
+      foreignKey: { id: 'targetOrganizationId' },
+      required: false,
+    },
+    targetSpace: {
+      modelName: 'Space',
+      foreignKey: { id: 'targetSpaceId' },
+      required: false,
+    },
+    targetSegment: {
+      modelName: 'Segment',
+      foreignKey: { id: 'targetSegmentId' },
+      required: false,
+    },
   },
 });
 

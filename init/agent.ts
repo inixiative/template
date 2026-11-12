@@ -136,7 +136,8 @@ if (import.meta.main) {
   if (section === 'monitoring') {
     const { setupTelemetry } = await import('./tasks/telemetrySetup');
     const mode = requireEnv('MONITORING_MODE');
-    if (!['off', 'otlp', 'split'].includes(mode)) throw new Error('MONITORING_MODE must be off, otlp, or split');
+    if (!['off', 'otlp', 'split'].includes(mode))
+      throw new Error('MONITORING_MODE must be off, otlp, or split');
     await setupTelemetry({
       mode: mode as 'off' | 'otlp' | 'split',
       endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,

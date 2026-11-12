@@ -21,12 +21,18 @@ export const customerRefProviderFk = (ownerModel: ProviderModel): string | null 
 export const customerRefCustomerFk = (customerModel: CustomerModel): string =>
   polymorphicKeyColumn('CustomerRef', 'customerModel', customerModel)!;
 
-export const providerWhere = (ownerModel: ProviderModel, ownerId: string): Prisma.CustomerRefWhereInput => {
+export const providerWhere = (
+  ownerModel: ProviderModel,
+  ownerId: string,
+): Prisma.CustomerRefWhereInput => {
   const fk = customerRefProviderFk(ownerModel);
   return fk ? { providerModel: ownerModel, [fk]: ownerId } : { providerModel: ownerModel };
 };
 
-export const segmentOwnerWhere = (ownerModel: ProviderModel, ownerId: string): Prisma.SegmentWhereInput => {
+export const segmentOwnerWhere = (
+  ownerModel: ProviderModel,
+  ownerId: string,
+): Prisma.SegmentWhereInput => {
   const fk = polymorphicKeyColumn('Segment', 'ownerModel', ownerModel);
   return fk ? { ownerModel, [fk]: ownerId } : { ownerModel };
 };
@@ -37,7 +43,9 @@ export const segmentsOf = (
   ownerId: string,
   where: Prisma.SegmentWhereInput = {},
 ): Promise<Segment[]> =>
-  db.segment.findMany({ where: { AND: [segmentOwnerWhere(ownerModel, ownerId), { deletedAt: null }, where] } });
+  db.segment.findMany({
+    where: { AND: [segmentOwnerWhere(ownerModel, ownerId), { deletedAt: null }, where] },
+  });
 
 export const providerOf = (customerRef: CustomerRef): Provider => {
   const target = polymorphicTarget(customerRef, 'CustomerRef', 'providerModel');

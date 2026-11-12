@@ -6,7 +6,9 @@
  */
 import type { Condition } from '@inixiative/json-rules';
 
-export type ParsedRule = { rule: Condition; ruleError?: never } | { rule?: never; ruleError: string };
+export type ParsedRule =
+  | { rule: Condition; ruleError?: never }
+  | { rule?: never; ruleError: string };
 
 export const parseRuleJson = (text: string): ParsedRule => {
   try {

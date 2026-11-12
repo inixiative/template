@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { buildFilterQuery } from '@template/ui/lib/buildFilterQuery';
-import { parseOrderByStrings, readStateFromUrl, syncStateToUrl } from '@template/ui/lib/dataStatePersistence';
+import {
+  parseOrderByStrings,
+  readStateFromUrl,
+  syncStateToUrl,
+} from '@template/ui/lib/dataStatePersistence';
 import { resolveSectionTarget } from '@template/ui/lib/resolveSectionTarget';
 
 // --- syncStateToUrl ---
@@ -74,7 +78,12 @@ describe('readStateFromUrl', () => {
 
 describe('URL round-trip', () => {
   it('full state round-trips', () => {
-    const original = { page: 5, pageSize: 100, search: 'hello world', orderBy: ['createdAt:desc', 'name:asc'] };
+    const original = {
+      page: 5,
+      pageSize: 100,
+      search: 'hello world',
+      orderBy: ['createdAt:desc', 'name:asc'],
+    };
     const url = syncStateToUrl(original);
     // Extract search string from the URL
     const searchString = url.includes('?') ? url.slice(url.indexOf('?')) : '';
@@ -102,7 +111,9 @@ describe('URL round-trip', () => {
 
 describe('parseOrderByStrings', () => {
   it('parses single field', () => {
-    expect(parseOrderByStrings(['createdAt:desc'])).toEqual([{ field: 'createdAt', direction: 'desc' }]);
+    expect(parseOrderByStrings(['createdAt:desc'])).toEqual([
+      { field: 'createdAt', direction: 'desc' },
+    ]);
   });
 
   it('parses multiple fields', () => {
@@ -130,7 +141,11 @@ describe('hydration chain: URL → filters → query', () => {
     const persisted = readStateFromUrl('?page=3&pageSize=50&search=acme&orderBy=createdAt:desc');
     const orderByObjects = parseOrderByStrings(persisted.orderBy!);
     const filterQuery = buildFilterQuery(persisted.search!, ['name', 'email'], {}, orderByObjects);
-    const query: Record<string, unknown> = { ...filterQuery, page: persisted.page, pageSize: persisted.pageSize };
+    const query: Record<string, unknown> = {
+      ...filterQuery,
+      page: persisted.page,
+      pageSize: persisted.pageSize,
+    };
 
     expect(query).toEqual({
       search: 'acme',

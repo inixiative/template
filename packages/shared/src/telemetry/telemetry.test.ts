@@ -7,8 +7,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { log, withLogContext } from '@template/shared/logger';
 import { observeLogRecords } from '@template/shared/logger/records';
-import { captureTraceContext, recordDuration, SpanKind, withRemoteTrace, withSpan } from '@template/shared/telemetry';
-import { parseOtlpHeaders, readTelemetryConfig, signalExportOptions } from '@template/shared/telemetry/config';
+import {
+  captureTraceContext,
+  incrementCounter,
+  recordDuration,
+  SpanKind,
+  withRemoteTrace,
+  withSpan,
+} from '@template/shared/telemetry';
+import {
+  parseOtlpHeaders,
+  readTelemetryConfig,
+  signalExportOptions,
+} from '@template/shared/telemetry/config';
 import { createFetchExporter } from '@template/shared/telemetry/fetchExporter';
 import { initializeTelemetry } from '@template/shared/telemetry/initialize';
 import { installEnvOverrideProxy, withEnv } from '@template/shared/utils/envOverrides';
@@ -82,6 +93,35 @@ describe('OTLP pipeline', () => {
     expect(point?.bucketCounts.filter((count) => count > 0)).toEqual([1, 1, 1]);
   });
 
+  it('exports counters as monotonic sums of every increment', async () => {
+    const name = 'test.counter.bytes';
+    for (const value of [1, 2, 3]) incrementCounter(name, value, { domain: 'user' }, 'By');
+    await sdk.forceFlush();
+    type ExportedMetrics = {
+      resourceMetrics?: {
+        scopeMetrics: {
+          metrics: {
+            name: string;
+            unit: string;
+            sum?: {
+              isMonotonic: boolean;
+              dataPoints: { asInt?: number | string; asDouble?: number }[];
+            };
+          }[];
+        }[];
+      }[];
+    };
+    const metric = batches
+      .flatMap((batch) => (batch.body as ExportedMetrics).resourceMetrics ?? [])
+      .flatMap((resource) => resource.scopeMetrics)
+      .flatMap((scope) => scope.metrics)
+      .find((metric) => metric.name === name);
+    expect(metric?.unit).toBe('By');
+    expect(metric?.sum?.isMonotonic).toBe(true);
+    const point = metric?.sum?.dataPoints[0];
+    expect(Number(point?.asInt ?? point?.asDouble)).toBe(6);
+  });
+
   it('exports correlated structured logs, traces and metrics to separate destinations', async () => {
     let parentTrace = '';
     await withLogContext({ requestId: 'request-1' }, () =>
@@ -103,7 +143,10 @@ describe('OTLP pipeline', () => {
     const logs = batches.filter((batch) => batch.path.includes('logs'));
     expect(logs.length).toBeGreaterThan(0);
     expect(
-      logs.every((batch) => batch.path === '/betterstack/v1/logs' && batch.authorization === 'Bearer logs-test-key'),
+      logs.every(
+        (batch) =>
+          batch.path === '/betterstack/v1/logs' && batch.authorization === 'Bearer logs-test-key',
+      ),
     ).toBe(true);
     const logsText = JSON.stringify(logs);
     expect(logsText).toContain('reminder.sent');
@@ -128,7 +171,9 @@ describe('OTLP pipeline', () => {
       {
         circular,
         count: 1n,
-        err: new Error('Failed https://example.test/auth?access_token=do-not-export&email=a@b.test'),
+        err: new Error(
+          'Failed https://example.test/auth?access_token=do-not-export&email=a@b.test',
+        ),
       },
       'safe message',
     );
@@ -158,7 +203,10 @@ describe('OTLP pipeline', () => {
       await withSpan('wide-record', {}, async (span) => {
         log
           .child({ token: 'private-scope-token' })
-          .info(Object.fromEntries(Array.from({ length: 110 }, (_, index) => [`field${index}`, index])), 'Wide record');
+          .info(
+            Object.fromEntries(Array.from({ length: 110 }, (_, index) => [`field${index}`, index])),
+            'Wide record',
+          );
         expect(records[0]?.fields.trace_id).toBe(span.spanContext().traceId);
         expect(Array.isArray(records[0]?.fields.scopes)).toBe(true);
       });
@@ -177,13 +225,18 @@ describe('OTLP pipeline', () => {
   });
 
   it('reports rejected exports without throwing or exposing credentials', async () => {
-    const rejecting = Bun.serve({ port: 0, fetch: () => new Response('private response', { status: 401 }) });
+    const rejecting = Bun.serve({
+      port: 0,
+      fetch: () => new Response('private response', { status: 401 }),
+    });
     try {
       const exporter = createFetchExporter({
         url: rejecting.url.toString(),
         serialize: () => new TextEncoder().encode('{}'),
       });
-      const result = await new Promise<{ code: number; error?: Error }>((resolve) => exporter.export({}, resolve));
+      const result = await new Promise<{ code: number; error?: Error }>((resolve) =>
+        exporter.export({}, resolve),
+      );
       expect(result.code).toBe(1);
       expect(result.error?.message).toBe('OTLP export failed');
       await exporter.shutdown();
@@ -197,11 +250,17 @@ describe('telemetry configuration', () => {
   for (const environment of ['pr', 'staging', 'prod']) {
     it(`exports configured ${environment} telemetry by default and honors opt-out`, async () => {
       await withEnv(
-        { ENVIRONMENT: environment, OTEL_ENABLED: undefined, OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test' },
+        {
+          ENVIRONMENT: environment,
+          OTEL_ENABLED: undefined,
+          OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test',
+        },
         async () => {
           expect(readTelemetryConfig('api')?.environment).toBe(environment);
           expect(readTelemetryConfig('worker')?.role).toBe('worker');
-          await withEnv({ OTEL_ENABLED: 'false' }, () => expect(readTelemetryConfig('api')).toBeNull());
+          await withEnv({ OTEL_ENABLED: 'false' }, () =>
+            expect(readTelemetryConfig('api')).toBeNull(),
+          );
         },
       );
     });
@@ -209,37 +268,52 @@ describe('telemetry configuration', () => {
   for (const environment of ['local', 'test', undefined]) {
     it(`requires opt-in for ${environment ?? 'unspecified'} telemetry`, async () => {
       await withEnv(
-        { ENVIRONMENT: environment, OTEL_ENABLED: undefined, OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test' },
+        {
+          ENVIRONMENT: environment,
+          OTEL_ENABLED: undefined,
+          OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test',
+        },
         async () => {
           expect(readTelemetryConfig('api')).toBeNull();
-          await withEnv({ OTEL_ENABLED: 'true' }, () => expect(readTelemetryConfig('api')).not.toBeNull());
+          await withEnv({ OTEL_ENABLED: 'true' }, () =>
+            expect(readTelemetryConfig('api')).not.toBeNull(),
+          );
         },
       );
     });
   }
   it('does not export without a configured destination', async () => {
-    await withEnv({ ENVIRONMENT: 'prod', OTEL_ENABLED: undefined, OTEL_EXPORTER_OTLP_ENDPOINT: undefined }, () =>
-      expect(readTelemetryConfig('api')).toBeNull(),
+    await withEnv(
+      { ENVIRONMENT: 'prod', OTEL_ENABLED: undefined, OTEL_EXPORTER_OTLP_ENDPOINT: undefined },
+      () => expect(readTelemetryConfig('api')).toBeNull(),
     );
   });
 
   it('respects literal false and validates enabled configuration', async () => {
     expect(
-      await withEnv({ OTEL_ENABLED: 'false', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test' }, () =>
-        readTelemetryConfig('api'),
+      await withEnv(
+        { OTEL_ENABLED: 'false', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test' },
+        () => readTelemetryConfig('api'),
       ),
     ).toBeNull();
     expect(
-      withEnv({ OTEL_ENABLED: 'true', OTEL_EXPORTER_OTLP_ENDPOINT: '' }, () => readTelemetryConfig('api')),
+      withEnv({ OTEL_ENABLED: 'true', OTEL_EXPORTER_OTLP_ENDPOINT: '' }, () =>
+        readTelemetryConfig('api'),
+      ),
     ).rejects.toThrow();
   });
   it('parses encoded credentials without losing equals signs', () => {
-    expect(parseOtlpHeaders('Authorization=Bearer%20abc%3D%3D')).toEqual({ Authorization: 'Bearer abc==' });
+    expect(parseOtlpHeaders('Authorization=Bearer%20abc%3D%3D')).toEqual({
+      Authorization: 'Bearer abc==',
+    });
   });
   it('will not forward default credentials to a different provider', async () => {
     await expect(
       withEnv(
-        { OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: 'https://other.test/v1/logs', OTEL_EXPORTER_OTLP_LOGS_HEADERS: undefined },
+        {
+          OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: 'https://other.test/v1/logs',
+          OTEL_EXPORTER_OTLP_LOGS_HEADERS: undefined,
+        },
         () => signalExportOptions('logs', 'https://one.test', { 'api-key': 'private' }),
       ),
     ).rejects.toThrow('explicit signal headers');

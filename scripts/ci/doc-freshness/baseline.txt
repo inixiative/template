@@ -1,0 +1,3 @@
+# Stale doc references that predate the doc-freshness rule: reported, not failed.
+# One per line: <doc>\t<kind>\t<value>. Fix the doc and delete its line; never add lines by hand.
+# Regenerate: bun scripts/ci/rules/lib/docFreshness.ts --write-baseline

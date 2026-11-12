@@ -9,7 +9,8 @@ import {
 
 describe('slug', () => {
   it('accepts lowercase words joined by single hyphens and nothing else', () => {
-    for (const ok of ['acme', 'acme-corp', 'a1-b2']) expect(slugSchema.safeParse(ok).success).toBe(true);
+    for (const ok of ['acme', 'acme-corp', 'a1-b2'])
+      expect(slugSchema.safeParse(ok).success).toBe(true);
     for (const bad of ['', 'Acme', 'acme--corp', '-acme', 'acme-', 'acme corp', 'custom:x']) {
       expect(slugSchema.safeParse(bad).success).toBe(false);
     }

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test';
-import type { Condition } from '@inixiative/json-rules';
-import { lensFor } from '@template/db/lens';
+import type { LensNarrowing } from '@inixiative/json-rules';
+import { lensFor, live } from '@template/db/lens';
 import { interpolate } from '@template/email/render/interpolate';
 import type { RuleErrorSink } from '@template/email/render/settle';
-import { type EmailLens, emailLens } from '@template/email/rules/emailLens';
+import { defaultEmailLens, type EmailLens, emailLens } from '@template/email/rules/emailLens';
 import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
 
 const render = (template: string, data: Record<string, unknown>, onError?: RuleErrorSink) =>
-  interpolate(template, { data }, onError);
+  interpolate(template, { data }, onError, { lens: defaultEmailLens });
 
 describe('{{#each}} loops', () => {
   it('renders the body once per element bound to as=', () => {
@@ -47,10 +47,13 @@ describe('{{#each}} loops', () => {
   });
 
   it('a filter and a rule inside a loop see only what the lens admits', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const tag = (id: string, organizationId: string) => ({
       deletedAt: null,
       tag: { id, name: 'vip', ownerModel: 'Organization', organizationId },
@@ -79,7 +82,10 @@ describe('{{#each}} loops', () => {
       id: 'u1',
       name: 'vip',
       email: 'ann@example.com',
-      providerRefs: [{ segmentMembers: [member('s1'), member('s2')] }, { segmentMembers: [member('s3')] }],
+      providerRefs: [
+        { segmentMembers: [member('s1'), member('s2')] },
+        { segmentMembers: [member('s3')] },
+      ],
       tagAttachments: [
         { deletedAt: null, tag: { id: 'match', name: 'vip' } },
         { deletedAt: null, tag: { id: 'other', name: 'plain' } },
@@ -103,11 +109,7 @@ describe('{{#each}} loops', () => {
         recipient: {
           picks: ['id', 'name'],
           relations: {
-            tagAttachments: {
-              picks: [],
-              where: { field: 'deletedAt', operator: 'notExists' },
-              relations: { tag: { picks: ['id', 'name'] } },
-            },
+            tagAttachments: { picks: [], relations: { tag: { picks: ['id', 'name'] } } },
           },
         },
       },
@@ -132,10 +134,13 @@ describe('{{#each}} loops', () => {
   });
 
   it('the stack a real send renders with — recipient narrowing, owner scope, planner target — shows one truth to tokens and rules', () => {
-    const scoped = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const scoped = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const lens = {
       ...scoped,
       recipient: {
@@ -143,14 +148,27 @@ describe('{{#each}} loops', () => {
         root: { where: { field: 'id', operator: 'equals', value: 'u1' } },
       } as unknown as EmailLens['recipient'],
     };
-    const attachment = (deletedAt: string | null, tag: Record<string, unknown>) => ({ deletedAt, tag });
+    const attachment = (deletedAt: string | null, tag: Record<string, unknown>) => ({
+      deletedAt,
+      tag,
+    });
     const recipient = (id: string) => ({
       id,
       name: 'Ann',
       email: 'ann@example.com',
       tagAttachments: [
-        attachment(null, { id: 'own', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' }),
-        attachment(null, { id: 'theirs', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' }),
+        attachment(null, {
+          id: 'own',
+          name: 'vip',
+          ownerModel: 'Organization',
+          organizationId: 'org-1',
+        }),
+        attachment(null, {
+          id: 'theirs',
+          name: 'vip',
+          ownerModel: 'Organization',
+          organizationId: 'org-2',
+        }),
         attachment('2026-01-01', { id: 'gone', name: 'vip', ownerModel: 'platform' }),
       ],
     });
@@ -158,29 +176,45 @@ describe('{{#each}} loops', () => {
       '{"field":"recipient.tagAttachments","arrayOperator":"any","condition":{"field":"tag.name","operator":"equals","value":"vip"}}';
     const template = `{{#if rule=${rule}}}VIP{{else}}BASE{{/if}}|{{#each recipient.tagAttachments as=item}}[{{item.tag.id}}]{{/each}}`;
     const render = (id: string) =>
-      interpolate(template, { recipient: recipient(id), sender: { id: 'org-1', name: 'Acme' }, data: {} }, undefined, {
-        lens,
-      });
-    expect(render('u1')).toBe('VIP|[own][]');
+      interpolate(
+        template,
+        { recipient: recipient(id), sender: { id: 'org-1', name: 'Acme' }, data: {} },
+        undefined,
+        {
+          lens,
+        },
+      );
+    expect(render('u1')).toBe('VIP|[own]');
     expect(render('u2')).toBe('BASE|');
   });
 
   it('a slot row the lens does not admit is not there to read: a foreign sender prints nothing and issues nothing false', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const render = (sender: Record<string, unknown>) =>
-      interpolate('[{{sender.name}}]', { recipient: { id: 'u1', name: 'Ann' }, sender, data: {} }, undefined, { lens });
+      interpolate(
+        '[{{sender.name}}]',
+        { recipient: { id: 'u1', name: 'Ann' }, sender, data: {} },
+        undefined,
+        { lens },
+      );
     expect(render({ id: 'org-1', name: 'Acme' })).toBe('[Acme]');
     expect(render({ id: 'org-2', name: 'FOREIGN' })).toBe('[]');
   });
 
   it('a token under a loop element reads only what the lens exposes: a foreign tag is not there to print', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const tag = (id: string, organizationId: string) => ({
       deletedAt: null,
       tag: { id, name: `name-${id}`, ownerModel: 'Organization', organizationId },
@@ -200,14 +234,134 @@ describe('{{#each}} loops', () => {
       undefined,
       { lens },
     );
-    expect(out).toBe('[name-own][]');
+    expect(out).toBe('[name-own]');
+  });
+
+  it("memberships are the sender's: another organization's membership is not a row of the loop", () => {
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
+    const out = interpolate(
+      '{{#each recipient.organizationUsers as=m}}[{{m.organization.name}}:{{m.role}}]{{/each}}',
+      {
+        recipient: {
+          id: 'u1',
+          name: 'Ann',
+          email: 'ann@example.com',
+          organizationUsers: [
+            { role: 'admin', organizationId: 'org-1', organization: { id: 'org-1', name: 'Acme' } },
+            {
+              role: 'member',
+              organizationId: 'org-2',
+              organization: { id: 'org-2', name: 'Rival' },
+            },
+          ],
+        },
+        sender: { id: 'org-1', name: 'Acme' },
+        data: {},
+      },
+      undefined,
+      { lens },
+    );
+    expect(out).toBe('[Acme:admin]');
+  });
+
+  describe('a row the owner cannot see renders nothing, yet rules judge it as the database does', () => {
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      { ownerModel: 'Organization', ownerId: 'org-1' },
+      null,
+    );
+    const variables = {
+      recipient: {
+        id: 'u1',
+        name: 'Ann',
+        email: 'ann@example.com',
+        organizationUsers: [
+          { role: 'admin', organization: { id: 'org-1', name: 'Acme' } },
+          { role: 'member', organization: { id: 'org-2', name: 'Rival' } },
+        ],
+      },
+      sender: { id: 'org-1', name: 'Acme' },
+      data: {},
+    };
+    const renderWith = (template: string) => interpolate(template, variables, undefined, { lens });
+
+    it('a foreign organization a loop element reaches prints nothing', () => {
+      expect(
+        renderWith('{{#each recipient.organizationUsers as=m}}[{{m.organization.id}}]{{/each}}'),
+      ).toBe('[org-1][]');
+    });
+
+    it('a negation through the hidden organization holds as the database would, outside and inside a loop', () => {
+      const notAcme = { field: 'organization.name', operator: 'notEquals', value: 'Acme' };
+      const anyNotAcme = JSON.stringify({
+        field: 'recipient.organizationUsers',
+        arrayOperator: 'any',
+        condition: notAcme,
+      });
+      const elementNotAcme = JSON.stringify({ ...notAcme, field: 'm.organization.name' });
+      expect(
+        renderWith(
+          `{{#if rule=${anyNotAcme}}}OTHER{{else}}ONLY{{/if}}|{{#each recipient.organizationUsers as=m}}{{#if rule=${elementNotAcme}}}X{{else}}{{m.role}}{{/if}} {{/each}}|{{#each recipient.organizationUsers as=m filter=${elementNotAcme}}}{{m.role}}{{/each}}`,
+        ),
+      ).toBe('ONLY|admin member |');
+    });
+
+    it('a loop over rows a clamp reads whole, hidden ones among them, fails closed with an issue', () => {
+      const { data, system } = emailLens();
+      const wholeList = {
+        data,
+        system,
+        recipient: {
+          parent: lensFor('User'),
+          root: {
+            picks: ['id', 'name'],
+            where: {
+              field: 'tagAttachments',
+              arrayOperator: 'any',
+              condition: { field: 'deletedAt', operator: 'exists' },
+            },
+            relations: {
+              tagAttachments: { picks: [], where: live, relations: { tag: { picks: ['id'] } } },
+            },
+          },
+        } as LensNarrowing,
+      };
+      const issues: string[] = [];
+      const out = interpolate(
+        '{{#each recipient.tagAttachments as=item}}[{{item.tag.id}}]{{/each}}',
+        {
+          recipient: {
+            id: 'u1',
+            name: 'Ann',
+            tagAttachments: [
+              { deletedAt: null, tag: { id: 'live' } },
+              { deletedAt: '2026-01-01', tag: { id: 'gone' } },
+            ],
+          },
+          data: {},
+        },
+        (issue) => issues.push(issue.detail),
+        { lens: wholeList },
+      );
+      expect(out).toBe('');
+      expect(issues.join(' ')).toContain('cannot be judged one by one');
+    });
   });
 
   it('an unsupported loop rule fails closed with an issue: nothing renders, no raw check', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const theirs = {
       deletedAt: null,
       tag: { id: 'theirs', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' },
@@ -227,9 +381,11 @@ describe('{{#each}} loops', () => {
       { lens },
     );
     expect(out).toBe('|');
-    expect(issues.some((detail) => detail.includes('reads the sender lens from inside a loop over recipient'))).toBe(
-      true,
-    );
+    expect(
+      issues.some((detail) =>
+        detail.includes('reads the sender lens from inside a loop over recipient'),
+      ),
+    ).toBe(true);
   });
 
   it('renders {{#if}} inside a loop against the element scope', () => {
@@ -246,20 +402,26 @@ describe('{{#each}} loops', () => {
   });
 
   it('renders nothing for an empty array', () => {
-    expect(render('before{{#each data.items as=item}}{{item.name}}{{/each}}after', { items: [] })).toBe('beforeafter');
+    expect(
+      render('before{{#each data.items as=item}}{{item.name}}{{/each}}after', { items: [] }),
+    ).toBe('beforeafter');
   });
 
   it('sinks and renders nothing when the path is not an array', () => {
     const errors: string[] = [];
-    const out = render('{{#each data.missing as=item}}{{item.name}}{{/each}}', {}, (m) => errors.push(m.detail));
+    const out = render('{{#each data.missing as=item}}{{item.name}}{{/each}}', {}, (m) =>
+      errors.push(m.detail),
+    );
     expect(out).toBe('');
     expect(errors).toContain('{{#each data.missing}} did not resolve to an array');
   });
 
   it('renders a bare binding token empty (and sinks) when it resolves to an object', () => {
     const errors: string[] = [];
-    const out = render('{{#each data.items as=item}}{{item}}{{/each}}', { items: [{ name: 'A' }] }, (m) =>
-      errors.push(m.detail),
+    const out = render(
+      '{{#each data.items as=item}}{{item}}{{/each}}',
+      { items: [{ name: 'A' }] },
+      (m) => errors.push(m.detail),
     );
     expect(out).toBe('');
     expect(errors.some((m) => m.includes('non-primitive'))).toBe(true);
@@ -276,12 +438,107 @@ describe('{{#each}} loops', () => {
 
   it('rejects a missing as= attribute', () => {
     const errors: string[] = [];
-    const out = render('{{#each data.items}}x{{/each}}', { items: [{ name: 'A' }] }, (m) => errors.push(m.detail));
+    const out = render('{{#each data.items}}x{{/each}}', { items: [{ name: 'A' }] }, (m) =>
+      errors.push(m.detail),
+    );
     expect(out).toBe('');
     expect(errors.some((m) => m.includes('as='))).toBe(true);
   });
 
   it('renders an unknown root empty outside any loop, never the literal token', () => {
     expect(render('hello {{unknown.thing}} world', {})).toBe('hello  world');
+  });
+
+  it('a rule inside a loop over an opaque slot that probes a lens-backed root renders nothing and reports it', () => {
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
+    const probe = JSON.stringify({
+      field: 'recipient.organizationUsers',
+      arrayOperator: 'any',
+      condition: { field: 'organization.name', operator: 'equals', value: 'Theirs' },
+    });
+    const issues: string[] = [];
+    const out = interpolate(
+      `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{else}}-{{/if}}{{/each}}`,
+      {
+        recipient: {
+          id: 'u1',
+          name: 'Ann',
+          organizationUsers: [{ role: 'member', organization: { id: 'org-2', name: 'Theirs' } }],
+        },
+        data: { items: [1] },
+      },
+      (issue) => issues.push(issue.detail),
+      { lens },
+    );
+    expect(out).not.toContain('LEAK');
+    expect(issues.join(' ')).toContain('opaque slot');
+  });
+
+  describe('a rule never reads a clamp column the lens hides', () => {
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
+    const variables = {
+      recipient: {
+        id: 'u1',
+        name: 'Ann',
+        tagAttachments: [
+          {
+            deletedAt: null,
+            tag: { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' },
+          },
+        ],
+      },
+      data: { org: 'org-1', items: [1] },
+    };
+    const probe = (path: string) => JSON.stringify({ field: 'data.org', operator: 'equals', path });
+    const renderIssues = (template: string) => {
+      const issues: string[] = [];
+      const out = interpolate(template, variables, (issue) => issues.push(issue.detail), { lens });
+      return { out, issues };
+    };
+
+    for (const path of [
+      'recipient.tagAttachments.0.tag.organizationId',
+      '$.recipient.tagAttachments.0.tag.organizationId',
+    ]) {
+      it(`a path value into a hidden column is refused: ${path}`, () => {
+        const top = renderIssues(`{{#if rule=${probe(path)}}}LEAK{{/if}}`);
+        expect(top.out).not.toContain('LEAK');
+        const looped = renderIssues(
+          `{{#each data.items as=i}}{{#if rule=${probe(path)}}}LEAK{{/if}}{{/each}}`,
+        );
+        expect(looped.out).not.toContain('LEAK');
+        expect(looped.issues.length).toBeGreaterThan(0);
+      });
+    }
+
+    it('a binding over a lens-backed collection inside an opaque loop is refused, rule and filter alike', () => {
+      const hidden = JSON.stringify({
+        field: 't.tag.organizationId',
+        operator: 'equals',
+        value: 'org-1',
+      });
+      const branch = renderIssues(
+        `{{#each data.items as=i}}{{#each recipient.tagAttachments as=t}}{{#if rule=${hidden}}}LEAK{{/if}}{{/each}}{{/each}}`,
+      );
+      expect(branch.out).not.toContain('LEAK');
+      expect(branch.issues.join(' ')).toContain('opaque slot');
+      const filtered = renderIssues(
+        `{{#each data.items as=i}}{{#each recipient.tagAttachments as=t filter=${hidden}}}LEAK{{/each}}{{/each}}`,
+      );
+      expect(filtered.out).not.toContain('LEAK');
+      expect(filtered.issues.join(' ')).toContain('opaque slot');
+    });
   });
 });

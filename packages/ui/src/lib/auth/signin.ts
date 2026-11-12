@@ -4,13 +4,19 @@
  * @partOf primitive:ui
  * @uses none
  */
-import { setToken } from '@template/ui/lib/auth/token';
-import type { AuthMethod, EmailAuthMethod, OAuthAuthMethod, SamlAuthMethod } from '@template/ui/lib/auth/types';
+import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
+import type {
+  AuthMethod,
+  EmailAuthMethod,
+  OAuthAuthMethod,
+  SamlAuthMethod,
+} from '@template/ui/lib/auth/types';
 import { createAuthClient } from 'better-auth/client';
+import { oneTimeTokenClient } from 'better-auth/client/plugins';
 
 const getAuthClient = () => {
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-  return createAuthClient({ baseURL });
+  return createAuthClient({ baseURL, plugins: [oneTimeTokenClient()] });
 };
 
 const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
@@ -22,15 +28,10 @@ const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
   });
 
   if (error) {
-    throw new Error(error.message || 'Sign in failed');
+    throw new Error(error.message || error.statusText);
   }
 
-  if (!data?.token) {
-    throw new Error('No token returned from sign in');
-  }
-
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  setToken(data.token, expiresAt);
+  storeJwtHandoff(data);
 };
 
 const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
@@ -41,7 +42,20 @@ const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
   await client.signIn.social({
     provider: method.provider,
     callbackURL,
+    errorCallbackURL: `${window.location.origin}/login`,
   });
+};
+
+export const completeOAuthSignIn = async (oneTimeToken: string): Promise<void> => {
+  const client = getAuthClient();
+
+  const { data, error } = await client.oneTimeToken.verify({ token: oneTimeToken });
+
+  if (error) {
+    throw new Error(error.message || error.statusText);
+  }
+
+  storeJwtHandoff(data);
 };
 
 const signInWithSaml = async (_method: SamlAuthMethod): Promise<void> => {

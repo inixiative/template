@@ -8,7 +8,10 @@ type RailwayProgressGroup = {
   getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
-const countCompletedActions = (progress: RailwayProgress, actions: readonly RailwayAction[]): number => {
+const countCompletedActions = (
+  progress: RailwayProgress,
+  actions: readonly RailwayAction[],
+): number => {
   return actions.filter((action) => progress[action]).length;
 };
 
@@ -16,7 +19,9 @@ const railwayProgressGroups: readonly RailwayProgressGroup[] = [
   {
     actions: ['selectWorkspace'],
     getLabel: (config) =>
-      config.railway?.workspaceId ? `Workspace selected: ${config.railway.workspaceId}` : 'Workspace selected',
+      config.railway?.workspaceId
+        ? `Workspace selected: ${config.railway.workspaceId}`
+        : 'Workspace selected',
   },
   {
     actions: ['storeRailwayToken'],
@@ -25,10 +30,16 @@ const railwayProgressGroups: readonly RailwayProgressGroup[] = [
   {
     actions: ['createProject'],
     getLabel: (config) =>
-      config.railway?.projectId ? `Project created: ${config.railway.projectId}` : 'Project created',
+      config.railway?.projectId
+        ? `Project created: ${config.railway.projectId}`
+        : 'Project created',
   },
   {
-    actions: ['ensureProdEnvironment', 'storeProdEnvironmentIdSecret', 'deleteLegacyProductionEnvironment'],
+    actions: [
+      'ensureProdEnvironment',
+      'storeProdEnvironmentIdSecret',
+      'deleteLegacyProductionEnvironment',
+    ],
     getLabel: (config, completedCount, totalCount) =>
       config.railway?.prodEnvironmentId
         ? `Production environment ready (${completedCount}/${totalCount}): ${config.railway.prodEnvironmentId}`
@@ -159,7 +170,9 @@ export const getRailwayProgressSummaries = (config: ProjectConfig): RailwayProgr
   });
 };
 
-export const getRailwayProgressItems = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
+export const getRailwayProgressItems = (
+  config: ProjectConfig,
+): Array<{ label: string; completed: boolean }> => {
   return getRailwayProgressSummaries(config).map((summary) => ({
     label: summary.label,
     completed: summary.completed,

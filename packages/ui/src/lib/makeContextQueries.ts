@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind factory
+ * @kind constructor
+ * @constructs contextQueries
  * @partOf primitive:ui
  * @uses none
  */
@@ -25,7 +26,9 @@ export type Slot = QuerySlot | MutationSlot;
 
 export const query = <TData>(slot: QuerySlot<TData>): QuerySlot<TData> => slot;
 
-export const mutation = <TVars, TData>(slot: MutationSlot<TVars, TData>): MutationSlot<TVars, TData> => slot;
+export const mutation = <TVars, TData>(
+  slot: MutationSlot<TVars, TData>,
+): MutationSlot<TVars, TData> => slot;
 
 type ContextScopeMap<T, P> = {
   public?: (args: undefined, params?: P) => T;

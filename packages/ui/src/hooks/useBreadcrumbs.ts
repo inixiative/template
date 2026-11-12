@@ -18,11 +18,17 @@ export const useBreadcrumbs = (): { items: Breadcrumb[]; onNavigate: (href: stri
   const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
 
   const items = useMemo(
-    () => (currentRouteMatch ? buildBreadcrumbs(currentRouteMatch, context, pageContext, spoofUserEmail) : []),
+    () =>
+      currentRouteMatch
+        ? buildBreadcrumbs(currentRouteMatch, context, pageContext, spoofUserEmail)
+        : [],
     [currentRouteMatch, context, pageContext, spoofUserEmail],
   );
 
-  const onNavigate = useCallback((href: string) => navigatePreserving(href, 'context'), [navigatePreserving]);
+  const onNavigate = useCallback(
+    (href: string) => navigatePreserving(href, 'context'),
+    [navigatePreserving],
+  );
 
   return useMemo(() => ({ items, onNavigate }), [items, onNavigate]);
 };

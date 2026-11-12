@@ -24,7 +24,10 @@ export const createEncryption = (keyring: EncryptionKeyring) => {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(keyring.currentKey, 'base64'), iv);
     cipher.setAAD(Buffer.from(aad, 'utf8'));
-    const encrypted = Buffer.concat([cipher.update(JSON.stringify(plaintext), 'utf8'), cipher.final()]);
+    const encrypted = Buffer.concat([
+      cipher.update(JSON.stringify(plaintext), 'utf8'),
+      cipher.final(),
+    ]);
     return {
       ciphertext: encrypted.toString('base64'),
       version: keyring.currentVersion,
@@ -34,7 +37,8 @@ export const createEncryption = (keyring: EncryptionKeyring) => {
   };
 
   const decrypt = (encrypted: EncryptedFieldData, aad: string): unknown => {
-    const key = encrypted.version === keyring.currentVersion ? keyring.currentKey : keyring.previousKey;
+    const key =
+      encrypted.version === keyring.currentVersion ? keyring.currentKey : keyring.previousKey;
     const decipher = crypto.createDecipheriv(
       ALGORITHM,
       Buffer.from(key!, 'base64'),

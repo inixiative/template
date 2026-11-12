@@ -1,0 +1,26 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
+import { andWhere, type SourceQuery } from '@inixiative/json-rules';
+import {
+  compiledSourceWhere,
+  type SourceQueryScope,
+  sourceQueryValues,
+} from '@template/db/utils/sourceQueryValues';
+
+export const sourceQueryWhere = async (
+  query: SourceQuery,
+  scope: SourceQueryScope,
+): Promise<Record<string, unknown>> => {
+  const where = await compiledSourceWhere(query);
+  if (query.recheck === undefined) return where;
+  if (query.field !== 'id')
+    throw new Error(
+      `Source ${query.model}.${query.field} reads across a bridge; only an id source pins its re-checked rows as a where`,
+    );
+  const { options } = await sourceQueryValues(query, scope);
+  return andWhere([where, { [query.field]: { in: options.map((option) => option.value) } }]);
+};

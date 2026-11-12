@@ -23,9 +23,9 @@ const internalSegmentWhere = (segmentId: string, deletedAt: Date | null) => ({
 });
 
 const cascadeInternalSegment = async ({ action, args, result, previous }: HookOptions) => {
-  const data = (action === DbAction.upsert ? (args as { update?: Row }).update : (args as { data?: Row }).data) as
-    | Row
-    | undefined;
+  const data = (
+    action === DbAction.upsert ? (args as { update?: Row }).update : (args as { data?: Row }).data
+  ) as Row | undefined;
   if (!data || !('deletedAt' in data)) return;
   const previousById = keyBy(castArray((previous ?? []) as FeatureFlagVariant[]), 'id');
   for (const variant of castArray(result) as FeatureFlagVariant[]) {
@@ -52,7 +52,9 @@ export const registerFeatureFlagVariantHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ args }) => {
-      for (const row of castArray((args as { data: FeatureFlagVariantRow | FeatureFlagVariantRow[] }).data)) {
+      for (const row of castArray(
+        (args as { data: FeatureFlagVariantRow | FeatureFlagVariantRow[] }).data,
+      )) {
         await validateFeatureFlagVariantRow(row);
       }
     },
@@ -73,7 +75,9 @@ export const registerFeatureFlagVariantHook = () => {
       };
       const [row] = castArray(a.data ?? []);
       if (!row) return;
-      const befores = previous ? castArray(previous) : await db.featureFlagVariant.findMany({ where: a.where });
+      const befores = previous
+        ? castArray(previous)
+        : await db.featureFlagVariant.findMany({ where: a.where });
       for (const before of befores) await validateFeatureFlagVariantRow(row, before);
     },
   );
@@ -84,7 +88,10 @@ export const registerFeatureFlagVariantHook = () => {
     HookTiming.before,
     [DbAction.upsert],
     async (options) => {
-      const { args, previous } = options as HookOptions & { action: SingleAction; previous?: FeatureFlagVariant };
+      const { args, previous } = options as HookOptions & {
+        action: SingleAction;
+        previous?: FeatureFlagVariant;
+      };
       const a = args as {
         where?: Prisma.FeatureFlagVariantWhereInput;
         create?: FeatureFlagVariantRow;

@@ -12,6 +12,9 @@ export type WSData = {
   userId: string | null; // effective identity: real, or spoofed-as; null = anonymous
   headers: Record<string, string>; // the credential behind `userId`, shaped as the HTTP surface expects
   channels: Set<string>; // subscribed channels (normalized query keys)
+  streams: Set<string>;
+  heldAppends: Map<string, string[]>;
+  latestStreamFrames: Map<string, StreamFrame>; // newest queued open/close per stream
   connectedAt: number;
   lastPing: number; // staleness detection
   queue: SerializedQueue; // serializes this connection's async message handling
@@ -24,7 +27,11 @@ export type WSMessage =
   | { action: 'logout' }
   | { action: 'subscribe'; channel: string }
   | { action: 'unsubscribe'; channel: string }
+  | { action: 'open'; stream: string }
+  | { action: 'close'; stream: string }
   | { action: 'ping' };
+
+export type StreamFrame = Extract<WSMessage, { action: 'open' | 'close' }>;
 
 export type WSSocket = ServerWebSocket<WSData>;
 

@@ -13,7 +13,10 @@ export type OrganizationDeletedPayload = { organization: Organization };
 export const organizationDeleted = makeAppEvent<OrganizationDeletedPayload>({
   cb: [
     async ({ organization }) => {
-      await enqueueJob('reconcileCustomerRefSegments', { customerModel: 'Organization', customerId: organization.id });
+      await enqueueJob('reconcileCustomerRefSegments', {
+        customerModel: 'Organization',
+        customerId: organization.id,
+      });
     },
   ],
 });

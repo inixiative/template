@@ -14,8 +14,8 @@ export type Variables = Partial<Record<ScopeRoot, Record<string, unknown>>>;
 
 export type InterpolateOptions = {
   locale?: string;
-  liveRefs?: ReadonlySet<string>;
-  lens?: EmailLens;
+  existingTargets?: ReadonlySet<string>;
+  lens: EmailLens;
 };
 
 const SYSTEM_TOKEN_PATTERN = /\{\{system\.([a-zA-Z0-9_-]+)\}\}/g;
@@ -31,9 +31,12 @@ const SYSTEM_TOKEN_RESOLVERS: Record<SystemTokenName, (now: Date, locale?: strin
     }
   },
   year: (now) => String(now.getUTCFullYear()),
+  platformName: () => process.env.PROJECT_NAME ?? 'Template',
+  webUrl: () => process.env.WEB_URL ?? '',
 };
 
-const isSystemTokenName = (name: string): name is SystemTokenName => Object.hasOwn(SYSTEM_TOKEN_RESOLVERS, name);
+const isSystemTokenName = (name: string): name is SystemTokenName =>
+  Object.hasOwn(SYSTEM_TOKEN_RESOLVERS, name);
 
 const resolveSystemTokens = (template: string, options: InterpolateOptions): string => {
   const now = new Date();
@@ -48,12 +51,16 @@ export const toScope = (variables: Variables): Scope => ({ ...variables });
 export const interpolate = (
   template: string,
   variables: Variables,
-  onError?: RuleErrorSink,
-  options: InterpolateOptions = {},
-): string =>
-  settle(
+  onError: RuleErrorSink | undefined,
+  options: InterpolateOptions,
+): string => {
+  const { lens } = options;
+  const scope = toScope(narrowVariables(lens, variables));
+  const ruleScope = toScope(narrowVariables(lens, variables, { keepClampColumns: true }));
+  return settle(
     resolveSystemTokens(template, options),
-    toScope(options.lens ? narrowVariables(options.lens, variables) : variables),
-    { substitute: true, liveRefs: options.liveRefs, lens: options.lens },
+    scope,
+    { substitute: true, existingTargets: options.existingTargets, lens, ruleScope },
     onError,
   );
+};

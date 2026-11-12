@@ -23,16 +23,23 @@ const refsOf = (
     REFS_TTL,
   );
 
-const platformOnly = (refs: CustomerRef[]): CustomerRef[] => refs.filter((ref) => ref.providerModel === 'platform');
+const platformOnly = (refs: CustomerRef[]): CustomerRef[] =>
+  refs.filter((ref) => ref.providerModel === 'platform');
 
 const subjectRefs = async (c: Context<AppEnv>): Promise<CustomerRef[]> => {
   const user = c.get('user');
   const token = c.get('token');
-  const organizations = user ? (c.get('organizations') ?? []) : token?.organization ? [token.organization] : [];
+  const organizations = user
+    ? (c.get('organizations') ?? [])
+    : token?.organization
+      ? [token.organization]
+      : [];
   const spaces = user ? (c.get('spaces') ?? []) : token?.space ? [token.space] : [];
   const [own, orgRefs, spaceRefs] = await Promise.all([
     user ? refsOf('user', 'customerUserId', user.id) : Promise.resolve([]),
-    Promise.all(organizations.map((org) => refsOf('organization', 'customerOrganizationId', org.id))),
+    Promise.all(
+      organizations.map((org) => refsOf('organization', 'customerOrganizationId', org.id)),
+    ),
     Promise.all(spaces.map((space) => refsOf('space', 'customerSpaceId', space.id))),
   ]);
   return [...own, ...platformOnly(orgRefs.flat()), ...platformOnly(spaceRefs.flat())];

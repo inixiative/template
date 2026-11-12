@@ -4,9 +4,9 @@
  * @partOf feature:integrations, superadmin
  * @uses primitive:routeTemplates
  */
-import { IntegrationScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
+import { integrationReadResponseSchema } from '#/modules/integration/schemas/integrationSchemas';
 import { Modules } from '#/modules/modules';
 
 export const adminIntegrationReadManyRoute = readRoute({
@@ -16,5 +16,5 @@ export const adminIntegrationReadManyRoute = readRoute({
   skipId: true,
   admin: true,
   filterLens: { parent: lensFor('Integration') },
-  responseSchema: IntegrationScalarSchema,
+  responseSchema: integrationReadResponseSchema,
 });

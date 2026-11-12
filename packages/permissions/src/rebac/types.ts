@@ -11,7 +11,6 @@ export type {
   RelationCheck,
   ResourcePermission,
   RuleCheck,
-  SelfCheck,
 } from '@inixiative/permissions';
 
 export type RebacSchema = EngineRebacSchema;

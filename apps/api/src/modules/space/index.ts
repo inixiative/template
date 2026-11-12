@@ -4,7 +4,6 @@ import type { AppEnv } from '#/types/appEnv';
 
 export const spaceRouter = new OpenAPIHono<AppEnv>();
 
-// Note: No validateActor middleware here - spaceRead is public
 // Protected routes use validatePermission middleware individually
 
 await autoRegisterRoutes(spaceRouter, import.meta.dirname);

@@ -1,6 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization, Space, SpaceUser } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -24,7 +28,7 @@ describe('handler: updateSpace — validate', () => {
   let spaceUser: SpaceUser;
   let freshSpace: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: owner } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
@@ -38,7 +42,10 @@ describe('handler: updateSpace — validate', () => {
     spaceUser = su;
     const { entity: fs } = await createSpace({}, { organization: org });
     freshSpace = fs;
-    const { entity: fsu } = await createSpaceUser({ role: 'owner' }, { ...ouCtx, space: freshSpace });
+    const { entity: fsu } = await createSpaceUser(
+      { role: 'owner' },
+      { ...ouCtx, space: freshSpace },
+    );
 
     const harness = createTestApp({
       mockUser: owner,
@@ -50,7 +57,7 @@ describe('handler: updateSpace — validate', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

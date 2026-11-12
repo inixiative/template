@@ -1,12 +1,22 @@
 /**
  * @atlas
- * @partOf infrastructure:prisma
+ * @kind constructor, registry
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
+ * @constructs factory
  */
 import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
+import { withDiscriminatorDefaults } from '@template/db/registries/discriminatorDefaults';
+import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { withMaterializedIds } from '@template/db/registries/materializedIds';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
+import {
+  assertDiscriminatorsChosen,
+  assertNoDiscriminatorDefaults,
+  assertParentFollowsAxes,
+  assertSelectedForeignKeys,
+} from '@template/db/test/factoryPolymorphism';
 import type {
   BuildContext,
   BuildResult,
@@ -19,7 +29,7 @@ import type {
   Serialized,
   WhereUniqueOf,
 } from '@template/db/test/factoryTypes';
-import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import { carryDelegatedKeys } from '@template/db/utils/carryDelegatedKeys';
 import { toAccessor } from '@template/db/utils/modelNames';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
@@ -83,8 +93,20 @@ type RegisteredFactory = {
 
 const factoryRegistry = new Map<ModelName, RegisteredFactory>();
 
-export const createFactory = <K extends ModelName>(modelName: K, config: FactoryConfig<K>): Factory<K> => {
+const foreignKeyGiven = (dep: DependencyConfig, scalarFields: Record<string, unknown>) =>
+  (typeof dep.foreignKey === 'string' ? [dep.foreignKey] : Object.values(dep.foreignKey)).every(
+    (field) => scalarFields[field] != null,
+  );
+
+export const registeredDependencies = (modelName: ModelName) =>
+  factoryRegistry.get(modelName)?.dependencies ?? {};
+
+export const createFactory = <K extends ModelName>(
+  modelName: K,
+  config: FactoryConfig<K>,
+): Factory<K> => {
   const dependencies = mergeDependencies(modelName, config.dependencies);
+  assertNoDiscriminatorDefaults(modelName, config.defaults() as Record<string, unknown>);
 
   factoryRegistry.set(modelName, {
     defaults: config.defaults as () => Partial<unknown>,
@@ -120,12 +142,17 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
       ...scalarFields,
     };
 
+    Object.assign(merged, withDiscriminatorDefaults(modelName, merged));
+    assertDiscriminatorsChosen(modelName, merged);
+
     for (const [fieldName, dep] of Object.entries(dependencies)) {
       const relationValue = relationFields[fieldName];
       const registered = factoryRegistry.get(dep.modelName);
 
       if (!registered) {
-        throw new Error(`Dependency factory not registered: ${dep.modelName}. Import it before using.`);
+        throw new Error(
+          `Dependency factory not registered: ${dep.modelName}. Import it before using.`,
+        );
       }
 
       const depAccessor = toAccessor(dep.modelName);
@@ -142,7 +169,8 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
             ? depFactory.create(relationValue as never, ctx)
             : depFactory.build(relationValue as never, ctx));
         }
-      } else if (!ctx[depAccessor] && dep.required) {
+      } else if (!ctx[depAccessor] && dep.required && !foreignKeyGiven(dep, scalarFields)) {
+        assertParentFollowsAxes(modelName, merged, dep.modelName);
         const depFactory = createFactory(dep.modelName, {
           defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
         });
@@ -162,7 +190,7 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
         //    from incidental ctx if the discriminator forbids it (e.g.
         //    Inquiry { targetModel: 'admin' } must not gain a
         //    targetOrganizationId just because orgCtx carries one).
-        const polyConfig = PolymorphismRegistry[modelName];
+        const polyConfig = getPolymorphismConfig(modelName);
         const fkAllowed = (fkField: string): boolean => {
           if (!polyConfig) return true;
           const axis = polyConfig.axes.find((a) => Object.values(a.fkMap).flat().includes(fkField));
@@ -186,10 +214,19 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
       }
     }
 
-    const delegate = db[toAccessor(modelName)] as unknown as RuntimeDelegate;
+    await carryDelegatedKeys(modelName, merged);
+
+    assertSelectedForeignKeys(modelName, merged);
+    Object.assign(merged, withMaterializedIds(modelName, merged));
+
+    const delegate = db.delegate(modelName);
     const entity: ModelOf<K> = persist
       ? upsertWhere
-        ? ((await delegate.upsert({ where: upsertWhere, create: merged, update: {} })) as ModelOf<K>)
+        ? ((await delegate.upsert({
+            where: upsertWhere,
+            create: merged,
+            update: {},
+          })) as ModelOf<K>)
         : ((await delegate.create({ data: merged })) as ModelOf<K>)
       : (merged as ModelOf<K>);
 
@@ -214,6 +251,7 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
   return {
     build: (overrides, context) => generate(false, overrides, context),
     create: (overrides, context) => generate(true, overrides, context) as Promise<BuildResult<K>>,
-    upsert: (where, overrides, context) => generate(true, overrides, context, where) as Promise<BuildResult<K>>,
+    upsert: (where, overrides, context) =>
+      generate(true, overrides, context, where) as Promise<BuildResult<K>>,
   };
 };

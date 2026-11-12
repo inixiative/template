@@ -8,13 +8,17 @@
 // - Audit trail (all Space access traces to Org membership)
 
 model SpaceUser {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  inquiriesSent        Inquiry[]       @relation("InquirySource")
+  inquiriesReceived    Inquiry[]       @relation("InquiryTarget")
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetEntitlements   Entitlement[]   @relation("EntitlementTarget")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
 
-  role         Role  @default(member)
-  entitlements Json?
+  role Role @default(member)
 
   // Relations
   organizationId     String           @db.VarChar(36)
@@ -22,9 +26,13 @@ model SpaceUser {
   userId             String           @db.VarChar(36)
   organizationUser   OrganizationUser @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
   organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  space              Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  space              Space            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
   user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokens             Token[]
+  integrations       Integration[]
+  projects           Project[]
+  emailTemplates     EmailTemplate[]
+  emailComponents    EmailComponent[]
   auditLogsAsSubject AuditLog[]       @relation("AuditLogSubjectSpaceUser")
 
   // ==========================================================================

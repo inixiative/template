@@ -4,9 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import type { LensNarrowing } from '@inixiative/json-rules';
-import type { ModelName } from '@template/db';
-import { dialect, rootLens, searchablePaths } from '@template/db/lens';
+import { getLensRoot, type LensNarrowing, projectLens } from '@inixiative/json-rules';
+import { lookupField, type ModelField, type ModelName, toModelName } from '@template/db';
+import { dialect, searchablePaths } from '@template/db/lens';
+import { redactLens } from '@template/db/lens/redactLens';
 import {
   FIELD_OPERATORS,
   isArrayFieldOperator,
@@ -17,12 +18,16 @@ import {
 import { makeError } from '#/lib/errors';
 import { buildSearchPath } from '#/lib/prisma/buildSearchPath';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
-import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
+import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
 import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { validatePathNotation } from '#/lib/prisma/pathNotation';
-import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/lib/prisma/scalarOperators';
-import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
+import { getDefaultOperator, getValidOperators } from '#/lib/prisma/scalarOperators';
+import type {
+  BracketQueryPrimitive,
+  BracketQueryRecord,
+  BracketQueryValue,
+} from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
   filterLens: LensNarrowing;
@@ -67,7 +72,10 @@ const MAX_COMBINATOR_CHILDREN = 25;
 // `{ '0': …, '1': … }` → ordered array. The wire carries combinator siblings under numeric
 // segments and the parse yields numeric-STRING keys, never a real array, so order comes from
 // the key rather than insertion.
-const indexedChildren = (combinator: string, value: BracketQueryValue | undefined): BracketQueryRecord[] => {
+const indexedChildren = (
+  combinator: string,
+  value: BracketQueryValue | undefined,
+): BracketQueryRecord[] => {
   const entries = isRecord(value) ? Object.entries(value) : [];
   if (!entries.length || entries.some(([key, child]) => !/^\d+$/.test(key) || !isRecord(child))) {
     throw makeError({
@@ -83,12 +91,35 @@ const indexedChildren = (combinator: string, value: BracketQueryValue | undefine
       message: `'${combinator}' accepts at most ${MAX_COMBINATOR_CHILDREN} groups, got ${entries.length}`,
     });
   }
-  return entries.sort(([a], [b]) => Number(a) - Number(b)).map(([, child]) => child as BracketQueryRecord);
+  return entries
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([, child]) => child as BracketQueryRecord);
 };
 
-const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
+const kindLabel = (field: ModelField): string => (field.kind === 'enum' ? 'enum' : field.type);
 
-const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
+const PATTERN_OPS = new Set(['contains', 'startsWith', 'endsWith']);
+const EQUALITY_OPS = new Set(['equals', 'not']);
+
+const isTextField = (field: ModelField): boolean =>
+  field.kind === 'scalar' && field.type === 'String' && !field.isList;
+
+const matchesLiterally = (
+  field: ModelField,
+  op: string,
+  value: unknown,
+  insensitive: boolean,
+): unknown =>
+  typeof value === 'string' &&
+  isTextField(field) &&
+  (PATTERN_OPS.has(op) || (insensitive && EQUALITY_OPS.has(op)))
+    ? escapeLikePattern(value)
+    : value;
+
+const wrapBareValue = (
+  field: ModelField,
+  value: BracketQueryPrimitive,
+): Record<string, unknown> => {
   // Bare symbols (null/true/false) on a json column → equals that json scalar (null
   // is the provider json-null). Non-symbol bare values never reach here for json.
   if (field.kind === 'scalar' && field.type === 'Json' && isBracketSymbol(value)) {
@@ -98,15 +129,11 @@ const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<st
     return { equals: null };
   }
   const op = getDefaultOperator(field);
-  const coerced = coerceValueForField(field, value);
-  if (dialect.stringMode && field.kind === 'scalar' && field.type === 'String' && STRING_OPS_WITH_MODE.has(op)) {
-    return { [op]: coerced, mode: dialect.stringMode };
-  }
-  return { [op]: coerced };
+  return { [op]: matchesLiterally(field, op, coerceValueForField(field, value), false) };
 };
 
 const transformOperatorValue = (
-  field: FieldDef,
+  field: ModelField,
   value: BracketQueryRecord,
   fieldPath: string,
 ): Record<string, unknown> => {
@@ -133,18 +160,42 @@ const transformOperatorValue = (
     }
   }
 
-  // String ops support `mode` on Postgres. Auto-add it when any mode-capable op is
-  // present and the caller didn't override `mode`. No-op where dialect omits mode.
-  if (
-    dialect.stringMode &&
-    field.kind === 'scalar' &&
-    field.type === 'String' &&
-    out.mode === undefined &&
-    Object.keys(out).some((k) => STRING_OPS_WITH_MODE.has(k))
-  ) {
-    out.mode = dialect.stringMode;
+  const insensitive = out.mode === 'insensitive';
+  for (const [op, opValue] of Object.entries(out)) {
+    out[op] = matchesLiterally(field, op, opValue, insensitive);
   }
   return out;
+};
+
+type EnumValuesAt = (path: string) => readonly string[] | undefined;
+
+const enumValuesLookup = (filterLens: LensNarrowing): EnumValuesAt => {
+  const rootKey = getLensRoot(filterLens).model;
+  const byPath = projectLens(redactLens(filterLens));
+  return (path) => {
+    const segments = path.split('.');
+    const fieldName = segments.pop() as string;
+    const entry = byPath[[rootKey, ...segments].join('.')]?.fields[fieldName];
+    return entry?.kind === 'enum' ? entry.values : undefined;
+  };
+};
+
+const validateEnumValues = (
+  value: BracketQueryValue,
+  allowed: readonly string[] | undefined,
+  fieldPath: string,
+): void => {
+  if (!allowed) return;
+  const candidates = isRecord(value) ? Object.values(value).flat() : [value];
+  for (const candidate of candidates) {
+    if (candidate === null || candidate === undefined) continue;
+    if (!allowed.includes(String(candidate))) {
+      throw makeError({
+        status: 400,
+        message: `Value '${String(candidate)}' is not valid for field '${fieldPath}'. Valid: ${allowed.join(', ')}.`,
+      });
+    }
+  }
 };
 
 const validateAndTransformSearchFields = (
@@ -152,10 +203,12 @@ const validateAndTransformSearchFields = (
   searchableFields: readonly string[],
   skipFieldValidation: boolean,
   model: ModelName,
+  enumValuesAt: EnumValuesAt,
   prefix = '',
   depth = 0,
 ): BracketQueryRecord => {
-  if (depth > 10) throw makeError({ status: 400, message: 'Search query nesting too deep (max 10 levels)' });
+  if (depth > 10)
+    throw makeError({ status: 400, message: 'Search query nesting too deep (max 10 levels)' });
 
   const result: BracketQueryRecord = {};
 
@@ -166,7 +219,15 @@ const validateAndTransformSearchFields = (
     // resolve against the same prefix, and the per-leaf whitelist still applies inside each.
     if (isCombinator(key)) {
       result[key] = indexedChildren(key, value).map((child) =>
-        validateAndTransformSearchFields(child, searchableFields, skipFieldValidation, model, prefix, depth + 1),
+        validateAndTransformSearchFields(
+          child,
+          searchableFields,
+          skipFieldValidation,
+          model,
+          enumValuesAt,
+          prefix,
+          depth + 1,
+        ),
       ) as unknown as BracketQueryValue;
       continue;
     }
@@ -199,6 +260,9 @@ const validateAndTransformSearchFields = (
           message: `Json field '${currentPath}' requires an operator (path, string_contains, …)`,
         });
       }
+      if (field.kind === 'enum') {
+        validateEnumValues(value, enumValuesAt(stripRelationOperators(currentPath)), currentPath);
+      }
       result[key] = wrapBareValue(field, value) as unknown as BracketQueryValue;
       continue;
     }
@@ -230,7 +294,10 @@ const validateAndTransformSearchFields = (
     const hasFieldOp = keys.some((k) => (FIELD_OPERATORS as readonly string[]).includes(k));
 
     if (hasRelationOp) {
-      if (!skipFieldValidation && !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))) {
+      if (
+        !skipFieldValidation &&
+        !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))
+      ) {
         throw makeError({
           status: 400,
           message: `Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
@@ -244,6 +311,7 @@ const validateAndTransformSearchFields = (
             searchableFields,
             skipFieldValidation,
             model,
+            enumValuesAt,
             currentPath,
             depth + 1,
           ) as BracketQueryValue;
@@ -269,7 +337,15 @@ const validateAndTransformSearchFields = (
         result[key] = value;
         continue;
       }
-      result[key] = transformOperatorValue(field, value, currentPath) as unknown as BracketQueryValue;
+      const operatorValue = transformOperatorValue(field, value, currentPath) as BracketQueryRecord;
+      if (field.kind === 'enum') {
+        validateEnumValues(
+          operatorValue,
+          enumValuesAt(stripRelationOperators(currentPath)),
+          currentPath,
+        );
+      }
+      result[key] = operatorValue;
       continue;
     }
 
@@ -278,6 +354,7 @@ const validateAndTransformSearchFields = (
       searchableFields,
       skipFieldValidation,
       model,
+      enumValuesAt,
       currentPath,
       depth + 1,
     ) as BracketQueryValue;
@@ -301,7 +378,10 @@ const allOf = (conditions: Record<string, unknown>[]): Record<string, unknown> =
 // group's own conditions AND'd together — flattening OR would turn a union into an
 // intersection, silently. The check names AND rather than OR so that a combinator added later
 // lands on the correct side by default.
-const toConditions = (record: BracketQueryRecord, orNullFields: string[]): Record<string, unknown>[] => {
+const toConditions = (
+  record: BracketQueryRecord,
+  orNullFields: string[],
+): Record<string, unknown>[] => {
   const out: Record<string, unknown>[] = [];
 
   for (const [key, value] of Object.entries(record)) {
@@ -335,8 +415,8 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     filters = {},
     orNullFields = [],
   } = options;
-  const lens = rootLens(filterLens);
-  const model = lens.model as ModelName;
+  const lens = getLensRoot(filterLens);
+  const model = toModelName(lens.model);
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
@@ -368,7 +448,13 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   }
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
-    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation, model);
+    const transformed = validateAndTransformSearchFields(
+      searchFields,
+      searchableFields,
+      skipFieldValidation,
+      model,
+      enumValuesLookup(filterLens),
+    );
     conditions.push(...toConditions(transformed, orNullFields));
   }
 

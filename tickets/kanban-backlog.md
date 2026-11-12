@@ -8,15 +8,20 @@ config:
 ---
 kanban
   Backlog
+    AUTH-006-webhook-tenant-isolation
+    AUTH-007-user-one-writer
+    AUTH-005-websocket-permission-change-interruption
     FEAT-017-audit-log-hardening-lineage-and-explorer
     FEAT-019-extensible-actor-attribution
     FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
     API-003-cursor-pagination-mode
+    API-005-route-permission-tags
     INFRA-006-tenant-isolation-test-matrix
     INFRA-007-data-lifecycle-retention-export-delete
     INFRA-008-disaster-recovery-and-restore-drills
     INFRA-005-platform-baseline-hosting-observability
+    OTEL-002-superadmin-alerts
     INFRA-003-cicd
     FE-001-web-tanstack-start-evaluation
     FEAT-006-localization
@@ -34,11 +39,18 @@ kanban
     INFRA-009-adapter-primitives
     INFRA-020-audit-logs-cold-storage
     INFRA-010-cloudflare-waf-and-asset-serving
+    INFRA-033-segment-reconcile-perf-budget
+    INFRA-036-clock-sensitive-rule-tick
+    INFRA-038-ws-channel-tenancy
+    INFRA-040-ws-content-channels
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
     FE-006-conditional-form-v2
     COMM-009-component-slots-passthrough-children
+    COMM-016-per-org-sending-domains
+    DEV-005-pr-reader
+    DEV-006-adopt-gloss
 ```
 
 ## Tickets
@@ -48,12 +60,13 @@ kanban
 **User Experience:**
 - [FEAT-006: Localization](./FEAT-006-localization.md) - i18n support, multi-language
 - [FEAT-007: White Labeling](./FEAT-007-white-labeling.md) - Custom domains, DNS hooks, CORS, theming
-- [FEAT-010: Addresses](./FEAT-010-addresses.md) - Address validation, geocoding, international formats
+- [FEAT-010: Addresses](./FEAT-010-addresses.md) - Own model (ruling 10-05); survey the international address standards, libraries and vendors first, then design
 - [FEAT-012: Notifications](./FEAT-012-notifications.md) - Novu integration, app-events completion, notification center
 - [COMM-002: Email Validation](./COMM-002-email-validation.md) - Email verification API (Bouncer/Emailable) for deliverability
 
 **Communications:**
 - [COMM-009: Component Slots](./COMM-009-component-slots-passthrough-children.md) - `{{slot:name}}` passthrough children for wrapper components (not registered/cascading subcomponents); from ZLT-3139
+- [COMM-016: Per-org Sending Domains](./COMM-016-per-org-sending-domains.md) - Stub. Each org signs with its own verified domain; port of Zealot's "Per-brand email domains" once its shape settles
 
 **Enterprise:**
 - [AUTH-001: SSO](./AUTH-001-sso.md) - SAML/OIDC, JIT provisioning, SCIM
@@ -65,20 +78,30 @@ kanban
 
 **Infrastructure / Platform:**
 - [INFRA-005: Platform Baseline](./INFRA-005-platform-baseline-hosting-observability.md) - Pick default hosting + DB + observability stack
+- [OTEL-002: Superadmin Alerts](./OTEL-002-superadmin-alerts.md) - Signal queries, incident lifecycle, superadmin inbox
 - [INFRA-003: CI/CD Pipeline](./INFRA-003-cicd.md) - Decision-first CI/CD baseline, implement after platform selection
 - [INFRA-006: Tenant Isolation Test Matrix](./INFRA-006-tenant-isolation-test-matrix.md) - Prove cross-tenant isolation across auth modes
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md) - Retention, export, and delete/redaction operations
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
 - [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) - Swappable external service pattern (in progress)
 - [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
-- [INFRA-031: Jobs lane + lock port from Zealot](./INFRA-031-jobs-lane-and-lock-port-from-zealot.md) - Gate 5 lane tag, outbox lane admission, presence set, createLock refresh fix, row-state claim policy
+- [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) ✅ - slow lane as lowest priority + per-worker slot share, createLock refresh fix, row-state claim policy
+- [INFRA-046: Cache primitives from Zealot after INFRA-037](./archived/INFRA-046-cache-primitives-from-zealot.md) ✅ - clears cancel in-flight computes, queued marker, abort releases the refresh lock, single-flight under lock/, cache telemetry and options, warm on boot
+- [INFRA-047: cache() inside a transaction](./archived/INFRA-047-transaction-cache-overlay.md) ✅ - a per-transaction overlay: reads its own writes, a rollback leaves nothing cached, published at commit behind the generation fence
+- [INFRA-048: Lock sets from Zealot ZLT-5949](./archived/INFRA-048-lock-sets-from-zealot.md) ✅ - one token, one heartbeat, one release over many keys; findForUpdate takes one lock set; verify() answers from Redis; the key-lock timeout is a 409
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
+- [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
+- [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - json-rules `clockUnit` with the `clock.finestUnit` engine floor; `Segment.clockUnit` derived at save, `lastComputedAt` on what was computed; one cron row per unit, looking one unit ahead
+- [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
+- [INFRA-040: WS Content Channels](./INFRA-040-ws-content-channels.md) - Every delivery is a channel named by content and authorized by its route; drops per-user addressing
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
 - [FEAT-019: Extensible Actor Attribution](./FEAT-019-extensible-actor-attribution.md) - actorMeta extension point + on-behalf-of for integration tokens; attribution-only, never authz
 
 **Security & Encryption:**
+- [AUTH-006: Webhook Tenant Isolation](./AUTH-006-webhook-tenant-isolation.md) - High-priority confirmed defect: scope recipients and payloads to the subscription owner's authorized records
+- [AUTH-005: WebSocket Permission Changes](./AUTH-005-websocket-permission-change-interruption.md) - Event-driven subscription interruption; deferred scaffolding follow-up, tracked in GitHub #126
 - [FEAT-013: Encryption](./FEAT-013-encryption.md) - Key escrow/backup, lifecycle management, feature visibility
 
 **AI Developer Experience:**
@@ -92,6 +115,7 @@ kanban
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
 - API-002: Admin Ad-Hoc Filtering - Make admin list routes exempt from requiring `searchableFields`; allow arbitrary field filtering for internal/superadmin use
 - [API-003: Cursor Pagination Mode](./API-003-cursor-pagination-mode.md) - Opt-in keyset pagination (signed opaque tokens, no count, write-stable) for feeds/logs/exports; offset stays default
+- [API-005: Route permission tags](./API-005-route-permission-tags.md) - A route declares `permission` / `submodelPermission` and the route template runs the check, as Zealot #2859 does; deferred until after #267 and its backport
 
 **Documentation & API Discovery:**
 - [DOC-001: Scalar API Docs UI](./DOC-001-scalar-api-docs-ui.md) - Interactive API docs via Scalar, mounted on existing OpenAPI spec
@@ -126,14 +150,14 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 30
+- **Total Backlog Items**: 37
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
 - **Communication**: 3
-- **Infrastructure**: 8
+- **Infrastructure**: 10
 - **Audit & Compliance**: 1
-- **Security & Encryption**: 1
+- **Security & Encryption**: 3
 - **AI Developer Experience**: 2
 - **Frontend Architecture**: 3
 - **Documentation & Discovery**: 2
@@ -142,6 +166,12 @@ kanban
 ## Notes
 
 **Why Backlog?**
+AUTH-006 is a confirmed isolation defect awaiting assignment and has High priority. It is distinct from the optional enhancements below.
+
+**Developer tooling:**
+- [DEV-005: PR reader](./DEV-005-pr-reader.md) - Review tool that groups changed files by atlas concept, hides gloss (toggle before/after per symbol) and replaces test code with an AI summary of the cases; home undecided
+- [DEV-006: Adopt gloss](./DEV-006-adopt-gloss.md) - Template under gloss: comments into `.gloss/` (rare one-line `// why:` stays), harvest at commit, a `run-ci-rules.sh` gate with fail fixtures so it can't pass vacuously (ZLT-4530); backport to Kingdom and Tribe
+
 These features are valuable but not critical for MVP or initial production launch. They're typical "v2.0" enhancements that add polish, enterprise appeal, or alternative monetization strategies.
 
 **Prioritization Triggers:**
@@ -153,4 +183,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-08-21_
+_Last Updated: 2026-11-10_

@@ -3,14 +3,16 @@
 // ============================================================================
 
 model WebhookSubscription {
-  id            String       @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  model         WebhookModel
-  url           String
-  isActive      Boolean      @default(true)
-  integrationId String?      @db.VarChar(36)
-  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  model                WebhookModel
+  url                  String
+  isActive             Boolean         @default(true)
+  integrationId        String?         @db.VarChar(36)
+  integration          Integration?    @relation(fields: [integrationId], references: [id], onDelete: SetNull)
 
   // Owner (fake polymorphism: User, Organization, or Space)
   ownerModel     WebhookOwnerModel

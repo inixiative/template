@@ -4,7 +4,7 @@
 # (Infisical → root .env.$ENV → apps/api/.env.$ENV), so DATABASE_URL is
 # resolved the same way the api process itself sees it.
 #
-# Always uses --accept-data-loss + --skip-generate. Dev-only — refuses any
+# Pushes through scripts/db/push-local.sh (--accept-data-loss), which refuses any
 # DATABASE_URL that doesn't look local. The safety check runs inside the
 # composed shell so a misconfigured env can never reach `prisma db push`.
 #
@@ -34,15 +34,8 @@ push() {
       echo "  skip — no DATABASE_URL after env composition" >&2
       exit 2
     fi
-    case "$DATABASE_URL" in
-      *@localhost*|*@127.0.0.1*|*@host.docker.internal*) ;;
-      *)
-        echo "  skip — DATABASE_URL not local ($DATABASE_URL). push-dev refuses non-local targets." >&2
-        exit 3
-        ;;
-    esac
     echo "  $DATABASE_URL"
-    bun run --cwd packages/db prisma db push --accept-data-loss
+    ./scripts/db/push-local.sh
   '
   local rc=$?
   set -e
@@ -61,4 +54,7 @@ if [ "$ANY_RAN" -eq 0 ] && [ "$ANY_FAIL" -eq 0 ]; then
   echo "no DATABASE_URLs found via with-env composition for local or test"
   exit 1
 fi
-[ "$ANY_FAIL" -eq 0 ]
+[ "$ANY_FAIL" -eq 0 ] || exit 1
+
+echo "── prisma client"
+bun run db:generate

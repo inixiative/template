@@ -4,10 +4,18 @@
  * @partOf feature:featureFlag
  * @uses none
  */
-import type { CustomerModel, FeatureFlagValueType, ProviderModel } from '@template/db/generated/client/enums';
+import type {
+  CustomerModel,
+  FeatureFlagValueType,
+  ProviderModel,
+} from '@template/db/generated/client/enums';
 import { LogScope, log } from '@template/shared/logger';
 import type { FlagValue } from '#/modules/featureFlag/lib/zeroFor';
-import { hopKey, type ResolvedFlag, type ResolvedFlags } from '#/modules/featureFlag/services/resolveFlags';
+import {
+  hopKey,
+  type ResolvedFlag,
+  type ResolvedFlags,
+} from '#/modules/featureFlag/services/resolveFlags';
 
 export type FlagOwner = 'platform' | { ownerModel: ProviderModel; ownerId: string };
 
@@ -33,7 +41,9 @@ export const findResolvedFlag = (
   subject?: FlagSubject,
 ): ResolvedFlag | null => {
   const hop = hopKey(ownerOf(owner));
-  const candidates = resolved.refs.filter((ref) => hopKey(ref.provider) === hop && slug in ref.flags);
+  const candidates = resolved.refs.filter(
+    (ref) => hopKey(ref.provider) === hop && slug in ref.flags,
+  );
   const ref = subject
     ? candidates.find(
         (each) =>

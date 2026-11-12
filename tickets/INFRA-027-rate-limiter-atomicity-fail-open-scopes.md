@@ -93,7 +93,7 @@ provenance in the audit log. IPv6 compounds it: the key is a full /128, so a rou
   `Organization` / `Space` owned tokens have no person behind them: the tenant is the principal.
   Anonymous requests key on the trusted client IP.
 - **Context is the other axis.** An organization bucket and a space bucket, taken from the token's scope
-  (`getActor`), AND-checked with the principal bucket. Space nests under organization. A session user acting
+  (`c.get('token')`), AND-checked with the principal bucket. Space nests under organization. A session user acting
   in an org contributes to no org bucket in this cut — resource-derived context is a later seam, not a column.
 - **Limits are entitlements, not columns.** No `rateLimitPerSecond` on Organization or Space; the existing
   column on Token is no longer read. Every max resolves through `rateLimitMax(tier, c)` — one stub with code
@@ -115,7 +115,7 @@ provenance in the audit log. IPv6 compounds it: the key is a full /128, so a rou
 - [x] Atomic `INCR` + first-hit `PEXPIRE` Lua window (`incrementFixedWindows`, batch of windows per call)
 - [x] Fail-open on Redis error: warn + `errorReporter.captureException`, request allowed
 - [x] Rule-array `rateLimit` middleware, AND-checked, `Retry-After`, `onLimited` hook
-- [x] Identities: `userIdentity` / `principalIdentity` / `organizationIdentity` / `spaceIdentity` / `ipIdentity` from `getActor`
+- [x] Identities: `userIdentity` / `principalIdentity` / `organizationIdentity` / `spaceIdentity` / `ipIdentity` in `apps/api/src/middleware/rateLimit/identities.ts`
 - [x] `rateLimitMax(tier, c)` seam with code defaults (user 20/s, space 30/s, org 60/s, auth 60/min)
 - [x] `clientIp` trusted-hop + /64 bucketing; `clientAddress` feeding `auditActorMiddleware`
 - [x] Wire `apiRateLimit` after auth and `authRateLimit` on `/api/auth/*`

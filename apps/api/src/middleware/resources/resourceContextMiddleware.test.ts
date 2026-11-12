@@ -1,14 +1,22 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { OpenAPIHono } from '@hono/zod-openapi';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { CronJobScalarSchema, OrganizationScalarSchema } from '@template/db';
 import type { CronJob, Organization, User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createCronJob, createOrganization, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCronJob,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { getResource } from '#/lib/context/getResource';
-import { readRoute } from '#/lib/routeTemplates';
+import { readRoute, updateRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
+import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 import { Modules } from '#/modules/modules';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get } from '#tests/utils/request';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
+import { get, json, patch } from '#tests/utils/request';
+
+useRealJobsQueue();
 
 // Drives resourceContextMiddleware via the real readRoute template (which
 // auto-attaches the middleware via prepareMiddleware) so the test surface
@@ -35,14 +43,47 @@ const cronJobReadController = makeController(cronJobReadRoute, async (c, respond
   return respond.ok(resource);
 });
 
-const mountRoutes: MountFn = (app) => {
-  const orgRouter = new OpenAPIHono();
-  orgRouter.openapi(orgReadRoute, orgReadController);
-  app.route('/api/v1/organization', orgRouter);
+// A route that may serve tombstones when the caller asks with ?includeDeleted=true.
+const orgHistoryRoute = readRoute({
+  model: Modules.organization,
+  action: 'history',
+  includeDeleted: true,
+  responseSchema: OrganizationScalarSchema,
+});
 
-  const cronJobRouter = new OpenAPIHono();
-  cronJobRouter.openapi(cronJobReadRoute, cronJobReadController);
-  app.route('/api/v1/cronJob', cronJobRouter);
+const orgHistoryController = makeController(orgHistoryRoute, async (c, respond) => {
+  const resource = getResource<'organization'>(c);
+  return respond.ok(resource);
+});
+
+// A revive: a write that has to load the tombstone it brings back.
+const orgReviveRoute = updateRoute({
+  model: Modules.organization,
+  action: 'revive',
+  includeDeleted: true,
+  bodySchema: OrganizationScalarSchema.pick({ name: true }),
+  responseSchema: OrganizationScalarSchema,
+});
+
+const orgReviveController = makeController(orgReviveRoute, async (c, respond) => {
+  const resource = getResource<'organization'>(c);
+  const revived = await c
+    .get('db')
+    .organization.update({ where: { id: resource.id }, data: { deletedAt: null } });
+  return respond.ok(revived);
+});
+
+const mountRoutes: MountFn = (app) => {
+  const orgRouter = app.basePath('/api/v1/organization');
+  orgRouter.openapi(orgReadRoute, orgReadController);
+  orgRouter.openapi(orgHistoryRoute, orgHistoryController);
+  orgRouter.openapi(orgReviveRoute, orgReviveController);
+
+  app.basePath('/api/v1/cronJob').openapi(cronJobReadRoute, cronJobReadController);
+
+  const adminRouter = app.basePath('/api/admin');
+  adminRouter.use('*', validateSuperadmin);
+  adminRouter.basePath('/organization').openapi(orgReadRoute, orgReadController);
 };
 
 describe('resourceContextMiddleware', () => {
@@ -54,7 +95,7 @@ describe('resourceContextMiddleware', () => {
   let deletedOrg: Organization;
   let cronJob: CronJob;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
@@ -80,19 +121,22 @@ describe('resourceContextMiddleware', () => {
     adminFetch = adminHarness.fetch;
 
     const { entity: d } = await createOrganization();
-    deletedOrg = await db.organization.update({ where: { id: d.id }, data: { deletedAt: new Date() } });
+    deletedOrg = await db.organization.update({
+      where: { id: d.id },
+      data: { deletedAt: new Date() },
+    });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
   it('loads the resource into context when the id exists', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.id}`));
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.data.id).toBe(org.id);
-    expect(body.data.name).toBe(org.name);
+    const { data } = await json<Organization>(response);
+    expect(data.id).toBe(org.id);
+    expect(data.name).toBe(org.name);
   });
 
   it('returns 400 when the id is not a uuidv7 (and no lookup query is set)', async () => {
@@ -108,8 +152,8 @@ describe('resourceContextMiddleware', () => {
   it('supports lookup by another field — `?lookup=slug` accepts non-uuid id', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.slug}?lookup=slug`));
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.data.id).toBe(org.id);
+    const { data } = await json<Organization>(response);
+    expect(data.id).toBe(org.id);
   });
 
   it('returns 404 for a soft-deleted resource when the caller is not a superadmin', async () => {
@@ -117,17 +161,60 @@ describe('resourceContextMiddleware', () => {
     expect(response.status).toBe(404);
   });
 
-  it('loads a soft-deleted resource when the caller is a superadmin', async () => {
+  it('returns 404 for a soft-deleted resource to a superadmin on a normal route', async () => {
     const response = await adminFetch(get(`/api/v1/organization/${deletedOrg.id}`));
+    expect(response.status).toBe(404);
+  });
+
+  it('loads a soft-deleted resource for a superadmin on a superadmin endpoint', async () => {
+    const response = await adminFetch(get(`/api/admin/organization/${deletedOrg.id}`));
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.data.id).toBe(deletedOrg.id);
+    const { data } = await json<Organization>(response);
+    expect(data.id).toBe(deletedOrg.id);
+  });
+
+  it('refuses a superadmin endpoint to a non-superadmin', async () => {
+    const response = await fetch(get(`/api/admin/organization/${deletedOrg.id}`));
+    expect(response.status).toBe(403);
+  });
+
+  it('loads a soft-deleted resource on a route that declares includeDeleted, only when asked', async () => {
+    expect((await fetch(get(`/api/v1/organization/${deletedOrg.id}/history`))).status).toBe(404);
+    expect(
+      (await fetch(get(`/api/v1/organization/${deletedOrg.id}/history?includeDeleted=false`)))
+        .status,
+    ).toBe(404);
+
+    const response = await fetch(
+      get(`/api/v1/organization/${deletedOrg.id}/history?includeDeleted=true`),
+    );
+    expect(response.status).toBe(200);
+    const { data } = await json<Organization>(response);
+    expect(data.id).toBe(deletedOrg.id);
+  });
+
+  it('ignores ?includeDeleted on a route that does not declare it', async () => {
+    const response = await fetch(get(`/api/v1/organization/${deletedOrg.id}?includeDeleted=true`));
+    expect(response.status).toBe(404);
+  });
+
+  it('lets a write that declares includeDeleted revive its tombstone', async () => {
+    const { entity: gone } = await createOrganization();
+    await db.organization.update({ where: { id: gone.id }, data: { deletedAt: new Date() } });
+
+    const response = await fetch(
+      patch(`/api/v1/organization/${gone.id}/revive?includeDeleted=true`, { name: gone.name }),
+    );
+    expect(response.status).toBe(200);
+
+    const stored = await db.organization.findUnique({ where: { id: gone.id } });
+    expect(stored?.deletedAt).toBeNull();
   });
 
   it('leaves models without a deletedAt column unaffected', async () => {
     const response = await fetch(get(`/api/v1/cronJob/${cronJob.id}`));
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.data.id).toBe(cronJob.id);
+    const { data } = await json<CronJob>(response);
+    expect(data.id).toBe(cronJob.id);
   });
 });

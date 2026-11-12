@@ -4,20 +4,17 @@
  * @partOf primitive:authz
  * @uses none
  */
+import { validateActionRule } from '@inixiative/permissions';
 import type { AccessorName } from '@template/db';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { z } from 'zod';
 
-// Recursive Zod schema for an `ActionRule` envelope. Validates the SHAPE only:
-// - delegation strings, { rel, action }, { self }, { any }, { all } structures
-// - the inner json-rules Condition under `{ rule: ... }` is passed through as
-//   unknown — runtime json-rules `check()` validates it when the rule fires.
 const actionRuleBase: z.ZodType = z.lazy(() =>
   z.union([
-    z.string(), // delegate to another action on the same model
+    z.string(),
+    z.boolean(),
     z.null(),
     z.object({ rel: z.string(), action: z.string() }).strict(),
-    z.object({ self: z.string() }).strict(),
     z.object({ rule: z.unknown() }).strict(),
     z.object({ any: z.array(actionRuleBase) }).strict(),
     z.object({ all: z.array(actionRuleBase) }).strict(),
@@ -37,8 +34,23 @@ export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly 
   const schemaActions = Object.keys(rebacSchema.permissions[`db:${model}`]?.actions ?? {});
   const allowed = pick ? schemaActions.filter((a) => pick.includes(a)) : schemaActions;
   if (allowed.length === 0) return z.never().nullable().optional();
+  const resource = `db:${model}`;
   return z
     .record(z.enum(allowed as [string, ...string[]]), actionRuleSchema)
+    .superRefine((rowRules, ctx) => {
+      for (const [action, rule] of Object.entries(rowRules))
+        for (const issue of validateActionRule(rule, {
+          schema: rebacSchema,
+          resource,
+          action,
+          rowRules,
+        }).errors)
+          ctx.addIssue({
+            code: 'custom',
+            path: [action],
+            message: `${issue.path}: ${issue.message}`,
+          });
+    })
     .nullable()
     .optional();
 };

@@ -1,429 +1,386 @@
-# Authentication & Authorization
+# Authentication
 
 <!-- toc:start -->
 
 ## Contents
 
-- [Authentication](#authentication)
-  - [Backend](#backend)
-    - [Overview](#overview)
-    - [BetterAuth (Session)](#betterauth-session)
-    - [OAuth + Bearer Tokens](#oauth--bearer-tokens)
-    - [Multi-Provider Authentication (AuthProvider)](#multi-provider-authentication-authprovider)
-    - [Token Authentication](#token-authentication)
-    - [Token Types](#token-types)
-    - [Auth Middleware Chain](#auth-middleware-chain)
-    - [Spoof Middleware](#spoof-middleware)
-    - [Validation Middleware](#validation-middleware)
-    - [Choosing Between validateUser and validateActor](#choosing-between-validateuser-and-validateactor)
-  - [Frontend](#frontend)
-    - [Architecture](#architecture)
-    - [Hooks](#hooks)
-    - [Login/Signup Pattern](#loginsignup-pattern)
-    - [Components](#components)
-    - [Types](#types)
-    - [OAuth/SAML](#oauthsaml)
-    - [Navigation Patterns](#navigation-patterns)
-    - [Guards](#guards)
-    - [Store Integration](#store-integration)
-    - [Error Handling](#error-handling)
-    - [Testing](#testing)
-    - [Security](#security)
-    - [Common Patterns](#common-patterns)
-    - [Key Files](#key-files)
-- [Authorization](#authorization)
+- [Overview](#overview)
+- [Sign-in (the BetterAuth handshake)](#sign-in-the-betterauth-handshake)
+  - [Configuration](#configuration)
+  - [What lives where](#what-lives-where)
+  - [jwtHandoff](#jwthandoff)
+  - [Auth Routes](#auth-routes)
+- [User JWT](#user-jwt)
+  - [Verification](#verification)
+  - [jwtAuthMiddleware](#jwtauthmiddleware)
+  - [Revocation and sign-out](#revocation-and-sign-out)
+  - [Spoofing and WebSockets](#spoofing-and-websockets)
+- [Account changes through BetterAuth (withThrowawaySession)](#account-changes-through-betterauth-withthrowawaysession)
+  - [Change password](#change-password)
+  - [The same pattern for the next account changes](#the-same-pattern-for-the-next-account-changes)
+- [OAuth + One-Time Token](#oauth--one-time-token)
+  - [OAuth Flow](#oauth-flow)
+  - [One-Time Token Handoff](#one-time-token-handoff)
+- [Multi-Provider Authentication (AuthProvider)](#multi-provider-authentication-authprovider)
+  - [Database Schema](#database-schema)
+  - [Encryption](#encryption)
+  - [Operations](#operations)
+  - [SAML/SSO Status](#samlsso-status)
+- [Token Authentication](#token-authentication)
+  - [How It Works](#how-it-works)
+  - [tokenAuthMiddleware](#tokenauthmiddleware)
+- [Token Types](#token-types)
+  - [User Token](#user-token)
+  - [Organization Token](#organization-token)
+  - [OrganizationUser Token](#organizationuser-token)
+  - [Space Token](#space-token)
+  - [SpaceUser Token](#spaceuser-token)
+  - [Token Schema](#token-schema)
+- [Auth Middleware Chain](#auth-middleware-chain)
+  - [Flow](#flow)
+- [Spoof Middleware](#spoof-middleware)
+  - [Usage](#usage)
+  - [Requirements](#requirements)
+- [Validation Middleware](#validation-middleware)
+  - [validateSuperadmin](#validatesuperadmin)
+- [Who Is a User](#who-is-a-user)
 
 <!-- toc:end -->
 
-Authentication = "who is this caller?" (sessions, tokens, OAuth, SAML).
-Authorization = "what can they do?" (ReBAC permissions — see [PERMISSIONS.md](./PERMISSIONS.md)).
+Who is the caller: user JWTs, API tokens, the sign-in handshake, OAuth, spoofing, and the middleware that enforces them. What they can do: [PERMISSIONS.md](./PERMISSIONS.md). Client side (forms, guards, auth slice): [FRONTEND/AUTH.md](./FRONTEND/AUTH.md).
 
-## Authentication
+## Overview
 
-### Backend
+Two credentials, both populate the same context. Both are bearer-only, and neither is a session: a cookie or a BetterAuth session never authenticates an API request (CI rule `bearer-only-auth`, [SCRIPTS.md](./SCRIPTS.md)).
 
-
-#### Overview
-
-Two authentication methods, both populate the same context:
-
-| Method | Use Case | Header/Cookie | Middleware |
+| Credential | Who presents it | Header | Middleware |
 |--------|----------|---------------|------------|
-| Session | Browser clients | Cookie (better-auth) | `authMiddleware` |
-| Token | API clients | `Authorization: Bearer <key>` | `tokenAuthMiddleware` |
+| User JWT | A signed-in user (web, admin and superadmin apps, or anything holding their JWT) | `Authorization: Bearer <jwt>` | `jwtAuthMiddleware` |
+| API token | A program (MCP, integrations, CI) | `Authorization: Bearer <key>` or `?token=<key>` | `tokenAuthMiddleware` |
 
-Both methods ultimately set `user`, `organizationUsers`, and configure `permix`.
+Both set `user`, `organizationUsers`, and configure `permix`.
+
+Why no sessions: a session is server state that every request must look up, and a session cookie is a second way in. Sessions lived on as the real credential under an earlier JWE cookie cache, and a revoked session stayed valid in that cache for up to 7 days. A user JWT is verified from its signature, and revocation is a per-user check in Redis ([Revocation and sign-out](#revocation-and-sign-out)).
 
 ---
 
-#### BetterAuth (Session)
+## Sign-in (the BetterAuth handshake)
 
-Located in `apps/api/src/lib/auth.ts`. Session-based authentication for browser clients.
+Located in `apps/api/src/lib/auth.ts`. BetterAuth runs sign-up, sign-in, email verification and OAuth. It still creates a session at the end of each sign-in, because its flows are built around one; `jwtHandoff` swaps that session for a JWT before the response leaves the API, so the client never holds a session.
 
-##### Configuration
+### Configuration
 
 ```typescript
 export const auth = betterAuth({
   database: prismaAdapter(db, { provider: 'postgresql' }),
-
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.API_URL,
-  basePath: '/auth',
 
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false,
+    requireEmailVerification: true,
+    onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) =>
+      emitAppEvent('user.verificationRequested', { userId: user.id, verificationUrl: url }),
   },
 
-  socialProviders: {
-    google: process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-      ? { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET }
-      : undefined,
-  },
+  socialProviders: { google: /* when GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are set */ },
 
-  session: {
-    expiresIn: 7 * 24 * 60 * 60,  // 7 days
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60,  // 5-minute cache window (stateless JWT in cookie)
-    },
-  },
+  session: { expiresIn: 10 * 60 },          // handshake only
 
-  user: {
-    additionalFields: {
-      platformRole: {
-        type: ['user', 'superadmin'],
-        defaultValue: 'user',
-        input: false,  // Can't be set by user
-      },
-    },
-  },
-
-  plugins: [bearer()],  // Allows session token in Authorization header
-
-  secondaryStorage: {
-    // Redis for frequently-accessed data (permissions, org lists)
-    // NOT primary session storage (uses stateless JWT)
-    get: async (key) => { /* redis get */ },
-    set: async (key, value, ttl) => { /* redis setex */ },
-    delete: async (key) => { /* redis del */ },
-  },
+  plugins: authPlugins(),                   // jwt(), oneTimeToken, oauthCallbackToken, jwtHandoff
+  disabledPaths: [/* every endpoint that acts on a live session, see below */],
+  trustedOrigins: getAllowedOrigins(),
+  secondaryStorage: { get, set, delete, getAndDelete },  // Redis, `redisNamespace.session`
 });
 ```
 
-##### Session Storage Strategy
+The plugin list lives in `apps/api/src/lib/auth/authPlugins.ts`. Its order matters: `jwtHandoff` runs last, after the one-time-token hook has read the new session.
 
-Sessions use **stateless JWT tokens** stored in HTTP-only cookies (not database-backed).
+### What lives where
 
-- **Primary:** JWT cookie with 5-minute cache window
-- **Secondary:** Redis for frequently-accessed data (permissions, org lists)
-- **Benefit:** Horizontal scaling without session affinity or database lookups
-- **Tradeoff:** 5-minute delay for permission revocation propagation
+| Piece | What it is | Where it lives |
+|-------|-----------|----------------|
+| **User JWT** | ES256 JWT, `sub` = `User.id`, `iss` = `aud` = `API_URL`, `iat`, `exp` 30 days | The client. Web apps keep it in localStorage (`packages/ui/src/lib/auth/token.ts`) and send `Authorization: Bearer <jwt>` on every call |
+| **Signing keys** | BetterAuth `jwt()` plugin keys, ES256, rotated every 90 days; a retired key stays published for 30 days so JWTs it signed keep verifying | `Jwks` table; the private key is encrypted by the template field encryption (`jwks.privateKey`, [ENCRYPTION.md](./ENCRYPTION.md)) through `apps/api/src/lib/auth/jwksStore.ts`. Public keys at `GET /api/auth/jwks` |
+| **Handshake session** | BetterAuth's session for one sign-in. Lives 10 minutes at most; `jwtHandoff` deletes it as soon as it hands out the JWT | Redis (`secondaryStorage`, `redisNamespace.session`). `storeSessionInDatabase` is off; the Prisma `Session` model is BetterAuth's schema and holds no rows |
+| **OAuth one-time token** | Single-use, 1 minute, stored hashed; consumed with Redis `GETDEL` (`getAndDelete`) | Redis |
+| **JWT version** | `User.jwtVersion`; every user JWT carries it as `ver`, and a JWT whose `ver` differs is refused. Incrementing it signs the user out everywhere | Postgres, on the `User` row `jwtAuthMiddleware` already loads |
 
-This means:
-- ✅ No database hit for session validation
-- ✅ Scales horizontally without sticky sessions
-- ⚠️ Permission changes take up to 5 minutes to propagate (cache window)
+- **Why the signing keys use the template field encryption:** one scheme for secrets at rest, rotated by the existing `rotateEncryptionKeys` job, instead of a second scheme keyed off `BETTER_AUTH_SECRET`.
+- **Why 30 days and no refresh token:** revocation is the control, not short expiry. A refresh token would be a second long-lived credential to store, rotate and revoke; incrementing `User.jwtVersion` already ends every JWT a user holds.
+- **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event. Verifying does not sign the user in; they sign in afterwards.
 
-##### Auth Routes
+### jwtHandoff
 
-BetterAuth exposes routes at `/auth/*`:
+`apps/api/src/lib/auth/jwtHandoff.ts`, a BetterAuth plugin with one after-hook. On every endpoint that produced a new session it:
+
+1. expires the session cookie on the response;
+2. on `/callback/*` (the OAuth redirect) stops there, because the one-time token must still resolve to that session;
+3. otherwise signs the user's JWT (`signJWT` with `userJwtOptions()` from `apps/api/src/lib/auth/userJwt.ts`), deletes the session, and replaces the response body with:
+
+```json
+{ "token": "<jwt>", "expiresAt": "<ISO time>", "user": { "...": "..." } }
+```
+
+That covers `POST /api/auth/sign-in/email`, `POST /api/auth/one-time-token/verify`, `POST /api/auth/sign-up/email` when verification is not required, and BetterAuth's `/change-password` called server-side by [change password](#change-password), where it first calls `rotateUserJwts`.
+
+### Auth Routes
+
+`apps/api/src/routes/api.ts` mounts BetterAuth at `/api/auth/*` behind `authRateLimit`:
 
 ```
-POST /auth/sign-up/email     # Email/password signup
-POST /auth/sign-in/email     # Email/password signin
-POST /auth/sign-out          # Sign out
-GET  /auth/session           # Get current session
-GET  /auth/sign-in/google    # Google OAuth redirect
-GET  /auth/callback/google   # Google OAuth callback
+POST /api/auth/sign-up/email
+POST /api/auth/sign-in/email           # → { token, expiresAt, user }
+GET  /api/auth/verify-email            # email verification link
+POST /api/auth/sign-in/social          # OAuth start
+GET  /api/auth/callback/:provider      # OAuth callback (register as the provider redirect URI)
+POST /api/auth/one-time-token/verify   # OAuth handoff exchange → { token, expiresAt, user }
+GET  /api/auth/jwks                    # public signing keys
 ```
 
-##### authMiddleware
-
-Located in `apps/api/src/middleware/auth/authMiddleware.ts`:
-
-```typescript
-export async function authMiddleware(c: Context<AppEnv>, next: Next) {
-  // Check for valid session
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session?.user?.id) return next();
-
-  // Load user with org memberships
-  const db = c.get('db');
-  const user = await findUserWithOrganizationUsers(db, session.user.id);
-  if (!user) return next();
-
-  // Set context and permissions
-  await setUserContext(c, user);
-  await next();
-}
-```
+`disabledPaths` turns every endpoint that acts on a live session into a 404: `/token` (it would mint a JWT from a session), `/get-session`, `/update-session`, `/list-sessions`, `/revoke-session`, `/revoke-sessions`, `/revoke-other-sessions`, `/sign-out`, `/update-user`, `/change-email`, `/change-password`, `/verify-password`, `/delete-user`, `/delete-user/callback`, `/link-social`, `/unlink-account`, `/list-accounts`, `/account-info`, `/get-access-token`, `/refresh-token`, `/one-time-token/generate`. They stay 404 over HTTP. Account changes that need one of them (a password change today) are JWT routes of our own that call BetterAuth's server API through `withThrowawaySession` ([below](#account-changes-through-betterauth-withthrowawaysession)); `disabledPaths` gates only BetterAuth's HTTP router, not `auth.api.*`.
 
 ---
 
-#### OAuth + Bearer Tokens
+## User JWT
 
-Located in `packages/ui/src/lib/auth/signin.ts` and `/apps/*/app/routes/_public/auth.callback.tsx`.
+### Verification
 
-##### OAuth Flow
+`apps/api/src/lib/auth/verifyIssuerJwt.ts` is the one verification path. It trusts:
+
+- **this API**, always: issuer and audience `API_URL`, public keys read in-process from the `Jwks` table (no HTTP call to itself, no private key decrypted). The key set is cached 10 minutes, dropped when this process creates a key, and reloaded on an unknown `kid` at most once a second (another instance rotated; a forged `kid` cannot force a read per request);
+- **a configured external issuer**, when `AUTH_ISSUER`, `AUTH_JWKS_URL` and `AUTH_AUDIENCE` are all set: keys from `createRemoteJWKSet(AUTH_JWKS_URL)`, cached 10 minutes.
+
+The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['ES256']` only, so `alg: none` and HS256 are refused; `iss`, `aud`, `exp`, `sub` and `iat` are required; 30 s clock tolerance. `sub` must be a local `User` id.
+
+### jwtAuthMiddleware
+
+`apps/api/src/middleware/auth/jwtAuthMiddleware.ts`. A bearer shaped like a JWT (three dot-separated segments) is verified and its user loaded with `findUserWithRelations` (the cached user every request loads) → `setUserContext`. A JWT this API signed must carry the user's current `jwtVersion` as `ver`; a soft-deleted user is refused.
+
+- A JWT-shaped bearer that fails is a **401**, never a fall-through to API-token hashing.
+- Unreachable issuer keys are a **503** (retryable, so a WebSocket keeps its identity).
+- A JWT is never read from `?token=`: a JWT in a URL ends up in logs and referrers. API tokens keep `?token=`.
+
+### Revocation and sign-out
+
+`rotateUserJwts(userId)` (`apps/api/src/modules/user/services/rotateUserJwts.ts`) is the one writer of `User.jwtVersion`: it increments it through the scoped db client, inside the caller's transaction. Every caller below goes through it; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store. Permissions are not on the JWT, so a role or member change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours, so the version check does not apply to it: rotating here (`/me/rotateJwts`, the admin rotation, password reset or change) does not end it. It ends when it expires (30 days at most), when the user is deleted here, when the issuer stops publishing its key, or, for a `grant` JWT, when the grant inquiry is revoked (read live). Signing out at the issuer is the issuer's job. The cached user row (`findUserWithRelations`, 10 minutes) is dropped by the cache hooks on the version bump; if that clear fails (the hook logs Redis errors), an old JWT can work until the cache entry expires, the same bound a role change has.
+
+| What | Revokes |
+|---|---|
+| Sign out of one browser | Nothing on the server: the SPA drops its JWT |
+| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. User-only (`validatePermission(UserAction.rotateUserJwts)` on the user, `actorIsUser` in the schema): an API token cannot rotate its user's JWTs |
+| `POST /api/admin/user/:id/rotateJwts` | Every JWT this API signed for that user (superadmin) |
+| `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account (`rotateUserJwts`; the soft-deleted user is refused too) |
+| Password reset (BetterAuth `onPasswordReset`) | Every JWT this API signed for that user |
+| `POST /api/v1/me/changePassword` | Every JWT this API signed for the caller before the change (jwtHandoff rotates on `/change-password`); the response carries the new one, or nulls on a spoof |
+
+`jwtVersion` is never returned: every user response schema is `userResponseSchema` (`apps/api/src/modules/user/schemas/userResponseSchema.ts`, `UserScalarSchema.omit({ jwtVersion: true }).strip()`), `jwtHandoff` omits it from the sign-in `user`, and BetterAuth declares it `returned: false`, so none of its own responses carry it (a sign-up still waiting for email verification answers with BetterAuth's raw `user`). Nothing accepts it as input: BetterAuth declares it `input: false`, and no route takes a user body.
+
+**Future: profile editing.** No profile-editing route exists yet (FEATURES.md, 🟡 Profile Editing). When it lands, the protection of `jwtVersion` and the other server-owned columns belongs in that route's body schema, not in a new mechanism.
+
+- BetterAuth's `input: false` on `additionalFields` (`platformRole`, `lastLoginAt`, `jwtVersion`) only stops those fields in the request body of BetterAuth's own endpoints. It does nothing for our API routes or for server code calling `db.user.update`.
+- Today nothing outside `rotateUserJwts` writes `jwtVersion`: there is no user update route, and BetterAuth's `/update-user` is in `disabledPaths`.
+- A `/me` update route's body schema is the guard: accept only profile fields, never `jwtVersion`, `platformRole`, `email` or `lastLoginAt`. Email and password changes get their own JWT-authenticated routes, and a password change calls `rotateUserJwts`, like password reset does. Responses already go through `userResponseSchema`.
+
+
+### Spoofing and WebSockets
+
+A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/identify` with it (any credential identifies; a token is a token, with no user), and the reauthorize sweep drops an identity whose JWT was revoked or expired.
+
+
+---
+
+## Account changes through BetterAuth (withThrowawaySession)
+
+BetterAuth already implements the account changes a person makes: changing a password, changing an email, deleting the account, linking a provider. Its endpoints for them act on a live session, and a person here never holds one. So the API keeps those endpoints off HTTP (`disabledPaths`) and calls them server-side, as the person, from a JWT route of its own.
+
+`withThrowawaySession(userId, call)` (`apps/api/src/lib/auth/withThrowawaySession.ts`) is the one way to do that:
+
+1. creates a BetterAuth session for the user with BetterAuth's own `internalAdapter.createSession`, living 60 seconds (Redis TTL), so a crash before cleanup leaves nothing that outlives a minute;
+2. builds the request headers BetterAuth's server API reads: the signed session cookie, made exactly as BetterAuth's bearer plugin makes it (`makeSignature` from `better-auth/crypto`, `setRequestCookie` from `better-auth/cookies`). No crypto of our own;
+3. runs `call(headers)`, typically `auth.api.<endpoint>({ body, headers })`. Server calls run BetterAuth's hooks, so `jwtHandoff` still swaps any new session for a JWT;
+4. deletes the session in `finally`, whether the call succeeded or threw.
+
+The session token never leaves the helper except inside those headers, and the helper logs nothing. A BetterAuth `APIError` comes out as an `AppError` (`makeError`): a 4xx keeps its status and message; a 5xx becomes a plain 500; a 401 becomes a 409 "try again", because a 401 inside the call means a concurrent account change revoked the throwaway session, not that the caller's JWT is bad. Every call gets its own session, so concurrent calls never share or reuse one.
+
+Why not let the browser hold a short-lived session for one call (the first design): web and API are cross-site on the template's pr and staging hosts (`*.vercel.app`, `*.render.com`), where a SameSite=Lax cookie is never sent and third-party cookies are blocked, and a kept session was reachable through the one-time-token header. A server-side session never reaches a browser at all. The `bearer-only-auth` fence enforces that this file is the only one that builds a session credential: importing or re-exporting a cookie signer (`makeSignature`, `setRequestCookie`, `createHMAC`, …) from better-auth, `@better-auth/*` or better-call, a namespace import of a signer module, or any reference to `createSession`, anywhere else fails CI. The same fence names who may call the helper: importing `withThrowawaySession` (import, re-export, dynamic `import()`, `require`) outside `THROWAWAY_SESSION_CALLERS` in `scripts/ci/rules/lib/bearerOnlyAuth.ts` (today `meChangePassword`) fails CI, so each new caller is a one-line addition a reviewer sees.
+
+### Change password
+
+`POST /api/v1/me/changePassword` (`modules/me/routes/meChangePassword.ts`), body `{ currentPassword, newPassword }`, response `{ token, expiresAt }`:
+
+- **Who:** a user. `validatePermission(UserAction.changePassword)` on the user, `actorIsUser` in the schema: an API token cannot change its user's password, whatever it holds. A superadmin passes on any credential. A superadmin spoofing a user can change that user's password like any other action (no spoof guard: a superadmin passes every check, on any credential); the response is then `{ token: null, expiresAt: null }`, so the spoofed user's new JWT never leaves the API, and the UI keeps its own JWT while spoofing or when the answer has no JWT. A superadmin cannot be spoofed ([Spoof Middleware](#spoof-middleware)), so a superadmin never changes their own password through a spoof.
+- **Not in a batch:** the route is `'x-batch': false`; a batch that reaches it is refused before anything runs ([BATCH.md](./BATCH.md#routes-that-cannot-batch)).
+- **Limits:** `newPassword` length comes from `passwordLength` (`packages/shared/src/auth/passwordLength.ts`, also used by the web form), the same constants `auth.ts` gives BetterAuth as `minPasswordLength`/`maxPasswordLength`; outside them is a 422 before BetterAuth runs. Rate limits: the `/api/auth` IP bucket (`authRateLimit`, 60 a minute) first, and a per-user bucket (`credentialChangeRateLimit`, 5 a minute) after the permission checks, so a stolen JWT can't guess the current password from rotating IPs and a refused token can't use up its person's attempts.
+- **What runs:** `withThrowawaySession(user.id, (headers) => auth.api.changePassword({ body: { currentPassword, newPassword, revokeOtherSessions: true }, headers }))`. BetterAuth verifies the current password and hashes the new one; a wrong current password is its 400 `Invalid password`, and nothing changes. `revokeOtherSessions` deletes every BetterAuth session of the user and creates a new one; `jwtHandoff` sees `/change-password`, calls `rotateUserJwts` before signing (every older JWT is a 401 from now on), signs the new JWT through the same path sign-in uses, stamps `lastLoginAt` (the person just proved the password) and deletes that session.
+- **Response check:** the controller checks BetterAuth's answer is a JWT handoff (`safeParse`); if the hook ever did not run, BetterAuth's own body (which carries a session token) fails that check and the request is a plain 500, never a leak.
+- **One transaction:** the controller runs the whole call in `db.txn`. BetterAuth writes through `prismaAdapter(db)`, so the password and `rotateUserJwts` share it: if the rotation or the signing throws, the call is a 500 and the old password stands. Sessions live in Redis (`secondaryStorage`), outside the transaction; the throwaway session and BetterAuth's new one are both deleted in a `finally`, so a failed call leaves no session behind.
+- An account with no password (Google only) gets BetterAuth's 400 `Credential account not found`.
+
+### The same pattern for the next account changes
+
+Not built; each is a JWT route plus one `withThrowawaySession` call, keeping BetterAuth's endpoint in `disabledPaths`:
+
+| Change | BetterAuth server call | Notes |
+|---|---|---|
+| Change email | `auth.api.changeEmail({ body: { newEmail, callbackURL }, headers })` | BetterAuth mails the verification link; the link's `/verify-email` finishes the change with no session. Rotate JWTs only if email is an identity claim somewhere |
+| Delete account | `auth.api.verifyPassword({ body: { password }, headers })`, then our `redactUser` | BetterAuth only checks the password; deletion stays ours (soft delete, audit, `rotateUserJwts`) |
+| Link Google | `auth.api.linkSocialAccount({ body: { provider: 'google', callbackURL }, headers })` returns the provider URL | The OAuth callback needs the session after the redirect, so this one must not delete it in `finally`: it needs a variant that lets the session live to the callback (as the sign-in OAuth session does) |
+| Set a first password (Google-only user) | `auth.api.setPassword({ body: { newPassword }, headers })` (server-only in BetterAuth) | Same shape as change password |
+
+---
+
+## OAuth + One-Time Token
+
+Server side: `apps/api/src/lib/auth/oauthHandoffPlugins.ts` and `jwtHandoff.ts`. Client side: `packages/ui/src/lib/auth/signin.ts` and `AuthCallbackPage` ([FRONTEND/AUTH.md](./FRONTEND/AUTH.md#oauth-callback)).
+
+### OAuth Flow
 
 1. **User clicks OAuth provider** (e.g., "Continue with Google")
 2. **Frontend calls BetterAuth** via `client.signIn.social({ provider, callbackURL })`
-3. **BetterAuth redirects** to OAuth provider (Google, GitHub, etc.)
+3. **BetterAuth redirects** to the OAuth provider
 4. **User authenticates** with provider
-5. **Provider redirects back** to `/auth/callback?token=...`
-6. **Callback route extracts token**:
-   - Read token from query param or hash
-   - Store in localStorage via `setToken()`
+5. **Provider redirects to the API** at `{API_URL}/api/auth/callback/<provider>` — register this as the redirect URI with the provider
+6. **API mints a one-time token** and redirects to `/auth/callback#ott=...`; the session cookie on that redirect is expired
+7. **Callback page exchanges it** via `completeOAuthSignIn()`:
+   - `POST /api/auth/one-time-token/verify` returns `{ token, expiresAt, user }`; `jwtHandoff` deletes the session
+   - `storeJwtHandoff()` stores the JWT
    - Hydrate user data via `fetchAndHydrateMe()`
    - Navigate to redirectTo destination
 
-##### Bearer Token Pattern
+### One-Time Token Handoff
 
-OAuth flow returns a **bearer token** (not just session cookie):
+The OAuth callback is a browser redirect, so the API cannot hand the SPA a JSON body there. `oauthHandoffPlugins()` bridges it:
 
-```typescript
-// Callback route (apps/web/app/routes/_public/auth.callback.tsx)
-const url = new URL(window.location.href);
-const token = url.searchParams.get('token') || url.hash.match(/token=([^&]+)/)?.[1];
+- `oneTimeToken({ setOttHeaderOnNewSession: true })` mints a single-use token (1 minute, stored hashed) for every new session
+- `oauthCallbackToken` moves that token onto the callback redirect as `#ott=` — a fragment, so it never reaches server logs or referrers
+- The browser can't mint tokens itself (`disableClientRequest`, and `/one-time-token/generate` is disabled); verify consumes atomically via Redis `GETDEL` (`secondaryStorage.getAndDelete`)
 
-if (token) {
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  setToken(token, expiresAt);
-  await fetchAndHydrateMe(store.setState, store.getState);
-  navigate({ to: redirectTo });
-}
-```
+Neither the session nor the JWT appears in a URL. The one-time token resolves only to the callback's 10-minute session, and its cookie is already expired.
 
-All API requests include the bearer token:
-
-```typescript
-Authorization: Bearer <token>
-```
-
-See [Frontend Auth](#frontend-auth) for frontend implementation details.
+See [FRONTEND/AUTH.md](./FRONTEND/AUTH.md) for the client side.
 
 ---
 
-#### Multi-Provider Authentication (AuthProvider)
+## Multi-Provider Authentication (AuthProvider)
 
-**Status:** ✅ Complete
-**Location:** `apps/api/src/modules/authProvider/`
+**Location:** `apps/api/src/modules/authProvider/`, organization routes in `apps/api/src/modules/organization/`.
 
-The template supports configurable authentication providers at both the platform and organization level, enabling multi-tenant OAuth/SAML configurations.
+Two sources of providers:
 
-##### Architecture
+1. **Platform providers** — not rows. `getPlatformProviders()` (`apps/api/src/lib/auth/platformProviders.ts`) lists Google and GitHub when their `*_CLIENT_ID` / `*_CLIENT_SECRET` env vars are set. Only Google is wired into BetterAuth `socialProviders` today.
+2. **Organization providers** — `AuthProvider` rows, one org each, secrets encrypted.
 
-**Two Provider Types:**
-
-1. **Platform Providers** (`organizationId = null`)
-   - Available to all organizations
-   - Configured by platform administrators
-   - Examples: Google, Microsoft, GitHub
-   - Listed in `apps/api/src/lib/auth/platformProviders.ts`
-
-2. **Organization Providers** (`organizationId != null`)
-   - Organization-specific configurations
-   - Configured by organization administrators
-   - Examples: Custom OAuth apps, SAML/SSO (Okta, Azure AD)
-   - Isolated per organization for security
-
-##### Database Schema
+### Database Schema
 
 ```prisma
+enum AuthProviderType {
+  EMAIL
+  OAUTH
+  SAML
+}
+
 model AuthProvider {
-  id               AuthProviderId
-  organizationId   OrganizationId?  // null = platform, set = organization
+  id             String           // uuidv7
+  deletedAt      DateTime?
+  type           AuthProviderType
+  provider       String           // 'google', 'github', 'okta', 'azure-ad'
+  name           String           // display name
+  enabled        Boolean          @default(true)
+  organizationId String           // required: org-specific providers only
+  config         Json             // public config, safe to return
+  encryptedSecrets           String  // AES-256-GCM ciphertext, never returned
+  encryptedSecretsMetadata   Json
+  encryptedSecretsKeyVersion Int
 
-  name             String            // Display name
-  provider         AuthProviderType  // GOOGLE | MICROSOFT | GITHUB | OKTA | SAML
-  config           Json              // Provider configuration
-  encryptedData    Json              // Encrypted secrets (client secret, certs)
-  encryptionVersion Int              // Key rotation support
-  enabled          Boolean           // Toggle on/off
-
-  organization     Organization?
-  @@unique([organizationId, name])
+  @@unique([organizationId, provider, type])
 }
 ```
 
-##### Encryption
-
-**All sensitive data is encrypted** using AES-256-GCM:
+### Encryption
 
 ```typescript
 import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
 
-// Encrypt secrets (AAD is bound automatically from the ENCRYPTED_MODELS config)
 const encrypted = await encryptField('authProvider', 'secrets', { ...data, secrets });
-// → { encryptedSecrets, secretsMetadata, secretsKeyVersion }
-
-// Decrypt
 const secrets = await decryptField('authProvider', 'secrets', authProvider);
 ```
 
-**Security Features:**
-- AES-256-GCM authenticated encryption
-- Additional Authenticated Data (AAD) prevents tampering
-- Key versioning supports rotation without downtime
+Provider credentials are encrypted, never hashed: the server must decrypt them to call the provider. AES-256-GCM with AAD bound from the encryption registry; the key version column supports rotation. See [ENCRYPTION.md](./ENCRYPTION.md).
 
-##### API Endpoints
+### Operations
 
-**Organization-scoped (Org Admins):**
-```
-POST   /organizations/:id/auth-providers      # Create provider
-GET    /organizations/:id/auth-providers      # List org providers
-PATCH  /auth-providers/:id                    # Update provider
-DELETE /auth-providers/:id                    # Delete provider
-GET    /auth-providers                        # List available providers
-```
+| Operation | Who | Notes |
+|-----------|-----|-------|
+| `authProviderReadMany` | public | Platform providers, for login/signup pages |
+| `organizationReadAuthProvider` | public (no auth middleware; login page calls it) | `{ platform, organization }`; secrets omitted, non-owners see enabled providers only |
+| `organizationCreateAuthProvider` | org owner | Encrypts `secrets` |
+| `authProviderUpdate` | `own` on the provider | `organizationId`, `type`, `provider` and encrypted columns are sanitized; new `secrets` re-encrypt |
+| `authProviderDelete` | `own` on the provider | |
+| `adminAuthProviderReadMany` | superadmin | `/api/admin/authProvider` |
 
-**Platform-wide (Superadmins):**
-```
-GET    /admin/auth-providers                  # List all providers
-```
+### SAML/SSO Status
 
-##### Example: Organization OAuth
-
-```typescript
-// Create custom Google OAuth for organization
-POST /organizations/{orgId}/auth-providers
-{
-  "name": "Acme Google SSO",
-  "provider": "GOOGLE",
-  "config": {
-    "clientId": "123456.apps.googleusercontent.com",
-    "redirectUri": "https://acme.example.com/auth/callback",
-    "allowedDomains": ["acme.com"]  // Optional domain restriction
-  },
-  "secrets": {
-    "clientSecret": "GOCSPX-xxxxx"  // Encrypted before storage
-  }
-}
-```
-
-##### Provider Types
-
-```typescript
-enum AuthProviderType {
-  GOOGLE      // Google OAuth
-  MICROSOFT   // Microsoft/Azure AD OAuth
-  GITHUB      // GitHub OAuth
-  OKTA        // Okta SAML/OAuth
-  SAML        // Generic SAML
-}
-```
-
-##### SAML/SSO Status
-
-**Schema ready**, **encryption ready**, **API complete**.
-
-SAML integration requires:
-- BetterAuth SAML plugin integration (in progress)
-- SAML metadata parsing
-- JIT (Just-In-Time) user provisioning
-
-See [AUTH-003 ticket](../../tickets/AUTH-003-saml-sso.md) for SAML implementation timeline.
+Schema and encryption support SAML rows; sign-in does not. The client throws `SAML authentication not yet implemented`. Remaining: BetterAuth SAML plugin, metadata parsing, JIT provisioning. See [AUTH-003](../../tickets/AUTH-003-saml-sso.md).
 
 ---
 
-#### Token Authentication
+## Token Authentication
 
-Located in `apps/api/src/middleware/auth/tokenAuth.ts`. API key authentication.
+Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`; the sign-in itself is `loadTokenContext` (`apps/api/src/lib/context/loadTokenContext.ts`), which `refreshUserContext` re-runs between batch rounds. API key authentication.
 
-##### How It Works
+### How It Works
 
 1. Extract token from `Authorization: Bearer <token>` header OR `?token=<token>` URL param
 2. Hash token with SHA-256
-3. Look up token by hash (cached in Redis with 10-minute TTL)
+3. Look up the token row by hash (cached in Redis with 10-minute TTL; the row alone, no relations)
 4. Validate: `isActive`, not expired
-5. Set context based on token type
+5. `hydrate('token', row)`: each owner record (user, organization, space, `OrganizationUser`, `SpaceUser`, integration) is read with `fetchOne` under its own cache key, live-scoped
+6. Refuse when the owner the token's `ownerModel` names is absent; a member owner also needs its user and tenant rows. A removed or soft-deleted member, or a deleted user, org or space, authenticates no one
+7. Set context based on token type
 
-URL token is useful for WebSocket connections, email links, file downloads (where headers can't be set).
+URL token is useful for email links and file downloads (where headers can't be set). Only API tokens are read from the URL; a user JWT never is.
 
-**Security:** Token lookups are cached for 10 minutes. Revoked tokens (isActive = false) are re-validated every 10 minutes to prevent indefinite caching of compromised tokens.
+**Security:** The token row is cached for 10 minutes and its key clears on every Token write, so a revoked token stops working on the next request. The owner records are never copied into the token's entry: the cache hook (`cacheReference`) clears their keys when they change, so a demoted member, a removed member and a revoked superadmin take effect on the next request. `lastUsedAt` is touched on cache miss only.
 
-##### tokenAuthMiddleware
+### tokenAuthMiddleware
 
 ```typescript
-export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  // Skip if already authenticated via session
-  if (c.get('user')) return next();
+const authenticateToken = async (c: Context<AppEnv>) => {
+  const apiKey = authorization?.startsWith('Bearer ') ? authorization.slice(7) : urlToken;
+  if (!apiKey) return;
 
-  const authorization = c.req.header('authorization');
-  if (!authorization?.startsWith('Bearer ')) return next();
-
-  const apiKey = authorization.slice(7);
   const keyHash = createHash('sha256').update(apiKey).digest('hex');
+  const signIn = await loadTokenContext(keyHash);  // cached row → isActive/expiresAt → hydrate → owner present
+  if (!signIn) return;
+  if (signIn.fetched) await db.token.update({ where: { id: signIn.context.token.id }, data: { lastUsedAt: new Date() } });
+  await setTokenContext(c, signIn.context);  // the actor is actorOf(Token, the token's scalar columns)
+};
 
-  // Cached lookup with 10-minute TTL (balances performance with security)
-  const token = await cache<TokenWithRelations | null>(
-    cacheKey('Token', { keyHash }),
-    () => db.token.findUnique({
-      where: {
-        keyHash,
-        isActive: true,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      include: {
-        user: true,
-        organization: true,
-        organizationUser: { include: { user: true, organization: true } },
-        space: true,
-        spaceUser: { include: { user: true, organization: true, organizationUser: true, space: true } },
-      },
-    }),
-    60 * 10, // 10-minute TTL to ensure revoked tokens are re-checked
-  );
-
-  if (!token) return next();
-
-  // Update lastUsedAt (fire and forget)
-  db.token.update({ where: { id: token.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
-
-  c.set('token', token);
-
-  // Set up context based on token type
-  if (token.ownerModel === 'User' && token.user) {
-    // User token → load user with all org memberships
-    const userWithOrgs = await findUserWithRelations(db, token.user.id);
-    if (userWithOrgs) await setUserContext(c, userWithOrgs);
-  } else if (token.ownerModel === 'OrganizationUser' && token.organizationUser) {
-    // OrgUser token → use token data directly (scoped to single org)
-    const { user, organization, ...orgUserFields } = token.organizationUser;
-    await setUserContext(c, {
-      ...user,
-      organizationUsers: [orgUserFields],
-      organizations: organization ? [organization] : [],
-      spaceUsers: [],
-      spaces: [],
-    });
-  } else if (token.ownerModel === 'SpaceUser' && token.spaceUser) {
-    // SpaceUser token → scoped to single space
-    const { user, organization, organizationUser, space, ...spaceUserFields } = token.spaceUser;
-    await setUserContext(c, {
-      ...user,
-      organizationUsers: organizationUser ? [organizationUser] : [],
-      organizations: organization ? [organization] : [],
-      spaceUsers: [spaceUserFields],
-      spaces: space ? [space] : [],
-    });
-  } else {
-    // Org/Space token → just set up permissions (no user)
-    await setupOrgPermissions(c);
+export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
+  if (!c.get('user')) {
+    try {
+      await authenticateToken(c);
+    } catch (err) {
+      log.warn('token auth lookup failed', { err }, LogScope.auth);
+    }
   }
-
   await next();
 };
 ```
 
+`jwtAuthMiddleware` runs first and claims every JWT-shaped bearer; API keys are hex and never look like a JWT. A bearer that is neither (a BetterAuth session token, say) misses the lookup and authenticates no one.
+
 ---
 
-#### Token Types
+## Token Types
 
 Defined by `TokenOwnerModel` enum:
 
-##### User Token
+### User Token
 
 ```
 ownerModel: 'User'
@@ -435,7 +392,7 @@ organizationId: null
 - Has access to all user's orgs (restricted by token's role/entitlements)
 - Used for personal API access
 
-##### Organization Token
+### Organization Token
 
 ```
 ownerModel: 'Organization'
@@ -443,12 +400,13 @@ userId: null
 organizationId: set
 ```
 
-- No user context, org-level only
+- No user context, org-level only: a machine key the organization holds itself
 - Has access only to the specific org
 - Permissions set by token's role/entitlements
 - Used for org-level integrations, CI/CD
+- Issued by `organizationCreateToken` (`apps/api/src/modules/organization/controllers/organizationCreateToken.ts`), through `createToken` like every create-token route ([PERMISSIONS.md § Minting a Token](./PERMISSIONS.md#minting-a-token))
 
-##### OrganizationUser Token
+### OrganizationUser Token
 
 ```
 ownerModel: 'OrganizationUser'
@@ -456,12 +414,12 @@ userId: set
 organizationId: set
 ```
 
-- Tied to a user's membership in a specific org
+- Tied to a user's member row in a specific org
 - Has access only to that org
-- Permissions are intersection of user's role AND token's role
+- Permissions are the token's own role and entitlements, narrowed to the member row's table and capped live by it; `full` installs the member row's table as-is
 - Used for scoped access to a single org
 
-##### Space Token
+### Space Token
 
 ```
 ownerModel: 'Space'
@@ -474,8 +432,9 @@ spaceId: set
 - Has access to the specific space within an org
 - Permissions set by token's role/entitlements
 - Used for space-level integrations
+- Issued by `spaceCreateToken` (`apps/api/src/modules/space/controllers/spaceCreateToken.ts`), through `createToken`
 
-##### SpaceUser Token
+### SpaceUser Token
 
 ```
 ownerModel: 'SpaceUser'
@@ -484,12 +443,12 @@ organizationId: set
 spaceId: set
 ```
 
-- Tied to a user's membership in a specific space
+- Tied to a user's member row in a specific space
 - Has access only to that space
-- Permissions are intersection of user's space role AND token's role
+- Permissions are the token's own role and entitlements, narrowed to the space member row's table and capped live by it; `full` installs that table as-is
 - Used for scoped access to a single space
 
-##### Token Schema
+### Token Schema
 
 ```prisma
 model Token {
@@ -511,9 +470,11 @@ model Token {
   space            Space?
   spaceUser        SpaceUser?
 
-  // Permissions
-  role         Role @default(member)
-  entitlements Json?
+  // Permissions (entitlements are Entitlement rows targeted at the token: targetEntitlements)
+  role         Role?
+  full         Boolean @default(false)
+
+  integrationId String?   // optional link to an Integration
 
   // Rate limiting
   rateLimitPerSecond Int?
@@ -535,23 +496,35 @@ enum TokenOwnerModel {
 
 ---
 
-#### Auth Middleware Chain
+## Auth Middleware Chain
 
 Order matters. Applied in `apps/api/src/routes/api.ts`:
 
 ```typescript
 apiRouter.use('*', corsMiddleware);
-apiRouter.use('*', prepareRequest);      // 1. Initialize context
-apiRouter.use('*', tokenAuthMiddleware); // 2. Check token auth (Authorization header wins)
-apiRouter.use('*', authMiddleware);      // 3. Check session auth (fallback to cookie)
-apiRouter.use('*', spoofMiddleware);     // 4. Allow superadmin spoofing (after user is resolved)
+apiRouter.use('*', prepareRequest);              // 1. Initialize context
+apiRouter.route('/telemetry/browser', …);        // Public, before auth
+apiRouter.route('/internal', internalRouter);    // Shared-secret auth only
+apiRouter.use('/auth/*', authRateLimit);         // BetterAuth: the sign-in handshake
+apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
+apiRouter.route('/unsubscribe', …);              // Public, signed link
+apiRouter.use('*', jwtAuthMiddleware);           // 2. User JWT
+apiRouter.use('*', tokenAuthMiddleware);         // 3. API token
+apiRouter.use('*', spoofMiddleware);             // 4. Superadmin spoofing (after user is resolved)
+apiRouter.use('*', auditActorMiddleware);        // 5. Actor context for audit logs
+apiRouter.use('*', apiRateLimit);
 ```
 
-Token auth runs first so an `Authorization: Bearer <key>` header always wins
-over a session cookie when both are present (typical SDK xhr from a browser).
-Spoof runs last so a superadmin can spoof via either auth path.
+A JWT-shaped bearer is the user's JWT; any other bearer is looked up as an API token.
+Spoof runs last so a superadmin can spoof through either credential.
 
-##### Flow
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| Put a fixed username and password in front of an operator tool (the job dashboard): "password-protect this admin page" | **basicAuthMiddleware** · primitive `apps/api/src/middleware/auth/basicAuthMiddleware.ts#basicAuthMiddleware` — one static credential per mount, answers 401 with `WWW-Authenticate`; not for users or API keys | this section · code `apps/api/src/routes/bullBoard.ts` | splitting the `Authorization` header and `atob`-decoding `Basic` credentials by hand |
+| Ask "would this caller be allowed this route?" without running it: "check the socket may read this channel" | **isAuthProbe** · primitive `apps/api/src/lib/utils/authProbe.ts#isAuthProbe` — the request carries the per-boot `x-auth-probe` secret; `makeController` answers 204 after the whole middleware chain and validation pass, without running the handler | [WEBSOCKETS.md](./WEBSOCKETS.md) (subscribe authorization, `apps/api/src/ws/probe.ts`) | a second permission check written for the socket path; calling the controller's service directly to test access |
+| Let the server's own stream probes skip the API rate limit | **isSystemProbe** · primitive `apps/api/src/lib/utils/authProbe.ts#isSystemProbe` — true only for the system probe secret (`apps/api/src/ws/streamProbe.ts`); `apiRateLimit` skips it | [REDIS.md § Rate Limiting](./REDIS.md#rate-limiting-limit) | a header or flag of your own to exempt internal calls from limits |
+
+### Flow
 
 ```
 Request
@@ -559,14 +532,15 @@ Request
 prepareRequest
   - user: null, token: null, permix: empty
   ↓
-tokenAuthMiddleware
-  - If valid Bearer/URL token matches a Token row → set token, setUserContext()
+jwtAuthMiddleware
+  - JWT-shaped bearer → verify, load the user, check `ver` against `jwtVersion`, setUserContext()
+  - Invalid or revoked JWT → 401; issuer keys unreachable → 503
   - Otherwise pass through unchanged
   ↓
-authMiddleware
-  - If already has user (token won) → skip
-  - If valid better-auth session → setUserContext()
-  - If no session → pass through unchanged
+tokenAuthMiddleware
+  - If already has user (JWT) → skip
+  - If valid Bearer/URL token matches a Token row → set token, setUserContext()
+  - Otherwise pass through unchanged
   ↓
 spoofMiddleware
   - If superadmin + spoof header → replace user context
@@ -575,12 +549,12 @@ spoofMiddleware
 
 ---
 
-#### Spoof Middleware
+## Spoof Middleware
 
 Located in `apps/api/src/middleware/auth/spoofMiddleware.ts`. Allows superadmins to act as other users.
 
 ```typescript
-export async function spoofMiddleware(c: Context<AppEnv>, next: Next) {
+export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const user = c.get('user');
   if (!user || !isSuperadmin(c)) return next();
 
@@ -588,78 +562,43 @@ export async function spoofMiddleware(c: Context<AppEnv>, next: Next) {
   if (!rawEmail) return next();
 
   const spoofEmail = normalizeEmail(rawEmail);
-  const spoofedUser = await findUserWithOrganizationUsers(db, spoofEmail);
+  const spoofedBasic = await findUserByEmail(spoofEmail);
+  if (!spoofedBasic) return next();
+  if (isSuperadminUser(spoofedBasic)) throw makeError({ status: 403, message: 'A superadmin cannot be spoofed' });
+  const spoofedUser = await findUserWithRelations(spoofedBasic.id);
   if (!spoofedUser) return next();
 
-  // Replace context with spoofed user
   await setUserContext(c, spoofedUser);
-  c.set('spoofedBy', user);  // Track original admin
-
-  // Response headers for debugging
-  c.header('spoofing-user-email', user.email);
-  c.header('spoofed-user-email', spoofEmail);
+  c.set('spoofedBy', user);
+  c.header('x-spoofing-user-email', user.email);
+  c.header('x-spoofed-user-email', spoofEmail);
 
   await next();
-}
+};
 ```
 
-##### Usage
+### Usage
 
 ```bash
-curl -H "Cookie: <session>" \
+curl -H "Authorization: Bearer <jwt>" \
      -H "x-spoof-user-email: target@example.com" \
      https://api.example.com/api/v1/me
 ```
 
-##### Requirements
+### Requirements
 
 - Caller must be authenticated as superadmin
 - Target user must exist
+- Target must not be a superadmin, the caller included (403)
 - Original admin tracked in `spoofedBy` for audit
 
 ---
 
-#### Validation Middleware
+## Validation Middleware
 
 Use these after auth to enforce requirements:
 
-##### validateUser
-
-Requires any authenticated user (session or token with user):
-
-```typescript
-import { validateUser } from '#/middleware/validations/validateUser';
-
-router.get('/me', validateUser, handler);  // 401 if no user
-```
-
-##### validateActor
-
-Requires any actor (user OR org/space token):
-
-```typescript
-import { validateActor } from '#/middleware/validations/validateActor';
-
-router.get('/resource', validateActor, handler);  // 401 if no user from getActor()
-```
-
-**Difference from validateUser:**
-- `validateUser` requires `c.get('user')` to be set (session or user token only)
-- `validateActor` requires `getActor(c).user` to be set (works with org/space tokens that have user relations)
-
-Use `validateActor` for endpoints that should work with both session and token auth, including org/space tokens.
-
-##### validateNotToken
-
-Requires session auth (tokens forbidden):
-
-```typescript
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
-
-router.post('/sensitive', validateNotToken, handler);  // 403 if using token
-```
-
-##### validateSuperadmin
+### validateSuperadmin
 
 Requires superadmin:
 
@@ -671,954 +610,17 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 
 ---
 
-#### Choosing Between validateUser and validateActor
+## Who Is a User
 
-Use this decision tree:
+Only a user JWT or a superadmin spoof makes the request a user (`c.get('user')`). A token never does: it is a Token actor `{ model: 'Token', record }`, and what it may do is its permissions over its owner's table. Routes name their action; there is no "is there a user" middleware.
 
-```
-Does the endpoint need to work with org/space tokens (no user context)?
-├─ YES → Use validateActor
-│   ├─ Examples: Batch API, org-level operations
-│   └─ Checks: getActor(c).user is set (works with delegated tokens)
-└─ NO → Use validateUser
-    ├─ Examples: /me endpoints, user-specific operations
-    └─ Checks: c.get('user') is set (requires JWT or user token)
-```
+| Credential | `c.get('user')` | `me(c)` (the `/me` resource) |
+|------------|-----------------|-------------------------------|
+| User JWT | the user | the user |
+| Spoof (a superadmin on any credential) | the spoofed user, token set aside | the spoofed user |
+| User token | none | its user |
+| Any other token | none | none: `/me` answers 401 |
 
-##### validateUser - Requires User Context
+`GET /api/v1/identify` answers for any credential: the actor `{ model, record }` the rules see, the record being the user, or the token's own columns, without the model's redact fields.
 
-Requires `c.get('user')` to be set:
-
-**Works with:**
-- ✅ JWT auth (authMiddleware via BetterAuth)
-- ✅ User tokens (`token.ownerModel === 'User'`)
-- ✅ OrganizationUser tokens (`token.ownerModel === 'OrganizationUser'`)
-- ✅ SpaceUser tokens (`token.ownerModel === 'SpaceUser'`)
-
-**Does NOT work with:**
-- ❌ Organization tokens (`token.ownerModel === 'Organization'`)
-- ❌ Space tokens (`token.ownerModel === 'Space'`)
-
-##### validateActor - More Permissive
-
-Requires `getActor(c).user` to be set:
-
-**Works with:**
-- ✅ All of the above validateUser cases
-- ✅ Organization tokens with organizationUser relation
-- ✅ Space tokens with spaceUser relation
-
-More permissive - works with all token types that have user relations.
-
-##### When to Use Each
-
-| Endpoint Type | Middleware | Reason |
-|--------------|------------|---------|
-| `/me/*` | `validateUser` | Always requires actual user context |
-| `/organization/:id/users` | `validateActor` | Org tokens need to list org users |
-| `/organization/:id/spaces` | `validateActor` | Org tokens need to access org resources |
-| `/batch` | `validateActor` | Should work with all token types |
-| User profile update | `validateUser` | Modifying user requires user session |
-| `/me/tokens` (create) | `validateUser` | Token creation requires user |
-
-##### Example
-
-```typescript
-// ❌ Wrong - org tokens can't access org resources
-router.get('/organization/:id/users', validateUser, handler);
-
-// ✅ Correct - org tokens can access org resources
-router.get('/organization/:id/users', validateActor, handler);
-```
-
----
-
-
----
-
-### Frontend
-
-
-
-Comprehensive guide to authentication in the template using BetterAuth, JWT sessions, and OAuth providers.
-
-#### Architecture
-
-**Stack:**
-- BetterAuth - Auth framework issuing stateless JWTs
-- HTTP-only cookie - JWT storage for email/password auth
-- localStorage + Bearer token - JWT storage for OAuth auth
-- OAuth/SAML - External identity providers
-- ReBAC - Permission system (see PERMISSIONS.md)
-
-**No server-side sessions** — JWTs are stateless. BetterAuth's `cookieCache` skips DB validation for up to 5 minutes.
-
-**Email/password flow:**
-```
-User submits credentials
-  ↓
-BetterAuth validates + issues JWT in HTTP-only cookie
-  ↓
-Store hydrates user data via /me
-  ↓
-Auto-redirect to redirectTo or /dashboard
-```
-
-**OAuth flow:**
-```
-User clicks OAuth provider
-  ↓
-BetterAuth redirects to provider (Google, GitHub, etc.)
-  ↓
-Provider redirects back to /auth/callback?token=<jwt>
-  ↓
-Callback extracts JWT from URL, stores in localStorage via setToken()
-  ↓
-Store hydrates user data via /me (Authorization: Bearer <jwt>)
-  ↓
-Auto-redirect to redirectTo or /dashboard
-```
-
----
-
-#### Hooks
-
-##### useAuthProviders
-
-**Location:** `/packages/ui/src/hooks/useAuthProviders.ts`
-
-Fetches context-aware authentication providers (OAuth/SAML).
-
-**Purpose:** Centralizes provider fetching logic, supports org-specific providers.
-
-```typescript
-import { useAuthProviders } from '@template/ui/hooks';
-
-const { providers, isLoading, error } = useAuthProviders();
-
-<LoginForm
-  providers={providers}
-  isLoading={isLoading}
-  error={error ? 'Unable to load providers.' : undefined}
-/>
-```
-
-**Returns:**
-- `providers` - Array of enabled providers
-- `isLoading` - Loading boolean
-- `error` - Error if fetch fails
-
-**Behavior:**
-- If `?org=xyz` in URL → fetches org providers + platform providers
-- Otherwise → fetches platform providers only
-- Auto-filters to enabled providers
-- Retries failed requests (2 attempts)
-
-**Provider Types:**
-```typescript
-type AuthProvider = {
-  type: 'oauth' | 'saml';
-  provider: string;  // 'google', 'github', etc.
-  name: string;      // Display name
-  enabled: boolean;
-};
-```
-
-**Implementation:**
-```typescript
-export const useAuthProviders = () => {
-  const search = useSearch({ strict: false }) as { org?: string };
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: search.org
-      ? ['authProviders', 'org', search.org]
-      : ['authProviders', 'platform'],
-    queryFn: search.org
-      ? apiQuery((opts) => organizationReadAuthProvider({ ...opts, path: { id: search.org! } }))
-      : apiQuery((opts) => authProviderReadMany(opts)),
-    retry: 2,
-  });
-
-  const providers = search.org && data?.platform && data?.organization
-    ? [...data.platform, ...data.organization]
-    : data ?? [];
-
-  return { providers, isLoading, error };
-};
-```
-
----
-
-#### Login/Signup Pattern
-
-##### Unified Auth System
-
-All authentication methods (email/password, OAuth, SAML) use a **unified `AuthMethod` interface**:
-
-```typescript
-// packages/ui/src/lib/auth/types.ts
-type AuthMethod =
-  | { type: 'email', email: string, password: string, name?: string }
-  | { type: 'oauth', provider: string, callbackURL?: string }
-  | { type: 'saml', provider: string, email?: string };
-
-// Unified sign-in interface
-signIn(method: AuthMethod) → Promise<void>
-signUp(method: AuthMethod) → Promise<void>
-```
-
-**Key Architectural Change:** Forms access store directly (no prop drilling).
-
-##### LoginPage
-
-**Location:** `/packages/ui/src/pages/LoginPage.tsx`
-
-```typescript
-import { navigateToSignup } from '@template/ui/lib/routeRedirect';
-import { useAppStore } from '@template/ui/store';
-import { LoginForm } from '@template/ui/components/auth/LoginForm';
-
-export const LoginPage = ({ hideSignup }: LoginPageProps) => {
-  const getStore = useAppStore.getState;
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <LoginForm
-        onSignupClick={hideSignup ? undefined : () => navigateToSignup(getStore, true)}
-      />
-    </div>
-  );
-};
-```
-
-**Key Points:**
-- ✅ **No props** - form accesses store directly for auth
-- ✅ **No error/loading state** - form manages internally
-- ✅ **No provider fetching** - form handles via `useAuthProviders()`
-- ✅ **Navigation helpers** - `navigateToSignup(getStore, preserveSearch: true)`
-
-##### SignupPage
-
-**Location:** `/packages/ui/src/pages/SignupPage.tsx`
-
-```typescript
-import { navigateToLogin } from '@template/ui/lib/routeRedirect';
-import { useAppStore } from '@template/ui/store';
-import { SignupForm } from '@template/ui/components/auth/SignupForm';
-
-export const SignupPage = () => {
-  const getStore = useAppStore.getState;
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <SignupForm onLoginClick={() => navigateToLogin(getStore, true)} />
-    </div>
-  );
-};
-```
-
-**Same pattern** - minimal page, smart form component.
-
----
-
-#### Components
-
-##### LoginForm
-
-**Location:** `/packages/ui/src/components/auth/LoginForm.tsx`
-
-**Smart component** - accesses store directly, manages own state.
-
-**Props:**
-```typescript
-export type LoginFormProps = {
-  hideSignup?: boolean;
-  onSignupClick?: () => void;
-};
-```
-
-**Internal Implementation:**
-```typescript
-export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string>();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const search = useSearch({ strict: false }) as { redirectTo?: string };
-  const signIn = useAppStore((state) => state.auth.signIn);
-  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
-  const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(undefined);
-    setIsLoading(true);
-
-    try {
-      await signIn({ type: 'email', email, password });
-      navigatePreservingContext(search.redirectTo || '/dashboard');
-    } catch (err: any) {
-      const message = err?.message || 'Sign in failed. Please try again.';
-      setError(message);
-      toast.error(message);  // Dual error handling
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOAuthClick = async (provider: string) => {
-    setError(undefined);
-    setIsLoading(true);
-
-    try {
-      const redirectTo = search.redirectTo || '/dashboard';
-      localStorage.setItem('authRedirectTo', redirectTo);
-      await signIn({
-        type: 'oauth',
-        provider,
-        callbackURL: `${window.location.origin}/auth/callback`,
-      });
-    } catch (err: any) {
-      const message = err?.message || 'OAuth sign in failed. Please try again.';
-      setError(message);
-      toast.error(message);
-      setIsLoading(false);
-    }
-  };
-
-  // ... render form
-};
-```
-
-**Features:**
-- ✅ Email/password form
-- ✅ OAuth/SAML provider buttons (auto-detected)
-- ✅ **Dual error handling** - inline form errors + toast notifications
-- ✅ **Managed state** - error, isLoading, form fields
-- ✅ **Store access** - calls `signIn()` directly
-- ✅ **Navigation** - `navigatePreservingContext` after success
-- ✅ **OAuth flow** - stores redirectTo in localStorage, uses BetterAuth client
-
-**Provider Icons:**
-```typescript
-import { Chrome, Github, Shield, Key } from 'lucide-react';
-
-const providerIcons: Record<string, typeof Chrome> = {
-  google: Chrome,
-  github: Github,
-  saml: Shield,
-};
-```
-
-##### SignupForm
-
-**Location:** `/packages/ui/src/components/auth/SignupForm.tsx`
-
-**Same pattern** - smart component accessing store directly.
-
-**Props:**
-```typescript
-export type SignupFormProps = {
-  hideLogin?: boolean;
-  onLoginClick?: () => void;
-};
-```
-
-**Features:**
-- ✅ Name, email, password fields
-- ✅ OAuth/SAML provider buttons (auto-detected)
-- ✅ **Dual error handling** - inline + toast
-- ✅ **Managed state** - form manages error, isLoading
-- ✅ **Store access** - calls `signUp()` directly
-- ✅ **Navigation** - `navigatePreservingContext` after success
-
----
-
-#### Types
-
-**Location:** `/packages/ui/src/lib/auth/types.ts`
-
-##### AuthMethod (Unified Auth Interface)
-
-```typescript
-export type EmailAuthMethod = {
-  type: 'email';
-  email: string;
-  password: string;
-  name?: string;  // For signup
-};
-
-export type OAuthAuthMethod = {
-  type: 'oauth';
-  provider: string;
-  callbackURL?: string;
-};
-
-export type SamlAuthMethod = {
-  type: 'saml';
-  provider: string;
-  email?: string;  // Optional hint for IdP
-};
-
-export type AuthMethod = EmailAuthMethod | OAuthAuthMethod | SamlAuthMethod;
-```
-
-**Usage:**
-
-```typescript
-// Email signin
-await signIn({ type: 'email', email: 'user@example.com', password: 'secret' });
-
-// OAuth signin
-await signIn({ type: 'oauth', provider: 'google', callbackURL: '/auth/callback' });
-
-// SAML signin (when implemented)
-await signIn({ type: 'saml', provider: 'okta-sso', email: 'user@company.com' });
-```
-
-**Benefits:**
-- Single interface for all auth methods
-- Type-safe - TypeScript enforces correct fields per method
-- Easy to add new auth methods (just extend union)
-- No code duplication between signin/signup
-
----
-
-#### OAuth/SAML
-
-##### OAuth Flow (BetterAuth Client)
-
-OAuth authentication uses **BetterAuth's client SDK** (not manual URL construction).
-
-**Implementation:**
-
-```typescript
-// packages/ui/src/lib/auth/signin.ts
-import { getAuthClient } from '@template/ui/lib/auth/authClient';
-
-const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
-  const client = getAuthClient();
-
-  // Store redirectTo before OAuth redirect (URL params lost during OAuth flow)
-  localStorage.setItem('authRedirectTo', window.location.pathname + window.location.search + window.location.hash);
-
-  // BetterAuth handles OAuth negotiation and redirect
-  await client.signIn.social({
-    provider: method.provider,
-    callbackURL: method.callbackURL || `${window.location.origin}/auth/callback`,
-  });
-};
-```
-
-**OAuth Callback Route:**
-
-```typescript
-// apps/web/app/routes/_public/auth.callback.tsx
-import { useEffect } from 'react';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { setToken } from '@template/ui/lib/auth/token';
-import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
-import { useAppStore } from '@template/ui/store';
-
-export const Route = createFileRoute('/_public/auth/callback')({
-  component: AuthCallbackPage,
-});
-
-function AuthCallbackPage() {
-  const navigate = useNavigate();
-  const store = useAppStore();
-
-  useEffect(() => {
-    const completeOAuth = async () => {
-      try {
-        const url = new URL(window.location.href);
-        const token = url.searchParams.get('token') || url.hash.match(/token=([^&]+)/)?.[1];
-
-        if (!token) {
-          throw new Error('No authentication token received');
-        }
-
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-        setToken(token, expiresAt);
-
-        await fetchAndHydrateMe(store.setState, store.getState);
-
-        const redirectTo = localStorage.getItem('authRedirectTo') || '/dashboard';
-        localStorage.removeItem('authRedirectTo');
-
-        navigate({ to: redirectTo });
-      } catch (error: any) {
-        console.error('OAuth callback failed:', error);
-        navigate({
-          to: '/login',
-          search: { error: error.message || 'Authentication failed' },
-        });
-      }
-    };
-
-    completeOAuth();
-  }, []);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div>Completing authentication...</div>
-    </div>
-  );
-}
-```
-
-**Flow:**
-1. User clicks OAuth provider button
-2. `signIn({ type: 'oauth', provider: 'google' })`
-3. BetterAuth redirects to Google OAuth
-4. User authenticates with Google
-5. Google redirects to `/auth/callback?token=...`
-6. Callback route extracts bearer token, stores in localStorage
-7. Hydrates user data via `/me` API call
-8. Navigates to redirectTo destination
-
-**Security:**
-- BetterAuth handles OAuth state/nonce validation
-- Bearer token pattern (not session cookies)
-- Callback routes in all 3 apps (web, admin, superadmin)
-
-##### Provider Configuration
-
-**Backend:** `/apps/api/src/lib/auth/platformProviders.ts`
-
-Platform providers configured via environment variables:
-```env
-GOOGLE_CLIENT_ID=<id>
-GOOGLE_CLIENT_SECRET=<secret>
-
-GITHUB_CLIENT_ID=<id>
-GITHUB_CLIENT_SECRET=<secret>
-```
-
-**Organization Providers:** Stored in database per organization:
-```prisma
-model AuthProvider {
-  id             String   @id
-  organizationId String
-  type           String   // 'oauth' | 'saml'
-  provider       String   // 'google', 'github', 'okta', etc.
-  name           String
-  enabled        Boolean
-  encryptedSecrets                   String?
-  encryptedSecretsEncryptionMetadata Json?
-  encryptedSecretsEncryptionKeyVersion Int?
-}
-```
-
----
-
-#### Navigation Patterns
-
-##### Preserving Context
-
-**Use navigation helpers to preserve URL parameters:**
-
-```typescript
-const navigate = useAppStore((state) => state.navigation.navigate);
-const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
-const navigatePreservingSpoof = useAppStore((state) => state.navigation.navigatePreservingSpoof);
-```
-
-**When to use:**
-- `navigate({ to, search })` - Basic navigation, explicit params
-- `navigatePreservingContext(to)` - Preserve org/space/spoof
-- `navigatePreservingSpoof(to)` - Preserve spoof only
-
-##### Preserving redirectTo
-
-**Use `buildPathWithSearch` to preserve redirectTo between login/signup:**
-
-```typescript
-import { buildPathWithSearch } from '@template/ui/lib/searchParams';
-
-const signupUrl = buildPathWithSearch(
-  '/signup',
-  search.redirectTo ? { redirectTo: search.redirectTo } : undefined
-);
-navigatePreservingContext(signupUrl);
-```
-
-**Why:** Ensures user lands on intended page after auth flow.
-
-**Example Flow:**
-1. User visits `/settings` (not logged in)
-2. Guard redirects to `/login?redirectTo=/settings`
-3. User clicks "Sign up"
-4. Navigates to `/signup?redirectTo=/settings`
-5. After signup, redirects to `/settings`
-
----
-
-#### Guards
-
-**Location:** `/packages/ui/src/guards/authGuard.ts`
-
-Route guards for protecting pages and redirecting unauthenticated users.
-
-##### requireAuth
-
-Redirects unauthenticated users to login.
-
-```typescript
-export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: (ctx) => requireAuth(ctx),
-  component: AuthenticatedLayout,
-});
-```
-
-**Behavior:**
-1. Calls `auth.initialize()` (loads user data)
-2. If not authenticated → redirect to `/login?redirectTo=<current-path>`
-3. Preserves context params (org, space, spoof) in redirectTo
-
-##### requirePublic
-
-Redirects authenticated users away from public pages.
-
-```typescript
-export const Route = createFileRoute('/_public/login')({
-  beforeLoad: (ctx) => requirePublic(ctx),
-  component: LoginPage,
-});
-```
-
-**Behavior:**
-1. Calls `auth.initialize()` (loads user data)
-2. If authenticated → redirect to `redirectTo` or `/dashboard`
-
-**Implementation:**
-```typescript
-export const createAuthGuards = (getStore: () => AppStore) => ({
-  requireAuth: async (context?: BeforeLoadContext) => {
-    await getStore().auth.initialize();
-
-    if (!getStore().auth.isAuthenticated) {
-      const pathname = context?.location.pathname || '/dashboard';
-      const search = context?.location.search;
-      const preserved = pickSearchParams(search, ['org', 'space', 'spoof']);
-      const redirectTo = buildPathWithSearch(pathname, preserved);
-
-      throw redirect({ to: '/login', search: { redirectTo } });
-    }
-  },
-
-  requirePublic: async (context?: BeforeLoadContext) => {
-    await getStore().auth.initialize();
-
-    if (getStore().auth.isAuthenticated) {
-      const search = context?.location.search;
-      const redirectTo = readSearchParam(search, 'redirectTo') || '/dashboard';
-
-      throw redirect({ to: redirectTo });
-    }
-  },
-});
-```
-
----
-
-#### Store Integration
-
-##### Auth Slice
-
-**Location:** `/packages/ui/src/store/slices/auth.ts`
-
-```typescript
-export type AuthSlice = {
-  auth: {
-    user: User | null;
-    organizations: Record<string, Organization> | null;
-    spaces: Record<string, Space> | null;
-    isAuthenticated: boolean;
-    isInitialized: boolean;
-    spoofUserEmail: string | null;
-
-    initialize: () => Promise<void>;
-    signIn: (credentials: SignInCredentials) => Promise<void>;
-    signUp: (credentials: SignUpCredentials) => Promise<void>;
-    logout: () => Promise<void>;
-    setSpoof: (email: string | null) => Promise<void>;
-  };
-};
-```
-
-**Key Methods:**
-
-###### initialize()
-
-Loads user data from backend `/me` endpoint.
-
-```typescript
-await auth.initialize();
-```
-
-**Called by:**
-- Auth guards (`requireAuth`, `requirePublic`)
-- Authenticated layout (on mount)
-
-###### signIn(credentials)
-
-Authenticates user via BetterAuth.
-
-```typescript
-await auth.signIn({ email, password });
-```
-
-**Flow:**
-1. Calls BetterAuth API
-2. Sets JWT in httpOnly cookie
-3. Hydrates store with user data
-4. Sets `isAuthenticated` to true
-
-###### signUp(credentials)
-
-Creates new user via BetterAuth.
-
-```typescript
-await auth.signUp({ email, password, name });
-```
-
-**Flow:**
-1. Calls BetterAuth API
-2. Sets JWT in httpOnly cookie
-3. Hydrates store with user data
-4. Sets `isAuthenticated` to true
-
-###### logout()
-
-Clears auth state and revokes session.
-
-```typescript
-await auth.logout();
-```
-
-**Flow:**
-1. Calls BetterAuth signOut API
-2. Clears JWT cookie
-3. Resets store state
-4. Sets `isAuthenticated` to false
-
----
-
-#### Error Handling
-
-##### Pattern: Error Injection
-
-**Don't duplicate component renders for errors:**
-
-❌ **Bad:**
-```typescript
-if (providerError) {
-  return <LoginForm providers={[]} error="Provider error" />;
-}
-return <LoginForm providers={providers} error={error} />;
-```
-
-✅ **Good:**
-```typescript
-return (
-  <LoginForm
-    providers={providerError ? [] : providers}
-    error={providerError ? 'Provider error' : error}
-    isLoading={isLoading || isLoadingProviders}
-  />
-);
-```
-
-**Why:** Single source of truth, easier to maintain, no duplication.
-
-##### Error Messages
-
-**Be specific and actionable:**
-
-```typescript
-// ✅ Good
-error={providerError
-  ? 'Unable to load authentication providers. You can still sign in with email and password.'
-  : error}
-
-// ❌ Bad
-error={providerError ? 'Error' : error}
-```
-
----
-
-#### Testing
-
-##### Hook Tests
-
-**Location:** `/packages/ui/src/hooks/useAuthFlow.test.ts`
-
-```bash
-cd packages/ui && bun test useAuthFlow
-```
-
-**Coverage:**
-- Successful auth flow
-- Error handling
-- Loading states
-- redirectTo preservation
-
-##### Page Tests
-
-**Location:** `/packages/ui/src/pages/LoginPage.test.tsx`
-
-```bash
-cd packages/ui && bun test LoginPage
-```
-
-**Coverage:**
-- Provider fetching
-- Form submission
-- Error display
-- Navigation between login/signup
-
----
-
-#### Security
-
-##### Best Practices
-
-**httpOnly Cookies:**
-- JWT tokens stored in httpOnly cookies
-- Not accessible via JavaScript
-- Prevents XSS attacks
-
-**CSRF Protection:**
-- BetterAuth handles CSRF tokens automatically
-- Validates on all auth endpoints
-
-**OAuth Validation:**
-- Validates callback URL origin
-- Only allows same-origin + localhost:3000
-- Prevents redirect attacks
-
-**Spoof Protection:**
-- Spoof feature only available to superadmin
-- Requires special permissions
-- Tracked via audit log
-
-##### Environment Variables
-
-```env
-### BetterAuth
-BETTER_AUTH_SECRET=<random-secret>
-
-### OAuth Providers (Platform)
-GOOGLE_CLIENT_ID=<id>
-GOOGLE_CLIENT_SECRET=<secret>
-GITHUB_CLIENT_ID=<id>
-GITHUB_CLIENT_SECRET=<secret>
-
-### API
-VITE_API_URL=http://localhost:8000
-```
-
----
-
-#### Common Patterns
-
-##### Login with redirectTo
-
-```typescript
-// Guard redirects to login
-throw redirect({
-  to: '/login',
-  search: { redirectTo: '/settings' }
-});
-
-// LoginPage preserves redirectTo
-const { handleAuth } = useAuthFlow(signIn);
-// Auto-redirects to '/settings' after login
-```
-
-##### Switching between Login/Signup
-
-```typescript
-// LoginPage
-onSignupClick={() => {
-  const signupUrl = buildPathWithSearch('/signup', search.redirectTo ? { redirectTo: search.redirectTo } : undefined);
-  navigatePreservingContext(signupUrl);
-}}
-
-// SignupPage
-onLoginClick={() => {
-  const loginUrl = buildPathWithSearch('/login', search.redirectTo ? { redirectTo: search.redirectTo } : undefined);
-  navigatePreservingContext(loginUrl);
-}}
-```
-
-##### OAuth Login
-
-```typescript
-// LoginForm automatically handles OAuth
-<Button onClick={() => redirectToOAuthProvider(provider)}>
-  Continue with {provider.name}
-</Button>
-
-// Redirects to: /auth/google/signin?callbackURL=<origin>/auth/callback
-```
-
-##### Logout
-
-```typescript
-const logout = useAppStore((state) => state.auth.logout);
-const navigate = useAppStore((state) => state.navigation.navigate);
-
-await logout();
-navigate({ to: '/login' });
-```
-
----
-
-#### Key Files
-
-##### Hooks
-- `/packages/ui/src/hooks/useAuthFlow.ts`
-- `/packages/ui/src/hooks/useAuthProviders.ts`
-
-##### Pages
-- `/packages/ui/src/pages/LoginPage.tsx`
-- `/packages/ui/src/pages/SignupPage.tsx`
-
-##### Components
-- `/packages/ui/src/components/auth/LoginForm.tsx`
-- `/packages/ui/src/components/auth/SignupForm.tsx`
-
-##### Utilities
-- `/packages/ui/src/lib/auth/oauthRedirect.ts`
-- `/packages/ui/src/lib/searchParams.ts`
-
-##### Guards
-- `/packages/ui/src/guards/authGuard.ts`
-
-##### Store
-- `/packages/ui/src/store/slices/auth.ts`
-- `/packages/ui/src/store/slices/navigation.ts`
-
-##### Types
-- `/packages/ui/src/types/auth.ts`
-- `/packages/ui/src/store/types/auth.ts`
-
-##### Backend
-- `/apps/api/src/lib/auth/platformProviders.ts`
-- `/apps/api/src/modules/authProvider/` (org providers)
-
----
-
-## Authorization
-
-Permission enforcement uses the ReBAC system (Permix-based). See [PERMISSIONS.md](./PERMISSIONS.md) for the full guide.
-
-Key entry points:
-
-- **Route layer:** `validateActor` / `validateUser` middleware (see [Validation Middleware](#validation-middleware) above for which to pick)
-- **Page layer:** `_authenticated.tsx` enforces nav-entry access — the nav config is the source of truth for "can view"
-- **Component / handler layer:** `checkPermission(permissions, model, record, action)` from `@template/ui/hooks/usePermission`
-- **Platform bypass:** `user.platformRole === 'superadmin'` short-circuits permission checks
+A token held by a user (User, OrganizationUser, SpaceUser) is superadmin when its user is, and can spoof. A spoof is a superadmin and an email: the request becomes that user and the token is set aside; `spoofedBy` records who.

@@ -1,13 +1,16 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createEmailTemplate,
   createOrganization,
+  createOrganizationUser,
   createSegment,
   createSpace,
+  createSpaceUser,
   createTag,
+  createTagCategory,
   createUser,
 } from '@template/db/test';
 import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
@@ -37,7 +40,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let superadmin: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     superadmin = (await createUser({ platformRole: PlatformRole.superadmin })).entity;
     const harness = createTestApp({
       mockUser: superadmin,
@@ -47,7 +50,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -74,7 +77,6 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   });
 
   it('the row narrows the data lens the registry entry declares', async () => {
-    await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
     await createEmailTemplate({
       slug: 'inquiry-invite-organization-user',
       ownerModel: 'default',
@@ -86,7 +88,9 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     });
 
     const { data } = await json<Surface>(
-      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' })),
+      await fetch(
+        post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' }),
+      ),
     );
 
     expect(data.source.maps[data.source.mapName]?.models.Email?.fields.data).toMatchObject({
@@ -95,13 +99,13 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     });
     expect(fieldsOf(data, 'Inquiry')).toEqual(['content', 'sourceOrganization']);
     expect(fieldsOf(data, 'Organization')).toEqual(['id', 'name']);
-    await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
   });
 
   it('falls back to the engine default lens when no default-tier row declares one', async () => {
-    await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
     const { data } = await json<Surface>(
-      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' })),
+      await fetch(
+        post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' }),
+      ),
     );
 
     expect(fieldsOf(data, 'Email')).toEqual(['data', 'recipient', 'sender', 'system']);
@@ -119,7 +123,9 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   });
 
   it('serves a recipient plus an unknown data bag for a slug the registry does not know', async () => {
-    const { data } = await json<Surface>(await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc' })));
+    const { data } = await json<Surface>(
+      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc' })),
+    );
 
     expect(fieldsOf(data, 'Email')).toEqual(['data', 'recipient', 'system']);
     expect(data.source.maps[data.source.mapName]?.models.Email?.fields.data).toEqual({
@@ -138,7 +144,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const superadmin = (await createUser({ platformRole: PlatformRole.superadmin })).entity;
     const harness = createTestApp({
       mockUser: superadmin,
@@ -148,7 +154,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -156,10 +162,33 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     const { entity: mine } = await createOrganization();
     const { entity: theirs } = await createOrganization();
     const platformTag = (await createTag()).entity;
-    const myTag = (await createTag({ ownerModel: 'Organization' }, { organization: mine })).entity;
-    const theirTag = (await createTag({ ownerModel: 'Organization' }, { organization: theirs })).entity;
-    const mySegment = (await createSegment({ ownerModel: 'Organization' }, { organization: mine })).entity;
-    const theirSegment = (await createSegment({ ownerModel: 'Organization' }, { organization: theirs })).entity;
+    const myTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization: mine,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization: mine })
+          ).entity,
+        },
+      )
+    ).entity;
+    const theirTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization: theirs,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization: theirs })
+          ).entity,
+        },
+      )
+    ).entity;
+    const mySegment = (await createSegment({ ownerModel: 'Organization' }, { organization: mine }))
+      .entity;
+    const theirSegment = (
+      await createSegment({ ownerModel: 'Organization' }, { organization: theirs })
+    ).entity;
 
     const { data } = await json<Surface>(
       await fetch(
@@ -182,12 +211,18 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     expect(optionsOf(data, 'Space')).toEqual([]);
   });
 
-  it("a space template offers its own space and its organization, never another's", async () => {
+  it("a space template offers its own space by default, never its siblings or another organization's", async () => {
     const { entity: mine } = await createOrganization();
     const { entity: theirs } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization: mine });
     const { entity: sibling } = await createSpace({}, { organization: mine });
     await createSpace({}, { organization: theirs });
+    const { entity: member } = await createUser();
+    const { entity: organizationUser } = await createOrganizationUser(
+      {},
+      { user: member, organization: mine },
+    );
+    await createSpaceUser({}, { user: member, organization: mine, space, organizationUser });
 
     const { data } = await json<Surface>(
       await fetch(
@@ -200,7 +235,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
       ),
     );
 
-    expect(optionsOf(data, 'Organization')).toEqual([mine.id]);
+    expect(optionsOf(data, 'Organization')).toEqual([]);
     expect(optionsOf(data, 'Space')).toEqual([space.id]);
     expect(optionsOf(data, 'Space')).not.toContain(sibling.id);
   });
@@ -208,7 +243,17 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
   it('a platform template offers platform tags and no segments', async () => {
     const { entity: org } = await createOrganization();
     const platformTag = (await createTag()).entity;
-    const orgTag = (await createTag({ ownerModel: 'Organization' }, { organization: org })).entity;
+    const orgTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization: org,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization: org })
+          ).entity,
+        },
+      )
+    ).entity;
     await createSegment({ ownerModel: 'Organization' }, { organization: org });
 
     const { data } = await json<Surface>(

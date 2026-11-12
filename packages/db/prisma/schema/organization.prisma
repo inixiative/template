@@ -3,10 +3,11 @@
 // ============================================================================
 
 model Organization {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id                 String        @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements Entitlement[] @relation("EntitlementSource")
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?
 
   name String
   slug String @unique
@@ -17,6 +18,7 @@ model Organization {
   tokens               Token[]
   webhookSubscriptions WebhookSubscription[]
   integrations         Integration[]
+  projects             Project[]
   contacts             Contact[]
   tagAttachments       TagAttachment[]
   tags                 Tag[]
@@ -25,7 +27,7 @@ model Organization {
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
   emailComponents      EmailComponent[]
   emailTemplates       EmailTemplate[]
-  ruleReferences       RuleReference[]
+  targetRuleReferences RuleReference[]       @relation("RuleReferenceTarget")
   spaces               Space[]
   customerRefs         CustomerRef[]         @relation("customerRefs")
   providerRefs         CustomerRef[]         @relation("providerRefs")

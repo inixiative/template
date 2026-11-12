@@ -1,24 +1,6 @@
-import { afterEach } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, getNextSeq, registerTestTracker } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerOrderedListHook } from '#/hooks/orderedList/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-
-// registerDbHook dedupes by hook name, so module-level registration across
-// multiple test files (which Bun runs in parallel) is safe — second-and-later
-// imports are no-ops. We intentionally do NOT call clearHookRegistry() in
-// afterAll because parallel files share the registry; one file clearing it
-// would yank hooks out from under tests still running in sibling files.
-registerTestTracker();
-registerRulesHook();
-registerContactRulesHook();
-registerOrderedListHook();
-
-afterEach(async () => {
-  await cleanupTouchedTables(db);
-});
+import { getNextSeq } from '@template/db/test';
 
 export const e164 = () => `+1555${String(getNextSeq()).padStart(7, '0').slice(-7)}`;
 
@@ -61,7 +43,7 @@ export const mkEmail = (userId: string) =>
     },
   });
 
-export const liveOrders = (userId: string, type = ContactType.phone) =>
+export const liveOrders = (userId: string, type: ContactType = ContactType.phone) =>
   db.contact.findMany({
     where: { userId, type, deletedAt: null },
     orderBy: { position: 'asc' },
@@ -69,16 +51,21 @@ export const liveOrders = (userId: string, type = ContactType.phone) =>
   });
 
 export const allOrders = (userId: string, type = ContactType.phone) =>
-  db.contact.findMany({
-    where: { userId, type },
-    orderBy: { position: 'asc' },
-    select: { id: true, position: true, deletedAt: true },
-  });
+  db.withDeleted(() =>
+    db.contact.findMany({
+      where: { userId, type },
+      orderBy: { position: 'asc' },
+      select: { id: true, position: true, deletedAt: true },
+    }),
+  );
 
 export const positions = (rows: { position: number }[]) => rows.map((r) => r.position);
 
-export const posOf = (rows: { id: string; position: number }[], id: string) => rows.find((r) => r.id === id)?.position;
+export const posOf = (rows: { id: string; position: number }[], id: string) =>
+  rows.find((r) => r.id === id)?.position;
 
-export const softDelete = (id: string) => db.contact.update({ where: { id }, data: { deletedAt: new Date() } });
+export const softDelete = (id: string) =>
+  db.contact.update({ where: { id }, data: { deletedAt: new Date() } });
 
-export const restore = (id: string) => db.contact.update({ where: { id }, data: { deletedAt: null } });
+export const restore = (id: string) =>
+  db.withDeleted(() => db.contact.update({ where: { id }, data: { deletedAt: null } }));

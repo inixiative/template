@@ -19,8 +19,6 @@
 - [Hot Reloading](#hot-reloading)
   - [Backend (API/Worker)](#backend-apiworker)
   - [Frontend (Web/Admin/Superadmin)](#frontend-webadminsuperadmin)
-- [Migration from Bash Watch Scripts](#migration-from-bash-watch-scripts)
-  - [Removed Scripts](#removed-scripts)
 - [Environment Composition with Turbo](#environment-composition-with-turbo)
 - [Filtering Tasks](#filtering-tasks)
 - [Debugging](#debugging)
@@ -211,28 +209,6 @@ vite
 ```
 
 Changes to React components update instantly in the browser without full page reload.
-
-## Migration from Bash Watch Scripts
-
-**Old approach:**
-- Bash scripts polling every 1 second
-- Manual file watching with `find` and `stat`
-- Separate watchers for API restarts and OpenAPI generation
-
-**New approach:**
-- Turborepo's event-based watching
-- Bun `--hot` for native hot reloading
-- Dependency-aware task cascading
-- Smart caching to skip unchanged work
-
-### Removed Scripts
-
-The following bash polling scripts have been removed in favor of Turborepo + `--hot`:
-
-- `apps/api/scripts/watch.sh` → replaced by `bun --hot` + turbo watch
-- `apps/api/scripts/watchWorker.sh` → replaced by `bun --hot` + turbo watch
-- `packages/shared/scripts/watch.sh` → replaced by turbo watch + generation tasks
-- `apps/{web,admin,superadmin}/scripts/watch.sh` → replaced by native `vite` command
 
 ## Environment Composition with Turbo
 

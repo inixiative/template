@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { emailOwnerProvider } from '@template/email/render/owner';
 
 describe('emailOwnerProvider — the provider whose tags and segments a row sees', () => {
-  it('tenant tiers scope to the tenant, user tiers to the person, platform tiers to nobody', () => {
+  it('tenant tiers scope to the tenant, user tiers to the user, platform tiers to nobody', () => {
     expect(emailOwnerProvider({ ownerModel: 'Organization', organizationId: 'o' })).toEqual({
       ownerModel: 'Organization',
       ownerId: 'o',
@@ -12,8 +12,13 @@ describe('emailOwnerProvider — the provider whose tags and segments a row sees
       ownerModel: 'Space',
       ownerId: 's',
     });
-    expect(emailOwnerProvider({ ownerModel: 'User', userId: 'u' })).toEqual({ ownerModel: 'User', ownerId: 'u' });
-    expect(emailOwnerProvider({ ownerModel: 'OrganizationUser', organizationId: 'o', userId: 'u' })).toEqual({
+    expect(emailOwnerProvider({ ownerModel: 'User', userId: 'u' })).toEqual({
+      ownerModel: 'User',
+      ownerId: 'u',
+    });
+    expect(
+      emailOwnerProvider({ ownerModel: 'OrganizationUser', organizationId: 'o', userId: 'u' }),
+    ).toEqual({
       ownerModel: 'User',
       ownerId: 'u',
     });

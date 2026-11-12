@@ -5,22 +5,21 @@
  * @uses primitive:shared
  */
 import {
-  applyLens,
   type Condition,
-  checkRuleAgainstLens,
   type LensNarrowing,
   RuleTarget,
   toPrisma,
   validateRule,
+  validateRuleInLens,
 } from '@inixiative/json-rules';
-import { rootLens } from '@template/db/lens/rootLens';
 import type { RuleLens } from '@template/shared/rules';
 
 export type RuleValidation = { valid: boolean; errors: string[]; normalized: unknown };
 
 type Node = Record<string, unknown>;
 
-const isNode = (value: unknown): value is Node => !!value && typeof value === 'object' && !Array.isArray(value);
+const isNode = (value: unknown): value is Node =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const isVacuouslyTrue = (node: unknown): boolean => {
   if (!isNode(node)) return false;
@@ -89,22 +88,24 @@ export const validateRuleForLens = (
   const invalid = (errors: string[]): RuleValidation => ({ valid: false, errors, normalized });
 
   const structural = validateRule(normalized, { target });
-  if (!structural.ok) return invalid(structural.errors.map((error) => `${error.path}: ${error.message}`));
+  if (!structural.ok)
+    return invalid(structural.errors.map((error) => `${error.path}: ${error.message}`));
 
   const rule = normalized as Condition;
-  const vocabulary = checkRuleAgainstLens(rule, lens);
+  const vocabulary = validateRuleInLens(rule, lens);
   if (!vocabulary.ok)
-    return invalid(vocabulary.violations.map((violation) => `${violation.path}: ${violation.reason}`));
+    return invalid(vocabulary.errors.map((error) => `${error.path}: ${error.message}`));
 
   const openArm = emptyArmInsideAny(rule);
   if (openArm) return invalid([openArm]);
 
   if (compileWith) {
     try {
-      const root = rootLens(compileWith);
-      toPrisma(applyLens(rule, compileWith), { map: root, mapName: root.mapName, model: root.model });
+      toPrisma(rule, { lens: compileWith });
     } catch (error) {
-      return invalid([error instanceof Error ? error.message : 'rule is not evaluable under the lens']);
+      return invalid([
+        error instanceof Error ? error.message : 'rule is not evaluable under the lens',
+      ]);
     }
   }
   return { valid: true, errors: [], normalized: rule };

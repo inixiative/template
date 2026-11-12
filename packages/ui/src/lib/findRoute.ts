@@ -26,7 +26,10 @@ function matchSegment(pattern: string, segment: string): Record<string, string> 
   return null;
 }
 
-function isPathPrefix(patternSegments: string[], targetSegments: string[]): Record<string, string> | null {
+function isPathPrefix(
+  patternSegments: string[],
+  targetSegments: string[],
+): Record<string, string> | null {
   if (patternSegments.length > targetSegments.length) return null;
 
   const params: Record<string, string> = {};

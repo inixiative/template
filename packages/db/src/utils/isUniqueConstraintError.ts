@@ -10,4 +10,7 @@ import type { Prisma } from '@template/db/generated/client/client';
 export const isUniqueConstraintError = (
   err: unknown,
 ): err is Prisma.PrismaClientKnownRequestError & { code: 'P2002' } =>
-  typeof err === 'object' && err !== null && 'code' in err && (err as { code?: unknown }).code === 'P2002';
+  typeof err === 'object' &&
+  err !== null &&
+  'code' in err &&
+  (err as { code?: unknown }).code === 'P2002';

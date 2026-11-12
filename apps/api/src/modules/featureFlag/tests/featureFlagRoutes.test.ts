@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db } from '@template/db';
-import type { Organization, OrganizationUser, Segment, User } from '@template/db/generated/client/client';
+import type {
+  Organization,
+  OrganizationUser,
+  Segment,
+  User,
+} from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -37,7 +42,12 @@ type Variant = {
   position: number;
   segmentId: string | null;
   sample: { from: number; to: number } | null;
-  segment: { id: string; members: number; featureFlagInternal: boolean; deletedAt: string | null } | null;
+  segment: {
+    id: string;
+    members: number;
+    featureFlagInternal: boolean;
+    deletedAt: string | null;
+  } | null;
 };
 type Flag = { id: string; slug: string; ownerModel: string; enabled: boolean; variants: Variant[] };
 type Value = {
@@ -75,20 +85,25 @@ describe('feature flag routes', () => {
     owner = context.user;
     org = context.organization;
     member = (await createUser({ email: `member-${getNextSeq()}${domain}` })).entity;
-    const { entity: memberOu } = await createOrganizationUser({ role: 'member' }, { organization: org, user: member });
+    const { entity: memberOu } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org, user: member },
+    );
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Organization',
-      customerUser: member,
-      providerOrganization: org,
+      customerUserId: member.id,
+      providerOrganizationId: org.id,
     });
     audience = (
-      await createSegment({
-        ownerModel: 'Organization',
-        organization: org,
-        type: 'dynamic',
-        conditions: { field: 'customerUser.email', operator: Operator.endsWith, value: domain },
-      })
+      await createSegment(
+        {
+          ownerModel: 'Organization',
+          type: 'dynamic',
+          conditions: { field: 'customerUser.email', operator: Operator.endsWith, value: domain },
+        },
+        { organization: org },
+      )
     ).entity;
     await emitAppEvent('segment.created', { segment: audience });
     const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
@@ -106,7 +121,11 @@ describe('feature flag routes', () => {
     const harness = createTestApp({ mockUser: owner, mockOrganizationUsers: [orgUser], mount });
     ownerFetch = harness.fetch;
     testDb = harness.db;
-    memberFetch = createTestApp({ mockUser: member, mockOrganizationUsers: [memberOu], mount }).fetch;
+    memberFetch = createTestApp({
+      mockUser: member,
+      mockOrganizationUsers: [memberOu],
+      mount,
+    }).fetch;
     superadminFetch = createTestApp({ mockUser: superadmin, mount }).fetch;
   });
 
@@ -147,16 +166,27 @@ describe('feature flag routes', () => {
 
   it('the internal segment is hidden from the owner’s segment list and the member sees the value', async () => {
     const listed = await ownerFetch(get(`/api/v1/organization/${org.id}/segments`));
-    expect((await json<Segment[]>(listed)).data.map((each) => each.id)).not.toContain(flag.variants[0]!.segmentId);
+    expect((await json<Segment[]>(listed)).data.map((each) => each.id)).not.toContain(
+      flag.variants[0]!.segmentId,
+    );
 
     const values = await memberFetch(get('/api/v1/me/featureFlagValues'));
     expect(values.status).toBe(200);
-    const mine = (await json<Value[]>(values)).data.find((each) => each.slug === 'custom:dark-mode');
-    expect(mine).toMatchObject({ ownerModel: 'Organization', ownerId: org.id, customerId: member.id, value: true });
+    const mine = (await json<Value[]>(values)).data.find(
+      (each) => each.slug === 'custom:dark-mode',
+    );
+    expect(mine).toMatchObject({
+      ownerModel: 'Organization',
+      ownerId: org.id,
+      customerId: member.id,
+      value: true,
+    });
 
     const memberships = await memberFetch(get('/api/v1/me/segmentMemberships'));
     expect(memberships.status).toBe(200);
-    const segmentIds = (await json<{ segmentId: string }[]>(memberships)).data.map((each) => each.segmentId);
+    const segmentIds = (await json<{ segmentId: string }[]>(memberships)).data.map(
+      (each) => each.segmentId,
+    );
     expect(segmentIds).not.toContain(flag.variants[0]!.segmentId);
   });
 
@@ -232,19 +262,25 @@ describe('feature flag routes', () => {
     );
     expect(both.status).toBe(422);
 
-    const before = (await json<Value[]>(await memberFetch(get('/api/v1/me/featureFlagValues')))).data;
+    const before = (await json<Value[]>(await memberFetch(get('/api/v1/me/featureFlagValues'))))
+      .data;
     expect(before.find((each) => each.slug === 'custom:theme')?.value).toBe('compact');
 
-    const moved = await ownerFetch(patch(`/api/v1/featureFlagVariant/${rollout.id}`, { position: 0 }));
+    const moved = await ownerFetch(
+      patch(`/api/v1/featureFlagVariant/${rollout.id}`, { position: 0 }),
+    );
     expect(moved.status).toBe(200);
-    const after = (await json<Value[]>(await memberFetch(get('/api/v1/me/featureFlagValues')))).data;
+    const after = (await json<Value[]>(await memberFetch(get('/api/v1/me/featureFlagValues'))))
+      .data;
     expect(after.find((each) => each.slug === 'custom:theme')?.value).toBe('classic');
 
     const read = (await json<Flag>(await ownerFetch(get(`/api/v1/featureFlag/${theme.id}`)))).data;
     expect(read.variants.map((each) => each.label)).toEqual(['rollout', 'beta']);
     expect(read.variants[0]!.segment?.members).toBe(1);
 
-    const relabeled = await ownerFetch(patch(`/api/v1/featureFlagVariant/${rollout.id}`, { label: 'staged' }));
+    const relabeled = await ownerFetch(
+      patch(`/api/v1/featureFlagVariant/${rollout.id}`, { label: 'staged' }),
+    );
     expect(relabeled.status).toBe(200);
     const renamed = await db.segment.findUnique({ where: { id: rollout.segmentId! } });
     expect(renamed?.name).toBe('custom:theme/staged');
@@ -280,12 +316,14 @@ describe('feature flag routes', () => {
   });
 
   it('a tombstoned shared audience shows as deleted on the owner’s read', async () => {
-    const { entity: doomed } = await createSegment({
-      ownerModel: 'Organization',
-      organization: org,
-      type: 'static',
-      conditions: { field: 'id', operator: Operator.in, value: [] },
-    });
+    const { entity: doomed } = await createSegment(
+      {
+        ownerModel: 'Organization',
+        type: 'static',
+        conditions: { field: 'id', operator: Operator.in, value: [] },
+      },
+      { organization: org },
+    );
     const created = await ownerFetch(
       post(`/api/v1/organization/${org.id}/featureFlags`, {
         slug: 'custom:doomed',
@@ -306,7 +344,8 @@ describe('feature flag routes', () => {
     expect((await json<Variant>(variant)).data.segment?.deletedAt).toBeNull();
 
     expect((await ownerFetch(del(`/api/v1/segment/${doomed.id}`))).status).toBe(204);
-    const read = (await json<Flag>(await ownerFetch(get(`/api/v1/featureFlag/${doomedFlag.id}`)))).data;
+    const read = (await json<Flag>(await ownerFetch(get(`/api/v1/featureFlag/${doomedFlag.id}`))))
+      .data;
     const dead = read.variants.find((each) => each.label === 'dead');
     expect(dead?.segment?.id).toBe(doomed.id);
     expect(dead?.segment?.deletedAt).not.toBeNull();
@@ -314,14 +353,17 @@ describe('feature flag routes', () => {
 
   it('deleting a variant tombstones its internal segment; a member cannot manage the flag', async () => {
     const onVariant = flag.variants[0]!;
-    expect((await memberFetch(patch(`/api/v1/featureFlag/${flag.id}`, { enabled: false }))).status).toBe(403);
+    expect(
+      (await memberFetch(patch(`/api/v1/featureFlag/${flag.id}`, { enabled: false }))).status,
+    ).toBe(403);
 
     const deleted = await ownerFetch(del(`/api/v1/featureFlagVariant/${onVariant.id}`));
     expect(deleted.status).toBe(204);
     const internal = await db.segment.findUnique({ where: { id: onVariant.segmentId! } });
     expect(internal?.deletedAt).not.toBeNull();
 
-    const values = (await json<Value[]>(await memberFetch(get('/api/v1/me/featureFlagValues')))).data;
+    const values = (await json<Value[]>(await memberFetch(get('/api/v1/me/featureFlagValues'))))
+      .data;
     expect(values.find((each) => each.slug === 'custom:dark-mode')?.value).toBe(false);
   });
 
@@ -349,7 +391,9 @@ describe('feature flag routes', () => {
     ).data;
     const firstInternal = first.segmentId!;
 
-    const toShared = await ownerFetch(patch(`/api/v1/featureFlagVariant/${first.id}`, { segmentId: audience.id }));
+    const toShared = await ownerFetch(
+      patch(`/api/v1/featureFlagVariant/${first.id}`, { segmentId: audience.id }),
+    );
     expect(toShared.status).toBe(200);
     expect((await json<Variant>(toShared)).data.segmentId).toBe(audience.id);
     const released = await db.segment.findUnique({ where: { id: firstInternal } });
@@ -417,12 +461,18 @@ describe('feature flag routes', () => {
     const doomedFlag = (await json<Flag>(created)).data;
 
     await db.organization.update({ where: { id: doomed.id }, data: { deletedAt: new Date() } });
-    expect(await db.featureFlag.findFirst({ where: { id: doomedFlag.id, deletedAt: { not: null } } })).not.toBeNull();
     expect(
-      await db.featureFlagVariant.findFirst({ where: { id: doomedFlag.variants[0]!.id, deletedAt: { not: null } } }),
+      await db.featureFlag.findFirst({ where: { id: doomedFlag.id, deletedAt: { not: null } } }),
     ).not.toBeNull();
     expect(
-      await db.segment.findFirst({ where: { id: doomedFlag.variants[0]!.segmentId!, deletedAt: { not: null } } }),
+      await db.featureFlagVariant.findFirst({
+        where: { id: doomedFlag.variants[0]!.id, deletedAt: { not: null } },
+      }),
+    ).not.toBeNull();
+    expect(
+      await db.segment.findFirst({
+        where: { id: doomedFlag.variants[0]!.segmentId!, deletedAt: { not: null } },
+      }),
     ).not.toBeNull();
   });
 
@@ -436,35 +486,43 @@ describe('feature flag routes', () => {
       }),
     );
     expect(created.status).toBe(400);
-    const flipped = await ownerFetch(patch(`/api/v1/segment/${audience.id}`, { featureFlagInternal: true }));
+    const flipped = await ownerFetch(
+      patch(`/api/v1/segment/${audience.id}`, { featureFlagInternal: true }),
+    );
     expect(flipped.status).toBe(400);
-    expect((await db.segment.findUnique({ where: { id: audience.id } }))?.featureFlagInternal).toBe(false);
+    expect((await db.segment.findUnique({ where: { id: audience.id } }))?.featureFlagInternal).toBe(
+      false,
+    );
   });
 
   it('two variants racing for one orphaned internal segment: exactly one wins', async () => {
-    const { entity: raceFlag } = await createFeatureFlag({
-      slug: `custom:race-${getNextSeq()}`,
-      ownerModel: 'Organization',
-      organization: org,
-      valueType: 'boolean',
-    });
-    const { entity: orphan } = await createSegment({
-      ownerModel: 'Organization',
-      organization: org,
-      featureFlagInternal: true,
-    });
+    const { entity: raceFlag } = await createFeatureFlag(
+      { slug: `custom:race-${getNextSeq()}`, ownerModel: 'Organization', valueType: 'boolean' },
+      { organization: org },
+    );
+    const { entity: orphan } = await createSegment(
+      { ownerModel: 'Organization', featureFlagInternal: true },
+      { organization: org },
+    );
     const outcomes = await Promise.allSettled([
       createVariant(raceFlag, { label: 'a', segmentId: orphan.id, valueBoolean: true }),
       createVariant(raceFlag, { label: 'b', segmentId: orphan.id, valueBoolean: false }),
     ]);
     expect(outcomes.filter((each) => each.status === 'fulfilled')).toHaveLength(1);
-    const referrers = await db.featureFlagVariant.findMany({ where: { segmentId: orphan.id, deletedAt: null } });
+    const referrers = await db.featureFlagVariant.findMany({
+      where: { segmentId: orphan.id, deletedAt: null },
+    });
     expect(referrers).toHaveLength(1);
   });
 
   it('the superadmin creates a bare platform flag and lists every owner’s flags', async () => {
     const created = await superadminFetch(
-      post('/api/admin/featureFlag', { slug: 'new-nav', name: 'New nav', subjectModel: 'User', valueType: 'boolean' }),
+      post('/api/admin/featureFlag', {
+        slug: 'new-nav',
+        name: 'New nav',
+        subjectModel: 'User',
+        valueType: 'boolean',
+      }),
     );
     expect(created.status).toBe(201);
     const platformFlag = (await json<Flag>(created)).data;

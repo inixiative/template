@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry } from '@template/db';
-import type { Organization, OrganizationUser, Segment, User } from '@template/db/generated/client/client';
+import type {
+  Organization,
+  OrganizationUser,
+  Segment,
+  User,
+} from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -39,13 +44,17 @@ describe('admin/segment', () => {
     org = context.organization;
 
     platformCustomer = (await createUser({ email: `platform-${getNextSeq()}${domain}` })).entity;
-    await createCustomerRef({ customerModel: 'User', providerModel: 'platform', customerUser: platformCustomer });
+    await createCustomerRef({
+      customerModel: 'User',
+      providerModel: 'platform',
+      customerUserId: platformCustomer.id,
+    });
     const orgCustomer = (await createUser({ email: `org-${getNextSeq()}${domain}` })).entity;
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Organization',
-      customerUser: orgCustomer,
-      providerOrganization: org,
+      customerUserId: orgCustomer.id,
+      providerOrganizationId: org.id,
     });
 
     const mount: MountFn[] = [
@@ -58,7 +67,11 @@ describe('admin/segment', () => {
     const harness = createTestApp({ mockUser: superadmin, mount });
     superadminFetch = harness.fetch;
     db = harness.db;
-    orgAdminFetch = createTestApp({ mockUser: context.user, mockOrganizationUsers: [orgUser], mount }).fetch;
+    orgAdminFetch = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [orgUser],
+      mount,
+    }).fetch;
   });
 
   afterAll(async () => {
@@ -70,7 +83,11 @@ describe('admin/segment', () => {
 
   it('the superadmin creates a platform segment and it reconciles over platform customers only', async () => {
     const response = await superadminFetch(
-      post('/api/admin/segment', { name: `platform-acme-${getNextSeq()}`, type: 'dynamic', conditions: acmeRule }),
+      post('/api/admin/segment', {
+        name: `platform-acme-${getNextSeq()}`,
+        type: 'dynamic',
+        conditions: acmeRule,
+      }),
     );
     expect(response.status).toBe(201);
     segment = (await json<Segment>(response)).data;
@@ -84,7 +101,9 @@ describe('admin/segment', () => {
   });
 
   it('reach counts the platform’s customers, not another provider’s', async () => {
-    const response = await superadminFetch(post('/api/admin/segment/reach', { conditions: acmeRule }));
+    const response = await superadminFetch(
+      post('/api/admin/segment/reach', { conditions: acmeRule }),
+    );
     expect(response.status).toBe(200);
     expect((await json<{ count: number }>(response)).data.count).toBe(1);
   });
@@ -94,7 +113,9 @@ describe('admin/segment', () => {
     expect(all.status).toBe(200);
     expect((await json<Segment[]>(all)).data.map((each) => each.id)).toContain(segment.id);
 
-    const platformOnly = await superadminFetch(get('/api/admin/segment?searchFields[ownerModel]=platform'));
+    const platformOnly = await superadminFetch(
+      get('/api/admin/segment?searchFields[ownerModel]=platform'),
+    );
     const { data } = await json<Segment[]>(platformOnly);
     expect(data.length).toBeGreaterThan(0);
     expect(data.every((each) => each.ownerModel === 'platform')).toBe(true);
@@ -102,7 +123,9 @@ describe('admin/segment', () => {
 
   it('an organization admin is refused the admin routes and cannot read a platform segment', async () => {
     expect((await orgAdminFetch(get('/api/admin/segment'))).status).toBe(403);
-    expect((await orgAdminFetch(post('/api/admin/segment', { name: 'x', conditions: acmeRule }))).status).toBe(403);
+    expect(
+      (await orgAdminFetch(post('/api/admin/segment', { name: 'x', conditions: acmeRule }))).status,
+    ).toBe(403);
     expect((await orgAdminFetch(get(`/api/v1/segment/${segment.id}`))).status).toBe(403);
 
     const owned = await orgAdminFetch(get(`/api/v1/organization/${org.id}/segments`));

@@ -5,11 +5,12 @@
  * @uses primitive:sdk
  */
 import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
+import type { InviteOrganizationUserContent } from '@template/shared/inquiry';
 import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 
 const InviteSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => {
-  const content = inquiry.content as { email?: string; role?: string } | null | undefined;
-  const email = inquiry.targetUser?.email ?? content?.email ?? '—';
+  const content = inquiry.content as Partial<InviteOrganizationUserContent> | null | undefined;
+  const email = inquiry.targetUser?.email ?? '—';
   const role = content?.role;
   return (
     <span>
@@ -20,7 +21,7 @@ const InviteSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => {
 };
 
 const InviteTargetSummary = ({ inquiry }: { inquiry: InquiryReceivedItem }) => {
-  const content = inquiry.content as { role?: string } | null | undefined;
+  const content = inquiry.content as Partial<InviteOrganizationUserContent> | null | undefined;
   const org = inquiry.sourceOrganization?.name ?? '—';
   const role = content?.role;
   return (

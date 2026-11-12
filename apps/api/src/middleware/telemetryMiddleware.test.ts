@@ -9,11 +9,10 @@ import { log } from '@template/shared/logger';
 import { type LogRecord, observeLogRecords } from '@template/shared/logger/records';
 import { captureTraceContext, trace, withSpan } from '@template/shared/telemetry';
 import { initializeTelemetry } from '@template/shared/telemetry/initialize';
-import { Hono } from 'hono';
 import { traceJob } from '#/jobs/traceJob';
 import { telemetryMiddleware } from '#/middleware/telemetryMiddleware';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
-import type { AppEnv } from '#/types/appEnv';
+import { createTestApp } from '#tests/createTestApp';
 
 const batches: string[] = [];
 const receiver = Bun.serve({
@@ -41,9 +40,14 @@ afterAll(async () => {
 });
 
 it('joins a browser trace and uses route templates instead of user identifiers', async () => {
-  const app = new Hono<AppEnv>();
-  app.use('*', telemetryMiddleware);
-  app.get('/users/:id', (c) => c.json({ ok: true }));
+  const { app } = createTestApp({
+    mount: [
+      (app) => {
+        app.use('*', telemetryMiddleware);
+        app.get('/users/:id', (c) => c.json({ ok: true }));
+      },
+    ],
+  });
   const traceId = 'a'.repeat(32);
   const response = await app.request('/users/private-user-id?token=private-token', {
     headers: { traceparent: `00-${traceId}-${'b'.repeat(16)}-01` },
@@ -84,39 +88,47 @@ it('keeps failed job logs correlated with its remote trace and attempt', async (
 });
 
 it('keeps parallel batch subrequests and their downstream work in the outer trace', async () => {
-  const app = new Hono<AppEnv>();
-  app.use('*', telemetryMiddleware);
-  app.get('/api/items/:id', async (c) =>
-    withSpan('batch.database.operation', {}, async (span) => {
-      await Promise.resolve();
-      return c.json({ traceId: span.spanContext().traceId, jobCarrier: captureTraceContext() });
-    }),
-  );
-  app.post('/api/batch', async (c) => {
-    const parent = trace.getActiveSpan()!.spanContext();
-    const results = await Promise.all(
-      ['one', 'two'].map((id) =>
-        executeRequest(
-          app,
-          {
-            method: 'GET',
-            path: `/api/items/${id}`,
-            headers: { Traceparent: `00-${'e'.repeat(32)}-${'f'.repeat(16)}-01` },
-          },
-          'test-batch',
-          {},
-          c.req.raw,
-        ),
-      ),
-    );
-    for (const result of results) {
-      expect(result.status).toBe(200);
-      expect(result.body).toMatchObject({
-        traceId: parent.traceId,
-        jobCarrier: { traceparent: expect.stringContaining(parent.traceId) },
-      });
-    }
-    return c.json({ ok: true });
+  const { app } = createTestApp({
+    mount: [
+      (app) => {
+        app.use('*', telemetryMiddleware);
+        app.get('/api/items/:id', async (c) =>
+          withSpan('batch.database.operation', {}, async (span) => {
+            await Promise.resolve();
+            return c.json({
+              traceId: span.spanContext().traceId,
+              jobCarrier: captureTraceContext(),
+            });
+          }),
+        );
+        app.post('/api/batch', async (c) => {
+          const parent = trace.getActiveSpan()!.spanContext();
+          const results = await Promise.all(
+            ['one', 'two'].map((id) =>
+              executeRequest(
+                app,
+                {
+                  method: 'GET',
+                  path: `/api/items/${id}`,
+                  headers: { Traceparent: `00-${'e'.repeat(32)}-${'f'.repeat(16)}-01` },
+                },
+                'test-batch',
+                {},
+                c.req.raw,
+              ),
+            ),
+          );
+          for (const result of results) {
+            expect(result.status).toBe(200);
+            expect(result.body).toMatchObject({
+              traceId: parent.traceId,
+              jobCarrier: { traceparent: expect.stringContaining(parent.traceId) },
+            });
+          }
+          return c.json({ ok: true });
+        });
+      },
+    ],
   });
   const traceId = '1'.repeat(32);
   const response = await app.request('/api/batch', {

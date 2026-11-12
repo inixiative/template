@@ -29,13 +29,15 @@ describe('featureFlag hook', () => {
 
   it('only the platform defines a bare slug; every owner may define custom: ones', async () => {
     await expect(
-      createFeatureFlag({ slug: 'dark-mode', ownerModel: ProviderModel.Organization, organization }),
+      createFeatureFlag(
+        { slug: 'dark-mode', ownerModel: ProviderModel.Organization },
+        { organization },
+      ),
     ).rejects.toThrow('prefix yours with custom:');
-    const { entity: custom } = await createFeatureFlag({
-      slug: 'custom:dark-mode',
-      ownerModel: ProviderModel.Organization,
-      organization,
-    });
+    const { entity: custom } = await createFeatureFlag(
+      { slug: 'custom:dark-mode', ownerModel: ProviderModel.Organization },
+      { organization },
+    );
     expect(custom.slug).toBe('custom:dark-mode');
     const { entity: bare } = await createFeatureFlag({ slug: 'dark-mode' });
     expect(bare.ownerModel).toBe('platform');
@@ -48,38 +50,34 @@ describe('featureFlag hook', () => {
   });
 
   it('the gate segment must be a live segment of the same owner and nobody’s internal audience', async () => {
-    const { entity: theirs } = await createSegment({ ownerModel: ProviderModel.Space, space });
+    const { entity: theirs } = await createSegment({ ownerModel: ProviderModel.Space }, { space });
     await expect(
-      createFeatureFlag({
-        slug: 'custom:gated',
-        ownerModel: ProviderModel.Organization,
-        organization,
-        segment: theirs,
-      }),
+      createFeatureFlag(
+        { slug: 'custom:gated', ownerModel: ProviderModel.Organization },
+        { organization, segment: theirs },
+      ),
     ).rejects.toThrow('not a live segment of this Organization');
 
-    const { entity: ours } = await createSegment({ ownerModel: ProviderModel.Organization, organization });
-    const { entity: gated } = await createFeatureFlag({
-      slug: 'custom:gated',
-      ownerModel: ProviderModel.Organization,
-      organization,
-      segment: ours,
-    });
+    const { entity: ours } = await createSegment(
+      { ownerModel: ProviderModel.Organization },
+      { organization },
+    );
+    const { entity: gated } = await createFeatureFlag(
+      { slug: 'custom:gated', ownerModel: ProviderModel.Organization },
+      { organization, segment: ours },
+    );
     expect(gated.segmentId).toBe(ours.id);
 
-    const { entity: internal } = await createSegment({
-      ownerModel: ProviderModel.Organization,
-      organization,
-      featureFlagInternal: true,
-    });
-    await createFeatureFlagVariant({ segment: internal }, { featureFlag: gated });
+    const { entity: internal } = await createSegment(
+      { ownerModel: ProviderModel.Organization, featureFlagInternal: true },
+      { organization },
+    );
+    await createFeatureFlagVariant({}, { segment: internal, featureFlag: gated });
     await expect(
-      createFeatureFlag({
-        slug: 'custom:other',
-        ownerModel: ProviderModel.Organization,
-        organization,
-        segment: internal,
-      }),
+      createFeatureFlag(
+        { slug: 'custom:other', ownerModel: ProviderModel.Organization },
+        { organization, segment: internal },
+      ),
     ).rejects.toThrow("a feature flag variant's internal audience");
   });
 });

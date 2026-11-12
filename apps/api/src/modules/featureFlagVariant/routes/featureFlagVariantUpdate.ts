@@ -17,5 +17,6 @@ export const featureFlagVariantUpdateRoute = updateRoute({
   middleware: [validatePermission('manage')],
   bodySchema: featureFlagVariantUpdateBodySchema,
   responseSchema: featureFlagVariantReadResponseSchema,
-  description: 'Edits a variant. position reorders it; the audience fields replace its segment as on create.',
+  description:
+    'Edits a variant. position reorders it; the audience fields replace its segment as on create.',
 });

@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test';
+import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createEmailTemplate, registerTestTracker } from '@template/db/test';
+import { cleanupTouchedTables, createEmailTemplate } from '@template/db/test';
 import type { SendEmailOptions } from '@template/email/client/types';
 import { appEventHandlers } from '#/appEvents/handlers';
 import type { UserVerificationRequestedPayload } from '#/appEvents/handlers/user/userVerificationRequested';
@@ -10,10 +10,12 @@ import { emailRegistry, emailVerifier } from '#/lib/email';
 const adapters = emailRegistry.names().map((name) => ({ name, client: emailRegistry.get(name) }));
 const sent: SendEmailOptions[] = [];
 const verificationEvent = spyOn(appEventHandlers, 'user.verificationRequested');
-const verifier = spyOn(emailVerifier, 'verify').mockImplementation(async (email) => ({ email, status: 'deliverable' }));
+const verifier = spyOn(emailVerifier, 'verify').mockImplementation(async (email) => ({
+  email,
+  status: 'deliverable',
+}));
 
-beforeAll(() => {
-  registerTestTracker();
+beforeEach(() => {
   for (const { name } of adapters) emailRegistry.unregister(name);
   emailRegistry.register('signup-recorder', {
     send: async (options) => {
@@ -26,7 +28,7 @@ beforeAll(() => {
   });
 });
 
-afterAll(async () => {
+afterEach(async () => {
   verificationEvent.mockRestore();
   verifier.mockRestore();
   emailRegistry.unregister('signup-recorder');
@@ -66,5 +68,5 @@ test('signup delivers a verification email through app events and keeps the acco
 
   const signIn = await auth.api.signInEmail({ body: { email, password }, asResponse: true });
   expect(signIn.status).toBe(403);
-  expect((await signIn.json()).code).toBe('EMAIL_NOT_VERIFIED');
+  expect(((await signIn.json()) as { code: string }).code).toBe('EMAIL_NOT_VERIFIED');
 });

@@ -5,7 +5,11 @@
  * @uses none
  */
 import { redirect } from '@tanstack/react-router';
-import { buildPathWithSearch, pickSearchParams, readSearchParam } from '@template/ui/lib/searchParams';
+import {
+  buildPathWithSearch,
+  pickSearchParams,
+  readSearchParam,
+} from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
 
 type BeforeLoadContext = {

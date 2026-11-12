@@ -6,15 +6,22 @@
  */
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { type ComponentNode, collectSlugsFromNodes, isOverrideSlot, type Node } from '@template/email/render/nodes';
+import {
+  type ComponentNode,
+  collectSlugsFromNodes,
+  isOverrideSlot,
+  type Node,
+} from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
-import type { OwnerScope } from '@template/email/render/types';
+import type { OwnerScope, RenderObserver } from '@template/email/render/types';
 
-export type LookupComponents = (slugs: string[]) => Promise<Record<string, { mjml: string } | undefined>>;
+export type LookupComponents = (
+  slugs: string[],
+) => Promise<Record<string, { mjml: string } | undefined>>;
 
 type ComponentCache = Map<string, Node[] | null>;
 
-type Renderer = { lookup: LookupComponents; cache: ComponentCache };
+type Renderer = { lookup: LookupComponents; cache: ComponentCache; observer?: RenderObserver };
 
 type RenderScope = {
   overrides: Map<string, Node[]>;
@@ -22,11 +29,19 @@ type RenderScope = {
   parent: RenderScope | null;
 };
 
-export const expandWith = async (mjml: string, lookup: LookupComponents): Promise<string> =>
-  renderNodes(parseBlocks(mjml), { overrides: new Map(), path: [], parent: null }, { lookup, cache: new Map() });
+export const expandWith = async (
+  mjml: string,
+  lookup: LookupComponents,
+  observer?: RenderObserver,
+): Promise<string> =>
+  renderNodes(
+    parseBlocks(mjml),
+    { overrides: new Map(), path: [], parent: null },
+    { lookup, cache: new Map(), observer },
+  );
 
-export const expand = (mjml: string, ctx: OwnerScope): Promise<string> =>
-  expandWith(mjml, (slugs) => lookupCascade(slugs, ctx));
+export const expand = (mjml: string, ctx: OwnerScope, observer?: RenderObserver): Promise<string> =>
+  expandWith(mjml, (slugs) => lookupCascade(slugs, ctx), observer);
 
 const loadComponents = async (slugs: string[], renderer: Renderer): Promise<void> => {
   const missing = [...new Set(slugs)].filter((slug) => !renderer.cache.has(slug));
@@ -39,7 +54,11 @@ const loadComponents = async (slugs: string[], renderer: Renderer): Promise<void
   }
 };
 
-const renderNodes = async (nodes: Node[], scope: RenderScope, renderer: Renderer): Promise<string> => {
+const renderNodes = async (
+  nodes: Node[],
+  scope: RenderScope,
+  renderer: Renderer,
+): Promise<string> => {
   await loadComponents(collectSlugsFromNodes(nodes), renderer);
 
   let out = '';
@@ -57,8 +76,17 @@ const renderNodes = async (nodes: Node[], scope: RenderScope, renderer: Renderer
   return out;
 };
 
-const renderComponentRef = async (node: ComponentNode, scope: RenderScope, renderer: Renderer): Promise<string> => {
-  if (scope.path.includes(node.slug)) throw new EmailRenderError(node.slug, 'circular_ref', [...scope.path, node.slug]);
+const renderComponentRef = async (
+  node: ComponentNode,
+  scope: RenderScope,
+  renderer: Renderer,
+): Promise<string> => {
+  if (scope.path.includes(node.slug)) {
+    const error = new EmailRenderError(node.slug, 'circular_ref', [...scope.path, node.slug]);
+    if (!renderer.observer?.onRenderFailure) throw error;
+    renderer.observer.onRenderFailure(error);
+    return '';
+  }
 
   const overrides = new Map<string, Node[]>();
   for (const child of node.children) {
@@ -67,7 +95,16 @@ const renderComponentRef = async (node: ComponentNode, scope: RenderScope, rende
 
   await loadComponents([node.slug], renderer);
   const body = renderer.cache.get(node.slug);
-  if (!body) throw new EmailRenderError(node.slug, 'component_missing');
+  if (!body) {
+    const error = new EmailRenderError(node.slug, 'component_missing');
+    if (!renderer.observer?.onRenderFailure) throw error;
+    renderer.observer.onRenderFailure(error);
+    return '';
+  }
 
-  return renderNodes(body, { overrides, path: [...scope.path, node.slug], parent: scope }, renderer);
+  return renderNodes(
+    body,
+    { overrides, path: [...scope.path, node.slug], parent: scope },
+    renderer,
+  );
 };

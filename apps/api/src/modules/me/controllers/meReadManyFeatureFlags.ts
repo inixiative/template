@@ -14,14 +14,21 @@ import {
 } from '#/modules/featureFlag/queries/featureFlagIncludes';
 import { meReadManyFeatureFlagsRoute } from '#/modules/me/routes/meReadManyFeatureFlags';
 
-export const meReadManyFeatureFlagsController = makeController(meReadManyFeatureFlagsRoute, async (c, respond) => {
-  const db = c.get('db');
-  const owner = c.get('user')!;
+export const meReadManyFeatureFlagsController = makeController(
+  meReadManyFeatureFlagsRoute,
+  async (c, respond) => {
+    const db = c.get('db');
+    const owner = c.get('user')!;
 
-  const { data, pagination } = await paginate<typeof db.featureFlag, FeatureFlagWithVariants>(c, db.featureFlag, {
-    where: { ownerModel: 'User', userId: owner.id },
-    include: includeFeatureFlagVariants,
-  });
+    const { data, pagination } = await paginate<typeof db.featureFlag, FeatureFlagWithVariants>(
+      c,
+      db.featureFlag,
+      {
+        where: { ownerModel: 'User', userId: owner.id },
+        include: includeFeatureFlagVariants,
+      },
+    );
 
-  return respond.ok(data.map(presentFeatureFlag), { pagination });
-});
+    return respond.ok(data.map(presentFeatureFlag), { pagination });
+  },
+);

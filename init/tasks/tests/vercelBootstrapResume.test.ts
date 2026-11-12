@@ -9,7 +9,8 @@ const config = createMockConfig();
 
 const cloneDefaultConfig = (): ProjectConfig => structuredClone(defaultConfig);
 const liveTeamId = process.env.VERCEL_TEAM_ID ?? 'team_123';
-const _liveTeamSlug = process.env.VERCEL_TEAM_NAME?.toLowerCase().replace(/\s+/g, '-') ?? 'template-team';
+const _liveTeamSlug =
+  process.env.VERCEL_TEAM_NAME?.toLowerCase().replace(/\s+/g, '-') ?? 'template-team';
 
 config.install();
 
@@ -46,7 +47,9 @@ describe('Vercel Bootstrap Resume Scenario', () => {
     // All steps complete except createInfisicalConnection
     config.markComplete(
       'vercel',
-      Object.keys(defaultConfig.vercel.progress).filter((action) => action !== 'createInfisicalConnection'),
+      Object.keys(defaultConfig.vercel.progress).filter(
+        (action) => action !== 'createInfisicalConnection',
+      ),
     );
 
     // listTeams runs unconditionally (line 51 in vercelSetup.ts)
@@ -69,7 +72,11 @@ describe('Vercel Bootstrap Resume Scenario', () => {
     await setupVercel(liveTeamId, 'Template Team', syncConfigMock);
 
     // createVercelConnection was called — verified by config update
-    expect(config.mocks.updateConfigField).toHaveBeenCalledWith('vercel', 'connectionId', expect.any(String));
+    expect(config.mocks.updateConfigField).toHaveBeenCalledWith(
+      'vercel',
+      'connectionId',
+      expect.any(String),
+    );
     expect(config.mocks.markComplete).toHaveBeenCalledWith('vercel', 'createInfisicalConnection');
 
     // No other API calls happened — VCR would throw if they did (no cassettes queued)

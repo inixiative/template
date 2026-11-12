@@ -5,8 +5,11 @@
  * @uses none
  */
 export class RuleReferenceError extends Error {
-  constructor(message: string) {
+  readonly details?: Record<string, unknown>[];
+
+  constructor(message: string, details?: Record<string, unknown>[]) {
     super(message);
     this.name = 'RuleReferenceError';
+    this.details = details;
   }
 }

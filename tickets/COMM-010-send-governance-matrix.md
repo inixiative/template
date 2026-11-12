@@ -74,7 +74,7 @@ The matrix **is** a `@inixiative/transitions` Action — no new primitive. The f
 | `Transition.to` (reads target record) | **recipient** side — `predicate` narrows recipient; `permission` = may-receive |
 | `Action { paths }` = OR of edges | the template's full allowed matrix |
 | `checkTransition → true \| Reason` | send-time guard (predicate fail → 409, permission fail → 403) |
-| `available` / `eligible → Prisma where` | "which templates can this sender send?" / eligible recipients |
+| `available` / `eligible → Prisma plan` (`executePrismaPlan` → where) | "which templates can this sender send?" / eligible recipients |
 
 Authoring sugar: `A|B => C|D || E => F` compiles to `paths[]` (`=>` = one path, `or` collapses into a
 side's predicate via json-rules `any`, `||` = another path).

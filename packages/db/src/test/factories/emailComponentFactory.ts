@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import { createFactory, getNextSeq } from '@template/db/test/factory';
@@ -11,7 +11,6 @@ const emailComponentFactory = createFactory('EmailComponent', {
     slug: `component-${getNextSeq()}`,
     locale: 'en',
     mjml: '<mj-text>Default content</mj-text>',
-    ownerModel: 'default' as const,
     componentRefs: [],
     inheritToSpaces: true,
   }),

@@ -10,7 +10,10 @@ import { collect } from '@template/email/validations/validateConditions/collect'
 import { collectStraddleIssues } from '@template/email/validations/validateConditions/collectStraddleIssues';
 import type { ValidateConditionsOptions } from '@template/email/validations/validateConditions/types';
 
-export const validateConditions = (content: string, options: ValidateConditionsOptions = {}): ConditionIssue[] => {
+export const validateConditions = (
+  content: string,
+  options: ValidateConditionsOptions = {},
+): ConditionIssue[] => {
   const issues: ConditionIssue[] = [];
   collect(content, '$', issues, new Map(), options, 0);
 

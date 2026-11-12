@@ -5,8 +5,8 @@
  * @uses primitive:websockets
  */
 import type { CustomerModel } from '@template/db/generated/client/enums';
+import { customerSegmentsChanged } from '#/appEvents/handlers/customerRef/customerSegmentsChanged';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { refetch } from '#/appEvents/refetch';
 
 export type CustomerRefSegmentsRemovedPayload = {
   customerRefId: string;
@@ -16,17 +16,5 @@ export type CustomerRefSegmentsRemovedPayload = {
 };
 
 export const customerRefSegmentsRemoved = makeAppEvent<CustomerRefSegmentsRemovedPayload>({
-  websocket: (data) =>
-    data.customerModel === 'User'
-      ? [
-          {
-            target: { userIds: [data.customerId] },
-            message: { data: refetch({ _id: 'meReadManySegmentMemberships' }) },
-          },
-          {
-            target: { userIds: [data.customerId] },
-            message: { data: refetch({ _id: 'meReadManyFeatureFlagValues' }) },
-          },
-        ]
-      : null,
+  websocket: customerSegmentsChanged,
 });

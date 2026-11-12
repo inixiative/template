@@ -19,12 +19,20 @@ export const includeVariantSegment = {
 } as const satisfies Prisma.FeatureFlagVariantInclude;
 
 export const includeFeatureFlagVariants = {
-  variants: { where: { deletedAt: null }, orderBy: { position: 'asc' }, include: includeVariantSegment },
+  variants: {
+    where: { deletedAt: null },
+    orderBy: { position: 'asc' },
+    include: includeVariantSegment,
+  },
 } as const satisfies Prisma.FeatureFlagInclude;
 
-export type VariantRow = Prisma.FeatureFlagVariantGetPayload<{ include: typeof includeVariantSegment }>;
+export type VariantRow = Prisma.FeatureFlagVariantGetPayload<{
+  include: typeof includeVariantSegment;
+}>;
 
-export type FeatureFlagWithVariants = Prisma.FeatureFlagGetPayload<{ include: typeof includeFeatureFlagVariants }>;
+export type FeatureFlagWithVariants = Prisma.FeatureFlagGetPayload<{
+  include: typeof includeFeatureFlagVariants;
+}>;
 
 const presentSegment = (segment: NonNullable<VariantRow['segment']>) => {
   const { _count, ...summary } = segment;

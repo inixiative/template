@@ -28,7 +28,7 @@ export default defineConfig({
   ],
   clearScreen: false,
   server: {
-    port: 3000,
+    port: Number(new URL(process.env.VITE_WEB_URL ?? 'http://localhost:3000').port),
     watch: {
       ignored: ['**/routeTree.gen.ts'],
     },

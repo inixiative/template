@@ -62,7 +62,7 @@
 
 | Package | Purpose | Notes |
 |---------|---------|-------|
-| `better-auth` | Authentication | Session-based auth, social providers |
+| `better-auth` | Authentication | Sign-in handshake, social providers, user-JWT signing keys (`jwt()` plugin) |
 | `@template/permissions` (`workspace:*`) | RBAC/ReBAC package | In-repo private package (packages/permissions); consumed by apps/api and packages/ui |
 | `permix` (`^3.6.0`) | Permissions | RBAC with runtime checks; declared inside `@template/permissions` |
 
@@ -73,7 +73,7 @@
 | Package | Purpose | Notes |
 |---------|---------|-------|
 | `zod` | Schema validation | Runtime type checking, OpenAPI integration |
-| `@inixiative/json-rules` (`^2.8.0`) | Rules engine | Declarative validation in hooks |
+| `@inixiative/json-rules` (`^3.0.0`) | Rules engine | Declarative validation in hooks |
 
 ---
 

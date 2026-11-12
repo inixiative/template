@@ -10,13 +10,16 @@ import { segmentReadManyRoute } from '#/modules/admin/segment/routes/segmentRead
 import { includeSegmentRuleReferences } from '#/modules/segment/queries/segmentIncludes';
 import { withSegmentsRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 
-export const segmentReadManyController = makeController(segmentReadManyRoute, async (c, respond) => {
-  const db = c.get('db');
+export const segmentReadManyController = makeController(
+  segmentReadManyRoute,
+  async (c, respond) => {
+    const db = c.get('db');
 
-  const { data, pagination } = await paginate(c, db.segment, {
-    where: { featureFlagInternal: false },
-    include: includeSegmentRuleReferences,
-  });
+    const { data, pagination } = await paginate(c, db.segment, {
+      where: { featureFlagInternal: false },
+      include: includeSegmentRuleReferences,
+    });
 
-  return respond.ok(await withSegmentsRuleIssues(data), { pagination });
-});
+    return respond.ok(await withSegmentsRuleIssues(data), { pagination });
+  },
+);

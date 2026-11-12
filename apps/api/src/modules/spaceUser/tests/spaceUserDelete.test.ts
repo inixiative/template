@@ -1,7 +1,18 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createSpace, createSpaceUser } from '@template/db/test';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSpace,
+  createSpaceUser,
+} from '@template/db/test';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
 import { del } from '#tests/utils/request';
@@ -15,7 +26,7 @@ describe('DELETE /api/v1/spaceUser/:id', () => {
   let space: Space;
   let spaceUser: SpaceUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'owner' });
     orgUser = ou;
     user = context.user;
@@ -37,13 +48,19 @@ describe('DELETE /api/v1/spaceUser/:id', () => {
     testDb = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
   });
 
   it('deletes the spaceUser', async () => {
-    const { context: memberCtx } = await createOrganizationUser({ role: 'member' }, { organization: org });
-    const { entity: memberSpaceUser } = await createSpaceUser({ role: 'member' }, { ...memberCtx, space });
+    const { context: memberCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
+    const { entity: memberSpaceUser } = await createSpaceUser(
+      { role: 'member' },
+      { ...memberCtx, space },
+    );
 
     const response = await fetch(del(`/api/v1/spaceUser/${memberSpaceUser.id}`));
     expect(response.status).toBe(204);
@@ -57,7 +74,10 @@ describe('DELETE /api/v1/spaceUser/:id', () => {
       { role: 'viewer' },
       { organization: org },
     );
-    const { entity: viewerSpaceUser } = await createSpaceUser({ role: 'viewer' }, { ...viewerCtx, space });
+    const { entity: viewerSpaceUser } = await createSpaceUser(
+      { role: 'viewer' },
+      { ...viewerCtx, space },
+    );
 
     const viewerHarness = createTestApp({
       mockUser: viewerCtx.user,

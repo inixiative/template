@@ -21,9 +21,9 @@ const seeds: SeedFile[] = [
   spaceSeeds, // 5. Spaces (depends on orgs)
   spaceUserSeeds, // 6. Space users (depends on users + spaces)
   tokenSeeds, // 7. Tokens (depends on users, orgs, spaces)
-  emailComponentSeeds, // 8. Email components (no dependencies)
-  emailTemplateSeeds, // 9. Email templates (references components by slug, not FK)
-  cronJobSeeds, // 10. Cron jobs (registerCronJobs reads from DB on startup)
+  cronJobSeeds, // 8. Cron jobs (registerCronJobs reads from DB on startup)
+  emailComponentSeeds, // 9. Email components (saved by the app; a refused one fails the run last)
+  emailTemplateSeeds, // 10. Email templates (references components by slug, not FK)
 ];
 
 export { seeds };

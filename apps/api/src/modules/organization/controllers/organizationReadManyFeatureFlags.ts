@@ -20,10 +20,14 @@ export const organizationReadManyFeatureFlagsController = makeController(
     const db = c.get('db');
     const owner = getResource<'organization'>(c);
 
-    const { data, pagination } = await paginate<typeof db.featureFlag, FeatureFlagWithVariants>(c, db.featureFlag, {
-      where: { ownerModel: 'Organization', organizationId: owner.id },
-      include: includeFeatureFlagVariants,
-    });
+    const { data, pagination } = await paginate<typeof db.featureFlag, FeatureFlagWithVariants>(
+      c,
+      db.featureFlag,
+      {
+        where: { ownerModel: 'Organization', organizationId: owner.id },
+        include: includeFeatureFlagVariants,
+      },
+    );
 
     return respond.ok(data.map(presentFeatureFlag), { pagination });
   },

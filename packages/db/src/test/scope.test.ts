@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
+import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 describe('scope', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);

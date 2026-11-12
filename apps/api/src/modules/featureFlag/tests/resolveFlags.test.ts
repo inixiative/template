@@ -1,7 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import type { CustomerRef, FeatureFlag, Segment, User } from '@template/db/generated/client/client';
-import { CustomerModel, FeatureFlagValueType, ProviderModel } from '@template/db/generated/client/enums';
+import {
+  CustomerModel,
+  FeatureFlagValueType,
+  ProviderModel,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createCustomerRef,
@@ -26,7 +30,8 @@ describe('resolveFlags', () => {
   let everyone: Segment;
   let beta: Segment;
 
-  const platformSegment = async () => (await createSegment({ ownerModel: ProviderModel.platform })).entity;
+  const platformSegment = async () =>
+    (await createSegment({ ownerModel: ProviderModel.platform })).entity;
   const flagFor = (ref: CustomerRef) => resolveFlags([ref]);
   const check = async <T extends FeatureFlagValueType>(flag: FeatureFlag, type: T, subject = ref) =>
     checkFlag('platform', flag.slug, type, await flagFor(subject));
@@ -34,7 +39,13 @@ describe('resolveFlags', () => {
   beforeAll(async () => {
     registerClearCacheHook();
     user = (await createUser()).entity;
-    ref = (await createCustomerRef({ customerModel: 'User', providerModel: 'platform', customerUser: user })).entity;
+    ref = (
+      await createCustomerRef({
+        customerModel: 'User',
+        providerModel: 'platform',
+        customerUserId: user.id,
+      })
+    ).entity;
     everyone = await platformSegment();
     beta = await platformSegment();
     await createSegmentMember({}, { segment: everyone, customerRef: ref });
@@ -52,12 +63,12 @@ describe('resolveFlags', () => {
       valueType: FeatureFlagValueType.string,
     });
     const { entity: broad } = await createFeatureFlagVariant(
-      { label: 'broad', position: 1, segment: everyone, valueBoolean: null, valueText: 'classic' },
-      { featureFlag: flag },
+      { label: 'broad', position: 1, valueBoolean: null, valueText: 'classic' },
+      { segment: everyone, featureFlag: flag },
     );
     const { entity: narrow } = await createFeatureFlagVariant(
-      { label: 'narrow', position: 2, segment: beta, valueBoolean: null, valueText: 'compact' },
-      { featureFlag: flag },
+      { label: 'narrow', position: 2, valueBoolean: null, valueText: 'compact' },
+      { segment: beta, featureFlag: flag },
     );
     expect(await check(flag, 'string')).toBe('classic');
 
@@ -70,7 +81,10 @@ describe('resolveFlags', () => {
 
   it('disabled serves the type’s zero, never the default variant; enabled with no match serves the default', async () => {
     const { entity: flag } = await createFeatureFlag({ slug: slug('kill'), enabled: false });
-    await createFeatureFlagVariant({ label: 'default', isDefault: true, valueBoolean: true }, { featureFlag: flag });
+    await createFeatureFlagVariant(
+      { label: 'default', isDefault: true, valueBoolean: true },
+      { featureFlag: flag },
+    );
     expect(await check(flag, 'boolean')).toBe(false);
 
     await db.featureFlag.update({ where: { id: flag.id }, data: { enabled: true } });
@@ -79,18 +93,24 @@ describe('resolveFlags', () => {
 
   it('no match and no default is the zero of the type', async () => {
     const stranger = await platformSegment();
-    const { entity: flag } = await createFeatureFlag({ slug: slug('limit'), valueType: FeatureFlagValueType.number });
+    const { entity: flag } = await createFeatureFlag({
+      slug: slug('limit'),
+      valueType: FeatureFlagValueType.number,
+    });
     await createFeatureFlagVariant(
-      { label: 'vip', segment: stranger, valueBoolean: null, valueNumber: 100 },
-      { featureFlag: flag },
+      { label: 'vip', valueBoolean: null, valueNumber: 100 },
+      { segment: stranger, featureFlag: flag },
     );
     expect(await check(flag, 'number')).toBe(0);
   });
 
   it('the gate refuses non-members to the default, and admits members to the rules', async () => {
     const outside = await platformSegment();
-    const { entity: gated } = await createFeatureFlag({ slug: slug('gated'), segment: outside });
-    await createFeatureFlagVariant({ label: 'on', segment: everyone }, { featureFlag: gated });
+    const { entity: gated } = await createFeatureFlag(
+      { slug: slug('gated') },
+      { segment: outside },
+    );
+    await createFeatureFlagVariant({ label: 'on' }, { segment: everyone, featureFlag: gated });
     expect(await check(gated, 'boolean')).toBe(false);
 
     await db.featureFlag.update({ where: { id: gated.id }, data: { segmentId: beta.id } });
@@ -103,7 +123,7 @@ describe('resolveFlags', () => {
       await createCustomerRef({
         customerModel: 'Organization',
         providerModel: 'platform',
-        customerOrganization: organization,
+        customerOrganizationId: organization.id,
       })
     ).entity;
     await createSegmentMember({}, { segment: everyone, customerRef: orgRef });
@@ -111,7 +131,7 @@ describe('resolveFlags', () => {
       slug: slug('org-only'),
       subjectModel: CustomerModel.Organization,
     });
-    await createFeatureFlagVariant({ label: 'on', segment: everyone }, { featureFlag: flag });
+    await createFeatureFlagVariant({ label: 'on' }, { segment: everyone, featureFlag: flag });
 
     expect(await check(flag, 'boolean')).toBeNull();
     expect(checkFlag('platform', flag.slug, 'boolean', await flagFor(orgRef))).toBe(true);
@@ -127,7 +147,7 @@ describe('resolveFlags', () => {
     const doomed = await platformSegment();
     await createSegmentMember({}, { segment: doomed, customerRef: ref });
     const { entity: flag } = await createFeatureFlag({ slug: slug('doomed') });
-    await createFeatureFlagVariant({ label: 'on', segment: doomed }, { featureFlag: flag });
+    await createFeatureFlagVariant({ label: 'on' }, { segment: doomed, featureFlag: flag });
     expect(await check(flag, 'boolean')).toBe(true);
 
     await db.segment.update({ where: { id: doomed.id }, data: { deletedAt: new Date() } });
@@ -136,28 +156,34 @@ describe('resolveFlags', () => {
 
   it('a missing flag or a reader asking for the wrong type gets null', async () => {
     const { entity: flag } = await createFeatureFlag({ slug: slug('typed') });
-    await createFeatureFlagVariant({ label: 'on', segment: everyone }, { featureFlag: flag });
+    await createFeatureFlagVariant({ label: 'on' }, { segment: everyone, featureFlag: flag });
     expect(await check(flag, 'string')).toBeNull();
     expect(checkFlag('platform', 'never-defined', 'boolean', await flagFor(ref))).toBeNull();
   });
 
   it('json values come back as stored', async () => {
-    const { entity: flag } = await createFeatureFlag({ slug: slug('layout'), valueType: FeatureFlagValueType.json });
+    const { entity: flag } = await createFeatureFlag({
+      slug: slug('layout'),
+      valueType: FeatureFlagValueType.json,
+    });
     await createFeatureFlagVariant(
-      { label: 'grid', segment: everyone, valueBoolean: null, valueJson: { columns: 3 } },
-      { featureFlag: flag },
+      { label: 'grid', valueBoolean: null, valueJson: { columns: 3 } },
+      { segment: everyone, featureFlag: flag },
     );
     expect(await check(flag, 'json')).toEqual({ columns: 3 });
   });
 
   it("a sampled variant serves only the subjects whose id bucket sits in its range, at the flag's offset", async () => {
-    const { entity: flag } = await createFeatureFlag({ slug: slug('sampled'), valueType: FeatureFlagValueType.string });
+    const { entity: flag } = await createFeatureFlag({
+      slug: slug('sampled'),
+      valueType: FeatureFlagValueType.string,
+    });
     const bucket = bucketOf(ref.id, flag.sampleOffset);
     const excluding = bucket < 50 ? { from: 50, to: 100 } : { from: 0, to: 50 };
     const including = bucket < 50 ? { from: 0, to: 50 } : { from: 50, to: 100 };
     const { entity: arm } = await createFeatureFlagVariant(
-      { label: 'arm', position: 1, segment: everyone, valueBoolean: null, valueText: 'sampled', sample: excluding },
-      { featureFlag: flag },
+      { label: 'arm', position: 1, valueBoolean: null, valueText: 'sampled', sample: excluding },
+      { segment: everyone, featureFlag: flag },
     );
     expect(await check(flag, FeatureFlagValueType.string)).toBe('');
 

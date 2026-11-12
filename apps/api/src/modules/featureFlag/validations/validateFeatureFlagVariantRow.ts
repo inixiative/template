@@ -31,28 +31,45 @@ export const validateFeatureFlagVariantRow = async (
 ): Promise<void> => {
   if (previous && Object.keys(row).every((column) => column === 'deletedAt')) return;
   const merged = { ...previous, ...row } as FeatureFlagVariant;
-  const parent = flag ?? (await db.featureFlag.findFirst({ where: { id: merged.featureFlagId, deletedAt: null } }));
-  if (!parent) throw makeError({ status: 422, message: `FeatureFlag ${merged.featureFlagId} not found` });
+  const parent =
+    flag ??
+    (await db.featureFlag.findFirst({ where: { id: merged.featureFlagId, deletedAt: null } }));
+  if (!parent)
+    throw makeError({ status: 422, message: `FeatureFlag ${merged.featureFlagId} not found` });
 
-  if ((row.label !== undefined || !previous) && (typeof merged.label !== 'string' || !isSlug(merged.label))) {
+  if (
+    (row.label !== undefined || !previous) &&
+    (typeof merged.label !== 'string' || !isSlug(merged.label))
+  ) {
     throw makeError({ status: 422, message: 'a variant label is a slug' });
   }
 
   if (merged.isDefault && merged.segmentId) {
-    throw makeError({ status: 422, message: 'the default variant has no segment; it serves whoever no rule matched' });
+    throw makeError({
+      status: 422,
+      message: 'the default variant has no segment; it serves whoever no rule matched',
+    });
   }
   if (!merged.isDefault && !merged.segmentId) {
     throw makeError({ status: 422, message: 'a rule variant names the segment it serves' });
   }
   if (isSet(merged.sample) && !sampleRangeSchema.safeParse(merged.sample).success) {
-    throw makeError({ status: 422, message: 'a sample is { from, to } on 0–100 with from below to' });
+    throw makeError({
+      status: 422,
+      message: 'a sample is { from, to } on 0–100 with from below to',
+    });
   }
   if (merged.isDefault && isSet(merged.sample)) {
-    throw makeError({ status: 422, message: 'the default variant is not sampled; it serves whoever no rule matched' });
+    throw makeError({
+      status: 422,
+      message: 'the default variant is not sampled; it serves whoever no rule matched',
+    });
   }
 
   const expected = VALUE_COLUMNS[parent.valueType];
-  const stray = Object.values(VALUE_COLUMNS).filter((column) => column !== expected && isSet(merged[column]));
+  const stray = Object.values(VALUE_COLUMNS).filter(
+    (column) => column !== expected && isSet(merged[column]),
+  );
   if (!isSet(merged[expected]) || stray.length) {
     throw makeError({
       status: 422,

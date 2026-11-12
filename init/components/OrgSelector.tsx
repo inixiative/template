@@ -54,7 +54,9 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({
           <Text bold>Select {serviceName} Organization</Text>
         </Box>
         <Box marginBottom={1}>
-          <Text color="red">No organizations found. Please ensure you're logged in to {serviceName}.</Text>
+          <Text color="red">
+            No organizations found. Please ensure you're logged in to {serviceName}.
+          </Text>
         </Box>
         <Box marginTop={1}>
           <Text dimColor>Press Esc to cancel</Text>
@@ -72,7 +74,13 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({
     };
   });
 
-  const itemComponent = ({ isSelected = false, label }: { isSelected?: boolean; label: string }) => {
+  const itemComponent = ({
+    isSelected = false,
+    label,
+  }: {
+    isSelected?: boolean;
+    label: string;
+  }) => {
     const prefix = isSelected ? '❯ ' : '  ';
 
     return (
@@ -90,7 +98,9 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({
       </Box>
 
       <Box marginBottom={1}>
-        <Text dimColor>You have access to {organizations.length} organizations. Select one to continue:</Text>
+        <Text dimColor>
+          You have access to {organizations.length} organizations. Select one to continue:
+        </Text>
       </Box>
 
       <SelectInput

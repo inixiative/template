@@ -26,7 +26,11 @@ export const updateProjectConfig = async (data: ProjectConfigData): Promise<void
   await writeProjectConfig(config);
 };
 
-export const renameProject = async (oldName: string, newName: string, onStepComplete?: StepCallback): Promise<void> => {
+export const renameProject = async (
+  oldName: string,
+  newName: string,
+  onStepComplete?: StepCallback,
+): Promise<void> => {
   const fromName = oldName === '' || oldName === 'template' ? 'template' : oldName;
   if (oldName === newName) {
     // Nothing to rename — but mark every substep complete so the UI reflects

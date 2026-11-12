@@ -1,7 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db, unregisterDbHook } from '@template/db';
 import { AuditAction } from '@template/db/generated/client/enums';
-import { auditActorContext, auditActorStore, nullAuditActor } from '@template/db/lib/auditActorContext';
+import {
+  auditActorContext,
+  auditActorStore,
+  nullAuditActor,
+} from '@template/db/lib/auditActorContext';
 import {
   cleanupTouchedTables,
   createCronJob,
@@ -11,25 +15,22 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { registerTestTracker } from '@template/db/test/testTracker';
 import { saveEmailTemplate } from '@template/email/render';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { createTestApp } from '#tests/createTestApp';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 
-registerTestTracker();
-registerAuditLogHook();
+useRealJobsQueue();
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 describe('auditLog hook', () => {
   let userId: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: user } = await createUser();
     userId = user.id;
   });
@@ -42,7 +43,7 @@ describe('auditLog hook', () => {
       mount: [
         (app) => {
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({ data: { email } });
+            const user = (await createUser({ email })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -50,7 +51,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -69,7 +70,10 @@ describe('auditLog hook', () => {
       mount: [
         (app) => {
           app.patch('/test/user/:id', async (c) => {
-            await db.user.update({ where: { id: c.req.param('id') }, data: { name: 'Audit Test Name' } });
+            await db.user.update({
+              where: { id: c.req.param('id') },
+              data: { name: 'Audit Test Name' },
+            });
             return c.json({ ok: true });
           });
         },
@@ -96,7 +100,10 @@ describe('auditLog hook', () => {
       mount: [
         (app) => {
           app.patch('/test/user/:id/touch', async (c) => {
-            await db.user.update({ where: { id: c.req.param('id') }, data: { updatedAt: new Date() } });
+            await db.user.update({
+              where: { id: c.req.param('id') },
+              data: { updatedAt: new Date() },
+            });
             return c.json({ ok: true });
           });
         },
@@ -119,7 +126,7 @@ describe('auditLog hook', () => {
         (app) => {
           app.use('*', auditActorMiddleware);
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({ data: { email: `audit-actor-${ts}@example.com` } });
+            const user = (await createUser({ email: `audit-actor-${ts}@example.com` })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -127,7 +134,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -137,6 +144,7 @@ describe('auditLog hook', () => {
     expect(log?.actorUserId).toBe(actor.id);
     expect(log?.actorSpoofUserId).toBeNull();
     expect(log?.actorTokenId).toBeNull();
+    expect(log?.actor).toMatchObject({ model: 'User', record: { id: actor.id } });
   });
 
   it('records actorSpoofUserId when spoofing', async () => {
@@ -154,7 +162,7 @@ describe('auditLog hook', () => {
           });
           app.use('*', auditActorMiddleware);
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({ data: { email: `audit-spoof-${ts}@example.com` } });
+            const user = (await createUser({ email: `audit-spoof-${ts}@example.com` })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -162,7 +170,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -175,14 +183,16 @@ describe('auditLog hook', () => {
 
   it('records actorTokenId when authenticated via token', async () => {
     const { entity: tokenOwner } = await createUser();
-    const { entity: token } = await createToken({ userId: tokenOwner.id });
+    const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
+      targetEntitlements: [],
       user: tokenOwner,
       organization: null,
       organizationUser: null,
       space: null,
       spaceUser: null,
+      integration: null,
     };
     const ts = Date.now();
 
@@ -193,7 +203,7 @@ describe('auditLog hook', () => {
         (app) => {
           app.use('*', auditActorMiddleware);
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({ data: { email: `audit-token-${ts}@example.com` } });
+            const user = (await createUser({ email: `audit-token-${ts}@example.com` })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -201,7 +211,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -209,21 +219,32 @@ describe('auditLog hook', () => {
     });
 
     expect(log?.actorTokenId).toBe(token.id);
-    expect(log?.actorTokenName).toBe(token.name);
-    expect(log?.actorTokenKeyPrefix).toBe(token.keyPrefix);
+    expect(log?.actor).toMatchObject({
+      model: 'Token',
+      record: {
+        id: token.id,
+        name: token.name,
+        keyPrefix: token.keyPrefix,
+        ownerModel: 'User',
+        userId: tokenOwner.id,
+      },
+    });
+    expect(log?.actor).not.toHaveProperty('record.keyHash');
     expect(log?.actorUserId).toBe(tokenOwner.id);
   });
 
   it('keeps the token snapshot after the acting token is deleted', async () => {
     const { entity: tokenOwner } = await createUser();
-    const { entity: token } = await createToken({ userId: tokenOwner.id });
+    const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
+      targetEntitlements: [],
       user: tokenOwner,
       organization: null,
       organizationUser: null,
       space: null,
       spaceUser: null,
+      integration: null,
     };
     const ts = Date.now();
 
@@ -234,7 +255,8 @@ describe('auditLog hook', () => {
         (app) => {
           app.use('*', auditActorMiddleware);
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({ data: { email: `audit-token-deleted-${ts}@example.com` } });
+            const user = (await createUser({ email: `audit-token-deleted-${ts}@example.com` }))
+              .entity;
             return c.json({ id: user.id });
           });
         },
@@ -242,18 +264,20 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
-    await db.token.delete({ where: { id: token.id } });
+    await db.token.update({ where: { id: token.id }, data: { deletedAt: new Date() } });
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
       orderBy: { id: 'desc' },
     });
 
-    expect(log?.actorTokenId).toBeNull();
-    expect(log?.actorTokenName).toBe(token.name);
-    expect(log?.actorTokenKeyPrefix).toBe(token.keyPrefix);
+    expect(log?.actorTokenId).toBe(token.id);
+    expect(log?.actor).toMatchObject({
+      model: 'Token',
+      record: { id: token.id, name: token.name, keyPrefix: token.keyPrefix },
+    });
   });
 
   it('records actorJobName when set in context', async () => {
@@ -263,10 +287,13 @@ describe('auditLog hook', () => {
     await db.scope(
       'test-worker:test',
       () =>
-        auditActorContext.scope({ ...nullAuditActor, actorJobName: 'cleanStaleAuditLogs' }, async () => {
-          const user = await db.user.create({ data: { email: `audit-job-${ts}@example.com` } });
-          userId = user.id;
-        }),
+        auditActorContext.scope(
+          { ...nullAuditActor, actorJobName: 'cleanStaleAuditLogs' },
+          async () => {
+            const user = (await createUser({ email: `audit-job-${ts}@example.com` })).entity;
+            userId = user.id;
+          },
+        ),
       'worker',
     );
 
@@ -282,6 +309,8 @@ describe('auditLog hook', () => {
     const { entity: organization } = await createOrganization();
     const { entity: targetUser } = await createUser();
     const { entity: inquiry } = await createInquiry({
+      sourceModel: 'Organization',
+      targetModel: 'User',
       sourceOrganizationId: organization.id,
       targetUserId: targetUser.id,
     });
@@ -293,7 +322,7 @@ describe('auditLog hook', () => {
           app.use('*', auditActorMiddleware);
           app.post('/test/resolve', async (c) => {
             auditActorContext.extend({ sourceInquiryId: inquiry.id });
-            const user = await db.user.create({ data: { email: `audit-inquiry-${ts}@example.com` } });
+            const user = (await createUser({ email: `audit-inquiry-${ts}@example.com` })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -301,7 +330,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/resolve', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -318,8 +347,13 @@ describe('auditLog hook', () => {
       mount: [
         (app) => {
           app.post('/test/org', async (c) => {
-            const org = await db.organization.create({ data: { name: `audit-softdel-${ts}`, slug: `softdel-${ts}` } });
-            await db.organization.update({ where: { id: org.id }, data: { deletedAt: new Date() } });
+            const org = (
+              await createOrganization({ name: `audit-softdel-${ts}`, slug: `softdel-${ts}` })
+            ).entity;
+            await db.organization.update({
+              where: { id: org.id },
+              data: { deletedAt: new Date() },
+            });
             return c.json({ id: org.id });
           });
         },
@@ -327,7 +361,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/org', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectOrganizationId: id, action: AuditAction.delete },
@@ -341,6 +375,7 @@ describe('auditLog hook', () => {
   });
 
   it('creates a delete audit log on hard-delete and preserves the deleted row in before', async () => {
+    unregisterDbHook('preventHardDelete');
     const ts = Date.now();
     const slug = `harddel-${ts}`;
 
@@ -348,7 +383,7 @@ describe('auditLog hook', () => {
       mount: [
         (app) => {
           app.post('/test/org/hard-delete', async (c) => {
-            const org = await db.organization.create({ data: { name: `audit-harddel-${ts}`, slug } });
+            const org = (await createOrganization({ name: `audit-harddel-${ts}`, slug })).entity;
             await db.organization.delete({ where: { id: org.id } });
             return c.json({ id: org.id });
           });
@@ -356,8 +391,10 @@ describe('auditLog hook', () => {
       ],
     });
 
-    const res = await fetch(new Request('http://localhost/test/org/hard-delete', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const res = await fetch(
+      new Request('http://localhost/test/org/hard-delete', { method: 'POST' }),
+    );
+    const { id } = (await res.json()) as { id: string };
 
     const logs = await db.auditLog.findMany({
       where: { subjectModel: 'Organization', action: AuditAction.delete },
@@ -378,6 +415,7 @@ describe('auditLog hook', () => {
   });
 
   it('keeps org context but clears space context on hard-delete for spaces', async () => {
+    unregisterDbHook('preventHardDelete');
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
 
@@ -392,11 +430,17 @@ describe('auditLog hook', () => {
       ],
     });
 
-    const res = await fetch(new Request('http://localhost/test/space/hard-delete', { method: 'POST' }));
+    const res = await fetch(
+      new Request('http://localhost/test/space/hard-delete', { method: 'POST' }),
+    );
     expect(res.status).toBe(200);
 
     const logs = await db.auditLog.findMany({
-      where: { subjectModel: 'Space', action: AuditAction.delete, contextOrganizationId: organization.id },
+      where: {
+        subjectModel: 'Space',
+        action: AuditAction.delete,
+        contextOrganizationId: organization.id,
+      },
       orderBy: { id: 'desc' },
       take: 10,
     });
@@ -433,6 +477,93 @@ describe('auditLog hook', () => {
     expect(after).toBe(before);
   });
 
+  describe('writes that include relations', () => {
+    const includeHistory = {
+      sourceOrganization: true,
+      auditLogsAsSubject: { include: { actorToken: true } },
+    } as const;
+
+    const asTokenActor = (tokenId: string, write: () => Promise<unknown>) =>
+      db.scope(
+        'test-worker:test',
+        () => auditActorContext.scope({ ...nullAuditActor, actorTokenId: tokenId }, write),
+        'worker',
+      );
+
+    const createInquiryWithHistory = async () => {
+      const { entity: organization } = await createOrganization();
+      const { entity: targetUser } = await createUser();
+      const { entity: token } = await createToken({
+        ownerModel: 'User',
+        userId: targetUser.id,
+      });
+      const { entity: inquiry } = await createInquiry({
+        sourceModel: 'Organization',
+        targetModel: 'User',
+        sourceOrganizationId: organization.id,
+        targetUserId: targetUser.id,
+      });
+      for (const round of [1, 2]) {
+        await asTokenActor(token.id, () =>
+          db.inquiry.update({
+            where: { id: inquiry.id },
+            data: { content: { round } },
+            include: includeHistory,
+          }),
+        );
+      }
+      return { inquiry, token };
+    };
+
+    const latestInquiryLog = (inquiryId: string) =>
+      db.auditLog.findFirstOrThrow({
+        where: { subjectInquiryId: inquiryId, action: AuditAction.update },
+        orderBy: { id: 'desc' },
+      });
+
+    it('stores only the record columns, never relations or earlier audit rows', async () => {
+      const { inquiry, token } = await createInquiryWithHistory();
+
+      const log = await latestInquiryLog(inquiry.id);
+      const after = log.after as Record<string, unknown>;
+      const before = log.before as Record<string, unknown>;
+
+      expect(after.content).toEqual({ round: 2 });
+      expect(before.content).toEqual({ round: 1 });
+      for (const snapshot of [after, before]) {
+        expect(snapshot).not.toHaveProperty('auditLogsAsSubject');
+        expect(snapshot).not.toHaveProperty('sourceOrganization');
+      }
+      const stored = JSON.stringify(log);
+      expect(stored).not.toContain('keyHash');
+      expect(stored).not.toContain(token.keyHash);
+    });
+
+    it('diffs only the changed columns', async () => {
+      const { inquiry } = await createInquiryWithHistory();
+
+      const log = await latestInquiryLog(inquiry.id);
+
+      expect(Object.keys(log.changes as Record<string, unknown>)).toEqual(['content']);
+    });
+
+    it('skips the audit row when only ignored columns changed', async () => {
+      const { inquiry, token } = await createInquiryWithHistory();
+      const before = await db.auditLog.count({ where: { subjectInquiryId: inquiry.id } });
+
+      await asTokenActor(token.id, () =>
+        db.inquiry.update({
+          where: { id: inquiry.id },
+          data: { updatedAt: new Date() },
+          include: includeHistory,
+        }),
+      );
+
+      const after = await db.auditLog.count({ where: { subjectInquiryId: inquiry.id } });
+      expect(after).toBe(before);
+    });
+  });
+
   // saveEmailTemplate is the deterministic case in this repo where async-local storage does not
   // survive into the mutation extension's continuation, so it is what pins the actor across that
   // hop: before the bridge the hook read a null actor here and attributed every row to nobody.
@@ -448,7 +579,9 @@ describe('auditLog hook', () => {
 
     const auditRowsFor = (templateId: string, componentId: string) =>
       db.auditLog.findMany({
-        where: { OR: [{ subjectEmailTemplateId: templateId }, { subjectEmailComponentId: componentId }] },
+        where: {
+          OR: [{ subjectEmailTemplateId: templateId }, { subjectEmailComponentId: componentId }],
+        },
       });
 
     it('records the actor set at the caller on every row the save writes', async () => {
@@ -464,7 +597,9 @@ describe('auditLog hook', () => {
     });
 
     it('leaves the actor null when the caller set none', async () => {
-      const { template, components } = await saveEmailTemplate(emailTemplate(`actor-absent-${Date.now()}`));
+      const { template, components } = await saveEmailTemplate(
+        emailTemplate(`actor-absent-${Date.now()}`),
+      );
 
       const logs = await auditRowsFor(template.id, components[0]!.id);
 
@@ -477,17 +612,22 @@ describe('auditLog hook', () => {
 
     it('records the actor for an unwrapped write — the txn opens in the caller frame', async () => {
       let userId = '';
-      await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'reissuedActor' }, async () => {
-        const user = await db.user.create({ data: { email: `actor-reissue-${Date.now()}@example.com` } });
-        userId = user.id;
-      });
+      await auditActorContext.scope(
+        { ...nullAuditActor, actorJobName: 'reissuedActor' },
+        async () => {
+          const user = (await createUser({ email: `actor-reissue-${Date.now()}@example.com` }))
+            .entity;
+          userId = user.id;
+        },
+      );
 
       expect((await actorLogFor(userId))?.actorJobName).toBe('reissuedActor');
     });
 
     it('records the actor when the scope callback returns the write un-awaited', async () => {
-      const user = await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'lazyActor' }, () =>
-        db.user.create({ data: { email: `actor-lazy-${Date.now()}@example.com` } }),
+      const user = await auditActorContext.scope(
+        { ...nullAuditActor, actorJobName: 'lazyActor' },
+        async () => (await createUser({ email: `actor-lazy-${Date.now()}@example.com` })).entity,
       );
 
       expect((await actorLogFor(user.id))?.actorJobName).toBe('lazyActor');
@@ -497,7 +637,7 @@ describe('auditLog hook', () => {
       let userId = '';
       await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'lostActor' }, () =>
         auditActorStore.exit(async () => {
-          const user = await db.user.create({ data: { email: `actor-lost-${Date.now()}@example.com` } });
+          const user = (await createUser({ email: `actor-lost-${Date.now()}@example.com` })).entity;
           userId = user.id;
         }),
       );
@@ -510,7 +650,8 @@ describe('auditLog hook', () => {
       await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'rescuedActor' }, () =>
         db.txn(() =>
           auditActorStore.exit(async () => {
-            const user = await db.user.create({ data: { email: `actor-rescued-${Date.now()}@example.com` } });
+            const user = (await createUser({ email: `actor-rescued-${Date.now()}@example.com` }))
+              .entity;
             userId = user.id;
           }),
         ),
@@ -520,7 +661,9 @@ describe('auditLog hook', () => {
     });
 
     it('runs a db.raw write with no life cycle at all — no transaction, no hooks, no audit row', async () => {
-      const user = await db.raw.user.create({ data: { email: `actor-raw-${Date.now()}@example.com` } });
+      const user = await db.raw.user.create({
+        data: { email: `actor-raw-${Date.now()}@example.com` },
+      });
 
       expect(await actorLogFor(user.id)).toBeNull();
     });

@@ -1,4 +1,12 @@
-import { DbAction, db, type HookOptions, HookTiming, isNoOpUpdate, NOOP_FIELDS, registerDbHook } from '@template/db';
+import {
+  DbAction,
+  db,
+  type HookOptions,
+  HookTiming,
+  isNoOpUpdate,
+  NOOP_FIELDS,
+  registerDbHook,
+} from '@template/db';
 import type { FeatureFlag } from '@template/db/generated/client/client';
 import { castArray, keyBy, uniqBy } from 'lodash-es';
 import { emitAppEvent } from '#/appEvents/emit';

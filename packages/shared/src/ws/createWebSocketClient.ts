@@ -58,10 +58,19 @@ export const createWebSocketClient = ({
     };
   };
 
+  // The socket's own close event arrives later, after a connect() may have replaced it, so the
+  // close is reported here and the socket's handlers are dropped.
   const close = (): void => {
     shouldReconnect = false;
     clearTimeout(timer);
-    ws?.close();
+    const socket = ws;
+    ws = null;
+    if (!socket || socket.readyState === WebSocket.CLOSED) return;
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onclose = null;
+    socket.close();
+    onClose?.();
   };
 
   // Drop the current socket but keep auto-reconnect — used to recover a half-open connection.

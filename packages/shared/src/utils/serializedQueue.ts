@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind utils
- * @partOf primitive:shared
+ * @partOf primitive:shared, mutex
  * @uses none
  */
 import { LogScope, log } from '@template/shared/logger';
@@ -29,10 +29,15 @@ export type SerializedQueueOptions = {
 };
 
 const logError = (err: unknown): void => {
-  log.error(`serialized queue task failed: ${err instanceof Error ? err.message : String(err)}`, LogScope.api);
+  log.error(
+    `serialized queue task failed: ${err instanceof Error ? err.message : String(err)}`,
+    LogScope.api,
+  );
 };
 
-export const createSerializedQueue = ({ onError = logError }: SerializedQueueOptions = {}): SerializedQueue => {
+export const createSerializedQueue = ({
+  onError = logError,
+}: SerializedQueueOptions = {}): SerializedQueue => {
   let tail: Promise<unknown> = Promise.resolve();
   let pending = 0;
 

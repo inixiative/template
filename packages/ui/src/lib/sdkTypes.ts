@@ -4,5 +4,4 @@
  * @partOf primitive:ui
  * @uses none
  */
-// biome-ignore lint/suspicious/noExplicitAny: function parameter contravariance requires any — see above
-export type SdkFunction = (opts: any) => Promise<unknown>;
+export type SdkFunction = (opts: never) => Promise<unknown>;

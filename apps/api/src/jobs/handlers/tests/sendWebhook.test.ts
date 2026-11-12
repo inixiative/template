@@ -1,10 +1,19 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import crypto from 'node:crypto';
 import type { User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createUser, createWebhookEvent, createWebhookSubscription } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCustomerRef,
+  createIntegration,
+  createIntegrationRecord,
+  createUser,
+  createWebhookEvent,
+  createWebhookSubscription,
+} from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
 import { sendWebhook } from '#/jobs/handlers/sendWebhook';
 import { createTestApp } from '#tests/createTestApp';
+import { createTestWorker } from '#tests/createTestWorker';
 
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -22,10 +31,10 @@ describe('sendWebhook handler', () => {
   let user: User;
   let testCounter = 0;
 
-  const getUniqueUrl = (suffix = '') => `http://test-webhook.local/${++testCounter}${suffix}`;
-  const mockLog = () => {};
+  const getUniqueUrl = (suffix = '') => `https://test-webhook.local/${++testCounter}${suffix}`;
+  const worker = createTestWorker();
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser();
     user = entity;
 
@@ -55,7 +64,7 @@ describe('sendWebhook handler', () => {
     mock.restore();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -69,16 +78,13 @@ describe('sendWebhook handler', () => {
         model: 'CustomerRef',
       });
 
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: sub.id,
-          action: 'create',
-          resourceId: user.id,
-          data: { id: user.id, name: user.name },
-          timestamp: eventTimestamp,
-        },
-      );
+      await sendWebhook(worker, {
+        subscriptionId: sub.id,
+        action: 'create',
+        resourceId: user.id,
+        data: { id: user.id, name: user.name },
+        timestamp: eventTimestamp,
+      });
 
       const event = await db.webhookEvent.findFirst({
         where: { webhookSubscriptionId: sub.id },
@@ -110,16 +116,13 @@ describe('sendWebhook handler', () => {
         model: 'CustomerRef',
       });
 
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: sub.id,
-          action: 'update',
-          resourceId: user.id,
-          data: { id: user.id },
-          timestamp: eventTimestamp,
-        },
-      );
+      await sendWebhook(worker, {
+        subscriptionId: sub.id,
+        action: 'update',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
 
       const received = receivedWebhooks[0];
       const signature = received.headers['x-webhook-signature'];
@@ -136,10 +139,15 @@ describe('sendWebhook handler', () => {
 
   describe('failed delivery', () => {
     it('creates error event on HTTP error response', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation((() =>
-        Promise.resolve(
-          new Response('Server Error', { status: 500, statusText: 'Internal Server Error' }),
-        )) as typeof fetch);
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(
+          () =>
+            Promise.resolve(
+              new Response('Server Error', { status: 500, statusText: 'Internal Server Error' }),
+            ),
+          { preconnect: fetch.preconnect },
+        ),
+      );
 
       const testUrl = getUniqueUrl('/error');
       const { entity: sub } = await createWebhookSubscription({
@@ -149,16 +157,13 @@ describe('sendWebhook handler', () => {
         model: 'CustomerRef',
       });
 
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: sub.id,
-          action: 'create',
-          resourceId: user.id,
-          data: { id: user.id },
-          timestamp: eventTimestamp,
-        },
-      );
+      await sendWebhook(worker, {
+        subscriptionId: sub.id,
+        action: 'create',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
 
       const event = await db.webhookEvent.findFirst({
         where: { webhookSubscriptionId: sub.id },
@@ -169,8 +174,14 @@ describe('sendWebhook handler', () => {
     });
 
     it('blocks a redirect instead of following it (SSRF)', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation((() =>
-        Promise.resolve(new Response('', { status: 302, statusText: 'Found' }))) as typeof fetch);
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(
+          () => Promise.resolve(new Response('', { status: 302, statusText: 'Found' })),
+          {
+            preconnect: fetch.preconnect,
+          },
+        ),
+      );
 
       const testUrl = getUniqueUrl('/redirect');
       const { entity: sub } = await createWebhookSubscription({
@@ -180,16 +191,13 @@ describe('sendWebhook handler', () => {
         model: 'CustomerRef',
       });
 
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: sub.id,
-          action: 'create',
-          resourceId: user.id,
-          data: { id: user.id },
-          timestamp: eventTimestamp,
-        },
-      );
+      await sendWebhook(worker, {
+        subscriptionId: sub.id,
+        action: 'create',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
 
       const event = await db.webhookEvent.findFirst({
         where: { webhookSubscriptionId: sub.id },
@@ -200,8 +208,11 @@ describe('sendWebhook handler', () => {
     });
 
     it('creates error event on network failure', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation((() =>
-        Promise.reject(new Error('Connection refused'))) as typeof fetch);
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
+      );
 
       const testUrl = getUniqueUrl('/unreachable');
       const { entity: sub } = await createWebhookSubscription({
@@ -211,16 +222,13 @@ describe('sendWebhook handler', () => {
         model: 'CustomerRef',
       });
 
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: sub.id,
-          action: 'create',
-          resourceId: user.id,
-          data: { id: user.id },
-          timestamp: eventTimestamp,
-        },
-      );
+      await sendWebhook(worker, {
+        subscriptionId: sub.id,
+        action: 'create',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
 
       const event = await db.webhookEvent.findFirst({
         where: { webhookSubscriptionId: sub.id },
@@ -240,16 +248,13 @@ describe('sendWebhook handler', () => {
         isActive: false,
       });
 
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: sub.id,
-          action: 'create',
-          resourceId: user.id,
-          data: { id: user.id },
-          timestamp: eventTimestamp,
-        },
-      );
+      await sendWebhook(worker, {
+        subscriptionId: sub.id,
+        action: 'create',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
 
       const event = await db.webhookEvent.findFirst({
         where: { webhookSubscriptionId: sub.id },
@@ -259,25 +264,175 @@ describe('sendWebhook handler', () => {
     });
 
     it('skips non-existent subscription', async () => {
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: 'non-existent-id',
-          action: 'create',
-          resourceId: user.id,
-          data: { id: user.id },
-          timestamp: eventTimestamp,
-        },
-      );
+      await sendWebhook(worker, {
+        subscriptionId: 'non-existent-id',
+        action: 'create',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
 
       expect(receivedWebhooks.length).toBe(0);
     });
   });
 
+  describe('retries', () => {
+    const attempt = (attemptNumber: number, attempts = 3) =>
+      createTestWorker({ attemptsMade: attemptNumber - 1, opts: { attempts } });
+
+    const respondWith = (status: number, statusText = '') =>
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(() => Promise.resolve(new Response(statusText, { status, statusText })), {
+          preconnect: fetch.preconnect,
+        }),
+      );
+
+    const refuseConnection = () =>
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
+      );
+
+    const createSubscription = async () => {
+      const { entity: sub } = await createWebhookSubscription({
+        ownerModel: 'User',
+        userId: user.id,
+        url: getUniqueUrl('/retries'),
+        model: 'CustomerRef',
+      });
+      return sub;
+    };
+
+    const deliver = (ctx: ReturnType<typeof createTestWorker>, subscriptionId: string) =>
+      sendWebhook(ctx, {
+        subscriptionId,
+        action: 'update',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
+
+    const eventsOf = (subscriptionId: string) =>
+      db.webhookEvent.findMany({
+        where: { webhookSubscriptionId: subscriptionId },
+        orderBy: { id: 'asc' },
+      });
+
+    const isActive = async (subscriptionId: string) =>
+      (await db.webhookSubscription.findUnique({ where: { id: subscriptionId } }))?.isActive;
+
+    it.each([
+      [503, 'Service Unavailable'],
+      [500, 'Internal Server Error'],
+      [404, 'Not Found'],
+      [429, 'Too Many Requests'],
+    ])('throws on HTTP %d before the last attempt, so the job retries, and records the attempt as retrying', async (status, statusText) => {
+      respondWith(status, statusText);
+      const sub = await createSubscription();
+
+      await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+
+      const events = await eventsOf(sub.id);
+      expect(events.map((event) => [event.status, event.httpStatus])).toEqual([
+        ['retrying', status],
+      ]);
+      expect(events[0]?.error).toBe(`HTTP ${status}: ${statusText}`);
+    });
+
+    it('throws on a network failure before the last attempt', async () => {
+      refuseConnection();
+      const sub = await createSubscription();
+
+      await expect(deliver(attempt(2), sub.id)).rejects.toThrow('Connection refused');
+
+      const events = await eventsOf(sub.id);
+      expect(events.map((event) => [event.status, event.httpStatus])).toEqual([['retrying', null]]);
+    });
+
+    it('settles the delivery on the last attempt: records it unreachable and completes', async () => {
+      respondWith(503, 'Service Unavailable');
+      const sub = await createSubscription();
+
+      await deliver(attempt(3), sub.id);
+
+      expect((await eventsOf(sub.id)).map((event) => event.status)).toEqual(['unreachable']);
+    });
+
+    it.each([
+      [400, 'Bad Request'],
+      [422, 'Unprocessable Entity'],
+      [401, 'Unauthorized'],
+      [302, 'Found'],
+    ])('does not retry HTTP %d: the first attempt settles the delivery as an error', async (status, statusText) => {
+      respondWith(status, statusText);
+      const sub = await createSubscription();
+
+      await deliver(attempt(1), sub.id);
+
+      const events = await eventsOf(sub.id);
+      expect(events.map((event) => [event.status, event.httpStatus])).toEqual([['error', status]]);
+      expect(receivedWebhooks.length).toBe(0);
+    });
+
+    it('delivers on a retry after a failed attempt', async () => {
+      const sub = await createSubscription();
+      respondWith(503, 'Service Unavailable');
+      await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+      mock.restore();
+      setEnvOverride('WEBHOOK_SIGNING_PRIVATE_KEY', privateKey);
+      respondWith(200, 'OK');
+
+      await deliver(attempt(2), sub.id);
+
+      expect((await eventsOf(sub.id)).map((event) => event.status)).toEqual([
+        'retrying',
+        'success',
+      ]);
+      expect(await isActive(sub.id)).toBe(true);
+    });
+
+    it('counts a whole retry cycle as one failure toward the circuit breaker', async () => {
+      refuseConnection();
+      const sub = await createSubscription();
+      const failDelivery = async () => {
+        await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+        await expect(deliver(attempt(2), sub.id)).rejects.toThrow('retrying');
+        await deliver(attempt(3), sub.id);
+      };
+
+      for (let i = 0; i < 4; i++) await failDelivery();
+
+      expect(await db.webhookEvent.count({ where: { webhookSubscriptionId: sub.id } })).toBe(12);
+      expect(await isActive(sub.id)).toBe(true);
+
+      await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+      await expect(deliver(attempt(2), sub.id)).rejects.toThrow('retrying');
+      expect(await isActive(sub.id)).toBe(true);
+
+      await deliver(attempt(3), sub.id);
+      expect(await isActive(sub.id)).toBe(false);
+    });
+
+    it('never trips the circuit breaker on attempts that will be retried', async () => {
+      refuseConnection();
+      const sub = await createSubscription();
+
+      for (let i = 0; i < 6; i++) {
+        await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+      }
+
+      expect(await isActive(sub.id)).toBe(true);
+    });
+  });
+
   describe('circuit breaker', () => {
     it('disables subscription after 5 consecutive failures', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation((() =>
-        Promise.reject(new Error('Connection refused'))) as typeof fetch);
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
+      );
 
       const testUrl = getUniqueUrl('/circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
@@ -300,24 +455,24 @@ describe('sendWebhook handler', () => {
         );
       }
 
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: sub.id,
-          action: 'create',
-          resourceId: user.id,
-          data: { id: user.id },
-          timestamp: eventTimestamp,
-        },
-      );
+      await sendWebhook(worker, {
+        subscriptionId: sub.id,
+        action: 'create',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
 
       const updated = await db.webhookSubscription.findUnique({ where: { id: sub.id } });
       expect(updated?.isActive).toBe(false);
     });
 
     it('does not disable if a recent success exists', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation((() =>
-        Promise.reject(new Error('Connection refused'))) as typeof fetch);
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
+      );
 
       const testUrl = getUniqueUrl('/no-circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
@@ -348,24 +503,24 @@ describe('sendWebhook handler', () => {
         context,
       );
 
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: sub.id,
-          action: 'create',
-          resourceId: user.id,
-          data: { id: user.id },
-          timestamp: eventTimestamp,
-        },
-      );
+      await sendWebhook(worker, {
+        subscriptionId: sub.id,
+        action: 'create',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
 
       const updated = await db.webhookSubscription.findUnique({ where: { id: sub.id } });
       expect(updated?.isActive).toBe(true);
     });
 
     it('does not disable if fewer than 5 total events', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation((() =>
-        Promise.reject(new Error('Connection refused'))) as typeof fetch);
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
+      );
 
       const testUrl = getUniqueUrl('/few-events');
       const { entity: sub, context } = await createWebhookSubscription({
@@ -388,17 +543,290 @@ describe('sendWebhook handler', () => {
         );
       }
 
-      await sendWebhook(
-        { db, log: mockLog },
-        {
-          subscriptionId: sub.id,
-          action: 'create',
-          resourceId: user.id,
-          data: { id: user.id },
-          timestamp: eventTimestamp,
-        },
+      await sendWebhook(worker, {
+        subscriptionId: sub.id,
+        action: 'create',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
+
+      const updated = await db.webhookSubscription.findUnique({ where: { id: sub.id } });
+      expect(updated?.isActive).toBe(true);
+    });
+  });
+
+  describe('poisoned records', () => {
+    const respondWith = (status: number, statusText: string) =>
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(() => Promise.resolve(new Response(statusText, { status, statusText })), {
+          preconnect: fetch.preconnect,
+        }),
+      );
+    const rejectDeliveries = () => respondWith(400, 'Bad Request');
+
+    const rejection = (resourceId: string, httpStatus = 400) =>
+      ({ status: 'error', resourceId, httpStatus, error: `HTTP ${httpStatus}` }) as const;
+
+    const createRecordSubscription = async ({ withIntegration = true } = {}) => {
+      const { entity: customer } = await createUser();
+      const { entity: customerRef } = await createCustomerRef({
+        customerModel: 'User',
+        providerModel: 'User',
+        customerUserId: customer.id,
+        providerUserId: user.id,
+      });
+      const { entity: integration } = await createIntegration({
+        ownerModel: 'User',
+        userId: user.id,
+      });
+      const { entity: sub, context } = await createWebhookSubscription({
+        ownerModel: 'User',
+        userId: user.id,
+        url: getUniqueUrl('/integration'),
+        model: 'CustomerRef',
+        integrationId: withIntegration ? integration.id : null,
+      });
+      receivedWebhooks.length = 0;
+      return { sub, context, integration, customerRef };
+    };
+
+    const deliver = (subscriptionId: string, resourceId: string) =>
+      sendWebhook(worker, {
+        subscriptionId,
+        action: 'update',
+        resourceId,
+        data: { id: resourceId },
+        timestamp: eventTimestamp,
+      });
+
+    const findRecord = (integrationId: string, customerRefId: string) =>
+      db.integrationRecord.findFirst({ where: { integrationId, customerRefId } });
+
+    const at = (ms: number) => new Date(Date.UTC(2026, 0, 1) + ms);
+    // The delivery's id comes from Postgres uuidv7(); a host uuidv7 from "now" can sort either side of it.
+    const past = (createdAtMs: number, idMs = createdAtMs) => ({
+      id: Bun.randomUUIDv7('hex', at(idMs)),
+      createdAt: at(createdAtMs),
+    });
+
+    it('poisons the record on the second touch once another record delivered since its first rejection', async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3) },
+        context,
+      );
+      rejectDeliveries();
+
+      await deliver(sub.id, customerRef.id);
+
+      const record = await findRecord(integration.id, customerRef.id);
+      expect(record?.model).toBe('CustomerRef');
+      expect(record?.poisonedAt).toBeInstanceOf(Date);
+      expect(record?.poisonedReason).toBe('HTTP 400: Bad Request');
+      const latest = await db.webhookEvent.findFirst({
+        where: { webhookSubscriptionId: sub.id, resourceId: customerRef.id },
+        orderBy: { id: 'desc' },
+      });
+      expect(latest?.httpStatus).toBe(400);
+    });
+
+    it('never counts a rate-limited (429) delivery toward the streak', async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRef.id, 429), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id, 429), ...past(2) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3) },
+        context,
+      );
+      rejectDeliveries();
+
+      await deliver(sub.id, customerRef.id);
+
+      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+    });
+
+    it('does not poison on a rate-limited (429) touch, even after enough rejections', async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(3) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(4) },
+        context,
+      );
+      respondWith(429, 'Too Many Requests');
+
+      await deliver(sub.id, customerRef.id);
+
+      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+    });
+
+    it('does not poison when the other record delivered before the streak began', async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(1) },
+        context,
+      );
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(3) }, context);
+      rejectDeliveries();
+
+      await deliver(sub.id, customerRef.id);
+
+      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+    });
+
+    it('does not poison when nothing else delivered — that is the subscription circuit, not a dead record', async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      rejectDeliveries();
+
+      await deliver(sub.id, customerRef.id);
+
+      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+    });
+
+    it('never counts unreachable events, and an unreachable blip mid-streak does not reset it', async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent(
+        { status: 'unreachable', resourceId: customerRef.id, error: 'HTTP 503', ...past(2) },
+        context,
+      );
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3) },
+        context,
+      );
+      rejectDeliveries();
+
+      await deliver(sub.id, customerRef.id);
+      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+
+      await deliver(sub.id, customerRef.id);
+      expect((await findRecord(integration.id, customerRef.id))?.poisonedAt).toBeInstanceOf(Date);
+    });
+
+    it("resets the streak on the record's own success", async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: customerRef.id, ...past(3) },
+        context,
+      );
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(4) },
+        context,
+      );
+      rejectDeliveries();
+
+      await deliver(sub.id, customerRef.id);
+
+      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+    });
+
+    it("orders by id: a rejection in the same millisecond but before the record's success does not count", async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1_000) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: customerRef.id, ...past(1_000, 1_001) },
+        context,
+      );
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2_000) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3_000) },
+        context,
+      );
+      rejectDeliveries();
+
+      await deliver(sub.id, customerRef.id);
+
+      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+    });
+
+    it("orders by id: a rejection in the same millisecond but after the record's success counts", async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent(
+        { status: 'success', resourceId: customerRef.id, ...past(1_000) },
+        context,
+      );
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1_000, 1_001) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2_000) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3_000) },
+        context,
+      );
+      rejectDeliveries();
+
+      await deliver(sub.id, customerRef.id);
+
+      expect((await findRecord(integration.id, customerRef.id))?.poisonedAt).toBeInstanceOf(Date);
+    });
+
+    it('skips a poisoned record: no event, no request, while other records still deliver', async () => {
+      const { sub, integration, customerRef } = await createRecordSubscription();
+      await createIntegrationRecord(
+        { model: 'CustomerRef', poisonedAt: new Date(), poisonedReason: 'HTTP 400: Bad Request' },
+        { integration, customerRef },
       );
 
+      await deliver(sub.id, customerRef.id);
+
+      expect(await db.webhookEvent.count({ where: { webhookSubscriptionId: sub.id } })).toBe(0);
+      expect(receivedWebhooks.length).toBe(0);
+
+      const otherResourceId = Bun.randomUUIDv7();
+      await deliver(sub.id, otherResourceId);
+
+      const delivered = await db.webhookEvent.findMany({
+        where: { webhookSubscriptionId: sub.id },
+      });
+      expect(delivered.map((event) => [event.resourceId, event.status])).toEqual([
+        [otherResourceId, 'success'],
+      ]);
+      expect(receivedWebhooks.length).toBe(1);
+    });
+
+    it('never poisons on a subscription without an integration', async () => {
+      const { sub, context, customerRef } = await createRecordSubscription({
+        withIntegration: false,
+      });
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3) },
+        context,
+      );
+      rejectDeliveries();
+
+      await deliver(sub.id, customerRef.id);
+
+      expect(await db.integrationRecord.count({ where: { customerRefId: customerRef.id } })).toBe(
+        0,
+      );
+    });
+
+    it('a record rejected five times in a row no longer disables a subscription that delivers other records', async () => {
+      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(2) },
+        context,
+      );
+      rejectDeliveries();
+
+      for (let i = 0; i < 5; i++) await deliver(sub.id, customerRef.id);
+
+      expect((await findRecord(integration.id, customerRef.id))?.poisonedAt).toBeInstanceOf(Date);
+      expect(
+        await db.webhookEvent.count({
+          where: { webhookSubscriptionId: sub.id, resourceId: customerRef.id },
+        }),
+      ).toBe(3);
       const updated = await db.webhookSubscription.findUnique({ where: { id: sub.id } });
       expect(updated?.isActive).toBe(true);
     });

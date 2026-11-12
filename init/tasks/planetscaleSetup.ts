@@ -1,5 +1,5 @@
 import { planetscaleApi } from '../api/planetscale';
-import { execAsync } from '../utils/exec';
+import { execFileAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
 
 /**
@@ -8,9 +8,10 @@ import { getProjectConfig } from '../utils/getProjectConfig';
  */
 const initPrismaMigrationTable = async (connectionString: string): Promise<void> => {
   try {
-    await execAsync(`bun --cwd packages/db scripts/initMigrationTable.ts "${connectionString}"`, {
+    await execFileAsync('bun', ['--cwd', 'packages/db', 'scripts/initMigrationTable.ts'], {
       encoding: 'utf-8',
       timeout: 30000,
+      env: { ...process.env, DATABASE_URL: connectionString },
     });
   } catch (error) {
     throw new Error(
@@ -21,7 +22,13 @@ const initPrismaMigrationTable = async (connectionString: string): Promise<void>
 
 import { updateConfigField } from '../utils/configHelpers';
 import { delay } from '../utils/delay';
-import { clearError, clearProgress, isComplete, markComplete, setError } from '../utils/progressTracking';
+import {
+  clearError,
+  clearProgress,
+  isComplete,
+  markComplete,
+  setError,
+} from '../utils/progressTracking';
 import { retryWithTimeout } from '../utils/retry';
 import { getSecretAsync, setSecretAsync } from './infisicalSetup';
 
@@ -65,7 +72,9 @@ export const setupPlanetScale = async (
     await clearError('planetscale');
 
     // Check if config is stale (project name changed since last setup)
-    const isStale = config.planetscale.configProjectName && config.planetscale.configProjectName !== configProjectName;
+    const isStale =
+      config.planetscale.configProjectName &&
+      config.planetscale.configProjectName !== configProjectName;
 
     if (isStale) {
       // Clearing stale config (project name changed)
@@ -147,20 +156,26 @@ export const setupPlanetScale = async (
     // This preserves the production status and PS-5 cluster assignment
     if (!(await isComplete('planetscale', 'renameProductionBranch'))) {
       try {
-        await retryWithTimeout(() => planetscaleApi.renameBranch(organization, databaseName, 'main', 'prod'), {
-          maxRetries: 100,
-          delayMs: 3000,
-          retryCondition: (error) => {
-            const msg = error.message.toLowerCase();
-            return (
-              msg.includes('still initializing') || msg.includes('not ready') || msg.includes('cluster is not ready')
-            );
+        await retryWithTimeout(
+          () => planetscaleApi.renameBranch(organization, databaseName, 'main', 'prod'),
+          {
+            maxRetries: 100,
+            delayMs: 3000,
+            retryCondition: (error) => {
+              const msg = error.message.toLowerCase();
+              return (
+                msg.includes('still initializing') ||
+                msg.includes('not ready') ||
+                msg.includes('cluster is not ready')
+              );
+            },
+            timeoutMessage:
+              'Branch rename timed out after 5 minutes - cluster not fully initialized',
+            onRetry: async (attempt, maxRetries) => {
+              await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
+            },
           },
-          timeoutMessage: 'Branch rename timed out after 5 minutes - cluster not fully initialized',
-          onRetry: async (attempt, maxRetries) => {
-            await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
-          },
-        });
+        );
       } catch (error) {
         // If 'main' branch not found, it was already renamed to 'prod' in a previous run
         const msg = error instanceof Error ? error.message.toLowerCase() : '';
@@ -187,10 +202,13 @@ export const setupPlanetScale = async (
             retryCondition: (error) => {
               const msg = error.message.toLowerCase();
               return (
-                msg.includes('still initializing') || msg.includes('not ready') || msg.includes('cluster is not ready')
+                msg.includes('still initializing') ||
+                msg.includes('not ready') ||
+                msg.includes('cluster is not ready')
               );
             },
-            timeoutMessage: 'Staging branch creation timed out after 5 minutes - cluster not fully initialized',
+            timeoutMessage:
+              'Staging branch creation timed out after 5 minutes - cluster not fully initialized',
             onRetry: async (attempt, maxRetries) => {
               await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
             },
@@ -218,17 +236,26 @@ export const setupPlanetScale = async (
     if (!(await isComplete('planetscale', 'storeProdConnectionString'))) {
       await onStepComplete?.('Creating production role...');
       const productionPassword = await retryWithTimeout(
-        () => planetscaleApi.createRole(organization, databaseName, 'prod', `${configProjectName}-production-init`),
+        () =>
+          planetscaleApi.createRole(
+            organization,
+            databaseName,
+            'prod',
+            `${configProjectName}-production-init`,
+          ),
         {
           maxRetries: 100,
           delayMs: 3000,
           retryCondition: (error) => {
             const msg = error.message.toLowerCase();
             return (
-              msg.includes('still initializing') || msg.includes('not ready') || msg.includes('cluster is not ready')
+              msg.includes('still initializing') ||
+              msg.includes('not ready') ||
+              msg.includes('cluster is not ready')
             );
           },
-          timeoutMessage: 'Production role creation timed out after 5 minutes - cluster not fully initialized',
+          timeoutMessage:
+            'Production role creation timed out after 5 minutes - cluster not fully initialized',
           onRetry: async (attempt, maxRetries) => {
             await onStepComplete?.(`Creating production role... attempt ${attempt}/${maxRetries}`);
           },
@@ -237,11 +264,19 @@ export const setupPlanetScale = async (
 
       const prodConnectionString = productionPassword.connection_strings.general;
       if (!prodConnectionString) {
-        throw new Error('Production connection string is empty. Check production role creation output.');
+        throw new Error(
+          'Production connection string is empty. Check production role creation output.',
+        );
       }
 
       await onStepComplete?.('Storing prod connection string in Infisical...');
-      await setSecretAsync(infisicalProjectId, 'prod', 'DATABASE_URL', prodConnectionString, '/api');
+      await setSecretAsync(
+        infisicalProjectId,
+        'prod',
+        'DATABASE_URL',
+        prodConnectionString,
+        '/api',
+      );
       await markComplete('planetscale', 'createProdRole');
       await markComplete('planetscale', 'storeProdConnectionString');
       await onStepComplete?.();
@@ -250,17 +285,26 @@ export const setupPlanetScale = async (
     if (!(await isComplete('planetscale', 'storeStagingConnectionString'))) {
       await onStepComplete?.('Creating staging role...');
       const stagingPassword = await retryWithTimeout(
-        () => planetscaleApi.createRole(organization, databaseName, 'staging', `${configProjectName}-staging-init`),
+        () =>
+          planetscaleApi.createRole(
+            organization,
+            databaseName,
+            'staging',
+            `${configProjectName}-staging-init`,
+          ),
         {
           maxRetries: 100,
           delayMs: 3000,
           retryCondition: (error) => {
             const msg = error.message.toLowerCase();
             return (
-              msg.includes('still initializing') || msg.includes('not ready') || msg.includes('cluster is not ready')
+              msg.includes('still initializing') ||
+              msg.includes('not ready') ||
+              msg.includes('cluster is not ready')
             );
           },
-          timeoutMessage: 'Staging role creation timed out after 5 minutes - cluster not fully initialized',
+          timeoutMessage:
+            'Staging role creation timed out after 5 minutes - cluster not fully initialized',
           onRetry: async (attempt, maxRetries) => {
             await onStepComplete?.(`Creating staging role... attempt ${attempt}/${maxRetries}`);
           },
@@ -273,7 +317,13 @@ export const setupPlanetScale = async (
       }
 
       await onStepComplete?.('Storing staging connection string in Infisical...');
-      await setSecretAsync(infisicalProjectId, 'staging', 'DATABASE_URL', stagingConnectionString, '/api');
+      await setSecretAsync(
+        infisicalProjectId,
+        'staging',
+        'DATABASE_URL',
+        stagingConnectionString,
+        '/api',
+      );
       await markComplete('planetscale', 'createStagingRole');
       await markComplete('planetscale', 'storeStagingConnectionString');
       await onStepComplete?.();

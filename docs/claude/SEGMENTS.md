@@ -83,6 +83,12 @@ Paths below are relative to `/api/v1`:
 | Estimate rule reach without saving | `POST /me/segments/reach`, `/organization/:id/segments/reach`, `/space/:id/segments/reach`, `/admin/segment/reach` |
 | Every owner's segments (superadmin) | `GET /admin/segment`, filter with `searchFields[ownerModel]=platform` |
 
+`GET /segment/info` (public) describes what `conditions` may read: every field `customerRefLens`
+exposes (dotted path from `CustomerRef`, kind, enum values, list relations, and `sourced` fields that
+take the id of a row the owner may name), built with `projectLens` (`lensFields` in
+`@template/shared/rules`). `conditions` is tagged `rule`: its grammar is `@inixiative/json-rules` and
+is not restated. Its `guide` says what each key means.
+
 Reach accepts `{ conditions }` and returns `{ count }`, using the same rule and reference
 admission checks as saving. Existing route permissions govern each owner context.
 
@@ -116,15 +122,16 @@ can inspect. See [COMMUNICATIONS.md](COMMUNICATIONS.md#the-email-lens).
   every writer emitting an event. `customerRef.created`, `user.updated`, `tag.deleted`,
   `tagAttachment.created` and `tagAttachment.deleted` have handlers without production emitters.
 - Field/model-specific trigger narrowing and hydration of only the affected rule paths are pending.
-- The rule editor, provider-side customer lists for User/Organization, and `CustomerRef.lastActiveAt`
-  remain separate work.
+- The rule editor, provider-side customer lists for User/Organization, and a last-active timestamp
+  on `CustomerRef` (the TODO in `packages/db/prisma/schema/customerRef.prisma`) remain separate work.
 - Whether `customerRefLens` should become a general customer lens is an unresolved design question.
 - Flag-selected email variants are not implemented; feature flags are, see [FEATURE_FLAGS.md](FEATURE_FLAGS.md).
 
 ## Source map
 
 - `packages/db/prisma/schema/segment.prisma`, `segmentMember.prisma`: data model.
-- `apps/api/src/modules/customerRef/lib/customerRefLens.ts`: vocabulary and ownership scope.
+- `apps/api/src/modules/customerRef/lib/lenses/`: the static lenses, `customerRefLens` (vocabulary
+  and ownership scope) and `customerRefsByIdLens` (the rows a reconcile hydrates).
 - `apps/api/src/modules/segment/`: routes, services, trigger registry and tests.
 - `apps/api/src/jobs/handlers/`: reconciliation and sweep jobs.
 - `apps/web/app/config/nav/features/segments.ts`, `apps/web/app/routes/_authenticated/segments/`:

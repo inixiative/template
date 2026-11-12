@@ -9,8 +9,15 @@ import { makeController } from '#/lib/utils/makeController';
 import { deleteVariant } from '#/modules/featureFlag/services/writeVariant';
 import { featureFlagVariantDeleteRoute } from '#/modules/featureFlagVariant/routes/featureFlagVariantDelete';
 
-export const featureFlagVariantDeleteController = makeController(featureFlagVariantDeleteRoute, async (c, respond) => {
-  const { featureFlag: _flag, segment: _segment, ...variant } = getResource<'featureFlagVariant'>(c);
-  await deleteVariant(variant);
-  return respond.noContent();
-});
+export const featureFlagVariantDeleteController = makeController(
+  featureFlagVariantDeleteRoute,
+  async (c, respond) => {
+    const {
+      featureFlag: _flag,
+      segment: _segment,
+      ...variant
+    } = getResource<'featureFlagVariant'>(c);
+    await deleteVariant(variant);
+    return respond.noContent();
+  },
+);

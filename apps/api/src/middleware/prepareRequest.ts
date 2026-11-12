@@ -5,14 +5,10 @@
  * @uses primitive:batch
  */
 import { db } from '@template/db';
-import type { UserId } from '@template/db/typedModelIds';
 import { createPermissions } from '@template/permissions';
 import { logScope, withLogContext } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
-import { isSuperadmin } from '#/lib/context/isSuperadmin';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
-import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
+import { installPermissions } from '#/lib/context/installPermissions';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
 import type { getBatchContext as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
 import type { AppEnv } from '#/types/appEnv';
@@ -25,10 +21,10 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     batchContext = getBatchContext(batchId);
   }
 
-  const requestId = batchContext?.baseContext.get('requestId') ?? crypto.randomUUID();
+  const requestId = batchContext?.baseContext.get('requestId') ?? Bun.randomUUIDv7();
 
-  c.set('db', batchContext?.txn ?? db);
-  c.set('txn', batchContext?.txn);
+  c.set('db', db);
+  c.set('txn', batchContext ? db : undefined);
   c.set('requestId', requestId);
   c.set('permix', createPermissions());
 
@@ -39,7 +35,6 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     // Deep clone mutable context to prevent mutation leakage between batch sub-requests
     const keysToClone = [
       'user',
-      'session',
       'organizationUsers',
       'organizations',
       'spaceUsers',
@@ -53,19 +48,9 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
       c.set(key, value ? structuredClone(value) : null);
     }
 
-    const user = batchContext.baseContext.get('user');
-    if (user) {
-      const permix = c.get('permix');
-      permix.setUserId(user.id as UserId);
-      if (isSuperadmin(c)) permix.setSuperadmin(true);
-
-      await setupUserPermissions(c);
-      await setupOrgPermissions(c);
-      await setupSpacePermissions(c);
-    }
+    if (c.get('user') || c.get('token')) await installPermissions(c);
   } else {
     c.set('user', null);
-    c.set('session', null);
     c.set('organizationUsers', null);
     c.set('organizations', null);
     c.set('spaceUsers', null);

@@ -18,7 +18,8 @@ export const preheaderPresent: SyncPreflightCheck = ({ mjml }) =>
         {
           code: 'preheader.missing',
           severity: 'warning',
-          message: 'No preheader (<mj-preview>) — inbox clients will show the first body text instead.',
+          message:
+            'No preheader (<mj-preview>) — inbox clients will show the first body text instead.',
           location: 'mjml',
         },
       ];

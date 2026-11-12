@@ -1,16 +1,16 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
+import { CommunicationReasonCode } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createCommunicationLog,
   createEmailComponent,
   createOrganization,
   createSpace,
+  createUser,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { saveEmailTemplate } from '@template/email/render';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { type DeliverEmailPayload, deliverEmail } from '#/jobs/handlers/deliverEmail';
 import { emailRegistry } from '#/lib/email';
 
@@ -21,17 +21,18 @@ const documentMjml = (content: string) =>
 
 describe('deliverEmail — send-time component version closure', () => {
   const sent: SendEmailOptions[] = [];
-  let rejectNextSend = false;
+  const attempts: SendEmailOptions[] = [];
+  const outcomes: Array<Error | { id: string; success: false }> = [];
 
-  beforeAll(() => {
-    registerAuditLogHook();
-    registerEmailVersioningHook();
+  let fan: { id: string };
+
+  beforeEach(() => {
     const recorder: EmailClient = {
       send: async (options) => {
-        if (rejectNextSend) {
-          rejectNextSend = false;
-          return { id: 'rejected', success: false };
-        }
+        attempts.push(options);
+        const outcome = outcomes.shift();
+        if (outcome instanceof Error) throw outcome;
+        if (outcome) return outcome;
         sent.push(options);
         return { id: `rec-${sent.length}`, success: true };
       },
@@ -40,30 +41,35 @@ describe('deliverEmail — send-time component version closure', () => {
     emailRegistry.register(ADAPTER, recorder);
   });
 
-  afterAll(async () => {
+  beforeEach(async () => {
+    fan = (await createUser({ email: 'fan@example.com' })).entity;
+  });
+
+  afterEach(async () => {
     emailRegistry.unregister(ADAPTER);
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 
   afterEach(async () => {
     sent.length = 0;
-    await db.communicationComponentVersion.deleteMany({});
-    await db.communicationLog.deleteMany({});
-    await db.auditLog.deleteMany({});
-    await db.emailTemplate.deleteMany({});
-    await db.emailComponent.deleteMany({});
+    attempts.length = 0;
+    outcomes.length = 0;
+    await cleanupTouchedTables(db);
   });
 
   const ctx = () => ({ db, log: () => {} }) as never;
 
   const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
-    (await createCommunicationLog({ address: 'fan@example.com', ...data })).entity;
+    (await createCommunicationLog({ senderType: 'platform', address: 'fan@example.com', ...data }))
+      .entity;
 
-  const payloadFor = (logId: string, sender: DeliverEmailPayload['sender']): DeliverEmailPayload => ({
+  const payloadFor = (
+    logId: string,
+    sender: DeliverEmailPayload['sender'],
+  ): DeliverEmailPayload => ({
     template: 'closure-template',
     sender,
-    recipient: { id: crypto.randomUUID(), name: 'Fan', email: 'fan@example.com' },
+    recipientId: fan.id,
     data: {},
     communicationLogId: logId,
   });
@@ -92,10 +98,15 @@ describe('deliverEmail — send-time component version closure', () => {
     });
     const log = await createLog({ senderType: 'Space', senderSpaceId: space.id });
 
-    await deliverEmail(ctx(), payloadFor(log.id, { type: 'Space', spaceId: space.id, organizationId: org.id }));
+    await deliverEmail(
+      ctx(),
+      payloadFor(log.id, { type: 'Space', spaceId: space.id, organizationId: org.id }),
+    );
 
     expect(sent).toHaveLength(1);
-    const rows = await db.communicationComponentVersion.findMany({ where: { communicationLogId: log.id } });
+    const rows = await db.communicationComponentVersion.findMany({
+      where: { communicationLogId: log.id },
+    });
     expect(rows).toHaveLength(1);
     expect(rows[0]?.slug).toBe('closure-footer');
     expect(rows[0]?.emailComponentId).toBe(spaceFooter.id);
@@ -110,7 +121,10 @@ describe('deliverEmail — send-time component version closure', () => {
   });
 
   it('captures the transitive closure — components resolved through other components', async () => {
-    const { entity: cta } = await createEmailComponent({ slug: 'closure-cta', mjml: '<mj-text>Go</mj-text>' });
+    const { entity: cta } = await createEmailComponent({
+      slug: 'closure-cta',
+      mjml: '<mj-text>Go</mj-text>',
+    });
     const { entity: hero } = await createEmailComponent({
       slug: 'closure-hero',
       mjml: '{{#component:closure-cta}}{{/component:closure-cta}}',
@@ -128,14 +142,16 @@ describe('deliverEmail — send-time component version closure', () => {
 
     await deliverEmail(ctx(), payloadFor(log.id, { type: 'platform' }));
 
-    const rows = await db.communicationComponentVersion.findMany({ where: { communicationLogId: log.id } });
+    const rows = await db.communicationComponentVersion.findMany({
+      where: { communicationLogId: log.id },
+    });
     expect(rows.map((row) => row.slug).sort()).toEqual(['closure-cta', 'closure-hero']);
     const byId = new Map(rows.map((row) => [row.slug, row.emailComponentId]));
     expect(byId.get('closure-cta')).toBe(cta.id);
     expect(byId.get('closure-hero')).toBe(hero.id);
   });
 
-  it('a re-claimed retry rewrites the closure instead of duplicating rows', async () => {
+  it('a rejected send closes the row; a retry of the same job does not resend', async () => {
     await createEmailComponent({ slug: 'closure-footer', mjml: '<mj-text>Footer</mj-text>' });
     await saveEmailTemplate({
       slug: 'closure-template',
@@ -148,15 +164,19 @@ describe('deliverEmail — send-time component version closure', () => {
     const log = await createLog({});
     const payload = payloadFor(log.id, { type: 'platform' });
 
-    rejectNextSend = true;
-    await expect(deliverEmail(ctx(), payload)).rejects.toThrow('rejected send');
+    outcomes.push({ id: 'rejected', success: false });
+    await deliverEmail(ctx(), payload);
     await deliverEmail(ctx(), payload);
 
-    const rows = await db.communicationComponentVersion.findMany({ where: { communicationLogId: log.id } });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.slug).toBe('closure-footer');
+    expect(attempts).toHaveLength(1);
+    expect(sent).toHaveLength(0);
     const refreshed = await db.communicationLog.findUnique({ where: { id: log.id } });
-    expect(refreshed?.status).toBe('sent');
+    expect(refreshed?.status).toBe('failed');
+    expect(refreshed?.reasonCode).toBe(CommunicationReasonCode.send_error);
+    const rows = await db.communicationComponentVersion.findMany({
+      where: { communicationLogId: log.id },
+    });
+    expect(rows).toHaveLength(1);
   });
 
   it('writes no closure rows for a template with no component references', async () => {
@@ -172,7 +192,9 @@ describe('deliverEmail — send-time component version closure', () => {
 
     await deliverEmail(ctx(), payloadFor(log.id, { type: 'platform' }));
 
-    expect(await db.communicationComponentVersion.count({ where: { communicationLogId: log.id } })).toBe(0);
+    expect(
+      await db.communicationComponentVersion.count({ where: { communicationLogId: log.id } }),
+    ).toBe(0);
     expect(sent).toHaveLength(1);
   });
 });

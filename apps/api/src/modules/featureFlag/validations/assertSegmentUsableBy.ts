@@ -14,19 +14,34 @@ type Holder = { ownerModel: ProviderModel; ownerId: string; audienceOf?: string 
 
 const assertInternalAudienceOf = async (segment: Segment, holder: Holder): Promise<void> => {
   if (holder.audienceOf === undefined) {
-    throw makeError({ status: 422, message: `Segment ${segment.id} is a feature flag variant's internal audience` });
+    throw makeError({
+      status: 422,
+      message: `Segment ${segment.id} is a feature flag variant's internal audience`,
+    });
   }
   await db.findForUpdate('Segment', { id: segment.id });
-  const referrers = await db.featureFlagVariant.findMany({ where: { segmentId: segment.id, deletedAt: null } });
+  const referrers = await db.featureFlagVariant.findMany({
+    where: { segmentId: segment.id, deletedAt: null },
+  });
   if (referrers.some((variant) => variant.id !== holder.audienceOf)) {
-    throw makeError({ status: 422, message: `Segment ${segment.id} is another variant's internal audience` });
+    throw makeError({
+      status: 422,
+      message: `Segment ${segment.id} is another variant's internal audience`,
+    });
   }
 };
 
 /** A live segment of the same owner; an internal one only as the audience of the variant already serving it. */
-export const assertSegmentUsableBy = async (segmentId: string, holder: Holder): Promise<Segment> => {
+export const assertSegmentUsableBy = async (
+  segmentId: string,
+  holder: Holder,
+): Promise<Segment> => {
   const segment = await db.segment.findFirst({
-    where: { id: segmentId, ...segmentOwnerWhere(holder.ownerModel, holder.ownerId), deletedAt: null },
+    where: {
+      id: segmentId,
+      ...segmentOwnerWhere(holder.ownerModel, holder.ownerId),
+      deletedAt: null,
+    },
   });
   if (!segment) {
     throw makeError({

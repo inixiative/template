@@ -26,7 +26,8 @@ export const telemetrySettings = (
   const headers = enabled ? (input.headers ?? '') : '';
   parseOtlpHeaders(headers);
   const logsEndpoint = input.mode === 'split' ? input.logsEndpoint?.trim() : '';
-  if (input.mode === 'split' && !logsEndpoint) throw new Error('A logs endpoint including /v1/logs is required');
+  if (input.mode === 'split' && !logsEndpoint)
+    throw new Error('A logs endpoint including /v1/logs is required');
   if (logsEndpoint) resolveOtlpEndpoint(logsEndpoint, 'logs');
   const logsHeaders = input.mode === 'split' ? (input.logsHeaders ?? '') : headers;
   parseOtlpHeaders(logsHeaders);
@@ -39,7 +40,8 @@ export const telemetrySettings = (
     OTEL_BROWSER_ENABLED: String(browser),
     OTEL_EXPORTER_OTLP_ENDPOINT: endpoint || '',
     OTEL_EXPORTER_OTLP_HEADERS: headers,
-    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: logsEndpoint || (endpoint ? resolveOtlpEndpoint(endpoint, 'logs') : ''),
+    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT:
+      logsEndpoint || (endpoint ? resolveOtlpEndpoint(endpoint, 'logs') : ''),
     OTEL_EXPORTER_OTLP_LOGS_HEADERS: logsHeaders,
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: endpoint ? resolveOtlpEndpoint(endpoint, 'traces') : '',
     OTEL_EXPORTER_OTLP_TRACES_HEADERS: headers,

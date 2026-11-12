@@ -24,6 +24,10 @@ export const TOKEN_PATTERN = /\{\{([a-z][a-z0-9-]*)((?:\.[a-zA-Z0-9_-]+)*)\}\}/g
 
 const GRAMMAR_KEYWORDS = ['else', 'if', 'each', 'as', 'index', 'rule', 'filter'] as const;
 
-export const RESERVED_BINDING_NAMES: ReadonlySet<string> = new Set([...RESERVED_SCOPE_ROOTS, ...GRAMMAR_KEYWORDS]);
+export const RESERVED_BINDING_NAMES: ReadonlySet<string> = new Set([
+  ...RESERVED_SCOPE_ROOTS,
+  ...GRAMMAR_KEYWORDS,
+]);
 
-export const isValidBindingIdentifier = (value: string): boolean => /^[a-z]/.test(value) && SLUG_PATTERN.test(value);
+export const isValidBindingIdentifier = (value: string): boolean =>
+  /^[a-z]/.test(value) && SLUG_PATTERN.test(value);

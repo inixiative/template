@@ -23,7 +23,10 @@ type FetchVersionOptions = {
   extract?: (res: Response) => string | Promise<string>;
 };
 
-export const fetchVersion = async (url: string, opts: FetchVersionOptions = {}): Promise<string> => {
+export const fetchVersion = async (
+  url: string,
+  opts: FetchVersionOptions = {},
+): Promise<string> => {
   const res = await fetch(url, { redirect: 'follow', ...opts.init });
   if (!res.ok) throw new Error(`fetchVersion(${url}): ${res.status} ${res.statusText}`);
 

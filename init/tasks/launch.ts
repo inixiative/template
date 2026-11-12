@@ -1,5 +1,6 @@
 import { setLaunched } from '../utils/configHelpers';
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig';
+import { baselineDeployedDatabases } from './baselineDeployedDatabases';
 
 export type PreflightCheck = {
   label: string;
@@ -47,7 +48,9 @@ const sectionHasError = (config: ProjectConfig, key: keyof ProjectConfig): strin
  * Run all preflight checks against the current config.
  * Returns check results and whether all passed.
  */
-export const runPreflightChecks = (config: ProjectConfig): { checks: PreflightCheck[]; allPassed: boolean } => {
+export const runPreflightChecks = (
+  config: ProjectConfig,
+): { checks: PreflightCheck[]; allPassed: boolean } => {
   const checks: PreflightCheck[] = [];
 
   // Check each required section
@@ -80,9 +83,7 @@ export const runPreflightChecks = (config: ProjectConfig): { checks: PreflightCh
   return { checks, allPassed };
 };
 
-/**
- * Execute the launch: flip the launched flag in config.
- */
 export const executeLaunch = async (): Promise<void> => {
+  await baselineDeployedDatabases(await getProjectConfig());
   await setLaunched(true);
 };

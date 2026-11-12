@@ -1,18 +1,17 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { CommunicationChannel, SenderType } from '@template/db/generated/client/enums';
+import { CommunicationChannel } from '@template/db/generated/client/enums';
 import { createFactory, getNextSeq } from '@template/db/test/factory';
 
 const communicationLogFactory = createFactory('CommunicationLog', {
   defaults: () => ({
     sendKey: `send-${getNextSeq()}`,
     channel: CommunicationChannel.email,
-    senderType: SenderType.platform,
     address: faker.internet.email().toLowerCase(),
     idempotencyKey: `idem-${getNextSeq()}-${faker.string.alphanumeric(8)}`,
   }),

@@ -16,7 +16,7 @@
     - [Enums](#enums)
   - [Component System](#component-system)
     - [Syntax](#syntax)
-    - [Extraction (mapRefs)](#extraction-maprefs)
+    - [Extraction (decompose)](#extraction-decompose)
   - [Variable Interpolation](#variable-interpolation)
   - [The email lens](#the-email-lens)
   - [Cascade Resolution](#cascade-resolution)
@@ -84,29 +84,27 @@ Located in `packages/email` (`@template/email`).
 
 ```
 packages/email/src/
-├── client/               # Email providers
-│   ├── resend.ts         # createResendClient(apiKey)
-│   ├── console.ts        # createConsoleClient() - dev logging
-│   └── types.ts          # SendEmailOptions, EmailClient
+├── client/               # Email providers (adapter): resend.ts, console.ts, types.ts
+│   └── verification/     # Address verification (bouncer, noop)
+├── errors/               # EmailRenderError, MjmlValidationError, DivergentDuplicateSlugError, ...
+├── preflight/            # runPreflight + checks (alt text, preheader, unsubscribe link, ...)
 ├── render/               # Template pipeline
+│   ├── parseBlocks.ts    # MJML → text/component/slot node tree
+│   ├── decompose.ts      # Component extraction: strip inline bodies, collect refs + component writes
 │   ├── compose.ts        # composeTemplate/composeComponent
 │   ├── expand.ts         # Recursive component expansion
-│   ├── extractRefs.ts    # Component extraction (mapRefs)
 │   ├── interpolate.ts    # Variable substitution + conditionals
 │   ├── evaluateConditions.ts  # {{#if rule=...}} evaluation
+│   ├── settle/           # Token/branch/each settlement used by interpolate
 │   ├── lookup.ts         # Single-tier ownership lookup
 │   ├── lookupCascade.ts  # Cascade lookup across ownership tiers
 │   ├── lookupTemplate.ts # lookupTemplate/lookupComponent entrypoints
-│   ├── resolveVariants.ts # Match-or-create component variants
-│   ├── validateNoCycle.ts # Component ref cycle guard
 │   ├── save.ts           # saveEmailTemplate coordinator
 │   ├── saveComponents.ts # Component persistence
 │   ├── saveTemplate.ts   # Template persistence
-│   ├── errors.ts         # EmailRenderError
-│   └── types.ts          # SaveContext, etc.
-└── validations/          # MJML validation
-    ├── validateMjml.ts
-    └── MjmlValidationError.ts
+│   └── types.ts          # OwnerScope, EmailModel
+├── rules/                # emailLens + rule scoping/reference helpers
+└── validations/          # validateMjml, validateNoCycle, validateConditions, validateTokens
 ```
 
 ---
@@ -165,9 +163,10 @@ model EmailTemplate {
   componentRefs    String[]            // Pre-computed slugs
 
   // Ownership (false polymorphism)
-  ownerModel       EmailOwnerModel     // default|admin|Organization|Space
+  ownerModel       EmailOwnerModel     // see Enums: platform, tenant and user tiers
   organizationId   String?
   spaceId          String?
+  userId           String?
   inheritToSpaces  Boolean             // Allow Space to use Org template
 }
 ```
@@ -188,6 +187,7 @@ model EmailComponent {
   ownerModel       EmailOwnerModel
   organizationId   String?
   spaceId          String?
+  userId           String?
   inheritToSpaces  Boolean
 }
 ```
@@ -221,6 +221,7 @@ model CommunicationLog {
   idempotencyKey       String                // @unique — the fence
   providerMessageId    String?
   error                String?
+  reasonCode           CommunicationReasonCode?  // why a failed row failed — see Deliver
   sentAt               DateTime?
 }
 ```
@@ -242,10 +243,13 @@ enum CommunicationStatus {
 }
 
 enum EmailOwnerModel {
-  default       // Base templates - read: all, write: super admin
-  admin         // Platform internal - super admin only
-  Organization  // Tenant-branded
-  Space         // Space-specific overrides
+  default           // Base templates - read: all, write: super admin
+  admin             // Platform internal - super admin only
+  Organization      // Tenant-branded - org admins
+  Space             // Space-specific overrides
+  User              // User chain floor - a user's personal template/component
+  OrganizationUser  // User-owned within an org
+  SpaceUser         // User-owned within a space
 }
 
 ```
@@ -268,21 +272,22 @@ enum EmailOwnerModel {
 
 Pattern: `{{#component:slug}}...{{/component:slug}}`
 
-#### Extraction (mapRefs)
+#### Extraction (decompose)
 
 ```typescript
-import { mapRefs } from '@template/email/render';
+import { decompose } from '@template/email/render';
 
-const result = mapRefs(mjmlString);
-// result.map - { slug: [{ mjml, refs }] }
-// result.mjml - Tagged output with :N indices
-// result.refs - Top-level refs
+// resolve(slug) returns the body the owner's cascade already has for that slug, if any
+const { mjml, refs, writes } = decompose(mjmlString, (slug) => existing[slug]?.mjml);
+// mjml   - the template with every component's inline body stripped; only override slots stay
+// refs   - every component slug the template uses, nested refs included
+// writes - { slug, mjml, refs } for each inline body that differs from what the cascade resolves
 ```
 
 Handles:
-- Nested components (depth N)
-- Variant deduplication (same MJML = same component)
-- Variant indexing (`:0`, `:1` for different content)
+- Nested components (depth N): an inline body is decomposed in turn, and its refs bubble up
+- A ref with no inline body inherits the cascade's body; nothing is written for it
+- The same slug inlined twice with different bodies throws `DivergentDuplicateSlugError`
 
 ---
 
@@ -326,22 +331,62 @@ other lens. Everything a template does with a path or a rule goes through it:
   rule inside `{{#each}}` is the array rule it always was (`scopedRule`): one `any` per enclosing
   loop, binding leaves element-relative, root leaves climbing with `$$`; vocabulary, references
   and evaluation all read that one form, and evaluation runs slot-relative against the iterated
-  collection pinned to the element in scope (`narrowToElements`, `evaluateScopedRule`).
+  collection pinned to the element in scope (`narrowToElements`, `evaluateScopedRule`). A loop over
+  the opaque `data` bag has no lens to fold, so a rule inside it may not read a lens-backed root at
+  all (`opaqueLoopIssue`): refused at save (`validateConditions`) and at render. Template save and
+  dependent re-validation check the *composed* template, so a cascade-resolved component is judged
+  against the embedding template's lens.
 - **The builder** — `emailSurface` composes the four exposed surfaces under a presentation root
-  `Email` for the rule surface route; `emailRuleDecoration` derives one facet per lens present.
+  `Email` for the rule surface route: the maps each slot's projection shows, plus a narrowing whose
+  `root.relations` turns each slot on and, beneath it, the slot's own shown tree (columns kept per
+  path), so the builder gates against the narrowed lens (`composeNarrowed(source)`) and walks loops
+  with `lensScopeSurface(lens, { at })`. Fetched options are keyed at the slot's path under `Email`
+  (`emailSurfaceSourceValues`). `emailRuleDecoration` derives one facet per lens present.
 
-**The lens is the row owner's.** `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
-builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient,
-narrowed by the slots stored on the row — or on the slug's default-tier row when the row carries
-none) and scopes it to the owner of the row being saved, edited or rendered
-(`scopeEmailLens`): tags are platform-owned or the owner's, segments are the owner's (via
-`recipient.providerRefs.segmentMembers.segment`), platform tiers see platform tags and no segments.
-`OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The owner
+**The lens is the row owner's.** `emailOwnerProvider(owner)` (`packages/email/src/render/owner.ts`) turns
+an email row's owner reference into the lens owner the scope binds: an `Organization` or a `Space` is
+itself, and a `User`, `OrganizationUser` or `SpaceUser` owner is its user; platform rows (`default`,
+`admin`) have none. `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
+builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient
+over `DEFAULT_RECIPIENT_NARROWING`, a sender slot from the actual sender when no entry declares
+one; every prisma slot foreign-key-free and redacted) and narrows it by the slots stored on the
+row — or on the slug's default-tier row when the row carries none. A stored slot is a **later
+layer**: it shows exactly what it names and can never turn on what the declared surface does not
+(a stored recipient lens naming `sessions` or `accounts` is refused). The lens is scoped to the
+owner of the row being saved, edited or rendered (`scopeEmailLens`): tags are platform-owned or the
+owner's, segments are the owner's (via `recipient.providerRefs.segmentMembers.segment`), platform
+tiers see platform tags and no segments; the link rows are bound the same way — a tag attachment or
+segment membership by its far side, a customer ref by its provider.
+`OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The scope
+is one of four static declarations in `packages/email/src/rules/scopes/` (tenant owner and sender,
+owner only, platform owner with a tenant sender, platform), chosen by `emailScopeFor(owner, sender)`
+and written into each slot's **first** narrowing, because json-rules lets a later layer's clamp read
+only what its parent shows and these clamps read columns the slot hides. Every owner id is an
+optional bind token (`equalsSuppliedBind`: the column exists and equals the token), so an
+unsupplied token matches no row; the row's `emailLensBindings(owner, sender)` go to `bindLens`.
+**Memberships are the sender's.** At send, `emailLensFor(slug, owner, stored, sender)` also clamps
+`OrganizationUser` / `SpaceUser` rows to the sending owner's tree (`senderLensOwner`): an
+Organization, OrganizationUser, Space or SpaceUser sender to its organization (the organization and
+all its spaces, a space's parent included); a User sender to none; a platform or admin send is
+unrestricted. Nothing outside that organization ever shows. The clamp bounds; the lens chooses what
+shows inside it. By default (`defaultRecipientNarrowing`) a sender sees its own level only: an
+Organization its organization memberships, a Space its own space's memberships, a User none, a
+platform or admin both. A stored recipient lens that turns on `organizationUsers` or `spaceUsers`
+widens it, still within the organization. Targeting follows the same bound: a `messageUser` rule
+from an Organization- or Space-level sender reaches only people holding a membership the recipient
+lens shows (`targetedBySender`), so a space reaches its own members by default and its organization's
+when its lens widens. Registry sends target the entity's own recipient (an invite's target need not
+be a member yet). Without a sender (save, preview, rule surface) the template owner stands in. The owner
 is decided per site: save takes it from the input, the rule surface and preflight from the body
 (default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
 the tree for now. The picker gets real options for Tag and Segment (`emailSourceValues`, the lens's
-`sourceQueries` run through Prisma). Organization and Space are scoped on both the model and
+`toSourceQueries` run through Prisma by `sourceQueryValues`, keyed onto the `email` surface map by
+`emailSurfaceSourceValues`). A source across a bridge returns candidates (`recheck`):
+`sourceQueryValues` / `sourceQueryWhere` re-check them with the far side the caller's `farSide`
+loads, and refuse them without it. A referenced model's path source points at its own model source
+(`sources: { id: { from: 'mapDefaults' } }`), so it offers every row the owner may name, not only
+rows already linked down the path. Organization and Space are scoped on both the model and
 its ID source: an Organization owner sees itself and its spaces; a Space owner sees itself
 and its organization; a User owner sees neither; platform rows leave these two models unrestricted.
 The picker uses those same source queries.
@@ -350,7 +395,7 @@ The picker uses those same source queries.
 token or rule reads a slot. `prune` applies both picks and each visit's `where`: hidden list
 elements are dropped, hidden to-one relations become null, and a hidden root becomes null.
 An unfiltered loop cannot expose a foreign tag through a token while the corresponding rule
-would refuse it. Token/path traversal delegates to json-rules' `resolveLensPath`.
+would refuse it. Token/path traversal delegates to json-rules' `walkLensPath`.
 
 A route's `filterLens` is a different role: it controls accepted filters and sorting, while
 `responseSchema` controls the response. Do not use this projection step to reshape an already
@@ -385,7 +430,7 @@ Two separate ownership chains, selected by the sender's tier — a user-actor wa
 | User | User → default |
 | Space | Space → Org (if `inheritToSpaces`) → default |
 | Organization | Org → default |
-| admin | admin only |
+| admin | admin → default |
 | default | default only |
 
 This cascade happens automatically during compose - `composeTemplate` and `composeComponent` handle lookup based on the ownership context.
@@ -455,8 +500,8 @@ for (const recipient of recipients) {
 }
 ```
 
-`interpolate(template, variables, onError?, { locale, liveRefs, lens })` and
-`evaluateConditions(template, variables, onError?, liveRefs?)` take an optional
+`interpolate(template, variables, onError?, { locale, existingTargets, lens })` and
+`evaluateConditions(template, variables, onError?, existingTargets?)` take an optional
 `onError: RuleErrorSink` (`(issue: RenderIssue) => void`, `RenderIssue = { kind:
 'rule' | 'token' | 'each', path?, detail }`). Render has one behaviour: a block whose
 rule is degraded (`withRule`: a required binding missing, the lens no longer admits
@@ -475,27 +520,31 @@ Coordinates template + component persistence:
 ```typescript
 import { saveEmailTemplate } from '@template/email/render';
 
-const { template, components } = await saveEmailTemplate(db, {
-  slug: 'welcome',
-  name: 'Welcome Email',
-  subject: 'Welcome, {{recipient.firstName}}!',
-  mjml: '<mjml>...</mjml>',
-  category: 'system',
-  ownerModel: 'Organization',
-  organizationId: 'org_123',
-  locale: 'en',
-});
+const { template, components } = await saveEmailTemplate(
+  {
+    slug: 'welcome',
+    name: 'Welcome Email',
+    subject: 'Welcome, {{recipient.firstName}}!',
+    mjml: '<mjml>...</mjml>',
+    ownerModel: 'Organization',
+    organizationId: 'org_123',
+    locale: 'en',
+  },
+  { lens, lensFor }, // optional: validate tokens/rules against the email lens; re-check dependents
+);
 ```
 
 Pipeline steps:
-1. Validate MJML syntax + conditional rules in `mjml` and `subject`
-   (`assertValidConditions`) — fail fast instead of shipping a render-time time-bomb
-2. Extract component refs (`mapRefs`)
-3. Lookup existing components via cascade
-4. Resolve variants (match or create)
-5. Save template + components in transaction (each component re-validates its own
-   conditionals at the unit boundary; component MJML is a fragment, so it is not
-   run through the full-document MJML validator)
+1. Validate MJML syntax (`validateMjml`) and conditional rules in `mjml` and `subject`
+   (`assertValidConditions`): fail fast instead of shipping a render-time time-bomb
+2. Look up every referenced slug through the owner's cascade (`lookupCascade`)
+3. Extract components (`decomposeNodes`): inline bodies that differ from the cascade become component writes
+4. Refuse component reference cycles (`validateNoCycle`)
+5. Save components + template in one transaction (`db.txn`), then expand the saved template and
+   validate conditions and tokens on the composed MJML (`assertValidTokens`); a non-system template
+   must carry an unconditional `{{system.unsubscribeUrl}}`. With `lensFor`, every template that uses
+   a saved component is re-validated (`validateDependents`). Component MJML is a fragment, so it is
+   not run through the full-document MJML validator.
 
 ---
 
@@ -551,7 +600,10 @@ type EmailEntry = {
 The identity an email is sent *as* — a discriminated union keyed on `SenderType`
 (`platform | admin | User | Organization | Space | OrganizationUser | SpaceUser`).
 Identity (from-address/display, via `resolveSender`/`resolveFromAddress`) is separate
-from branding (which template), which the cascade resolves. `ownerScope(sender)` maps a sender to
+from branding (which template), which the cascade resolves. `resolveSender` loads the sending row
+through its lens (`lensFor(type)`, scalar columns) as the `sender` variable, so `{{sender.*}}`
+reads what the sender slot's lens declares; a platform or admin send has no `sender`. The
+platform's own name and URL are system tokens: `{{system.platformName}}`, `{{system.webUrl}}`. `ownerScope(sender)` maps a sender to
 its own owner tier — user-actors keep their tier (`SpaceUser`/`OrganizationUser`/`User`), and
 `platform → default` (the one bridge between the two enums) — then the cascade walks that tier's
 chain (user or org) down to the `default` floor, carrying the user id for interpolation.
@@ -561,31 +613,57 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 1. Resolve the entity lens; bail if missing or no email adapter is registered.
 2. Resolve the template row for the sender's scope and build the owner-scoped email lens from that
    row; fetch recipients in one batch through its **recipient lens** with the entry's targeting
-   `where` (`recipientLens`), pruned to what the lens picks plus what its `where`s read. The
-   recipient that reaches delivery carries its tags, memberships and segments, so a
-   `{{#if rule=…}}` over them decides at send. Then resolve each recipient's email `Contact`
-   (settings + deliverability live there).
+   `where` (`slotRowsLens`), pruned to what the lens picks plus what its `where`s read. The
+   delivery job carries the recipient's id, the bound targeting `where` and the cc / bcc rules — no
+   addresses: `deliverEmail` re-reads the recipient through the lens at send time with the
+   targeting re-checked (`not_found` once it no longer matches), resolves cc / bcc through the same
+   recipient lens (owner- and sender-scoped relations; the registry `where` picks the people), and sends to — and records on the log — the recipient's current
+   email, so nothing hidden rides the queue and the email shows the recipient as they are when it
+   goes out. Then resolve each recipient's email `Contact` (settings + deliverability
+   live there).
 3. **Find-or-create** a `queued` `CommunicationLog` row keyed on the per-recipient `idempotencyKey`
    — the at-most-once fence, durable beyond BullMQ's retention window (P2002 race → re-read).
-4. Enqueue `deliverEmail` with the log id.
+4. Enqueue `deliverEmail` with the log id. A fan-out wider than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` runs on
+   the **slow lane** (enqueued concurrently, at the lowest queue priority so other work goes first); smaller sends
+   stay fast. See [JOBS.md § Fast and Slow Lanes](./JOBS.md#fast-and-slow-lanes).
 
 #### Deliver (`deliverEmail`) — per recipient
 
-1. Load the log; **skip if already `sent`**.
+The body lives in `lib/email/deliverEmailMessage.ts`; `deliverEmail` is its job wrapper. **The claim reads
+the row and nothing else: only a `queued` row is open.** `sending`, `sent`, `failed`, `suppressed` and
+`undeliverable` are all closed — a retry, a duplicate job, or a re-dispatch never resends. A crash between
+claim and settle leaves `sending` for a person to resolve (an explicit resend with a staleness bound), never
+for the claim to reopen.
+
+1. Load the log; **skip unless `queued`**.
 2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
-   Rules evaluate through the lens of the row that won the cascade (`composed.owner`); a referenced
+   The recipient is loaded through the lens of the row that won the cascade (`composed.owner`) and
+   the sender (`recipientVariables`), and a model-lens data slot is re-read the same way from the
+   payload's `data.id`; a recipient or data entity that no longer resolves → `failed` with
+   `reasonCode: not_found`, no send. Rendering is `renderForRecipient` (see
+   [Messaging](#messaging-non-email-channels)). Rules evaluate through that lens; a referenced
    segment whose own rule is degraded leaves the live set first (`withoutDegradedSegments`).
-   A render error → mark `failed` → rethrow → retries → DLQ.
+   A content error (`isEmailContentError`: render, parse, MJML, token, condition) → `failed` with
+   `reasonCode: render_failed`, no retry. Any other error before the claim (database, verifier) throws with
+   the row still `queued`, so the job retry picks it up — nothing has been sent.
 3. **Gate ① scope** — `inScope` rebac read-check. STUB pass-through today (see COMM-005).
 4. **Gate ② settings** — `canDeliver(kind, contact)`: honor `acceptedKinds` opt-outs; `system` always
    delivers; a non-`system` send with no `Contact` → `suppressed`.
 5. **Deliverability** — bouncer pre-flight, cached on `Contact.deliverability` (TTL 30d); `undeliverable`
    → mark `undeliverable`, no send.
-6. **Claim** the send — atomic compare-and-set `queued|failed → sending`; a racing/retried sibling that
-   loses the claim bails (no double-send).
-7. Render `mjml2html`, add `List-Unsubscribe` + `List-Unsubscribe-Post` headers (non-`system`), send,
-   then `sent` (+ `providerMessageId`) / `failed`. **Every terminal write is CAS-guarded** so a sibling
-   can't clobber a `sent` row.
+6. Render `mjml2html` (content error → `render_failed`) and add `List-Unsubscribe` +
+   `List-Unsubscribe-Post` headers (non-`system`).
+7. **Claim** the send — atomic compare-and-set `queued → sending`; a racing/retried sibling that loses the
+   claim bails (no double-send).
+8. Send with `Idempotency-Key: <communicationLogId>`. Failures the provider definitely did not accept — a
+   rate limit or a 5xx — retry inside the claim, up to five retries backing off 2→32s. Everything else
+   closes on the first attempt: a 408 or network failure (`ambiguous_timeout` — the provider may have
+   accepted it), a quota wall (`quota_exceeded`), auth, validation, not found. Once worker shutdown
+   begins, the backoff wakes early and the next failure is recorded instead of retried, so a deploy never
+   force-exits mid-backoff and strands the row in `sending`. Then `sent`
+   (+ `providerMessageId`) or `failed` with a `reasonCode`; the failure is recorded, not thrown. **Every
+   terminal write is CAS-guarded** so a sibling can't clobber a `sent` row; if recording the outcome itself
+   fails, the job retries and meets the `sending` row.
 
 `CommunicationLog` persists `settledMjml`, `variables` and `renderIssues` alongside delivery metadata
 and audit references. Variables currently include the hydrated recipient, not just its delivery fields.
@@ -614,6 +692,10 @@ declared on the template's code registry entry (`apps/api/src/lib/email/registry
 - **`substitute: '<slug>'`** — a different template rendered instead of the platform fallback,
   with the primary's sender, recipient and variables. Same clean-or-fail rule. A substitute may
   not itself name a substitute.
+
+A fallback or substitute renders its own content through the **primary** template's lens — its
+owner clamps and stored recipient targeting — so it never sends what the primary would refuse: a
+recipient outside the primary lens is `not_found`.
 
 A non-system template rendered for a recipient with no contact row fails
 (`unsubscribe_unavailable`) before anything is sent: the unsubscribe link is not optional.
@@ -644,73 +726,88 @@ lives in the audit log**:
   placeholders intact — not the per-recipient interpolated bytes.
 - **Seeds**: the `packages/db` seed can't import `registerHooks`, so the canonical seed runs through
   `apps/api/scripts/seed.ts`, which registers all hooks first — seeded system templates get their
-  initial snapshots.
+  initial snapshots. Email seed files are `savedByApp`: the api seed persists them through
+  `emailSeedSavers` (`saveEmailComponents`, the api `saveEmailTemplate`), so a seeded row meets
+  the guards its save runs (a template: MJML, conditions, lens tokens, rule references; a component:
+  MJML, conditions, rule references) and one that would not validate fails the run. They seed last,
+  after the cron jobs. The `packages/db` seed alone refuses them.
 
 ### Rule References (the rows a rule names)
 
 A `{{#if rule=…}}` block can name a row — "recipient is tagged X", "recipient is in space Y". Those
 edges are persisted so that "who references X" is an index and a stale rule is never evaluated
-(INFRA-030; Zealot ZLT-4441 is the same primitive on MySQL).
+(INFRA-030).
 
 - **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
-  (owner row → referenced row), false-polymorphic on both ends — `ownerModel` + one typed FK per
-  rule-bearing model (`emailTemplateId` / `emailComponentId`), `referencedModel` + one typed FK per
-  referenceable model (`tagId` / `organizationId` / `spaceId`), both axes in `PolymorphismRegistry`.
-  Real relations on both ends, `onDelete: Cascade`; append/delete only, no lifecycle of its own.
+  (source row → target row), false-polymorphic on both ends — `sourceModel` + one typed FK per
+  rule-bearing model (`sourceEmailTemplateId` / `sourceEmailComponentId` / `sourceSegmentId` / `sourceEntitlementId`), `targetModel` + one typed FK per
+  referenceable model (`targetTagId`, `targetOrganizationId`, `targetSpaceId`, `targetSegmentId`, and one per rebac resource an entitlement's `where` can name), both axes in `PolymorphismRegistry`.
+  Real relations on both ends: the source side cascades, the target side is left to `SET NULL` on a
+  purge. Edges are written by the sync (create, delete, restamp) and stamped by `ruleReference:target`.
 - **Which models are referenceable is the registry's answer, not any surface's.**
-  `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `referencedModel` axis of
+  `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `targetModel` axis of
   `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it.
 - **A rule-tracked lens has one spelling per reference: the row's `id`, never an FK column.**
-  `omitForeignKeys(lens)` (`packages/db/lens`, the same shape as `redactLens`) omits every FK
+  `omitForeignKeys(lens)` (`packages/db/src/lens/omitForeignKeys.ts`, the same shape as `redactLens`) omits every FK
   column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
   itself in it and declares its own id sources. Each model-rooted lens of the email lens
   (`emailLens`, `packages/email/src/rules/emailLens.ts`) wraps in `omitForeignKeys` and declares
-  `sources: { id: { label: 'name' } }` as a `mapDefaults` entry for each of
-  `RULE_REFERENCEABLE_MODELS`, so the id answers on every path to the model. The default
+  `sources: { id: { label: 'name' } }` (or `sources: { id: true }` for a model without a
+  `name`) as a `mapDefaults` entry for each of `RULE_REFERENCEABLE_MODELS`, so the id answers on
+  every path to the model. The default
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
   and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
-  builder gets `emailSurface` of it (which strips sources), while save and settle keep the lens
+  builder gets `emailSurface` of it (which strips clamps and sources), while save and settle keep the lens
   itself (`defaultEmailLens` when none is threaded) — extraction never runs on the exposed
   surface. Adding a referenceable model = a registry entry + an FK column (the hook and email's
   sources derive); a surface that reaches it declares its own labeled id source.
-- **Extraction is the lens's** (`ruleReferences(lens, rule)`, `packages/db`): `ruleSourceValues`
-  (json-rules ≥ 2.20) reports the values a rule names at each source, and a source on a model's
+- **Extraction is the lens's** (`ruleReferences(lens, rule)`, `packages/db`): `describeRuleSources`
+  (json-rules ≥ 3.0) reports the values a rule names at each source, and a source on a model's
   id field is a row reference. Nested and dotted spellings are one path; a `path`/`bind` leaf at a
   source — or an operator that describes the row without naming it (`contains`, `between`) — is
-  `dynamic`: it names no row and registers no edge. When save is handed a lens (the api
+  `dynamic`: no save can check which rows it names, so save refuses it (`dynamicRuleReferences`;
+  email throws `RuleReferenceError`, a segment's conditions fail validation). When save is handed a lens (the api
   always is), its condition gate (`assertValidConditions`) refuses any rule path the lens does not
   resolve — an FK spelling or typo path is a 422, never a silently unregistered rule; `withRule`
   asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
   to decide and only extraction runs.
-- **Edges are written by the save path, not a hook.** The writer is
-  `syncRuleReferenceEdges(owner, references, sources?)` in `packages/db` — set-diff (survivors
-  keep their row), a newly added missing or soft-deleted target refused as a delta (a pre-existing
-  dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
-  reads them. With the lens's `sourceQueries` passed as `sources`, a newly added reference the
-  source's composed `where` does not admit is refused too (`unadmittedRuleReferences`): that is how
-  an Organization template cannot name another organization's tag or segment. Throws
-  `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
-  call from its save path. Email's `syncRuleReferences(owner, contents, lens)` is the
-  content-shaped front: it collects the rules out of MJML and subject (`contentRuleReferences`)
-  and hands the references down. `saveEmailTemplate` calls it inside
-  its transaction for the template and each saved component; it is the only writer of
-  `mjml`/`subject`, so nothing bypasses it.
+- **Edges are written by one hook over one declaration table.** `RULE_REFERENCE_SURFACES`
+  (`apps/api/src/hooks/ruleReference/surfaces.ts`) declares each rule-bearing model: its rule
+  columns, a label, the lens a row's rules are read under (`emailLensFor` for email rows, the
+  owner-bound customer-ref lens for segments) and the storage wrapper that reads rules out of the
+  stored value (MJML and subject for email, a condition tree for segments). The `ruleReference`
+  after-hook runs on every write to those models. When a row's rule columns differ from the
+  pre-image, it first checks the changed columns: `deadRuleReferences` (`packages/db`) reads the
+  rows they reference and reports each one that is soft-deleted, or absent from its scope's owner
+  scope (the lens's id source), as `{ model, id, state: 'deleted' | 'missing' }`. Any such row
+  refuses the write: `assertRuleReferencesExist` (`packages/db/src/validations`) throws a
+  `RuleReferenceError` carrying that list, which the API error handler answers as a 422 with `details`. A column resent unchanged is not
+  checked, so a subject-only edit passes over a body naming a dead tag. That is how an Organization
+  template cannot name another organization's tag or segment. Then it calls
+  `syncRuleReferenceEdges(source, references)`, the one edge writer, which mirrors exactly what the
+  rule references: it set-diffs (survivors keep their row), locks the referenced rows with
+  `db.findForUpdate`, stamps each edge with its target's `deletedAt`, and never refuses. Revive
+  regenerates through `syncRuleReferences(model, rows)` with the revived rows read whole, no check. Adding a rule-bearing
+  column means adding a declaration entry and a source FK on `RuleReference`.
 - **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
-  referenced row is copied onto every edge naming it by `ruleReference:referenced` (one
-  `updateManyAndReturn`, matched on `(referencedModel, referencedId)`, cleared on undelete); a
-  purge `SET NULL`s the typed FK and leaves `referencedId` naming the row that went. The referenced
+  referenced row is copied onto every edge naming it by `ruleReference:target` (one
+  `updateManyAndReturn`, matched on `(targetModel, targetId)`, cleared on undelete); a
+  purge `SET NULL`s the typed FK and leaves `targetId` naming the row that went. The referenced
   axis therefore carries true polymorphism beside the false — the FK is the relation and may go
-  null, `referencedId` is the name and never changes, and the sync writes both from one value.
-  `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
-  write `include: { ruleReferences: true }` and never grow that include as models become
+  null, `targetId` is the name and never changes. The false-polymorphism rules hook writes `sourceId`
+  and `targetId` from the set typed FK on create (`materialized` on the registry axis), refuses a
+  row where they disagree, and the immutable-fields hook refuses any update to an edge's typed FKs
+  or materialized ids, so the only updatable column on an edge is its `targetDeletedAt` stamp.
+  `ruleReferenceTargets(edges)` reads both from the edge rows alone (each target as `existing`, `deleted` or `purged`), so consumers
+  write `include: { sourceRuleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the
   components the cascade resolved into one live set, and every branch goes through **`withRule`**
   (`@template/shared/rules`) — the one fork a stored rule is evaluated through anywhere.
 - **`withRule(health, { degraded, sound })`** asks, at evaluation and against the current lens,
   whether the rule can be evaluated correctly — two questions: every binding it requires is
   supplied (`bindOptional` marks the ones that may be left out and resolve to null), and it is
-  still valid — the lens admits it (`checkRuleAgainstLens`, so a lens change after save degrades
+  still valid — the lens admits it (`validateRuleInLens`, so a lens change after save degrades
   the rule instead of silently narrowing it) and every row it names is in the live set the caller
   confirmed (absent set = nothing confirmed = every reference missing). Degraded means "do nothing
   new, say why": in email that is a rule issue, never a match, and the registry entry's `render`
@@ -754,14 +851,25 @@ type MessageDispatchOptions = { replyTo?: { chatMessageId: string } };
 Two BullMQ handlers (`messageUser`, `messageContact`), shaped like the email jobs but with no template
 cascade, no `CommunicationLog`, and no fan-out planner:
 
-- **`messageUser`** — `{ rule, kind, content }`. `resolveUsers(rule, lens?)` compiles the
-  `@inixiative/json-rules` `Condition` through a recipient lens (default: the platform-scoped
-  recipient lens of the email lens, so an organization's tag is outside its view) to a Prisma
-  query, then for each resolved user interpolates `content` and dispatches to
-  every `canDeliver(kind, contact)` contact via that contact's registered adapter. A missing adapter for
-  a `ContactType` throws.
+- **`messageUser`** — `{ rule, kind, content, sender? }` (sender defaults to platform). It builds the
+  sender's email lens (`emailLensFor(undefined, ownerScope(sender), undefined, sender)`), and
+  `resolveUsers(rule, lens.recipient)` compiles the `@inixiative/json-rules` `Condition` through its
+  recipient lens to a Prisma query at job time. Each resolved user is rendered through the same
+  primitive email uses, then dispatched to every `canDeliver(kind, contact)` contact via that
+  contact's registered adapter. A missing adapter for a `ContactType` throws. Not registered in
+  `jobHandlers` until an adapter exists.
 - **`messageContact`** — `{ contactId, kind, content, replyTo? }`. Loads one `Contact`, gates on
   `canDeliver`, and dispatches (no interpolation — `content` is pre-rendered).
+
+**Both lanes render with one primitive** (`apps/api/src/lib/email/renderForRecipient.ts`):
+`recipientVariables(lens, { recipientId, sender, data })` loads the recipient through the recipient
+lens when the send runs (the fetched rows a re-check needs, with the sender-scoped memberships),
+and a data slot that is a model lens through the data lens by `data.id` (the queued payload is
+never rendered, so an owner's clamp on the data entity re-checks against the row as it is),
+and `renderForRecipient(text, variables, lens)` interpolates: tokens and loops read the viewer
+projection (scope-root tokens through json-rules `readLensValue`), rules judge the re-check rows.
+`deliverEmail` and `messageUser` both call it, so the same recipient and content render the same in
+either lane.
 
 `canDeliver(kind, contact, customerRef?)` (`apps/api/src/lib/messaging/canDeliver.ts`) is the shared
 gate for both lanes: `system` always delivers; otherwise the kind must be in `contact.acceptedKinds`

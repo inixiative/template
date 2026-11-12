@@ -14,7 +14,8 @@ export type SegmentUpdatedPayload = { segment: Segment; previous: Segment };
 export const segmentUpdated = makeAppEvent<SegmentUpdatedPayload>({
   cb: [
     async ({ segment, previous }) => {
-      if (segmentNeedsReconcile(segment, previous)) await enqueueJob('reconcileSegment', { segmentId: segment.id });
+      if (segmentNeedsReconcile(segment, previous))
+        await enqueueJob('reconcileSegment', { segmentId: segment.id });
     },
   ],
 });

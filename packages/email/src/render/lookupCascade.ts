@@ -15,7 +15,9 @@ export const lookupCascade = async (
 ): Promise<Record<string, EmailComponent | undefined>> => {
   if (!slugs.length) return {};
 
-  const lookups = cascadeLookups(ctx, (tier) => lookupAtOwner(null, slugs, ctx, tier).then((r) => r.components));
+  const lookups = cascadeLookups(ctx, (tier) =>
+    lookupAtOwner(null, slugs, ctx, tier).then((r) => r.components),
+  );
   const results = await Promise.all(lookups.map((fn) => fn()));
 
   const merged: Record<string, EmailComponent | undefined> = Object.create(null);

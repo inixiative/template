@@ -56,7 +56,9 @@ export const encryptionEnv = (opts: { envPrefixes?: string[] } = {}) => {
 
   const unknown = prefixes.filter((p) => !registered.includes(p));
   if (unknown.length > 0) {
-    throw new Error(`Unknown encryption envPrefix(es): ${unknown.join(', ')}. Registered: ${registered.join(', ')}`);
+    throw new Error(
+      `Unknown encryption envPrefix(es): ${unknown.join(', ')}. Registered: ${registered.join(', ')}`,
+    );
   }
 
   const fields: Record<string, z.ZodTypeAny> = {};
@@ -70,7 +72,10 @@ export const encryptionEnv = (opts: { envPrefixes?: string[] } = {}) => {
     return prefixes.reduce<z.ZodTypeAny>(
       (acc, prefix) =>
         acc.superRefine(
-          createEncryptionEnvRefinement(`${prefix}_ENCRYPTION_VERSION`, `${prefix}_ENCRYPTION_KEY_PREVIOUS`),
+          createEncryptionEnvRefinement(
+            `${prefix}_ENCRYPTION_VERSION`,
+            `${prefix}_ENCRYPTION_KEY_PREVIOUS`,
+          ),
         ),
       schema,
     ) as T;

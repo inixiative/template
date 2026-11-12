@@ -13,6 +13,7 @@ export type UISlice = {
     projectName: string;
     appName: string;
     shortName: string;
+    logo: string;
     description: string;
     setTheme: (theme: Theme) => void;
     setLoading: (loading: boolean) => void;

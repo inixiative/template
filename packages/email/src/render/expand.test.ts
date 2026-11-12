@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expandWith, type LookupComponents } from '@template/email/render/expand';
 
 const lookupFrom =
@@ -25,15 +26,20 @@ describe('expand', () => {
     });
 
     it('renders a loaded component body for a bare ref', async () => {
-      expect(await render('{{#component:card}}{{/component:card}}', { card: '<x>Card</x>' })).toBe('<x>Card</x>');
+      expect(await render('{{#component:card}}{{/component:card}}', { card: '<x>Card</x>' })).toBe(
+        '<x>Card</x>',
+      );
     });
   });
 
   describe('one-level slots', () => {
     it('injects a caller override at the matching slot marker', async () => {
-      const out = await render('{{#component:card}}{{#slot:body}}OVERRIDE{{/slot:body}}{{/component:card}}', {
-        card: '<x>{{#slot:body:default}}DEFAULT{{/slot:body:default}}</x>',
-      });
+      const out = await render(
+        '{{#component:card}}{{#slot:body}}OVERRIDE{{/slot:body}}{{/component:card}}',
+        {
+          card: '<x>{{#slot:body:default}}DEFAULT{{/slot:body:default}}</x>',
+        },
+      );
       expect(out).toBe('<x>OVERRIDE</x>');
     });
 
@@ -52,16 +58,22 @@ describe('expand', () => {
     });
 
     it('blanks the slot on an empty override (holds position over the default)', async () => {
-      const out = await render('{{#component:card}}{{#slot:body}}{{/slot:body}}{{/component:card}}', {
-        card: '<x>{{#slot:body:default}}DEFAULT{{/slot:body:default}}</x>',
-      });
+      const out = await render(
+        '{{#component:card}}{{#slot:body}}{{/slot:body}}{{/component:card}}',
+        {
+          card: '<x>{{#slot:body:default}}DEFAULT{{/slot:body:default}}</x>',
+        },
+      );
       expect(out).toBe('<x></x>');
     });
 
     it('fills a default slot nested inside another default slot of the same body', async () => {
-      const out = await render('{{#component:card}}{{#slot:inner}}FILL{{/slot:inner}}{{/component:card}}', {
-        card: '{{#slot:outer:default}}[{{#slot:inner:default}}D{{/slot:inner:default}}]{{/slot:outer:default}}',
-      });
+      const out = await render(
+        '{{#component:card}}{{#slot:inner}}FILL{{/slot:inner}}{{/component:card}}',
+        {
+          card: '{{#slot:outer:default}}[{{#slot:inner:default}}D{{/slot:inner:default}}]{{/slot:outer:default}}',
+        },
+      );
       expect(out).toBe('[FILL]');
     });
 
@@ -69,9 +81,12 @@ describe('expand', () => {
       const card =
         '{{#slot:heading:default}}outer [{{#slot:heading:default}}inner{{/slot:heading:default}}]{{/slot:heading:default}}';
 
-      const filled = await render('{{#component:card}}{{#slot:heading}}FILL{{/slot:heading}}{{/component:card}}', {
-        card,
-      });
+      const filled = await render(
+        '{{#component:card}}{{#slot:heading}}FILL{{/slot:heading}}{{/component:card}}',
+        {
+          card,
+        },
+      );
       const unfilled = await render('{{#component:card}}{{/component:card}}', { card });
 
       expect(filled).toBe('FILL');
@@ -116,7 +131,10 @@ describe('expand', () => {
 
   describe('concentric slot pass-through', () => {
     it('fills a slot re-exposed inside a nested component override', async () => {
-      const out = await render('{{#component:b}}{{#slot:heading}}From A{{/slot:heading}}{{/component:b}}', reexposing);
+      const out = await render(
+        '{{#component:b}}{{#slot:heading}}From A{{/slot:heading}}{{/component:b}}',
+        reexposing,
+      );
       expect(out).toBe('<x>From A</x>');
     });
 
@@ -134,7 +152,10 @@ describe('expand', () => {
     });
 
     it('blanks a re-exposed slot on an empty fill (holds position)', async () => {
-      const out = await render('{{#component:b}}{{#slot:heading}}{{/slot:heading}}{{/component:b}}', reexposing);
+      const out = await render(
+        '{{#component:b}}{{#slot:heading}}{{/slot:heading}}{{/component:b}}',
+        reexposing,
+      );
       expect(out).toBe('<x></x>');
     });
   });
@@ -168,7 +189,9 @@ describe('expand', () => {
 
   describe('lookup', () => {
     it('throws component_missing when the lookup has no row', async () => {
-      await expect(render('{{#component:missing}}{{/component:missing}}', {})).rejects.toMatchObject({
+      await expect(
+        render('{{#component:missing}}{{/component:missing}}', {}),
+      ).rejects.toMatchObject({
         slug: 'missing',
         type: 'component_missing',
       });
@@ -176,7 +199,9 @@ describe('expand', () => {
 
     it('throws component_missing for a ref nested inside a loaded body', async () => {
       await expect(
-        render('{{#component:card}}{{/component:card}}', { card: '{{#component:missing}}{{/component:missing}}' }),
+        render('{{#component:card}}{{/component:card}}', {
+          card: '{{#component:missing}}{{/component:missing}}',
+        }),
       ).rejects.toMatchObject({ slug: 'missing', type: 'component_missing' });
     });
 
@@ -209,10 +234,43 @@ describe('expand', () => {
 
     it('does not treat inherited object keys as components', async () => {
       const lookup: LookupComponents = async () => ({});
-      await expect(expandWith('{{#component:constructor}}{{/component:constructor}}', lookup)).rejects.toMatchObject({
+      await expect(
+        expandWith('{{#component:constructor}}{{/component:constructor}}', lookup),
+      ).rejects.toMatchObject({
         slug: 'constructor',
         type: 'component_missing',
       });
     });
+  });
+});
+
+describe('render observers', () => {
+  it('reports a missing component and continues rendering', async () => {
+    const failures: EmailRenderError[] = [];
+    const output = await expandWith(
+      'before{{#component:missing}}{{/component:missing}}{{#component:present}}{{/component:present}}after',
+      lookupFrom({ present: 'PRESENT' }),
+      { onRenderFailure: (error) => failures.push(error) },
+    );
+    expect(output).toBe('beforePRESENTafter');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toBeInstanceOf(EmailRenderError);
+    expect(failures[0]).toMatchObject({ slug: 'missing', type: 'component_missing' });
+  });
+
+  it('reports a circular reference instead of throwing', async () => {
+    const failures: EmailRenderError[] = [];
+    const output = await expandWith(
+      '{{#component:a}}{{/component:a}}tail',
+      lookupFrom({
+        a: 'A{{#component:b}}{{/component:b}}',
+        b: 'B{{#component:a}}{{/component:a}}',
+      }),
+      { onRenderFailure: (error) => failures.push(error) },
+    );
+    expect(output).toBe('ABtail');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toBeInstanceOf(EmailRenderError);
+    expect(failures[0]).toMatchObject({ slug: 'a', type: 'circular_ref', path: ['a', 'b', 'a'] });
   });
 });

@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, type ModelName } from '@template/db';
+import { db, type ModelName } from '@template/db';
 import type { CustomerRef, Segment, Space, Tag, User } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -16,11 +16,7 @@ import {
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName } from '#/appEvents/handlers';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefReachedModels';
 import { RECONCILE_TRIGGERS } from '#/modules/segment/lib/reconcileTriggers';
 import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
 
@@ -30,13 +26,21 @@ const taggedRule = (tagId: string) => ({
   condition: { field: 'tag.id', operator: Operator.equals, value: tagId },
 });
 
+// By name: a rule naming the tag by id degrades when the tag goes, and a degraded rule keeps its members.
+const tagNamedRule = (name: string) => ({
+  field: 'customerUser.tagAttachments',
+  arrayOperator: 'any',
+  condition: { field: 'tag.name', operator: Operator.equals, value: name },
+});
+
 describe('reconcile triggers — the lens defines the propagation graph', () => {
   it('every model the segment lens reads has an event that reconciles it, and every event exists', () => {
     const names = new Set<string>(Object.values(AppEventName));
     for (const model of customerRefReachedModels()) {
       const events = RECONCILE_TRIGGERS[model as ModelName] ?? [];
       expect(events.length, `${model} has no reconcile trigger`).toBeGreaterThan(0);
-      for (const event of events) expect(names.has(event), `${event} is not an app event`).toBe(true);
+      for (const event of events)
+        expect(names.has(event), `${event} is not an app event`).toBe(true);
     }
   });
 });
@@ -52,22 +56,21 @@ describe('reconcile triggers — membership follows the events', () => {
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: user,
-        providerSpace: space,
+        customerUserId: user.id,
+        providerSpaceId: space.id,
       })
     ).entity;
 
   const liveSegment = async (conditions: object): Promise<Segment> => {
-    const { entity } = await createSegment({ type: SegmentType.dynamic, conditions }, { space });
+    const { entity } = await createSegment(
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions },
+      { space },
+    );
     await emitAppEvent('segment.created', { segment: entity });
     return entity;
   };
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
-    registerSegmentMemberOwnerHook();
-    registerSegmentRuleReferencesHook();
-    registerSoftDeleteCascadeHook();
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
     tag = (await createTag()).entity;
@@ -75,33 +78,44 @@ describe('reconcile triggers — membership follows the events', () => {
     memberRef = await customerOf(member);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('a tag attachment created or deleted moves the customer in and out of a tag segment', async () => {
     const segment = await liveSegment(taggedRule(tag.id));
     expect(await memberIds(segment.id)).toEqual([]);
 
-    const { entity: attachment } = await createTagAttachment({ resourceModel: 'User' }, { user: member, tag });
+    const { entity: attachment } = await createTagAttachment(
+      { resourceModel: 'User' },
+      { user: member, tag },
+    );
     await emitAppEvent('tagAttachment.created', { tagAttachment: attachment });
     expect(await memberIds(segment.id)).toEqual([memberRef.id]);
 
-    const detached = await db.tagAttachment.update({ where: { id: attachment.id }, data: { deletedAt: new Date() } });
+    const detached = await db.tagAttachment.update({
+      where: { id: attachment.id },
+      data: { deletedAt: new Date() },
+    });
     await emitAppEvent('tagAttachment.deleted', { tagAttachment: detached });
     expect(await memberIds(segment.id)).toEqual([]);
   });
 
   it('deleting a tag reconciles every resource it was attached to', async () => {
     const doomed = (await createTag()).entity;
-    const segment = await liveSegment(taggedRule(doomed.id));
-    const { entity: attachment } = await createTagAttachment({ resourceModel: 'User' }, { user: member, tag: doomed });
+    const segment = await liveSegment(tagNamedRule(doomed.name));
+    const { entity: attachment } = await createTagAttachment(
+      { resourceModel: 'User' },
+      { user: member, tag: doomed },
+    );
     await emitAppEvent('tagAttachment.created', { tagAttachment: attachment });
     expect(await memberIds(segment.id)).toEqual([memberRef.id]);
 
     const tagAttachments = await db.tagAttachment.findMany({ where: { tagId: doomed.id } });
-    const deleted = await db.tag.update({ where: { id: doomed.id }, data: { deletedAt: new Date() } });
+    const deleted = await db.tag.update({
+      where: { id: doomed.id },
+      data: { deletedAt: new Date() },
+    });
     await emitAppEvent('tag.deleted', { tag: deleted, tagAttachments });
     expect(await memberIds(segment.id)).toEqual([]);
   });

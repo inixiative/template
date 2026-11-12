@@ -79,7 +79,8 @@ export class VCR {
         if (saved.status >= 400) {
           throw new Error(typeof saved.body === 'string' ? saved.body : JSON.stringify(saved.body));
         }
-        if (saved.bodyFile) return readFileSync(join(dirname(fixturePath), saved.bodyFile)) as unknown as T;
+        if (saved.bodyFile)
+          return readFileSync(join(dirname(fixturePath), saved.bodyFile)) as unknown as T;
         return saved.body as T;
       }
       log.warn(
@@ -140,7 +141,8 @@ export class VCR {
     const cached = VCR.versionCache.get(this.service);
     if (cached !== undefined) return cached;
     const resolved = await this.versionFn();
-    if (!resolved) throw new Error(`VCR: version callback resolved to empty string (service=${this.service})`);
+    if (!resolved)
+      throw new Error(`VCR: version callback resolved to empty string (service=${this.service})`);
     VCR.versionCache.set(this.service, resolved);
     return resolved;
   }
@@ -160,7 +162,12 @@ export class VCR {
       const sidecarPath = join(dirname(fixturePath), sidecarName);
       mkdirSync(dirname(sidecarPath), { recursive: true });
       writeFileSync(sidecarPath, body as Uint8Array);
-      this.__save(fixturePath, { version, status, bodyFile: sidecarName, ...(headers && { headers }) });
+      this.__save(fixturePath, {
+        version,
+        status,
+        bodyFile: sidecarName,
+        ...(headers && { headers }),
+      });
       return { status, body: body as T, ...(headers && { headers }) };
     }
     this.__save(fixturePath, { version, status, body, ...(headers && { headers }) });

@@ -1,8 +1,16 @@
-import { describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { db, unregisterDbHook } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
-import { allOrders, liveOrders, mkEmail, phone, positions, posOf, softDelete } from '#/hooks/orderedList/tests/setup';
+import {
+  allOrders,
+  liveOrders,
+  mkEmail,
+  phone,
+  positions,
+  posOf,
+  softDelete,
+} from '#/hooks/orderedList/tests/setup';
 
 describe('soft delete', () => {
   it('negates position and compacts siblings', async () => {
@@ -17,7 +25,7 @@ describe('soft delete', () => {
     expect(posOf(rows, a.id)).toBe(1);
     expect(posOf(rows, c.id)).toBe(2);
 
-    const deleted = await db.contact.findUnique({ where: { id: b.id } });
+    const deleted = await db.withDeleted(() => db.contact.findUnique({ where: { id: b.id } }));
     expect(deleted!.position).toBeLessThan(0);
   });
 
@@ -45,7 +53,9 @@ describe('bulk soft delete', () => {
     const b = await phone(u.id); // 2 — already soft-deleted before the bulk op
     const c = await phone(u.id); // 3
     await softDelete(b.id); // live: a=1, c=2; b: negative
-    const bAfterFirstDelete = await db.contact.findUnique({ where: { id: b.id } });
+    const bAfterFirstDelete = await db.withDeleted(() =>
+      db.contact.findUnique({ where: { id: b.id } }),
+    );
     const bOldNeg = bAfterFirstDelete!.position;
     // Bulk-set deletedAt over a where-clause that matches BOTH live and the already-deleted row.
     // Only a and c should transition; b must keep its existing negative.
@@ -102,6 +112,8 @@ describe('bulk soft delete', () => {
 });
 
 describe('hard delete', () => {
+  beforeEach(() => unregisterDbHook('preventHardDelete'));
+
   it('compacts via Prisma delete', async () => {
     const { entity: u } = await createUser();
     const a = await phone(u.id); // 1
@@ -154,7 +166,7 @@ describe('multi-scope isolation — bulk soft-delete', () => {
     const pa = await phone(u.id);
     await phone(u.id); // phone: [1,2]
     const ea = await mkEmail(u.id);
-    await mkEmail(u.id); // email: [1,2]
+    await mkEmail(u.id); // email: [1,2,3] with the user's own
 
     await db.contact.updateManyAndReturn({
       where: { id: { in: [pa.id, ea.id] } },
@@ -162,11 +174,13 @@ describe('multi-scope isolation — bulk soft-delete', () => {
     });
 
     expect(positions(await liveOrders(u.id, ContactType.phone))).toEqual([1]);
-    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1]);
+    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2]);
   });
 });
 
 describe('multi-scope isolation — deleteMany', () => {
+  beforeEach(() => unregisterDbHook('preventHardDelete'));
+
   it('deleting across two owners compacts each list independently', async () => {
     const { entity: u1 } = await createUser();
     const { entity: u2 } = await createUser();
@@ -195,6 +209,6 @@ describe('multi-scope isolation — deleteMany', () => {
     await db.contact.deleteMany({ where: { id: { in: [pb.id, eb.id] } } });
 
     expect(positions(await liveOrders(u.id, ContactType.phone))).toEqual([1, 2]);
-    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2]);
+    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2, 3]);
   });
 });

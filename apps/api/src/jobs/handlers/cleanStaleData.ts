@@ -4,11 +4,11 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma
  */
-import { type ModelName, toAccessor } from '@template/db';
+import { db, type ModelName } from '@template/db';
 import { log } from '@template/shared/logger';
 import { type ArchiveConfig, archiveStaleRecords } from '#/jobs/handlers/archiveStaleRecords';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
-import type { JobHandler, WorkerContext } from '#/jobs/types';
+import type { JobHandler } from '#/jobs/types';
 
 // Generic stale-data cleanup. One handler, N cron rows — each row points at a
 // model + retention + (optional) filter in its payload. Add a new cleanup
@@ -30,11 +30,8 @@ export type CleanStaleDataPayload = {
   archive?: ArchiveConfig;
 };
 
-type DeletableDelegate = { deleteMany: (args: { where: Record<string, unknown> }) => Promise<{ count: number }> };
-
 export const cleanStaleData: JobHandler<CleanStaleDataPayload> = makeSingletonJob(
-  async (ctx: WorkerContext, payload: CleanStaleDataPayload) => {
-    const { db } = ctx;
+  async (_ctx, payload: CleanStaleDataPayload) => {
     const { model, retentionDays, dateField = 'createdAt', filters = {}, archive } = payload;
 
     const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
@@ -44,13 +41,9 @@ export const cleanStaleData: JobHandler<CleanStaleDataPayload> = makeSingletonJo
       await archiveStaleRecords(model, where, archive);
     }
 
-    const accessor = toAccessor(model);
-    const delegate = (db as unknown as Record<string, DeletableDelegate>)[accessor];
-    if (!delegate?.deleteMany) {
-      throw new Error(`cleanStaleData: no Prisma delegate for model "${model}" (accessor "${accessor}")`);
-    }
-
-    const result = await delegate.deleteMany({ where });
-    log.info(`cleanStaleData: deleted ${result.count} ${model} rows older than ${retentionDays} days`);
+    const result = await db.delegate(model).deleteMany({ where });
+    log.info(
+      `cleanStaleData: deleted ${result.count} ${model} rows older than ${retentionDays} days`,
+    );
   },
 );

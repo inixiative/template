@@ -1,8 +1,13 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Integration, Organization, User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createOrganizationUser, createUser, getNextSeq } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createIntegration,
+  createOrganizationUser,
+  createUser,
+  getNextSeq,
+} from '@template/db/test';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -15,7 +20,7 @@ describe('Integration CRUD', () => {
   let user: User;
   let org: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: orgUser, context } = await createOrganizationUser({ role: Role.admin });
     user = context.user;
     org = context.organization;
@@ -33,14 +38,15 @@ describe('Integration CRUD', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   describe('POST create via owner submodels', () => {
     it('creates a user-owned integration via /me/integrations', async () => {
-      const response = await fetch(post('/api/v1/me/integrations', { name: `Personal ${getNextSeq()}` }));
+      const response = await fetch(
+        post('/api/v1/me/integrations', { name: `Personal ${getNextSeq()}`, role: 'viewer' }),
+      );
       const { data } = await json<Integration>(response);
       expect(response.status).toBe(201);
       expect(data.ownerModel).toBe('User');
@@ -49,7 +55,10 @@ describe('Integration CRUD', () => {
 
     it('creates an org-owned integration via /organization/:id/integrations as admin', async () => {
       const response = await fetch(
-        post(`/api/v1/organization/${org.id}/integrations`, { name: `Salesforce ${getNextSeq()}` }),
+        post(`/api/v1/organization/${org.id}/integrations`, {
+          name: `Salesforce ${getNextSeq()}`,
+          role: 'viewer',
+        }),
       );
       const { data } = await json<Integration>(response);
       expect(response.status).toBe(201);
@@ -60,15 +69,23 @@ describe('Integration CRUD', () => {
 
   describe('GET /integration/:id', () => {
     it('reads own user integration', async () => {
-      const integration = await db.integration.create({ data: { name: 'Own', ownerModel: 'User', userId: user.id } });
+      const { entity: integration } = await createIntegration({
+        name: 'Own',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: user.id,
+      });
       const response = await fetch(get(`/api/v1/integration/${integration.id}`));
       expect(response.status).toBe(200);
     });
 
     it('rejects reading another user integration (403)', async () => {
       const { entity: otherUser } = await createUser();
-      const integration = await db.integration.create({
-        data: { name: 'Foreign', ownerModel: 'User', userId: otherUser.id },
+      const { entity: integration } = await createIntegration({
+        name: 'Foreign',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: otherUser.id,
       });
       const response = await fetch(get(`/api/v1/integration/${integration.id}`));
       expect(response.status).toBe(403);
@@ -77,10 +94,15 @@ describe('Integration CRUD', () => {
 
   describe('PATCH /integration/:id', () => {
     it('updates own user integration', async () => {
-      const integration = await db.integration.create({
-        data: { name: 'Before', ownerModel: 'User', userId: user.id },
+      const { entity: integration } = await createIntegration({
+        name: 'Before',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: user.id,
       });
-      const response = await fetch(patch(`/api/v1/integration/${integration.id}`, { name: 'After' }));
+      const response = await fetch(
+        patch(`/api/v1/integration/${integration.id}`, { name: 'After' }),
+      );
       const { data } = await json<Integration>(response);
       expect(response.status).toBe(200);
       expect(data.name).toBe('After');
@@ -88,23 +110,33 @@ describe('Integration CRUD', () => {
 
     it('rejects updating another user integration (403)', async () => {
       const { entity: otherUser } = await createUser();
-      const integration = await db.integration.create({
-        data: { name: 'NoTouch', ownerModel: 'User', userId: otherUser.id },
+      const { entity: integration } = await createIntegration({
+        name: 'NoTouch',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: otherUser.id,
       });
-      const response = await fetch(patch(`/api/v1/integration/${integration.id}`, { name: 'Hacked' }));
+      const response = await fetch(
+        patch(`/api/v1/integration/${integration.id}`, { name: 'Hacked' }),
+      );
       expect(response.status).toBe(403);
     });
   });
 
   describe('DELETE /integration/:id', () => {
     it('tombstones own user integration — row survives, read 404s', async () => {
-      const integration = await db.integration.create({
-        data: { name: 'Doomed', ownerModel: 'User', userId: user.id },
+      const { entity: integration } = await createIntegration({
+        name: 'Doomed',
+        role: 'viewer',
+        ownerModel: 'User',
+        userId: user.id,
       });
       const response = await fetch(del(`/api/v1/integration/${integration.id}`));
       expect(response.status).toBe(204);
 
-      const row = await db.integration.findFirst({ where: { id: integration.id, deletedAt: { not: null } } });
+      const row = await db.integration.findFirst({
+        where: { id: integration.id, deletedAt: { not: null } },
+      });
       expect(row).not.toBeNull();
 
       const readResponse = await fetch(get(`/api/v1/integration/${integration.id}`));
@@ -114,9 +146,14 @@ describe('Integration CRUD', () => {
 
   describe('policy: read gates on read, mutate gates on admin', () => {
     it('an org member reads an org integration but cannot mutate it', async () => {
-      const { entity: memberOrgUser, context: memberContext } = await createOrganizationUser({ role: Role.member });
-      const integration = await db.integration.create({
-        data: { name: 'OrgOwned', ownerModel: 'Organization', organizationId: memberContext.organization.id },
+      const { entity: memberOrgUser, context: memberContext } = await createOrganizationUser({
+        role: Role.member,
+      });
+      const { entity: integration } = await createIntegration({
+        name: 'OrgOwned',
+        role: 'viewer',
+        ownerModel: 'Organization',
+        organizationId: memberContext.organization.id,
       });
 
       const memberApp = createTestApp({

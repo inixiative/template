@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser, createUser } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
@@ -12,7 +12,7 @@ describe('GET /api/v1/organization/:id/protected', () => {
   let org: Organization;
   let orgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'member' });
     orgUser = ou;
     user = context.user;
@@ -27,7 +27,7 @@ describe('GET /api/v1/organization/:id/protected', () => {
     testDb = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
   });
 
@@ -39,7 +39,7 @@ describe('GET /api/v1/organization/:id/protected', () => {
     expect(data.id).toBe(org.id);
   });
 
-  it('returns 403 for user without org membership', async () => {
+  it('returns 403 for user without being an org member', async () => {
     const { entity: otherUser } = await createUser();
 
     const otherHarness = createTestApp({

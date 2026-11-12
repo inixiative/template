@@ -10,7 +10,12 @@ import type { ComponentNode, Node, SlotNode } from '@template/email/render/nodes
 import { assertNoDuplicateOverrideSlots } from '@template/email/validations/assertNoDuplicateOverrideSlots';
 import { assertNoStrayTagShapes } from '@template/email/validations/assertNoStrayTagShapes';
 
-type Frame = { node: ComponentNode | SlotNode; kind: 'component' | 'slot'; name: string; children: Node[] };
+type Frame = {
+  node: ComponentNode | SlotNode;
+  kind: 'component' | 'slot';
+  name: string;
+  children: Node[];
+};
 
 export const parseBlocks = (input: string): Node[] => {
   assertNoStrayTagShapes(input);
@@ -56,7 +61,8 @@ export const parseBlocks = (input: string): Node[] => {
       stack.push({ node, kind, name, children: node.children });
     } else {
       const top = stack.at(-1);
-      if (!top) throw new ParseBlocksError('stray_close', `Stray close tag with no matching open: ${tag}`);
+      if (!top)
+        throw new ParseBlocksError('stray_close', `Stray close tag with no matching open: ${tag}`);
       if (top.kind !== kind || top.name !== name) {
         throw new ParseBlocksError(
           'mismatched_close',

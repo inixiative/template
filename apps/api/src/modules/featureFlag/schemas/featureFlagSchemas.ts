@@ -16,7 +16,12 @@ import { CustomerModel, ProviderModel, SegmentType } from '@template/db/generate
 import { sampleRangeSchema } from '#/modules/segment/lib/sample';
 import { selectSegmentForCustomer } from '#/modules/segment/queries/segmentIncludes';
 
-export const FEATURE_FLAG_CREATE_IMMUTABLE_FIELDS = ['ownerModel', 'userId', 'organizationId', 'spaceId'] as const;
+export const FEATURE_FLAG_CREATE_IMMUTABLE_FIELDS = [
+  'ownerModel',
+  'userId',
+  'organizationId',
+  'spaceId',
+] as const;
 
 export const featureFlagCreateBodySchema = FeatureFlagScalarInputSchema.omit({
   ownerModel: true,
@@ -43,7 +48,9 @@ export const featureFlagVariantReadResponseSchema = FeatureFlagVariantScalarSche
   segment: variantSegmentSchema.nullable(),
 });
 
-export const featureFlagReadResponseSchema = FeatureFlagScalarSchema.omit({ sampleOffset: true }).extend({
+export const featureFlagReadResponseSchema = FeatureFlagScalarSchema.omit({
+  sampleOffset: true,
+}).extend({
   variants: z.array(featureFlagVariantReadResponseSchema),
 });
 

@@ -14,9 +14,19 @@ let __main: Redis | null = null;
 let __subscriber: Redis | null = null;
 let __mock: Redis | null = null;
 
-export const resolveRedisUrl = (url?: string): string => url || process.env.REDIS_URL || 'redis://localhost:6379';
+export const resolveRedisUrl = (url?: string): string =>
+  url || process.env.REDIS_URL || 'redis://localhost:6379';
 
-export const createRedisConnection = (scope: LogScope | string = LogScope.db, url?: string): Redis => {
+// A command that never answers would otherwise hang its caller forever, and a lock heartbeat with
+// it. Blocking consumers (a BullMQ Worker or QueueEvents, a pub/sub subscriber) wait on Redis by
+// design, so they opt out with `isBlocking`.
+export const COMMAND_TIMEOUT_MS = 5_000;
+
+export const createRedisConnection = (
+  scope: LogScope | string = LogScope.db,
+  url?: string,
+  { isBlocking = false }: { isBlocking?: boolean } = {},
+): Redis => {
   if (isTest) {
     if (!__mock) __mock = new RedisMock() as unknown as Redis;
     log.info('Using shared in-memory mock', scope);
@@ -26,6 +36,7 @@ export const createRedisConnection = (scope: LogScope | string = LogScope.db, ur
   const redis = new Redis(resolveRedisUrl(url), {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
+    ...(isBlocking ? {} : { commandTimeout: COMMAND_TIMEOUT_MS }),
   });
 
   redis.on('error', (err) => log.error('Error:', err, scope));
@@ -44,7 +55,10 @@ export const getRedisPub = (): Redis => getRedisClient();
 export const getRedisSub = (): Redis => {
   // A subscribed connection can only run subscriber commands, so the subscriber is always
   // its own connection — in tests a duplicate() of the shared mock (same broker, separate mode).
-  if (!__subscriber) __subscriber = isTest ? getRedisClient().duplicate() : createRedisConnection(LogScope.ws);
+  if (!__subscriber)
+    __subscriber = isTest
+      ? getRedisClient().duplicate()
+      : createRedisConnection(LogScope.ws, undefined, { isBlocking: true });
   return __subscriber;
 };
 

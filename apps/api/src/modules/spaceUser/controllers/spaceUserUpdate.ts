@@ -4,31 +4,35 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import { db, type HydratedRecord, hydrate } from '@template/db';
-import { greaterRole } from '@template/permissions';
+import { db, hydrate, includeTargetEntitlements, Prisma } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
+import { memberRoleWrite } from '@template/permissions/rebac/schemaHelpers';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceUserUpdateRoute } from '#/modules/spaceUser/routes/spaceUserUpdate';
 
-export const spaceUserUpdateController = makeController(spaceUserUpdateRoute, async (c, respond) => {
-  const spaceUser = getResource<'spaceUser'>(c);
-  const body = c.req.valid('json');
-  const permix = c.get('permix');
+export const spaceUserUpdateController = makeController(
+  spaceUserUpdateRoute,
+  async (c, respond) => {
+    const spaceUser = getResource<'spaceUser'>(c);
+    const body = c.req.valid('json');
+    const permix = c.get('permix');
 
-  const hydrated = await hydrate(db, 'spaceUser', spaceUser);
-  const space = hydrated.space as HydratedRecord;
-  const targetRole = greaterRole(spaceUser.role, body.role);
+    const before = await hydrate('spaceUser', spaceUser);
+    const after = await hydrate('spaceUser', { ...spaceUser, role: body.role ?? spaceUser.role });
+    if (
+      !check(permix, rebacSchema, 'spaceUser', before, memberRoleWrite('space')) ||
+      !check(permix, rebacSchema, 'spaceUser', after, memberRoleWrite('space'))
+    )
+      throw makeError({ status: 403, message: `Cannot assign ${after.role} role` });
 
-  if (!check(permix, rebacSchema, 'space', { ...space, role: targetRole }, 'assign')) {
-    throw makeError({ status: 403, message: `Cannot assign ${targetRole} role` });
-  }
+    const updated = await db.spaceUser.update({
+      where: { id: spaceUser.id },
+      include: includeTargetEntitlements('SpaceUser'),
+      data: body,
+    });
 
-  const updated = await db.spaceUser.update({
-    where: { id: spaceUser.id },
-    data: body,
-  });
-
-  return respond.ok(updated);
-});
+    return respond.ok(updated);
+  },
+);

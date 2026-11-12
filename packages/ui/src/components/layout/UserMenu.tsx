@@ -16,7 +16,6 @@ import {
   DropdownMenuTrigger,
 } from '@template/ui/components/primitives/DropdownMenu';
 import { Input } from '@template/ui/components/primitives/Input';
-import { toast } from '@template/ui/lib/toast';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
 import { useState } from 'react';
@@ -52,13 +51,7 @@ export const UserMenu = ({ className, showSpoofControls = true }: UserMenuProps)
   const handleExitSpoof = async () => {
     await setSpoof(null);
   };
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch {
-      toast.error('Signed out on this device, but the server session could not be revoked.');
-    }
-  };
+  const handleLogout = () => logout();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className={cn('w-full', className)}>
@@ -70,12 +63,17 @@ export const UserMenu = ({ className, showSpoofControls = true }: UserMenuProps)
         >
           <Avatar className="h-8 w-8 rounded-lg">
             <AvatarImage src={user?.image ?? undefined} alt={user?.name ?? 'User'} />
-            <AvatarFallback className="rounded-lg">{user?.name?.charAt(0).toUpperCase() ?? 'U'}</AvatarFallback>
+            <AvatarFallback className="rounded-lg">
+              {user?.name?.charAt(0).toUpperCase() ?? 'U'}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 text-left min-w-0">
             <div className="text-sm font-semibold truncate">{user?.name ?? 'User'}</div>
             <div
-              className={cn('text-xs truncate', isSpoofing ? 'text-destructive font-medium' : 'text-muted-foreground')}
+              className={cn(
+                'text-xs truncate',
+                isSpoofing ? 'text-destructive font-medium' : 'text-muted-foreground',
+              )}
             >
               {isSpoofing ? 'Spoofing' : (user?.email ?? '')}
             </div>

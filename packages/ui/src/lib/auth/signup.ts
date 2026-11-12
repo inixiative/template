@@ -4,7 +4,8 @@
  * @partOf primitive:ui
  * @uses none
  */
-import { clearToken, setToken } from '@template/ui/lib/auth/token';
+import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
+import { clearToken } from '@template/ui/lib/auth/token';
 import type {
   AuthMethod,
   EmailAuthMethod,
@@ -33,7 +34,7 @@ const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> =
   });
 
   if (error) {
-    throw new Error(error.message || 'Sign up failed');
+    throw new Error(error.message || error.statusText);
   }
 
   if (!data?.token) {
@@ -44,8 +45,7 @@ const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> =
     throw new Error('No token returned from sign up');
   }
 
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  setToken(data.token, expiresAt);
+  storeJwtHandoff(data);
   return { status: 'authenticated' };
 };
 
@@ -57,8 +57,9 @@ const signUpWithOAuth = async (method: OAuthAuthMethod): Promise<SignUpResult> =
   const { error } = await client.signIn.social({
     provider: method.provider,
     callbackURL,
+    errorCallbackURL: `${window.location.origin}/login`,
   });
-  if (error) throw new Error(error.message || 'Sign up failed');
+  if (error) throw new Error(error.message || error.statusText);
   return { status: 'redirecting' };
 };
 

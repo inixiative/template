@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import '@template/ui/store';
-import { createApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
+import { QueryClient, QueryObserver, skipToken } from '@tanstack/react-query';
+import type { WSFrameErrorFrame, WSStreamAckFrame } from '@template/shared/ws';
+import {
+  type ApiWebsocket,
+  type ApiWebsocketTiming,
+  createApiWebsocket,
+} from '@template/ui/lib/ws/createApiWebsocket';
+import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 
 let instances: FakeWebSocket[] = [];
 
@@ -32,14 +38,40 @@ const open = (ws: FakeWebSocket): void => {
   ws.readyState = FakeWebSocket.OPEN;
   ws.onopen?.();
 };
-const receive = (ws: FakeWebSocket, frame: unknown): void => ws.onmessage?.({ data: JSON.stringify(frame) });
-const sends = (ws: FakeWebSocket): Array<Record<string, unknown>> => ws.sent.map((s) => JSON.parse(s));
+const receive = (ws: FakeWebSocket, frame: unknown): void =>
+  ws.onmessage?.({ data: JSON.stringify(frame) });
+const sends = (ws: FakeWebSocket): Array<Record<string, unknown>> =>
+  ws.sent.map((s) => JSON.parse(s));
+const opensOf = (ws: FakeWebSocket) => sends(ws).filter((frame) => frame.action === 'open');
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fastTiming: Partial<ApiWebsocketTiming> = {
+  retryBaseMs: 5,
+  retryMaxMs: 20,
+  openAckTimeoutMs: 30,
+  streamSettleMs: 1,
+};
+const settled = () => wait(5);
+
+let queryClient: QueryClient | null = null;
+const clients: ApiWebsocket[] = [];
+const createClient = (
+  url: string,
+  onReconnect?: () => void,
+  timing?: Partial<ApiWebsocketTiming>,
+): ApiWebsocket => {
+  const client = createApiWebsocket(url, { getClient: () => queryClient, onReconnect }, timing);
+  clients.push(client);
+  return client;
+};
 
 describe('createApiWebsocket', () => {
   let wsSpy: ReturnType<typeof spyOn>;
   beforeEach(() => {
     instances = [];
-    wsSpy = spyOn(globalThis, 'WebSocket').mockImplementation(((url: string) => new FakeWebSocket(url)) as never);
+    wsSpy = spyOn(globalThis, 'WebSocket').mockImplementation(
+      ((url: string) => new FakeWebSocket(url)) as never,
+    );
     Object.assign(wsSpy, {
       CONNECTING: FakeWebSocket.CONNECTING,
       OPEN: FakeWebSocket.OPEN,
@@ -48,13 +80,49 @@ describe('createApiWebsocket', () => {
     });
   });
   afterEach(() => {
+    for (const client of clients.splice(0)) client.disconnect();
+    queryClient = null;
     wsSpy.mockRestore();
   });
 
-  it('drops a subscription the server rejects so it is not replayed on reconnect', () => {
-    const api = createApiWebsocket('ws://x');
+  it('disconnect closes the socket and stays closed until connect is called again', async () => {
+    const api = createClient('ws://x', undefined, {
+      ...fastTiming,
+      heartbeatMs: 2,
+      pongTimeoutMs: 4,
+    });
     api.connect();
-    const ws = instances[0];
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    await wait(3);
+
+    api.disconnect();
+    expect(ws.readyState).toBe(FakeWebSocket.CLOSED);
+    await wait(20);
+    expect(instances).toHaveLength(1);
+
+    api.connect();
+    expect(instances).toHaveLength(2);
+  });
+
+  it('replays its subscriptions on the socket opened after a disconnect', () => {
+    const api = createClient('ws://x');
+    api.connect();
+    open(instances[0] as FakeWebSocket);
+    api.subscribe('ch1');
+
+    api.disconnect();
+    api.connect();
+    const second = instances[1] as FakeWebSocket;
+    open(second);
+
+    expect(sends(second)).toContainEqual({ action: 'subscribe', channel: 'ch1' });
+  });
+
+  it('drops a subscription the server rejects so it is not replayed on reconnect', () => {
+    const api = createClient('ws://x');
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
     open(ws);
 
     api.subscribe('ch1');
@@ -64,34 +132,44 @@ describe('createApiWebsocket', () => {
     ws.sent.length = 0;
     open(ws);
 
-    expect(sends(ws).some((frame) => frame.action === 'subscribe' && frame.channel === 'ch1')).toBe(false);
+    expect(sends(ws).some((frame) => frame.action === 'subscribe' && frame.channel === 'ch1')).toBe(
+      false,
+    );
   });
 
   it('falls back to real identity when the server rejects a spoof', () => {
-    const api = createApiWebsocket('ws://x');
+    const api = createClient('ws://x');
     api.connect();
-    const ws = instances[0];
+    const ws = instances[0] as FakeWebSocket;
     open(ws);
 
     api.spoof('tok', 'a@example.com');
     receive(ws, { type: 'spoofRejected' });
 
-    expect(sends(ws).at(-1)).toEqual({ action: 'authenticate', headers: { authorization: 'Bearer tok' } });
+    expect(sends(ws).at(-1)).toEqual({
+      action: 'authenticate',
+      headers: { authorization: 'Bearer tok' },
+    });
 
     ws.sent.length = 0;
     open(ws);
 
-    expect(sends(ws)).toContainEqual({ action: 'authenticate', headers: { authorization: 'Bearer tok' } });
-    expect(sends(ws).some((frame) => (frame.headers as Record<string, unknown>)?.['x-spoof-user-email'])).toBe(false);
+    expect(sends(ws)).toContainEqual({
+      action: 'authenticate',
+      headers: { authorization: 'Bearer tok' },
+    });
+    expect(
+      sends(ws).some((frame) => (frame.headers as Record<string, unknown>)?.['x-spoof-user-email']),
+    ).toBe(false);
   });
 
   it('defers onReconnect until replayed subscriptions are acked', () => {
     let reconnected = 0;
-    const api = createApiWebsocket('ws://x', () => {
+    const api = createClient('ws://x', () => {
       reconnected++;
     });
     api.connect();
-    const ws = instances[0];
+    const ws = instances[0] as FakeWebSocket;
     open(ws);
 
     api.subscribe('ch1');
@@ -101,5 +179,759 @@ describe('createApiWebsocket', () => {
     expect(reconnected).toBe(0);
     receive(ws, { type: 'subscribed', channel: 'ch1' });
     expect(reconnected).toBe(1);
+  });
+
+  it('re-sends a subscribe the server dropped for load', async () => {
+    const api = createClient('ws://x', undefined, fastTiming);
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    api.subscribe('ch1');
+    ws.sent.length = 0;
+
+    receive(ws, {
+      type: 'error',
+      action: 'subscribe',
+      channel: 'ch1',
+      retryable: true,
+    } satisfies WSFrameErrorFrame);
+    await wait(20);
+
+    expect(sends(ws)).toEqual([{ action: 'subscribe', channel: 'ch1' }]);
+  });
+
+  it('re-sends an identity frame the server dropped for load, then replays grants under it', async () => {
+    const api = createClient('ws://x', undefined, fastTiming);
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    api.subscribe('ch1');
+    api.authenticate('tok');
+    ws.sent.length = 0;
+
+    receive(ws, {
+      type: 'error',
+      action: 'authenticate',
+      retryable: true,
+    } satisfies WSFrameErrorFrame);
+    await wait(20);
+
+    expect(sends(ws)[0]).toEqual({
+      action: 'authenticate',
+      headers: { authorization: 'Bearer tok' },
+    });
+    expect(sends(ws)).toContainEqual({ action: 'subscribe', channel: 'ch1' });
+  });
+
+  it('leaves no frame-error retry pending after disconnect', () => {
+    const api = createClient('ws://x', undefined, fastTiming);
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    api.subscribe('ch1');
+
+    const live = new Set<unknown>();
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    const setSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((
+      callback: () => void,
+      ms?: number,
+    ) => {
+      const id = realSetTimeout(() => {
+        live.delete(id);
+        callback();
+      }, ms);
+      live.add(id);
+      return id;
+    }) as never);
+    const clearSpy = spyOn(globalThis, 'clearTimeout').mockImplementation(((
+      id: ReturnType<typeof setTimeout>,
+    ) => {
+      live.delete(id);
+      realClearTimeout(id);
+    }) as never);
+
+    try {
+      for (const frame of [
+        { action: 'authenticate' },
+        { action: 'subscribe', channel: 'ch1' },
+        { action: 'unsubscribe', channel: 'ch2' },
+        { action: 'close', stream: 'gone' },
+      ])
+        receive(ws, { type: 'error', retryable: true, ...frame });
+      expect(live.size).toBe(4);
+
+      api.disconnect();
+      expect(live.size).toBe(0);
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
+  });
+
+  it('does not report a reconnect when the socket closes before the replayed subscriptions are acked', async () => {
+    let reconnected = 0;
+    const api = createClient(
+      'ws://x',
+      () => {
+        reconnected++;
+      },
+      { reconnectAckTimeoutMs: 5 },
+    );
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    api.subscribe('ch1');
+    open(ws);
+
+    ws.close();
+    await wait(20);
+
+    expect(reconnected).toBe(0);
+  });
+
+  describe('data streams', () => {
+    const stream = 'organizationReadManyContacts:id:org-1';
+    let client: QueryClient;
+    beforeEach(() => {
+      client = new QueryClient();
+      queryClient = client;
+    });
+
+    const connected = (timing: Partial<ApiWebsocketTiming> = fastTiming) => {
+      const api = createClient('ws://x', undefined, timing);
+      api.connect();
+      const ws = instances[0] as FakeWebSocket;
+      open(ws);
+      return { api, ws };
+    };
+
+    const observe = () =>
+      new QueryObserver(client, {
+        queryKey: dataStreamQueryKey(stream),
+        queryFn: skipToken,
+      }).subscribe(() => {});
+
+    const snapshotFrame = {
+      category: 'data',
+      action: 'snapshot',
+      stream,
+      seq: 1,
+      payload: { data: [] },
+    };
+
+    it('opens once per stream across holders and closes when the last holder releases it', async () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      api.open(stream);
+      api.close(stream);
+      await settled();
+      expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+      expect(sends(ws).some((frame) => frame.action === 'close')).toBe(false);
+
+      api.close(stream);
+      await settled();
+      expect(sends(ws).at(-1)).toEqual({ action: 'close', stream });
+    });
+
+    it('sends nothing for streams opened and released within the settle window', async () => {
+      const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
+      const names = Array.from(
+        { length: 130 },
+        (_, i) => `organizationReadManyContacts:id:org-${i}`,
+      );
+      for (const name of names) {
+        api.open(name);
+        api.close(name);
+      }
+      await wait(30);
+
+      expect(
+        sends(ws).filter((frame) => frame.action === 'open' || frame.action === 'close'),
+      ).toEqual([]);
+    });
+
+    it('re-opens a stream re-held inside the settle window after the server rejected its open', async () => {
+      const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
+      api.open(stream);
+      await wait(30);
+      api.close(stream);
+      receive(ws, { type: 'openRejected', stream } satisfies WSStreamAckFrame);
+      api.open(stream);
+      await wait(30);
+
+      expect(opensOf(ws)).toHaveLength(2);
+    });
+
+    it('re-opens a stream re-held inside the settle window after a retryable open error', async () => {
+      const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
+      api.open(stream);
+      await wait(30);
+      api.close(stream);
+      receive(ws, {
+        type: 'error',
+        action: 'open',
+        stream,
+        retryable: true,
+      } satisfies WSFrameErrorFrame);
+      api.open(stream);
+      await wait(30);
+
+      expect(opensOf(ws)).toHaveLength(2);
+    });
+
+    it('keeps a pending retry through a release and re-hold inside the settle window', async () => {
+      const { api, ws } = connected({
+        ...fastTiming,
+        streamSettleMs: 5,
+        retryBaseMs: 40,
+        retryMaxMs: 40,
+        openAckTimeoutMs: 10_000,
+      });
+      api.open(stream);
+      await wait(10);
+      receive(ws, { type: 'opened', stream });
+      receive(ws, {
+        type: 'error',
+        action: 'open',
+        stream,
+        retryable: true,
+      } satisfies WSFrameErrorFrame);
+      api.close(stream);
+      api.open(stream);
+      await wait(80);
+
+      expect(opensOf(ws)).toHaveLength(2);
+    });
+
+    it('re-opens after an ack timeout even when the stream is re-held during the retry backoff', async () => {
+      const { api, ws } = connected({
+        ...fastTiming,
+        streamSettleMs: 5,
+        openAckTimeoutMs: 20,
+        retryBaseMs: 40,
+        retryMaxMs: 40,
+      });
+      api.open(stream);
+      await wait(30);
+      api.close(stream);
+      api.open(stream);
+      await wait(80);
+
+      expect(opensOf(ws).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('keeps a stream open across a release and re-hold within the settle window', async () => {
+      const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
+      api.open(stream);
+      await wait(30);
+      receive(ws, { type: 'opened', stream });
+      api.close(stream);
+      api.open(stream);
+      receive(ws, snapshotFrame);
+      await wait(30);
+
+      expect(opensOf(ws)).toHaveLength(1);
+      expect(sends(ws).some((frame) => frame.action === 'close')).toBe(false);
+      expect(client.getQueryData<unknown>(dataStreamQueryKey(stream))).toEqual({ data: [] });
+    });
+
+    it('re-opens held streams after identity on reconnect, for a fresh snapshot', () => {
+      const { api, ws } = connected();
+      api.authenticate('tok');
+      api.open(stream);
+      ws.sent.length = 0;
+      open(ws);
+
+      expect(sends(ws)).toEqual([
+        { action: 'authenticate', headers: { authorization: 'Bearer tok' } },
+        { action: 'open', stream },
+      ]);
+    });
+
+    it('replays identity, then subscribes, then opens', () => {
+      const { api, ws } = connected();
+      api.authenticate('tok');
+      api.open(stream);
+      api.subscribe('ch1');
+      ws.sent.length = 0;
+      open(ws);
+
+      expect(sends(ws).map((frame) => frame.action)).toEqual(['authenticate', 'subscribe', 'open']);
+    });
+
+    it('re-opens held streams on an identity change so they are re-authorized', () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      ws.sent.length = 0;
+      api.logout();
+
+      expect(sends(ws)).toEqual([{ action: 'logout' }, { action: 'open', stream }]);
+    });
+
+    it('drops a rejected stream from replay and wipes its data', async () => {
+      const unobserve = observe();
+      const { api, ws } = connected();
+      api.open(stream);
+      await settled();
+      receive(ws, { type: 'opened', stream } satisfies WSStreamAckFrame);
+      receive(ws, snapshotFrame);
+
+      receive(ws, { type: 'openRejected', stream } satisfies WSStreamAckFrame);
+      const state = client.getQueryState(dataStreamQueryKey(stream));
+      expect(state?.status).toBe('error');
+      expect(state?.data).toBeUndefined();
+
+      ws.sent.length = 0;
+      open(ws);
+      expect(opensOf(ws)).toEqual([]);
+      unobserve();
+    });
+
+    it('ignores data frames for a stream it no longer holds', () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      api.close(stream);
+
+      receive(ws, snapshotFrame);
+
+      expect(client.getQueryData<unknown>(dataStreamQueryKey(stream))).toBeUndefined();
+    });
+
+    it('routes a data frame by category, even when its action type collides with a control frame', () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      receive(ws, { type: 'opened', stream });
+      receive(ws, {
+        category: 'data',
+        action: 'append',
+        stream,
+        type: 'openRejected',
+        payload: {},
+      });
+
+      ws.sent.length = 0;
+      open(ws);
+      expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+    });
+
+    it('routes a held stream snapshot into its query', async () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      await settled();
+
+      receive(ws, snapshotFrame);
+
+      expect(client.getQueryData<unknown>(dataStreamQueryKey(stream))).toEqual({ data: [] });
+    });
+
+    it('never sends an open ahead of the identity frame on a connection that is not yet open', () => {
+      const api = createClient('ws://x', undefined, fastTiming);
+      api.connect();
+      const ws = instances[0] as FakeWebSocket;
+      api.authenticate('tok');
+      api.open(stream);
+      open(ws);
+
+      const actions = sends(ws).map((frame) => frame.action);
+      expect(actions.filter((action) => action === 'open')).toHaveLength(1);
+      expect(actions.indexOf('authenticate')).toBeLessThan(actions.indexOf('open'));
+    });
+
+    it('ignores a rejection answering an open that a later open superseded', async () => {
+      const unobserve = observe();
+      const { api, ws } = connected();
+      api.open(stream);
+      await settled();
+      api.authenticate('tok');
+
+      receive(ws, { type: 'openRejected', stream });
+      receive(ws, { type: 'opened', stream });
+      receive(ws, snapshotFrame);
+
+      expect(client.getQueryState(dataStreamQueryKey(stream))?.status).toBe('success');
+      unobserve();
+    });
+
+    it('keeps its holder count across a rejection, and a new holder retries the open', async () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      api.open(stream);
+      await settled();
+      receive(ws, { type: 'openRejected', stream });
+
+      api.open(stream);
+      api.close(stream);
+      await settled();
+
+      expect(opensOf(ws)).toHaveLength(2);
+      expect(sends(ws).some((frame) => frame.action === 'close')).toBe(false);
+    });
+
+    it('retries a retryable open error with backoff on the same connection, keeping the last snapshot', async () => {
+      const unobserve = observe();
+      const { api, ws } = connected();
+      api.open(stream);
+      await settled();
+      receive(ws, { type: 'opened', stream });
+      receive(ws, snapshotFrame);
+      ws.sent.length = 0;
+
+      receive(ws, {
+        type: 'error',
+        action: 'open',
+        stream,
+        retryable: true,
+      } satisfies WSFrameErrorFrame);
+      const state = client.getQueryState(dataStreamQueryKey(stream));
+      expect(state?.status).toBe('error');
+      expect(state?.data).toEqual({ data: [] });
+
+      await wait(15);
+      expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+      unobserve();
+    });
+
+    it('doubles the retry delay on each consecutive retryable failure and resets once opened', async () => {
+      const random = spyOn(Math, 'random').mockReturnValue(1);
+      try {
+        const { api, ws } = connected({
+          ...fastTiming,
+          retryBaseMs: 20,
+          retryMaxMs: 1_000,
+          openAckTimeoutMs: 10_000,
+        });
+        api.open(stream);
+        await settled();
+        const fail = () => receive(ws, { type: 'error', action: 'open', stream, retryable: true });
+
+        fail();
+        await wait(25);
+        expect(opensOf(ws)).toHaveLength(2);
+
+        fail();
+        await wait(25);
+        expect(opensOf(ws)).toHaveLength(2);
+        await wait(25);
+        expect(opensOf(ws)).toHaveLength(3);
+
+        receive(ws, { type: 'opened', stream });
+        fail();
+        await wait(25);
+        expect(opensOf(ws)).toHaveLength(4);
+      } finally {
+        random.mockRestore();
+      }
+    });
+
+    it('treats an unanswered open as failed after the ack timeout and retries it', async () => {
+      const unobserve = observe();
+      const { api, ws } = connected();
+      api.open(stream);
+
+      await wait(35);
+      expect(client.getQueryState(dataStreamQueryKey(stream))?.status).toBe('error');
+      await wait(25);
+      expect(opensOf(ws).length).toBeGreaterThanOrEqual(2);
+      unobserve();
+    });
+
+    it('closes a stream the server stops authorizing mid-stream', async () => {
+      const unobserve = observe();
+      const { api, ws } = connected();
+      api.open(stream);
+      await settled();
+      receive(ws, { type: 'opened', stream });
+      receive(ws, snapshotFrame);
+
+      receive(ws, { type: 'openRejected', stream });
+
+      expect(client.getQueryState(dataStreamQueryKey(stream))?.data).toBeUndefined();
+      receive(ws, snapshotFrame);
+      expect(client.getQueryState(dataStreamQueryKey(stream))?.data).toBeUndefined();
+      unobserve();
+    });
+
+    it('replays identity, then subscribes, then opens on reconnect', () => {
+      const { api, ws } = connected();
+      const names = Array.from({ length: 3 }, (_, i) => `organizationReadManyContacts:id:org-${i}`);
+      for (const name of names) api.open(name);
+      for (let i = 0; i < 3; i++) api.subscribe(`ch${i}`);
+      ws.sent.length = 0;
+      open(ws);
+
+      expect(sends(ws).filter((frame) => frame.action === 'subscribe')).toHaveLength(3);
+      expect(opensOf(ws)).toHaveLength(3);
+      const actions = sends(ws).map((frame) => frame.action);
+      expect(actions.indexOf('open')).toBeGreaterThan(actions.lastIndexOf('subscribe'));
+    });
+
+    it('resync re-opens a live stream once, and never a rejected one', async () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      await settled();
+      receive(ws, { type: 'opened', stream });
+      ws.sent.length = 0;
+
+      api.resync(stream);
+      api.resync(stream);
+      expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+
+      receive(ws, { type: 'openRejected', stream });
+      ws.sent.length = 0;
+      api.resync(stream);
+      expect(opensOf(ws)).toEqual([]);
+    });
+
+    describe('sequence numbers', () => {
+      const row = (id: string, version = 1) => ({
+        id,
+        updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, version)).toISOString(),
+      });
+      const snapshot = (seq: number, ids: string[]) => ({
+        category: 'data',
+        action: 'snapshot',
+        stream,
+        seq,
+        payload: { data: ids.map((id) => row(id)) },
+      });
+      const upsert = (seq: number, id: string) => ({
+        category: 'data',
+        action: 'append',
+        stream,
+        seq,
+        type: 'upsert',
+        payload: row(id),
+      });
+      const remove = (seq: number, id: string) => ({
+        category: 'data',
+        action: 'append',
+        stream,
+        seq,
+        type: 'remove',
+        payload: { id },
+      });
+      const ids = () =>
+        client
+          .getQueryData<{ data: Array<{ id: string }> }>(dataStreamQueryKey(stream))
+          ?.data.map(({ id }) => id);
+
+      let consoleError: ReturnType<typeof spyOn>;
+      beforeEach(() => {
+        consoleError = spyOn(console, 'error').mockImplementation(() => {});
+      });
+      afterEach(() => consoleError.mockRestore());
+
+      const opened = async () => {
+        const { api, ws } = connected();
+        api.open(stream);
+        await settled();
+        receive(ws, { type: 'opened', stream });
+        ws.sent.length = 0;
+        return { api, ws };
+      };
+
+      it('applies the next seq and ignores an append the snapshot already holds', async () => {
+        const { ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+
+        receive(ws, upsert(9, 'held-before-snapshot'));
+        receive(ws, upsert(10, 'held-at-snapshot'));
+        receive(ws, upsert(11, 'b'));
+        receive(ws, upsert(11, 'b-duplicate'));
+
+        expect(ids()).toEqual(['b', 'a']);
+        expect(opensOf(ws)).toEqual([]);
+      });
+
+      it('a dropped append makes the client resync, and the new snapshot converges', async () => {
+        const { ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        receive(ws, upsert(11, 'b'));
+
+        receive(ws, remove(13, 'a'));
+
+        expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+        expect(ids()).toEqual(['b', 'a']);
+
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(13, ['c', 'b']));
+        receive(ws, upsert(14, 'd'));
+
+        expect(ids()).toEqual(['d', 'c', 'b']);
+      });
+
+      it('ignores appends between a gap and the resync snapshot, and stale ones after it', async () => {
+        const { ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        receive(ws, upsert(12, 'gap'));
+
+        receive(ws, upsert(13, 'before-resync-snapshot'));
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(14, ['x', 'a']));
+        receive(ws, upsert(14, 'stale-after-resync'));
+        receive(ws, upsert(13, 'older-still'));
+
+        expect(ids()).toEqual(['x', 'a']);
+        expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+
+        receive(ws, upsert(15, 'y'));
+        expect(ids()).toEqual(['y', 'x', 'a']);
+      });
+
+      it('a gap while an open is already in flight waits for that open instead of sending another', async () => {
+        const { api, ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        api.authenticate('tok');
+        expect(opensOf(ws)).toHaveLength(1);
+
+        receive(ws, upsert(12, 'gap'));
+        expect(opensOf(ws)).toHaveLength(1);
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(12, ['gap', 'a']));
+        expect(ids()).toEqual(['gap', 'a']);
+      });
+
+      it('a gap that lands while the stream is released and re-held still resyncs', async () => {
+        const { api, ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        api.close(stream);
+        receive(ws, upsert(12, 'gap'));
+        api.open(stream);
+        await settled();
+
+        expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(12, ['gap', 'a']));
+        receive(ws, upsert(13, 'b'));
+        expect(ids()).toEqual(['gap', 'b', 'a']);
+      });
+
+      it('a server resync re-opens at once and keeps the data, without failing the stream', async () => {
+        const { ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+
+        receive(ws, { type: 'resync', stream });
+        receive(ws, upsert(11, 'before-resync-snapshot'));
+
+        expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+        expect(client.getQueryState(dataStreamQueryKey(stream))?.status).toBe('success');
+        expect(ids()).toEqual(['a']);
+
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(20, ['b', 'a']));
+        receive(ws, upsert(21, 'c'));
+        expect(ids()).toEqual(['c', 'b', 'a']);
+      });
+
+      it('a server resync while an open is in flight waits for that open, whose answer still counts', async () => {
+        const { api, ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        api.authenticate('tok');
+        expect(opensOf(ws)).toHaveLength(1);
+
+        receive(ws, { type: 'resync', stream });
+        expect(opensOf(ws)).toHaveLength(1);
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(30, ['b', 'a']));
+        expect(ids()).toEqual(['b', 'a']);
+        expect(client.getQueryState(dataStreamQueryKey(stream))?.status).toBe('success');
+      });
+
+      it('after a server-side close (dropped frame), the reconnect snapshot restores state', async () => {
+        const { api, ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        receive(ws, upsert(11, 'b'));
+
+        ws.close();
+        api.connect();
+        const reconnected = instances.at(-1) as FakeWebSocket;
+        expect(reconnected).not.toBe(ws);
+        open(reconnected);
+        expect(opensOf(reconnected)).toEqual([{ action: 'open', stream }]);
+
+        receive(reconnected, upsert(12, 'before-snapshot'));
+        receive(reconnected, { type: 'opened', stream });
+        receive(reconnected, snapshot(12, ['c', 'b', 'a']));
+        receive(reconnected, remove(13, 'a'));
+
+        expect(ids()).toEqual(['c', 'b']);
+      });
+    });
+  });
+
+  describe('adversarial review', () => {
+    const stream = 'organizationReadManyContacts:id:org-1';
+    beforeEach(() => {
+      queryClient = new QueryClient();
+    });
+
+    const connected = (timing: Partial<ApiWebsocketTiming> = fastTiming) => {
+      const api = createClient('ws://x', undefined, timing);
+      api.connect();
+      const ws = instances[0] as FakeWebSocket;
+      open(ws);
+      return { api, ws };
+    };
+
+    it('re-sends a close the server dropped for load while the stream stays released', async () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      await settled();
+      receive(ws, { type: 'opened', stream });
+      api.close(stream);
+      await settled();
+      ws.sent.length = 0;
+
+      receive(ws, {
+        type: 'error',
+        action: 'close',
+        stream,
+        retryable: true,
+      } satisfies WSFrameErrorFrame);
+      await wait(20);
+
+      expect(sends(ws)).toEqual([{ action: 'close', stream }]);
+    });
+
+    it('re-sends an unsubscribe the server dropped for load', async () => {
+      const { api, ws } = connected();
+      api.subscribe('ch1');
+      receive(ws, { type: 'subscribed', channel: 'ch1' });
+      api.unsubscribe('ch1');
+      ws.sent.length = 0;
+
+      receive(ws, {
+        type: 'error',
+        action: 'unsubscribe',
+        channel: 'ch1',
+        retryable: true,
+      } satisfies WSFrameErrorFrame);
+      await wait(20);
+
+      expect(sends(ws)).toEqual([{ action: 'unsubscribe', channel: 'ch1' }]);
+    });
+
+    it('backs off identity re-sends after repeated load drops', async () => {
+      const random = spyOn(Math, 'random').mockReturnValue(1);
+      try {
+        const { api, ws } = connected({ ...fastTiming, retryBaseMs: 20, retryMaxMs: 1_000 });
+        api.authenticate('tok');
+        const drop = () => receive(ws, { type: 'error', action: 'authenticate', retryable: true });
+        const identities = () =>
+          sends(ws).filter((frame) => frame.action === 'authenticate').length;
+
+        drop();
+        await wait(25);
+        expect(identities()).toBe(2);
+        drop();
+        await wait(25);
+        expect(identities()).toBe(2);
+        await wait(25);
+        expect(identities()).toBe(3);
+      } finally {
+        random.mockRestore();
+      }
+    });
   });
 });

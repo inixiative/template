@@ -26,7 +26,10 @@ export const CONTACT_CREATE_IMMUTABLE_FIELDS = [
 // Update-only addition: `type` drives valueKey/registry parsing — flipping
 // it after create silently breaks (ownerModel, ..., type, valueKey)
 // uniqueness and would re-derive valueKey under a different schema.
-export const CONTACT_UPDATE_IMMUTABLE_FIELDS = ['type', ...CONTACT_CREATE_IMMUTABLE_FIELDS] as const;
+export const CONTACT_UPDATE_IMMUTABLE_FIELDS = [
+  'type',
+  ...CONTACT_CREATE_IMMUTABLE_FIELDS,
+] as const;
 
 // Server-authored / hook-computed / route-injected fields are omitted.
 // `permissionRules` is replaced with a validated schema picked from the
@@ -43,6 +46,9 @@ export const contactCreateBodySchema = ContactScalarInputSchema.omit({
   permissionRules: true,
   acceptedKinds: true,
 }).extend({
+  value: z
+    .unknown()
+    .describe('Shape depends on `type`; see GET /api/v1/contact/info (`types.<type>.input`).'),
   permissionRules: buildPermissionRulesSchema('contact', ['read']),
   // Optional override of the DB default ['platform', 'activity']; otherwise applied at insert.
   acceptedKinds: z.array(CommunicationKindSchema).optional(),

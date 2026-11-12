@@ -1,0 +1,1 @@
+docs/claude/BAD.md	name	ghostFixed

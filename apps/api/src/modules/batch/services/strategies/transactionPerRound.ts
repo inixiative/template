@@ -5,10 +5,14 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { refreshBatchContext, registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';
+import {
+  refreshBatchContext,
+  registerBatch,
+  unregisterBatch,
+} from '#/modules/batch/services/batchRegistry';
 import { interpolateRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
-import type { StrategyExecutor } from '#/modules/batch/services/strategies/types';
+import type { RequestResult, StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
 export const transactionPerRound: StrategyExecutor = async (
   app,
@@ -18,8 +22,7 @@ export const transactionPerRound: StrategyExecutor = async (
   baseContext,
   timeout,
 ) => {
-  // biome-ignore lint/suspicious/noExplicitAny: batch results are heterogeneous — each request returns a different shape
-  const results: any[][] = [];
+  const results: RequestResult[][] = [];
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
   const timeoutPerRound = Math.ceil(timeout / rounds.length);
   let completedRounds = 0;
@@ -32,13 +35,30 @@ export const transactionPerRound: StrategyExecutor = async (
 
       const roundResult = await db.txn(
         async () => {
-          const batchId = crypto.randomUUID();
-          registerBatch(batchId, db, baseContext);
+          const batchId = Bun.randomUUIDv7();
+          registerBatch(batchId, baseContext);
 
           try {
-            const roundPromises = round.map(async (request) => {
-              const interpolatedRequest = interpolateRequest(request, { results, currentRound: roundIndex });
-              return await executeRequest(app, interpolatedRequest, batchId, sharedHeaders, baseRequest);
+            const roundPromises = round.map(async (request): Promise<RequestResult> => {
+              try {
+                const interpolatedRequest = interpolateRequest(request, {
+                  results,
+                  currentRound: roundIndex,
+                });
+                return await executeRequest(
+                  app,
+                  interpolatedRequest,
+                  batchId,
+                  sharedHeaders,
+                  baseRequest,
+                );
+              } catch (error) {
+                return {
+                  status: 500,
+                  body: null,
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                };
+              }
             });
 
             const roundResults = await Promise.all(roundPromises);
@@ -63,8 +83,8 @@ export const transactionPerRound: StrategyExecutor = async (
       completedRounds++;
 
       if (roundIndex < rounds.length - 1) {
-        const batchId = crypto.randomUUID();
-        registerBatch(batchId, db, baseContext);
+        const batchId = Bun.randomUUIDv7();
+        registerBatch(batchId, baseContext);
         await refreshBatchContext(batchId);
         unregisterBatch(batchId);
       }

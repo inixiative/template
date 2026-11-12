@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
@@ -22,14 +22,17 @@ describe('PATCH /api/v1/organization/:id', () => {
   let org: Organization;
   let orgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
     const { entity: o } = await createOrganization();
     org = o;
 
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'admin' },
+      { user, organization: org },
+    );
     orgUser = ou;
 
     const harness = createTestApp({
@@ -41,7 +44,7 @@ describe('PATCH /api/v1/organization/:id', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -57,7 +60,9 @@ describe('PATCH /api/v1/organization/:id', () => {
     const seq = getNextSeq();
     await createOrganization({ slug: `taken-slug-${seq}` });
 
-    const response = await fetch(patch(`/api/v1/organization/${org.id}`, { slug: `taken-slug-${seq}` }));
+    const response = await fetch(
+      patch(`/api/v1/organization/${org.id}`, { slug: `taken-slug-${seq}` }),
+    );
     const body = await jsonError(response);
 
     expect(response.status).toBe(409);

@@ -18,7 +18,6 @@ kanban
     INFRA-018-lens-builder
     INFRA-012-typed-prisma-results
     INFRA-021-jobs-overflow-buffer
-    INFRA-031-jobs-lane-and-lock-port-from-zealot
     DEV-004-prisma-map-doc-comment-tags
     FEAT-002-notes-system
     FEAT-003-feature-flags
@@ -29,6 +28,7 @@ kanban
     FEAT-011-dates-timezones
     COMM-001-email-system
     FEAT-008-permissions-builder
+    API-004-route-exposure-tags
   In Progress
     INFRA-027-rate-limiter-atomicity-fail-open-scopes
     INFRA-029-preset-facet-knobs
@@ -41,6 +41,9 @@ kanban
     INFRA-030-reference-registry
     FEAT-021-segments
   Done
+    DB-006-compiled-wheres-compose-through-the-fold
+    DB-003-endpoint-decides-soft-delete-visibility
+    INFRA-031-jobs-lane-and-lock-port-from-zealot
     DEV-003-code-annotations-and-sitemap
     FE-002-navigation-refactoring
     FEAT-001-inquiry-system
@@ -56,6 +59,7 @@ kanban
 **Infrastructure:**
 - [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (rules-builder repo)
 - [INFRA-012: Typed Prisma Results](./INFRA-012-typed-prisma-results-with-zod-json-registry.md) - Branded IDs + zod JSON typing via Prisma `$extends`
+- [API-004: Route exposure tags](./API-004-route-exposure-tags.md) - Which surfaces (WebSocket, MCP) may reach a route, and whether its result is per-caller: route tags vs per-surface registries
 - [INFRA-021: Jobs Overflow Buffer](./INFRA-021-jobs-overflow-buffer.md) ⭐ - Durable outbox in front of BullMQ at the `enqueueJob` chokepoint; bounds Redis depth on fan-outs (createLock singleton refactor landed)
 
 **Rules / Lens Platform** (json-rules + rules-builder):
@@ -102,6 +106,9 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 - [FEAT-021: Segments](./FEAT-021-segments.md) - Zealot's Groups ported onto CustomerRef, stacked on INFRA-030: owner = `ProviderModel`, every segment is a rule (static = computed at save, dynamic = continuous, hand-picked = `id in [...]`), lens-driven validation + set/entity reconcile jobs through `withRule` (degraded, not paused; `ruleIssues` on the owner's reads), Segment → Segment edges, business-event triggers handled by jobs, four membership events (owner + member side), read-many pair on me/user/organization/space, nested Owned/Memberships pages in all three contexts
 
 ### ✅ Done
+- [DB-006: A rule that matches nobody matches nobody wherever it is composed](./DB-006-compiled-wheres-compose-through-the-fold.md) - compiled wheres compose through json-rules' `andWhere` / `orWhere`; a segment whose rule matched nobody had admitted every customer (Zealot ZLT-5489)
+- [DB-003: The endpoint decides soft-delete visibility](./DB-003-endpoint-decides-soft-delete-visibility.md) - Declared superadmin endpoints (the admin router) run unscoped; every other endpoint is live-scoped for every actor, superadmin included (ZLT-5486)
+- [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) - createLock refresh hardening (#104), slow lane as lowest priority + per-worker slot share + per-lane depth budget (matches Zealot #2438), row-state delivery claim
 - [DEV-003: Code Annotations & Sitemap](./archived/DEV-003-code-annotations-and-sitemap.md) - atlas code-map (`@atlas` + `MAP.md`) shipped (#50)
 - [FEAT-001: Inquiry System](./archived/FEAT-001-inquiry-system.md) - Generic workflow engine for multi-party approval flows
 - [FE-002: Navigation Refactoring](./archived/FE-002-navigation-refactoring.md) - Context preservation and navigation cleanup
@@ -110,10 +117,10 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 
 ## Quick Stats
 
-- **Total Tickets**: 19
-- **Todo**: 13
+- **Total Tickets**: 21
+- **Todo**: 14
 - **In Progress**: 6
-- **Review**: 1
+- **Review**: 2
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 3
 
@@ -137,5 +144,4 @@ FEAT-021 (Segments, PR #105)
 
 ---
 
-_Last Updated: 2026-08-31_
-_Last Updated: 2026-09-09_
+_Last Updated: 2026-10-10_

@@ -1,10 +1,21 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  PlatformRole,
+} from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createInquiry,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { WS_CHANNELS } from '@template/shared/ws';
 import { websocketHandler } from '#/ws/handler';
-import { byChannel, byId, byUser, clearRegistry } from '#/ws/registry';
+import { meChannel } from '#/ws/meChannel';
+import { byChannel, byId, clearRegistry } from '#/ws/registry';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
@@ -66,6 +77,23 @@ describe('websocketHandler', () => {
     expect(lastFrame(sent)).toEqual({ type: 'subscribed', channel });
   });
 
+  it("a /me channel is filed under the subscriber's user and confirmed by its own name", async () => {
+    const { entity: user } = await createUser();
+    const { authorization } = await createBearerToken(user);
+    const channel = WS_CHANNELS.meReadManySegmentMemberships.name();
+
+    const { socket, sent } = createTestSocket({
+      connectionId: 'c1',
+      userId: user.id,
+      headers: { authorization },
+    });
+    websocketHandler.open(socket);
+    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
+    expect([...(byChannel.get(meChannel(channel, user.id)) ?? [])]).toEqual(['c1']);
+    expect(byChannel.has(channel)).toBe(false);
+    expect(lastFrame(sent)).toEqual({ type: 'subscribed', channel });
+  });
+
   it('rejects a subscribe from a connection without a credential', async () => {
     const inquiry = await createTestInquiry();
     const channel = WS_CHANNELS.inquiryRead.name(inquiry.id);
@@ -80,7 +108,10 @@ describe('websocketHandler', () => {
   it('rejects a subscribe to a channel outside the registry', async () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: 'nope:id:x' }));
+    await websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'subscribe', channel: 'nope:id:x' }),
+    );
     expect(byChannel.has('nope:id:x')).toBe(false);
     expect(lastFrame(sent)).toEqual({ type: 'subscribeRejected', channel: 'nope:id:x' });
   });
@@ -89,7 +120,10 @@ describe('websocketHandler', () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
     subscribeToChannel(socket, 'ch1');
-    await websocketHandler.message(socket, JSON.stringify({ action: 'unsubscribe', channel: 'ch1' }));
+    await websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'unsubscribe', channel: 'ch1' }),
+    );
     expect(byChannel.has('ch1')).toBe(false);
     expect(lastFrame(sent)).toEqual({ type: 'unsubscribed', channel: 'ch1' });
   });
@@ -102,14 +136,28 @@ describe('websocketHandler', () => {
     expect(lastFrame(sent)).toEqual({ type: 'pong' });
   });
 
-  it('authenticate resolves identity as provenance of the credential (/me)', async () => {
+  it('answers ping even while the connection queue is blocked', async () => {
+    const { socket, sent } = createTestSocket({ connectionId: 'c1' });
+    websocketHandler.open(socket);
+    void socket.data.queue.run(() => new Promise<void>(() => {}));
+
+    await websocketHandler.message(socket, JSON.stringify({ action: 'ping' }));
+
+    expect(lastFrame(sent)).toEqual({ type: 'pong' });
+  });
+
+  it("authenticate keeps a user's token as its credential, acting for its user (/identify)", async () => {
     const { entity: user } = await createUser();
     const { authorization } = await createBearerToken(user);
 
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', headers: { authorization } }));
+    await websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'authenticate', headers: { authorization } }),
+    );
     expect(socket.data.userId).toBe(user.id);
+    expect(socket.data.headers.authorization).toBe(authorization);
     expect(lastFrame(sent)).toEqual({ type: 'identity', userId: user.id });
   });
 
@@ -164,7 +212,6 @@ describe('websocketHandler', () => {
     await pending;
 
     expect(byId.has('c1')).toBe(false);
-    expect(byUser.has(user.id)).toBe(false);
   });
 
   it('a subscribe resolving after close does not re-index the dead connection', async () => {
@@ -174,7 +221,10 @@ describe('websocketHandler', () => {
 
     const { socket } = createTestSocket({ connectionId: 'c1', headers: { authorization } });
     websocketHandler.open(socket);
-    const pending = websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
+    const pending = websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'subscribe', channel }),
+    );
     websocketHandler.close(socket);
     await pending;
 

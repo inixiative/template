@@ -16,21 +16,25 @@ export const telemetryExtension = Prisma.defineExtension({
         'db.operation.name': operation,
         'db.collection.name': model ?? 'raw',
       };
-      return withSpan(`${model ?? 'db'}.${operation}`, { kind: SpanKind.CLIENT, attributes }, async () => {
-        const start = performance.now();
-        let outcome = 'success';
-        try {
-          return await query(args);
-        } catch (error) {
-          outcome = 'error';
-          throw error;
-        } finally {
-          recordDuration('db.client.operation.duration', (performance.now() - start) / 1000, {
-            ...attributes,
-            outcome,
-          });
-        }
-      });
+      return withSpan(
+        `${model ?? 'db'}.${operation}`,
+        { kind: SpanKind.CLIENT, attributes },
+        async () => {
+          const start = performance.now();
+          let outcome = 'success';
+          try {
+            return await query(args);
+          } catch (error) {
+            outcome = 'error';
+            throw error;
+          } finally {
+            recordDuration('db.client.operation.duration', (performance.now() - start) / 1000, {
+              ...attributes,
+              outcome,
+            });
+          }
+        },
+      );
     },
   },
 });

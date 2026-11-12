@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { filterFields, isNoOpUpdate, NOOP_FIELDS, unionRegistries, WEBHOOK_NOOP_FIELDS } from '@template/db/registries';
+import {
+  filterFields,
+  isNoOpUpdate,
+  NOOP_FIELDS,
+  unionRegistries,
+  WEBHOOK_NOOP_FIELDS,
+} from '@template/db/registries';
 
 describe('NOOP_FIELDS', () => {
   it('includes global updatedAt and high-frequency tracking columns', () => {
@@ -17,7 +23,9 @@ describe('NOOP_FIELDS', () => {
     const before = { id: 'v1', position: 0, updatedAt: new Date(0) };
     const after = { id: 'v1', position: 1, updatedAt: new Date(1) };
     expect(isNoOpUpdate('FeatureFlagVariant', after, before, NOOP_FIELDS)).toBe(false);
-    expect(isNoOpUpdate('Contact', { id: 'c1', position: 1 }, { id: 'c1', position: 0 }, NOOP_FIELDS)).toBe(true);
+    expect(
+      isNoOpUpdate('Contact', { id: 'c1', position: 1 }, { id: 'c1', position: 0 }, NOOP_FIELDS),
+    ).toBe(true);
   });
 
   it('does NOT include encrypted columns — those belong to REDACT_FIELDS', () => {
@@ -75,7 +83,12 @@ describe('isNoOpUpdate', () => {
       lastUsedAt: new Date('2024-01-01'),
       updatedAt: new Date('2024-01-01'),
     };
-    const current = { id: '123', name: 'Token', lastUsedAt: new Date('2024-01-02'), updatedAt: new Date('2024-01-02') };
+    const current = {
+      id: '123',
+      name: 'Token',
+      lastUsedAt: new Date('2024-01-02'),
+      updatedAt: new Date('2024-01-02'),
+    };
     expect(isNoOpUpdate('Token', current, previous, NOOP_FIELDS)).toBe(true);
   });
 

@@ -6,15 +6,22 @@
  */
 import { channelKey } from '@template/shared/ws/channelKey';
 
-// Live queries, keyed by operationId and named by channelKey(queryKey). Authorization is the
-// route itself — the subscribe handler probes the operation with the connection's credential.
 export const WS_CHANNELS = {
   inquiryRead: {
-    type: 'query',
     name: (id: string) => channelKey({ _id: 'inquiryRead', path: { id } }),
   },
+  meReadManySegmentMemberships: {
+    name: () => channelKey({ _id: 'meReadManySegmentMemberships' }),
+    me: true,
+  },
+  organizationReadManySegmentMemberships: {
+    name: (id: string) =>
+      channelKey({ _id: 'organizationReadManySegmentMemberships', path: { id } }),
+  },
+  spaceReadManySegmentMemberships: {
+    name: (id: string) => channelKey({ _id: 'spaceReadManySegmentMemberships', path: { id } }),
+  },
   segmentReadManySegmentMembers: {
-    type: 'query',
     name: (id: string) => channelKey({ _id: 'segmentReadManySegmentMembers', path: { id } }),
   },
   meReadManyFeatureFlagValues: {

@@ -16,7 +16,7 @@ Or from this workspace:
 bun run dev
 ```
 
-Default local port: `3000`.
+Local port: the registry `web` port (`bunx @inixiative/config ports <project>`; template main checkout 3100, slot N adds 10 × N).
 
 ## Notes
 

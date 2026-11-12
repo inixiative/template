@@ -1,0 +1,267 @@
+#!/usr/bin/env bun
+/**
+ * Detector for the bearer-only-auth CI rule. Run from the repo (or fixture) root:
+ *   bun scripts/ci/rules/lib/bearerOnlyAuth.ts [--write-baseline]
+ *
+ * API auth is bearer-only and session-free: a person presents a JWT, a program an API token, in
+ * `Authorization: Bearer`. A cookie or a BetterAuth session never authenticates a request. Sessions
+ * exist only inside BetterAuth's own `/api/auth/*` handler for the sign-in handshake (OAuth state, the
+ * one-time-token handoff), and jwtHandoff swaps each for a JWT; that is library code, not ours. Each
+ * check is one entry in CHECKS, so the rule grows by adding one.
+ *
+ * Fails, in non-test source under apps/ and packages/, on:
+ * - `cookieCache` anywhere (BetterAuth's JWE cookie cache keeps a revoked session alive until it expires)
+ * - `credentials` set to `'include'` (also inside a conditional) and `withCredentials` (a client that
+ *   sends cookies to the API)
+ * - `document.cookie` (auth state lives in the bearer token, never a cookie)
+ * - any session lookup: a `getSession(...)` call, `findSession(...)`, or a read of the `session`
+ *   table (`<x>.session.find*` / `.count`); a person is resolved from a JWT, never a session
+ * - importing BetterAuth's `bearer` plugin (it accepts a session token as a bearer credential)
+ * - building a session credential: importing or re-exporting a session-cookie signer
+ *   (`makeSignature`, `setRequestCookie`, `setSessionCookie`, `serializeSignedCookie`,
+ *   `signCookieValue`, `createHMAC`) from better-auth, @better-auth/* or better-call, a namespace
+ *   import or re-export of a signer module, or any reference to `createSession` (property, string
+ *   element access, destructuring)
+ *
+ * - importing `withThrowawaySession` (import, re-export, dynamic `import()`, `require`) anywhere but
+ *   the callers named in THROWAWAY_SESSION_CALLERS; each new caller is a reviewed one-line addition
+ *
+ * Exemptions: none in exempt.txt. One named file may build a session credential:
+ * `withThrowawaySession` (THROWAWAY_SESSION_HELPER), which hands a short-lived session to a
+ * BetterAuth server call and deletes it.
+ */
+import ts from 'typescript';
+import { finishFence, isTestFile, lineAt, listFiles, readSource, type Violation } from './fence';
+
+type Found = { node: ts.Node; key: string; detail: string };
+type Check = (node: ts.Node, sourceFile: ts.SourceFile) => Found | null;
+
+const unquote = (text: string): string => text.replace(/^['"`]|['"`]$/g, '');
+
+const propertyName = (node: ts.Node, sourceFile: ts.SourceFile): string | null => {
+  if (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node))
+    return unquote(node.name.getText(sourceFile));
+  if (ts.isPropertyAccessExpression(node)) return node.name.text;
+  return null;
+};
+
+const containsString = (node: ts.Node, value: string): boolean =>
+  (ts.isStringLiteralLike(node) && node.text === value) ||
+  (ts.forEachChild(node, (child) => containsString(child, value) || undefined) ?? false);
+
+const SESSION_TABLE_READS = new Set([
+  'findUnique',
+  'findUniqueOrThrow',
+  'findFirst',
+  'findFirstOrThrow',
+  'findMany',
+  'count',
+]);
+
+const calledName = (node: ts.CallExpression): string | null => {
+  if (ts.isPropertyAccessExpression(node.expression)) return node.expression.name.text;
+  if (ts.isIdentifier(node.expression)) return node.expression.text;
+  return null;
+};
+
+const isSessionTableRead = (node: ts.CallExpression): boolean =>
+  ts.isPropertyAccessExpression(node.expression) &&
+  SESSION_TABLE_READS.has(node.expression.name.text) &&
+  ts.isPropertyAccessExpression(node.expression.expression) &&
+  node.expression.expression.name.text === 'session';
+
+const sessionLookup: Check = (node) => {
+  if (!ts.isCallExpression(node)) return null;
+  const name = calledName(node);
+  if (name !== 'getSession' && name !== 'findSession' && !isSessionTableRead(node)) return null;
+  return {
+    node,
+    key: `session-lookup: ${name}`,
+    detail:
+      'a session lookup outside the sign-in handshake; a person is resolved from a JWT (jwtAuthMiddleware)',
+  };
+};
+
+const bearerPluginImport: Check = (node) =>
+  ts.isImportDeclaration(node) &&
+  ts.isStringLiteral(node.moduleSpecifier) &&
+  node.moduleSpecifier.text.startsWith('better-auth') &&
+  node.importClause?.namedBindings &&
+  ts.isNamedImports(node.importClause.namedBindings) &&
+  node.importClause.namedBindings.elements.some(
+    (element) => (element.propertyName ?? element.name).text === 'bearer',
+  )
+    ? {
+        node,
+        key: 'better-auth bearer plugin',
+        detail:
+          "BetterAuth's bearer plugin turns a session token into a credential; persons send JWTs",
+      }
+    : null;
+
+const THROWAWAY_SESSION_HELPER = 'apps/api/src/lib/auth/withThrowawaySession.ts';
+
+const SESSION_CREDENTIAL_SOURCES = /^(@better-auth\/|better-auth(\/|$)|better-call(\/|$))/;
+const SESSION_CREDENTIAL_SIGNERS = new Set([
+  'makeSignature',
+  'setRequestCookie',
+  'setSessionCookie',
+  'serializeSignedCookie',
+  'signCookieValue',
+  'createHMAC',
+]);
+const SIGNER_MODULES = /^(better-auth\/(crypto|cookies)|better-call|@better-auth\/utils(\/.*)?)$/;
+
+const sessionCredential = (node: ts.Node, key: string): Found => ({
+  node,
+  key: `session-credential: ${key}`,
+  detail: `builds a BetterAuth session credential (${key}); only withThrowawaySession may (${THROWAWAY_SESSION_HELPER})`,
+});
+
+const moduleOf = (node: ts.ImportDeclaration | ts.ExportDeclaration): string | null =>
+  node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)
+    ? node.moduleSpecifier.text
+    : null;
+
+const namedSigner = (elements: ts.NodeArray<ts.ImportSpecifier | ts.ExportSpecifier>) =>
+  elements
+    .map((element) => (element.propertyName ?? element.name).text)
+    .find((name) => SESSION_CREDENTIAL_SIGNERS.has(name));
+
+const sessionCredentialBuild: Check = (node, sourceFile) => {
+  if (sourceFile.fileName === THROWAWAY_SESSION_HELPER) return null;
+  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+    const source = moduleOf(node);
+    if (!source || !SESSION_CREDENTIAL_SOURCES.test(source)) return null;
+    const bindings = ts.isImportDeclaration(node)
+      ? node.importClause?.namedBindings
+      : node.exportClause;
+    if (!bindings || ts.isNamespaceImport(bindings) || ts.isNamespaceExport(bindings))
+      return SIGNER_MODULES.test(source) ? sessionCredential(node, `* from ${source}`) : null;
+    const signer = namedSigner(bindings.elements);
+    return signer ? sessionCredential(node, signer) : null;
+  }
+  const createSessionReference =
+    (ts.isPropertyAccessExpression(node) && node.name.text === 'createSession') ||
+    (ts.isElementAccessExpression(node) &&
+      ts.isStringLiteralLike(node.argumentExpression) &&
+      node.argumentExpression.text === 'createSession') ||
+    (ts.isBindingElement(node) &&
+      unquote((node.propertyName ?? node.name).getText(sourceFile)) === 'createSession');
+  return createSessionReference ? sessionCredential(node, 'createSession') : null;
+};
+
+const THROWAWAY_SESSION_CALLERS = new Set([
+  'apps/api/src/modules/me/controllers/meChangePassword.ts',
+]);
+
+const isThrowawaySessionModule = (node: ts.Node | undefined): boolean =>
+  !!node &&
+  ts.isStringLiteralLike(node) &&
+  /(^|\/)withThrowawaySession(\.[cm]?[jt]sx?)?$/.test(node.text);
+
+const throwawaySessionImport: Check = (node, sourceFile) => {
+  if (THROWAWAY_SESSION_CALLERS.has(sourceFile.fileName)) return null;
+  const imports =
+    ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      isThrowawaySessionModule(node.moduleSpecifier)) ||
+    (ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
+      isThrowawaySessionModule(node.arguments[0]));
+  return imports
+    ? {
+        node,
+        key: 'throwaway-session-caller',
+        detail:
+          'imports withThrowawaySession outside THROWAWAY_SESSION_CALLERS; a new caller is added there, in review',
+      }
+    : null;
+};
+
+const CHECKS: Check[] = [
+  (node, sourceFile) =>
+    propertyName(node, sourceFile) === 'cookieCache'
+      ? {
+          node,
+          key: 'cookie-cache',
+          detail: 'BetterAuth cookieCache; sessions are resolved from Redis on every request',
+        }
+      : null,
+  (node, sourceFile) =>
+    ts.isPropertyAssignment(node) &&
+    propertyName(node, sourceFile) === 'credentials' &&
+    containsString(node.initializer, 'include')
+      ? {
+          node,
+          key: "credentials: 'include'",
+          detail: "credentials: 'include' sends cookies to the API; send Authorization: Bearer",
+        }
+      : null,
+  (node, sourceFile) =>
+    propertyName(node, sourceFile) === 'withCredentials'
+      ? {
+          node,
+          key: 'withCredentials',
+          detail: 'withCredentials sends cookies to the API; send Authorization: Bearer',
+        }
+      : null,
+  (node, sourceFile) =>
+    ts.isPropertyAccessExpression(node) &&
+    node.name.text === 'cookie' &&
+    node.expression.getText(sourceFile) === 'document'
+      ? {
+          node,
+          key: 'document.cookie',
+          detail: 'document.cookie; auth state is the bearer token, never a cookie',
+        }
+      : null,
+  sessionLookup,
+  bearerPluginImport,
+  sessionCredentialBuild,
+  throwawaySessionImport,
+];
+
+const violations: Violation[] = [];
+
+// Helpers under tests/ are not test files: they can carry the helper out to production code.
+const checksFor = (file: string): Check[] =>
+  /\.test\.[cm]?[jt]sx?$/.test(file) ? [] : isTestFile(file) ? [throwawaySessionImport] : CHECKS;
+
+for (const file of listFiles(['apps', 'packages'], /\.[cm]?[jt]sx?$/)) {
+  const checks = checksFor(file);
+  if (!checks.length) continue;
+  const source = readSource(file);
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const visit = (node: ts.Node) => {
+    for (const check of checks) {
+      const found = check(node, sourceFile);
+      if (found)
+        violations.push({
+          file,
+          line: lineAt(source, found.node.getStart(sourceFile)),
+          key: found.key,
+          detail: found.detail,
+        });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+}
+
+finishFence({
+  rule: 'bearer-only-auth',
+  violations,
+  explain: [
+    'API auth is bearer-only and session-free (docs/claude/AUTH.md).',
+    '  clients send   Authorization: Bearer <JWT | API token>   (API tokens also as ?token=)',
+    '  the server     resolves a person from the JWT (jwtAuthMiddleware); no getSession, no cookieCache',
+  ],
+  clean: 'No cookie- or session-based API auth.',
+});

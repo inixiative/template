@@ -12,7 +12,9 @@ export const CUSTOM_FLAG_PREFIX = 'custom:';
 
 export const isSlug = (value: string): boolean => SLUG_RE.test(value);
 
-export const slugSchema = z.string().refine(isSlug, { message: 'lowercase letters, digits and single hyphens only' });
+export const slugSchema = z
+  .string()
+  .refine(isSlug, { message: 'lowercase letters, digits and single hyphens only' });
 
 export const toSlug = (raw: string): string =>
   raw
@@ -20,7 +22,8 @@ export const toSlug = (raw: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-export const keepSlugCharacters = (raw: string): string => raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
+export const keepSlugCharacters = (raw: string): string =>
+  raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
 
 export const isCustomFlagSlug = (slug: string): boolean => slug.startsWith(CUSTOM_FLAG_PREFIX);
 

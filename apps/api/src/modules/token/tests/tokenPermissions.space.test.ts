@@ -4,8 +4,8 @@
  * @partOf feature:auth
  * @uses primitive:authz, infrastructure:prisma
  */
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { createHash } from 'node:crypto';
 import { db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createSpace, createToken } from '@template/db/test';
@@ -18,7 +18,7 @@ describe('Space token bearer authentication', () => {
   let space: Space;
   let sibling: Space;
   let unrelated: Space;
-  const key = randomUUID();
+  let key: string;
   const { fetch } = createTestApp({
     mount: [
       (app) => app.use('*', tokenAuthMiddleware),
@@ -34,7 +34,8 @@ describe('Space token bearer authentication', () => {
       }),
     );
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    key = Bun.randomUUIDv7();
     const created = await createSpace();
     space = created.entity;
     sibling = (await createSpace({}, { organization: created.context.organization })).entity;
@@ -50,7 +51,7 @@ describe('Space token bearer authentication', () => {
     );
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -63,8 +64,9 @@ describe('Space token bearer authentication', () => {
     expect((await request(`/space/${unrelated.id}/customers`)).status).toBe(403);
   });
 
-  it('cannot enter organization routes that require a user identity', async () => {
-    expect((await request(`/organization/${space.organizationId}`)).status).toBe(401);
+  it('reads no more of its organization than anyone may', async () => {
+    expect((await request(`/organization/${space.organizationId}`)).status).toBe(200);
+    expect((await request(`/organization/${space.organizationId}/protected`)).status).toBe(403);
   });
 
   it('keeps the token role restriction on its own space', async () => {

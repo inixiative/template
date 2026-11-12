@@ -10,9 +10,14 @@ import { enumToSelectOptions } from '@template/ui/lib/enumOptions';
 import { memo, useState } from 'react';
 
 type CreateTokenFormData = Pick<MeCreateTokenData['body'], 'name' | 'role'>;
-type TokenRole = CreateTokenFormData['role'];
+type TokenRole = NonNullable<CreateTokenFormData['role']>;
 
-const tokenRoleValues = ['owner', 'admin', 'member', 'viewer'] as const satisfies readonly TokenRole[];
+const tokenRoleValues = [
+  'owner',
+  'admin',
+  'member',
+  'viewer',
+] as const satisfies readonly TokenRole[];
 const tokenRoleOptions = enumToSelectOptions<TokenRole>(tokenRoleValues);
 
 type CreateTokenModalProps = {
@@ -49,7 +54,9 @@ export const CreateTokenModal = memo(
               placeholder="My API Token"
               autoFocus
             />
-            <p className="text-xs text-muted-foreground">A descriptive name to help you identify this token</p>
+            <p className="text-xs text-muted-foreground">
+              A descriptive name to help you identify this token
+            </p>
           </div>
 
           <div className="space-y-2">

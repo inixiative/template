@@ -7,7 +7,6 @@
 import { z } from '@hono/zod-openapi';
 import { AuthProviderScalarSchema } from '@template/db';
 import { updateRoute } from '#/lib/routeTemplates';
-import { validateActor } from '#/middleware/validations/validateActor';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 
@@ -34,5 +33,5 @@ export const authProviderUpdateRoute = updateRoute({
     'encryptedSecretsMetadata',
     'encryptedSecretsKeyVersion',
   ],
-  middleware: [validateActor, validatePermission('own')],
+  middleware: [validatePermission('own')],
 });

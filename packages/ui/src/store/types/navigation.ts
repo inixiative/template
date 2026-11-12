@@ -10,12 +10,16 @@ import type { RouteMatch } from '@template/ui/lib/findRoute';
 
 export type NavigationSlice = {
   navigation: {
-    navigate: ((options: { to: string; search?: Record<string, string> }) => void) | null;
+    navigate:
+      | ((options: { to: string; search?: Record<string, string>; hash?: string }) => void)
+      | null;
     navConfig: NavConfig | null;
     currentRouteMatch: RouteMatch | null;
+    flowId: string | null;
     setNavigate: (fn: UseNavigateResult<string>) => void;
     setNavConfig: (config: NavConfig) => void;
     setCurrentRouteMatch: (match: RouteMatch | null) => void;
     navigatePreserving: (to: string, policy: 'context' | 'spoof' | 'all') => void;
+    setFlowId: (id: string | null) => void;
   };
 };

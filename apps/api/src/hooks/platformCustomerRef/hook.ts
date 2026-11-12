@@ -14,7 +14,10 @@ export const registerPlatformCustomerRefHook = () => {
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ model, result }) => {
       for (const row of castArray(result) as { id: string }[]) {
-        const { customerRef, outcome } = await provisionPlatformCustomerRef(model as CustomerModel, row.id);
+        const { customerRef, outcome } = await provisionPlatformCustomerRef(
+          model as CustomerModel,
+          row.id,
+        );
         if (outcome !== 'present') await emitAppEvent('customerRef.created', { customerRef });
       }
     },

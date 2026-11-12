@@ -1,6 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Inquiry, Organization } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -18,7 +22,7 @@ describe('handler: inviteOrganizationUser', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let org: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: sourceUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
@@ -27,7 +31,7 @@ describe('handler: inviteOrganizationUser', () => {
     db = createTestApp({ mockUser: sourceUser, mount }).db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -44,17 +48,22 @@ describe('handler: inviteOrganizationUser', () => {
     });
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
-    const response = await targetFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }));
+    const response = await targetFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.approved);
 
-    const membership = await db.organizationUser.findUnique({
+    const organizationUser = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
     });
-    expect(membership).toBeTruthy();
-    expect(membership?.role).toBe('member');
+    expect(organizationUser).toBeTruthy();
+    expect(organizationUser?.role).toBe('member');
   });
 
   it('deny does not create OrganizationUser', async () => {
@@ -70,12 +79,17 @@ describe('handler: inviteOrganizationUser', () => {
     });
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
-    await targetFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'denied' }));
+    await targetFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+      }),
+    );
 
-    const membership = await db.organizationUser.findUnique({
+    const organizationUser = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
     });
-    expect(membership).toBeNull();
+    expect(organizationUser).toBeNull();
   });
 
   it('invitee cannot override role via resolution', async () => {
@@ -92,11 +106,17 @@ describe('handler: inviteOrganizationUser', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     // Attempt to escalate to 'admin' via resolution payload
-    await targetFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved', role: 'admin' }));
+    await targetFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+        role: 'admin',
+      }),
+    );
 
-    const membership = await db.organizationUser.findUnique({
+    const organizationUser = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
     });
-    expect(membership?.role).toBe('member');
+    expect(organizationUser?.role).toBe('member');
   });
 });

@@ -24,7 +24,9 @@ export const withEnv = async <T>(
   overrides: Record<string, string | undefined>,
   fn: () => T | Promise<T>,
 ): Promise<T> => {
-  const prior = Object.keys(overrides).map((key) => [key, key in envOverrides, envOverrides[key]] as const);
+  const prior = Object.keys(overrides).map(
+    (key) => [key, key in envOverrides, envOverrides[key]] as const,
+  );
   for (const [key, value] of Object.entries(overrides)) envOverrides[key] = value;
   try {
     return await fn();
@@ -36,10 +38,23 @@ export const withEnv = async <T>(
   }
 };
 
-export const wrapEnvWithOverrides = <T extends object>(target: T): T =>
+export type EnvOverrideParser = (
+  key: string,
+  override: string | undefined,
+  current: unknown,
+) => unknown;
+
+const passOverrideThrough: EnvOverrideParser = (_key, override) => override;
+
+export const wrapEnvWithOverrides = <T extends object>(
+  target: T,
+  parseOverride: EnvOverrideParser = passOverrideThrough,
+): T =>
   new Proxy(target, {
     get(t, prop, receiver) {
-      if (typeof prop === 'string' && prop in envOverrides) return envOverrides[prop];
+      if (typeof prop === 'string' && prop in envOverrides) {
+        return parseOverride(prop, envOverrides[prop], Reflect.get(t, prop, receiver));
+      }
       return Reflect.get(t, prop, receiver);
     },
   });

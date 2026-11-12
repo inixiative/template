@@ -13,7 +13,10 @@ describe('recomposeFromSnapshots', () => {
           mjml: '{{#component:card}}{{#slot:body}}OVERRIDE{{/slot:body}}{{/component:card}}',
           componentVersions: { card: 'card-v1' },
         },
-        'card-v1': { mjml: '<x>{{#slot:body:default}}DEFAULT{{/slot:body:default}}</x>', componentVersions: {} },
+        'card-v1': {
+          mjml: '<x>{{#slot:body:default}}DEFAULT{{/slot:body:default}}</x>',
+          componentVersions: {},
+        },
       }),
     );
     expect(result).toBe('<x>OVERRIDE</x>');
@@ -23,7 +26,10 @@ describe('recomposeFromSnapshots', () => {
     const result = await recomposeFromSnapshots(
       'root',
       loaderFrom({
-        root: { mjml: '{{#component:hero}}{{/component:hero}}', componentVersions: { hero: 'hero-v2' } },
+        root: {
+          mjml: '{{#component:hero}}{{/component:hero}}',
+          componentVersions: { hero: 'hero-v2' },
+        },
         'hero-v2': {
           mjml: '{{#slot:body:default}}{{#component:cta}}{{/component:cta}}{{/slot:body:default}}',
           componentVersions: { cta: 'cta-v7' },
@@ -38,7 +44,10 @@ describe('recomposeFromSnapshots', () => {
     const result = await recomposeFromSnapshots(
       'root',
       loaderFrom({
-        root: { mjml: 'a{{#component:gone}}{{/component:gone}}b', componentVersions: { gone: null } },
+        root: {
+          mjml: 'a{{#component:gone}}{{/component:gone}}b',
+          componentVersions: { gone: null },
+        },
       }),
     );
     expect(result).toBe('ab');
@@ -60,33 +69,22 @@ describe('recomposeFromSnapshots', () => {
   });
 });
 
-import { afterAll, afterEach, beforeAll } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
-import { cleanupTouchedTables } from '@template/db/test';
+import { afterEach } from 'bun:test';
+import { db } from '@template/db';
+import { cleanupTouchedTables, createCommunicationLog } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { recomposeCommunication } from '#/lib/email/recompose';
 
 const documentMjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
 
 describe('recomposeCommunication (DB-backed)', () => {
-  beforeAll(() => {
-    registerAuditLogHook();
-    registerEmailVersioningHook();
-  });
-
-  afterAll(async () => {
-    clearHookRegistry();
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
   afterEach(async () => {
-    await db.communicationLog.deleteMany({});
-    await db.auditLog.deleteMany({});
-    await db.emailTemplate.deleteMany({});
-    await db.emailComponent.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   const savedPin = async () => {
@@ -95,7 +93,9 @@ describe('recomposeCommunication (DB-backed)', () => {
       name: 'Recompose Sent',
       subject: 'Hi',
       kind: 'system',
-      mjml: documentMjml('{{#component:recompose-hero}}<mj-text>Saved</mj-text>{{/component:recompose-hero}}'),
+      mjml: documentMjml(
+        '{{#component:recompose-hero}}<mj-text>Saved</mj-text>{{/component:recompose-hero}}',
+      ),
       ownerModel: 'default',
     });
     const pin = await db.auditLog.findFirst({
@@ -106,17 +106,9 @@ describe('recomposeCommunication (DB-backed)', () => {
     return { template, pin };
   };
 
-  const createLog = (data: Record<string, unknown>) =>
-    db.communicationLog.create({
-      data: {
-        sendKey: 'recompose-test',
-        channel: 'email',
-        address: 'fan@example.com',
-        idempotencyKey: crypto.randomUUID(),
-        senderType: 'platform',
-        ...data,
-      },
-    });
+  const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
+    (await createCommunicationLog({ senderType: 'platform', address: 'fan@example.com', ...data }))
+      .entity;
 
   it('returns the recorded settledMjml — the sent truth — not a recompose of the save-time pin', async () => {
     const { template, pin } = await savedPin();

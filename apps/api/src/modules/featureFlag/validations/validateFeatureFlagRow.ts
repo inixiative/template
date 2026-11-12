@@ -12,15 +12,24 @@ import { assertSegmentUsableBy } from '#/modules/featureFlag/validations/assertS
 
 export type FeatureFlagRow = Partial<FeatureFlag>;
 
-export const validateFeatureFlagRow = async (row: FeatureFlagRow, previous?: FeatureFlag): Promise<void> => {
+export const validateFeatureFlagRow = async (
+  row: FeatureFlagRow,
+  previous?: FeatureFlag,
+): Promise<void> => {
   if (previous && Object.keys(row).every((column) => column === 'deletedAt')) return;
   const merged = { ...previous, ...row } as FeatureFlag;
   if (row.slug !== undefined || !previous) {
     if (typeof merged.slug !== 'string' || !isFeatureFlagSlug(merged.slug)) {
-      throw makeError({ status: 422, message: 'a feature flag slug is a slug, optionally prefixed custom:' });
+      throw makeError({
+        status: 422,
+        message: 'a feature flag slug is a slug, optionally prefixed custom:',
+      });
     }
     if (!isCustomFlagSlug(merged.slug) && merged.ownerModel !== 'platform') {
-      throw makeError({ status: 422, message: 'only the platform defines bare flag slugs; prefix yours with custom:' });
+      throw makeError({
+        status: 422,
+        message: 'only the platform defines bare flag slugs; prefix yours with custom:',
+      });
     }
   }
   if (merged.segmentId && (row.segmentId !== undefined || !previous)) {

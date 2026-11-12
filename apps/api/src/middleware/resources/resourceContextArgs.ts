@@ -5,7 +5,10 @@
  * @uses infrastructure:prisma, feature:featureFlag, feature:inquiry, feature:segment, feature:webhooks
  */
 import { type AccessorName, Prisma } from '@template/db';
-import { includeFeatureFlagVariants, includeVariantSegment } from '#/modules/featureFlag/queries/featureFlagIncludes';
+import {
+  includeFeatureFlagVariants,
+  includeVariantSegment,
+} from '#/modules/featureFlag/queries/featureFlagIncludes';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { includeSegmentRuleReferences } from '#/modules/segment/queries/segmentIncludes';
 

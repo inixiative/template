@@ -1,47 +1,70 @@
 import { describe, expect, it } from 'bun:test';
-import { check, requiredBindings, resolveBindings, toPrisma } from '@inixiative/json-rules';
+import { bindRule, check, listBindings, toPrisma } from '@inixiative/json-rules';
 import { polymorphicBindings, polymorphicIs } from '@template/db/registries/polymorphicIs';
 
 describe('polymorphicIs', () => {
   it('one arm per FK column, fenced by its discriminator values; unbound kinds match nothing', () => {
     const rule = polymorphicIs('Tag', 'ownerModel');
-    expect(requiredBindings(rule).size).toBe(0);
+    expect(listBindings(rule, { required: true })).toEqual([]);
 
-    const bound = resolveBindings(rule, polymorphicBindings('Organization', 'org-1'));
+    const bound = bindRule(rule, polymorphicBindings('Organization', 'org-1'));
     expect(check(bound, { ownerModel: 'Organization', organizationId: 'org-1' })).toBe(true);
     expect(check(bound, { ownerModel: 'Organization', organizationId: 'org-2' })).not.toBe(true);
-    expect(check(bound, { ownerModel: 'User', userId: 'u-9', organizationId: null })).not.toBe(true);
-    expect(check(bound, { ownerModel: 'platform', userId: null, organizationId: null })).not.toBe(true);
+    expect(check(bound, { ownerModel: 'User', userId: 'u-9', organizationId: null })).not.toBe(
+      true,
+    );
+    expect(check(bound, { ownerModel: 'platform', userId: null, organizationId: null })).not.toBe(
+      true,
+    );
   });
 
   it('a composite value is reached through the column it shares with the single-key kind', () => {
-    const bound = resolveBindings(
+    const bound = bindRule(
       polymorphicIs('CommunicationLog', 'senderType'),
       polymorphicBindings('Organization', 'org-1'),
     );
-    expect(check(bound, { senderType: 'OrganizationUser', senderOrganizationId: 'org-1', senderUserId: 'u-1' })).toBe(
-      true,
-    );
+    expect(
+      check(bound, {
+        senderType: 'OrganizationUser',
+        senderOrganizationId: 'org-1',
+        senderUserId: 'u-1',
+      }),
+    ).toBe(true);
     expect(check(bound, { senderType: 'Organization', senderOrganizationId: 'org-1' })).toBe(true);
-    expect(check(bound, { senderType: 'User', senderUserId: 'u-9', senderOrganizationId: null })).not.toBe(true);
+    expect(
+      check(bound, { senderType: 'User', senderUserId: 'u-9', senderOrganizationId: null }),
+    ).not.toBe(true);
   });
 
   it('a no-FK owner is bound by its discriminator: platform rows match only when platform is the bound owner', () => {
     const rule = polymorphicIs('Tag', 'ownerModel');
-    expect(requiredBindings(rule).size).toBe(0);
+    expect(listBindings(rule, { required: true })).toEqual([]);
     expect(polymorphicBindings('platform', 'platform')).toEqual({ platform: ['platform'] });
 
-    const asPlatform = resolveBindings(rule, polymorphicBindings('platform', 'platform'));
-    expect(check(asPlatform, { ownerModel: 'platform', userId: null, organizationId: null, spaceId: null })).toBe(true);
-    expect(check(asPlatform, { ownerModel: 'Organization', organizationId: 'org-1' })).not.toBe(true);
+    const asPlatform = bindRule(rule, polymorphicBindings('platform', 'platform'));
+    expect(
+      check(asPlatform, {
+        ownerModel: 'platform',
+        userId: null,
+        organizationId: null,
+        spaceId: null,
+      }),
+    ).toBe(true);
+    expect(check(asPlatform, { ownerModel: 'Organization', organizationId: 'org-1' })).not.toBe(
+      true,
+    );
 
-    const asOrg = resolveBindings(rule, polymorphicBindings('Organization', 'org-1'));
-    expect(check(asOrg, { ownerModel: 'platform', userId: null, organizationId: null, spaceId: null })).not.toBe(true);
+    const asOrg = bindRule(rule, polymorphicBindings('Organization', 'org-1'));
+    expect(
+      check(asOrg, { ownerModel: 'platform', userId: null, organizationId: null, spaceId: null }),
+    ).not.toBe(true);
   });
 
   it('a value with keys keeps its FK arm and gains no discriminator arm', () => {
     const rule = polymorphicIs('Tag', 'ownerModel') as { any: unknown[] };
-    const discriminatorArms = rule.any.filter((arm) => JSON.stringify(arm).includes('"bind":"platform"'));
+    const discriminatorArms = rule.any.filter((arm) =>
+      JSON.stringify(arm).includes('"bind":"platform"'),
+    );
     expect(discriminatorArms).toHaveLength(1);
     expect(JSON.stringify(rule)).not.toContain('"bind":"Organization"');
   });
@@ -51,9 +74,15 @@ describe('polymorphicIs', () => {
       ['Segment', 'ownerModel'],
       ['CustomerRef', 'providerModel'],
     ] as const) {
-      const asPlatform = resolveBindings(polymorphicIs(model, axis), polymorphicBindings('platform', 'platform'));
+      const asPlatform = bindRule(
+        polymorphicIs(model, axis),
+        polymorphicBindings('platform', 'platform'),
+      );
       expect(check(asPlatform, { [axis]: 'platform' })).toBe(true);
-      const asOrg = resolveBindings(polymorphicIs(model, axis), polymorphicBindings('Organization', 'org-1'));
+      const asOrg = bindRule(
+        polymorphicIs(model, axis),
+        polymorphicBindings('Organization', 'org-1'),
+      );
       expect(check(asOrg, { [axis]: 'platform' })).not.toBe(true);
     }
   });
@@ -61,15 +90,19 @@ describe('polymorphicIs', () => {
   it('the discriminator arm compiles on the Prisma rail: bound admits platform rows, unbound matches nothing', () => {
     const compile = (bindings: Record<string, unknown>) =>
       JSON.stringify(
-        toPrisma(resolveBindings(polymorphicIs('Tag', 'ownerModel'), bindings as never), {
+        toPrisma(bindRule(polymorphicIs('Tag', 'ownerModel'), bindings as never), {
           map: { models: {} },
           mapName: 'probe',
           model: 'Tag',
           now: new Date(),
         } as never),
       );
-    expect(compile(polymorphicBindings('platform', 'platform'))).toContain('"ownerModel":{"in":["platform"]}');
-    expect(compile(polymorphicBindings('Organization', 'org-1'))).toContain('"ownerModel":{"in":[]}');
+    expect(compile(polymorphicBindings('platform', 'platform'))).toContain(
+      '"ownerModel":{"in":["platform"]}',
+    );
+    expect(compile(polymorphicBindings('Organization', 'org-1'))).toContain(
+      '"ownerModel":{"in":[]}',
+    );
   });
 
   it('refuses an axis the registry does not declare, and a kind no single key binds', () => {

@@ -137,8 +137,8 @@ default are partial unique indexes. `writeVariant.ts` owns the internal-segment 
 the rule, re-point, detach (tombstone) and delete, and refuses more than one audience per write.
 
 Permissions on a variant flow through its flag, never its audience; a flag's gate is likewise outside
-the permissions tree. Those relations carry `/// @permissions(hydrate: false)` in the schema so
-`hydrate` skips them (see PERMISSIONS.md).
+the permissions tree. `hydrate` walks only the relations `rebacSchema` names, so neither is loaded
+(see PERMISSIONS.md).
 
 ## Invalidation and live updates
 

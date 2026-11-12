@@ -3,8 +3,9 @@
  * @kind utils
  * @partOf primitive:ui
  */
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
+import { toRoutePattern } from '@template/ui/lib/toRoutePattern';
 
 interface EndpointInfo {
   method: string;
@@ -47,7 +48,9 @@ const extractEndpoints = (sdkContent: string): EndpointInfo[] => {
 };
 
 const generateHandlers = (endpoints: EndpointInfo[]): string => {
-  const apiEndpoints = endpoints.filter((e) => e.url.startsWith('/api/v1') || e.url.startsWith('/api/admin'));
+  const apiEndpoints = endpoints.filter(
+    (e) => e.url.startsWith('/api/v1') || e.url.startsWith('/api/admin'),
+  );
 
   const handlerCases: string[] = [];
 
@@ -57,7 +60,7 @@ const generateHandlers = (endpoints: EndpointInfo[]): string => {
 
     handlerCases.push(`
   ${comment}
-  http.${httpMethod}('*${endpoint.url}', () => {
+  http.${httpMethod}('*${toRoutePattern(endpoint.url)}', () => {
     return HttpResponse.json({ data: null, error: 'Not implemented in MSW' });
   }),`);
   }

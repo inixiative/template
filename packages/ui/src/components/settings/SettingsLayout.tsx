@@ -44,12 +44,12 @@ export const SettingsLayout = ({
   return (
     <div className="flex flex-col h-full">
       <div className="border-b bg-background">
-        <div className="p-8 pb-0">
-          <h1 className="text-3xl font-bold">{title}</h1>
-          {description && <p className="text-muted-foreground mt-1">{description}</p>}
+        <div className="mx-auto w-full max-w-6xl space-y-1.5 px-6 pt-8 lg:px-10 lg:pt-10">
+          <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
+          {description && <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>}
         </div>
-        <div className="px-8 pt-6">
-          <div className="flex gap-6 border-b">
+        <div className="mx-auto w-full max-w-6xl px-6 pt-6 lg:px-10">
+          <div className="flex gap-6">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -74,7 +74,7 @@ export const SettingsLayout = ({
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8">{children}</div>
+        <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-10 lg:py-10">{children}</div>
       </div>
     </div>
   );
