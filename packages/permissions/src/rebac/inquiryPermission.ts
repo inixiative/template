@@ -21,7 +21,7 @@ type Verb = 'send' | 'resolve';
 type AnyLevel = PartyLevel<InquiryPartyModel>;
 
 const isType = (type: InquiryType): ActionRule => ({
-  rule: { field: 'type', operator: Operator.in, value: [type] },
+  rule: { field: 'type', operator: Operator.equals, value: type },
 });
 
 const isPartyModel = (side: InquirySide, model: InquiryPartyModel): ActionRule => ({

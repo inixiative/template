@@ -4,7 +4,7 @@ import { inquiryPartyRule, inquiryPermission } from '@template/permissions/rebac
 import { INQUIRY_TYPES } from '@template/permissions/rebac/inquiryTypes';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 
-type Gated = { any: { all: [{ rule: { value: string[] } }, unknown] }[] };
+type Gated = { any: { all: [{ rule: { operator: string; value: string } }, unknown] }[] };
 
 describe('inquiryPermission', () => {
   it('declares parties for every inquiry type', () => {
@@ -42,8 +42,9 @@ describe('inquiryPermission', () => {
 
   it('gates each send, resolve and read branch on its own type', () => {
     const { actions } = inquiryPermission(INQUIRY_TYPES);
-    const gates = (rule: unknown) => (rule as Gated).any.map(({ all: [gate] }) => gate.rule.value);
-    const expected = Object.keys(INQUIRY_TYPES).map((type) => [type]);
+    const gates = (rule: unknown) =>
+      (rule as Gated).any.map(({ all: [gate] }) => [gate.rule.operator, gate.rule.value]);
+    const expected = Object.keys(INQUIRY_TYPES).map((type) => ['equals', type]);
 
     expect(gates(actions.send)).toEqual(expected);
     expect(gates(actions.resolve)).toEqual(expected);
