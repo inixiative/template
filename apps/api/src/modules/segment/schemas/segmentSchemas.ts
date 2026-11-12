@@ -6,6 +6,7 @@
  */
 import { z } from '@hono/zod-openapi';
 import {
+  RuleReferenceScalarSchema,
   SegmentMemberScalarSchema,
   SegmentScalarInputSchema,
   SegmentScalarSchema,
@@ -26,6 +27,10 @@ export const segmentCreateBodySchema = SegmentScalarInputSchema.omit({
   organizationId: true,
   spaceId: true,
   deletedAt: true,
+}).extend({
+  conditions: z
+    .unknown()
+    .describe('A json-rules condition over CustomerRef; see GET /api/v1/segment/info.'),
 });
 
 export const segmentUpdateBodySchema = segmentCreateBodySchema.partial();
@@ -40,8 +45,15 @@ export const ruleIssueSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
+export const segmentRuleReferenceSchema = RuleReferenceScalarSchema.pick({
+  targetModel: true,
+  targetId: true,
+  targetDeletedAt: true,
+});
+
 export const segmentReadResponseSchema = SegmentScalarSchema.extend({
   ruleIssues: z.array(ruleIssueSchema),
+  ruleReferences: z.array(segmentRuleReferenceSchema),
 });
 
 export const segmentMemberWithCustomerSchema = SegmentMemberScalarSchema.extend({

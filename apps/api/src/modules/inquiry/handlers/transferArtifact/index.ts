@@ -4,20 +4,20 @@
  * @partOf feature:inquiry, feature:files
  * @uses infrastructure:prisma
  */
-import { type Db, polymorphicTarget } from '@template/db';
+import { db, polymorphicTarget } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
+import {
+  baseResolutionInputSchema,
+  type TransferArtifactContent,
+  transferArtifactContentSchema,
+  transferArtifactResolutionInputSchema,
+} from '@template/shared/inquiry';
 import { makeError } from '#/lib/errors';
 import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
 import { copyArtifactInto } from '#/modules/artifact/services/artifactPlacements';
 import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
-import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
-import {
-  type TransferArtifactContent,
-  transferArtifactContentSchema,
-  transferArtifactResolutionInputSchema,
-} from '#/modules/inquiry/handlers/transferArtifact/schema';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
 
 const PARTIES = [
@@ -46,7 +46,7 @@ const ownerOf = ({ kind, id }: Party): OwnedArtifact => ({
   spaceId: kind === 'Space' ? id : null,
 });
 
-const loadOwnedObject = async (db: Db, artifactId: string, source: Party): Promise<Artifact> => {
+const loadOwnedObject = async (artifactId: string, source: Party): Promise<Artifact> => {
   const artifact = await db.artifact.findUnique({ where: { id: artifactId } });
   if (!artifact) throw makeError({ status: 404, message: 'Artifact not found' });
   if (!sameArtifactOwner(artifact, ownerOf(source))) {
@@ -69,7 +69,7 @@ const loadOwnedObject = async (db: Db, artifactId: string, source: Party): Promi
   return artifact;
 };
 
-const managesParty = async (db: Db, userId: string, target: Party): Promise<boolean> => {
+const managesParty = async (userId: string, target: Party): Promise<boolean> => {
   if (target.kind === 'User') return target.id === userId;
   if (target.kind === 'Organization') {
     const membership = await db.organizationUser.findFirst({
@@ -83,7 +83,7 @@ const managesParty = async (db: Db, userId: string, target: Party): Promise<bool
   return !!membership;
 };
 
-const grantSourceRead = async (db: Db, artifactId: string, source: Party) => {
+const grantSourceRead = async (artifactId: string, source: Party) => {
   await db.resourceBinding.create({
     data: {
       sourceModel: 'Artifact',
@@ -108,16 +108,14 @@ const grantSourceRead = async (db: Db, artifactId: string, source: Party) => {
 };
 
 export const transferArtifactHandler: InquiryHandler<TransferArtifactContent> = {
-  sources: PARTIES.map((sourceModel) => ({ sourceModel })),
-  targets: PARTIES.map((targetModel) => ({ targetModel })),
   contentSchema: transferArtifactContentSchema,
   resolutionInputSchema: transferArtifactResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
   defaultExpirationDays: 30,
 
-  validate: async (db, inquiry, content) => {
+  validate: async (inquiry, content) => {
     const source = party(inquiry, 'sourceModel');
-    await loadOwnedObject(db, content.artifactId, source);
+    await loadOwnedObject(content.artifactId, source);
     const open = await db.inquiry.count({
       where: {
         type: 'transferArtifact',
@@ -137,19 +135,19 @@ export const transferArtifactHandler: InquiryHandler<TransferArtifactContent> = 
     }
   },
 
-  autoApprove: async (db, inquiry) => {
+  autoApprove: async (inquiry) => {
     const source = party(inquiry, 'sourceModel');
     const actorUserId =
       auditActorContext.getScope()?.actorUserId ?? (source.kind === 'User' ? source.id : null);
     if (!actorUserId) return false;
-    return managesParty(db, actorUserId, party(inquiry, 'targetModel'));
+    return managesParty(actorUserId, party(inquiry, 'targetModel'));
   },
 
-  handleApprove: async (db, inquiry, content) => {
+  handleApprove: async (inquiry, content) => {
     const source = party(inquiry, 'sourceModel');
     const target = party(inquiry, 'targetModel');
     await db.findForUpdate('Artifact', { id: content.artifactId });
-    const artifact = await loadOwnedObject(db, content.artifactId, source);
+    const artifact = await loadOwnedObject(content.artifactId, source);
     const tracked = content.keepTracking && content.allowTracking !== false;
 
     if (content.keepTracking && content.allowTracking === false) {
@@ -164,7 +162,7 @@ export const transferArtifactHandler: InquiryHandler<TransferArtifactContent> = 
       data: { deletedAt: new Date() },
     });
     await db.artifact.update({ where: { id: artifact.id }, data: ownerOf(target) });
-    if (tracked) await grantSourceRead(db, artifact.id, source);
+    if (tracked) await grantSourceRead(artifact.id, source);
     return {};
   },
 };

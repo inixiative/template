@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { db, isHardDeletedOnTombstone } from '@template/db';
+import { db, isHardDeletedOnTombstone, isSkippedOnRevive } from '@template/db';
 import { uniq } from 'lodash-es';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
 import { REGENERATE_ON_REVIVE } from '#/hooks/softDeleteCascade/regenerateOnRevive';
@@ -19,9 +19,10 @@ const fkWhere = (child: ChildRelation, rows: Row[]): Record<string, unknown> | u
     const keys = uniq(
       rows.map((row) => row[child.toFields[0] ?? 'id']).filter((key) => key != null),
     );
-    return keys.length ? { [from]: { in: keys } } : undefined;
+    return keys.length ? { ...child.arm, [from]: { in: keys } } : undefined;
   }
   return {
+    ...child.arm,
     OR: rows.map((row) =>
       Object.fromEntries(child.fromFields.map((from, i) => [from, row[child.toFields[i] ?? 'id']])),
     ),
@@ -40,7 +41,7 @@ const hardDelete = async (model: string, where: Record<string, unknown>) => {
       if (!isHardDeletedOnTombstone(child.model)) continue;
       const [from] = child.fromFields;
       if (child.fromFields.length === 1 && from)
-        await hardDelete(child.model, { [from]: { in: ids } });
+        await hardDelete(child.model, { ...child.arm, [from]: { in: ids } });
     }
   }
   await db.delegate(model).deleteMany({ where });
@@ -68,6 +69,7 @@ export const reviveChildren = async (model: string, rows: Row[], priorDeletedAt:
       await REGENERATE_ON_REVIVE[child.model]?.(model, rows);
       continue;
     }
+    if (isSkippedOnRevive(child.model)) continue;
     const where = fkWhere(child, rows);
     if (!child.hasDeletedAt || !where) continue;
     await db.delegate(child.model).updateManyAndReturn({

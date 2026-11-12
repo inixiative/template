@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { validateEncryptionVersions } from '@template/db/lib/encryption/validation';
 import { cleanupTouchedTables, createAuthProvider } from '@template/db/test';
@@ -8,7 +8,7 @@ describe('validateEncryptionVersions', () => {
   const testKey1Base64 = Buffer.from('12345678901234567890123456789012', 'utf8').toString('base64');
   const testKey2Base64 = Buffer.from('abcdefghijklmnopqrstuvwxyz123456', 'utf8').toString('base64');
 
-  beforeAll(() => {});
+  beforeEach(() => {});
 
   beforeEach(() => {
     setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '1');

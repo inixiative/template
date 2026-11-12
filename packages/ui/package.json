@@ -37,14 +37,14 @@
     "./lib/browserTelemetry": "./src/lib/browserTelemetry.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "test": "NODE_ENV=test bun test src/",
     "generate:msw": "bun scripts/generateMswHandlers.ts"
   },
   "dependencies": {
     "@ariakit/react": "^0.4.22",
     "@iconify/react": "^6.0.2",
-    "@inixiative/rules-builder": "0.31.0",
+    "@inixiative/rules-builder": "^0.32.0",
     "@tanstack/react-router": "^1.166.2",
     "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",

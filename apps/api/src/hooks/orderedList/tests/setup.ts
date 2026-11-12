@@ -1,23 +1,6 @@
-import { afterEach } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, getNextSeq } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerOrderedListHook } from '#/hooks/orderedList/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-
-// registerDbHook dedupes by hook name, so module-level registration across
-// multiple test files (which Bun runs in parallel) is safe — second-and-later
-// imports are no-ops. We intentionally do NOT call clearHookRegistry() in
-// afterAll because parallel files share the registry; one file clearing it
-// would yank hooks out from under tests still running in sibling files.
-registerRulesHook();
-registerContactRulesHook();
-registerOrderedListHook();
-
-afterEach(async () => {
-  await cleanupTouchedTables(db);
-});
+import { getNextSeq } from '@template/db/test';
 
 export const e164 = () => `+1555${String(getNextSeq()).padStart(7, '0').slice(-7)}`;
 

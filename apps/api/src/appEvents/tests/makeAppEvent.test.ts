@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
@@ -23,14 +23,14 @@ const createEvent = (name: string, data: Record<string, unknown>): AppEventPaylo
 
 describe('makeAppEvent', () => {
   const observed: AppEventPayload[] = [];
-  beforeAll(() => {
+  beforeEach(() => {
     observeRegistry.register('test-recorder', {
       record: async (event) => {
         observed.push(event);
       },
     });
   });
-  afterAll(() => observeRegistry.unregister('test-recorder'));
+  afterEach(() => observeRegistry.unregister('test-recorder'));
   afterEach(async () => {
     observed.length = 0;
     await cleanupTouchedTables(db);
@@ -132,8 +132,8 @@ describe('makeAppEvent', () => {
           received = data;
           return [
             {
-              kind: 'users',
-              target: { userIds: ['user-1'] },
+              kind: 'channels',
+              target: { channels: ['test'] },
               message: { data: { category: 'query', action: 'refetch', key: { _id: 'test' } } },
             },
           ];

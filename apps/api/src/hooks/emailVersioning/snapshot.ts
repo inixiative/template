@@ -8,6 +8,7 @@ import { db, Prisma } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import {
+  auditActorColumns,
   buildContextFkFields,
   buildSubjectFkFields,
   processAuditData,
@@ -28,14 +29,7 @@ export const createVersionBumpSnapshot = async (
     after: processed,
     changes: Prisma.JsonNull,
     componentVersions: componentVersions as Prisma.InputJsonValue,
-    actorUserId: actor?.actorUserId ?? null,
-    actorSpoofUserId: actor?.actorSpoofUserId ?? null,
-    actorTokenId: actor?.actorTokenId ?? null,
-    actorJobName: actor?.actorJobName ?? null,
-    ipAddress: actor?.ipAddress ?? null,
-    userAgent: actor?.userAgent ?? null,
-    sourceInquiryId: actor?.sourceInquiryId ?? null,
-    integrationId: actor?.integrationId ?? null,
+    ...auditActorColumns(actor),
     ...buildContextFkFields(model, record),
     ...buildSubjectFkFields(model, record),
   };

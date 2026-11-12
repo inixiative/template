@@ -7,7 +7,7 @@
 import { z } from '@hono/zod-openapi';
 import { AuthProviderScalarSchema, AuthProviderTypeSchema } from '@template/db';
 import { createRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
 
 const AuthProviderCreateBodySchema = z.object({
@@ -33,5 +33,5 @@ export const organizationCreateAuthProviderRoute = createRoute({
     'encryptedSecretsMetadata',
     'encryptedSecretsKeyVersion',
   ],
-  middleware: [validatePermission('own')],
+  middleware: [validateSubmodelPermission('create')],
 });

@@ -16,6 +16,7 @@ import { frameError } from '#/ws/frameError';
 import { overFrameLimit } from '#/ws/frameRateLimit';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
+import { isMeChannel, meChannel } from '#/ws/meChannel';
 import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
 import { addConnection, byId, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
@@ -36,7 +37,7 @@ export const stopStaleSweep = staleSweep.stop;
 export const acceptWebSocket = (req: Request, server: WSServer): Response | undefined => {
   const now = Date.now();
   const data: WSData = {
-    connectionId: crypto.randomUUID(),
+    connectionId: Bun.randomUUIDv7(),
     userId: null,
     headers: {},
     channels: new Set(),
@@ -75,6 +76,11 @@ const takeLatestStreamFrame = (ws: WSSocket, msg: StreamFrame): boolean => {
   return true;
 };
 
+const filedUnder = (ws: WSSocket, channel: string): string | null => {
+  if (!isMeChannel(channel)) return channel;
+  return ws.data.userId ? meChannel(channel, ws.data.userId) : null;
+};
+
 const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
   switch (msg.action) {
     case 'authenticate': {
@@ -85,15 +91,18 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
         sendTo(ws, frameError(msg));
         return;
       }
-      const me = identity.status === 'resolved' ? identity : null;
-      // A spoof header /me doesn't honor (non-superadmin) is a rejection, not a silent keep.
+      const actor = identity.status === 'resolved' ? identity : null;
+      // A spoof header /identify doesn't honor (non-superadmin) is a rejection, not a silent keep.
       const spoofEmail = headers['x-spoof-user-email'];
-      if (spoofEmail && (!me || normalizeEmail(me.email) !== normalizeEmail(spoofEmail))) {
+      if (
+        spoofEmail &&
+        (!actor?.email || normalizeEmail(actor.email) !== normalizeEmail(spoofEmail))
+      ) {
         sendTo(ws, { type: 'spoofRejected' });
         return;
       }
-      setIdentity(ws, me?.id ?? null, me ? headers : {});
-      sendTo(ws, { type: 'identity', userId: me?.id ?? null });
+      setIdentity(ws, actor?.userId ?? null, actor ? headers : {});
+      sendTo(ws, { type: 'identity', userId: actor?.userId ?? null });
       return;
     }
     case 'logout': {
@@ -104,16 +113,18 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
     case 'subscribe': {
       const granted = await canSubscribe(ws.data.headers, msg.channel);
       if (!byId.has(ws.data.connectionId)) return;
-      if (!granted) {
+      const indexed = filedUnder(ws, msg.channel);
+      if (!granted || !indexed) {
         sendTo(ws, { type: 'subscribeRejected', channel: msg.channel });
         return;
       }
-      subscribeToChannel(ws, msg.channel);
+      subscribeToChannel(ws, indexed);
       sendTo(ws, { type: 'subscribed', channel: msg.channel });
       return;
     }
     case 'unsubscribe': {
-      unsubscribeFromChannel(ws, msg.channel);
+      const indexed = filedUnder(ws, msg.channel);
+      if (indexed) unsubscribeFromChannel(ws, indexed);
       sendTo(ws, { type: 'unsubscribed', channel: msg.channel });
       return;
     }

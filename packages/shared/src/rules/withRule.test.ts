@@ -38,34 +38,36 @@ const arms = {
 
 describe('withRule', () => {
   it('accepts a vocabulary provider in place of a lens', () => {
-    const live = new Set([referenceKey({ model: 'Tag', id: 'tag-1' })]);
+    const existingTargets = new Set([referenceKey({ model: 'Tag', id: 'tag-1' })]);
     const provider = {
       vocabularyIssues: (rule: Condition) => ('field' in (rule as object) ? [] : ['not a leaf']),
     };
-    expect(withRule({ lens: provider, rule: tagged, references: tagRef, live }, arms)).toEqual([
+    expect(
+      withRule({ lens: provider, rule: tagged, references: tagRef, existingTargets }, arms),
+    ).toEqual(['sound']);
+    expect(
+      withRule({ lens: provider, rule: { all: [] }, references: [], existingTargets }, arms),
+    ).toEqual(['vocabulary']);
+  });
+
+  it('runs the sound arm when the lens admits the rule and every referenced row exists', () => {
+    const existingTargets = new Set([referenceKey({ model: 'Tag', id: 'tag-1' })]);
+    expect(withRule({ lens, rule: tagged, references: tagRef, existingTargets }, arms)).toEqual([
       'sound',
     ]);
-    expect(withRule({ lens: provider, rule: { all: [] }, references: [], live }, arms)).toEqual([
-      'vocabulary',
-    ]);
   });
 
-  it('runs the sound arm when the lens admits the rule and every named row is live', () => {
-    const live = new Set([referenceKey({ model: 'Tag', id: 'tag-1' })]);
-    expect(withRule({ lens, rule: tagged, references: tagRef, live }, arms)).toEqual(['sound']);
+  it('a named row outside the existing-target set is a reference issue — absence is the answer', () => {
+    expect(
+      withRule({ lens, rule: tagged, references: tagRef, existingTargets: new Set() }, arms),
+    ).toEqual(['reference']);
   });
 
-  it('a named row outside the live set is a reference issue — absence is the answer', () => {
-    expect(withRule({ lens, rule: tagged, references: tagRef, live: new Set() }, arms)).toEqual([
-      'reference',
-    ]);
-  });
-
-  it('no live set means nothing was confirmed, so every named row is a reference issue', () => {
+  it('no existing-target set means nothing was confirmed, so every named row is a reference issue', () => {
     expect(withRule({ lens, rule: tagged, references: tagRef }, arms)).toEqual(['reference']);
   });
 
-  it('a rule with no references and no live set is sound — there is nothing to confirm', () => {
+  it('a rule with no references and no existing-target set is sound — there is nothing to confirm', () => {
     const plain: Condition = { field: 'tier', operator: 'equals', value: 'gold' };
     expect(withRule({ lens, rule: plain, references: [] }, arms)).toEqual(['sound']);
   });

@@ -29,7 +29,7 @@ export default defineConfig({
   ],
   clearScreen: false,
   server: {
-    port: 3002,
+    port: Number(new URL(process.env.VITE_SUPERADMIN_URL ?? 'http://localhost:3002').port),
     watch: {
       ignored: ['**/routeTree.gen.ts'],
     },

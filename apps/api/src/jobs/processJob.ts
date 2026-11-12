@@ -39,7 +39,7 @@ const runJob = async (
           async () => {
             addLogBroadcast((_level, msg) => job.log(msg));
 
-            const ctx: WorkerContext = { db, queue, job };
+            const ctx: WorkerContext = { queue, job };
 
             log.info(`Processing job ${job.name} (${job.id})`);
 

@@ -16,7 +16,8 @@ Always use the scripts. The `bashMainCheckoutGuard` hook denies a raw `git workt
 | `bun run worktree:create <base-branch> <new-branch> [--skip-db]` | Checks Docker/Postgres up front, allocates a slot (1–9) under a per-slot lock and records it in `.worktrees/.slots/<N>`, creates the git worktree at `.worktrees/<name>/`, generates slot-specific `.env.local` / `.env.test` (root and `apps/*`) synced against the branch's `.env.*.example`, creates the Postgres `<project>_wt_<N>` and `<project>_test_wt_<N>` databases and MinIO buckets, runs `bun install` and verifies workspace resolution, builds the gitignored artifacts (route trees, Prisma client + `prismaMap.gen.ts` + zod, OpenAPI spec + SDK + MSW handlers), pushes the Prisma schema to both DBs, and warns about any worktrees whose branches are already merged into the default branch. Refuses when `<new-branch>` already exists (attach it instead). `--skip-db` skips the Docker gate, databases, buckets, and schema push. |
 | `bun run worktree:create <existing-branch> [--skip-db]` | Same, but attaches an existing local/`origin` branch to a new worktree (useful for PR review without disturbing the main checkout). |
 | `bun run worktree:list` | Shows every worktree with its slot, branch, and assigned ports. |
-| `bun run worktree:destroy <name> [--force]` | Requires a worktree registered with THIS repository's `.git` (an independent repository under `.worktrees/` is refused), or a half-created directory whose `.git` FILE points under this repository's `.git/worktrees/` at a gitdir that no longer exists (removed and pruned). A `.git` file whose gitdir still exists — here (a worktree moved by hand) or at another checkout — is refused with a `git worktree repair` hint and nothing is deleted; a directory with no `.git` at all is refused. Normalises the typed name to the on-disk spelling on a case-insensitive filesystem, prints whether the branch is merged into the default branch, refuses a worktree with uncommitted or untracked changes unless `--force`, drops the Postgres databases, removes the MinIO buckets one by one with the same `STORAGE_*` values from the root `.env.local` that provisioning used (each bucket is listed first: `already absent` when it is not there, `removed` only when it existed and the post-check shows it gone, `could NOT remove` otherwise), `FLUSHDB` on Redis DB `<N>`, kills every listener on the worktree's four ports, removes the git worktree, frees the slot. |
+| `bun run worktree:ports [<name>]` | Re-applies the registry ports to a checkout's env files: this checkout, or `.worktrees/<name>`. The main checkout gets the project's base, a worktree its slot's. `bun run setup` runs it too, and `worktree:list` names every checkout whose env files are on other ports. Restart running servers afterwards. |
+| `bun run worktree:destroy <name> [--force]` | Requires a worktree registered with THIS repository's `.git` (an independent repository under `.worktrees/` is refused), or a half-created directory whose `.git` FILE points under this repository's `.git/worktrees/` at a gitdir that no longer exists (removed and pruned). A `.git` file whose gitdir still exists — here (a worktree moved by hand) or at another checkout — is refused with a `git worktree repair` hint and nothing is deleted; a directory with no `.git` at all is refused. Normalises the typed name to the on-disk spelling on a case-insensitive filesystem, prints whether the branch is merged into the default branch, refuses a worktree with uncommitted or untracked changes unless `--force`, drops the Postgres databases, removes the MinIO buckets one by one with the same `STORAGE_*` values from the root `.env.local` that provisioning used (each bucket is listed first: `already absent` when it is not there, `removed` only when it existed and the post-check shows it gone, `could NOT remove` otherwise), `FLUSHDB` on Redis DB `<N>`, kills every listener on the slot's ports (web, admin, superadmin, api, http), removes the git worktree, frees the slot. |
 
 `<name>` for destroy is the worktree directory name (the branch with slashes replaced by dashes). Get it from `bun run worktree:list`.
 
@@ -41,14 +42,15 @@ A bare `git worktree add` lands you in a fresh checkout with **no `node_modules`
 
 ## Slot anatomy
 
-Each slot (1–9) gets a unique set of resources. If `WORKTREE_SLOT=3` (and `PROJECT_NAME=template`):
+Each slot (1–9) gets a unique set of resources. Ports come from the `@inixiative/config` port registry (`ports.json`; print a project's with `bunx @inixiative/config ports <project>`): the project's block is its base, the main checkout runs on the base, and slot N adds 10 × N. Projects never share ports, and neither do slots. If `WORKTREE_SLOT=3` (and `PROJECT_NAME=template`, block 1, base web 3100 / api 8100):
 
 | Resource | Value |
 |---|---|
-| Web port | `3300` |
-| Admin port | `3301` |
-| Superadmin port | `3302` |
-| API port | `8300` |
+| Web port | `3130` |
+| Admin port | `3131` |
+| Superadmin port | `3132` |
+| API port | `8130` |
+| Other app with a `PORT` (registry `http`) | `4130` |
 | Postgres local DB | `template_wt_3` |
 | Postgres test DB | `template_test_wt_3` |
 | Redis DB index | `3` |
@@ -56,7 +58,7 @@ Each slot (1–9) gets a unique set of resources. If `WORKTREE_SLOT=3` (and `PRO
 
 Slot ownership is recorded in two places (the lock in `.worktrees/.locks/slot-<N>` is held from allocation until the script exits, so a second create running seconds later moves on to the next slot): `.worktrees/.slots/<N>` (one file per slot, containing the owning worktree's path — the registry) and `WORKTREE_SLOT=<N>` on the **first line** of the worktree's `.env.local` and `.env.test` (the marker). Don't edit either. A slot counts as taken when the registry names a registered worktree for it, or when any registered worktree carries the marker **or** references the slot's database names in any of its env files — so a worktree that lost its marker still owns its slot. A registry entry counts as a claim even before its directory exists; an entry whose directory is missing is removed (with a notice) only when no lock for that slot exists and the entry is older than 120 seconds. An empty entry is corrupt (`worktree:list` warns, create removes it with a notice); a relative entry is resolved against `.worktrees/` and rewritten absolute; an entry that is a directory rather than a file is a hard error with the repair hint (each file in `.worktrees/.slots/` is named after a slot and contains the absolute worktree path). Slot evidence (`WORKTREE_SLOT`, the `DATABASE_URL` database name) is read through the env parser, so quoted or commented lines count the way `source` would see them; the project-name prefix is matched literally. Two entries naming one worktree are resolved by the next create: it keeps the slot the worktree's `WORKTREE_SLOT` marker names, or the newest entry when the marker names neither, and removes the others with a notice saying which rule applied; `worktree:list` warns until then. The lock reclaim (`kill -0` on the pid, or mtime for a pid-less lock — `stat -c %Y` where it works, else `stat -f %m`, else the current time with a warning, so BusyBox does not abort) renames the stale lock before deleting it, so two reclaimers cannot both claim. A worktree whose files name **more than one** slot is a conflict: create reserves every slot it names and warns; destroy refuses to guess and asks you to fix the env files first.
 
-The main checkout uses slot 0 / default ports (`3000`, `3001`, `3002`, `8000`). It shows in `bun run worktree:list` as `(main)`.
+The main checkout is slot 0: the project's base ports (template `3100`, `3101`, `3102`, `8100`; Kingdom `3200`…`8200`; Tribe `3300`…`8300`). It shows in `bun run worktree:list` as `(main)`. A project missing from the registry is an error: add it to `ports.json` in `@inixiative/config`. An app's `PORT` in `apps/<app>/.env.local` is the registry service named after the app (`web`, `admin`, `superadmin`, `api`), or `http` for any other app.
 
 ## What `bun run worktree:create` runs (so you know what to expect)
 
@@ -120,7 +122,7 @@ If Docker is unreachable at destroy time it says so; the next `worktree:create` 
 |---|---|
 | `scripts/worktree/create.sh` | Full script — Docker pre-flight, slot lock + registry + allocation, env generation, DB/bucket setup, install + resolution check, generated artifacts, schema push, gap summary |
 | `scripts/worktree/destroy.sh` | Cleanup logic — registration check, slot validation, shared-slot skip, DB drop, bucket removal, Redis flush, port kill, worktree remove |
-| `scripts/worktree/lib.sh` | Shared helpers — `main_checkout_root`, `default_branch`, `resolve_docker`, `slot_resources`, `worktree_slots`, `slot_claimant`, `claim_slot_lock`, `register_slot`, `ensure_env_var`, `rewrite_database_url`, `kill_port_listeners`, `run_step`, `require_artifact` |
+| `scripts/worktree/lib.sh` | Shared helpers — `main_checkout_root`, `default_branch`, `resolve_docker`, `slot_resources` / `set_slot_ports` / `apply_slot_ports` (registry ports), `worktree_slots`, `slot_claimant`, `claim_slot_lock`, `register_slot`, `ensure_env_var`, `rewrite_database_url`, `kill_port_listeners`, `run_step`, `require_artifact` |
 | `scripts/worktree/list.sh` | Output format and how the slot is read from `.env.local` |
 | `.claude/hooks/bashMainCheckoutGuard.ts` | The PreToolUse / SessionStart hook described above; `.claude/hooks/tests/` has its tests (`__TEST_REDIRECT__=1 bun test ./.claude/hooks/tests/bashMainCheckoutGuard.test.ts`) |
 | `scripts/setup/sync-env.sh` | What the env sync appends (keys the branch's examples have that the copied file lacks, whole quoted values included; never overwrites a value) |
@@ -137,7 +139,7 @@ If Docker is unreachable at destroy time it says so; the next `worktree:create` 
 | Editing files in the main repo when you meant to work in a worktree | `cd .worktrees/<name>` first; verify with `git rev-parse --show-toplevel` |
 | Dispatching a subagent without the worktree path in the prompt | Always include `Work entirely in <absolute path>. Do NOT touch the main repo path.` |
 | Leaving merged worktrees around | Run `bun run worktree:destroy <name>` after merge; the script also warns you on every create |
-| Hardcoding slot ports | Don't — read them from the worktree's `.env.local` |
+| Hardcoding slot ports | Don't — read them from the worktree's `.env.local`, or `bunx @inixiative/config ports <project>` + 10 × slot |
 | Editing `WORKTREE_SLOT=<N>` in `.env.local` or `.worktrees/.slots/<N>` | Slot is auto-allocated; don't manually shuffle — a mismatch between the two is a conflict destroy refuses to resolve for you |
 
 ## Anti-patterns

@@ -20,6 +20,7 @@ type SourceRow = Record<string, unknown>;
 export type SourceQueryScope = {
   lens: Lens | LensNarrowing;
   farSide?: (query: SourceQuery, candidates: SourceRow[]) => Promise<SourceRow[]>;
+  among?: unknown[];
 };
 
 export const compiledSourceWhere = async (query: SourceQuery): Promise<Record<string, unknown>> =>
@@ -27,14 +28,15 @@ export const compiledSourceWhere = async (query: SourceQuery): Promise<Record<st
     ? executePrismaPlan({ steps: query.prisma.steps }, db as never)
     : query.prisma.where;
 
+/** The source's options; with `among`, only those of these values, read in one bounded query. */
 export const sourceQueryValues = async (
   query: SourceQuery,
-  { lens, farSide }: SourceQueryScope,
-  where: Record<string, unknown> = {},
+  { lens, farSide, among }: SourceQueryScope,
 ): Promise<SourceValues> => {
   const { select, distinct } = query.prisma;
+  const where = await compiledSourceWhere(query);
   const candidates = (await db.delegate(query.model).findMany({
-    where: andWhere([await compiledSourceWhere(query), where]),
+    where: among ? andWhere([where, { [query.field]: { in: among } }]) : where,
     select,
     ...(distinct ? { distinct } : {}),
   })) as SourceRow[];

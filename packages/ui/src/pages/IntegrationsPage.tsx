@@ -12,12 +12,27 @@ import type {
   OrganizationReadManyIntegrationsResponse,
   SpaceReadManyIntegrationsResponse,
 } from '@template/sdk';
-import { Badge, Button, Card, Page } from '@template/ui/components';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Page,
+} from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
-import { useInfiniteDataQuery, useInfiniteScrollTrigger, useMutation } from '@template/ui/hooks';
+import {
+  createOptimisticListTarget,
+  useInfiniteDataQuery,
+  useInfiniteScrollTrigger,
+  useOptimisticMutation,
+} from '@template/ui/hooks';
 import { getContextParams } from '@template/ui/lib/getContextParams';
 import {
   type IntegrationListQuery,
+  type IntegrationOwnerScope,
   integrationContextQueries,
 } from '@template/ui/lib/integrationContextQueries';
 import {
@@ -48,8 +63,14 @@ const statusBadges: Record<
 
 const BUCKET_PAGE_SIZE = 100;
 
+const bucketQueryFor = (provider: IntegrationProvider | null): IntegrationListQuery => ({
+  searchFields: { provider: { equals: provider } },
+  pageSize: BUCKET_PAGE_SIZE,
+});
+
 export type IntegrationConnectFlowProps = {
   context: AuthenticatedContext;
+  scope?: IntegrationOwnerScope;
   onClose: () => void;
   onConnected: () => void;
 };
@@ -64,6 +85,7 @@ type IntegrationsPageProps = {
 
 type IntegrationBucketProps = {
   context: AuthenticatedContext;
+  scope?: IntegrationOwnerScope;
   provider: IntegrationProvider | null;
   label: string;
   icon: string;
@@ -78,6 +100,7 @@ type IntegrationBucketProps = {
 
 const IntegrationBucket = ({
   context,
+  scope,
   provider,
   label,
   icon,
@@ -89,11 +112,8 @@ const IntegrationBucket = ({
   onAct,
   onDelete,
 }: IntegrationBucketProps) => {
-  const integrationQueries = integrationContextQueries(context);
-  const bucketQuery: IntegrationListQuery = {
-    searchFields: { provider: { equals: provider } },
-    pageSize: BUCKET_PAGE_SIZE,
-  };
+  const integrationQueries = integrationContextQueries(context, scope);
+  const bucketQuery = bucketQueryFor(provider);
 
   const bucket = useInfiniteDataQuery<Integration>({
     queryKey: integrationQueries.readManyQueryKey(bucketQuery),
@@ -182,27 +202,55 @@ const IntegrationBucket = ({
   );
 };
 
-export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) => {
+type IntegrationOwnerSectionProps = {
+  context: AuthenticatedContext;
+  scope?: IntegrationOwnerScope;
+  connectFlows: IntegrationConnectFlows;
+  sectionKey: string;
+  title?: string;
+  description?: string;
+};
+
+const IntegrationOwnerSection = ({
+  context,
+  scope,
+  connectFlows,
+  sectionKey,
+  title,
+  description,
+}: IntegrationOwnerSectionProps) => {
   const [connectingProvider, setConnectingProvider] = useState<
     IntegrationProvider | null | undefined
   >(undefined);
   const queryClient = useQueryClient();
-  const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const permissions = useAppStore((state) => state.permissions);
-  const integrationQueries = integrationContextQueries(context);
-  const canManage = permissions.check(...getContextParams(context), 'manage');
+  const integrationQueries = integrationContextQueries(context, scope);
+  const canManage = scope?.member || permissions.check(...getContextParams(context), 'manage');
 
   const refreshIntegrations = () =>
     queryClient.invalidateQueries({ queryKey: integrationQueries.readManyQueryKey() });
 
-  const createMutation = useMutation({
+  const bucketQueryKeyFor = (provider: IntegrationProvider | null) =>
+    integrationQueries.readManyQueryKey(bucketQueryFor(provider));
+
+  const createMutation = useOptimisticMutation({
     mutationFn: integrationQueries.create.mutationFn,
-    onSuccess: refreshIntegrations,
+    targets: (variables) => [
+      createOptimisticListTarget<Integration>({
+        queryKey: bucketQueryKeyFor(variables?.body.provider ?? null),
+        operation: 'create',
+      }),
+    ],
   });
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: integrationQueries.delete.mutationFn,
-    onSuccess: refreshIntegrations,
+    targets: [...integrationProviderValues, null].map((provider) =>
+      createOptimisticListTarget<Integration>({
+        queryKey: bucketQueryKeyFor(provider),
+        operation: 'delete',
+      }),
+    ),
   });
 
   const handleCreate = (body: Pick<MeCreateIntegrationData['body'], 'name' | 'provider'>) => {
@@ -218,48 +266,65 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
   const closeConnect = () => setConnectingProvider(undefined);
   const connectFlow = connectingProvider ? connectFlows[connectingProvider] : undefined;
 
-  return (
-    <>
-      <Page title="Integrations" description="Connect the services this workspace works with">
-        <div className="space-y-3">
-          {integrationProviderValues.map((provider) => {
-            const { label, icon } = integrationProviders[provider];
-            return (
-              <IntegrationBucket
-                key={provider}
-                context={context}
-                provider={provider}
-                label={label}
-                icon={icon}
-                actionLabel="Connect"
-                actionAriaLabel={`Connect ${label}`}
-                canAct={canConnect(provider)}
-                showStatus
-                canManage={canManage}
-                onAct={() => setConnectingProvider(provider)}
-                onDelete={handleDelete}
-              />
-            );
-          })}
+  const buckets = (
+    <div className="space-y-3">
+      {integrationProviderValues.map((provider) => {
+        const { label, icon } = integrationProviders[provider];
+        return (
           <IntegrationBucket
+            key={provider}
             context={context}
-            provider={null}
-            label={customIntegration.label}
-            icon={customIntegration.icon}
-            actionLabel="Add custom"
-            actionAriaLabel="Add custom"
-            canAct={canManage}
-            showStatus={false}
+            scope={scope}
+            provider={provider}
+            label={label}
+            icon={icon}
+            actionLabel="Connect"
+            actionAriaLabel={`Connect ${label}`}
+            canAct={canConnect(provider)}
+            showStatus
             canManage={canManage}
-            onAct={() => setConnectingProvider(null)}
+            onAct={() => setConnectingProvider(provider)}
             onDelete={handleDelete}
           />
-        </div>
-      </Page>
+        );
+      })}
+      <IntegrationBucket
+        context={context}
+        scope={scope}
+        provider={null}
+        label={customIntegration.label}
+        icon={customIntegration.icon}
+        actionLabel="Add custom"
+        actionAriaLabel="Add custom"
+        canAct={canManage}
+        showStatus={false}
+        canManage={canManage}
+        onAct={() => setConnectingProvider(null)}
+        onDelete={handleDelete}
+      />
+    </div>
+  );
+
+  return (
+    <>
+      {title ? (
+        <section className="space-y-3" data-testid={`integrations-section-${sectionKey}`}>
+          <Card>
+            <CardHeader>
+              <CardTitle>{title}</CardTitle>
+              {description ? <CardDescription>{description}</CardDescription> : null}
+            </CardHeader>
+            <CardContent>{buckets}</CardContent>
+          </Card>
+        </section>
+      ) : (
+        buckets
+      )}
 
       {connectFlow ? (
         connectFlow({
           context,
+          scope,
           onClose: closeConnect,
           onConnected: () => {
             closeConnect();
@@ -274,5 +339,45 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
         />
       )}
     </>
+  );
+};
+
+export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) => {
+  const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
+  const tenant = context.space ?? context.organization;
+  const hasMembership = useAppStore((state) =>
+    context.space
+      ? Boolean(state.auth.spaceUsers?.[context.space.id])
+      : context.organization
+        ? Boolean(state.auth.organizationUsers?.[context.organization.id])
+        : false,
+  );
+
+  return (
+    <Page title="Integrations" description="Connect the services this workspace works with">
+      {tenant ? (
+        <div className="space-y-6">
+          {hasMembership ? (
+            <IntegrationOwnerSection
+              context={context}
+              scope={{ member: true }}
+              connectFlows={connectFlows}
+              sectionKey="member"
+              title={`Yours in ${tenant.name}`}
+              description={`Services connected as you within ${tenant.name}. Only you and its owners see them.`}
+            />
+          ) : null}
+          <IntegrationOwnerSection
+            context={context}
+            connectFlows={connectFlows}
+            sectionKey="tenant"
+            title={`${tenant.name}'s integrations`}
+            description={`Services connected for all of ${tenant.name}.`}
+          />
+        </div>
+      ) : (
+        <IntegrationOwnerSection context={context} connectFlows={connectFlows} sectionKey="user" />
+      )}
+    </Page>
   );
 };

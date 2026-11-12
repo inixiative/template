@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type {
@@ -33,8 +34,15 @@ import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
-import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
+import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
 import { withLockUntilSettled } from '@template/db/lock/withLockUntilSettled';
+import { cacheAccessor } from '@template/db/redis/cache/telemetry/cacheAccessor';
+import {
+  type CacheOverlay,
+  isWrittenInTransaction,
+  newCacheOverlay,
+} from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
+import { publishKey } from '@template/db/redis/cache/transactionOverlay/publishKey';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import {
@@ -44,8 +52,10 @@ import {
   toModelName,
 } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
-import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import { incrementCounter } from '@template/shared/telemetry';
+import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
+import { uuidv7 } from 'uuidv7';
 
 const store = new AsyncLocalStorage<Scope>();
 
@@ -70,6 +80,17 @@ const throwIfFailures = (context: string, errors: unknown[]): void => {
 
 // Every callback runs even when one throws, and a failure is logged, never thrown: the finally
 // queue runs on the rollback path too, where rethrowing would mask the transaction's own error.
+// Every key runs even when one fails (db.parallel's allSettled, as the on-commit batches use); each
+// caller decides what a failure means.
+const publishKeys = (
+  overlay: CacheOverlay,
+  keys: string[],
+): Promise<PromiseSettledResult<void>[]> =>
+  db.parallel(
+    keys.map((key) => () => publishKey(overlay, key)),
+    { concurrency: getConcurrency([ConcurrencyType.redis]), resolution: 'allSettled' },
+  );
+
 const drainFinally = async (openTransaction: OpenTransaction | null): Promise<void> => {
   if (!openTransaction?.finallyFns.length) return;
   const fns = openTransaction.finallyFns.splice(0);
@@ -116,13 +137,14 @@ const dbMethods = {
     const existing = store.getStore();
     if (existing?.openTransaction) return fn();
 
-    const scope = existing ?? newScope(crypto.randomUUID(), null);
+    const scope = existing ?? newScope(uuidv7(), null);
     // The caller frame is the last point at which async-local storage is reliable.
     const bridgedContext = captureBridgedContext();
 
     const run = async () => {
       let opened: OpenTransaction | null = null;
       let settled: { result: T; openTransaction: OpenTransaction };
+      let cacheFailures: unknown[] = [];
       try {
         settled = await db.raw.$transaction(
           async (transactionClient) => {
@@ -135,6 +157,7 @@ const dbMethods = {
               heldLocks: new Map(),
               settled: false,
               bridgedContext,
+              cacheOverlay: newCacheOverlay(),
             };
             opened = openTransaction;
             scope.openTransaction = openTransaction;
@@ -161,6 +184,10 @@ const dbMethods = {
             ...(options?.maxWait ? { maxWait: options.maxWait } : {}),
           },
         );
+        const written = await publishKeys(settled.openTransaction.cacheOverlay, [
+          ...settled.openTransaction.cacheOverlay.written,
+        ]);
+        cacheFailures = written.flatMap((r) => (r.status === 'rejected' ? [r.reason] : []));
       } finally {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a
         // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
@@ -169,21 +196,39 @@ const dbMethods = {
         await drainFinally(opened);
       }
       const { result, openTransaction } = settled;
+      // Keys the transaction only read publish after the locks drop; a failure costs only the warm-up.
+      const overlay = openTransaction.cacheOverlay;
+      const warmKeys = [...overlay.values.keys()].filter(
+        (key) => !isWrittenInTransaction(overlay, key),
+      );
+      const warm = await publishKeys(overlay, warmKeys);
+      for (const [i, key] of warmKeys.entries()) {
+        const r = warm[i];
+        if (r?.status !== 'rejected') continue;
+        log.error(`Failed to publish cache key ${key} after commit:`, r.reason, LogScope.db);
+        incrementCounter('cache.publish.failed', 1, { accessor: cacheAccessor(key) });
+      }
 
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
       // onCommit handler) drains its own and a rollback discards these with the object.
       const batches = openTransaction.afterCommitBatches;
-      for (const batch of batches) {
-        const results = await db.parallel(
-          batch.fns.map((fn) => () => Promise.resolve(fn())),
-          { concurrency: batch.concurrency, resolution: 'allSettled' },
-        );
+      const failures = [...cacheFailures];
+      try {
+        for (const batch of batches) {
+          const results = await db.parallel(
+            batch.fns.map((fn) => () => Promise.resolve(fn())),
+            { concurrency: batch.concurrency, resolution: 'allSettled' },
+          );
 
-        throwIfFailures(
-          'db.onCommit() callback failed',
-          results.filter((result) => result.status === 'rejected').map((result) => result.reason),
-        );
+          throwIfFailures(
+            'db.onCommit() callback failed',
+            results.filter((result) => result.status === 'rejected').map((result) => result.reason),
+          );
+        }
+      } catch (error) {
+        failures.unshift(error);
       }
+      throwIfFailures('db.txn() after-commit work failed', failures);
       return result;
     };
 
@@ -222,7 +267,7 @@ const dbMethods = {
     }
     const parent = store.getStore();
     const inOwnScope = (thunk: () => Promise<T>) =>
-      store.run(newScope(crypto.randomUUID(), parent?.scopeContext ?? null), thunk);
+      store.run(newScope(uuidv7(), parent?.scopeContext ?? null), thunk);
     if (options?.resolution === 'allSettled') {
       return resolveAll(
         thunks.map((thunk) => async (): Promise<PromiseSettledResult<T>> => {
@@ -253,7 +298,11 @@ const dbMethods = {
 
   isInTxn: (): boolean => !!store.getStore()?.openTransaction,
 
-  // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
+  cacheOverlay: (): CacheOverlay | null => store.getStore()?.openTransaction?.cacheOverlay ?? null,
+
+  // Raw SELECT * FOR NO KEY UPDATE (the lock an UPDATE takes): other lockers, updaters and deleters of
+  // the row wait, inserts of rows that reference it do not. `changesKey: true` takes FOR UPDATE.
+  // Scalar columns only, no relations/includes; load related data separately.
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
   // the where-key itself (see acquireFindForUpdateLock) and returns the rows it currently names. One
   // field may list values as `{ in: [...] }` to fence a batch of such rows, each under the key a
@@ -300,12 +349,12 @@ const dbMethods = {
     if (options?.upserting)
       await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
     return db.$queryRaw<T[]>(
-      Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
+      Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} ${Prisma.raw(options?.changesKey ? 'FOR UPDATE' : 'FOR NO KEY UPDATE')}`,
     );
   },
 
   withLockUntilSettled: async <T>(
-    options: LockOptions,
+    options: LockOptions & LockTarget,
     fn: () => Promise<T>,
     acquireOptions?: AcquireOptions,
   ): Promise<T> => {

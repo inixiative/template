@@ -1,5 +1,5 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db, unregisterDbHook } from '@template/db';
 import {
   ContactType,
   TagOwnerModel,
@@ -15,6 +15,7 @@ import {
   createEmailTemplate,
   createIntegration,
   createOrganization,
+  createProject,
   createSpace,
   createSpaceUser,
   createTag,
@@ -24,25 +25,12 @@ import {
   createWebhookSubscription,
   getNextSeq,
 } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
-
-// Register only the hooks that affect data shape during create — the rules
-// hook (polymorphism), contactRules (computes valueKey), tagOwnerCategory
-// (tag↔category check). We avoid registerHooks() because it also wires up
-// the outbound webhook hook which signs payloads with PEM keys not present
-// in the test env.
-registerRulesHook();
-registerContactRulesHook();
-registerTagOwnerCategoryHook();
 
 const seq = (prefix: string) => `${prefix}-${getNextSeq()}`;
 
 describe('partial unique constraints', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   describe('Contact: per-(userId, type, valueKey)', () => {
@@ -193,6 +181,60 @@ describe('partial unique constraints', () => {
     });
   });
 
+  describe('Project: one partial unique per ownerModel', () => {
+    it('allows the same name across all five owner kinds', async () => {
+      const { context } = await createSpaceUser();
+      const { user, organization, space } = context;
+      const name = seq('project');
+      await createProject({ name, ownerModel: 'User', userId: user.id });
+      await createProject({
+        name,
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: user.id,
+      });
+      await createProject({ name, ownerModel: 'Organization', organizationId: organization.id });
+      await createProject({
+        name,
+        ownerModel: 'Space',
+        organizationId: organization.id,
+        spaceId: space.id,
+      });
+      await createProject({
+        name,
+        ownerModel: 'SpaceUser',
+        organizationId: organization.id,
+        spaceId: space.id,
+        userId: user.id,
+      });
+      expect(await db.project.count({ where: { name } })).toBe(5);
+    });
+
+    it('blocks two projects with the same name on the same space member', async () => {
+      const { context } = await createSpaceUser();
+      const { user, organization, space } = context;
+      const name = seq('project-dupe');
+      const row = {
+        name,
+        ownerModel: 'SpaceUser' as const,
+        organizationId: organization.id,
+        spaceId: space.id,
+        userId: user.id,
+      };
+      await createProject(row);
+      await expect(createProject(row)).rejects.toThrow();
+    });
+
+    it('allows the same name again once the first is soft-deleted', async () => {
+      const { entity: user } = await createUser();
+      const name = seq('project-revived');
+      const first = await createProject({ name, ownerModel: 'User', userId: user.id });
+      await db.project.update({ where: { id: first.entity.id }, data: { deletedAt: new Date() } });
+      const second = await createProject({ name, ownerModel: 'User', userId: user.id });
+      expect(second.entity.deletedAt).toBeNull();
+    });
+  });
+
   describe('Integration: one partial unique per ownerModel', () => {
     it('allows the same name across all five owner kinds', async () => {
       const { context } = await createSpaceUser();
@@ -299,6 +341,8 @@ describe('partial unique constraints', () => {
     });
 
     it("allows the same (slug, locale) across 'default' and 'admin'", async () => {
+      // The index allows it; the slug reservation hook is the one that refuses.
+      unregisterDbHook('emailTemplateSlugReservation');
       const slug = seq('tpl-cross-platform');
       await createEmailTemplate({ slug, locale: 'en', ownerModel: 'default' });
       const second = await createEmailTemplate({ slug, locale: 'en', ownerModel: 'admin' });

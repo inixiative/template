@@ -10,7 +10,7 @@ import type {
   EmailOwnerModel,
   EmailTemplate,
 } from '@template/db/generated/client/client';
-import { EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
+import { visitTemplateBlocks } from '@template/email/render/conditionParser';
 import { decomposeNodes } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
@@ -20,12 +20,7 @@ import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
 import { validateDependents } from '@template/email/render/validateDependents';
-import {
-  componentRuleContents,
-  type EmailLens,
-  syncRuleReferences,
-  templateRuleContents,
-} from '@template/email/rules';
+import type { EmailLens } from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 import { validateNoCycle } from '@template/email/validations/validateNoCycle';
@@ -55,20 +50,17 @@ export type SaveTemplateOptions = {
 
 const withoutConditionals = (mjml: string): string => {
   let out = '';
-  let i = 0;
-  while (i < mjml.length) {
-    const ifIdx = mjml.indexOf(IF, i);
-    const eachIdx = mjml.indexOf(EACH, i);
-    if (ifIdx === -1 && eachIdx === -1) {
-      out += mjml.slice(i);
-      break;
-    }
-    const isEach = eachIdx !== -1 && (ifIdx === -1 || eachIdx < ifIdx);
-    const open = isEach ? eachIdx : ifIdx;
-    out += mjml.slice(i, open);
-    const block = isEach ? parseEachBlock(mjml, open) : parseIfBlock(mjml, open);
-    i = block ? block.end : open + (isEach ? EACH.length : IF.length);
-  }
+  visitTemplateBlocks<boolean>(
+    mjml,
+    {
+      text: (text, { state: isNested }) => {
+        if (!isNested) out += text;
+      },
+      branch: () => true,
+      loop: () => true,
+    },
+    { bindings: new Map(), state: false },
+  );
   return out;
 };
 
@@ -80,22 +72,11 @@ export const ownerScopeOf = (input: SaveTemplateInput): OwnerScope => ({
   locale: input.locale ?? 'en',
 });
 
-/** Components saved and their rule references synced, inside the caller's transaction. */
-export const saveEmailComponents = async (
+export const saveEmailComponents = (
   inputs: EmailComponent[],
   ctx: OwnerScope,
   lens?: EmailLens,
-): Promise<EmailComponent[]> => {
-  const components = await saveComponents(inputs, ctx, lens);
-  for (const component of components) {
-    await syncRuleReferences(
-      { model: 'EmailComponent', id: component.id },
-      componentRuleContents(component),
-      lens,
-    );
-  }
-  return components;
-};
+): Promise<EmailComponent[]> => saveComponents(inputs, ctx, lens);
 
 export const saveEmailTemplate = async (
   input: SaveTemplateInput,
@@ -137,12 +118,6 @@ export const saveEmailTemplate = async (
         ? await saveEmailComponents(finalComponents, ctx, options.lens)
         : [];
       const template = await saveTemplate(finalTemplate, ctx);
-
-      await syncRuleReferences(
-        { model: 'EmailTemplate', id: template.id },
-        templateRuleContents(template),
-        options.lens,
-      );
 
       const composed = await expand(template.mjml, ctx);
       assertValidConditions(composed, { lens: options.lens });

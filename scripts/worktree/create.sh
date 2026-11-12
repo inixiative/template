@@ -259,12 +259,7 @@ fi
 prepend_slot_marker "$WT_ENV" "$SLOT"
 prepend_slot_marker "$WT_TEST_ENV" "$SLOT"
 
-ensure_env_var "$WT_ENV" PORT "$API_PORT"
-ensure_env_var "$WT_ENV" API_URL "http://localhost:${API_PORT}"
-ensure_env_var "$WT_ENV" WEB_URL "http://localhost:${WEB_PORT}"
-ensure_env_var "$WT_ENV" ADMIN_URL "http://localhost:${ADMIN_PORT}"
-ensure_env_var "$WT_ENV" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
-replace_env_var_if_present "$WT_ENV" BETTER_AUTH_BASE_URL "http://localhost:${API_PORT}"
+apply_slot_ports "$WORKTREE_DIR" "$SLOT"
 ensure_env_var "$WT_ENV" STORAGE_BUCKET_SYSTEM "$STORAGE_BUCKET_SYSTEM"
 ensure_env_var "$WT_ENV" STORAGE_BUCKET_USER "$STORAGE_BUCKET_USER"
 rewrite_database_url "$WT_ENV" "$DB_LOCAL"
@@ -273,10 +268,6 @@ rewrite_redis_db "$WT_ENV" "$REDIS_DB"
 if [ -f "$WT_TEST_ENV" ]; then
   ensure_env_var "$WT_TEST_ENV" STORAGE_BUCKET_SYSTEM "$STORAGE_BUCKET_SYSTEM_TEST"
   ensure_env_var "$WT_TEST_ENV" STORAGE_BUCKET_USER "$STORAGE_BUCKET_USER_TEST"
-  replace_env_var_if_present "$WT_TEST_ENV" API_URL "http://localhost:${API_PORT}"
-  replace_env_var_if_present "$WT_TEST_ENV" WEB_URL "http://localhost:${WEB_PORT}"
-  replace_env_var_if_present "$WT_TEST_ENV" ADMIN_URL "http://localhost:${ADMIN_PORT}"
-  replace_env_var_if_present "$WT_TEST_ENV" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
   rewrite_database_url "$WT_TEST_ENV" "$DB_TEST"
   rewrite_redis_db "$WT_TEST_ENV" "$REDIS_DB"
 else
@@ -285,17 +276,11 @@ fi
 
 for f in "$WORKTREE_DIR"/apps/*/.env.local; do
   [ -f "$f" ] || continue
-  replace_env_var_if_present "$f" PORT "$API_PORT"
-  replace_env_var_if_present "$f" API_URL "http://localhost:${API_PORT}"
-  replace_env_var_if_present "$f" WEB_URL "http://localhost:${WEB_PORT}"
-  replace_env_var_if_present "$f" ADMIN_URL "http://localhost:${ADMIN_PORT}"
-  replace_env_var_if_present "$f" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
   rewrite_database_url "$f" "$DB_LOCAL"
   rewrite_redis_db "$f" "$REDIS_DB"
 done
 for f in "$WORKTREE_DIR"/apps/*/.env.test; do
   [ -f "$f" ] || continue
-  replace_env_var_if_present "$f" API_URL "http://localhost:${API_PORT}"
   rewrite_database_url "$f" "$DB_TEST"
   rewrite_redis_db "$f" "$REDIS_DB"
 done
@@ -397,6 +382,10 @@ echo "  Web:         http://localhost:${WEB_PORT}"
 echo "  Admin:       http://localhost:${ADMIN_PORT}"
 echo "  Superadmin:  http://localhost:${SUPERADMIN_PORT}"
 echo "  API:         http://localhost:${API_PORT}"
+for f in "$WORKTREE_DIR"/apps/*/.env.local; do
+  app="$(basename "$(dirname "$f")")"
+  registry_has_service "$app" || ! env_has_key "$f" PORT || printf '  %-12s http://localhost:%s\n' "${app}:" "$HTTP_PORT"
+done
 if [ "$SKIP_DB" -eq 1 ]; then
   echo "  DB:          none (--skip-db)"
   echo "  Buckets:     none (--skip-db)"

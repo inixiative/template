@@ -139,11 +139,13 @@ describe('artifact routes', () => {
     });
     const mockToken: TokenWithRelations = {
       ...token,
+      targetEntitlements: [],
       user: member,
       organization: null,
       organizationUser: null,
       space: null,
       spaceUser: null,
+      integration: null,
     };
     const tokenFetch = createTestApp({
       mockUser: member,
@@ -204,11 +206,13 @@ describe('artifact routes', () => {
       mockSpaceUsers: [spaceUser],
       mockToken: {
         ...token,
+        targetEntitlements: [],
         user: member,
         organization: null,
         organizationUser: null,
         space: null,
         spaceUser: null,
+        integration: null,
       },
       mount,
     }).fetch;

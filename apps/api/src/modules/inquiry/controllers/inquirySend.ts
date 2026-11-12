@@ -10,6 +10,10 @@ import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
 import { sendInquiry } from '#/modules/inquiry/services/sendInquiry';
 
 export const inquirySendController = makeController(inquirySendRoute, async (c, respond) => {
-  const sent = await sendInquiry(c, getResource<'inquiry'>(c));
+  const sent = await sendInquiry(
+    c,
+    getResource<'inquiry'>(c),
+    c.req.valid('json').expectedUpdatedAt,
+  );
   return respond.ok(sent);
 });

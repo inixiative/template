@@ -5,36 +5,56 @@
 ## Contents
 
 - [Overview](#overview)
+- [The Model](#the-model)
+  - [Vocabulary](#vocabulary)
+  - [Tenants and Members](#tenants-and-members)
+  - [Delegates](#delegates)
 - [Roles](#roles)
   - [PlatformRole](#platformrole)
   - [Role](#role)
   - [Role Hierarchy](#role-hierarchy)
 - [Actions](#actions)
-  - [Role → Action Mapping](#role--action-mapping)
-  - [roleToStandardAction](#roletostandardaction)
-- [Permix](#permix)
-  - [API](#api)
-  - [How It Works](#how-it-works)
-  - [Superadmin Bypass](#superadmin-bypass)
-- [Permission Setup](#permission-setup)
-  - [setupOrgContext](#setuporgcontext)
-  - [setupUserContext](#setupusercontext)
-  - [setupSpacePermissions](#setupspacepermissions)
-  - [Token Permission Restriction](#token-permission-restriction)
-  - [Role Validation](#role-validation)
-- [Permission Checks](#permission-checks)
-  - [In Controllers](#in-controllers)
-  - [Via Validation Middleware](#via-validation-middleware)
-    - [Resource Lookup Runs Before Authorization](#resource-lookup-runs-before-authorization)
+  - [Every Action Is an Action on the Record](#every-action-is-an-action-on-the-record)
+  - [The Standard Chain](#the-standard-chain)
+  - [Actions on Their Own Models](#actions-on-their-own-models)
+  - [Person-Only Actions](#person-only-actions)
+  - [The Actor](#the-actor)
+- [Member Rows](#member-rows)
+  - [The Member Self-Grant](#the-member-self-grant)
+  - [Role Assignment](#role-assignment)
+- [Integrations and Tokens by Owner Kind](#integrations-and-tokens-by-owner-kind)
+  - [Integrations](#integrations)
+  - [Creating an Integration](#creating-an-integration)
+  - [Tokens](#tokens)
+  - [Minting a Token](#minting-a-token)
+- [Full and delegateFull](#full-and-delegatefull)
+  - [What Full Is](#what-full-is)
+  - [Who May Set It](#who-may-set-it)
+  - [The Backstop Rules](#the-backstop-rules)
+- [Resolution at Read Time](#resolution-at-read-time)
+  - [Hydration](#hydration)
+  - [installPermissions](#installpermissions)
+  - [permissionsOfUser](#permissionsofuser)
+  - [ownerPermissions](#ownerpermissions)
+  - [delegatedPermissions](#delegatedpermissions)
+  - [A Token on a Member Row](#a-token-on-a-member-row)
+  - [Worked Example: I1](#worked-example-i1)
+  - [A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)
+- [Writing Delegates](#writing-delegates)
+  - [Integrations Are Delegates](#integrations-are-delegates)
+  - [An Integration's Role](#an-integrations-role)
+  - [Granting an Entitlement](#granting-an-entitlement)
 - [Entitlements](#entitlements)
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
-  - [Intersecting Entitlements](#intersecting-entitlements)
+  - [Changing Entitlements](#changing-entitlements)
+  - [The Path Names the Anchor and the Axis; the Where Narrows](#the-path-names-the-anchor-and-the-axis-the-where-narrows)
+- [Adding a Model](#adding-a-model)
+- [Permix](#permix)
 - [REBAC](#rebac)
   - [Schema](#schema)
   - [ActionRule Types](#actionrule-types)
   - [How It Works](#how-it-works)
   - [Dot-path vs. Single-hop Delegation](#dot-path-vs-single-hop-delegation)
-  - [Example: Space Permission Check](#example-space-permission-check)
 - [Owner-Polymorphic Models](#owner-polymorphic-models)
 - [Row-Level Overrides](#row-level-overrides)
   - [Schema](#schema)
@@ -42,19 +62,11 @@
   - [Boundary validation](#boundary-validation)
   - [When to use it](#when-to-use-it)
 - [Space Permissions](#space-permissions)
-  - [Space Roles](#space-roles)
-  - [SpaceUser Model](#spaceuser-model)
-  - [Permission Flow](#permission-flow)
-  - [Key Points](#key-points)
 - [Validation Middleware](#validation-middleware)
   - [validatePermission](#validatepermission)
-  - [validateOwnerPermission](#validateownerpermission)
-  - [validateNotToken](#validatenottoken)
-- [Role Assignment](#role-assignment)
-  - [Role Assignment Rules](#role-assignment-rules)
-- [Token Permissions](#token-permissions)
-  - [Token Creation](#token-creation)
-  - [Token Deletion](#token-deletion)
+  - [validateSubmodelPermission](#validatesubmodelpermission)
+  - [Lists under an owner](#lists-under-an-owner)
+  - [The user as a resource](#the-user-as-a-resource)
 - [Frontend Checks](#frontend-checks)
 - [Future Work](#future-work)
   - [Groups](#groups)
@@ -66,21 +78,74 @@
 
 ## Overview
 
-Three-layer permission system:
+The permission system is the rebac schema (`packages/permissions/src/rebac/schema.ts`) plus the check engine of `@inixiative/permissions`. A request installs what its principal holds into a permix (a table of grants plus entitlements), and every decision is `check(permix, rebacSchema, model, record, action)` on a hydrated record, or on a pseudo record when the row does not exist yet.
 
-| Layer | Scope | Storage | Example |
-|-------|-------|---------|---------|
-| PlatformRole | System-wide | `User.platformRole` | superadmin bypasses all |
-| Role | Per-org RBAC | `OrganizationUser.role` | owner, admin, member, viewer |
-| Entitlements | Custom ABAC | JSON on OrganizationUser/Token | `{ "canExport": true }` |
+| Layer | Where it lives | What it says |
+|---|---|---|
+| Platform role | `User.platformRole` | `superadmin` passes every check |
+| Tenant role | `OrganizationUser.role`, `SpaceUser.role` | what a member holds at its organization or space |
+| Delegate permissions | `role` and `full` on `Token` and `Integration`, plus their entitlement rows | how much of its owner a delegate holds |
+| Entitlements | rows of the `Entitlement` table, one per grant, targeted at a member or a delegate | named grants beyond a role, given by hand |
+
+The rest of this doc follows one cast through every section:
+
+| Name | What it is |
+|---|---|
+| U1 | a user |
+| O1 | an organization |
+| S1 | a space under O1 |
+| M1 | U1's member row in O1 (`OrganizationUser`, role `member`) |
+| SM1 | U1's member row in S1 (`SpaceUser`) |
+| M2 | another user's member row in O1, role `owner` (the owner of O1) |
+| M3 | another user's member row in O1, role `admin` (an admin of O1) |
+| I1 | an integration owned by M1 (`ownerModel: OrganizationUser`) |
+| IO | an integration owned by O1 (`ownerModel: Organization`) |
+| T | a token; which owner it has is said each time |
+
+---
+
+## The Model
+
+### Vocabulary
+
+One word per party, used in code and prose alike. Names in code are composed of these words.
+
+| Word | Means |
+|---|---|
+| **user** | the `User` row: a person's account. Only a user is ever superadmin. |
+| **tenant** | an organization or a space. A space is a sub-tenancy of its organization. |
+| **member** | the row joining a user to a tenant (`OrganizationUser`, `SpaceUser`). The only place a person's role at a tenant is stored. |
+| **JWT** / **token** | how a request authenticates. A JWT (or a superadmin's spoof) is the user; a token is a `Token` row. |
+| **actor** | who is acting this request: `{ model: 'User' \| 'Token', record }` |
+| **owner** | the row a token or integration belongs to (its `ownerModel`): a user, a member, a tenant, or (for a token) an integration |
+| **delegate** | a token or an integration |
+| **permissions** | a delegate's `{ role, full, entitlements }` |
+| **entitlement** | a named grant `{ resource, anchor: { resource, id, path? }, where?, actions }`, stored as one `Entitlement` row whose **source** is the anchor and whose **target** is the holder ([Entitlements](#entitlements)) |
+| **member self-grant** | the entitlement every member row carries to `operate` on itself, backed by its user ([The Member Self-Grant](#the-member-self-grant)) |
+| **delegateFull** | the person-only action on an owner that lets you set `full` on its delegate ([Full and delegateFull](#full-and-delegatefull)) |
+| **anchor** | the record an entitlement acts from, reached from the entitled record along `path` |
+| **pseudo record** | the would-be row a create, a collection action or a grant is checked on |
+| **me** | the user when the actor is a user, or a User-owned token's user (`me(c)`) |
+
+### Tenants and Members
+
+Things belong to a user (U1's own integrations, tokens, contacts) or to a tenant (O1's integrations, S1's tokens). A user reaches a tenant only through a member row: M1 gives U1 the role `member` at O1, SM1 gives U1 a role at S1. The member's role is installed as one grant on the tenant (`getOrgPermissions`, `getSpacePermissions`): `owner` holds `own`, `admin` `manage`, `member` `operate`, `viewer` `read`. A space's `own` comes from its organization's `own`, and nothing else crosses: the owner of O1 owns S1, an admin of O1 holds nothing at S1 unless it has its own member row there.
+
+### Delegates
+
+A delegate acts for its owner and never holds more than its owner. Its permissions are three separate things:
+
+- **`role`** is a narrowing of the tenant. It caps what the owner holds at the tenant: a member-role token on M1 holds O1 at `member` or less, live. It says nothing about the owner itself: a role token on M1 does not act as M1.
+- **`entitlements`** are given by hand and only by hand: `Entitlement` rows targeted at the delegate. A delegate never inherits its owner's entitlements; each one it holds was written on it, and holds only while the owner still allows it.
+- **`full`** is the owner's permissions, whole and in sync: role, entitlements and the owner's own identity, as they are on every request. It is not a permission in the schema; it is resolved when permissions are installed.
+
+`full` takes no role and no entitlements. A delegate that is not `full`, with no role and no entitlements, holds nothing; it is not refused (silence never widens: the library's `delegate` installs the role's ceiling and the entitlement rows, and both are empty).
 
 ---
 
 ## Roles
 
 ### PlatformRole
-
-System-wide role on User model:
 
 ```prisma
 enum PlatformRole {
@@ -90,22 +155,22 @@ enum PlatformRole {
 ```
 
 Superadmins:
-- Skip all `permix.check()` calls (always return true)
-- Can access admin routes — and only there see soft-deleted rows (the admin router runs inside `db.withDeleted`); on ordinary routes tombstones stay invisible to them too
-- Can spoof other users
+- pass every `check` (`permix.setSuperadmin(true)`), on any credential;
+- can access admin routes, and only there see soft-deleted rows (the admin router runs inside `db.withDeleted`);
+- can spoof other users.
 
 ### Role
 
-Per-organization role on OrganizationUser:
-
 ```prisma
 enum Role {
-  owner   // Full control, can delete org, assign any role
-  admin   // Can manage settings and users (except owners)
-  member  // Can operate (create, edit own resources)
-  viewer  // Read-only access
+  owner
+  admin
+  member
+  viewer
 }
 ```
+
+The same enum is the role of a member at its tenant and the role of a delegate.
 
 ### Role Hierarchy
 
@@ -114,53 +179,407 @@ enum Role {
 export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 ```
 
-Higher index = more permissions. Used for:
-- `lesserRole(a, b)` - Returns the lower of two roles
-- `greaterRole(a, b)` - Returns the higher of two roles
-- Token permission restriction (token can't exceed user's role)
+`roleToStandardAction(role)` maps a role to the one standard action it names: `owner` is `own`, `admin` is `manage`, `member` is `operate`, `viewer` is `read`. The library's `capAtRole(schema, entry, ceiling)` keeps an entry at a ceiling, the role's standard action: every action on the entry's resource that the ceiling reaches by pure delegation and the entry holds or implies ([building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md)).
+
+```typescript
+// packages/permissions/src/roles/organization.ts
+export const organizationRoles = {
+  owner: { organization: { own: true } },
+  admin: { organization: { manage: true } },
+  member: { organization: { operate: true } },
+  viewer: { organization: { read: true } },
+} as const;
+```
 
 ---
 
 ## Actions
 
-Actions define what operations are allowed:
+### Every Action Is an Action on the Record
+
+An action in the schema is something you do to the record it is defined on, never something the record does. `operate` on M1 means acting as M1; `manage` on I1 means administering I1; `delete` on a token means revoking it. What a delegate can reach elsewhere is not an action on the delegate: it is the delegate's permissions, installed when it signs in.
+
+### The Standard Chain
+
+`read`, `operate`, `manage` and `own` are the standard actions. On a model that chains them, each one is implied by the one above it on the same record, so holding `own` is holding all four. `chainedStandardActions` builds this, and `ownerActions` uses it. Three kinds of model differ, each declared in `standardActionsChain.test.ts`:
+
+- **Member rows** (`db:organizationUser`, `db:spaceUser`): `manage` and `own` do not imply `operate`. Administering a member row is not being the member.
+- **Integrations** and **projects** have no `own`; `read`, `operate` and `manage` chain.
+- **Contacts** (`db:contact`): `manage` also requires the contact's `source` not to be `userCreation`, so it does not chain past `manage`.
+
+Actions outside the four (`create`, `delete`, `leave`, `delegateFull`, `send`, `resolve`, `user.redact`, ...) are not part of the chain; they delegate only where their rule says so.
+
+### Actions on Their Own Models
+
+Every action lives on the model it acts on; a dotted action is named after its model (`packages/permissions/src/rebac/principals.test.ts`):
 
 ```typescript
 // packages/permissions/src/client.ts
-export const StandardAction = {
-  read: 'read',       // View resources
-  operate: 'operate', // Create, edit own resources
-  manage: 'manage',   // Edit any resource, manage settings
-  own: 'own',         // Full control, delete, transfer ownership
-} as const;
+export const OrganizationAction = { ...StandardAction, create: 'create', delete: 'delete' };
+export const UserAction = { ...StandardAction, redactUser: 'user.redact', rotateUserJwts: 'user.rotateJwts', changePassword: 'user.changePassword' };
+export const TokenAction = { create: 'create', delete: 'delete' };
 ```
 
-### Role → Action Mapping
+Creating checks `create` on a pseudo record of the model being created (token create in `createToken`, organization create in `organizationCreate`).
+
+### Person-Only Actions
+
+Some actions are for a person, not a token: minting and updating a token (`create` on `db:token`), deleting an organization, `user.redact`, `user.rotateJwts`, `user.changePassword`, and `delegateFull` on every model that has it. Their rules include `actorIsUser` (`__actor.model equals User`). Creating an organization takes a user behind the actor: `actorIsUser` or `actorIsDelegateOfUser` (a token owned by a user). A token holding `own` still cannot take a person-only action, and because the grant check runs with no actor, a person-only action can never be granted as an entitlement.
+
+### The Actor
+
+The table says what a principal holds. The actor says only who is acting: `permix.setActor(actorOf(model, record))` (`packages/permissions/src/actorOf.ts`) gives `{ model, record }`, with `model` `User` for a JWT or spoof and `Token` for any API token, and `record` the row's columns with its redacted fields left out. Rules read it as `__actor` in a json-rules condition. Actor rules only gate person-only actions; who is related to what is decided by walking relations. With nobody acting, an actor rule denies and the table still answers everything else.
+
+---
+
+## Member Rows
+
+`memberRowActions(tenant)` in `packages/permissions/src/rebac/schemaHelpers.ts` gives `db:organizationUser` (tenant `organization`) and `db:spaceUser` (tenant `space`) their actions. The two sides of a member row are separate actions:
+
+| Action on M1 | Who holds it | Rule |
+|---|---|---|
+| `operate` (being M1) | U1, and whoever holds M1's own permissions whole | `{ rel: 'user', action: 'manage' }`, plus the member self-grant |
+| `manage` (administering M1) | an admin or owner of O1 | `own`, or `manage` on O1 |
+| `own` | the owner of O1 | `own` on O1 |
+| `read` | U1, O1's admins and owner, and anyone who reads O1 | `operate`, `manage`, `read` on U1, or `read` on O1 |
+| `leave` | U1 | `{ rel: 'user', action: 'manage' }` |
+| `delegateFull` | U1, as a person | `actorIsUser` and `operate` |
+
+So the owner of O1 owns M1 and still does not operate it: removing M1 is the owner's, acting as M1 is U1's (`packages/permissions/src/rebac/memberRow.test.ts`). A member's things (its integrations, its tokens) are administered by `operate` on the member row, so they follow the person, not the tenant.
+
+### The Member Self-Grant
+
+`operate` on M1 comes from U1 by the schema walk. A delegate holding M1's permissions has no U1 in its table, so M1 carries its own `operate` as a stored entitlement, the member self-grant (`packages/permissions/src/roles/memberSelfGrant.ts`):
 
 ```typescript
-// packages/permissions/src/roles/organization.ts
-export const organizationRoles = {
-  owner:  { organization: { read: true, operate: true, manage: true, own: true } },
-  admin:  { organization: { read: true, operate: true, manage: true, own: false } },
-  member: { organization: { read: true, operate: true, manage: false, own: false } },
-  viewer: { organization: { read: true, operate: false, manage: false, own: false } },
-};
+memberSelfGrant('db:organizationUser', { id: M1.id, userId: U1.id })
+// {
+//   resource: 'db:organizationUser',
+//   anchor: { resource: 'db:user', id: U1.id, path: 'user' },
+//   where: { field: 'id', operator: 'equals', value: M1.id },
+//   actions: { operate: true },
+// }
 ```
 
-### roleToStandardAction
+- **Anchored on the member's user, along `user`, pinned to the row's id.** The anchor is U1 because U1 is what makes M1 operable; the `where` pins it to M1, so it never reaches U1's other member rows (U1's member row in another organization, or SM1).
+- **Backed by the member's user.** A member's stored entitlements are installed with an owner that must still allow each action on each record. Every other entitlement on M1 is backed by O1's owner grant; the self-grant is backed by U1 (`getUserPermissions(U1)`), because O1's owner does not hold `operate` on M1 and would back nothing. At read time U1 still operates M1 through the normal walk, so the self-grant holds exactly as long as M1 is U1's.
+- **Only that exact entry is backed by the user.** `permissionsOfUser` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry whose resource, anchor and `where` equal the self-grant of that very row goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
+- **The `memberSelfGrant` hook writes it; a guard keeps it.** The hook (`apps/api/src/hooks/memberSelfGrant/hook.ts`, after `create`, `createManyAndReturn` and an `upsert` that creates, on `OrganizationUser` and `SpaceUser`) writes the self-grant as an `Entitlement` row targeted at the new member, once the member has its id. A member created tombstoned (a transferred space's dropped people, `transferSpace`) gets its self-grant tombstoned with the member's own `deletedAt`, so reviving the member revives the grant. The guard `memberSelfGrant:kept` (same file, after updates on `Entitlement`) refuses with 422 any write that tombstones a live member's self-grant, by id or in bulk; only the cascade from the member's own tombstone takes it. Rows are immutable, so the grant can't be weakened in place either (`apps/api/src/hooks/memberSelfGrant/hook.test.ts`).
 
-Maps role to the highest action it permits:
+Who holds `operate` on M1, then: U1 through the walk; a `full` delegate of M1 (or of U1), through the self-grant installed with M1's permissions; and a role delegate only when it is given `operate` on M1 by hand.
+
+### Role Assignment
+
+Writing a member's role is `memberRoleWrite(tenant)`: `manage` at the tenant, and hold there the role being set (`owner` needs `own`, `admin` `manage`, `member` `operate`, `viewer` `read`). Controllers check it on the row as it is and as it will be:
 
 ```typescript
-const roleActionMap: Record<Role, OrganizationAction> = {
-  owner: 'own',
-  admin: 'manage',
-  member: 'operate',
-  viewer: 'read',
-};
-
-roleToStandardAction('admin');  // 'manage'
+check(permix, rebacSchema, 'organizationUser', before, memberRoleWrite('organization')) &&
+  check(permix, rebacSchema, 'organizationUser', after, memberRoleWrite('organization'));
 ```
+
+| Assigner role | Can assign |
+|---|---|
+| owner | owner, admin, member, viewer |
+| admin | admin, member, viewer |
+| member | nothing |
+| viewer | nothing |
+
+The last-owner check stays in code: `validateNotLastOwner(organizationId)` (`apps/api/src/modules/organization/validations/validateNotLastOwner.ts`) answers 400 "Cannot remove last owner" when an organization's only owner is removed (`organizationUserDelete`) or demoted (`organizationUserUpdate`); both controllers call it only when the row being changed is an owner. `memberRoleWrite` also gates writing a member's entitlements (`validateMemberGrant`, `apps/api/src/lib/permissions/validateMemberGrant.ts`).
+
+Removing a member checks `memberRemoval(tenant)` at the route: `leave` (U1 leaves) or `memberRoleWrite` on the row. Removing tombstones the member row: `softDeleteCascade` tombstones what it owned (its integrations, its tokens, its entitlement rows), and a later invite revives the row with what died with it, except its tokens: a token never revives (`SKIP_REVIVE`), and neither do its entitlement rows (`memberRemoval.test.ts`, `entitlementRows.test.ts`). A tombstoned member is not found by the routes, so its user mints nothing on it.
+
+---
+
+## Integrations and Tokens by Owner Kind
+
+Who administers a delegate depends on its owner's kind. Nobody owns an integration or a token: neither has an `own` action.
+
+### Integrations
+
+`integrationAdministering` and `integrationAccess` (`schemaHelpers.ts`) make up `db:integration`:
+
+| Integration owned by | `read` | `operate` | `manage` | `delete` | `delegateFull` |
+|---|---|---|---|---|---|
+| a user (U1) | U1 | U1 | U1 (`manage` on U1) | U1 | U1, as a person |
+| a tenant (IO, owned by O1) | `read` on O1 | `operate` on O1 | `manage` on O1 | `manage` on O1 | `own` on O1, as a person |
+| a member (I1, owned by M1) | `operate` on M1; the owner of O1 (`own` on M1) | `operate` on M1 | `operate` on M1 | `operate` on M1; the owner of O1 | `operate` on M1, as a person |
+
+So for IO a viewer of O1 reads, a member uses it, an admin administers it; for I1 the owner of O1 reads and deletes it (cleanup of something abandoned) and nothing more, and admins hold nothing (`apps/api/src/lib/permissions/integrationsUnderOrganization.test.ts`). A space member's integration works the same with S1 as the tenant; the owner of O1 owns S1's member rows, so they read and delete those too.
+
+Every kind under O1, for the owner and an admin of O1:
+
+| Integration owned by | Owner of O1 | Admin of O1 |
+|---|---|---|
+| O1 | read, operate, manage, delete | read, operate, manage, delete |
+| S1 | read, operate, manage, delete | nothing |
+| M1 | read, delete | nothing |
+| SM1 | read, delete | nothing |
+
+### Creating an Integration
+
+Each create route checks `create` on a pseudo integration placed under the loaded owner (`validateSubmodelPermission('create')`), then `createIntegration` (`apps/api/src/modules/integration/services/createIntegration.ts`) checks the role with `validateIntegrationRole` and writes the row and its entitlements in one transaction.
+
+| Route | `create` passes when |
+|---|---|
+| `POST /me/integrations` | `operate` on the user |
+| `POST /organization/:id/integrations`, `POST /space/:id/integrations` | `manage` on the tenant |
+| `POST /organizationUser/:id/integrations`, `POST /spaceUser/:id/integrations` | `operate` on the member row, and `operate` at the member's tenant (O1 for M1, S1 for SM1) |
+
+So U1 adds I1 on M1 as a member of O1; a viewer of O1 adds none, and a role token on M1 adds none (it does not operate M1). A full token of U1 or of M1 adds one when U1 is at least a member.
+
+### Tokens
+
+`db:token` has `leave`, `read`, `create` and `delete`; `read` and `delete` are `leave` or `tokenAdministering`, which follows the token's owner kind:
+
+| Token owned by | `read` and `delete` |
+|---|---|
+| a user | that user (`manage` on the user) |
+| a tenant | `manage` on the tenant (an admin of O1 reads and revokes O1's tokens) |
+| a member | `operate` on the member row; the owner of the tenant (`own` on the row) |
+| an integration | whoever may `delete` that integration |
+
+`leave` is `operate` on the token's `user`: a token on a member row, or on a user's or member's integration, carries that user's id, so U1 always revokes tokens made for U1. Deleting only removes access, so a token may revoke within its reach; minting and updating stay person-only. On I1's tokens the owner of O1 revokes and an admin does not (`integrationsUnderOrganization.test.ts`).
+
+### Minting a Token
+
+Every create-token route calls `createToken` (`apps/api/src/modules/me/services/createToken.ts`), which checks `create` on a pseudo token. The rule is `actorIsUser` and `tokenAccessIsYours`:
+
+- the owner is a tenant, or a user you manage (a token on M1 carries U1, so only U1 mints on M1);
+- for a token on an integration, the same is asked of the integration's owner;
+- the role is any role when the chain ends at a user or a member row (it is capped at use), and otherwise a role you hold at the owner (`roleHeldAtOwner`; for an integration's token, at the integration's owner).
+
+Then `validateDelegateRole` refuses a role on a token whose integration has no role and is not `full` (422: the role would narrow nothing), `validateFullGrant` runs when the body sets `full` ([Full and delegateFull](#full-and-delegatefull)). The token row and its entitlements are written in one transaction: the token first, then the body's entries through the one writer, `changeEntitlements` ([Changing Entitlements](#changing-entitlements)), which checks every entry. A token with no role and no entitlements is minted and holds nothing. Creating an integration does the same (`apps/api/src/modules/integration/services/createIntegration.ts`).
+
+`PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`. A token never changes itself.
+
+---
+
+## Full and delegateFull
+
+### What Full Is
+
+`full` makes a delegate its owner: the owner's permissions are installed unchanged, on every request (`delegatedPermissions` returns `owner` as is). Writing `full` clears the delegate's role before the write and tombstones its live entitlement rows after it (the `fullDelegate` hook, `apps/api/src/hooks/fullDelegate/hook.ts`); the same hook refuses any `Entitlement` row created for a `full` delegate (422), through the writer or not. The schema never reads `full`, on the record or on the actor (CI rule `no-full-in-rebac-schema`).
+
+### Who May Set It
+
+Setting `full` is the action `delegateFull` on the delegate's owner. `validateFullGrant` (`apps/api/src/lib/permissions/validateFullGrant.ts`) is one check:
+
+```typescript
+check(writer, rebacSchema, model, delegate, {
+  rel: toAccessor(delegate.ownerModel as string),
+  action: 'delegateFull',
+});
+```
+
+`delegateFull` is person-only on every model that has it:
+
+| Delegate's owner | `delegateFull` held by |
+|---|---|
+| a user (U1) | U1 (`own` on U1) |
+| a member (M1, SM1) | the member's user (`operate` on the row) |
+| a user's integration | that user |
+| a member's integration (I1) | the member's user (`operate` on M1) |
+| a tenant's integration (IO) | the tenant's owner (`own` on O1) |
+| a tenant (O1, S1) | nobody: `db:organization` and `db:space` have no `delegateFull` |
+
+So U1 mints a full token on M1 and makes I1 full; the owner of O1 mints a full token on IO and an admin does not; nobody makes O1's own token or IO itself full; a token never sets `full`, even one holding everything its user holds (`packages/permissions/src/rebac/delegateFull.test.ts`). A refusal is 403.
+
+### The Backstop Rules
+
+`delegatePermissionRules` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`, enforced on every write by the rules hook through `RulesRegistry`) states where `full` may sit, on the row's own columns:
+
+- `full` takes no role;
+- an integration is `full` only when owned by a User, OrganizationUser or SpaceUser;
+- a token is `full` only when owned by a User, OrganizationUser, SpaceUser or Integration.
+
+A delegate that is not `full` and has no role and no entitlements is not refused, on any write or at sign-in: it holds nothing, because the library treats an empty delegate as the empty permissions (`@inixiative/permissions` README, "Silence never widens"). Taking the role off, or removing the last entitlement row, leaves such a delegate. A member row always has a role.
+
+`validateFullGrant` answers first on API writes, so a person is refused with 403. The rules catch what never goes through it: a superadmin (who passes every check, `delegateFull` included) and writes outside the API (seeds, jobs, scripts). They refuse with 422.
+
+---
+
+## Resolution at Read Time
+
+### Hydration
+
+`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchOne` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load goes through `cache()`, which computes inside `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchOne` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its live entitlement rows (`includeTargetEntitlements(model)`, ordered by `createdAt`, `id`) and caches it with those rows as stored, so a hydrated holder carries `targetEntitlements: Entitlement[]` and the cache holds one shape. `findUserWithRelations` and `loadTokenContext` read the same way. The rows turn into the library's entries at check time, where a holder is handed to the library (`entitlementsOf` in `@template/permissions`, which also prunes them with `wellFormedEntitlements`). A write to an `Entitlement` row clears its target's cache keys (its parent edge, [HOOKS.md](HOOKS.md#parent-edges)), so a revoked row is gone on the very next request.
+
+### installPermissions
+
+One builder fills a permix for whoever acts: `installPermissionsFor(permix, { user, token, organizationUsers, spaceUsers })` (`apps/api/src/lib/permissions/userPermissions.ts`). It resets the permix, sets the actor (the token if there is one, else the user) and the superadmin bypass from the user's platform role, then installs:
+
+- no token (JWT or spoof): `permissionsOfUser(user.id, organizationUsers, spaceUsers)`;
+- a token: `delegatedPermissions(token, owner)`, where `owner` is those same permissions for a User-owned token and `ownerPermissions(token)` otherwise.
+
+`installPermissions(c)` (`apps/api/src/lib/context/installPermissions.ts`) is the request's call. For a user who is not the requester (a job acting as a user), `userPermissions(userId)` builds the same permix on a fresh instance, or returns `null` when the user does not exist.
+
+### permissionsOfUser
+
+`permissionsOfUser(userId, members, spaceMembers)` (`packages/permissions/src/roles/permissionsOfUser.ts`, shared by the API and the UI) returns the permissions to install, as the library's `Permissions` (groups of entries; a group with an `owner` is entitlements backed by that owner):
+
+1. one group with the user's own entry (`own` on the user, when a user id is given) and one role entry per member row;
+2. per member row, its well-formed stored entitlements, split in two: the member self-grant, owned by the member's user, and the rest, owned by the tenant's owner.
+
+The library's `installPermissions` sets each group up with its owner, so an owned entitlement holds only while that owner allows it on the record.
+
+### ownerPermissions
+
+`ownerPermissions(delegated)` (`apps/api/src/lib/permissions/ownerPermissions.ts`) builds the owner's permissions from the owner model:
+
+| Owner model | Owner's permissions |
+|---|---|
+| `User` | `permissionsOfUser` for the user: the user entry, every member row and its entitlements |
+| `OrganizationUser` / `SpaceUser` | `permissionsOfUser` for that one member row: its role at the tenant, its self-grant (owned by its user) and its other entitlements (owned by the tenant) |
+| `Organization` / `Space` | `own` on the tenant: `organizationOwnerPermissions(organizationId)` / `spaceOwnerPermissions(spaceId)` (`packages/permissions/src/roles/permissionsOfUser.ts`) |
+| `Integration` | `delegatedPermissions(integration, ownerPermissions(integration))`: the integration's own permissions over its owner |
+
+The permissions are read from the database on every request, so demote M1 and its tokens lose it on the next request.
+
+### delegatedPermissions
+
+The library's `delegate` resolves a delegate from its owner's permissions; the template maps the row onto it:
+
+```typescript
+export const delegatedPermissions = (delegated, owner) =>
+  delegate(rebacSchema, owner, {
+    full: delegated.full,
+    ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
+    entitlements: wellFormedEntitlements(delegated.entitlements),
+  });
+```
+
+- **`full`**: the owner's permissions, whole: its role entries, its entitlements, the member self-grant.
+- **`role`**: only the owner's groups that have no owner of their own (role entries, the user entry), each entry capped at the role's standard action (`capAtRole`). Every owned group (entitlements, the self-grant) is dropped.
+- **`entitlements`**: installed with the owner's permissions as owner: each holds only while the owner allows it on that record.
+
+A token or integration that is not `full`, has no role and has nothing left after pruning is signed out (401) at sign-in (`loadTokenContext`), by the same condition that refuses it on write.
+
+### A Token on a Member Row
+
+A token on M1 acts as M1 only if it holds `operate` on M1:
+
+| Token on M1 | Holds | At O1 | As M1 |
+|---|---|---|---|
+| `full` | M1's permissions whole, self-grant included | M1's role | yes |
+| role `member`, no entitlements | O1 capped at `member` | `operate` | no: it is U1's personal org token |
+| role `viewer`, given `{ resource: 'db:organizationUser', anchor: { resource: 'db:organizationUser', id: M1 }, actions: { operate: true } }` | O1 at `read`, plus `operate` on M1 | `read` | yes |
+
+Acting as M1 is the entitlement, not the role: the viewer-role token given `operate` on M1 manages I1, the owner-role token without it does nothing on I1 (`integrationsUnderOrganization.test.ts`, "a token on your member row acts as you only if it holds operate on the row"). Neither reaches SM1's things or another member's.
+
+A token owned by U1 caps U1's permissions at its role, U1's own entry included. At `member` or above it keeps `operate` on U1, and every one of U1's member rows walks `operate` to U1, so it acts as each of U1's members. A `viewer` User token holds `read` on U1 and acts as none.
+
+### Worked Example: I1
+
+I1 is owned by M1. Each row is one actor; the statuses are what the routes return (`GET` checks `read`, `PATCH` checks `manage`, `DELETE` checks `delete`):
+
+| Actor | `GET /integration/I1` | `PATCH /integration/I1` `{ name }` | `DELETE /integration/I1` |
+|---|---|---|---|
+| U1 (JWT) | 200 | 200 | 204 |
+| T on M1, `full` | 200 | 200 | 204 |
+| T on M1, role `member` | 403 | 403 | 403 |
+| T on M1, role `member`, given `operate` on M1 | 200 | 200 | 204 |
+| T owned by U1, `full` | 200 | 200 | 204 |
+| the owner of O1 (JWT) | 200 | 403 | 204 |
+| an admin of O1 (JWT) | 403 | 403 | 403 |
+| another member of O1 (JWT) | 403 | 403 | 403 |
+| a superadmin | 200 | 200 | 204 |
+
+A `PATCH` that sets `role` or `full` also runs the role check below on I1 as it is and as it will be.
+
+### A Token Never Exceeds Its Owner
+
+A viewer member's token naming `manage` on O1 reads it and does not manage it; an admin's owner-role token manages and does not own; a space is reached exactly as far as the member reaches its organization; a member-role token on M1 minted with role `owner` holds `operate` at O1. Situations: `apps/api/src/lib/permissions/tokenNeverExceedsOwner.test.ts`, `delegatePermissions.test.ts`, `memberTokenGrants.test.ts`.
+
+---
+
+## Writing Delegates
+
+### Integrations Are Delegates
+
+An integration has a nullable `role`, `full` and `entitlements`, held over its owner (a user, a member or a tenant), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:delegatedKeys` hook; the keys are tenancy, for scans, revocation and rate-limit buckets. It is listed only under its integration (`/integration/:id/tokens`), never in its tenant's list. An integration acts only through its tokens (`integrationDelegate.test.ts`, `packages/permissions/src/rebac/delegation.test.ts`).
+
+### An Integration's Role
+
+`validateIntegrationRole` (`apps/api/src/modules/integration/validations/validateIntegrationRole.ts`) checks the body on a hydrated pseudo integration: `validateFullGrant` when it is `full`, else `integrationRoleWrite`: `manage` on the integration, and the role being set held at its owner (`roleHeldAtOwner`: `owner` needs `own` there, `admin` `manage`, `member` `operate`, `viewer` or none `read`). On I1 the owner is M1, so U1 sets any role M1's actions allow U1: `member` through `operate` on M1, `admin` or `owner` only when U1 also administers O1.
+
+Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on the row as it is and as it will be. Setting `role` to null is allowed; an integration left with no role and no entitlements holds nothing.
+
+### Granting an Entitlement
+
+A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
+
+1. **The writer's role table.** The writer's table alone (no entitlements, no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable.
+2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed, and its granter still backing each action. Held entitlements never combine: to pass on two, grant two.
+
+Every entry goes through this check, whoever writes it and whatever delegate it lands on, and so does every row being removed: you remove only what you could grant. A malformed entry or an anchor that does not exist is 422; a refusal is 403.
+
+Each pseudo record is built from the anchor down the path: the foreign keys the parent knows, one record per kind the step admits, each with its owner placed under the anchor, ids below the anchor unknown, plus the `where`'s exact `equals` values. The `where`'s root leaves (the `where` itself, or each leaf of its top `all`; nothing nested) on the kind field are checked on each kind the first step admits, and a kind a leaf fails is dropped. So, for the owner and an admin of O1:
+
+- `{ integration, anchor O1 via organization, delete }`: every kind of integration under O1. The owner grants it (the owner deletes all four kinds); an admin does not.
+- the same with `where ownerModel = Organization`: O1's own integrations. An admin grants it.
+- the same with `where ownerModel in [Organization, OrganizationUser]`: only the owner grants it (an admin holds nothing on members' integrations).
+- the same with `manage`: nobody grants it unfiltered, since the owner of O1 does not manage members' integrations.
+- `{ token, anchor O1 via organization, create }`: refused for everyone. Minting is person-only, and the grant check has no actor.
+- a path that does not end at the anchor's model, runs through a list, or is missing on another model: 422.
+
+Situations: `integrationGrantsUnderOrganization.test.ts`, `entitlementGrants.test.ts`, `integrationDelegate.test.ts`, `memberTokenGrants.test.ts`, `packages/permissions/src/rebac/schemaMap.test.ts`.
+
+---
+
+## Entitlements
+
+Grants beyond a role. Each is one row of the `Entitlement` table (`packages/db/prisma/schema/entitlement.prisma`, [DATABASE.md](DATABASE.md#entitlement)): its **source** is the anchor (`sourceModel`, `sourceId`, `sourcePath`), its **target** the holder (a `Token`, `Integration`, `OrganizationUser` or `SpaceUser`), `resource` the model its `actions` apply to, `where` a positive json-rules condition. The grantor is never a column: it is the target's owner, re-walked live. The API speaks rows: a write takes `EntitlementInput` rows (`entitlementInputSchema`: `resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`), and every read of a token, integration or member row (single reads, list reads and `/me`) includes its live rows as stored under `targetEntitlements` (`EntitlementScalarSchema`). The library keeps its own words, and one small transformer in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`) moves between the two only where a holder meets the library: `toEntitlementEntry` turns a row into the entry `{ resource, anchor: { resource, id, path? }, where?, actions }`, with no `path` or `where` when the row has none and `actions` as a map; `toEntitlementInput` turns an entry the library hands back (a self-grant) into a row; `entitlementsOf(holder)` gives the well-formed entries a holder's rows grant (`wellFormedEntitlements`, by the library's `entitlementProblem`, dropping entries another one covers). Its callers are `delegatedPermissions` / `ownerPermissions`, `permissionsOfUser`, `changeEntitlements` (validation and coverage) and the `memberSelfGrant` hook. Why rows: "who holds what on this record?" is a query, and every grant and revocation is its own audit entry. How to write one: [building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md).
+
+### How Entitlements Are Applied
+
+An entitlement applies to a record when all three hold:
+
+- **its anchor is reached along its path**, each polymorphic step being a kind that carries the step's keys;
+- **its `where` holds** on the record (positive json-rules; "no value" is `equals null`);
+- **its owner still allows the action** on that record through the normal walk, so a grant never outlives or outreaches whoever backs it.
+
+The action is checked on the record, never asked of the anchor. Who backs it: for a delegate, its owner's permissions; for a member row, the tenant's owner, except the member self-grant, backed by the member's user.
+
+### Changing Entitlements
+
+Entitlements are read on their holder (every read of a token, integration or member row includes `targetEntitlements`; there is no list route of their own) and change only through the holder's `entitlements` sub-resource, never through a record update, and every change goes through one writer, `changeEntitlements` (`apps/api/src/lib/permissions/changeEntitlements.ts`), inside `db.txn()` and the holder's `entitlements` owner lock:
+
+| Route | Body | Answer |
+|---|---|---|
+| `POST /{token,integration,organizationUser,spaceUser}/:id/entitlements` | a JSON array of `EntitlementInput` rows | 201, every live row the holder now holds, as stored |
+| `DELETE /{token,integration,organizationUser,spaceUser}/:id/entitlements` | a JSON array of `Entitlement` row ids | 204 |
+
+- The writer must be able to change the holder: `validateMemberGrant` (`memberRoleWrite`) on a member row, `validateIntegrationRole` on an integration (plus `manage` at the route), `validateTokenWrite` on a token.
+- Every added entry and every removed row goes through the same grant check, with one exception: a removed row whose anchor was hard-deleted (its typed source FK is null) has no anchor left to check against, so only the holder check applies to it. An anchor that is only soft-deleted (`sourceDeletedAt` set) can be revived, and the row would grant again, so its removal is checked like any other, reading the anchor with tombstones (`db.withDeleted`). A removal names rows the holder holds live; any other id is 404 and nothing changes.
+- An added entry already covered by one the holder holds (`coversEntitlement`) is skipped.
+- Rows are immutable (`immutableFields` refuses a change to any column but the tombstones): a change is a removal plus a grant. A removal is a soft delete, audited per row, as is every created row.
+- A member's self-grant can't be removed ([The Member Self-Grant](#the-member-self-grant)); a `full` holder takes none. A holder left with no rows holds nothing ([The Backstop Rules](#the-backstop-rules)).
+- The create body of a token or an integration may carry `entitlements`; they are written by the same writer in the same transaction as the row.
+
+### The Path Names the Anchor and the Axis; the Where Narrows
+
+A polymorphic record carries the ids of everything above it: S1's integration has `organizationId`, I1 has `organizationId` and `userId`. The path names the anchor and the polymorphic axis; the polymorphism registry (`packages/db/src/registries/falsePolymorphism.ts`, passed to the library in `schemaMap`) says which kinds on that axis carry the relation's keys, and an entitlement reaches every one of them. The `where` narrows the kinds.
+
+| Path from an integration | Kinds reached |
+|---|---|
+| `organization` | the organization's, its spaces', its members', its space members' |
+| `space.organization` | its spaces' and space members' |
+| `organizationUser.organization` | its members' (including as space members) |
+| `user` | the user's, and the user's members' (narrow with `where ownerModel = User`) |
+
+Sides are separate axes: `targetOrganization` reaches what O1 (or its members) received, never what it sent. A self anchor (the entitled record itself) has no path. Only the anchor's id is fixed: a record that moves within the anchor stays reached, one that moves out stops.
+
+---
+
+## Adding a Model
+
+1. **Schema entry.** Add `db:<model>` to `rebacSchema.permissions` with its actions. A model owned through `user`/`organization`/`space` relations uses `ownerActions()` (or `ownerActions(['user'])` for a subset); a child of another model walks to its parent (`db:segmentMember` asks the same action of its `segment`). Build the four standard actions with `chainedStandardActions` so each implies the one below.
+2. **Every action is on the record.** Name what a caller does to this model (`create`, `delete`, `send`), never what the model does elsewhere. A create rule goes on the created model and is checked on a pseudo record.
+3. **Person-only acts** add `actorIsUser` to their rule. Never use the actor to decide relationships.
+4. **Declare deviations.** If the model does not chain all four standard actions, list exactly which links it misses in `notStandard` in `standardActionsChain.test.ts`.
+5. **Hydration.** The check walks hydrated to-one relations only. `hydrate` (`packages/db/src/hydrate/hydrate.ts`) loads every foreign-key relation of the model, recursively and live rows only, so a new relation is reachable once the Prisma schema has it.
+6. **Routes.** A route on the record names its action with `validatePermission(action)`; a create or collection under an owner uses `validateSubmodelPermission(action)`. Checks that need the body run in the controller with the same `check`.
+7. **Tests first**, in the situations' own sentences, including attempts to get around the rule (another member's row, a token actor, a lower role, another tenant). Factories only.
 
 ---
 
@@ -168,509 +587,103 @@ roleToStandardAction('admin');  // 'manage'
 
 Permix is the permission checker. Each request gets a fresh instance via `prepareRequest`.
 
-### API
-
-```typescript
-type Permix = {
-  check: (resource: ResourceType, action: Action, id?: string, data?: unknown) => boolean;
-  setup: (perms: PermissionEntry | PermissionEntry[], options?: { replace?: boolean }) => Promise<void>;
-  setSuperadmin: (value: boolean) => void;
-  getJSON: () => Record<string, Record<string, boolean>> | null;
-};
-```
-
-### How It Works
-
-```typescript
-// 1. Created in prepareRequest (empty, no permissions)
-c.set('permix', createPermissions());
-
-// 2. Populated by auth middleware via setupOrgContext/setupUserContext
-await permix.setup({
-  resource: 'organization',
-  id: 'org_abc123',
-  actions: { read: true, operate: true, manage: false, own: false },
-});
-
-// 3. Checked by validation middleware or controllers
-permix.check('organization', 'manage', 'org_abc123');  // false
-```
-
-### Superadmin Bypass
-
-```typescript
-permix.setSuperadmin(true);
-permix.check('organization', 'own', 'any_org');  // Always true
-```
-
----
-
-## Permission Setup
-
-Both organization and user contexts follow the same pattern: role → actions, with optional entitlements and token restrictions.
-
-### setupOrgContext
-
-Called by auth middleware to set org permissions.
-
-```typescript
-// packages/permissions/src/roles/organization.ts
-export async function setupOrgContext(permix: Permix, params: {
-  user?: { platformRole: string } | null;
-  role: Role;
-  orgId: OrganizationId;
-  entitlements?: Entitlements;
-}): Promise<void> {
-  if (isSuperadmin(params.user)) {
-    permix.setSuperadmin(true);
-    return;
-  }
-
-  await permix.setup(getOrgPermissions(params.role, params.orgId, params.entitlements));
-}
-```
-
-### setupUserContext
-
-Called by auth middleware to set user permissions. Mirrors org pattern exactly.
-
-```typescript
-// packages/permissions/src/roles/user.ts
-export async function setupUserContext(permix: Permix, params: {
-  user: { id: string; platformRole: string };
-  role?: Role;  // Defaults to 'owner'
-  entitlements?: Entitlements;
-}): Promise<void> {
-  if (isSuperadmin(params.user)) {
-    permix.setSuperadmin(true);
-    return;
-  }
-
-  await permix.setup(getUserPermissions(params.user.id, params.role ?? 'owner', params.entitlements));
-}
-```
-
-**Note**: User context uses the same `Role` enum - a user is effectively "owner" of themselves by default, but tokens can restrict this.
-
-### setupSpacePermissions
-
-Called by auth middleware to set space permissions. Located in `apps/api/src/lib/permissions/setupSpacePermissions.ts`.
-
-```typescript
-export const setupSpacePermissions = async (c: Context<AppEnv>) => {
-  const permix = c.get('permix');
-  const token = c.get('token');
-  const spaceUsers = c.get('spaceUsers');
-
-  // Space token → single space, token permissions only
-  if (token?.ownerModel === 'Space' && token.spaceId) {
-    await setupSpaceContext(permix, { role, spaceId, entitlements });
-    return;
-  }
-
-  // SpaceUser token → single space, lesser of spaceUser + token
-  if (token?.ownerModel === 'SpaceUser' && token.spaceId) {
-    const spaceUser = spaceUsers?.find((su) => su.spaceId === token.spaceId);
-    if (spaceUser) {
-      await setupSpaceContext(permix, {
-        role: lesserRole(spaceUser.role, token.role),
-        spaceId,
-        entitlements: intersectEntitlements(spaceUser.entitlements, token.entitlements),
-      });
-    }
-    return;
-  }
-
-  // Session or User token → all spaces the user belongs to
-  for (const spaceUser of spaceUsers ?? []) {
-    const role = token ? lesserRole(spaceUser.role, token.role) : spaceUser.role;
-    await setupSpaceContext(permix, { role, spaceId: spaceUser.spaceId, entitlements });
-  }
-};
-```
-
-### Token Permission Restriction
-
-Tokens have their own `role` field that restricts permissions below the user's actual role. This applies to both org and user contexts.
-
-```typescript
-// Token schema (simplified)
-{
-  role: Role,    // 'owner' | 'admin' | 'member' | 'viewer'
-  entitlements: Entitlements // Optional custom grants
-}
-```
-
-**Organization context** - token restricts per-org role:
-
-```typescript
-// apps/api/src/lib/permissions/setupOrgPermissions.ts
-for (const orgUser of orgUsers) {
-  const role = token
-    ? lesserRole(orgUser.role, token.role)  // Token can't exceed user's role
-    : orgUser.role;
-  const entitlements = token
-    ? intersectEntitlements(orgUser.entitlements, token.entitlements)
-    : orgUser.entitlements;
-
-  await setupOrgContext(permix, { role, orgId, entitlements });
-}
-```
-
-**User context** - token restricts what user can do to themselves:
-
-```typescript
-// apps/api/src/lib/permissions/setupUserPermissions.ts
-const role = token?.role ?? 'owner';  // Default: full control
-const entitlements = token
-  ? intersectEntitlements(user.entitlements, token.entitlements)
-  : user.entitlements;
-
-await setupUserContext(permix, { user, role, entitlements });
-```
-
-A read-only token (`role: 'viewer'`) can't modify user profile even though the user owns it.
-
-### Role Validation
-
-All permission setup functions validate role values before use to prevent permission bypass from corrupted database data.
-
-**validateRole helper** (`apps/api/src/lib/permissions/validateRole.ts`):
-
-```typescript
-import { Role } from '@template/db/generated/client/enums';
-import { makeError } from '#/lib/errors';
-
-export const validateRole = (value: unknown): Role => {
-  if (typeof value === 'string' && Object.values(Role).includes(value as Role)) {
-    return value as Role;
-  }
-  throw makeError({
-    status: 500,
-    message: `Invalid role value: ${JSON.stringify(value)}. Expected one of: ${Object.values(Role).join(', ')}`,
-  });
-};
-```
-
-**Security principles:**
-- **Fail loud**: an invalid role is a 500 that names the bad value, not a silent downgrade to `viewer`; a corrupted row stops the request instead of running with a guessed role
-- **Runtime validation**: Type assertions alone don't protect against corrupted DB values
-- **Defense in depth**: Extra safety layer even though API validation should prevent invalid data
-
-**Usage in permission setup:**
-```typescript
-// Before: Trust type assertion
-role: token.role as Role
-
-// After: Validate before using
-role: validateRole(token.role)
-```
-
-This prevents scenarios where database corruption or bugs could result in invalid role values bypassing security checks.
-
----
-
-## Permission Checks
-
-### In Controllers
-
-```typescript
-const permix = c.get('permix');
-
-if (!permix.check('organization', 'manage', orgId)) {
-  throw makeError({ status: 403, message: 'Access denied' });
-}
-```
-
-### Via Validation Middleware
-
-Authentication gates run first: `validateUser` (needs `c.get('user')`) or `validateActor` (needs `getActor(c).user`; Organization and Space tokens carry no user and fail both). Which to pick: [AUTH.md](./AUTH.md#choosing-between-validateuser-and-validateactor).
-
-The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
-
-```typescript
-import { validatePermission } from '#/middleware/validations/validatePermission';
-
-router.patch('/:id',
-  resourceContextMiddleware(),
-  validatePermission('manage'),  // Checks permission via ReBAC
-  handler
-);
-```
-
-#### Resource Lookup Runs Before Authorization
-
-`resourceContextMiddleware` throws **404** (not found) or **409** (multiple matches)
-*before* `validatePermission` runs. This is intentional. An unauthenticated or
-unauthorized caller probing a URL cannot distinguish "this resource doesn't exist"
-from "this resource exists but you can't see it" — both surface as 404.
-
-The template treats resource existence as non-secret (IDs frequently appear in
-share links, emails, audit logs, and references from peers). Privacy is enforced
-on **field visibility and queries**, not on the discoverability of a resource ID.
-If a future resource type genuinely needs to hide its existence from non-members,
-write a custom middleware that returns 404 when the permission check fails.
-
----
-
-## Entitlements
-
-Custom permission grants beyond roles. Stored as JSON on OrganizationUser or Token.
-
-```typescript
-type Entitlements = Record<string, boolean> | null;
-
-// Example
-{
-  "canExport": true,
-  "canInvite": true,
-  "maxProjects": false  // Can be used for feature flags too
-}
-```
-
-### How Entitlements Are Applied
-
-Merged into role permissions during setup using **allow override** (entitlements can grant permissions the role doesn't have):
-
-```typescript
-// packages/permissions/src/roles/organization.ts
-export function getOrgPermissions(role, orgId, entitlements): PermissionEntry {
-  const baseActions = organizationRoles[role].organization;
-  return {
-    resource: 'organization',
-    id: orgId,
-    actions: { ...baseActions, ...entitlements },  // Entitlements override role
-  };
-}
-```
-
-**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage. Alternative would be deny override where role caps permissions.
-
-| Strategy | Viewer + `{ manage: true }` | Use Case |
-|----------|----------------------------|----------|
-| Allow override (current) | Can manage | Grant specific powers to limited roles |
-| Deny override | Cannot manage | Role is hard ceiling |
-
-### Intersecting Entitlements
-
-When a token has entitlements, they're intersected with user's entitlements:
-
-```typescript
-// Only keys true in BOTH are kept
-intersectEntitlements(
-  { canExport: true, canInvite: true },
-  { canExport: true, canInvite: false }
-);
-// Result: { canExport: true }
-```
+- `permix.setup(entries, { replace?, owner? })` installs entries: a grant `{ resource, id?, actions }` or an entitlement `{ resource, anchor, where?, actions }`. Entries installed with an `owner` permix hold an action only while that owner still allows it on the record.
+- `permix.setActor(actor)` / `permix.getActor()` set and read who is acting.
+- `permix.setSuperadmin(value)` turns on the bypass; `installPermissions` sets it from `isSuperadmin(me(c))`.
+
+The engine is `@inixiative/permissions`; `createPermissions` in `packages/permissions/src/client.ts` types it with the app's actions and actor. A check is always `check(permix, rebacSchema, model, record, action)` from `@template/permissions/rebac` on a hydrated record.
 
 ---
 
 ## REBAC
 
-Relationship-Based Access Control allows permissions to delegate through relationships.
-
-Located in `packages/permissions/src/rebac/`.
-
 ### Schema
 
-Defines how actions can delegate to other actions or related resources:
+The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed by resource (`db:user`, `db:organization`, `db:token`, ...), each with its `actions`. Rules shared across models are named helpers in `schemaHelpers.ts`:
 
-```typescript
-// packages/permissions/src/rebac/schema.ts
-const highRoles = ['owner', 'admin'];
+| Helper | What it says |
+|---|---|
+| `actionOnOwner(action, at?, owners?)` | the action on whichever owner `ownerModel` names |
+| `ownedBy(owners, at?)` | the record's `ownerModel` is one of these |
+| `managesItsUser(at?)` | `manage` on the record's `user` |
+| `memberRowActions(tenant)` | a member row's actions |
+| `memberRoleWrite(tenant)`, `memberRemoval(tenant)` | writing a member's role; removing a member |
+| `integrationAdministering`, `integrationAccess` | `db:integration`'s `create`, `manage`, `delete`, `delegateFull`; its `operate` and `read` |
+| `administeredByOwnerKind` | the same by owner kind without `delegateFull`, for a model owned by any of the five owners (`db:project`) |
+| `integrationRoleWrite`, `roleHeldAtOwner(at?)` | writing an integration's role; the role on the row held at its owner |
+| `tokenAccessIsYours`, `tokenAdministering` | `db:token`'s `create`; its `read` and `delete` |
+| `chainedStandardActions`, `ownerActions(rels?)` | the standard chain; the owner fan-out over it |
 
-export const rebacSchema: RebacSchema = {
-  user: {
-    actions: {
-      own: null,
-      manage: 'own',
-      operate: 'manage',
-      read: 'operate',
-    },
-  },
-
-  organization: {
-    actions: {
-      own: null,           // Terminal - no delegation
-      manage: 'own',       // manage → check own on same resource
-      operate: 'manage',   // operate → check manage
-      read: 'operate',     // read → check operate
-      // Role assignment: high roles need own, others need manage
-      assign: {
-        any: [
-          { all: [{ rule: { field: 'role', operator: 'in', value: highRoles } }, 'own'] },
-          { all: [{ rule: { field: 'role', operator: 'notIn', value: highRoles } }, 'manage'] },
-        ],
-      },
-    },
-  },
-
-  space: {
-    actions: {
-      own: { rel: 'organization', action: 'own' },  // Delegate to org
-      manage: 'own',
-      operate: 'manage',
-      read: 'operate',
-      assign: { /* same as organization */ },
-    },
-  },
-
-  organizationUser: {
-    actions: {
-      read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
-      leave: { self: 'userId' },  // Users can leave orgs themselves
-      manage: { rel: 'organization', action: 'manage' },
-      own: { rel: 'organization', action: 'own' },
-    },
-  },
-
-  spaceUser: {
-    actions: {
-      read: { any: [{ self: 'userId' }, { rel: 'space', action: 'read' }] },
-      leave: { self: 'userId' },  // Users can leave spaces themselves
-      manage: { rel: 'space', action: 'manage' },
-      own: { rel: 'space', action: 'own' },
-    },
-  },
-
-  token: {
-    actions: {
-      leave: { self: 'userId' },  // Users can delete their own tokens
-    },
-  },
-
-  authProvider: {
-    actions: {
-      own: { rel: 'organization', action: 'own' },  // Only org owners manage auth providers
-    },
-  },
-
-  inquiry: {
-    actions: {
-      // Source or target can read their own inquiry
-      read: {
-        any: [
-          { self: 'sourceUserId' },
-          { rel: 'sourceOrganization', action: 'manage' },
-          { rel: 'sourceSpace', action: 'manage' },
-          { self: 'targetUserId' },
-          { rel: 'targetOrganization', action: 'manage' },
-          { rel: 'targetSpace', action: 'manage' },
-        ],
-      },
-
-      // Send: who may create/initiate each inquiry type
-      send: {
-        any: [
-          // Source user can act on their own inquiry (cancel, edit, re-send)
-          // Add type strings here when user-sourced inquiry types exist
-          { all: [{ rule: { field: 'type', operator: 'in', value: [] } }, { self: 'sourceUserId' }] },
-          // inviteOrganizationUser: high roles require own
-          { all: [{ rule: { field: 'type', operator: 'in', value: ['inviteOrganizationUser'] } }, { rule: { field: 'content.role', operator: 'in', value: highRoles } }, { rel: 'sourceOrganization', action: 'own' }] },
-          // inviteOrganizationUser: normal roles require manage
-          { all: [{ rule: { field: 'type', operator: 'in', value: ['inviteOrganizationUser'] } }, { rule: { field: 'content.role', operator: 'notIn', value: highRoles } }, { rel: 'sourceOrganization', action: 'manage' }] },
-          // createSpace — org owner only
-          { all: [{ rule: { field: 'type', operator: 'in', value: ['createSpace'] } }, { rel: 'sourceOrganization', action: 'own' }] },
-          // updateSpace — space owner or org owner (sourceSpace.own delegates to org.own)
-          { all: [{ rule: { field: 'type', operator: 'in', value: ['updateSpace'] } }, { rel: 'sourceSpace', action: 'own' }] },
-          // transferSpace — org owner only (explicit 2-hop bypasses direct space.own)
-          { all: [{ rule: { field: 'type', operator: 'in', value: ['transferSpace'] } }, { rel: 'sourceSpace.organization', action: 'own' }] },
-        ],
-      },
-
-      // Resolve: target decides (approve/deny/requestChanges)
-      resolve: {
-        any: [
-          { self: 'targetUserId' },
-          // transferSpace — target org owner only
-          { all: [{ rule: { field: 'type', operator: 'in', value: ['transferSpace'] } }, { rel: 'targetOrganization', action: 'own' }] },
-          // all other types — target org manager
-          { all: [{ rule: { field: 'type', operator: 'notIn', value: ['transferSpace'] } }, { rel: 'targetOrganization', action: 'manage' }] },
-          { rel: 'targetSpace', action: 'manage' },
-        ],
-      },
-    },
-  },
-};
-```
+`memberRoleWrite`, `memberRemoval` and `integrationRoleWrite` are rules that routes and controllers check, not named actions, so they cannot be granted as entitlements.
 
 ### ActionRule Types
 
 | Rule | Meaning | Example |
 |------|---------|---------|
-| `string` | Inherit action from same resource | `manage: 'own'` → check `own` on same resource |
-| `{ rel, action }` | Delegate to related resource (supports dot-path) | `{ rel: 'organization', action: 'own' }` |
-| `{ self: field }` | Current user owns the record | `{ self: 'userId' }` → user.id === record.userId |
-| `{ rule: Condition }` | JSON rule condition | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
-| `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ self: 'userId' }, 'read'] }` |
-| `{ all: ActionRule[] }` | All must pass | `{ all: [{ rule: ... }, 'own'] }` |
-| `null` | Always false (terminal) | `own: null` |
+| `string` | another action on the same record | `manage: 'own'` |
+| `{ rel, action }` | the action on a related record (dot-paths walk further) | `{ rel: 'organization', action: 'own' }` |
+| `{ rule: Condition }` | a json-rules condition over the record and `__actor` | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
+| `{ any: ActionRule[] }` | at least one passes | `{ any: [{ rel: 'user', action: 'read' }, 'read'] }` |
+| `{ all: ActionRule[] }` | all pass | `{ all: [actorIsUser, 'own'] }` |
+| `null` | only a held grant passes | `own: null` |
+
+Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'operate' }` passes when the record's `user` is a user the credential holds `operate` on. `operate` on a user stays inside that user's own tenancy (the user's own tokens, integrations and records). Reaching into another tenancy through the user needs `manage` on them: being one of their members (`operate` and `leave` on a member row) and resolving an inquiry addressed to them. So a member-role token on U1 handles U1's own things but neither acts as U1's members, leaves an organization nor accepts an invite; an admin- or owner-role token on U1, a full one, and U1 do (`memberRow.test.ts`, `principals.test.ts`, `memberRemoval.test.ts`). The record must arrive with `user` hydrated; a bare foreign key is denied, never guessed (`principals.test.ts`).
 
 ### How It Works
 
-1. **Same-resource inheritance**: `manage: 'own'` means "to manage, check if user can own"
-2. **Relation delegation**: `own: { rel: 'organization', action: 'own' }` means "to own a Space, check if user owns its Organization"
-3. **Dot-path traversal**: `rel` supports dot-notation for multi-hop chains. `{ rel: 'sourceSpace.organization', action: 'own' }` traverses `inquiry.sourceSpace` then `.organization`, resolving the final model type at each step. Useful when you want to explicitly bypass intermediate delegation and assert on a specific ancestor.
-4. **Chain resolution**: Rules can chain (read → operate → manage → own)
-5. **Cycle detection**: Prevents infinite loops
+1. **Same-resource delegation**: `manage: 'own'` means "to manage, check if you own".
+2. **Relation delegation**: `own: { rel: 'organization', action: 'own' }` means "to own a space, own its organization".
+3. **Dot-path traversal**: `{ rel: 'sourceSpace.organization', action: 'own' }` walks `inquiry.sourceSpace` and then its `organization`, and asks `own` only there.
+4. **Entitlements**: consulted at a record only after the table and the schema rule miss.
+5. **Cycle detection** stops a rule that comes back to itself.
 
 ### Dot-path vs. Single-hop Delegation
 
-These two rules look similar but behave differently:
-
 ```typescript
-// Single-hop on space: checks space.own, which delegates to organization.own
-// → space owner OR org owner passes (delegation chain runs)
+// Single-hop: own on the space, which its organization's own also gives.
+// A space owner or an organization owner passes.
 { rel: 'sourceSpace', action: 'own' }
 
-// Dot-path to organization: jumps directly to the organization record, checks own there
-// → only org owner passes (the space record is never checked, only traversed)
+// Dot-path: own on the organization itself. Only an organization owner passes.
 { rel: 'sourceSpace.organization', action: 'own' }
 ```
 
-Use dot-path when you want a stricter check that bypasses intermediate delegation. In the inquiry schema, `updateSpace` uses single-hop (space owner or org owner can update), while `transferSpace` uses dot-path (org owner only can transfer).
+In the inquiry schema, `updateSpace` uses single-hop and `transferSpace` uses the dot-path.
 
-### Example: Space Permission Check
+### Inquiry permissions
 
-```typescript
-// To check space.read:
-// 1. read → operate (same resource)
-// 2. operate → manage (same resource)
-// 3. manage → own (same resource)
-// 4. own → { rel: 'organization', action: 'own' } (delegate to org)
-// 5. Check organization.own
-```
+`db:inquiry` is the `inquiry` object `inquiryPermission.ts` builds from `INQUIRY_TYPES`; the schema imports it like any other resource. Each inquiry type declares, in `INQUIRY_TYPES` (`inquiryTypes.ts`), the party models that may stand on each side and the level each needs: `send` for a source, `resolve` for a target. A level is an action of that party model's own resource; `inquiryPermission.test.ts` walks every send, resolve and read rule and fails when a relation, action or field it names, in a plain action or inside a rule-form level, does not exist. A level can instead be a plain rebac rule in the schema's own vocabulary, used as written, for a case one action cannot say: `transferSpace` is `{ rel: 'sourceSpace.organization', action: 'own' }`, and an invite picks `own` or `manage` with `any`/`all` over its role.
+
+- **`read`** is party-wide, whatever the type: the user on either side (`read`), or `manage` on the organization or space on either side (`INQUIRY_READ_LEVELS`).
+- **`send`** and **`resolve`** are one branch per type, each gated on the type and on the party model, asking the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`).
+- A platform (`admin`) party has no relation, so only a superadmin acts for it.
+
+The API reads the same declarations to check that a create's parties are ones the type accepts (`validateInquiryHandler`).
 
 ---
 
 ## Owner-Polymorphic Models
 
-Models with nullable FKs to multiple owners (Contact, WebhookSubscription, etc.) use the `ownerActions()` helper instead of writing the same fan-out for every action:
+Models with nullable foreign keys to several owners (Contact, WebhookSubscription, Segment, Flow) use `ownerActions()`:
 
 ```typescript
-// packages/permissions/src/rebac/ownerActions.ts
-import { ownerActions } from '@template/permissions/rebac/ownerActions';
-
-// Default: fan out across user/organization/space
-contact: { actions: ownerActions() },
-
-// Pick a subset
-emailTemplate: { actions: ownerActions(['organization', 'space']) },
-
-// Compose with custom actions
-contact: { actions: { ...ownerActions(), share: { ... } } },
+'db:webhookSubscription': { actions: { ...ownerActions(), create: 'operate' } },
+'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 ```
 
-For each of `own`/`manage`/`operate`/`read`, the helper expands to `{ any: [{ rel: 'user', action }, { rel: 'organization', action }, { rel: 'space', action }] }`. Only the populated FK resolves — `rel` returns false for the other relations because the record isn't loaded — so the `any` collapses to the actual owner's chain.
+For each standard action the helper asks the same action of `user`, `organization` and `space`, chained. Only the populated relation is hydrated, so the others fail and the rule follows the actual owner. Integrations and tokens are owner-polymorphic too but follow their own owner-kind rules ([Integrations and Tokens by Owner Kind](#integrations-and-tokens-by-owner-kind)).
 
-This is what makes the `read → operate → manage → own` chain on User/Org/Space reusable as-is for every owner-polymorphic resource.
+`ownerActions()` reads the `user`, `organization` and `space` relations, so it can't tell a member's row from its tenant's: an OrganizationUser-owned row carries `organizationId` too, and `manage` on the organization would reach it. A model owned by any of the five owner kinds (User, OrganizationUser, Organization, Space, SpaceUser) uses `administeredByOwnerKind` instead. It is the integration rules without `delegateFull`, keyed on `ownerModel` ([Integrations](#integrations)): an organization's admin manages its organization's rows but can't reach a member's own; the organization's owner can read and delete a member's row, not change it; only the member manages it.
+
+```typescript
+'db:project': { actions: administeredByOwnerKind },
+```
 
 ---
 
 ## Row-Level Overrides
 
-Some resources need per-row sharing on top of the schema-default permissions — e.g. a user wants to make one specific contact readable by anyone, without changing the rule for all their contacts. The pattern is a `permissionRules: Json?` column on the resource that `check()` merges additively with the schema rule.
+Some resources need per-row sharing on top of the schema rule, for example one contact readable by anyone without changing the rule for every contact. The pattern is a `permissionRules: Json?` column that `check()` merges additively with the schema rule.
 
 ### Schema
 
@@ -683,65 +696,41 @@ model Contact {
 
 ### How `check()` merges
 
-Inside `packages/permissions/src/rebac/check.ts`, when resolving an action by name:
+Inside the library's rebac check (`createRebacCheck` in `@inixiative/permissions`, bound by `packages/permissions/src/rebac/check.ts`), when resolving an action by name:
 
 ```typescript
 const schemaRule = schema[model]?.actions[actionOrRule] ?? null;
 const rowRule    = record.permissionRules?.[actionOrRule];
 const merged: ActionRule = rowRule !== undefined
-  ? { any: [schemaRule, rowRule] }   // OR — additive only
+  ? { any: [schemaRule, rowRule] }
   : schemaRule;
 return check(permix, schema, model, record, merged, visited);
 ```
 
-**Additive only.** Row rules can grant additional paths but never restrict — the schema rule is the floor. A row rule like `read: { all: [] }` (vacuously true) opens the row to any authenticated requester; setting `read: null` doesn't take read away from the owner.
+**Additive only.** Row rules grant additional paths and never restrict; the schema rule is the floor. `read: { all: [] }` opens the row to any authenticated requester; `read: null` does not take `read` from the owner.
 
 ### Boundary validation
 
-Rows arrive over the API, so route schemas validate the shape before it lands in the DB. Use `buildPermissionRulesSchema(model, pick?)` from `@template/permissions/rebac/permissionRulesSchema` — it derives the valid action keys from `rebacSchema[model].actions` so there's no second source of truth:
+Route schemas validate the shape before it lands in the database. Use `buildPermissionRulesSchema(model, pick?)` from `@template/permissions/rebac/permissionRulesSchema`; it derives the valid action keys from `rebacSchema[model].actions`:
 
 ```typescript
 // apps/api/src/modules/contact/schemas/contactSchemas.ts
-import { buildPermissionRulesSchema } from '@template/permissions/rebac/permissionRulesSchema';
-
 export const contactCreateBodySchema = ContactScalarInputSchema.omit({ ... }).extend({
-  // Only `read` is row-overridable — granting manage/delete via row rules
-  // would effectively transfer ownership, so those stay owner-gated.
   permissionRules: buildPermissionRulesSchema('contact', ['read']),
 });
 ```
 
-The schema validates the recursive `ActionRule` envelope (delegations, `{ rel, action }`, `{ self }`, `{ rule }`, `{ any }`, `{ all }`) but passes the inner json-rules `Condition` through as `unknown` — runtime `check()` validates it when the rule fires.
+The schema validates the `ActionRule` envelope and passes the inner json-rules `Condition` through; `check()` validates it when the rule fires.
 
 ### When to use it
 
-Row-level overrides solve a specific need: opt-in sharing of individual records without changing the schema rule for everyone. Use it when:
-
-- The resource has natural per-row access decisions (sharing a contact, publishing an asset).
-- The set of overridable actions is narrow — typically `read` only. Exposing `manage`/`delete` row rules effectively lets owners delegate ownership, which usually shouldn't be a row decision.
-
-Don't use it as a substitute for proper rebac modeling. If every row needs the same override, that belongs in the schema rule.
+Use it for opt-in sharing of individual records (sharing a contact, publishing an asset), with a narrow set of overridable actions, typically `read` only. If every row needs the same override, it belongs in the schema rule.
 
 ---
 
 ## Space Permissions
 
-Spaces are containers within organizations. Space permissions delegate to the parent organization via REBAC.
-
-### Space Roles
-
-Spaces use the same `Role` enum as organizations:
-
-```prisma
-enum Role {
-  owner   // Full control
-  admin   // Manage settings and members
-  member  // Operate within resource
-  viewer  // Read-only access
-}
-```
-
-### SpaceUser Model
+Spaces are sub-tenancies of their organization. A space has its own members (`SpaceUser`, with the same `Role` enum) and its own role grants; its `own` also comes from its organization's `own`.
 
 ```prisma
 model SpaceUser {
@@ -750,190 +739,92 @@ model SpaceUser {
   spaceId         String
   userId          String
 
-  // Must be OrganizationUser first
   @@unique([organizationId, spaceId, userId])
 }
 ```
 
-### Permission Flow
-
-```
-Space Permission Request
-    ↓
-Check SpaceUser.role for direct permission
-    ↓
-If not found, delegate via REBAC to Organization
-    ↓
-Organization permission grants Space permission
-```
-
-### Key Points
-
-1. **Prerequisite**: User must be OrganizationUser before SpaceUser
-2. **Delegation**: Space `own` delegates to Organization `own`
-3. **Inheritance**: Org owners automatically have Space permissions
-4. **Tokens**: Can be scoped to Space via `spaceId` field
+1. A user is a member of the organization before being a member of one of its spaces.
+2. The owner of O1 owns S1, and so owns SM1 and reads and deletes SM1's integrations and tokens.
+3. An admin of O1 holds nothing at S1 without a member row there.
+4. A token owned by S1 (`ownerModel: Space`) holds `own` on S1 capped at its role.
 
 ---
 
 ## Validation Middleware
 
-Located in `apps/api/src/middleware/validations/`.
+Located in `apps/api/src/middleware/validations/`. There is no "is there a user" gate: every route names its action, and the action's rule decides who may take it.
 
 ### validatePermission
 
-Unified permission middleware using ReBAC. Hydrates the resource with relations needed for permission traversal, then checks via ReBAC schema (handles superadmin, direct perms, delegation):
+Checks an action on the route's loaded record:
 
 ```typescript
-import { validatePermission } from '#/middleware/validations/validatePermission';
-
-// Check 'read' on loaded resource
 router.get('/:id', validatePermission('read'), handler);
-
-// Check 'manage' on loaded resource
 router.patch('/:id', validatePermission('manage'), handler);
 ```
 
-How it works:
-1. Gets the loaded `resource` and `resourceType` from context
-2. Hydrates the resource with relations for ReBAC traversal (org -> space, etc.)
-3. Checks permission via `check(permix, rebacSchema, resourceType, hydrated, action)`
-4. Throws 403 if check fails
+1. Gets the loaded `resource` and `resourceType` from context.
+2. Hydrates the resource with the relations the check walks.
+3. Checks `check(permix, rebacSchema, resourceType, hydrated, action)`.
+4. Throws 403 when it fails.
 
-### validateOwnerPermission
+`resourceContextMiddleware` throws 404 (not found) or 409 (multiple matches) before `validatePermission` runs. Resource existence is not secret (ids appear in share links, emails, audit logs); privacy is enforced on field visibility and queries. A resource that must hide its existence needs a middleware that returns 404 when the check fails.
 
-For polymorphic resources owned by either User or Organization. Checks the `ownerModel` field to determine which permission to validate.
+### validateSubmodelPermission
+
+A route on a submodel (a create or a collection under an owner: `/organization/:id/contacts`, `/organizationUser/:id/integrations`, `/me/integrations`) checks its action on a pseudo record of the submodel, placed under the loaded owner, so the rule lives with the child model and entitlements on the child apply:
 
 ```typescript
-// apps/api/src/middleware/validations/validateOwnerPermission.ts
-export const validateOwnerPermission = makeMiddleware<Options>((options) => async (c, next) => {
-  const resource = c.get('resource');
-  const permix = c.get('permix');
-  const ownerModel = resource?.ownerModel;  // 'User' | 'Organization' | 'OrganizationUser'
+// apps/api/src/middleware/validations/validateSubmodelPermission.ts
+const { submodel, placed } = placeSubmodel(c);
+const pseudo = await hydrate(submodel, { id: '', ...placed });
+check(permix, rebacSchema, submodel, pseudo, action);
+```
 
-  if (ownerModel === 'User' || ownerModel === 'OrganizationUser') {
-    const userId = resource?.userId;
-    if (userId && permix.check('user', action, userId)) return next();
-  }
+- `placeSubmodel` (`apps/api/src/lib/permissions/placeSubmodel.ts`) calls `placeUnder` (the library's, re-exported from `@template/permissions/rebac`), which builds the pseudo record along the owner's relation: the owner keys, the owner attached, the kind narrowed to the owner's model; `id: ''` never matches a grant keyed by a real row.
+- It never reads the request body. Checks that depend on the body (a token's role or `full`, an integration's role, an inquiry's `send`) stay in their services.
+- Using it on a route with no submodel throws on each request to that route (`validateSubmodelPermission.test.ts`).
 
-  if (ownerModel === 'Organization') {
-    const orgId = resource?.organizationId;
-    if (orgId && permix.check('organization', action, orgId)) return next();
-  }
+Routes that still check an action on the owner (`validatePermission` on spaces, members, inquiries, customer refs, segments) are not migrated yet.
 
-  throw makeError({ status: 403, message: 'Access denied' });
+### Lists under an owner
+
+A model with a five-way owner (`User`, `OrganizationUser`, `Organization`, `Space`, `SpaceUser`; a token also has `Integration`) gets one list per owner kind: `/me/tokens`, `/organizationUser/:id/tokens`, `/organization/:id/tokens`, `/space/:id/tokens`, `/spaceUser/:id/tokens`, `/integration/:id/tokens`. Each tenant and member list returns exactly that owner's rows: an organization's list holds no member's rows. `/me/tokens` is the user's view across tenants: their own tokens and every membership's, each with its `organization`, `organizationUser`, `space` and `spaceUser`.
+
+The controller filters with `submodelOwnerWhere(c)` (`apps/api/src/lib/prisma/submodelOwnerWhere.ts`): the owner keys and kind of the same placement the route's `validateSubmodelPermission('read')` checked. One check on the owner covers every row the list returns, and the two can't drift apart.
+
+```typescript
+const { data, pagination } = await paginate(c, db.token, {
+  where: submodelOwnerWhere(c),
+  omit: { keyHash: true },
 });
 ```
 
-Usage (Token/WebhookSubscription can be owned by user or org):
+A member's list is read by the member and by the organization's owner, never by an admin or another member (`memberOwnedLists.test.ts`). In the UI, an organization or space page shows two lists: yours there (the membership's) and the tenant's (`tokenContextQueries` / `integrationContextQueries` with `{ member: true }`).
+
+### The user as a resource
+
+`/me/*` routes check their action like any other route; `meResourceMiddleware` loads `me(c)` as the resource, typed `user`. `me(c)` is the request's user (a user JWT or a spoof), or the user of a User-owned token; anything else has no me and gets 401.
 
 ```typescript
-// tokenDelete.ts - user deleting their own token
-middleware: [validateOwnerPermission({ action: 'manage' })]
-
-// webhookSubscriptionRead.ts - anyone with read access
-middleware: [validateOwnerPermission({ action: 'read' })]
+middleware: [validateSubmodelPermission('read')]     // meReadManyContacts, -Integrations, -WebhookSubscriptions, -Tokens
+middleware: [validateSubmodelPermission('create')]   // meCreateContact, -Flow, -Integration, -WebhookSubscription
+middleware: [validatePermission('read')]             // the other meReadMany*
+middleware: [validatePermission('operate')]          // meCreateInquiry, meCreateSegment, meReachSegment
 ```
 
-### validateNotToken
-
-Blocks token-based auth for sensitive operations. Session-only.
-
-```typescript
-// Tokens cannot: create other tokens, delete orgs, delete themselves (a superadmin's token can)
-export const validateNotToken = async (c, next) => {
-  if (!c.get('user')) throw makeError({ status: 401, message: 'Authentication required' });
-  if (c.get('token') && !isSuperadmin(c)) {
-    throw makeError({ status: 403, message: 'Tokens cannot perform this action' });
-  }
-  await next();
-};
-```
-
-Usage:
-
-```typescript
-// tokenDelete.ts - prevent token from deleting itself
-middleware: [validateNotToken, validateOwnerPermission({ action: 'manage' })]
-
-// meCreateToken.ts - only sessions can create tokens
-middleware: [validateNotToken]
-
-// organizationDelete.ts - destructive action requires session
-middleware: [validateNotToken, validatePermission('own')]
-```
-
----
-
-## Role Assignment
-
-Role assignment uses the `assign` action defined in the ReBAC schema. The schema checks:
-- Assigning owner/admin (high roles) requires `own` permission
-- Assigning member/viewer requires `manage` permission
-
-```typescript
-// ReBAC handles this automatically via the assign action
-check(permix, rebacSchema, 'organization', { id: orgId, role: targetRole }, 'assign');
-
-// Or inline in controller:
-const action = ['owner', 'admin'].includes(targetRole) ? 'own' : 'manage';
-if (!permix.check('organization', action, orgId)) {
-  throw makeError({ status: 403, message: `Cannot assign ${targetRole} role` });
-}
-```
-
-### Role Assignment Rules
-
-| Assigner Role | Can Assign |
-|---------------|------------|
-| owner | owner, admin, member, viewer |
-| admin | member, viewer |
-| member | - |
-| viewer | - |
-
----
-
-## Token Permissions
-
-Tokens use the `leave` action for self-deletion and the `assign` action (via parent) for creation.
-
-### Token Creation
-
-Token creation checks if the user can assign the token's role:
-- Creating an owner-role token requires `own` permission
-- Creating a member-role token requires `manage` permission
-
-```typescript
-// Check via parent resource (orgUser, spaceUser, etc.)
-check(permix, rebacSchema, 'organization', { id: orgId, role: tokenRole }, 'assign');
-```
-
-### Token Deletion
-
-The ReBAC schema allows users to delete their own tokens via `leave`:
-
-```typescript
-token: {
-  actions: {
-    leave: { self: 'userId' },  // User can delete if token.userId === user.id
-  },
-},
-```
-
-Additionally, org/space admins can delete tokens within their scope via delegation:
-- Org admins can delete OrgUser tokens (via `manage` on organization)
-- Space admins can delete SpaceUser tokens (via `manage` on space)
+Person-only situations: `apps/api/src/middleware/validations/userOnlyActions.test.ts`, `apps/api/src/lib/context/userActsDirectly.test.ts`.
 
 ---
 
 ## Frontend Checks
 
-The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/src/store/slices/permissions.ts`) loads the user's own, organization and space permissions from `/me`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
+The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/src/store/slices/permissions.ts`) loads the user's own, organization and space permissions from `/me` through `permissionsOfUser`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
 
 | Layer | Entry point |
 |-------|-------------|
-| Route | `validateUser` / `validateActor`, then `validatePermission` ([Validation Middleware](#validation-middleware)) |
-| Page | `_authenticated.tsx` → `useAuthenticatedRouting` → `checkContextPermission`: the nav item's `access` decides "can view"; on failure it falls back to the org (from a space), then user, then public context, else renders `Unauthorized` |
+| Route | `validatePermission`, naming the action ([Validation Middleware](#validation-middleware)) |
+| Page | `_authenticated.tsx`, `useAuthenticatedRouting`, then `checkContextPermission`: the nav item's `access` decides "can view"; on failure it falls back to the org (from a space), then user, then public context, else renders `Unauthorized` |
 | Nav item | `access(permissions, context, page?)` on `NavItem`; the Sidebar hides items that fail it |
 | Component | `checkPermission(permissions, model, record, action)` / `permissions.check(model, record, action)` |
 
@@ -993,9 +884,8 @@ Permission groups for bulk assignment:
 model Group {
   id              String           @id
   organizationId  String
-  name            String           // "Engineering", "Sales"
-  role            Role // Base role for group members
-  entitlements    Json?            // Additional grants for group
+  name            String
+  role            Role
   members         GroupMember[]
 }
 
@@ -1006,6 +896,5 @@ model GroupMember {
 ```
 
 Use cases:
-- Assign role + entitlements to many users at once
-- "Engineering" group gets `member` role + `{ canDeploy: true }`
-- User inherits highest role from all their groups
+- assign a role and entitlements to many users at once (a `Group` would be one more `Entitlement` target);
+- an "Engineering" group gets the `member` role plus an entitlement to manage one space.

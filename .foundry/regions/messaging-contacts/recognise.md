@@ -66,7 +66,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - keep the position column dense
 - declare that this model's position field is ordered
 - contacts are created under me, the org or the space
-- sibling pages shouldn't fire each other's queries
 - pull the handle out of a profile url
 - one composite unique over all the owner columns
 - sms and push are a separate lane from email
@@ -111,7 +110,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll renumber positions in the controller
 - register the scope fields for ordering
 - where do the contact routes live
-- each nested page loads only its own data
 - I'll write a regex for the new network's url
 - stop duplicates per owner when the owner is polymorphic
 - direct messages don't go through templates

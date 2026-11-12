@@ -12,11 +12,32 @@ const GLOBAL_IMMUTABLE_FIELDS = ['id', 'createdAt'] as const;
 type ImmutableFieldsOverride = {
   exclude?: string[];
   include?: string[];
+  refuse?: string[];
 };
 
 export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
   ...polymorphismImmutableFields,
   Space: { exclude: ['organizationId'] },
+  // A changed entitlement is a removed row and a new one; only its tombstones move.
+  Entitlement: {
+    include: polymorphismImmutableFields.Entitlement?.include,
+    refuse: [
+      ...(polymorphismImmutableFields.Entitlement?.refuse ?? []),
+      'resource',
+      'actions',
+      'where',
+      'lens',
+      'sourcePath',
+    ],
+  },
+  Tag: {
+    ...polymorphismImmutableFields.Tag,
+    refuse: [...(polymorphismImmutableFields.Tag?.refuse ?? []), 'tagCategoryId'],
+  },
+  CommunicationLog: {
+    ...polymorphismImmutableFields.CommunicationLog,
+    exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],
+  },
   Artifact: {
     include: [
       ...(polymorphismImmutableFields.Artifact?.include ?? []).filter(
@@ -72,3 +93,6 @@ export const getImmutableFields = (model: ModelName): readonly string[] => {
   immutableFieldsCache.set(model, result);
   return result;
 };
+
+export const getRefusedFields = (model: ModelName): readonly string[] =>
+  ImmutableFieldsOverrides[model]?.refuse ?? [];

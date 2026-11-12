@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, primitive:authz
  */
 import { ContactScalarSchema } from '@template/db';
-import { updateRoute } from '#/lib/routeTemplates';
+import { permissionsBodyRefinement, updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   CONTACT_UPDATE_IMMUTABLE_FIELDS,
@@ -16,6 +16,7 @@ import { Modules } from '#/modules/modules';
 export const contactUpdateRoute = updateRoute({
   model: Modules.contact,
   middleware: [validatePermission('manage')],
+  bodyRefinement: permissionsBodyRefinement,
   bodySchema: contactUpdateBodySchema,
   sanitizeKeys: CONTACT_UPDATE_IMMUTABLE_FIELDS,
   responseSchema: ContactScalarSchema,

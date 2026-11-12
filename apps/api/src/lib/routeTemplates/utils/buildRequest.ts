@@ -86,11 +86,15 @@ type QueryType<T extends RouteArgs> = T['paginate'] extends 'cursor'
       ? T['query']
       : ZodAnyObject;
 
+type BodyType<T extends RouteArgs> = T['many'] extends true
+  ? z.ZodArray<SanitizedBodySchema<NonNullable<T['bodySchema']>>>
+  : SanitizedBodySchema<NonNullable<T['bodySchema']>>;
+
 type RequestWithBody<T extends RouteArgs> = {
   params: ParamsType<T>;
   query: QueryType<T>;
   body: {
-    content: { 'application/json': { schema: SanitizedBodySchema<NonNullable<T['bodySchema']>> } };
+    content: { 'application/json': { schema: BodyType<T> } };
     required: T['bodyRequired'] extends false ? false : true;
   };
 };

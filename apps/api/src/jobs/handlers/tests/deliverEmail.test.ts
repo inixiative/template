@@ -1,5 +1,5 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { CommunicationReasonCode } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -11,8 +11,6 @@ import {
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { saveEmailTemplate } from '@template/email/render';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { type DeliverEmailPayload, deliverEmail } from '#/jobs/handlers/deliverEmail';
 import { emailRegistry } from '#/lib/email';
 
@@ -28,9 +26,7 @@ describe('deliverEmail — send-time component version closure', () => {
 
   let fan: { id: string };
 
-  beforeAll(() => {
-    registerAuditLogHook();
-    registerEmailVersioningHook();
+  beforeEach(() => {
     const recorder: EmailClient = {
       send: async (options) => {
         attempts.push(options);
@@ -49,9 +45,8 @@ describe('deliverEmail — send-time component version closure', () => {
     fan = (await createUser({ email: 'fan@example.com' })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     emailRegistry.unregister(ADAPTER);
-    clearHookRegistry();
     await cleanupTouchedTables(db);
   });
 

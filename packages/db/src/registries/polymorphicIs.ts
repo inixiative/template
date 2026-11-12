@@ -5,7 +5,7 @@
  * @uses none
  */
 import { type Condition, Operator } from '@inixiative/json-rules';
-import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { polymorphicAxis } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 
 export const POLYMORPHIC_BINDS = {
@@ -16,20 +16,46 @@ export const POLYMORPHIC_BINDS = {
 
 export type PolymorphicKind = keyof typeof POLYMORPHIC_BINDS;
 
+/** Every key column a false-polymorphic axis uses for a value; empty when the value carries no key (platform, admin). */
+export const polymorphicKeyColumns = (
+  model: ModelName,
+  axisField: string,
+  value: string,
+): string[] => [
+  ...((polymorphicAxis(model, axisField).fkMap as Record<string, readonly string[] | undefined>)[
+    value
+  ] ?? []),
+];
+
+/** Whether `columns` are exactly the key columns an axis uses for a value, in any order. */
+export const isArmColumns = (
+  model: ModelName,
+  axisField: string,
+  value: string,
+  columns: readonly string[],
+): boolean => {
+  const keys = polymorphicKeyColumns(model, axisField, value);
+  return keys.length === columns.length && keys.every((key) => columns.includes(key));
+};
+
 /** The key column a false-polymorphic axis uses for a value, or null when the value carries no key (platform, admin). */
 export const polymorphicKeyColumn = (
   model: ModelName,
   axisField: string,
   value: string,
 ): string | null => {
-  const axis = getPolymorphismConfig(model)?.axes.find(
-    (candidate) => candidate.field === axisField,
-  );
-  if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
-  return (axis.fkMap as Record<string, string[] | undefined>)[value]?.[0] ?? null;
+  const columns = polymorphicKeyColumns(model, axisField, value);
+  if (columns.length > 1)
+    throw new Error(
+      `${model}.${axisField} value ${value} keys on ${columns.join('+')}; ask for polymorphicKeyColumns instead`,
+    );
+  return columns[0] ?? null;
 };
 
-/** The row a false-polymorphic axis points at — its kind and id — or null when it points at nobody. */
+/**
+ * The row a false-polymorphic axis points at — its kind and id — or null when it points at nobody.
+ * A composite kind has no single id, so asking for one is a bug.
+ */
 export const polymorphicTarget = (
   row: Record<string, unknown>,
   model: ModelName,
@@ -49,7 +75,7 @@ export const polymorphicBindings = (
   [POLYMORPHIC_BINDS[ownerModel]]: ownerId,
 });
 
-const isOwnerKind = (value: string): value is PolymorphicKind => value in POLYMORPHIC_BINDS;
+export const isOwnerKind = (value: string): value is PolymorphicKind => value in POLYMORPHIC_BINDS;
 
 /**
  * "This row's false-polymorphic axis points at the bound row": one arm per key column, each pairing
@@ -58,11 +84,10 @@ const isOwnerKind = (value: string): value is PolymorphicKind => value in POLYMO
  * no row of that kind has (the polymorphism rule makes the key required), so the arm matches nothing.
  */
 export const polymorphicIs = (model: ModelName, axisField: string): Condition => {
-  const axis = getPolymorphismConfig(model)?.axes.find(
-    (candidate) => candidate.field === axisField,
-  );
-  if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
-  const entries = Object.entries(axis.fkMap) as [string, string[]][];
+  const entries = Object.entries(polymorphicAxis(model, axisField).fkMap) as [
+    string,
+    readonly string[],
+  ][];
   const kindOf = (fk: string): PolymorphicKind | undefined =>
     entries.find(([value, fks]) => isOwnerKind(value) && fks.length === 1 && fks[0] === fk)?.[0] as
       | PolymorphicKind

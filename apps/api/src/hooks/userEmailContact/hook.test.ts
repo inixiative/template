@@ -1,19 +1,9 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerOrderedListHook } from '#/hooks/orderedList/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 
-registerRulesHook();
-registerContactRulesHook();
-registerOrderedListHook();
-registerUserEmailContactHook();
-
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 describe('userEmailContact hook', () => {
@@ -23,7 +13,7 @@ describe('userEmailContact hook', () => {
     expect(contacts).toHaveLength(1);
     expect((contacts[0].value as { address: string }).address).toBe(user.email.toLowerCase());
     expect(contacts[0].valueKey).toBe(user.email.toLowerCase());
-    expect(contacts[0].source).toBe('user-creation');
+    expect(contacts[0].source).toBe('userCreation');
   });
 
   it('leaves the contact unverified — channel-ownership verification is COMM-004, not auth', async () => {

@@ -1,35 +1,24 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import {
   cleanupTouchedTables,
   createOrganization,
   createOrganizationUser,
+  createToken,
   createUser,
   getNextSeq,
 } from '@template/db/test';
-import { registerRulesHook } from '#/hooks/rules/hook';
 
 // Polymorphism validation is now handled via rules (auto-injected from FalsePolymorphismRegistry)
-registerRulesHook();
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
 describe('falsePolymorphism hook', () => {
   it('pass: User owner with userId', async () => {
     const { entity: user } = await createUser();
-    const seq = getNextSeq();
-
-    const token = await db.token.create({
-      data: {
-        name: 'test',
-        keyHash: `h${seq}`,
-        keyPrefix: `p${seq}`,
-        ownerModel: 'User',
-        userId: user.id,
-      },
-    });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user });
 
     expect(token.userId).toBe(user.id);
     expect(token.organizationId).toBeNull();
@@ -37,17 +26,10 @@ describe('falsePolymorphism hook', () => {
 
   it('pass: Organization owner with organizationId', async () => {
     const { entity: org } = await createOrganization();
-    const seq = getNextSeq();
-
-    const token = await db.token.create({
-      data: {
-        name: 'test',
-        keyHash: `h${seq}`,
-        keyPrefix: `p${seq}`,
-        ownerModel: 'Organization',
-        organizationId: org.id,
-      },
-    });
+    const { entity: token } = await createToken(
+      { ownerModel: 'Organization' },
+      { organization: org },
+    );
 
     expect(token.organizationId).toBe(org.id);
     expect(token.userId).toBeNull();
@@ -55,18 +37,10 @@ describe('falsePolymorphism hook', () => {
 
   it('pass: OrganizationUser owner with both FKs', async () => {
     const { entity: orgUser } = await createOrganizationUser();
-    const seq = getNextSeq();
-
-    const token = await db.token.create({
-      data: {
-        name: 'test',
-        keyHash: `h${seq}`,
-        keyPrefix: `p${seq}`,
-        ownerModel: 'OrganizationUser',
-        userId: orgUser.userId,
-        organizationId: orgUser.organizationId,
-      },
-    });
+    const { entity: token } = await createToken(
+      { ownerModel: 'OrganizationUser' },
+      { organizationUser: orgUser },
+    );
 
     expect(token.userId).toBe(orgUser.userId);
     expect(token.organizationId).toBe(orgUser.organizationId);
@@ -78,15 +52,18 @@ describe('falsePolymorphism hook', () => {
     const seq = getNextSeq();
 
     const promise = async () =>
-      db.token.create({
-        data: {
-          name: 'test',
-          keyHash: `h${seq}`,
-          keyPrefix: `p${seq}`,
-          ownerModel: 'User',
-          userId: user.id,
-          organizationId: org.id,
-        },
+      db.token.createManyAndReturn({
+        data: [
+          {
+            name: 'test',
+            keyHash: `h${seq}`,
+            keyPrefix: `p${seq}`,
+            ownerModel: 'User',
+            role: 'member',
+            userId: user.id,
+            organizationId: org.id,
+          },
+        ],
       });
 
     await expect(promise).toThrow('Invalid ownerModel value on Token');
@@ -106,6 +83,7 @@ describe('falsePolymorphism hook', () => {
             keyHash: `h${seq1}`,
             keyPrefix: `p${seq1}`,
             ownerModel: 'User',
+            role: 'member',
             userId: user.id,
           },
           {
@@ -113,6 +91,7 @@ describe('falsePolymorphism hook', () => {
             keyHash: `h${seq2}`,
             keyPrefix: `p${seq2}`,
             ownerModel: 'User',
+            role: 'member',
             userId: user.id,
             organizationId: org.id,
           },
@@ -134,6 +113,7 @@ describe('falsePolymorphism hook', () => {
           keyHash: `h${seq}`,
           keyPrefix: `p${seq}`,
           ownerModel: 'User',
+          role: 'member',
           userId: user.id,
         },
         update: { name: 'wont-use' },
@@ -155,6 +135,7 @@ describe('falsePolymorphism hook', () => {
             keyHash: `h${seq}`,
             keyPrefix: `p${seq}`,
             ownerModel: 'User',
+            role: 'member',
             userId: user.id,
             organizationId: org.id, // Invalid - User owner can't have orgId
           },
@@ -166,17 +147,7 @@ describe('falsePolymorphism hook', () => {
 
     it('pass: regular update without nested creates', async () => {
       const { entity: user } = await createUser();
-      const seq = getNextSeq();
-
-      const token = await db.token.create({
-        data: {
-          name: 'original',
-          keyHash: `h${seq}`,
-          keyPrefix: `p${seq}`,
-          ownerModel: 'User',
-          userId: user.id,
-        },
-      });
+      const { entity: token } = await createToken({ ownerModel: 'User' }, { user });
 
       const updated = await db.token.update({
         where: { id: token.id },

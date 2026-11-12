@@ -148,16 +148,57 @@ container_on_port() {
   printf '%s\n' "${names%%$'\n'*}"
 }
 
+# Ports come from the @inixiative/config port registry (ports.json): the project's block is
+# the main checkout's ports (slot 0), and slot N sits SLOT_PORT_STEP x N above them.
+SLOT_PORT_STEP=10
+
+load_registry_ports() {
+  [ -z "${REGISTRY_PORTS:-}" ] || return 0
+  local bin="$ROOT_DIR/node_modules/.bin/inixiative-config" out
+  [ -x "$bin" ] || die "Error: $bin not found — run 'bun install' in $ROOT_DIR. Slot ports come from the @inixiative/config port registry."
+  out="$("$bin" ports "$PROJECT_NAME" 2>&1)" \
+    || die "Error: project '$PROJECT_NAME' has no block in the @inixiative/config port registry ($out). Add it to ports.json in @inixiative/config and release it with train."
+  REGISTRY_PORTS="${out#*: }"
+}
+
+registry_has_service() {
+  [[ " $REGISTRY_PORTS " == *" $1="* ]]
+}
+
+slot_port() {
+  local service="$1" slot="$2" pair
+  for pair in $REGISTRY_PORTS; do
+    [ "${pair%%=*}" = "$service" ] || continue
+    echo $(( ${pair#*=} + SLOT_PORT_STEP * slot ))
+    return 0
+  done
+  die "Error: the @inixiative/config port registry has no '$service' service (it has: $REGISTRY_PORTS)."
+}
+
+# An app's own PORT: the registry service named after the app, or the generic http service.
+app_port() {
+  local app="$1" slot="$2"
+  if registry_has_service "$app"; then slot_port "$app" "$slot"; else slot_port http "$slot"; fi
+}
+
+set_slot_ports() {
+  local slot="$1"
+  load_registry_ports
+  WEB_PORT="$(slot_port web "$slot")" || exit 1
+  ADMIN_PORT="$(slot_port admin "$slot")" || exit 1
+  SUPERADMIN_PORT="$(slot_port superadmin "$slot")" || exit 1
+  API_PORT="$(slot_port api "$slot")" || exit 1
+  HTTP_PORT="$(slot_port http "$slot")" || exit 1
+}
+
 slot_ports() {
-  echo "3${1}00 3${1}01 3${1}02 8${1}00"
+  set_slot_ports "$1"
+  echo "$WEB_PORT $ADMIN_PORT $SUPERADMIN_PORT $API_PORT $HTTP_PORT"
 }
 
 slot_resources() {
   local slot="$1"
-  WEB_PORT="3${slot}00"
-  ADMIN_PORT="3${slot}01"
-  SUPERADMIN_PORT="3${slot}02"
-  API_PORT="8${slot}00"
+  set_slot_ports "$slot"
   DB_LOCAL="${PROJECT_NAME}_wt_${slot}"
   DB_TEST="${PROJECT_NAME}_test_wt_${slot}"
   REDIS_DB="$slot"
@@ -247,6 +288,63 @@ rewrite_redis_db() {
     [ -n "$url" ] || continue
     [[ "$url" =~ $pattern ]] || continue
     set_env_var "$file" "$key" "${BASH_REMATCH[1]}/${n}"
+  done
+}
+
+SLOT_URL_KEYS="API_URL WEB_URL ADMIN_URL SUPERADMIN_URL"
+SLOT_OPTIONAL_URL_KEYS="BETTER_AUTH_BASE_URL VITE_API_URL VITE_WEB_URL VITE_ADMIN_URL VITE_SUPERADMIN_URL"
+
+slot_url() {
+  case "$1" in
+    API_URL|VITE_API_URL|BETTER_AUTH_BASE_URL) echo "http://localhost:${API_PORT}" ;;
+    WEB_URL|VITE_WEB_URL) echo "http://localhost:${WEB_PORT}" ;;
+    ADMIN_URL|VITE_ADMIN_URL) echo "http://localhost:${ADMIN_PORT}" ;;
+    SUPERADMIN_URL|VITE_SUPERADMIN_URL) echo "http://localhost:${SUPERADMIN_PORT}" ;;
+    *) die "Error: slot_url does not know $1" ;;
+  esac
+}
+
+# Points a checkout's env files at its slot's ports (slot 0 = the main checkout).
+apply_slot_ports() {
+  local dir="$1" slot="$2" f app key app_port_value
+  set_slot_ports "$slot"
+  f="$dir/.env.local"
+  if [ -f "$f" ]; then
+    ensure_env_var "$f" PORT "$API_PORT"
+    for key in $SLOT_URL_KEYS; do ensure_env_var "$f" "$key" "$(slot_url "$key")"; done
+    for key in $SLOT_OPTIONAL_URL_KEYS; do replace_env_var_if_present "$f" "$key" "$(slot_url "$key")"; done
+  fi
+  f="$dir/.env.test"
+  if [ -f "$f" ]; then
+    for key in $SLOT_URL_KEYS; do replace_env_var_if_present "$f" "$key" "$(slot_url "$key")"; done
+  fi
+  for f in "$dir"/apps/*/.env.local; do
+    [ -f "$f" ] || continue
+    app="$(basename "$(dirname "$f")")"
+    app_port_value="$(app_port "$app" "$slot")" || exit 1
+    replace_env_var_if_present "$f" PORT "$app_port_value"
+    for key in $SLOT_URL_KEYS $SLOT_OPTIONAL_URL_KEYS; do replace_env_var_if_present "$f" "$key" "$(slot_url "$key")"; done
+  done
+  for f in "$dir"/apps/*/.env.test; do
+    [ -f "$f" ] || continue
+    replace_env_var_if_present "$f" API_URL "$(slot_url API_URL)"
+  done
+}
+
+url_port() {
+  local pattern='^[a-z]+://[^/:]+:([0-9]+)'
+  [[ "$1" =~ $pattern ]] && printf '%s\n' "${BASH_REMATCH[1]}"
+  return 0
+}
+
+# Whether a checkout's root .env.local already points at its slot's ports.
+env_ports_match() {
+  local f="$1/.env.local" key
+  [ -f "$f" ] || return 0
+  set_slot_ports "$2"
+  [ "$(env_value "$f" PORT)" = "$API_PORT" ] || return 1
+  for key in $SLOT_URL_KEYS; do
+    [ "$(url_port "$(env_value "$f" "$key")")" = "$(url_port "$(slot_url "$key")")" ] || return 1
   done
 }
 

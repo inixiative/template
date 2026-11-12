@@ -36,7 +36,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - where do I install this dependency
 - authenticate the caller on this route
 - gate the route on a permission
-- a session-only route
+- a person-only route (no tokens)
 - api tokens shouldn't reach this
 - should the batch be all or nothing
 - commit each round separately
@@ -50,7 +50,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - who is calling this request
 - read the current user in a handler
 - impersonate a user
-- cookie or bearer token
+- user JWT or API token
 - get the current user and db in a handler
 - pass the request context around
 - a module variable for the current org
@@ -110,7 +110,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - render an email template to html
 - the schema is split per model
 - which app or package does this belong in
-- accept a session cookie or a bearer token
+- accept a user JWT or an API token
 - I'll commit the staging env
 - I'll jump the key version by two
 - I'll stash the current user on a module singleton
@@ -130,7 +130,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - every response is wrapped in a data key
 - lint or test every package from the root
 - turn on error tracking or tracing
-- prepare org context before a permission check
 - can this go in shared
 - send the email after the transaction commits
 - where do scratch files go
@@ -206,7 +205,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll return the object directly from the route
 - one command across all packages
 - the toggles for sentry and telemetry
-- set up the org for the permission engine
 - I'll put node-only code in shared
 - I'll fire the webhook inside the transaction
 - I'll drop the output at the repo root
@@ -281,7 +279,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the api response envelope
 - I'll run the command in each package
 - I'll hardcode sentry on
-- I'll pass the org id into the check manually
 - shared is only code that runs on server and client
 - the side effect ran even though the write rolled back
 - throwaway scripts live in the gitignored tmp folder
@@ -311,7 +308,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - tilde imports anywhere
 - I'll duplicate the component in web and admin
 - org permissions cascade to spaces
-- one chain for cookies, bearer and url tokens
+- one chain for user JWTs, API tokens and url tokens
 - where should request data live instead
 - the dot-dot-slash import in a source file
 - spec from the route definitions

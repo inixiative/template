@@ -4,17 +4,13 @@
  * @partOf feature:customer
  * @uses none
  */
-import {
-  CustomerRefScalarSchema,
-  OrganizationScalarSchema,
-  SpaceScalarSchema,
-  UserScalarSchema,
-} from '@template/db';
+import { CustomerRefScalarSchema, OrganizationScalarSchema, SpaceScalarSchema } from '@template/db';
 import { Tags } from '#/modules/tags';
+import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
 // Customer side - who is the customer (User, Org, or Space)
 const customerSchema = {
-  customerUser: UserScalarSchema.nullable(),
+  customerUser: userResponseSchema.nullable(),
   customerOrganization: OrganizationScalarSchema.nullable(),
   customerSpace: SpaceScalarSchema.extend({
     organization: OrganizationScalarSchema,
@@ -23,7 +19,7 @@ const customerSchema = {
 
 // Provider side - who is the provider (User, Org, or Space)
 const providerSchema = {
-  providerUser: UserScalarSchema.nullable(),
+  providerUser: userResponseSchema.nullable(),
   providerOrganization: OrganizationScalarSchema.nullable(),
   providerSpace: SpaceScalarSchema.extend({
     organization: OrganizationScalarSchema,

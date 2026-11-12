@@ -15,12 +15,12 @@
     "./lib/encryption/*": "./src/lib/encryption/*",
     "./test": "./src/test/index.ts",
     "./test/*": "./src/test/*",
-    "./zod": "./src/generated/zod/schemas/index.ts",
     "./zod/models": "./src/generated/zod/schemas/variants/pure/index.ts",
     "./zod/*": "./src/generated/zod/schemas/*.ts",
     "./generated/prismaMap": "./src/generated/prismaMap.gen.ts",
     "./lens": "./src/lens/index.ts",
     "./lens/*": "./src/lens/*.ts",
+    "./registries/*": "./src/registries/*.ts",
     "./prisma/seed": "./prisma/seed.ts",
     "./prisma/seeds": "./prisma/seeds/index.ts"
   },
@@ -28,19 +28,20 @@
     "test": "bun run --cwd ../.. with test api env __TEST_REDIRECT__=1 bun test --max-concurrency=1 packages/db/",
     "db:generate": "rm -rf src/generated/zod && PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 bunx prisma generate && bun run scripts/generatePrismaMap.ts && bun run scripts/generateScalarSchemas.ts && echo $(date) > .prisma.gen",
     "db:push": "prisma db push",
-    "db:push:force": "[ \"$ENV\" = 'test' ] || [ \"$ENV\" = 'local' ] && prisma db push --accept-data-loss || echo 'ERROR: db:push:force only allowed in test/local env'",
+    "db:push:force": "if [ \"$ENV\" = \"test\" ] || [ \"$ENV\" = \"local\" ]; then ../../scripts/db/push-local.sh; else echo \"ERROR: db:push:force only allowed in test/local env\" >&2; exit 1; fi",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:baseline": "bun run scripts/createBaselineMigration.ts",
     "db:studio": "prisma studio",
     "db:seed": "bun run --cwd ../../apps/api db:seed",
     "db:truncate:webhooks": "bun run scripts/truncateWebhookSubscriptions.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bun check"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^3.5.0",
-    "@prisma/adapter-pg": "^7.4.2",
-    "@prisma/client": "^7.4.2",
+    "@inixiative/json-rules": "^3.6.0",
+    "@inixiative/permissions": "^0.21.1",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "@supercharge/promise-pool": "^3.3.0",
     "@template/shared": "workspace:*",
     "bcryptjs": "^3.0.3",
@@ -48,16 +49,17 @@
     "ioredis-mock": "^8.13.1",
     "lodash-es": "^4.18.1",
     "pg": "^8.20.0",
-    "superjson": "^2.2.2"
+    "superjson": "^2.2.2",
+    "uuidv7": "^1.1.0"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
-    "@inixiative/prisma-map": "^0.3.1",
+    "@inixiative/prisma-map": "^0.4.1",
     "@types/bcryptjs": "^3.0.0",
     "@types/ioredis-mock": "^8.2.7",
     "@types/lodash-es": "^4.17.12",
     "@types/pg": "^8.18.0",
-    "prisma": "^7.4.2",
+    "prisma": "^7.10.1",
     "prisma-zod-generator": "^2.1.4",
     "zod": "^4.3.6"
   }

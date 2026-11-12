@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -9,9 +9,6 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { sweepableSegments } from '#/modules/segment/services/sweepableSegments';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
@@ -25,17 +22,13 @@ const membersOf = (segmentId: string) => ({
 describe('sweepable segments — what the nightly sweep enqueues', () => {
   let space: Space;
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
-    registerRuleReferenceTargetHook();
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('enqueues sound dynamic segments only: a degraded one is skipped, not warned about by its job', async () => {

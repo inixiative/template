@@ -19,7 +19,7 @@ export const createFlow = async (
 ) => {
   const definition = flowRegistry[body.flowKey];
   const { bindings } = z.object({ bindings: definition.bindingsSchema }).parse(body);
-  const steps = await definition.steps(bindings, new Date());
+  const steps = await definition.steps(bindings, { userId, now: new Date() });
 
   const flow = await c.get('db').flow.create({
     data: {

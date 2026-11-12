@@ -9,7 +9,7 @@ import { db, Prisma } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { RuleDegradedError, RuleEvaluationError, withRule } from '@template/shared/rules';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
 import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentRuleState } from '#/modules/segment/services/segmentRuleHealth';
 

@@ -370,7 +370,7 @@ copy of `createLock` (the unconditional `del` can delete a *different* holder's 
 lapse; `createLock` fences release with a per-process `processId`). Folded onto the primitive:
 
 ```ts
-const lock = createLock({ service: 'job-singleton', identifier, ttlMs: 300_000, heartbeatMs: 60_000, maxMissed: 3 });
+const lock = createLock({ service: 'job-singleton', identifier, ttlMs: 300_000, heartbeatMs: 60_000 });
 if (!(await lock.acquire())) return;
 try { await handler(ctx, ...args); } finally { await lock.release(); }
 ```

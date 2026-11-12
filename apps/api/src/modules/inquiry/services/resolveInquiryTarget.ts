@@ -4,7 +4,6 @@
  * @partOf feature:inquiry
  * @uses infrastructure:prisma, feature:tenancy, feature:users
  */
-import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { getValidatedBody, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { makeError } from '#/lib/errors';
@@ -28,22 +27,22 @@ export type InquiryTargetBody = {
 };
 
 export type InquiryTargetFields =
-  | { targetModel: (typeof InquiryResourceModel)['User']; targetUserId: UserId }
+  | { targetModel: (typeof InquiryResourceModel)['User']; targetUserId: string }
   | {
       targetModel: (typeof InquiryResourceModel)['Organization'];
-      targetOrganizationId: OrganizationId;
+      targetOrganizationId: string;
     }
-  | { targetModel: (typeof InquiryResourceModel)['Space']; targetSpaceId: SpaceId }
+  | { targetModel: (typeof InquiryResourceModel)['Space']; targetSpaceId: string }
   | {
       targetModel: (typeof InquiryResourceModel)['OrganizationUser'];
-      targetOrganizationId: OrganizationId;
-      targetUserId: UserId;
+      targetOrganizationId: string;
+      targetUserId: string;
     }
   | {
       targetModel: (typeof InquiryResourceModel)['SpaceUser'];
-      targetOrganizationId: OrganizationId;
-      targetSpaceId: SpaceId;
-      targetUserId: UserId;
+      targetOrganizationId: string;
+      targetSpaceId: string;
+      targetUserId: string;
     }
   | { targetModel: (typeof InquiryResourceModel)['admin'] };
 
@@ -56,13 +55,13 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
 
   if (targetModel === InquiryResourceModel.User) {
     if (body.targetUserId) {
-      const user = await db.user.findUnique({ where: { id: body.targetUserId as UserId } });
+      const user = await db.user.findUnique({ where: { id: body.targetUserId } });
       if (!user) throw makeError({ status: 404, message: 'Target user not found' });
-      return { ...nullTargetFields, targetModel, targetUserId: user.id as UserId };
+      return { ...nullTargetFields, targetModel, targetUserId: user.id };
     }
     if (body.targetEmail) {
       const user = await findUserOrCreateGuest(c, { email: body.targetEmail as string });
-      return { ...nullTargetFields, targetModel, targetUserId: user.id as UserId };
+      return { ...nullTargetFields, targetModel, targetUserId: user.id };
     }
     throw makeError({ status: 422, message: 'targetUserId or targetEmail is required' });
   }
@@ -70,17 +69,17 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
   if (targetModel === InquiryResourceModel.Organization) {
     if (body.targetOrganizationId) {
       const org = await db.organization.findUnique({
-        where: { id: body.targetOrganizationId as OrganizationId },
+        where: { id: body.targetOrganizationId },
       });
       if (!org) throw makeError({ status: 404, message: 'Target organization not found' });
-      return { ...nullTargetFields, targetModel, targetOrganizationId: org.id as OrganizationId };
+      return { ...nullTargetFields, targetModel, targetOrganizationId: org.id };
     }
     if (body.targetOrganizationSlug) {
       const org = await db.organization.findUnique({
         where: { slug: body.targetOrganizationSlug as string },
       });
       if (!org) throw makeError({ status: 404, message: 'Target organization not found' });
-      return { ...nullTargetFields, targetModel, targetOrganizationId: org.id as OrganizationId };
+      return { ...nullTargetFields, targetModel, targetOrganizationId: org.id };
     }
     throw makeError({
       status: 422,
@@ -90,9 +89,9 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
 
   if (targetModel === InquiryResourceModel.Space) {
     if (body.targetSpaceId) {
-      const space = await db.space.findUnique({ where: { id: body.targetSpaceId as SpaceId } });
+      const space = await db.space.findUnique({ where: { id: body.targetSpaceId } });
       if (!space) throw makeError({ status: 404, message: 'Target space not found' });
-      return { ...nullTargetFields, targetModel, targetSpaceId: space.id as SpaceId };
+      return { ...nullTargetFields, targetModel, targetSpaceId: space.id };
     }
     if (body.targetOrganizationSlug && body.targetSpaceSlug) {
       const space = await db.space.findFirst({
@@ -102,7 +101,7 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
         },
       });
       if (!space) throw makeError({ status: 404, message: 'Target space not found' });
-      return { ...nullTargetFields, targetModel, targetSpaceId: space.id as SpaceId };
+      return { ...nullTargetFields, targetModel, targetSpaceId: space.id };
     }
     throw makeError({
       status: 422,
@@ -116,37 +115,37 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
         status: 422,
         message: 'targetOrganizationId and targetUserId are required',
       });
-    const membership = await db.organizationUser.findUnique({
+    const organizationUser = await db.organizationUser.findUnique({
       where: {
         organizationId_userId: {
-          organizationId: body.targetOrganizationId as OrganizationId,
-          userId: body.targetUserId as UserId,
+          organizationId: body.targetOrganizationId,
+          userId: body.targetUserId,
         },
       },
     });
-    if (!membership)
+    if (!organizationUser)
       throw makeError({ status: 404, message: 'Target organization user not found' });
     return {
       ...nullTargetFields,
       targetModel,
-      targetOrganizationId: membership.organizationId as OrganizationId,
-      targetUserId: membership.userId as UserId,
+      targetOrganizationId: organizationUser.organizationId,
+      targetUserId: organizationUser.userId,
     };
   }
 
   if (targetModel === InquiryResourceModel.SpaceUser) {
     if (!body.targetSpaceId || !body.targetUserId)
       throw makeError({ status: 422, message: 'targetSpaceId and targetUserId are required' });
-    const membership = await db.spaceUser.findFirst({
-      where: { spaceId: body.targetSpaceId as SpaceId, userId: body.targetUserId as UserId },
+    const spaceUser = await db.spaceUser.findFirst({
+      where: { spaceId: body.targetSpaceId, userId: body.targetUserId },
     });
-    if (!membership) throw makeError({ status: 404, message: 'Target space user not found' });
+    if (!spaceUser) throw makeError({ status: 404, message: 'Target space user not found' });
     return {
       ...nullTargetFields,
       targetModel,
-      targetOrganizationId: membership.organizationId as OrganizationId,
-      targetSpaceId: membership.spaceId as SpaceId,
-      targetUserId: membership.userId as UserId,
+      targetOrganizationId: spaceUser.organizationId,
+      targetSpaceId: spaceUser.spaceId,
+      targetUserId: spaceUser.userId,
     };
   }
 

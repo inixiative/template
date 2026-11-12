@@ -12,7 +12,9 @@ import { sourceMutations } from '@template/ui/lib/inquiries/queryKeys';
 
 export const useSendInquiryMutation = () => {
   return useOptimisticMutation<unknown, Error, InquiryMeta>({
-    mutationFn: apiMutation((inquiry: InquiryMeta) => inquirySend({ path: { id: inquiry.id } })),
+    mutationFn: apiMutation((inquiry: InquiryMeta) =>
+      inquirySend({ path: { id: inquiry.id }, body: { expectedUpdatedAt: inquiry.updatedAt } }),
+    ),
     targets: (inquiry) =>
       sourceMutations[inquiry.type](inquiry).map((queryKey) => ({
         queryKey,

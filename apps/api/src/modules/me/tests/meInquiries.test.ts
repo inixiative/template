@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Inquiry, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -26,7 +26,7 @@ describe('GET /api/v1/me/inquiries/sent', () => {
   let user: User;
   let otherUser: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
     const { entity: other } = await createUser();
@@ -37,7 +37,7 @@ describe('GET /api/v1/me/inquiries/sent', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -79,7 +79,7 @@ describe('GET /api/v1/me/inquiries/received', () => {
   let user: User;
   let otherUser: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
     const { entity: other } = await createUser();
@@ -90,7 +90,7 @@ describe('GET /api/v1/me/inquiries/received', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -136,7 +136,7 @@ describe('GET /api/v1/me/inquiries/received', () => {
     expect(data.every((i) => i.status !== InquiryStatus.draft)).toBe(true);
   });
 
-  it('includes inquiries addressed to my organization and space memberships', async () => {
+  it('includes inquiries addressed to my organization and space members', async () => {
     const { entity: sender } = await createUser();
     const { entity: org } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization: org });

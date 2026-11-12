@@ -6,7 +6,7 @@
  */
 import { DbAction, type HookOptions, HookTiming, registerDbHook } from '@template/db';
 import { artifactKindDef } from '@template/shared/artifact';
-import { type HookRow, writtenPatches } from '#/hooks/shared/hookRows';
+import { type HookRow, writeData } from '#/hooks/shared/hookRows';
 import { makeError } from '#/lib/errors';
 
 const stampCreationAccess = (row: HookRow): void => {
@@ -24,7 +24,7 @@ export const registerArtifactAccessHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async (options: HookOptions) => {
-      for (const row of writtenPatches(options)) stampCreationAccess(row);
+      for (const row of writeData(options)) stampCreationAccess(row);
     },
   );
 

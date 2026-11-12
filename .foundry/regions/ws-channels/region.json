@@ -3,18 +3,18 @@
   "title": "WebSocket channels and refetch hints",
   "routing": "Is this about pushing a 'something changed' hint to the browser: the WS contract (WSEvent, never persisted or replayed), channels vs streams and which lane to pick, WS_CHANNELS and LIVE_QUERIES, channelKey, subscribe authorization by probing the route (resolveOperationRoute), publishing a refetch (refetch, sendToChannel / sendToUser / broadcast and their Local variants, Redis ws:broadcast fan-out), sendFrame instead of ws.send, the client socket (createApiWebsocket, useApiWebsocket, dispatchMessage, refetchQuery, setClient), live query recovery on reconnect, or horizontal scaling?",
   "concepts": ["ws-channels"],
-  "tokens": 9364,
+  "tokens": 8991,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1792,
+      "tokens": 1644,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 9364
+      "tokens": 8991
     }
   },
   "runsAgreed": 0,
@@ -29,9 +29,9 @@
       "doc:docs/claude/WEBSOCKETS.md#source-and-verification",
       "doc:FEATURES.md#real-time-communication"
     ],
-    "catalogClusters": ["websocket-realtime-delivery"],
-    "codeEntries": 24,
-    "docMembers": 11
+    "catalogClusters": ["frontend-state-api-client", "websocket-realtime-delivery"],
+    "codeEntries": 22,
+    "docMembers": 9
   },
   "bypassLines": 21,
   "glossaryTerms": 10

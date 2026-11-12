@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { ContactType } from '@template/db/generated/client/enums';
 import {
@@ -29,7 +29,7 @@ describe('messageUser handler', () => {
   const dispatched: DispatchedCall[] = [];
   const worker = createTestWorker();
 
-  beforeAll(() => {
+  beforeEach(() => {
     const harness = createTestApp({});
     testDb = harness.db;
 
@@ -42,11 +42,13 @@ describe('messageUser handler', () => {
     };
     messageProviderRegistry.register(ContactType.whatsapp, recorder as never);
     messageProviderRegistry.register(ContactType.telegram, recorder as never);
+    messageProviderRegistry.register(ContactType.email, recorder as never);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     messageProviderRegistry.unregister(ContactType.whatsapp);
     messageProviderRegistry.unregister(ContactType.telegram);
+    messageProviderRegistry.unregister(ContactType.email);
     await cleanupTouchedTables(testDb);
   });
 
@@ -86,6 +88,7 @@ describe('messageUser handler', () => {
     });
 
     expect(dispatched.map((d) => d.contactType).sort()).toEqual([
+      ContactType.email,
       ContactType.telegram,
       ContactType.whatsapp,
     ]);
@@ -151,7 +154,12 @@ describe('messageUser handler', () => {
       content: { text: 'hi' },
     });
 
-    expect(dispatched).toHaveLength(2);
+    expect(dispatched.map((d) => d.contactType).sort()).toEqual([
+      ContactType.email,
+      ContactType.email,
+      ContactType.whatsapp,
+      ContactType.whatsapp,
+    ]);
   });
 
   it('interpolates {{recipient.*}} and {{data.*}} per recipient', async () => {
@@ -184,7 +192,8 @@ describe('messageUser handler', () => {
     });
 
     const texts = dispatched.map((d) => d.content.text).sort();
-    expect(texts).toEqual(['Hi Alice from Tribe', 'Hi Bob from Tribe']);
+    expect(new Set(texts)).toEqual(new Set(['Hi Alice from Tribe', 'Hi Bob from Tribe']));
+    expect(texts).toHaveLength(4);
   });
 
   it('always delivers system kind regardless of acceptedKinds', async () => {
@@ -200,7 +209,10 @@ describe('messageUser handler', () => {
       content: { text: 'security alert' },
     });
 
-    expect(dispatched).toHaveLength(1);
+    expect(dispatched.map((d) => d.contactType).sort()).toEqual([
+      ContactType.email,
+      ContactType.whatsapp,
+    ]);
   });
 
   it('throws when a matched user has a contact type with no adapter', async () => {
@@ -270,7 +282,7 @@ describe('messageUser handler', () => {
       return dispatched.at(-1)?.content.text;
     };
 
-    it("renders only the viewer projection: a hidden column and another organization's membership never print", async () => {
+    it("renders only the viewer projection: a hidden column and another organization's member row never print", async () => {
       const { user, mine } = await member();
       expect(
         await send(

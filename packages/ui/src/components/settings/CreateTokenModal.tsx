@@ -10,7 +10,7 @@ import { enumToSelectOptions } from '@template/ui/lib/enumOptions';
 import { memo, useState } from 'react';
 
 type CreateTokenFormData = Pick<MeCreateTokenData['body'], 'name' | 'role'>;
-type TokenRole = CreateTokenFormData['role'];
+type TokenRole = NonNullable<CreateTokenFormData['role']>;
 
 const tokenRoleValues = [
   'owner',

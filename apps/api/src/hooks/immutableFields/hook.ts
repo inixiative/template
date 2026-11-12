@@ -1,8 +1,12 @@
 import { DbAction, HookTiming, type ModelName, registerDbHook } from '@template/db';
 import { unset } from 'lodash-es';
-import { getImmutableFields } from '#/hooks/immutableFields/registry';
+import { getImmutableFields, getRefusedFields } from '#/hooks/immutableFields/registry';
+import { makeError } from '#/lib/errors';
 
 const stripFromObject = (obj: Record<string, unknown>, model: ModelName): void => {
+  const [refused] = getRefusedFields(model).filter((field) => obj[field] !== undefined);
+  if (refused)
+    throw makeError({ status: 422, message: `${model}.${refused} cannot change after create` });
   for (const field of getImmutableFields(model)) {
     unset(obj, field);
   }

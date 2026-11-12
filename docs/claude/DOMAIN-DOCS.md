@@ -108,7 +108,7 @@ Where two or more things do neighbouring jobs (lock vs lane vs queue; readRoute 
 |---|---|---|
 | **createLock** | one process owns a resource; first holder keeps it | newest should win (claimLane); rows read-then-written in a txn (db.findForUpdate) |
 | **claimLane / watchLane** | newest job per (handlerName, dedupeKey) wins | first holder must keep it (createLock) |
-| **db.findForUpdate** | SELECT … FOR UPDATE inside db.txn; upserting: true for create-if-missing | non-row ownership (createLock) |
+| **db.findForUpdate** | SELECT … FOR NO KEY UPDATE inside db.txn; upserting: true for create-if-missing | non-row ownership (createLock) |
 
 - Good: every row's *Not when* names the sibling to use instead, so a wrong pick is one hop from the right one.
 - Bad: a table that lists members with a description each and no *Not when*: that is a glossary, and the Warden still cannot choose.
@@ -158,7 +158,7 @@ Source these from the doc's own Direction sections, from FEATURES.md status mark
 
 Open work an agent cannot use yet, with the ticket or PR, so it neither builds against it nor rebuilds it:
 
-- Session refresh (silent re-authentication, auto-retry on 401) is not implemented — FEATURES.md § Authentication & Sessions (🟡 Session Refresh)
+- Password change and account linking for a signed-in person need JWT-authenticated routes, not built yet — FEATURES.md § Authentication (🟡 Password Change and Account Linking)
 - Cursor (keyset) pagination mode: core landed, signing and the remaining pieces in progress — ticket API-003
 
 - Good: the thing, its state, and the reference that will change when it lands.
@@ -206,8 +206,8 @@ Domain docs are read by a model with a fixed budget per region (about 20k tokens
 - **Narrative code walkthroughs in the row.** The row points; part 4 (the doc section itself) explains.
 - **Duplicates of a rule that already exists.** Sharpen the existing row; do not add a second one next to it.
 
-- Good: `| Guard a route on a polymorphic owner: "the resource is owned by whichever of user, org or space" | **validateOwnerPermission** · primitive `apps/api/src/middleware/validations/validateOwnerPermission.ts` — fixed owner chain is validatePermission | PERMISSIONS.md § Owner-Polymorphic Models | a switch on the owner kind testing each branch |`
-- Bad: `On 2026-10-11 Aron reminded Claude that owner-polymorphic resources should use the robust validateOwnerPermission middleware, which makes gating seamless.`
+- Good: `| Guard a create or a list under an owner: "may this caller add a contact to this organization" | **validateSubmodelPermission** · primitive `apps/api/src/middleware/validations/validateSubmodelPermission.ts` — an action on the loaded record itself is validatePermission | PERMISSIONS.md § validateSubmodelPermission | a validatePermission('manage') on the parent standing in for the child's rule |`
+- Bad: `On 2026-10-26 Aron reminded Claude that collection routes should use the robust validateSubmodelPermission middleware, which makes gating seamless.`
 
 ---
 

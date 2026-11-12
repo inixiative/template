@@ -47,10 +47,13 @@ describe('{{#each}} loops', () => {
   });
 
   it('a filter and a rule inside a loop see only what the lens admits', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const tag = (id: string, organizationId: string) => ({
       deletedAt: null,
       tag: { id, name: 'vip', ownerModel: 'Organization', organizationId },
@@ -131,10 +134,13 @@ describe('{{#each}} loops', () => {
   });
 
   it('the stack a real send renders with — recipient narrowing, owner scope, planner target — shows one truth to tokens and rules', () => {
-    const scoped = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const scoped = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const lens = {
       ...scoped,
       recipient: {
@@ -183,10 +189,13 @@ describe('{{#each}} loops', () => {
   });
 
   it('a slot row the lens does not admit is not there to read: a foreign sender prints nothing and issues nothing false', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const render = (sender: Record<string, unknown>) =>
       interpolate(
         '[{{sender.name}}]',
@@ -199,10 +208,13 @@ describe('{{#each}} loops', () => {
   });
 
   it('a token under a loop element reads only what the lens exposes: a foreign tag is not there to print', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const tag = (id: string, organizationId: string) => ({
       deletedAt: null,
       tag: { id, name: `name-${id}`, ownerModel: 'Organization', organizationId },
@@ -226,10 +238,13 @@ describe('{{#each}} loops', () => {
   });
 
   it("memberships are the sender's: another organization's membership is not a row of the loop", () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const out = interpolate(
       '{{#each recipient.organizationUsers as=m}}[{{m.organization.name}}:{{m.role}}]{{/each}}',
       {
@@ -257,7 +272,7 @@ describe('{{#each}} loops', () => {
 
   describe('a row the owner cannot see renders nothing, yet rules judge it as the database does', () => {
     const lens = scopeEmailLens(
-      emailLens({ sender: lensFor('Organization') }),
+      { sender: lensFor('Organization') },
       { ownerModel: 'Organization', ownerId: 'org-1' },
       null,
     );
@@ -340,10 +355,13 @@ describe('{{#each}} loops', () => {
   });
 
   it('an unsupported loop rule fails closed with an issue: nothing renders, no raw check', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const theirs = {
       deletedAt: null,
       tag: { id: 'theirs', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' },
@@ -432,10 +450,13 @@ describe('{{#each}} loops', () => {
   });
 
   it('a rule inside a loop over an opaque slot that probes a lens-backed root renders nothing and reports it', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const probe = JSON.stringify({
       field: 'recipient.organizationUsers',
       arrayOperator: 'any',
@@ -460,10 +481,13 @@ describe('{{#each}} loops', () => {
   });
 
   describe('a rule never reads a clamp column the lens hides', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
-      ownerModel: 'Organization',
-      ownerId: 'org-1',
-    });
+    const lens = scopeEmailLens(
+      { sender: lensFor('Organization') },
+      {
+        ownerModel: 'Organization',
+        ownerId: 'org-1',
+      },
+    );
     const variables = {
       recipient: {
         id: 'u1',

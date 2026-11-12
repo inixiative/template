@@ -10,8 +10,8 @@ import {
   type Prisma,
   SpaceScalarSchema,
   TokenScalarSchema,
-  UserScalarSchema,
 } from '@template/db';
+import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
 const auditActorTokenSchema = TokenScalarSchema.omit({ keyHash: true }).strip();
 
@@ -24,8 +24,8 @@ export const includeAuditLogResponse = {
 } as const satisfies Prisma.AuditLogInclude;
 
 export const auditLogResponseSchema = AuditLogScalarSchema.extend({
-  actorUser: UserScalarSchema.nullable(),
-  actorSpoofUser: UserScalarSchema.nullable(),
+  actorUser: userResponseSchema.nullable(),
+  actorSpoofUser: userResponseSchema.nullable(),
   actorToken: auditActorTokenSchema.nullable(),
   contextOrganization: OrganizationScalarSchema.nullable(),
   contextSpace: SpaceScalarSchema.nullable(),

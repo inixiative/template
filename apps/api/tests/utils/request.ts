@@ -55,6 +55,6 @@ export const patch = (path: string, body?: unknown, headers?: Record<string, str
   return createRequest('PATCH', path, { body, headers });
 };
 
-export const del = (path: string, headers?: Record<string, string>) => {
-  return createRequest('DELETE', path, { headers });
+export const del = (path: string, headers?: Record<string, string>, body?: unknown) => {
+  return createRequest('DELETE', path, { body, headers });
 };

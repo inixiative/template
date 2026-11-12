@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
@@ -15,7 +15,7 @@ describe('GET /me/spaces', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser();
     user = entity;
 
@@ -27,7 +27,7 @@ describe('GET /me/spaces', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -40,7 +40,7 @@ describe('GET /me/spaces', () => {
     expect(pagination!.total).toBe(0);
   });
 
-  it('returns user spaces with membership info', async () => {
+  it('returns user spaces with member info', async () => {
     // createSpaceUser auto-creates: User, Organization, OrganizationUser, Space
     const { entity: _spaceUser, context } = await createSpaceUser({ role: Role.admin }, { user });
     const space = context.space!;

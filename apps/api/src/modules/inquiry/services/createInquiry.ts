@@ -38,7 +38,7 @@ export const createInquiry = async (
 
   const handler = inquiryHandlers[body.type];
   const content = handler.contentSchema.parse(body.content);
-  validateInquiryHandler(handler, source.sourceModel, body.targetModel);
+  validateInquiryHandler(body.type, source.sourceModel, body.targetModel);
   const target = await resolveInquiryTarget(c);
 
   const partial = await hydrate('inquiry', {
@@ -51,7 +51,7 @@ export const createInquiry = async (
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 
-  await validateInquiryPreCreate(db, handler, body.type, source, target, content);
+  await validateInquiryPreCreate(handler, body.type, source, target, content);
 
   return db.txn(async () => {
     const draft = await db.inquiry.create({

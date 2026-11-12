@@ -6,7 +6,7 @@
  */
 import { db, type Prisma } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { flushLinger, flushMaxRows, SHUTDOWN_FLUSH_RETRIES } from '#/jobs/outbox/config';
+import { flushMaxRows, SHUTDOWN_FLUSH_RETRIES } from '#/jobs/outbox/config';
 import { flushQueue } from '#/jobs/outbox/mutex';
 import {
   type OutboxRow,
@@ -20,8 +20,10 @@ import { JobLane } from '#/jobs/types';
 type Pending = { row: OutboxRow; resolve: () => void; reject: (e: unknown) => void };
 
 let acc: Pending[] = [];
-let timer: ReturnType<typeof setTimeout> | null = null;
-let closing = false; // shutdown: stop arming timers — flushOutbox owns the final drain
+// Flushes queued or running on flushQueue. While one is, new spills wait for it to settle and then go
+// out together (group commit).
+let flushesInFlight = 0;
+let closing = false; // shutdown: stop flushing on accept — flushOutbox owns the final drain
 let lastFlush: Promise<void> = Promise.resolve();
 
 // Accepted but not yet committed (or rejected) — rows still in `acc` plus rows in a flush queued behind
@@ -87,13 +89,10 @@ const writeBatch = (batch: Pending[]): Promise<void> =>
   });
 
 const flush = (): void => {
-  if (timer) {
-    clearTimeout(timer);
-    timer = null;
-  }
   if (!acc.length) return;
   const batch = acc; // synchronous swap — single-threaded JS, no await between
   acc = [];
+  flushesInFlight++;
   lastFlush = flushQueue.run(async () => {
     try {
       await writeBatch(batch);
@@ -101,9 +100,12 @@ const flush = (): void => {
     } catch (e) {
       for (const p of batch) p.reject(e); // callers awaiting spillToOutbox see the failure
       throw e; // surface to lastFlush
+    } finally {
+      flushesInFlight--;
+      if (flushesInFlight === 0 && acc.length && !closing) flush(); // group commit: everything that waited goes out as one batch
     }
   });
-  lastFlush.catch(() => {}); // fire-and-forget (timer/size) path: callers already got the rejection
+  lastFlush.catch(() => {}); // fire-and-forget path: callers already got the rejection
 };
 
 const accumulate = (row: OutboxRow, { flushImmediately = false }: SpillOptions): Promise<void> =>
@@ -127,15 +129,20 @@ const accumulate = (row: OutboxRow, { flushImmediately = false }: SpillOptions):
       },
     });
     if (closing) return; // shutdown drains via flushOutbox — its loop catches mid-drain spills, or rejects them if it gives up
-    if (flushImmediately || acc.length >= flushMaxRows())
-      flush(); // size trip — partitions a Promise.all burst inline
-    else if (!timer) timer = setTimeout(flush, flushLinger()); // arm for the partial-batch tail
+    // Idle: write now. A flush in flight: wait, and go out with everything else that waited.
+    if (flushImmediately || flushesInFlight === 0 || acc.length >= flushMaxRows()) flush();
   });
 
 // Spill one job. Everything routes through the accumulator; superseding lanes collapse at flush
 // time. Resolves on COMMIT, never on accumulation — a crash in the flush window must not drop it.
 // `flushImmediately` commits as soon as the row is accepted, carrying every row already pending into
 // the same batch — the slow-lane refusal path uses it so a worker slot waits only for the commit.
+// Default spills group-commit: with no flush in flight a spill is written at once; while one is queued
+// or running, spills wait and go out together when it settles. Batch size follows load, there is still
+// one outbox write at a time, and a producer that awaits each spill pays one write. There is no linger
+// timer: a producer that awaits each spill is common (db.txn awaits its afterCommit callbacks and app
+// events enqueue there), and a linger charged every such write its full delay while the queue was over
+// its cap. The size trigger still splits a burst larger than flushMaxRows.
 export const spillToOutbox = (row: OutboxRow, options: SpillOptions = {}): Promise<void> =>
   accumulate(row, options);
 
@@ -167,10 +174,6 @@ const flushBatchWithRetry = async (batch: Pending[]): Promise<void> => {
 
 export const flushOutbox = async (): Promise<void> => {
   closing = true;
-  if (timer) {
-    clearTimeout(timer);
-    timer = null;
-  }
   let persisted = 0;
   try {
     await lastFlush.catch(() => {}); // let any in-flight pre-shutdown flush settle first
@@ -194,7 +197,7 @@ export const flushOutbox = async (): Promise<void> => {
       log.error(err.message, err, LogScope.job);
     }
     closing = false; // don't latch — an aborted shutdown (or a test) must be able to buffer again.
-    // No timer re-arm here: during a real shutdown it could fire after Redis/DB are torn down. The
-    // loop above already drained everything present; an aborted shutdown re-arms on its next spill.
+    // No flush here: during a real shutdown it could run after Redis/DB are torn down. The loop above
+    // already drained everything present; an aborted shutdown flushes on its next spill.
   }
 };

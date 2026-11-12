@@ -23,6 +23,7 @@
 - [Security](#security)
   - [Singleton Pattern](#singleton-pattern)
   - [Absolute URL Protection](#absolute-url-protection)
+  - [Routes That Cannot Batch](#routes-that-cannot-batch)
   - [Limits](#limits)
   - [Timeout Calculation](#timeout-calculation)
 - [Implementation Patterns](#implementation-patterns)
@@ -237,12 +238,12 @@ Reference values from previous round results using `<<roundIndex.requestIndex.pa
 ### Syntax
 
 ```
-<<roundIndex.requestIndex.bodyPath>>
+<<roundIndex.requestIndex.fieldPath>>
 ```
 
 - `roundIndex`: Which round (0-based)
 - `requestIndex`: Which request within that round (0-based)
-- `bodyPath`: Dot-notation path into response body
+- `fieldPath`: Dot-notation path into that request's result (`{ status, body }`), so `body.data.id` reads the response body (`modules/batch/services/interpolation.ts`)
 
 ### Examples
 
@@ -343,6 +344,7 @@ data.batch.forEach((round, roundIndex) => {
 **Exception:** Only returns non-200 for:
 - `400` - Invalid batch request syntax (validation failure)
 - `400` - Nested batch request attempt (security violation)
+- `400` - A request reaches a route marked `'x-batch': false`
 - `500` - Unexpected server error (not request failures)
 
 ---
@@ -378,6 +380,10 @@ Detection: Requests with `X-Batch-Id` header are rejected.
 ```
 
 Only relative paths are allowed.
+
+### Routes That Cannot Batch
+
+A route whose effect a batch transaction cannot roll back (a signed JWT, a password) carries `'x-batch': false` in its route args; it lands in the OpenAPI document as an operation extension. `assertBatchable` (`modules/batch/services/assertBatchable.ts`) scans every request of every round against the app's OpenAPI registry before anything runs, and one match refuses the whole batch with a 400. An interpolated segment (`<<0.0.body.id>>`) is resolved only when its round runs, so it counts as matching any route below it. Today: `POST /api/v1/me/changePassword`, `POST /api/v1/me/rotateJwts`, and every Better Auth endpoint (`/api/auth/*`, any method), which signs, revokes and resets credentials outside the registry.
 
 ### Limits
 
@@ -463,7 +469,7 @@ type StrategyExecutor = (
 ```
 
 **Common structure:**
-1. Initialize batch registry with `registerBatch(batchId, db, baseContext)`
+1. Initialize batch registry with `registerBatch(batchId, baseContext)`
 2. Execute rounds (transaction or non-transaction)
 3. Track success/failure counts
 4. Calculate status based on strategy semantics
@@ -475,8 +481,8 @@ Internal requests inherit authentication from parent request:
 
 ```typescript
 // Parent request authenticated → all batch requests use same auth
-const batchId = crypto.randomUUID();
-registerBatch(batchId, db, parentContext);
+const batchId = Bun.randomUUIDv7();
+registerBatch(batchId, parentContext);
 
 // Internal requests detect batch via X-Batch-Id header
 const internalRequest = new Request(url, {
@@ -497,7 +503,7 @@ if (batchContext) {
   c.set('app', batchContext.baseContext.get('app'));
 
   // Deep clone mutable state (isolated per request)
-  const keysToClone = ['user', 'session', 'organizationUsers', 'organizations',
+  const keysToClone = ['user', 'organizationUsers', 'organizations',
                        'spaceUsers', 'spaces', 'token', 'spoofedBy'];
   for (const key of keysToClone) {
     const value = batchContext.baseContext.get(key);
@@ -519,8 +525,9 @@ Under `transactionAll` every sub-request writes into the batch's one transaction
 (`withOwnerLock`, upserting `findForUpdate`) is held until the transaction settles — the batch's
 commit or rollback, or the round's — never released when the sub-request returns, because its writes
 are not yet visible to anyone else. Taking the same lock again later in the batch, or from parallel
-sub-requests of one round, joins the batch's hold and runs after the holders before it instead of
-waiting on itself. A lock wait past its `waitMs` fails that sub-request, which rolls the batch (or
+sub-requests of one round, joins the batch's hold instead of waiting on itself; a `withOwnerLock`
+holder also runs after the holders before it, and one whose turn comes after the transaction
+settled throws instead of running. A lock wait past its `waitMs` fails that sub-request, which rolls the batch (or
 round) back. See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
 
 A round under `transactionAll` or `transactionPerRound` waits for every one of its sub-requests to

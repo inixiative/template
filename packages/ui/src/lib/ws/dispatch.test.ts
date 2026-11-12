@@ -4,7 +4,6 @@ import { type ChannelKeyInput, STREAM_DEFINITIONS, type WSEvent } from '@templat
 import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
 import { addStreamListener } from '@template/ui/lib/ws/streamListeners';
-import { useAppStore } from '@template/ui/store';
 import { contactStreamRow } from '@template/ui/test/contactStreamRow';
 
 const refetchEvent = (key: ChannelKeyInput): WSEvent => ({
@@ -13,27 +12,25 @@ const refetchEvent = (key: ChannelKeyInput): WSEvent => ({
   key,
 });
 
-const qc = () => useAppStore.getState().client!;
+let client: QueryClient;
+let resyncs: string[];
+const qc = () => client;
 const prime = (queryKey: unknown[]) => qc().prefetchQuery({ queryKey, queryFn: async () => ({}) });
+const dispatch = (event: WSEvent) =>
+  dispatchMessage(event, { client, resync: (stream) => resyncs.push(stream) });
 
 describe('dispatchMessage', () => {
-  const initialState = useAppStore.getState();
-  let resyncs: string[];
   beforeEach(() => {
     resyncs = [];
-    useAppStore.setState({
-      client: new QueryClient(),
-      websocket: { ...initialState.websocket, resync: (stream) => resyncs.push(stream) },
-    });
+    client = new QueryClient();
   });
-  afterEach(() => useAppStore.setState(initialState));
 
   it('invalidates the exact query on query.refetch', async () => {
     const key = { _id: 'adminBotRead', path: { id: 'b1' } };
     await prime([key]);
     expect(qc().getQueryState([key])?.isInvalidated).toBe(false);
 
-    dispatchMessage(refetchEvent(key));
+    dispatch(refetchEvent(key));
 
     expect(qc().getQueryState([key])?.isInvalidated).toBe(true);
   });
@@ -44,7 +41,7 @@ describe('dispatchMessage', () => {
     const other = [{ _id: 'adminBotRead', path: { id: 'x' } }];
     for (const k of [a, b, other]) await prime(k);
 
-    dispatchMessage(refetchEvent({ _id: 'userRead' }));
+    dispatch(refetchEvent({ _id: 'userRead' }));
 
     expect(qc().getQueryState(a)?.isInvalidated).toBe(true);
     expect(qc().getQueryState(b)?.isInvalidated).toBe(true);
@@ -52,8 +49,8 @@ describe('dispatchMessage', () => {
   });
 
   it('ignores unknown categories and actions', () => {
-    expect(() => dispatchMessage({ category: 'presence', action: 'join' } as never)).not.toThrow();
-    expect(() => dispatchMessage({ category: 'query', action: 'explode' } as never)).not.toThrow();
+    expect(() => dispatch({ category: 'presence', action: 'join' } as never)).not.toThrow();
+    expect(() => dispatch({ category: 'query', action: 'explode' } as never)).not.toThrow();
   });
 
   describe('data streams', () => {
@@ -77,12 +74,12 @@ describe('dispatchMessage', () => {
 
     it('stores a snapshot as the stream query data', async () => {
       const payload = await snapshot();
-      dispatchMessage({ category: 'data', action: 'snapshot', seq: 1, stream, payload });
+      dispatch({ category: 'data', action: 'snapshot', seq: 1, stream, payload });
       expect(qc().getQueryData<unknown>(key)).toEqual(payload);
     });
 
     it('folds an append into the snapshot by the stream kind', async () => {
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'snapshot',
         seq: 1,
@@ -90,7 +87,7 @@ describe('dispatchMessage', () => {
         payload: await snapshot(),
       });
       const created = await contactStreamRow({ id: '0002' });
-      dispatchMessage(append('upsert', created));
+      dispatch(append('upsert', created));
       expect(
         qc()
           .getQueryData<{ data: Array<{ id: string }> }>(key)
@@ -99,15 +96,15 @@ describe('dispatchMessage', () => {
     });
 
     it('drops an append that arrives with no snapshot to fold into', async () => {
-      dispatchMessage(append('upsert', await contactStreamRow({ id: '0002' })));
+      dispatch(append('upsert', await contactStreamRow({ id: '0002' })));
       expect(qc().getQueryData<unknown>(key)).toBeUndefined();
     });
 
     it('requests a fresh snapshot instead of folding an op its kind does not define', async () => {
       const payload = await snapshot();
-      dispatchMessage({ category: 'data', action: 'snapshot', seq: 1, stream, payload });
+      dispatch({ category: 'data', action: 'snapshot', seq: 1, stream, payload });
 
-      dispatchMessage(append('append', {}));
+      dispatch(append('append', {}));
 
       expect(qc().getQueryData<unknown>(key)).toEqual(payload);
       expect(resyncs).toEqual([stream]);
@@ -121,10 +118,10 @@ describe('dispatchMessage', () => {
       const removeListener = addStreamListener(stream, 'remove', (payload) => heard.push(payload));
       const removal = { id: '0001' };
 
-      dispatchMessage(append('remove', removal));
+      dispatch(append('remove', removal));
       removeListener();
       removeThrowing();
-      dispatchMessage(append('remove', removal));
+      dispatch(append('remove', removal));
 
       expect(heard).toEqual([removal]);
     });
@@ -132,15 +129,15 @@ describe('dispatchMessage', () => {
     it('keeps removed ids across a fresh snapshot, so a late upsert still cannot resurrect a row', async () => {
       const removed = await contactStreamRow({ id: '0002' });
       const kept = await contactStreamRow({ id: '0001' });
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'snapshot',
         seq: 1,
         stream,
         payload: { data: [removed, kept] },
       });
-      dispatchMessage(append('remove', { id: '0002' }));
-      dispatchMessage({
+      dispatch(append('remove', { id: '0002' }));
+      dispatch({
         category: 'data',
         action: 'snapshot',
         seq: 1,
@@ -148,7 +145,7 @@ describe('dispatchMessage', () => {
         payload: { data: [kept] },
       });
 
-      dispatchMessage(append('upsert', removed));
+      dispatch(append('upsert', removed));
 
       expect(
         qc()
@@ -164,19 +161,19 @@ describe('dispatchMessage', () => {
         qc()
           .getQueryData<{ data: Array<{ id: string }> }>(key)
           ?.data.map((row) => row.id);
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'snapshot',
         seq: 1,
         stream,
         payload: { data: [removed, kept] },
       });
-      dispatchMessage(append('remove', { id: '0002' }));
+      dispatch(append('remove', { id: '0002' }));
 
-      dispatchMessage(append('upsert', removed));
+      dispatch(append('upsert', removed));
       expect(held()).toEqual(['0001']);
 
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'append',
         seq: 1,
@@ -197,7 +194,7 @@ describe('dispatchMessage', () => {
       };
       const heard: unknown[] = [];
       const removeListener = addStreamListener(stream, 'upsert', (payload) => heard.push(payload));
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'snapshot',
         seq: 1,
@@ -205,7 +202,7 @@ describe('dispatchMessage', () => {
         payload: { data: [current] },
       });
 
-      dispatchMessage(append('upsert', stale));
+      dispatch(append('upsert', stale));
       removeListener();
 
       expect(qc().getQueryData<{ data: unknown[] }>(key)?.data).toEqual([current]);
@@ -214,7 +211,7 @@ describe('dispatchMessage', () => {
 
     it('ignores frames for a stream family outside the registry', () => {
       const unknown = 'nope:id:x';
-      dispatchMessage({
+      dispatch({
         category: 'data',
         action: 'snapshot',
         seq: 1,

@@ -1,8 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser, createToken } from '@template/db/test';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
+import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import { del } from '#tests/utils/request';
 
 describe('DELETE /token/:id', () => {
@@ -12,7 +15,7 @@ describe('DELETE /token/:id', () => {
   let org: Organization;
   let orgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = entity;
     user = context.user;
@@ -27,7 +30,7 @@ describe('DELETE /token/:id', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -65,5 +68,36 @@ describe('DELETE /token/:id', () => {
 
     const deleted = await db.token.findUnique({ where: { id: token.id } });
     expect(deleted).toBeNull();
+  });
+});
+
+describe('a token deletes tokens: it only removes access (R84)', () => {
+  const { call } = createTokenProbeApp((hono) => hono.route('/api/v1/token', tokenRouter));
+
+  afterEach(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  const memberToken = async (
+    member: OrganizationUser,
+    data: { role: 'admin' | 'viewer' | null; full?: boolean },
+  ) => createKeyedToken({ ownerModel: 'OrganizationUser', ...data }, { organizationUser: member });
+
+  it("a member's full token deletes another token of that member", async () => {
+    const { entity: member } = await createOrganizationUser({ role: 'admin' });
+    const { rawKey } = await memberToken(member, { role: null, full: true });
+    const { entity: sibling } = await memberToken(member, { role: 'viewer' });
+    expect((await call(rawKey, 'DELETE', `/api/v1/token/${sibling.id}`)).status).toBe(204);
+  });
+
+  it("a token cannot delete a token outside its owner's reach", async () => {
+    const { entity: member, context } = await createOrganizationUser({ role: 'member' });
+    const { rawKey } = await memberToken(member, { role: null, full: true });
+    const { entity: other } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: context.organization },
+    );
+    const { entity: theirs } = await memberToken(other, { role: 'viewer' });
+    expect((await call(rawKey, 'DELETE', `/api/v1/token/${theirs.id}`)).status).toBe(403);
   });
 });

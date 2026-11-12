@@ -15,12 +15,16 @@ A moment that says any of these, or something close, is this region's. Both voic
 - show every step with a tick instead of streaming logs
 - catch the already-exists error and return the existing one
 - wire the secrets to sync into the deploy service
+- does the setup script guide the user through every step or do it for them
+- figure out whether setup is fresh, stale or finished
 - check if it exists first, then create it
+- a boolean for whether the step is running
 - always pull from infisical in steps with passwords, never trust passed props
 - running the create twice should not fail
 - how do we test init tasks that call providers
 - always prompt for the GitHub connection in the Railway setup
 - fetch the existing connections for this project
+- record that this setup step finished
 - hide the token as they type it
 - don't hand-write the press enter text
 - I'll wrap the handler body in an async arrow and call it
@@ -42,17 +46,22 @@ A moment that says any of these, or something close, is this region's. Both voic
 - store the token in the secret store under the right environment
 - show a loading indicator after they paste the token so it doesn't look hung
 - the screen should show what's saved, not what's in memory
+- which screen is showing right now
 - I don't think we need details, just a boolean of each step
 - test that a half-finished setup resumes correctly
 - the setup screen should list the steps and their status
 - there's no way to list them, so try the create and handle duplicate
 - connect the secret store to the hosting service, skip if already wired
+- is the project new, stale or complete
+- work out how far setup got from the saved config
 - list the existing ones before creating
+- track loading while something async happens
 - the step should read the secret from Infisical, not from props
 - make the setup call safe to run again
 - test a provisioning task with recorded responses
 - the setup should ask for the missing value instead of failing
 - see what's already connected in the project
+- check whether the step already ran before doing it again
 - the password shows in plain text in the terminal
 - the keyboard hint strings are hardcoded in the view
 - async work in an event handler
@@ -74,17 +83,22 @@ A moment that says any of these, or something close, is this region's. Both voic
 - make sure to upload to infisical
 - the screen goes blank after pressing enter
 - status comes from the persisted flags
+- track the current screen of the TUI
 - one done flag per remote write
 - I'll mock fetch for the provider calls in the test
 - I'll print progress lines as the task runs
 - the create throws when it already exists
 - I'll create the sync and ignore a duplicate error
+- is the setup new, stale, partly done or complete
+- I'll compare each flag by hand to decide the status
 - look it up and only create when missing
+- I'll add a loading value to the screen state instead of a flag
 - pull the password from the secret store each step
 - if the resource already exists, just use it
 - I'll hit the real provider in the test
 - if the user needs to do something, prompt them and wait
 - find an existing connection by name
+- resume setup from where it stopped
 - mask the input field for credentials
 - compose the hint instead of a literal string
 - don't inline an immediately-invoked async in the handler
@@ -106,20 +120,28 @@ A moment that says any of these, or something close, is this region's. Both voic
 - save the credential for later steps to fetch
 - I'll switch views first and set loading after
 - I'll track done steps in component state
+- I'll put running inside the screen state enum
 - just a boolean of each step
 - record the provider responses once and replay them
 - I'll let the create fail on a duplicate and ask for a rerun
+- compute the setup status from config instead of storing it
 - find or create the connection
+- name the busy flag by what it's doing
 - never trust a connection string passed from the last step
 - I'll guard the create with a did-it-already flag only
 - ask for the token in the UI instead of failing
+- skip steps that are already done on rerun
 - we have a helper for this stuff
 - I need an API token just to list workspaces
+- name the screen state, not a generic state
 - don't mark the step complete until it actually succeeded
+- I'll set the status in an effect after reading config
 - fetch the token from Infisical when the step needs it
 - I'll throw an error telling them to create the token and rerun
+- I'll track finished steps in a local variable
 - compose the keyboard hint line from the available commands
 - I'll set one flag after the whole section finishes
+- the status flashes wrong on mount
 - I'll pass the database password from step one into step two
 - we always want to prompt the github connection
 - I'll write the press-enter-to-continue text by hand
@@ -130,4 +152,5 @@ These mention this region's words but belong elsewhere; the answer is no, and th
 
 - Where do I read the project config in init → init-architecture
 - How do I test this route → test-harness
+- Store or read a cloud secret → secrets
 - Encrypt or decrypt a stored secret field → encryption

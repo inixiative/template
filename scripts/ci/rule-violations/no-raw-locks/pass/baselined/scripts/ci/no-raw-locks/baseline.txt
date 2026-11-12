@@ -1,0 +1,2 @@
+apps/api/src/services/claim.ts	raw-for-update: 'SELECT 1 FROM "A" FOR UPDATE'
+apps/api/src/services/claim.ts	raw-for-update: 'SELECT 1 FROM "B" FOR UPDATE'

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -17,6 +17,7 @@ import {
 } from '@template/db/test';
 import type { z } from 'zod';
 import { flowRouter } from '#/modules/flow';
+import { flowRegistry } from '#/modules/flow/registry/flowRegistry';
 import type { flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -25,10 +26,10 @@ import { del, get, json, jsonError, post } from '#tests/utils/request';
 
 type FlowResponse = z.infer<typeof flowResponseSchema>;
 
-const harnessFor = (user: User, seats: OrganizationUser[]) =>
+const harnessFor = (user: User, members: OrganizationUser[]) =>
   createTestApp({
     mockUser: user,
-    mockOrganizationUsers: seats,
+    mockOrganizationUsers: members,
     mount: [
       (app) => app.route('/api/v1/me', meRouter),
       (app) => app.route('/api/v1/flow', flowRouter),
@@ -58,22 +59,22 @@ describe('flows', () => {
   let owner: User;
   let harness: Harness;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     owner = (await createUser()).entity;
     harness = harnessFor(owner, []);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(harness.db);
   });
 
   const ownedOrganization = async () => {
     const { entity: organization } = await createOrganization();
-    const { entity: seat } = await createOrganizationUser(
+    const { entity: member } = await createOrganizationUser(
       { role: 'owner' },
       { user: owner, organization },
     );
-    return { organization, seat, app: harnessFor(owner, [seat]) };
+    return { organization, member, app: harnessFor(owner, [member]) };
   };
 
   const startIn = (app: Harness, bindings: Record<string, unknown>) =>
@@ -109,6 +110,23 @@ describe('flows', () => {
 
     expect(response.status).toBe(404);
     expect(await harness.db.flow.count({ where: { userId: owner.id } })).toBe(0);
+  });
+
+  it('hands steps the flow owner as the caller, and refuses a userId in the bindings', async () => {
+    const { organization, app } = await ownedOrganization();
+    const stepsSpy = spyOn(flowRegistry.setUpOrganization, 'steps');
+    try {
+      const flow = await started(app, organization.id);
+      const smuggled = await startIn(app, { organizationId: organization.id, userId: owner.id });
+
+      expect(flow.userId).toBe(owner.id);
+      expect(stepsSpy).toHaveBeenCalledTimes(1);
+      expect(stepsSpy.mock.calls[0]?.[1]).toEqual({ userId: owner.id, now: expect.any(Date) });
+      expect(smuggled.status).toBe(422);
+      expect((await jsonError(smuggled)).fieldErrors).toHaveProperty('bindings');
+    } finally {
+      stepsSpy.mockRestore();
+    }
   });
 
   it('resolves and stores every step at create', async () => {
@@ -155,7 +173,7 @@ describe('flows', () => {
     expect(advanced.currentStep).toBe(2);
     expect(advanced.stepStates).toEqual(['done', 'done', 'pending']);
 
-    await harness.db.token.delete({ where: { id: ciToken.id } });
+    await harness.db.token.update({ where: { id: ciToken.id }, data: { deletedAt: new Date() } });
     const back = await readIn(app, flow.id);
     expect(back.currentStep).toBe(1);
     expect(back.stepStates).toEqual(['done', 'pending', 'pending']);

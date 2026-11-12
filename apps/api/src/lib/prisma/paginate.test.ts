@@ -16,12 +16,12 @@ const makeDelegate = (captured: Captured): AnyDelegate =>
     count: async () => 0,
   }) as unknown as AnyDelegate;
 
-const makeContext = (
-  filterLens: LensNarrowing,
-  query: Record<string, unknown> = {},
-  user: Record<string, unknown> | undefined = undefined,
-) => {
-  const vars: Record<string, unknown> = { filterLens, bracketQuery: {}, user };
+const makeContext = (filterLens: LensNarrowing, query: Record<string, unknown> = {}) => {
+  const vars: Record<string, unknown> = {
+    filterLens,
+    bracketQuery: {},
+    permix: { isSuperadmin: () => false },
+  };
   return {
     get: (key: string) => vars[key],
     req: { valid: () => query },

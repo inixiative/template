@@ -56,11 +56,14 @@ A moment that says any of these, or something close, is this region's. Both voic
 - regenerate the route tree after adding a page
 - the query client and websocket live in the store
 - a route segment that just redirects to its default child
+- show nav items depending on where I am and what I may do
 - every guard redirect must keep org and space
+- is there already a component for this
 - build guards against a custom store
 - read the current url parts safely, even during server render
 - the current url as one string with query and hash
 - menu items that hide themselves by permission
+- a broken rule doesn't empty the audience
 - add a page by dropping a file in routes
 - a page without the sidebar, like a print view or preview
 - check auth before the route loads
@@ -82,18 +85,21 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the profile route that works in any context
 - put the auth gate on the layout, not each page
 - redirect in the route guard without dropping org and space
+- keep audiences up to date as data changes
 - list the segments this context owns or belongs to
 - any frontend state goes in the shared store
 - the create-account screen
 - the space's settings and profile form
 - superadmin shouldn't need an org selected
 - the context selector is locked in superadmin
+- paged table with page numbers
 - server data belongs in the query cache
 - org and space ride in the query string
 - read the current org or space from the store
 - the current acting context type, org and space
 - the route file only mounts the page
 - theme, loading flag and app identity state
+- the current org and space should be in the URL
 - read shared app state from any component
 - the user's own profile and settings form
 - client-only state goes in the shared store
@@ -123,11 +129,14 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the new route file isn't picked up
 - reach the query client outside a component
 - parent path with no page of its own
+- the sidebar changes between personal, org and space
 - I'll redirect without the search params
+- I'll build a bespoke button
 - only when not using the shared store
 - get pathname, search and hash separately
 - where am I right now, as a single path
 - describe the nav once and let it filter
+- don't clear membership when a reference breaks
 - the route tree is generated from files
 - chromeless page for an invoice or embed
 - I'll check auth in an effect and redirect
@@ -150,18 +159,21 @@ A moment that says any of these, or something close, is this region's. Both voic
 - one profile page that shows user or space depending on context
 - I'll guard every page individually
 - bounce them to another route before load, keeping the tenant
+- event-driven incremental updates with a nightly full sweep
 - the segments screen with owned and memberships views
 - where do I keep client state
 - new user registration form page
 - edit a space's name, slug and theme
 - I'll require an org for this superadmin feature
 - no org or space switching in the platform app
+- load more as they scroll
 - I'll fetch in an effect and store it in state
 - I'll put the org id in the url path
 - I'll pass the org down as a prop
 - what scope is the ui in right now
 - I'll write the page logic in the route file
 - where the global loading spinner flag lives
+- refresh keeps you in the same org
 - the one store all three apps use
 - edit my name and preferences
 - I'll put the fetched records in the store
@@ -191,11 +203,14 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll edit the generated route tree by hand
 - I'll import a module-level query client
 - I'll give the parent a component that redirects
+- I'll hardcode the menu per app
 - don't lose the tenant on redirect
+- raw html controls with hand-written styles
 - I'll write my own route guard functions
 - I'll read window.location directly
 - I'll concatenate pathname and search myself
 - I'll add an if around this menu entry
+- I'll recompute a degraded segment to zero members
 - I'll register the route in a central routes list
 - focused full-page view with just a back button
 - where does the auth gate go
@@ -218,18 +233,21 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll make separate profile routes per context
 - the layout route carries the guard
 - I'll throw a redirect with the search params copied in
+- I'll recompute every segment on every write
 - show segments for the current org or space
 - I'll keep this in a module variable
 - where new users sign up
 - profile page when we know it's a space
 - superadmin works at the user level
 - non-superadmins see unauthorized there
+- I'll build my own page buttons
 - cache what comes from the api
 - why isn't the tenant part of the path
 - which tenant are we acting in
 - auth loads the orgs and spaces, callers pass an id
 - pages reused across apps belong in the shared package
 - app branding from env in the store
+- I'll keep the selected org only in state
 - I'll make a new store for this app
 - profile page when we know it's a user
 - where does ui state live
@@ -238,6 +256,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll hide the nav for this page
 - where public content pages go
 - I'll build a layout with a sidebar for this app
+- the menu follows the current context
+- reuse before creating a new component
 - sidebar filtering is automatic from config
 - I'll hide the shell for this one page
 - hide the page from users without access
@@ -246,6 +266,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the reverse direction, signup from the login page
 - show the delete action only if allowed
 - the before-load redirect that keeps the query
+- how membership stays correct over time
+- infinite scroll on a list
+- shareable links carry the tenant
 - get it right from the context instead of passing it
 
 ## When this is not your domain

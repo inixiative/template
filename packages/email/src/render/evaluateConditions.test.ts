@@ -119,7 +119,7 @@ describe('evaluateConditions — non-object rules', () => {
   });
 });
 
-describe('evaluateConditions — reference liveness', () => {
+describe('evaluateConditions — reference existence', () => {
   const tagged = JSON.stringify({
     field: 'recipient.tagAttachments',
     arrayOperator: 'any',
@@ -128,13 +128,13 @@ describe('evaluateConditions — reference liveness', () => {
   const tpl = `{{#if rule=${tagged}}}VIP{{else}}BASE{{/if}}`;
   const vars = { recipient: { tagAttachments: [{ tag: { id: 'tag-1' } }] } };
 
-  it('renders normally when the named row is in the live set', () => {
+  it('renders normally when the named row is in the existing-target set', () => {
     expect(evaluateConditions(tpl, vars, defaultEmailLens, undefined, new Set(['Tag|tag-1']))).toBe(
       'VIP',
     );
   });
 
-  it('a branch whose rule names a row outside the live set is a rule error, never a match', () => {
+  it('a branch whose rule names a row outside the existing-target set is a rule error, never a match', () => {
     const errors: string[] = [];
     expect(
       evaluateConditions(
@@ -148,7 +148,7 @@ describe('evaluateConditions — reference liveness', () => {
     expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 
-  it('fails closed on an empty live set — absence is the answer, not an unchecked pass', () => {
+  it('fails closed on an empty existing-target set — absence is the answer, not an unchecked pass', () => {
     const errors: string[] = [];
     expect(
       evaluateConditions(
@@ -162,7 +162,7 @@ describe('evaluateConditions — reference liveness', () => {
     expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 
-  it('an omitted live set means nothing was confirmed, so a rule naming a row is degraded', () => {
+  it('an omitted existing-target set means nothing was confirmed, so a rule naming a row is degraded', () => {
     const errors: string[] = [];
     expect(
       evaluateConditions(tpl, vars, defaultEmailLens, (message) => errors.push(message.detail)),

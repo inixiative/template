@@ -1,8 +1,8 @@
 import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { ENCRYPTED_MODELS } from '../../packages/db/src/lib/encryption/registry';
-import { infisicalApi, toInfisicalSlug } from '../api/infisical';
+import { infisicalApi, infisicalSecretArgument, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';
-import { execFileAsync } from '../utils/exec';
+import { execFileAsync, execFileWithInput } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import {
   clearError,
@@ -412,14 +412,18 @@ export const setSecretAsync = async (
   path: string = '/',
 ): Promise<void> => {
   const realFn = async (): Promise<void> => {
-    await execFileAsync('infisical', [
-      'secrets',
-      'set',
-      `--projectId=${projectId}`,
-      `--env=${environment}`,
-      `--path=${path}`,
-      `${key}=${value}`,
-    ]);
+    await execFileWithInput(
+      'infisical',
+      [
+        'secrets',
+        'set',
+        `--projectId=${projectId}`,
+        `--env=${environment}`,
+        `--path=${path}`,
+        infisicalSecretArgument(key),
+      ],
+      value,
+    );
   };
 
   if (process.env.NODE_ENV === 'test') {

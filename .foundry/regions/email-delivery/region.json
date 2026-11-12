@@ -3,18 +3,18 @@
   "title": "Email delivery and preferences",
   "routing": "Is this about getting a templated email out: an email handoff on an app event, deliverEmailHandoffs, the sendEmail planner or deliverEmail / deliverEmailMessage job, the registry's EmailEntry (entity, sender, recipients, cc/bcc, data), CommunicationLog rows, statuses, reason codes and idempotency keys, sender identity (SenderType, resolveSender, resolveFromAddress), provider clients (createResendClient, createConsoleClient, emailRegistry, defaultEmailClient), address verification (emailVerifier, Bouncer, Contact.deliverability), the slow lane for wide fan-outs, or communication preferences and unsubscribe (CommunicationKind, acceptedKinds, canDeliver, unsubscribeUrl, List-Unsubscribe, the POST-only unsubscribe route)?",
   "concepts": ["email-delivery", "communication-preferences"],
-  "tokens": 14980,
+  "tokens": 16165,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1787,
+      "tokens": 2151,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 14980
+      "tokens": 16165
     }
   },
   "runsAgreed": 0,
@@ -32,15 +32,20 @@
       "audit-logging",
       "email-composition-rendering",
       "email-delivery-senders",
+      "graceful-shutdown-lifecycle",
+      "immutable-fields",
+      "json-rules-engine",
       "lenses-multi-source",
       "locks-and-serialization",
       "messaging-channels-adapters",
-      "multi-tenancy-membership",
       "mutation-hooks",
+      "permission-rule-algebra",
+      "rule-builder-ui-model",
+      "rule-references-registry",
       "seeding-data"
     ],
-    "codeEntries": 32,
-    "docMembers": 42
+    "codeEntries": 34,
+    "docMembers": 57
   },
   "bypassLines": 13,
   "glossaryTerms": 25

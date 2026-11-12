@@ -97,7 +97,7 @@ export const settleEach = (
         lens: emailRuleVocabulary(lens),
         rule: scoped.rule,
         references: emailRuleReferences(lens, scoped.rule),
-        live: options.liveRefs,
+        existingTargets: options.existingTargets,
       },
       { degraded: (issues) => issues.map((each) => each.detail).join('; '), sound: () => null },
     );

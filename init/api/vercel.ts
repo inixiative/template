@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { execAsync } from '../utils/exec';
+import { execAsync, execFileWithInput } from '../utils/exec';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/vercel');
 
@@ -26,15 +26,12 @@ class VercelApi {
   ): Promise<Record<string, unknown>> {
     const token = await this.getVercelToken();
     const url = `https://api.vercel.com${endpoint}`;
-    const headers = [
-      `-H "Authorization: Bearer ${token}"`,
-      `-H "Content-Type: application/json"`,
-    ].join(' ');
-    const cmd = body
-      ? `curl -s -X ${method} "${url}" ${headers} -d '${JSON.stringify(body)}'`
-      : `curl -s "${url}" ${headers}`;
-    const { stdout } = await execAsync(cmd);
-    return JSON.parse(stdout);
+    const response = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    return (await response.json()) as Record<string, unknown>;
   }
 
   async listTeams(): Promise<VercelTeam[]> {
@@ -161,11 +158,19 @@ class VercelApi {
   ): Promise<void> {
     return this.vcr.capture('addEnvVar', async () => {
       try {
-        const teamFlag = teamId ? `--scope ${teamId}` : '';
-        const escapedValue = value.replace(/'/g, `'"'"'`);
-        await execAsync(
-          `printf '%s\\n' '${escapedValue}' | vercel env add ${key} ${environment} --project ${projectName} ${teamFlag} --yes`,
-          { encoding: 'utf-8' },
+        await execFileWithInput(
+          'vercel',
+          [
+            'env',
+            'add',
+            key,
+            environment,
+            '--project',
+            projectName,
+            ...(teamId ? ['--scope', teamId] : []),
+            '--yes',
+          ],
+          `${value}\n`,
         );
       } catch (error) {
         if (error instanceof Error)

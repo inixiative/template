@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, RuleReferenceError } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db, RuleReferenceError } from '@template/db';
 import type { Organization, Segment, Tag } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -8,8 +8,8 @@ import {
   createTag,
   createTagCategory,
 } from '@template/db/test';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -53,8 +53,7 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
   let mySegment: Segment;
   let theirSegment: Segment;
 
-  beforeAll(async () => {
-    registerRulesHook();
+  beforeEach(async () => {
     mine = (await createOrganization()).entity;
     theirs = (await createOrganization()).entity;
     platformTag = (await createTag()).entity;
@@ -86,9 +85,8 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
       .entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it("platform tags and the owner's own tags and segments are admitted", async () => {
@@ -105,15 +103,15 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
   });
 
   it("another owner's tag is refused", async () => {
-    await expect(saveFor(mine.id, taggedBlock(theirTag.id))).rejects.toBeInstanceOf(
-      RuleReferenceError,
-    );
+    expect(await deadReferencesOf(saveFor(mine.id, taggedBlock(theirTag.id)))).toEqual([
+      { model: 'Tag', id: theirTag.id, state: 'missing' },
+    ]);
   });
 
   it("another owner's segment is refused", async () => {
-    await expect(saveFor(mine.id, inSegmentBlock(theirSegment.id))).rejects.toBeInstanceOf(
-      RuleReferenceError,
-    );
+    expect(await deadReferencesOf(saveFor(mine.id, inSegmentBlock(theirSegment.id)))).toEqual([
+      { model: 'Segment', id: theirSegment.id, state: 'missing' },
+    ]);
   });
 
   it('a tag named by a value read at evaluation is refused: no save can check which rows it names', async () => {

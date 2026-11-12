@@ -43,7 +43,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - leave the walkthrough without finishing it
 - add the new flow to the registry test
 - remember where the user is in a multi-step setup
-- pages need no flow code of their own
 - how the frontend keeps track of the active walkthrough
 - re-evaluate every step from the start each time
 - a step holds when the list isn't empty or has at least two
@@ -58,9 +57,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - steps are computed and stored when the flow starts
 - act on what's next: navigate to the step or finish
 - is this page part of the active walkthrough
-- if they navigate away from the walkthrough it ends
 - the endpoint that starts a walkthrough for the current user
-- closing the dialog should move them to the next step
 - navigate without losing the flow and spoof params
 - filter in the route's query, not in the step rule
 - run the step's read as the user, with their permissions
@@ -82,7 +79,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the user wandered off, abandon the flow
 - the test proves every step's read is a real route
 - the row that holds a guided walkthrough in progress
-- I'll add a continue button to this specific page
 - the id in the store, the data in the query cache
 - steps can move backward if the data disappears
 - a step holds when the record has this field set
@@ -97,9 +93,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - create checks too, so just create instead of asking
 - take the user to the next page of the walkthrough
 - does leaving this route mean they left the flow
-- design step pages so wandering off means abandoning
 - post a flow key and bindings, get back the computed steps
-- the modal's close button becomes the continue button
 - keep the flow id in the URL when moving between pages
 - let the list endpoint do the filtering the step needs
 - fetch every page of the list for a step check
@@ -121,7 +115,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - stop guiding them and go back to the normal site
 - a new flow key without test coverage
 - I'll add an onboarding progress table with a step column
-- flow handling belongs in the shared UI package
 - I'll keep onboarding state in a context provider
 - I'll persist which steps are done on the row
 - how to write the condition that says a step is done
@@ -136,9 +129,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll resolve the steps lazily on each read
 - I'll call navigate with the step URL myself
 - check the current path against the flow's pages and return URL
-- I'll keep the flow alive across unrelated pages
 - start the flow over the API
-- I'll add a separate Next button inside the modal
 - I'll call navigate and lose the search params
 - I'll fetch the whole list and filter it in the rule
 - a single record read versus a list read inside the flow
@@ -155,7 +146,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a flow whose steps all hold is never stored
 - clear the active flow without navigating anywhere
 - store which setup steps this user still has to do
-- don't sprinkle walkthrough checks across app pages
 - the server decides progress by reading live data as the user
 - I'll write a custom function to check step completion
 - I'll add a Continue button to each onboarding page
@@ -166,7 +156,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - go where the next-step rule says and clear the flow when done
 - I'll compare the pathname to a hardcoded list of onboarding routes
 - I'll add a route that checks whether onboarding is needed
-- after they create the thing in a dialog, carry on the walkthrough
 - the rule only judges what comes back
 - I'll query the database directly to check the step
 - I'll add my own invalidation after this mutation

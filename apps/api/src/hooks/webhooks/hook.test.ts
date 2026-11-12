@@ -1,16 +1,5 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  spyOn,
-} from 'bun:test';
-import { randomUUID } from 'node:crypto';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
+import { db } from '@template/db';
 import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import {
@@ -22,15 +11,17 @@ import {
   createUser,
   createWebhookSubscription,
 } from '@template/db/test';
-import { registerWebhookHook } from '#/hooks/webhooks/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 import { processJob } from '#/jobs/processJob';
 import { JobType } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
 
-registerWebhookHook();
-
-type Enqueued = { subscriptionId: string; action: string; resourceId: string };
+type Enqueued = {
+  subscriptionId: string;
+  action: string;
+  resourceId: string;
+  data: Record<string, unknown>;
+};
 
 let enqueueSpy: Mock<typeof enqueueModule.enqueueJob>;
 
@@ -41,13 +32,9 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => {
+afterEach(async () => {
   enqueueSpy.mockRestore();
-});
-
-afterAll(async () => {
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 const enqueued = () => enqueueSpy.mock.calls.map(([, payload]) => payload as Enqueued);
@@ -91,7 +78,7 @@ describe('webhook hook — tenancy', () => {
   let inactiveCustomerSub: { id: string };
   let inactiveCustomerId: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: customer } = await createUser();
     const { entity: other } = await createUser();
     const { entity: providerOrganization } = await createOrganization();
@@ -151,12 +138,12 @@ describe('webhook hook — tenancy', () => {
     expect(enqueued()).toEqual([]);
   });
 
-  it('delivers deletes to the parties of the deleted row', async () => {
+  it('delivers a CustomerRef soft delete to its parties as a delete', async () => {
     const { customerUserId, sub } = await subscribedCustomer();
     const ref = await createRef(customerUserId);
     enqueueSpy.mockClear();
 
-    await db.customerRef.delete({ where: { id: ref.id } });
+    await db.customerRef.update({ where: { id: ref.id }, data: { deletedAt: new Date() } });
 
     expect(deliveredTo(sub.id)).toEqual([
       expect.objectContaining({ action: 'delete', resourceId: ref.id }),
@@ -169,7 +156,7 @@ describe('webhook hook — tenancy', () => {
 
   it('delivers upserts on both paths to the parties', async () => {
     const { customerUserId, sub } = await subscribedCustomer();
-    const id = randomUUID();
+    const id = Bun.randomUUIDv7();
     const upsert = () =>
       db.customerRef.upsert({
         where: { id },
@@ -263,34 +250,184 @@ describe('webhook hook — tenancy', () => {
     expect(deliveredTo(organizationSub.id)).toEqual([]);
   });
 
-  it('AUTH-006 regression: an unrelated organization hears nothing about a user it has no CustomerRef with', async () => {
+  it('AUTH-006 regression: a change to a user with no CustomerRef emits nothing', async () => {
     const { entity: user } = await createUser();
     enqueueSpy.mockClear();
 
     await db.user.update({ where: { id: user.id }, data: { name: 'Changed Name' } });
 
-    expect(deliveredTo(outsiderSub.id)).toEqual([]);
     expect(enqueued()).toEqual([]);
   });
 
-  it('a party change emits no CustomerRef events, even to the parties', async () => {
+  const relate = (
+    customer: { model: 'User' | 'Organization' | 'Space'; id: string },
+    provider: { model: 'User' | 'Organization' | 'Space'; id: string },
+  ) =>
+    createCustomerRef({
+      customerModel: customer.model,
+      providerModel: provider.model,
+      [`customer${customer.model}Id`]: customer.id,
+      [`provider${provider.model}Id`]: provider.id,
+    });
+
+  it('a provider hears its customer change; the customer does not hear itself', async () => {
+    const { customerUserId, sub } = await subscribedCustomer();
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
-    await createCustomerRef({
-      customerModel: 'User',
-      providerModel: 'Space',
-      customerUserId: customerId,
-      providerSpaceId: space.id,
-    });
+    const spaceSub = await subscribeSpace(space.id);
+    await relate({ model: 'User', id: customerUserId }, { model: 'Space', id: space.id });
     enqueueSpy.mockClear();
 
-    await db.user.update({ where: { id: customerId }, data: { name: 'Party Changed' } });
-    await db.organization.update({
-      where: { id: providerOrganizationId },
-      data: { name: 'Provider Changed' },
-    });
+    await db.user.update({ where: { id: customerUserId }, data: { name: 'Customer Changed' } });
+
+    expect(deliveredTo(spaceSub.id)).toEqual([
+      expect.objectContaining({ action: 'update', resourceId: customerUserId }),
+    ]);
+    expect(deliveredTo(sub.id)).toEqual([]);
+    expect(deliveredTo(outsiderSub.id)).toEqual([]);
+  });
+
+  it('a customer hears its organization vendor change; the vendor does not hear itself', async () => {
+    const { customerUserId, sub } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const vendorSub = await subscribeOrganization(vendor.id);
+    await relate({ model: 'User', id: customerUserId }, { model: 'Organization', id: vendor.id });
+    enqueueSpy.mockClear();
+
+    await db.organization.update({ where: { id: vendor.id }, data: { name: 'Vendor Changed' } });
+
+    expect(deliveredTo(sub.id)).toEqual([
+      expect.objectContaining({ action: 'update', resourceId: vendor.id }),
+    ]);
+    expect(deliveredTo(vendorSub.id)).toEqual([]);
+    expect(deliveredTo(outsiderSub.id)).toEqual([]);
+  });
+
+  it('a customer hears its user vendor change', async () => {
+    const { entity: customer } = await createOrganization();
+    const customerSub = await subscribeOrganization(customer.id);
+    const { entity: vendor } = await createUser();
+    const vendorSub = await subscribeUser(vendor.id);
+    await relate({ model: 'Organization', id: customer.id }, { model: 'User', id: vendor.id });
+    enqueueSpy.mockClear();
+
+    await db.user.update({ where: { id: vendor.id }, data: { name: 'Vendor Changed' } });
+
+    expect(deliveredTo(customerSub.id)).toEqual([
+      expect.objectContaining({ action: 'update', resourceId: vendor.id }),
+    ]);
+    expect(deliveredTo(vendorSub.id)).toEqual([]);
+  });
+
+  it('a Space on both axes reaches its customer and its vendor once each, never itself', async () => {
+    const { customerUserId, sub } = await subscribedCustomer();
+    const { entity: organization } = await createOrganization();
+    const { entity: space } = await createSpace({}, { organization });
+    const spaceSub = await subscribeSpace(space.id);
+    await relate({ model: 'User', id: customerUserId }, { model: 'Space', id: space.id });
+    await relate(
+      { model: 'Space', id: space.id },
+      { model: 'Organization', id: providerOrganizationId },
+    );
+    enqueueSpy.mockClear();
+
     await db.space.update({ where: { id: space.id }, data: { name: 'Space Changed' } });
 
+    for (const counterparty of [sub, providerSub]) {
+      expect(deliveredTo(counterparty.id)).toEqual([
+        expect.objectContaining({ action: 'update', resourceId: space.id }),
+      ]);
+    }
+    expect(deliveredTo(spaceSub.id)).toEqual([]);
+    expect(deliveredTo(outsiderSub.id)).toEqual([]);
+  });
+
+  it('does not reach past one CustomerRef: a vendor of my vendor hears nothing about me', async () => {
+    const { customerUserId } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const vendorSub = await subscribeOrganization(vendor.id);
+    const { entity: vendorOfVendor } = await createOrganization();
+    const vendorOfVendorSub = await subscribeOrganization(vendorOfVendor.id);
+    await relate({ model: 'User', id: customerUserId }, { model: 'Organization', id: vendor.id });
+    await relate(
+      { model: 'Organization', id: vendor.id },
+      { model: 'Organization', id: vendorOfVendor.id },
+    );
+    enqueueSpy.mockClear();
+
+    await db.user.update({ where: { id: customerUserId }, data: { name: 'Customer Changed' } });
+
+    expect(deliveredTo(vendorSub.id)).toHaveLength(1);
+    expect(deliveredTo(vendorOfVendorSub.id)).toEqual([]);
+  });
+
+  it('a vendor hears its customer soft delete as a delete', async () => {
+    const { customerUserId } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const vendorSub = await subscribeOrganization(vendor.id);
+    await relate({ model: 'User', id: customerUserId }, { model: 'Organization', id: vendor.id });
+    enqueueSpy.mockClear();
+
+    await db.user.update({ where: { id: customerUserId }, data: { deletedAt: new Date() } });
+
+    expect(deliveredTo(vendorSub.id)).toEqual([
+      expect.objectContaining({ action: 'delete', resourceId: customerUserId }),
+    ]);
+  });
+
+  it('a customer hears its vendor soft delete, though the cascade tombstones their CustomerRef', async () => {
+    const { customerUserId, sub } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const { entity: ref } = await relate(
+      { model: 'User', id: customerUserId },
+      { model: 'Organization', id: vendor.id },
+    );
+    enqueueSpy.mockClear();
+
+    await db.organization.update({ where: { id: vendor.id }, data: { deletedAt: new Date() } });
+
+    expect(
+      deliveredTo(sub.id)
+        .map(({ action, resourceId }) => ({ action, resourceId }))
+        .sort((a, b) => a.resourceId.localeCompare(b.resourceId)),
+    ).toEqual(
+      [
+        { action: 'delete', resourceId: vendor.id },
+        { action: 'delete', resourceId: ref.id },
+      ].sort((a, b) => a.resourceId.localeCompare(b.resourceId)),
+    );
+  });
+
+  it('a vendor deleted earlier does not resurface through a later customer change', async () => {
+    const { customerUserId } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const vendorSub = await subscribeOrganization(vendor.id);
+    const { entity: ref } = await relate(
+      { model: 'User', id: customerUserId },
+      { model: 'Organization', id: vendor.id },
+    );
+    await db.customerRef.update({ where: { id: ref.id }, data: { deletedAt: new Date() } });
+    enqueueSpy.mockClear();
+
+    await db.user.update({ where: { id: customerUserId }, data: { name: 'After The Breakup' } });
+
+    expect(deliveredTo(vendorSub.id)).toEqual([]);
+  });
+
+  it('sends a customer email change to the vendor and never sends platformRole', async () => {
+    const { customerUserId } = await subscribedCustomer();
+    await createRef(customerUserId);
+    enqueueSpy.mockClear();
+
+    const email = `changed-${Bun.randomUUIDv7()}@example.com`;
+    await db.user.update({ where: { id: customerUserId }, data: { email } });
+
+    const [payload] = deliveredTo(providerSub.id);
+    expect(payload?.data).toEqual(expect.objectContaining({ email }));
+    expect(payload?.data).not.toHaveProperty('platformRole');
+
+    enqueueSpy.mockClear();
+    await db.user.update({ where: { id: customerUserId }, data: { platformRole: 'superadmin' } });
     expect(enqueued()).toEqual([]);
   });
 });
@@ -302,7 +439,7 @@ describe('webhook hook — origin suppression', () => {
   let hsSub: { id: string };
   let plainSub: { id: string };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: user, context } = await createUser();
     const { entity: customer } = await createUser();
 
@@ -334,6 +471,7 @@ describe('webhook hook — origin suppression', () => {
       providerUserId: user.id,
     });
     customerRefId = ref.id;
+    enqueueSpy.mockClear();
   });
 
   const touchRef = (kinds: ('platform' | 'activity' | 'marketing')[]) =>

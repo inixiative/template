@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { Prisma } from '@template/db';
+import { FindForUpdateLockTimeoutError, LockLostError, Prisma } from '@template/db';
 import { HTTPException } from 'hono/http-exception';
 import { makeError } from '#/lib/errors';
 import { createTestApp } from '#tests/createTestApp';
@@ -37,6 +37,12 @@ const { fetch } = createTestApp({
           code: 'P2025',
           clientVersion: Prisma.prismaVersion.client,
         });
+      });
+      app.get('/find-for-update-timeout', () => {
+        throw new FindForUpdateLockTimeoutError('User', 'User:abc (+2)', 3_000);
+      });
+      app.get('/lock-lost', () => {
+        throw new LockLostError('lock:cronJobs:schedulers');
       });
       app.get('/raw', () => {
         throw new Error('boom');
@@ -109,6 +115,26 @@ describe('errorHandlerMiddleware', () => {
 
     expect(response.status).toBe(404);
     await expectEnvelope(response, { message: 'Resource not found' });
+  });
+
+  it('answers a findForUpdate key-lock timeout as a retriable conflict', async () => {
+    const response = await fetch(get('/find-for-update-timeout'));
+
+    expect(response.status).toBe(409);
+    await expectEnvelope(response, {
+      error: 'CONFLICT',
+      message: 'Another request is writing this record; please retry',
+    });
+  });
+
+  it('answers a lost lock lease as a retriable conflict', async () => {
+    const response = await fetch(get('/lock-lost'));
+
+    expect(response.status).toBe(409);
+    await expectEnvelope(response, {
+      error: 'CONFLICT',
+      message: 'Lost the lock guarding this write; please retry',
+    });
   });
 
   it('stamps the request id on the generic 500', async () => {

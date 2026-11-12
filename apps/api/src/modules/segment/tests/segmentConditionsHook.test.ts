@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, Prisma } from '@template/db';
+import { db, Prisma } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -9,7 +9,7 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 
@@ -18,17 +18,15 @@ describe('segmentConditions hook', () => {
   let organization: Organization;
   let user: User;
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     user = context.user;
     organization = context.organization;
     space = (await createSpace({}, { organization })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('refuses a segment without conditions, whatever its type', async () => {
@@ -137,12 +135,12 @@ describe('segmentConditions hook', () => {
       arrayOperator: 'any',
       condition: { field: 'segment.id', operator: Operator.equals, value: id },
     });
-    await expect(
-      createSegment(
-        { ownerModel: 'Space', conditions: membersOf('00000000-0000-7000-8000-00000000dead') },
-        { space },
+    const absent = '00000000-0000-7000-8000-00000000dead';
+    expect(
+      await deadReferencesOf(
+        createSegment({ ownerModel: 'Space', conditions: membersOf(absent) }, { space }),
       ),
-    ).rejects.toThrow('does not own');
+    ).toEqual([{ model: 'Segment', id: absent, state: 'missing' }]);
 
     const { context } = await createOrganizationUser();
     const elsewhere = (await createSpace({}, { organization: context.organization })).entity;
@@ -150,9 +148,11 @@ describe('segmentConditions hook', () => {
       { ownerModel: 'Space', conditions: acmeRule },
       { space: elsewhere },
     );
-    await expect(
-      createSegment({ ownerModel: 'Space', conditions: membersOf(foreign.id) }, { space }),
-    ).rejects.toThrow('does not own');
+    expect(
+      await deadReferencesOf(
+        createSegment({ ownerModel: 'Space', conditions: membersOf(foreign.id) }, { space }),
+      ),
+    ).toEqual([{ model: 'Segment', id: foreign.id, state: 'missing' }]);
 
     const { entity: own } = await createSegment(
       { ownerModel: 'Space', conditions: acmeRule },

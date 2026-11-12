@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { db } from '@template/db';
 import { CommunicationReasonCode, CommunicationStatus } from '@template/db/generated/client/enums';
 import {
@@ -48,7 +48,7 @@ describe('deliverEmailMessage — claim policy', () => {
 
   let fan: { id: string };
 
-  beforeAll(() => {
+  beforeEach(() => {
     const recorder: EmailClient = {
       send: async (options) => {
         attempts.push(options);
@@ -80,7 +80,7 @@ describe('deliverEmailMessage — claim policy', () => {
     await cleanupTouchedTables(db);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     emailRegistry.unregister(ADAPTER);
     await cleanupTouchedTables(db);
   });
@@ -206,7 +206,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
   const sleep = async (): Promise<void> => {};
   const RENDER_ADAPTER = 'send-time-recipient';
 
-  beforeAll(() => {
+  beforeEach(() => {
     emailRegistry.register(RENDER_ADAPTER, {
       send: async (options) => {
         sent.push(options);
@@ -221,7 +221,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     await cleanupTouchedTables(db);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     emailRegistry.unregister(RENDER_ADAPTER);
     await cleanupTouchedTables(db);
   });
@@ -273,14 +273,14 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
   it('closes a send whose recipient no longer resolves as not_found, without sending', async () => {
     await saveTemplate('send-time-gone', 'Hello {{recipient.name}}');
 
-    const row = await deliver('send-time-gone', crypto.randomUUID());
+    const row = await deliver('send-time-gone', Bun.randomUUIDv7());
 
     expect(sent).toHaveLength(0);
     expect(row.status).toBe(CommunicationStatus.failed);
     expect(row.reasonCode).toBe(CommunicationReasonCode.not_found);
   });
 
-  it("an organization's send shows only its own membership of a recipient who belongs to two", async () => {
+  it("an organization's send shows only its own member row of a recipient who belongs to two", async () => {
     const { entity: mine } = await createOrganization({ name: 'Sending Org' });
     const { entity: theirs } = await createOrganization({ name: 'Other Org' });
     const { entity: user } = await createUser();
@@ -302,7 +302,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain(':member]');
   });
 
-  it("an organization's default lens shows its memberships, and its spaces' only when the lens turns them on", async () => {
+  it("an organization's default lens shows its members, and its spaces' only when the lens turns them on", async () => {
     const { entity: organization } = await createOrganization({ name: 'Org Default' });
     const { entity: space } = await createSpace({ name: 'Org Space' }, { organization });
     const { entity: user } = await createUser();
@@ -329,7 +329,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain('[Org Space]');
   });
 
-  it("a space sending with its organization's template shows that space's membership only", async () => {
+  it("a space sending with its organization's template shows that space's member row only", async () => {
     const { entity: organization } = await createOrganization({ name: 'Parent Org' });
     const { entity: space } = await createSpace({ name: 'Sending Space' }, { organization });
     const { entity: sibling } = await createSpace({ name: 'Sibling Space' }, { organization });
@@ -361,7 +361,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain('Sibling Space');
   });
 
-  it("a space's default lens leaves organization memberships off, so a template reading them falls back to the platform's", async () => {
+  it("a space's default lens leaves organization members off, so a template reading them falls back to the platform's", async () => {
     const { entity: organization } = await createOrganization({ name: 'Default Org' });
     const { entity: space } = await createSpace({ name: 'Default Space' }, { organization });
     const { entity: user } = await createUser();
@@ -385,7 +385,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain('[Default Org]');
   });
 
-  it("a space whose lens widens to its organization renders the organization's and sibling spaces' memberships, never another organization's", async () => {
+  it("a space whose lens widens to its organization renders the organization's and sibling spaces' members, never another organization's", async () => {
     const { entity: organization } = await createOrganization({ name: 'Parent Org' });
     const { entity: other } = await createOrganization({ name: 'Other Org' });
     const { entity: space } = await createSpace({ name: 'Lens Space' }, { organization });
@@ -525,7 +525,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
         INVITE,
         user.id,
         { type: 'Organization', organizationId: organization.id },
-        { id: crypto.randomUUID() },
+        { id: Bun.randomUUIDv7() },
       );
 
       expect(sent).toHaveLength(0);
@@ -553,8 +553,9 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
           },
         },
       );
-      await db.emailComponent.deleteMany({
+      await db.emailComponent.updateManyAndReturn({
         where: { slug: 'bound-promo', organizationId: organization.id },
+        data: { deletedAt: new Date() },
       });
 
       const row = await deliver('bound-fallback', outsider.id, {
@@ -588,8 +589,9 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
         '{{#component:clamp-promo}}<mj-text>promo</mj-text>{{/component:clamp-promo}}',
         { ownerModel: 'Organization', organizationId: organization.id },
       );
-      await db.emailComponent.deleteMany({
+      await db.emailComponent.updateManyAndReturn({
         where: { slug: 'clamp-promo', organizationId: organization.id },
+        data: { deletedAt: new Date() },
       });
 
       const row = await deliver('clamp-fallback', user.id, {

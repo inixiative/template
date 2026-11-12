@@ -3,27 +3,42 @@
   "title": "Test factories, cleanup and test rules",
   "routing": "Is this about test data or test rules: building or persisting a row for a test (createX / buildX, \"seed a user\", \"create a test org\", \"the record has to exist in the database\"), a factory for a new model (createFactory, the builder, generics), factories creating their own dependencies (\"you don't need to make the org before the org user\", \"get the user and org off the context\", optional parents with {}), unique values (getNextSeq), __serialize for UI assertions, cleanup after tests (cleanupTouchedTables, the test tracker, \"deleteMany in afterEach\"), or a test that mocks a module, fakes a store or client, spies on enqueueJob, writes rows with prisma directly, mutates env, or uses jest / vitest (no-module-mocks, no-direct-prisma-in-tests, no-test-env-mutation, spy-must-restore, no-jest, no-vitest)?",
   "concepts": ["test-factories", "test-rules"],
-  "tokens": 12196,
+  "tokens": 13909,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2449,
+      "tokens": 2438,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12196
+      "tokens": 13909
     }
   },
   "runsAgreed": 0,
   "sources": {
     "docs": ["docs/claude/TESTING.md"],
-    "docUnits": ["doc:docs/claude/TESTING.md#factories"],
-    "catalogClusters": ["testing-helpers", "testing-rules"],
-    "codeEntries": 93,
-    "docMembers": 29
+    "docUnits": [
+      "doc:docs/claude/TESTING.md#factories",
+      "doc:docs/claude/TESTING.md#factories/build-vs-create",
+      "doc:docs/claude/TESTING.md#factories/serialization-for-api-ui-shaped-assertions",
+      "doc:docs/claude/TESTING.md#factories/basic-usage",
+      "doc:docs/claude/TESTING.md#factories/triggering-optional-dependencies",
+      "doc:docs/claude/TESTING.md#factories/context-keys",
+      "doc:docs/claude/TESTING.md#factories/reusing-entities",
+      "doc:docs/claude/TESTING.md#factories/unique-data-with-getnextseq",
+      "doc:docs/claude/TESTING.md#factories/typedbuildresult-type-safety",
+      "doc:docs/claude/TESTING.md#factories/fk-auto-inference",
+      "doc:docs/claude/TESTING.md#factories/composite-foreign-keys",
+      "doc:docs/claude/TESTING.md#factories/factory-data-the-rules-expect",
+      "doc:docs/claude/TESTING.md#factories/cleanup",
+      "doc:docs/claude/TESTING.md#factories/test-data-patterns"
+    ],
+    "catalogClusters": ["naming-vocabulary", "testing-helpers", "testing-rules"],
+    "codeEntries": 102,
+    "docMembers": 30
   },
   "bypassLines": 33,
   "glossaryTerms": 16

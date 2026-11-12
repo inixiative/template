@@ -4,7 +4,7 @@
  * @partOf primitive:websockets
  * @uses none
  */
-import { byChannel, byId, byStream, byUser, removeConnection } from '#/ws/registry';
+import { byChannel, byId, byStream, removeConnection } from '#/ws/registry';
 import type { WSOutbound, WSSocket } from '#/ws/types';
 
 // Bun returns 0 for a dropped frame; closing makes the client reconnect and resync instead of drift.
@@ -59,11 +59,6 @@ export const sendToStreamLocal = (
     if (held) held.push(message);
     else sendOrEvict(ws, message);
   });
-};
-
-export const sendToUserLocal = (userId: string, event: WSOutbound): void => {
-  const ids = byUser.get(userId);
-  if (ids) deliverMessage(ids, event);
 };
 
 export const broadcastLocal = (event: WSOutbound): void => {

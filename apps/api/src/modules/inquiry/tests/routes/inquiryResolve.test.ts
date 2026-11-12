@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Inquiry, Organization, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -23,7 +23,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
   let org: Organization;
   let targetUser: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: sourceUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
@@ -35,7 +35,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
     db = createTestApp({ mockUser: targetUser, mount }).db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -53,7 +53,10 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     const response = await targetFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
     );
     const { data } = await json<Inquiry>(response);
 
@@ -75,13 +78,43 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     const response = await targetFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
     );
     const { data } = await json<Record<string, unknown>>(response);
 
     expect(response.status).toBe(200);
     expect(data.sourceOrganization).toBeDefined();
     expect(data.targetUser).toBeUndefined();
+  });
+
+  it('stores the resolution through its schema, dropping keys it does not define', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { role: 'member' },
+    });
+
+    const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
+    const response = await targetFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+        explanation: 'Not now',
+        role: 'owner',
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(stored.resolution).toEqual({ explanation: 'Not now' });
   });
 
   it('sets status to denied', async () => {
@@ -98,7 +131,10 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     const response = await targetFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'denied' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+      }),
     );
     const { data } = await json<Inquiry>(response);
 
@@ -121,7 +157,10 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     const response = await targetFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
     );
     expect(response.status).toBe(410);
   });
@@ -141,7 +180,10 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     const response = await targetFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'denied' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+      }),
     );
     expect(response.status).toBe(410);
   });
@@ -160,7 +202,10 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     const response = await targetFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
     );
     expect(response.status).toBe(400);
   });

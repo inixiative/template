@@ -1,8 +1,9 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
+  createIntegration,
   createOrganization,
   createSpace,
   createToken,
@@ -45,10 +46,11 @@ const bareRelations = {
   organizationUser: null,
   space: null,
   spaceUser: null,
+  integration: null,
 };
 
 describe('rate limit identities', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -70,7 +72,7 @@ describe('rate limit identities', () => {
     const viaToken = await who(
       createTestApp({
         mockUser: user,
-        mockToken: { ...token, ...bareRelations, user },
+        mockToken: { ...token, targetEntitlements: [], ...bareRelations, user },
         mount: [echo],
       }).fetch,
     );
@@ -88,8 +90,10 @@ describe('rate limit identities', () => {
     );
 
     const result = await who(
-      createTestApp({ mockToken: { ...token, ...bareRelations, organization }, mount: [echo] })
-        .fetch,
+      createTestApp({
+        mockToken: { ...token, targetEntitlements: [], ...bareRelations, organization },
+        mount: [echo],
+      }).fetch,
     );
 
     expect(result).toEqual({
@@ -107,12 +111,39 @@ describe('rate limit identities', () => {
 
     const result = await who(
       createTestApp({
-        mockToken: { ...token, ...bareRelations, organization, space },
+        mockToken: { ...token, targetEntitlements: [], ...bareRelations, organization, space },
         mount: [echo],
       }).fetch,
     );
 
     expect(result.organization).toBe(`organization:${organization.id}`);
     expect(result.space).toBe(`space:${space.id}`);
+  });
+
+  it("an integration's token counts against its integration's owner", async () => {
+    const { entity: user } = await createUser();
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'User',
+      userId: user.id,
+    });
+    const { entity: token } = await createToken(
+      { ownerModel: TokenOwnerModel.Integration },
+      { integration },
+    );
+
+    const result = await who(
+      createTestApp({
+        mockToken: {
+          ...token,
+          targetEntitlements: [],
+          ...bareRelations,
+          user,
+          integration: { ...integration, targetEntitlements: [] },
+        },
+        mount: [echo],
+      }).fetch,
+    );
+
+    expect(result.principal).toBe(`user:${user.id}`);
   });
 });

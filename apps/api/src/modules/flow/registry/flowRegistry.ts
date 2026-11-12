@@ -9,10 +9,14 @@ import type { z } from 'zod';
 import { setUpOrganizationFlow } from '#/modules/flow/registry/setUpOrganization';
 import type { FlowStep } from '#/modules/flow/schemas/flowSchemas';
 
-export type FlowDefinition<TBindings extends z.ZodObject = z.ZodObject> = {
+export type FlowStepsContext = { userId: string; now: Date };
+
+export type FlowDefinition<
+  TBindings extends z.ZodType<Record<string, unknown>> = z.ZodType<Record<string, unknown>>,
+> = {
   key: FlowKey;
   bindingsSchema: TBindings;
-  steps(bindings: z.infer<TBindings>, now: Date): Promise<FlowStep[]>;
+  steps(bindings: z.infer<TBindings>, context: FlowStepsContext): Promise<FlowStep[]>;
 };
 
 export const flowRegistry: Record<FlowKey, FlowDefinition> = {

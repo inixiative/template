@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import {
-  broadcastLocal,
-  sendToChannelLocal,
-  sendToStreamLocal,
-  sendToUserLocal,
-} from '#/ws/delivery';
+import { broadcastLocal, sendToChannelLocal, sendToStreamLocal } from '#/ws/delivery';
 import { addConnection, byId, clearRegistry } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
@@ -26,21 +21,6 @@ describe('delivery', () => {
 
     expect(parse(a.sent)).toEqual([{ type: 'query.refetch', queryKey: ['x'] }]);
     expect(b.sent).toEqual([]);
-  });
-
-  it('sendToUserLocal fans to all of a user’s sessions, no one else', () => {
-    const a = createTestSocket({ connectionId: 'a', userId: 'u1' });
-    const b = createTestSocket({ connectionId: 'b', userId: 'u1' });
-    const c = createTestSocket({ connectionId: 'c', userId: 'u2' });
-    addConnection(a.socket);
-    addConnection(b.socket);
-    addConnection(c.socket);
-
-    sendToUserLocal('u1', { hi: true });
-
-    expect(a.sent).toHaveLength(1);
-    expect(b.sent).toHaveLength(1);
-    expect(c.sent).toEqual([]);
   });
 
   it('broadcastLocal reaches every connection', () => {

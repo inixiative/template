@@ -54,7 +54,7 @@ const isRetryableSendError = (error: unknown): boolean =>
 
 // The claim reads the row and nothing else: only a `queued` row is open. `sending`, `sent`, and every
 // recorded outcome are closed, so a retry, a duplicate job, or a re-dispatch never resends. A crash
-// between claim and settle leaves `sending` for a person to resolve, never for the claim to reopen.
+// between claim and settle leaves `sending` for a user to resolve, never for the claim to reopen.
 // Failures before the claim that nothing deterministic caused (the verifier, the database) throw
 // with the row still `queued`, so the job retry picks it up — nothing has been sent yet.
 export const deliverEmailMessage = async (

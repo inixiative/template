@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   Inquiry,
   Organization,
@@ -30,7 +30,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
   let org: Organization;
   let adminOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -50,7 +50,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -68,6 +68,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
 
     const response = await fetch(
       patch(`/api/v1/inquiry/${inquiry.id}`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         content: { organizationId: org.id, role: 'member' },
       }),
     );
@@ -91,6 +92,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
 
     const response = await fetch(
       patch(`/api/v1/inquiry/${inquiry.id}`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         content: { organizationId: org.id, role: 'member' },
       }),
     );
@@ -111,6 +113,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
 
     const response = await fetch(
       patch(`/api/v1/inquiry/${inquiry.id}`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         content: { organizationId: org.id, role: 'admin' },
         status: InquiryStatus.sent,
       }),
@@ -121,7 +124,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     expect(stored.status).toBe(InquiryStatus.sent);
     expect(stored.sentAt).not.toBeNull();
     expect(stored.expiresAt).not.toBeNull();
-    expect(stored.content).toEqual({ organizationId: org.id, role: 'admin' });
+    expect(stored.content).toEqual({ role: 'admin' });
   });
 
   it('unsends a sent inquiry back to draft', async () => {
@@ -139,7 +142,10 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     });
 
     const response = await fetch(
-      patch(`/api/v1/inquiry/${inquiry.id}`, { status: InquiryStatus.draft }),
+      patch(`/api/v1/inquiry/${inquiry.id}`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: InquiryStatus.draft,
+      }),
     );
     expect(response.status).toBe(200);
 
@@ -173,6 +179,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
 
     const response = await adminFetch(
       patch(`/api/v1/inquiry/${inquiry.id}`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         content: { organizationId: org.id, role: 'admin' },
       }),
     );
@@ -191,7 +198,12 @@ describe('PATCH /api/v1/inquiry/:id', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: {} }));
+    const response = await fetch(
+      patch(`/api/v1/inquiry/${inquiry.id}`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        content: {},
+      }),
+    );
     expect(response.status).toBe(400);
   });
 });

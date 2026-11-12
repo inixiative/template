@@ -1,14 +1,18 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { db } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
-import { registerRulesHook } from '#/hooks/rules/hook';
+import { registerHooks } from '#/hooks';
 import { clearRulesCache, RulesRegistry, setRulesCache } from '#/hooks/rules/registry';
 
-RulesRegistry.User = true;
-registerRulesHook();
+// The rules hook reads the registry's models when it registers, so it is registered again with User in it.
+beforeEach(() => {
+  RulesRegistry.User = true;
+  clearHookRegistry();
+  registerHooks();
+});
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
   delete RulesRegistry.User;
 });
@@ -75,7 +79,7 @@ describe('rules hook', () => {
   describe('update validation with previous merging', () => {
     let userId: string;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       const { entity: user } = await createUser({
         name: 'Original',
         email: `merge${getNextSeq()}@example.com`,

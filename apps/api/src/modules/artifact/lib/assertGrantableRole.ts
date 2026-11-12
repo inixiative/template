@@ -5,7 +5,7 @@
  * @uses primitive:authz
  */
 import type { Role } from '@template/db/generated/client/enums';
-import { roleHierarchy } from '@template/permissions';
+import { roleHierarchy } from '@template/permissions/roles/shared';
 import { makeError } from '#/lib/errors';
 import type { ArtifactAccessVerdict } from '#/modules/artifact/services/checkArtifactAccess';
 

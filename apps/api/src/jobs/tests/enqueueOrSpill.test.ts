@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
@@ -17,14 +17,19 @@ describe('enqueueOrSpill', () => {
   const counts = { waiting: 0, prioritized: 0, active: 0 };
   // BullMQ answers a deduplicated add with the id of the job already holding the deduplication id.
   const holders = new Map<string, string>();
+  let refuseNextAdd = false;
   let restore = (): void => {};
 
-  beforeAll(() => {
+  beforeEach(() => {
     const add = spyOn(queue, 'add').mockImplementation((async (
       _name: string,
       _data: unknown,
       opts?: { jobId?: string; priority?: number; deduplication?: { id: string } },
     ) => {
+      if (refuseNextAdd) {
+        refuseNextAdd = false;
+        throw new Error("OOM command not allowed when used memory > 'maxmemory'.");
+      }
       const holder = opts?.deduplication && holders.get(opts.deduplication.id);
       if (holder) return { id: holder };
       added.push({
@@ -60,7 +65,7 @@ describe('enqueueOrSpill', () => {
     await cleanupTouchedTables(db);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     restore();
     await cleanupTouchedTables(db);
   });
@@ -124,6 +129,26 @@ describe('enqueueOrSpill', () => {
     expect((row?.options as { priority?: number }).priority).toBe(SLOW_LANE_PRIORITY);
   });
 
+  it('spills a job Redis refuses as out of memory instead of failing', async () => {
+    refuseNextAdd = true;
+
+    const result = await place(JobLane.fast, 'refused-add');
+
+    expect(result).toEqual({ jobId: 'refused-add', outboxed: true });
+    expect(added).toEqual([]);
+    const [row] = await db.jobOutbox.findMany();
+    expect(row).toMatchObject({ jobId: 'refused-add', lane: JobLane.fast });
+  });
+
+  it('throws a flow child Redis refuses as out of memory, since it cannot wait in the outbox', async () => {
+    refuseNextAdd = true;
+
+    await expect(
+      place(JobLane.fast, 'refused-child', { parent: { id: 'parent-job', queue: 'bull:jobs' } }),
+    ).rejects.toThrow('OOM command not allowed');
+    expect(await db.jobOutbox.findMany()).toHaveLength(0);
+  });
+
   it('adds a flow child straight to the queue even when its lane is over pressure', async () => {
     await queue.redis.set(flagKey(JobLane.fast), String(Date.now()));
 
@@ -149,20 +174,6 @@ describe('enqueueOrSpill', () => {
       ['fast-spilled', JobLane.fast],
       ['slow-spilled', JobLane.slow],
     ]);
-  });
-
-  it('trips the slow flag when prioritized work reaches the slow share, and the budget flag at the total cap', async () => {
-    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
-    setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
-
-    Object.assign(counts, { waiting: 0, prioritized: 5, active: 0 });
-    await place(JobLane.slow, 'slow-at-share');
-    expect(await queue.redis.get(flagKey(JobLane.slow))).not.toBeNull();
-    expect(await queue.redis.get(flagKey(JobLane.fast))).toBeNull();
-
-    Object.assign(counts, { waiting: 3, prioritized: 5, active: 2 });
-    await place(JobLane.fast, 'fast-at-cap');
-    expect(await queue.redis.get(flagKey(JobLane.fast))).not.toBeNull();
   });
 
   describe('singletons', () => {

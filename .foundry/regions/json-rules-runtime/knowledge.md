@@ -13,7 +13,7 @@
   - [Class `json-rules-runtime`](#class-json-rules-runtime-running-validating-and-typing-rules-the-three-rails-check--toprisma--executeprismaplan-and-where-they-differ-rule-introspection-describerule-getoperatorsforkind-runtime-validation-validaterule-assertvalidrule-validatenarrowing-bindrule-engine-globals-typescript-types-error-classes-usageerror-lensrefusal-root-array-rules)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
-    - `@inixiative/json-rules/README.md`: Rule Introspection; Runtime Validation; Engine Globals; TypeScript Types; Error Handling; Root-Array Rules in `check()`
+    - `@inixiative/json-rules/README.md`: Rule Introspection; Runtime Validation; Engine Globals; Inline Predicates — `toWhereSql`, `toLensWhereSql`; TypeScript Types; Error Handling; Root-Array Rules in `check()`
   - [4b. Code entries](#4b-code-entries)
 
 ## Glossary
@@ -75,37 +75,51 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | throw if the rule is malformed; guard the input and get a typed rule back; fail fast on a bad rule shape; I'll sniff the shape to decide if it's a rule | **assertValidRule** · package `@inixiative/json-rules#assertValidRule` — Need issues returned rather than thrown: validateRule instead; checking a rule against a lens: validateRuleInLens. | @inixiative/json-rules/README.md § Error Handling; @inixiative/json-rules/README.md § TypeScript Types | throws json-rules rule-shape Error (`rule-shape`) |
 | fill the placeholders in the rule before compiling; substitute the tenant id into the rule; I'll build the rule literal per request with the value inlined; a standalone rule's binds, not a lens's | **bindRule** · package `@inixiative/json-rules#bindRule` — Binding tokens inside a lens chain: bindLens instead; evaluating once: pass bindings to check. | @inixiative/json-rules/README.md § Rule Introspection; @inixiative/json-rules/README.md § TypeScript Types | String-replacing tokens in rule JSON, or building a new rule literal per request with the caller's value inlined, instead of a { bind } token filled by bindRule or check's bindings. (@inixiative/json-rules/README.md § Path Semantics, § Rule Introspection) |
 | evaluate the rule against this object in memory; does this row match the rule; filter the rows in memory with the rule; I'll write a function that walks the rule and tests the row; use the in-process sliver, not the compiler | **check** · package `@inixiative/json-rules#check` — Compiling to a database query instead of in-memory evaluation: toPrisma or toSql instead. | @inixiative/json-rules/README.md § Root-Array Rules in `check()`; @inixiative/permissions/README.md § The check engine | A hand-written interpreter that walks a Condition's JSON to evaluate it against a row, or a JS predicate re-implementing a stored rule, instead of check(rule, row, { bindings, now }). (catalog entry check; @inixiative/json-rules/README.md § Runtime Validation). throws UsageError (`usage`); json-rules rule-shape Error (`rule-shape`) |
+| find the finest time unit a rule's answer can change by, or null | **clockUnit** · package `@inixiative/json-rules#clockUnit` — find the finest time unit a rule's answer can change by, or null | @inixiative/json-rules/README.md § Rule Introspection; @inixiative/json-rules/docs/VERBS.md § Public API | — |
 | what sources and targets does this rule use; which executor can run this rule; does the rule cross a bridge; report the rule's supported targets to the builder | **describeRule** · package `@inixiative/json-rules#describeRule` — For routing and UX; gating still uses validateRuleInLens. describeRuleSources when you need the literal values named per source. | @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/docs/LENS.md § 11. Describe-and-validate vs deny-at-execution | — |
-| set the default time zone for the whole process; process-wide engine defaults; change the default provider globally | **engineGlobals** · package `@inixiative/json-rules#engineGlobals` — read and set process-wide rule engine defaults by dotted path | @inixiative/json-rules/README.md § Engine Globals; @inixiative/json-rules/README.md § TypeScript Types | — |
+| set the default time zone for the whole process; process-wide engine defaults; change the default provider globally | **engineGlobals** · package `@inixiative/json-rules#engineGlobals` — read and set process-wide rules engine defaults by typed dotted path | @inixiative/json-rules/README.md § Engine Globals; @inixiative/json-rules/README.md § Inline Predicates — `toWhereSql`, `toLensWhereSql` | — |
+| list required and optional keys for a condition node shape | **getConditionShapeKeys** · package `@inixiative/json-rules#getConditionShapeKeys` — Node keys: use this; an operator's operand shape: getValueShape instead. | @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/docs/VERBS.md § Public API | — |
 | which operators does a string field take; the operator menu for a field type; I'll hard-code a switch from type to operators; valid operators for a date field on Prisma | **getOperatorsForKind** · package `@inixiative/json-rules#getOperatorsForKind` — Field/date conditions; getArrayOperators for array operators, getAggregateOperators for aggregates. | @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/docs/VERBS.md § Public API | A hard-coded switch mapping field types to operator lists in a rule editor or validator. (@inixiative/json-rules/README.md § Operator Catalog; docs/VERBS.md (no list of operators elsewhere)) |
+| tell which operand shape an operator takes within its family | **getValueShape** · package `@inixiative/json-rules#getValueShape` — Operator operand: use this; keys a condition node takes: getConditionShapeKeys instead. | @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/docs/VERBS.md § Public API | — |
 | index the foreign rows by the join field; shape the cross-source data for evaluation; I'll build a map of foreign rows keyed by id | **indexBridges** · package `@inixiative/json-rules#indexBridges` — Shapes rule eval data; for source option rows use materializeSourceQuery instead. | @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Option Sources | Hand-built maps of foreign rows keyed by each bridge's join field, instead of indexBridges(lens, rawForeign). (@inixiative/json-rules/README.md › Evaluating Across Bridges) |
 | which binds does the whole lens chain need; the bind names across every layer; what values must I supply before using this lens | **listLensBindings** · package `@inixiative/json-rules#listLensBindings` — Lens-level requirement with parent: refs collapsed; for a bare rule use listBindings. | @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Bindings in a Lens | — |
 | turn the query's rows into picker options; options from a source query result; recheck the bridged candidates against the lens | **materializeSourceQuery** · package `@inixiative/json-rules#materializeSourceQuery` — After running toSourceQueries against a DB; for an already-fetched collection use materializeSources. | @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Option Sources | throws UsageError (`usage`) |
 | sort the rows the way the window would; in-memory sort with nulls last and multiple keys; I'll write a comparator to mimic the rule's ordering | **orderRecords** · package `@inixiative/json-rules#orderRecords` — In-memory sort matching window semantics; for database ordering compile via toPrisma instead. | @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Lens Utilities | A hand-rolled sort that tries to mimic a rule window's ordering (NULLs last, multi-key, stable) for in-memory rows. (catalog entry orderRecords; README Lens Utilities (orderRecords)) |
 | OR two compiled wheres together; combine the compiled where with an extra clause; I'll wrap them in an OR array by hand; match-all and match-nothing fold correctly when combined | **orWhere** · package `@inixiative/json-rules#orWhere` — Use with andWhere instead of hand-written `OR: [...]` so compiled false/true fold correctly. | @inixiative/json-rules/docs/VERBS.md § Public API | Hand-written `OR: [compiledWhere, extra]` / `AND: [...]` around compiled wheres, which mishandles compiled match-all / match-nothing arms (`AND: [x, { OR: [] }]` matches everything). (@inixiative/json-rules/docs/VERBS.md Public API (compose); catalog entry orWhere) |
 | read the value a scope reference points at; resolve the parent reference against the stack; out of bounds instead of throwing | **readScopeRef** · package `@inixiative/json-rules#readScopeRef` — Resolves against scopes; parseScopeRef when you only need depth and path. | @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/docs/VERBS.md § Public API | — |
+| render a lens's where clauses as inline SQL predicates per path | **toLensWhereSql** · package `@inixiative/json-rules#toLensWhereSql` — Whole lens to SQL; single condition: toWhereSql instead; in-memory filtering: projectRows. | @inixiative/json-rules/README.md § Inline Predicates — `toWhereSql`, `toLensWhereSql`; @inixiative/json-rules/README.md § Engine Globals | — |
+| render one condition as an inline SQL predicate in the engine dialect | **toWhereSql** · package `@inixiative/json-rules#toWhereSql` — Single condition; for a lens's wheres use toLensWhereSql. | @inixiative/json-rules/README.md § Inline Predicates — `toWhereSql`, `toLensWhereSql`; @inixiative/json-rules/README.md § Engine Globals | — |
 | the caller forgot to pass now; an unbound placeholder at evaluation; a bad time zone from the caller; whose fault is this error: the input | **UsageError** · package `@inixiative/json-rules#UsageError` — Caller input problems; when the lens itself can't apply a clamp or source: LensRefusal instead. | @inixiative/json-rules/README.md § Error Handling; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Option Sources | error class `usage` (json-rules UsageError: the caller's input is missing or malformed (no now for a relative date, invalid now or time zone, an unbound bind). Fix: supply the input.); thrown by check, toPrisma, toSql, materializeSourceQuery, materializeSources |
-| is this rule well-formed; list the problems with the rule's shape; can this rule compile to the target; I'll check the rule structurally myself | **validateRule** · package `@inixiative/json-rules#validateRule` — Shape and target only; to check fields resolve through a lens use validateRuleInLens. assertValidRule throws instead. | @inixiative/json-rules/README.md § Error Handling; @inixiative/json-rules/README.md § TypeScript Types | — |
+| is this rule well-formed; list the problems with the rule's shape; can this rule compile to the target; I'll check the rule structurally myself | **validateRule** · package `@inixiative/json-rules#validateRule` — Standalone rule shape checks; validateNarrowing or validateRuleInLens when the rule must fit a lens. | @inixiative/json-rules/README.md § Error Handling; @inixiative/json-rules/README.md § TypeScript Types | — |
 | which error is the caller's fault and which is the lens's; I'll match on the error message; catch by error class, rethrow the rest | **Classify json-rules errors by class** · pattern @inixiative/json-rules/README.md § Error Handling — catch UsageError for input, LensRefusal for lens, rethrow others as rule shape | code `validateRule`, `UsageError`, `LensRefusal`, `assertValidRule` | Matching json-rules error message strings to decide whose fault an error is, instead of instanceof UsageError / LensRefusal. (@inixiative/json-rules/README.md § Error Handling) |
+| avoid any(cond) hiding rows by filtering in the relation's where | **Prefer relation where plus notEmpty over any(cond)** · pattern @inixiative/json-rules/README.md — Join mode — over any(cond) in join mode, since any hides failing rows from the whole query | part 4 | — |
+| read to-many relations from caller LEFT JOINs instead of correlated EXISTS subqueries | **toMany: 'join'** · pattern @inixiative/json-rules/README.md — Join mode — when the consumer (e.g. Omni topic) loses correlation; use toMany 'subquery' for negative operators or shared model defaults | part 4 | — |
 | throw if the narrowing is invalid; fail at construction on a bad lens layer; a throwing check for the narrowing chain | **assertValidNarrowing** · primitive @inixiative/json-rules — Throwing variant; validateNarrowing to collect errors. | part 4 | throws json-rules rule-shape Error (`rule-shape`, inferred) |
-| the type of the rule JSON; the shape of a stored rule; type the conditions column | **Condition** · primitive @inixiative/json-rules/README.md — TypeScript Types — strict typed rules: StrictCondition instead | part 4 | — |
-| put the engine defaults back; undo every global override after the test; restore the default time zone and provider | **engineGlobals.reset** · primitive @inixiative/json-rules engineGlobals.reset — restore all engine defaults to their initial values | part 4 | — |
-| temporarily override an engine default for one call; set the default, run, then reset after; I'll set the global before and reset it in finally | **engineGlobals.with** · primitive @inixiative/json-rules engineGlobals.with — scoped override instead of set/reset; callback must be synchronous, Promise-returning callbacks throw | part 4 | engineGlobals.set before a call and reset after it (leaking the override when the call throws) instead of a scoped engineGlobals.with, or an async callback, which throws. (@inixiative/json-rules/README.md § Engine Globals). throws engineGlobals.with async-callback Error (`server-error`) |
+| the type of the rule JSON; the shape of a stored rule; type the conditions column | **Condition** · primitive @inixiative/json-rules/README.md › TypeScript Types — type-safe operator/operand pairing: StrictCondition instead | part 4 | — |
 | which base lens is this narrowing built on; find the root of the chain; the lens at the bottom of the layers | **getLensRoot** · primitive @inixiative/json-rules — find the base lens a narrowing chain is rooted at | part 4 | — |
-| the list of field kinds; enumerate the compile targets; which kinds count as numeric | **Operator catalog constants** · primitive @inixiative/json-rules FieldKind, RuleTarget, ValueShape, NUMERIC_KINDS, ALL_KINDS — enumerate field kinds, compile targets and operand shapes for rule builders | part 4 | — |
-| the Prisma null sentinel from a different client; Json null checks with another Prisma client; pass my own AnyNull instance | **prismaOptions.anyNull** · primitive @inixiative/json-rules toPrisma prismaOptions.anyNull — Only when using a different client than the installed @prisma/client. | part 4 | — |
-| compile for a database that isn't Postgres; set the provider for one compile call; the default provider for every compile | **prismaOptions.datasource.provider** · primitive @inixiative/json-rules README > Engine Globals — per-call option overrides the global; set globally only for a non-postgresql default | part 4 | — |
-| typo-tolerant contains on strings; fuzzy matching in the in-memory filter; approximate match in the search box | **string.fuzzy** · primitive @inixiative/json-rules README > Engine Globals — only for check(); toSql/toPrisma refuse contains/notContains when fuzzy is on | part 4 | — |
+| the list of field kinds; enumerate the compile targets; which kinds count as numeric | **Operator catalog constants** · primitive @inixiative/json-rules Operator Catalog — enumerate field kinds, targets, value and condition shapes for rule builders | part 4 | — |
+| pick the SQL dialect inline predicates are written in (postgres default, mysql) | **sql.dialect** · primitive @inixiative/json-rules engineGlobals 'sql.dialect' — pick the SQL dialect inline predicates are written in (postgres default, mysql) | part 4 | — |
+| compile to-many reads as EXISTS subqueries carrying model defaults inside each | **toMany: 'subquery'** · primitive @inixiative/json-rules/README.md — Join mode — default; required when a model default would need two aliases or negative operators are used, over 'join' | part 4 | — |
 | check the field map for bad names; errors in the field map, returned not thrown; a non-throwing field map check | **validateFieldMaps** · primitive @inixiative/json-rules — Non-throwing; assertValidFieldMaps to throw. | part 4 | — |
+| Inline SQL compares under column collation, so _ci columns match case-insensitively unlike check(). | **Binary collation for exact string match** · rule @inixiative/json-rules README, Inline Predicates — Collation — MySQL _ci columns where exact-case matching matters. | part 4 | — |
+| Queries with joined to-many relations must count distinct since parents repeat per row. | **Count distinct on joined fan-out** · rule @inixiative/json-rules/README.md — Join mode, Fan-out — Any toMany 'join' consumer aggregating parents | part 4 | — |
+| Every field path in a toWhereSql rule must be mapped in columns; missing paths throw, never quote-fall back. | **Every field path needs a column mapping** · rule @inixiative/json-rules README, Inline Predicates — Columns — Any toWhereSql or toLensWhereSql call, including relation keys as '<relation>.<key>'. | part 4 | — |
+| which map in the set is the root; passing a set of maps to the SQL compiler; SQL compile over a lens or a map set | **FieldMapSet requires mapName** · rule @inixiative/json-rules README, Inline Predicates — Map — Every toWhereSql call; values are checked against column kinds via leafFitViolations. | part 4 | — |
 | a user-written rule must be gated before it runs; I'll trust the rule the client sent; check the rule's paths against the lens first | **Gate user rules with validateRuleInLens** · rule @inixiative/json-rules/README.md — Any user-supplied rule evaluated against a lens. | part 4 | — |
+| Only equals/notEquals/in/notIn/exists/notExists, all/any and to-many array rules compile; others throw. | **Inline predicate operator subset** · rule @inixiative/json-rules README, Inline Predicates — Operators — Whenever writing rules destined for toWhereSql or toLensWhereSql. | part 4 | — |
+| Under toMany 'join', only notEmpty and any are allowed on to-many relations. | **Join mode allows positive operators only** · rule @inixiative/json-rules/README.md — Join mode — Any root where reading a to-many relation in join mode | part 4 | — |
+| A joined relation's clamps must sit in a layer earlier than the root where reading it. | **Join mode: clamps in earlier layer** · rule @inixiative/json-rules/README.md — Join mode, layer guard — Join-mode lenses with layered narrowings over a joined relation | part 4 | — |
+| A joined relation may carry only one any rule across the where and layers. | **Join mode: one any per relation** · rule @inixiative/json-rules/README.md — Join mode — Join-mode lenses with multiple conditions on the same to-many relation | part 4 | — |
+| Only the root where may read a joined to-many relation; nested reads throw. | **Join mode: root where only** · rule @inixiative/json-rules/README.md — Join mode — Join-mode compilation | part 4 | — |
 | an array rule over a Json column that isn't an array; the Json value is not a list in an array rule; what happens when the Json isn't an array | **Non-array Json in array rules is a data error** · rule @inixiative/json-rules/README.md — Where the Rails Differ — When writing array, aggregate, empty or notEmpty rules over Json values. | part 4 | — |
-| add an alias export for this function; a second name for the same operation; I'll export a resolve helper too | **One public name per operation** · rule @inixiative/json-rules/README.md — TypeScript Types; docs/VERBS.md — adding or renaming json-rules exports | part 4 | Adding an alias export or a second function for an operation json-rules already names (or a public name starting with resolve). (@inixiative/json-rules/docs/VERBS.md; README § TypeScript Types) |
+| add an alias export for this function; a second name for the same operation; I'll export a resolve helper too | **One public name per operation** · rule @inixiative/json-rules/README.md › TypeScript Types; docs/VERBS.md — When adding or renaming json-rules exports. | part 4 | Adding an alias export or a second function for an operation json-rules already names (or a public name starting with resolve). (@inixiative/json-rules/docs/VERBS.md; README § TypeScript Types) |
 | in-memory and database give the same answer; where do the evaluator and the compilers disagree; same rule, same result on both rails | **Rails agree except engine differences** · rule @inixiative/json-rules/README.md — Where the Rails Differ — When the same rule runs both in memory and in the database. | part 4 | — |
-| evaluate the rule against a list of rows; a rule over the whole array in memory; the data is an array, not a row | **Root-array rules are fieldless and check-only** · rule @inixiative/json-rules/README.md § Root-Array Rules in check() — When evaluating a rule against an array of rows. | part 4 | — |
-| walk the rule tree to find the bind names; I'll write a recursive helper over all and any; read what a stored rule names | **Rule introspection belongs in the engine** · rule @inixiative/json-rules/README.md — Rule Introspection — Whenever code needs a rule's bind names or contents. | part 4 | A recursive helper outside json-rules that descends `all` / `any` / `condition` to read what a stored rule names or needs; it goes blind silently when the format grows a node type. (@inixiative/json-rules/README.md § Rule Introspection; docs/VERBS.md (traverse a condition tree)) |
-| validate the rule from the request body before running it; a rule from the database straight into the evaluator; I'll trust the rule the editor sent | **Validate external rules first** · rule @inixiative/json-rules/README.md § Error Handling — Whenever rules originate outside code. | code `validateRule`, `UsageError`, `LensRefusal`, `assertValidRule` | Passing a rule from an API body, a database row or an editor straight to check / toPrisma / toSql without validateRule / assertValidRule (or the lens gate). (@inixiative/json-rules/README.md § Error Handling) |
+| evaluate the rule against a list of rows; a rule over the whole array in memory; the data is an array, not a row | **Root-array rules are fieldless and check-only** · rule @inixiative/json-rules/README.md § Root-Array Rules in check() — evaluating a rule against an array root; compilers throw on fieldless ArrayRule | part 4 | — |
+| walk the rule tree to find the bind names; I'll write a recursive helper over all and any; read what a stored rule names | **Rule introspection belongs in the engine** · rule @inixiative/json-rules/README.md — Rule Introspection — Any caller needing a rule's binds, values or clock dependence. | part 4 | A recursive helper outside json-rules that descends `all` / `any` / `condition` to read what a stored rule names or needs; it goes blind silently when the format grows a node type. (@inixiative/json-rules/README.md § Rule Introspection; docs/VERBS.md (traverse a condition tree)) |
+| Array rules on to-many relations require tables['<relation>'] with alias; nested relations, counts and windows throw. | **To-many relations need a tables entry** · rule @inixiative/json-rules README, Inline Predicates — To-many relations — Array rules any/all/none/empty/notEmpty in toWhereSql; lens defaults keyed '<Model>.<relation>'. | part 4 | — |
+| validate the rule from the request body before running it; a rule from the database straight into the evaluator; I'll trust the rule the editor sent | **Validate external rules first** · rule @inixiative/json-rules/README.md § Error Handling — any rule not authored in typed code | code `validateRule`, `UsageError`, `LensRefusal`, `assertValidRule` | Passing a rule from an API body, a database row or an editor straight to check / toPrisma / toSql without validateRule / assertValidRule (or the lens gate). (@inixiative/json-rules/README.md § Error Handling) |
 
-- *Also here, by name:* ALL_KINDS (`@inixiative/json-rules`); ArrayOperator (`@inixiative/json-rules`); NUMERIC_KINDS (`@inixiative/json-rules`); RuleTarget (`@inixiative/json-rules`); SourceOptionOrder (`@inixiative/json-rules`); ValueShape (`@inixiative/json-rules`); andWhere (`@inixiative/json-rules`); getAggregateOperators (`@inixiative/json-rules`); getArrayOperators (`@inixiative/json-rules`); getValueShape (`@inixiative/json-rules`); matchAll (`@inixiative/json-rules`); matchNothing (`@inixiative/json-rules`); parseScopeRef (`@inixiative/json-rules`)
+- *Also here, by name:* ALL_KINDS (`@inixiative/json-rules`); ArrayOperator (`@inixiative/json-rules`); CLOCK_UNITS (`@inixiative/json-rules`); ConditionShape (`@inixiative/json-rules`); NUMERIC_KINDS (`@inixiative/json-rules`); RuleTarget (`@inixiative/json-rules`); SourceOptionOrder (`@inixiative/json-rules`); SqlDialect (`@inixiative/json-rules`); ValueShape (`@inixiative/json-rules`); andWhere (`@inixiative/json-rules`); getAggregateOperators (`@inixiative/json-rules`); getArrayOperators (`@inixiative/json-rules`); matchAll (`@inixiative/json-rules`); matchNothing (`@inixiative/json-rules`); parseScopeRef (`@inixiative/json-rules`); prefixConditionFields (`@inixiative/json-rules`)
 
 ## 4. The specifics, in full
 
@@ -127,6 +141,7 @@ format grows a node type, and it goes blind silently.
 | `listBindings(rule, { required: true })` | Names a bindings map must cover — every `{ bind }` token not marked `bindOptional`, sorted. A name optional at one leaf and required at another is required. |
 | `listBindings(rule)` | Every `{ bind }` name in the tree, optional or not, sorted — what a lens declares. |
 | `bindRule(rule, bindings)` | Substitutes covered binds with their values, leaving uncovered tokens in place (partial resolution). |
+| `clockUnit(rule)` | The finest clock unit the rule's answer can change by while its data stays the same: the smallest unit any relative date in the tree names (`{ ago: { hours: 2 } }` → `hour`, `{ this: 'week' }` → `week`, `isoWeek` → `week`), one of `CLOCK_UNITS` (`second` … `year`); throws on a unit finer than the engine's `clock.finestUnit`, as evaluating the rule does. `null` when it reads no clock: absolute dates, column compares and their offsets, weekday lists. A caller re-evaluates a stored rule on that tick instead of guessing from its JSON. |
 
 A leaf may mark its bind optional: `{ field, operator, bind: 'region', bindOptional: true }`. An
 unsupplied required bind is a caller bug — `check()` throws, and both compilers refuse a
@@ -211,7 +226,7 @@ Every rule can define its own error:
 
 #### Engine Globals
 
-`engineGlobals` holds process-wide defaults. Keys are dotted paths into one state object.
+`engineGlobals` holds process-wide defaults. Keys are dotted paths into one state object, and `set` / `get` are typed per path (`EngineGlobalPath`, `EngineGlobalValues`): each path takes only its own values.
 
 | Key | Default | Governs |
 | --- | --- | --- |
@@ -219,6 +234,7 @@ Every rule can define its own error:
 | `string.fuzzy` | `false` | Default for a rule's `fuzzy` (`true` or a `FuzzyConfig` `{ maxDistance?, maxRatio? }`): typo-tolerant `contains` / `notContains` on strings. A rule's own flag wins. The compilers have no fuzzy form: they refuse `contains` / `notContains` whenever fuzzy is on, by the rule or by this default. |
 | `prismaOptions.datasource.provider` | `'postgresql'` | The Prisma connector. `toPrisma()` emits `mode: 'insensitive'` only for `postgresql`, `cockroachdb` and `mongodb`; the others are case-insensitive by collation and reject it. `toPrisma(rule, { datasource: { provider } })` overrides it per call. |
 | `prismaOptions.anyNull` | your `@prisma/client`'s | Prisma's `AnyNull` for Json null checks (see above); set it only to use another client's. |
+| `clock.finestUnit` | `'second'` | The finest unit a date rule may name: one of `CLOCK_UNITS`, or its plural (`'hours'` reads as `'hour'`); anything else throws when a date rule is evaluated. Every unit a date rule names counts, in its value (a relative date, either end of a range) and in its offset, whatever it compares against: a relative date, an absolute one or another column. A finer one fails: `check`, `toPrisma` and `toSql` throw and `validateRule` reports `clock_unit_below_floor`. The rule decides as written, so an amount read from the row or a binding (`{ minutes: { path } }`, a null one too) fails the same, and a bound whole expression is held to it once bound. Under `'hour'`, `{ ago: { minutes: 30 } }`, `{ this: 'minute' }`, and any compare offset by `{ ago: { minutes: 5 } }` fail. A caller whose finest tick is an hour sets it once at boot. |
 
 ```ts
 import { engineGlobals } from '@inixiative/json-rules';
@@ -226,6 +242,8 @@ import { engineGlobals } from '@inixiative/json-rules';
 engineGlobals.set('string.caseInsensitive', true);
 engineGlobals.get('string.caseInsensitive'); // true
 engineGlobals.set('prismaOptions.datasource.provider', 'mysql');
+engineGlobals.set('sql.dialect', SqlDialect.mysql); // what toWhereSql / toLensWhereSql write
+engineGlobals.set('clock.finestUnit', 'hour'); // a rule reading minutes or seconds fails to evaluate
 engineGlobals.reset(); // back to the defaults
 
 // A scoped override: merged over the current state for the duration of a synchronous callback.
@@ -235,6 +253,168 @@ const result = engineGlobals.with({ string: { caseInsensitive: true } }, () => c
 `with()` restores the previous state when the callback returns or throws. The callback must be
 synchronous: one that returns a Promise throws. `set()` copies plain data and keeps a class
 instance (like `AnyNull`) as given, since Prisma recognizes it by identity.
+
+<!-- unit doc:@inixiative/json-rules/README.md#inline-predicates-towheresql-tolenswheresql -->
+**Source:** `@inixiative/json-rules/README.md` § Inline Predicates — `toWhereSql`, `toLensWhereSql` (in "@inixiative/json-rules")
+
+#### Inline Predicates — `toWhereSql`, `toLensWhereSql`
+
+Two small helpers write a condition, or a lens's row filters, as a SQL predicate for a caller
+that names its own columns and writes its own joins (an Omni topic, for one). They write the
+engine's `sql.dialect` — `SqlDialect.postgres` by default, `SqlDialect.mysql` the other — and
+are not a second `toSql`: `toSql` and `toPrisma` are unchanged.
+
+```ts
+import { ArrayOperator, engineGlobals, Operator, SqlDialect, toLensWhereSql, toWhereSql } from '@inixiative/json-rules';
+
+engineGlobals.set('sql.dialect', SqlDialect.mysql);
+
+toWhereSql(
+  { field: 'affiliation', operator: Operator.in, value: ['advocate', 'consultant'] },
+  { columns: { affiliation: '${fan_user.affiliation}' }, map, mapName: 'prisma', model: 'FanUser' },
+);
+// => "${fan_user.affiliation} IN ('advocate', 'consultant')"
+
+toWhereSql(
+  {
+    field: 'affiliations',
+    arrayOperator: ArrayOperator.any,
+    condition: { field: 'affiliation', operator: Operator.equals, value: 'advocate' },
+  },
+  {
+    columns: {
+      uuid: '${fan_users.uuid}',
+      'affiliations.fanUserUuid': 'a.fanUserUuid',
+      'affiliations.affiliation': 'a.affiliation',
+    },
+    tables: { affiliations: 'FanUserAffiliation AS a' },
+    map,
+    mapName: 'prisma',
+    model: 'FanUser',
+  },
+);
+// => "EXISTS (SELECT 1 FROM FanUserAffiliation AS a WHERE a.fanUserUuid = ${fan_users.uuid} AND (a.affiliation = 'advocate'))"
+
+toLensWhereSql(lens, { columns, tables });
+// => { root: '…' | null, relations: {}, mapDefaults: { prisma: { models: { BrandReferenceRequestFanUser: "${brand_reference_request_fan_user.affiliation} = 'advocate'" } } } }
+```
+
+- **Operators:** `equals`, `notEquals`, `in`, `notIn`, `exists`, `notExists`, inside `all` / `any`
+  (and `true` / `false`), and `any` / `all` / `none` / `empty` / `notEmpty` over a to-many relation
+  (below). Anything else — another operator, a date rule, a count or windowed array rule, an
+  aggregate, `if` / `then` / `else` — throws, naming it. So do binds, `path` (column-to-column),
+  offsets, `coerceType`, case-insensitivity, a path across a bridge, a field rule through a to-many
+  relation, anything Json (a stored JSON null is a value to SQL and null to `check()`), and a
+  DateTime or list *value*. A DateTime's or list's existence compiles: `deletedAt notExists`, a
+  lens's soft-delete `where`, is `… IS NULL`. A rule with no `value` throws, as on every rail.
+- **To-many relations:** an array rule on a to-many relation of the model is one subquery on the
+  relation's table, keyed to the row: `any` / `notEmpty` is `EXISTS`, `none` / `empty` is
+  `NOT EXISTS`, and `all` is `NOT EXISTS` of a row whose condition `IS NOT TRUE` — a NULL result
+  fails, as in `check()`. The map gives the keys (`relationKeys`; a composite key ANDs every pair):
+  the row's side reads `columns['<key>']`, the related side `columns['<relation>.<key>']`.
+  `tables['<relation>']` is the table, written after `FROM` as given, with the alias its columns
+  read. The condition compiles as above and reads `columns['<relation>.<field>']`; a to-many
+  relation of the related rows nests (`tables['<relation>.<relation>']`). A relation behind
+  another one (`profile.affiliations`), a relation missing from `tables`, `atLeast` / `atMost` /
+  `exactly`, a window (`filter` / `orderBy` / `take` / `skip`) and a fieldless array rule throw.
+- **Map:** `map` / `mapName` / `model` are required. A value is checked against its column's
+  kind (`leafFitViolations`, as `validateNarrowing` checks it) and an undeclared path is refused —
+  MySQL casts a mistyped literal instead of erroring, so `score = TRUE` would match 1 where
+  `check()` matches nothing. The map also finds a to-one relation's key for its `exists`
+  (`columns['<relation>.<key>']`: the related row's key, NULL when there is none), and says which
+  values have no form here.
+- **Columns:** `columns` maps a field path to the caller's SQL, used as written; the engine writes
+  no joins and no identifiers. A path missing from it throws, naming the path — it never falls back
+  to a quoted name, which MySQL's default mode reads as a string literal.
+- **Values** are written inline — there are no placeholders to fill. A string doubles `'`; on
+  MySQL it doubles `\` too (MySQL's default mode reads a backslash as an escape;
+  `NO_BACKSLASH_ESCAPES` is not supported). `in` is `IN (…)`; an enum compares as written, with no
+  cast.
+- **NULL rows:** negations keep them, as on every rail: `notEquals` / `notIn` are ORed with
+  `IS NULL`; `in [x, null]` matches NULL, `notIn [x, null]` doesn't.
+- **Collation:** `=` and `IN` compare under the column's collation. check() compares strings
+  exactly, so a `_ci` column (MySQL's default) also matches `'Advocate'` for `'advocate'`; compare a
+  binary-collated column where that matters.
+
+`toLensWhereSql(lens, { columns, tables?, toMany? })` mirrors the lens: the root path's `where`s under `root` (null
+when it has none), each relation path's own under `relations`, keyed by the path, and each model
+default's (`mapDefaults[map].models[model].where`) under `mapDefaults`, keyed the same way — one
+predicate per model however many paths reach it. Each is the `where` as its layer wrote it: a
+parent layer's clamp on a hop is reported at that hop's path, never folded into what a later
+layer wrote through it. A `where` that reads through a relation the lens hides throws — that
+hop's clamps have no path to report at, and `check()` still carries them. A lens that spans maps
+reports every map's defaults; a caller writing one database reads its own map's. A path `where` reads `columns` by its path from the lens model (`status` at the root,
+`brandReferenceRequestFanUsers.id` below it); a model default by `'<Model>.<field>'`
+(`BrandReferenceRequestFanUser.affiliation`). It does not compile through `toSql`'s `{ lens }`
+path, which would fold the lens's `where`s into the predicate a second time.
+
+An array rule on a to-many relation has no join to put that relation's clamps on, so its subquery
+carries them: the relation path's own `where` and the related model's default, ANDed beside the
+key (outside the `IS NOT TRUE` of an `all`, as `check()` filters the rows before it tests them).
+It carries only the clamps of the layers above the layer that wrote the `where`, which is what
+`check()` reads it through: a layer's clamps narrow the layers after it, never its own conditions.
+A clamp in the same layer or a later one stays out, so a later layer can't widen what a `none` or
+an `empty` admitted. Each clamp reads its own relations through the layers above its own. The
+clamps are still reported at their own path and model. `tables` reads like `columns`: by the
+relation's path from the lens model in a path `where` (`affiliations`), by
+`'<Model>.<relation>'` in a model default (`FanUser.affiliations`). An array rule on a relation
+the lens hides throws, and its condition's fields are checked from the relation, not from the
+model it sits on. A model default compiles to one predicate for every path that reaches its
+model, so it throws when a to-many relation it reads carries different clamps on two of them.
+
+**Join mode — `toMany: 'join'`.** For a caller that can't run a correlated subquery (an Omni
+topic rebuilds one as its own query and loses the correlation), the root's `where` reads a to-many
+relation on the row the caller's join brings instead. Nothing about the join is a new option: the
+caller LEFT JOINs each to-many relation the root's `where` reads (a relation the lens declares),
+ON the map's relation keys (`relationKeys`, the same keys a to-one relation's existence reads) AND
+`relations['<path>']` AND the related model's `mapDefaults` entry, and reads the related columns as
+`columns['<path>.<field>']`. `tables` is not read. A join the `where` does not read only fans the
+rows out (count distinct); a read of a relation the caller did not join fails loudly (a missing
+column).
+
+```ts
+toLensWhereSql(lens, { columns, toMany: 'join' });
+// root: "(${fan_users.deleted_at} IS NULL AND ${fan_user_affiliation.fan_user_uuid} IS NOT NULL)"
+// relations: { affiliations: "(${fan_user_affiliation.affiliation} = 'advocate' AND ${fan_user_affiliation.ended_at} IS NULL)" }
+// the topic: LEFT JOIN fan_user_affiliation ON <keys> AND relations.affiliations [AND its model default]
+```
+
+- **What compiles:** `notEmpty` is `<key> IS NOT NULL`, and `any(cond)` is
+  `(<key> IS NOT NULL AND cond)`, with `cond` on the joined columns. The key is the first key
+  column: a matched row's key equals the parent's and is never NULL, an unmatched row is all NULL,
+  so one column decides. `cond` may hold on a missing value (`endedAt notExists`): the
+  `IS NOT NULL` guard has already dropped the all-NULL row of a parent with no rows.
+- **Positive operators only.** `empty`, `none` and `all` can hold with no rows (the catalog's
+  `holdsOnNoRows`), which takes an anti-join, not the topic's join — `all(cond)` is
+  `none(NOT cond)`, and the join drops the parents with no rows that `all` keeps. They throw, as do
+  the counts, `exists` / `notExists` on the relation (a to-many relation has one spelling, an
+  `arrayOperator` rule) and a field read through it (`affiliations.affiliation`).
+- **The root's `where` only.** A relation path's `where` sits in that relation's ON, ahead of the
+  joins below it, and a model default compiles once for every path that reaches its model, where
+  the join exists only on the paths the lens shows: either one reading a to-many relation throws.
+  So do a to-many relation, or any relation, read inside a joined `any`.
+- **One `any` per relation.** One joined row stands for the relation, so two `any` rules on it
+  (`any advocate AND any prospect`, in one `where` or across layers) would need one row to meet
+  both, where `check()` lets each find its own: it throws. Write one `any` whose condition says
+  which row (`any: [advocate, prospect]` for either). `notEmpty` beside an `any` is fine.
+- **One alias per model default.** `mapDefaults` holds one predicate per model, on
+  `columns['<Model>.<field>']`, so it can sit on one table alias. A joined relation whose model has
+  a default `where` throws when the root's `where` needs that default on a second alias too: a
+  to-many self-relation (the root is that model as well), or two joined relations that reach one
+  model. Compile with `toMany: 'subquery'`, which carries the default inside each `EXISTS`.
+- **The layer guard.** The ON carries every clamp on the relation, from every layer, but `check()`
+  reads a `where` through the clamps of the layers above its own only. So a root `where` that
+  reads a joined relation throws when one of that relation's clamps (its path `where` or its
+  model's default) sits in the `where`'s own layer or a later one, naming the path and both layers.
+  Move the clamp into an earlier narrowing: then the ON is exactly what `check()` reads.
+- **`any(cond)` hides rows.** The rows that fail `cond` are gone from the whole query, not only
+  from the filter; `check()` hides nothing. Where you can, write the condition as the relation's
+  `where` (in a layer above) and have the root read `notEmpty`.
+- **Fan-out.** A joined to-many relation repeats the parent once per related row: count distinct.
+
+**Absent, not hidden.** A row a relation's `where` filters out is absent from the SQL join, so a
+negation through that relation holds for it; `check()` under the lens treats the row as hidden.
+The lens is a projection: the difference is accepted and documented.
 
 <!-- unit doc:@inixiative/json-rules/README.md#typescript-types -->
 **Source:** `@inixiative/json-rules/README.md` § TypeScript Types (in "@inixiative/json-rules")
@@ -281,6 +461,7 @@ Lens & bridges:
 - `projectLens`, `walkLensPath`, `readLensValue`, `LensValue`, `describeRule`, `describeRuleSources`
 - `toLensSelect`, `projectRows`, `LensSelect`, `LensRelationSelect`, `LensSelectOptions`, `ProjectRowsOptions`
 - `toSourceQueries`, `materializeSources`, `materializeSourceQuery`
+- `toLensWhereSql`, `LensWhereSql`, `LensWhereSqlOptions`
 - `PathProjection`, `ProjectedVisit`, `ProjectLensOptions`, `LensPathHop`, `LensPathResolution`, `RuleDescription`, `RuleSourceDescription`, `SourceQuery`, `SourcePrismaQuery`, `SourceSqlQuery`, `SourceSelect`, `SourceValues`, `SourceRowShape`, `MaterializeSourceQueryOptions`
 
 A lens has three forms, each with its own job:
@@ -311,7 +492,7 @@ const lens = composeLens('delegate-7', { user, 'org-acme': orgAcme, 'delegate-7'
 ##### Operator Catalog
 
 What a rule builder can offer for a field. The catalog's constants are `FieldKind`,
-`RuleTarget`, `ValueShape`, `NUMERIC_KINDS` and `ALL_KINDS`; `getValueShape(operator, family)` takes an
+`RuleTarget`, `ValueShape`, `ConditionShape`, `NUMERIC_KINDS` and `ALL_KINDS`; `getValueShape(operator, family)` takes an
 `OperatorFamily` (`'field' | 'date' | 'array'`).
 
 ```ts
@@ -338,6 +519,7 @@ getValueShape('between', 'date'); // 'dateRange'
 | `getArrayOperators(target?)` | The array operators, narrowed to one target when given. |
 | `getAggregateOperators()` | The comparisons an aggregate rule takes. Every target compiles all of them. |
 | `getValueShape(operator, family)` | The operand an operator takes (`'scalar'`, `'range'`, `'dayList'`, …). `family` is `'field'`, `'date'` or `'array'`, since `between` is both a field and a date operator. Throws on an operator the family doesn't have. |
+| `getConditionShapeKeys(shape)` | `{ required, optional }`: the keys a node of a `ConditionShape` (`'all'`, `'any'`, `'if'`, `'field'`, `'aggregate'`, `'array'`, `'date'`) must have and the keys it may. A literal `true` / `false` is a condition too. |
 
 To ask whether a whole rule runs on a target (windows, scope refs and operators together), use
 `validateRule(rule, { target })`.
@@ -446,14 +628,19 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **assertValidRule** `@inixiative/json-rules#assertValidRule` [package] throw on an invalid rule and narrow unknown input to a Condition Use: assertValidRule(input, options)
 - **bindRule** `@inixiative/json-rules#bindRule` [package] substitute bind tokens in a rule with values before compiling, leaving uncovered ones Use: const bound = bindRule(rule, { userId })
 - **check** `@inixiative/json-rules#check` [package] evaluate a JSON rule against a row, returning true or the failing error text Use: const result = check(rule, row, { bindings })
+- **clockUnit** `@inixiative/json-rules#clockUnit` [package] find the finest time unit a rule's answer can change by, or null Use: const unit = clockUnit(rule) // 'hour' | 'week' | ... | null
 - **describeRule** `@inixiative/json-rules#describeRule` [package] report a rule's sources, bridges crossed, runnable targets and lens errors Use: const { sources, bridgesCrossed, supportedTargets, errors } = describeRule(rule, lens)
-- **engineGlobals** `@inixiative/json-rules#engineGlobals` [package] read and set process-wide rule engine defaults by dotted path Use: engineGlobals.set('prismaOptions.datasource.provider', 'postgresql')
+- **engineGlobals** `@inixiative/json-rules#engineGlobals` [package] read and set process-wide rules engine defaults by typed dotted path Use: engineGlobals.set('sql.dialect', value)
+- **getConditionShapeKeys** `@inixiative/json-rules#getConditionShapeKeys` [package] list required and optional keys for a condition node shape Use: const { required, optional } = getConditionShapeKeys('field')
 - **getOperatorsForKind** `@inixiative/json-rules#getOperatorsForKind` [package] list field and date operators a field kind takes, optionally per target Use: const { field, date } = getOperatorsForKind(kind, 'toSql')
+- **getValueShape** `@inixiative/json-rules#getValueShape` [package] tell which operand shape an operator takes within its family Use: const shape = getValueShape('between', 'date')
 - **indexBridges** `@inixiative/json-rules#indexBridges` [package] pre-index foreign rows by bridge `on` field so rules can read across relations Use: const bridged = indexBridges(lens, rawForeignRowsByEndpoint)
 - **listLensBindings** `@inixiative/json-rules#listLensBindings` [package] list bind names a lens's whole narrowing chain needs supplied to execute Use: const required = listLensBindings(lensOrNarrowing)
 - **materializeSourceQuery** `@inixiative/json-rules#materializeSourceQuery` [package] turn one compiled SourceQuery's fetched DB rows into its option values Use: const values = materializeSourceQuery(query, rows, { rowShape: 'prisma' })
 - **orderRecords** `@inixiative/json-rules#orderRecords` [package] sort records in memory exactly as a rule window orders them, nulls last Use: orderRecords(items, orderBy)
 - **orWhere** `@inixiative/json-rules#orWhere` [package] OR Prisma where arms, absorbing match-all and dropping match-nothing Use: const where = orWhere([compiledWhere, extraFilter])
 - **readScopeRef** `@inixiative/json-rules#readScopeRef` [package] resolve a $-prefixed ref to its scope in a stack plus remaining path Use: const hit = readScopeRef(ref, scopes) // { outOfBounds } instead of throwing
+- **toLensWhereSql** `@inixiative/json-rules#toLensWhereSql` [package] render a lens's where clauses as inline SQL predicates per path Use: const sql = toLensWhereSql(lens, { columns, tables, toMany })
+- **toWhereSql** `@inixiative/json-rules#toWhereSql` [package] render one condition as an inline SQL predicate in the engine dialect Use: const predicate = toWhereSql(condition, { columns, tables })
 - **UsageError** `@inixiative/json-rules#UsageError` [package] signal missing or malformed caller input like now, time zone or unbound binds Use: import { UsageError } from '@inixiative/json-rules'
-- **validateRule** `@inixiative/json-rules#validateRule` [package] check a rule's shape and that it can run on a compile target, without data Use: const { ok, errors } = validateRule(rule, { target: 'toPrisma', map, model })
+- **validateRule** `@inixiative/json-rules#validateRule` [package] check a rule's shape and runnability on a target without data Use: validateRule(rule, { target: 'toPrisma', map, model })

@@ -4,8 +4,13 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
-import { getResource } from '#/lib/context/getResource';
+import {
+  type IncludeTargetEntitlements,
+  includeTargetEntitlements,
+  type Prisma,
+} from '@template/db';
 import { paginate } from '#/lib/prisma/paginate';
+import { submodelOwnerWhere } from '#/lib/prisma/submodelOwnerWhere';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceReadManyTokensRoute } from '#/modules/space/routes/spaceReadManyTokens';
 
@@ -13,13 +18,14 @@ export const spaceReadManyTokensController = makeController(
   spaceReadManyTokensRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const space = getResource<'space'>(c);
-
-    const { data, pagination } = await paginate(c, db.token, {
-      where: { spaceId: space.id },
+    const { data, pagination } = await paginate<
+      typeof db.token,
+      Prisma.TokenGetPayload<{ include: IncludeTargetEntitlements; omit: { keyHash: true } }>
+    >(c, db.token, {
+      include: includeTargetEntitlements('Token'),
+      where: submodelOwnerWhere(c),
       omit: { keyHash: true },
     });
-
     return respond.ok(data, { pagination });
   },
 );

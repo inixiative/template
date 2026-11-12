@@ -6,19 +6,29 @@
  */
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
-  clearKey,
   DbAction,
-  db,
   HookTiming,
   isNoOpUpdate,
+  loadParentRows,
   NOOP_FIELDS,
   type Prisma,
   registerDbHook,
 } from '@template/db';
-import { ConcurrencyType } from '@template/shared/utils';
-import { keyBy } from 'lodash-es';
-import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
+import { groupBy, keyBy } from 'lodash-es';
+import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { isManyAction } from '#/hooks/shared/hookRows';
+
+const queueParentCacheClear = async (
+  model: Prisma.ModelName,
+  records: Record<string, unknown>[],
+) => {
+  const parents = (await loadParentRows(model, records)).filter((parent) => parent !== null);
+  for (const [parentModel, group] of Object.entries(groupBy(parents, 'model')))
+    await queueCacheClear(
+      parentModel as Prisma.ModelName,
+      group.map((parent) => parent.row),
+    );
+};
 
 const isUpdateAction = (action: DbAction): boolean =>
   action === DbAction.update || action === DbAction.updateManyAndReturn;
@@ -36,10 +46,7 @@ export const registerClearCacheHook = () => {
 
   registerDbHook('clearCache', '*', HookTiming.after, actions, async (options: HookOptions) => {
     const { model, action } = options;
-    const keys = new Set<string>();
-    const collect = (record: Record<string, unknown>) => {
-      for (const key of fetchCacheKeys(model as Prisma.ModelName, record)) keys.add(key);
-    };
+    const records: Record<string, unknown>[] = [];
 
     if (isManyAction(action)) {
       const { result, previous } = options as HookOptions & { action: ManyAction };
@@ -52,8 +59,8 @@ export const registerClearCacheHook = () => {
         if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData, NOOP_FIELDS))
           continue;
 
-        collect(resultData);
-        if (previousData) collect(previousData);
+        records.push(resultData);
+        if (previousData) records.push(previousData);
       }
     } else {
       const { result, previous } = options as HookOptions & { action: SingleAction };
@@ -64,16 +71,11 @@ export const registerClearCacheHook = () => {
         return;
       }
 
-      collect(resultData);
-      if (previousData) collect(previousData);
+      records.push(resultData);
+      if (previousData) records.push(previousData);
     }
 
-    if (keys.size === 0) return;
-
-    const clearKeys = [...keys].map((key) => async () => {
-      await clearKey(key);
-    });
-
-    db.onCommit(clearKeys, ConcurrencyType.redis);
+    await queueCacheClear(model as Prisma.ModelName, records);
+    await queueParentCacheClear(model as Prisma.ModelName, records);
   });
 };

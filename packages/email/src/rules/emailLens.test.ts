@@ -237,7 +237,7 @@ describe('emailLens — evaluation goes through the lens', () => {
   });
 
   it('a tag or segment outside the owner view does not match; inside it does', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), org);
+    const lens = scopeEmailLens({ sender: lensFor('Organization') }, org);
     const own = scope(
       { ownerModel: 'Organization', organizationId: 'org-1' },
       { ownerModel: 'Organization', organizationId: 'org-1' },
@@ -259,7 +259,7 @@ describe('emailLens — evaluation goes through the lens', () => {
   });
 
   it('a loop filter is judged and evaluated through the lens: a foreign tag in the element list does not pass', () => {
-    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), org);
+    const lens = scopeEmailLens({ sender: lensFor('Organization') }, org);
     const bindings = new Map([['item', 'recipient.tagAttachments']]);
     const frames = loopFrames(bindings);
     const scoped = scopedRule(
@@ -327,7 +327,7 @@ describe('emailLens — evaluation goes through the lens', () => {
   });
 
   it('an organization owner reaches only its own organization through the recipient, by name as well as id', () => {
-    const lens = scopeEmailLens(emailLens(), org);
+    const lens = scopeEmailLens({}, org);
     const member = (organization: Record<string, unknown>) => ({
       recipient: {
         id: 'u1',
@@ -349,7 +349,7 @@ describe('emailLens — evaluation goes through the lens', () => {
   });
 
   it('a platform owner sees platform tags and no segments', () => {
-    const lens = scopeEmailLens(emailLens(), null);
+    const lens = scopeEmailLens({}, null);
     const own = scope(
       { ownerModel: 'platform', organizationId: null },
       { ownerModel: 'Organization', organizationId: 'org-1' },

@@ -8,18 +8,20 @@ import type { RedisEval } from '@template/db/redis/types';
 import type { Redis } from 'ioredis';
 
 export type LockRedis = Pick<Redis, 'set' | 'get'> & RedisEval;
-export type LockLostReason = 'token_mismatch' | 'refresh_errors';
 export type LockReleaseResult = 'released' | 'notHeld' | 'unconfirmed';
 
 export type LockTarget = { service: string; identifier: string } | { key: string };
 
-export type LockOptions = LockTarget & {
+// One lock over several keys, `lock:<service>:<identifier>` each: one token, one heartbeat, one
+// release. Duplicates collapse and the keys are sorted. A claim takes a single key only.
+export type LockSetTarget = { service: string; identifiers: readonly string[] };
+
+export type LockOptions = (LockTarget | LockSetTarget) & {
   redis?: LockRedis;
   ttlMs?: number;
   heartbeat?: true;
   heartbeatMs?: number;
-  maxMissed?: number;
-  onLockLost?: (reason: LockLostReason) => void | Promise<void>;
+  onLockLost?: () => void | Promise<void>;
 };
 
 export type ClaimOptions = LockTarget & {
@@ -31,8 +33,9 @@ export type ClaimOptions = LockTarget & {
 
 export type ClaimResult = { claimed: boolean; holder: string };
 
-// With `waitMs` acquire keeps trying every `pollMs` until it wins or the wait runs out; without
-// it acquire is one SET NX. `onTimeout` returns the error a timed-out wait should throw, so a
+// With `waitMs` acquire keeps trying until it wins or the wait runs out: first after 1 ms, then
+// doubling up to `pollMs`, so a lock held briefly is taken over within a millisecond or two; without
+// it acquire is one attempt: SET NX, or one fencedSetPrefix for a lock set. `onTimeout` returns the error a timed-out wait should throw, so a
 // caller that must fail loudly does not wrap a boolean in its own if/throw; without it a
 // timed-out wait returns false like a plain contended acquire.
 export type AcquireOptions = {
@@ -42,9 +45,12 @@ export type AcquireOptions = {
 };
 
 export type Lock = {
+  holder: string;
   acquire: (options?: AcquireOptions) => Promise<boolean>;
   verify: () => Promise<boolean>;
   release: () => Promise<LockReleaseResult>;
+  isWithinLease: () => boolean;
+  assertHeld: () => void;
 };
 
 export type Claim = {

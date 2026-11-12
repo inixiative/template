@@ -1,12 +1,15 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf infrastructure:prisma
+ */
 import {
   DbAction,
   db,
-  type HookOptions,
   HookTiming,
   PolymorphismRegistry,
   type Prisma,
   registerDbHook,
-  type SingleAction,
   withDiscriminatorDefaults,
 } from '@template/db';
 import { castArray } from 'lodash-es';
@@ -111,35 +114,9 @@ export const registerTagOwnerCategoryHook = () => {
     'Tag',
     HookTiming.before,
     [DbAction.upsert],
-    async (options) => {
-      const { args, previous } = options as HookOptions & { action: SingleAction };
-      if (!args || typeof args !== 'object') return;
-      const a = args as Record<string, unknown>;
-      const create = a.create as TagRow | undefined;
-      const update = a.update as TagRow | undefined;
+    async ({ args }) => {
+      const create = (args as { create?: TagRow } | undefined)?.create;
       if (create) await validateOwnerMatchesCategory(create);
-      if (update) {
-        const prev = previous as TagRow | undefined;
-        const merged: TagRow = { ...(prev ?? {}), ...update };
-        await validateOwnerMatchesCategory(merged);
-      }
-    },
-  );
-
-  registerDbHook(
-    'tagOwnerCategory:update',
-    'Tag',
-    HookTiming.before,
-    [DbAction.update, DbAction.updateManyAndReturn],
-    async (options) => {
-      const { args, previous } = options as HookOptions & { action: SingleAction };
-      if (!args || typeof args !== 'object') return;
-      const a = args as Record<string, unknown>;
-      const data = a.data as TagRow | undefined;
-      if (!data) return;
-      const prev = previous as TagRow | undefined;
-      const merged: TagRow = { ...(prev ?? {}), ...data };
-      await validateOwnerMatchesCategory(merged);
     },
   );
 };

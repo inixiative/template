@@ -3,18 +3,18 @@
   "title": "Writing an init task",
   "routing": "Is this about the behaviour of one provider setup step: composable prompts (prompt, prompts; never hardcode prompt text), clean status lists shown upfront, no console.log in tasks, fetching from the source of truth instead of props, retrying async provisioning on specific conditions, async exec for smooth animations, Railway CLI for reads vs GraphQL for mutations (createRailwayConnection, ensureRailwayConnection, listRailwayConnections, createRailwaySync), the token input flow and loading-state sequencing, atomic progress flags with idempotent API calls (isProgressComplete, one flag per remote write), OrgSelector requiring onCancel, interactive prompts for missing required input (getSecret / setSecret into Infisical), masking sensitive inputs, or Bun-native resume tests with VCR fixtures?",
   "concepts": ["init-tasks"],
-  "tokens": 13037,
+  "tokens": 13554,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1851,
+      "tokens": 2128,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 13037
+      "tokens": 13554
     }
   },
   "runsAgreed": 0,
@@ -40,11 +40,10 @@
       "guided-flows",
       "integrations-records",
       "naming-vocabulary",
-      "testing-helpers",
-      "ui-components"
+      "testing-helpers"
     ],
     "codeEntries": 0,
-    "docMembers": 36
+    "docMembers": 39
   },
   "bypassLines": 21,
   "glossaryTerms": 12

@@ -8,7 +8,7 @@ import type { Condition } from '@inixiative/json-rules';
 import { ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ReferenceMap } from '@template/shared/graph';
-import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
 export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
   const map: ReferenceMap = new Map();

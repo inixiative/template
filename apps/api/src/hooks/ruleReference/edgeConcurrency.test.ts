@@ -1,6 +1,6 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { type Condition, Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, ruleReferences, syncRuleReferenceEdges } from '@template/db';
+import { db, ruleReferences, syncRuleReferenceEdges } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -8,14 +8,9 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
+import { gate } from '@template/db/test/gate';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
-import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 
@@ -27,19 +22,11 @@ const membersOf = (segmentId: string) => ({
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-const gate = () => {
-  let open!: () => void;
-  const opened = new Promise<void>((resolve) => {
-    open = resolve;
-  });
-  return { open, opened };
-};
-
-// The contender's blocked FOR UPDATE is observed in pg_stat_activity before the holder mutates, so
-// the contender has provably finished its unlocked reads against the live row; a fixed delay would
-// only guess at that and make the race flaky in both directions.
+// The contender's blocked FOR NO KEY UPDATE is observed in pg_stat_activity before the holder
+// mutates, so the contender has provably finished its unlocked reads against the live row; a fixed
+// delay would only guess at that and make the race flaky in both directions.
 const waitForBlockedLockOn = async (table: string): Promise<void> => {
-  const pattern = `%"${table}"%FOR UPDATE%`;
+  const pattern = `%"${table}"%FOR NO KEY UPDATE%`;
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const rows = await db.$queryRaw<{ n: bigint | number }[]>`
@@ -70,23 +57,13 @@ describe('ruleReference — edges under concurrency and repair', () => {
   let space: Space;
   let owner: { ownerModel: string; ownerId: string };
 
-  beforeAll(async () => {
-    registerPreventHardDeleteHook();
-    registerRulesHook();
-    registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
-    registerRuleReferenceTargetHook();
-    registerSoftDeleteCascadeHook();
-  });
-
   beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
     owner = { ownerModel: 'Space', ownerId: space.id };
   });
 
-  afterAll(async () => {
-    clearHookRegistry();
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -95,7 +72,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
   });
 
   describe('a save racing the delete of the row it names', () => {
-    it('waits for the delete to commit and is then refused, never written live against a dead row', async () => {
+    it('waits for the delete to commit and writes the edge stamped, never unstamped against a deleted row', async () => {
       const { entity: target } = await createSegment(
         { ownerModel: 'Space', conditions: acmeRule },
         { space },
@@ -133,12 +110,10 @@ describe('ruleReference — edges under concurrency and repair', () => {
         await holder;
       }
 
-      expect(await outcome).toBe('refused');
-      expect(await edgesOf(other.id)).toEqual([]);
-      expect(
-        (await db.withDeleted(() => db.segment.findUnique({ where: { id: other.id } })))
-          ?.conditions,
-      ).toEqual(acmeRule);
+      expect(await outcome).toBe('saved');
+      const [edge] = await edgesOf(other.id);
+      expect(edge?.targetId).toBe(target.id);
+      expect(edge?.targetDeletedAt).not.toBeNull();
     });
   });
 
@@ -148,7 +123,6 @@ describe('ruleReference — edges under concurrency and repair', () => {
         syncRuleReferenceEdges(
           { model: 'Segment', id: segment.id },
           ruleReferences(customerRefLens, segment.conditions as Condition),
-          'rebuild',
         ),
       );
 

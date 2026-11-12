@@ -20,7 +20,7 @@
 ## Glossary
 
 **access**  
-NavItem rule (permissions-roles / permissions-rebac, context, pageContext) => boolean; the source of truth for page visibility.
+NavItem rule (permissions, context, pageContext) => boolean; the source of truth for page visibility.
 
 **alias**  
 NavItem flag: routable page hidden from the sidebar.
@@ -41,7 +41,7 @@ AppShell control for switching Personal/Organization/Space; reads tenant and aut
 Match a path to its nav item within one context, or across contexts.
 
 **getContextParams**  
-Turns tenant context into [model, record] for permissions-roles / permissions-rebac.check in access rules.
+Turns tenant context into [model, record] for permissions.check in access rules.
 
 **NavConfig**  
 Per-app map of context type (user, organization, space, public) to NavItem[].
@@ -79,9 +79,9 @@ The nav config as the source of truth for page access, the hooks that enforce it
 
 ## 2. The domain
 
-The nav config (ROUTING_NAVIGATION.md § Navigation; apps/*/app/config/nav/: one `NavItem` per feature, composed into one `NavItem[]` per context: `userContext`, `organizationContext`, `spaceContext`, `publicContext`) is the source of truth for who can view a page; adding a page means adding a nav item. Its `access` rule, usually `permissions-roles / permissions-rebac.check(...getContextParams(context), action)`, hides sidebar items (`Sidebar`, `UserMenu`) and gates the page through `useAuthenticatedRouting`, which uses `findRoute` / `findRouteAcrossContexts` and `checkContextPermission` and falls back space → organization → user → public before rendering Unauthorized (the Unauthorized context fallback). The same config feeds `usePageMeta` and `useBreadcrumbs` / `buildBreadcrumbs`; `useRegisterNavigation` registers it in the store at the root; `useSectionHash` / `useSectionOpen` / `useScrollState` keep section and scroll state in the URL. Tenant context never lives in the path: it rides in `?org=` / `?space=` / `?spoof=` / `?flow=`, synced with the tenant slice by `useAuthenticatedRouting` (context-free paths stay context-free). Switch context through `tenant.setOrganization` / `setSpace` / `setUser` / `setPublic` (the `ContextSelector`; a context switch redirects to the equivalent page) and move between pages with `navigation.navigatePreserving(to, 'context' | 'spoof' | 'all')` rather than the raw router navigate, which drops the context.
+The nav config (ROUTING_NAVIGATION.md § Navigation; apps/*/app/config/nav/: one `NavItem` per feature, composed into one `NavItem[]` per context: `userContext`, `organizationContext`, `spaceContext`, `publicContext`) is the source of truth for who can view a page; adding a page means adding a nav item. Its `access` rule, usually `permissions.check(...getContextParams(context), action)`, hides sidebar items (`Sidebar`, `UserMenu`) and gates the page through `useAuthenticatedRouting`, which uses `findRoute` / `findRouteAcrossContexts` and `checkContextPermission` and falls back space → organization → user → public before rendering Unauthorized (the Unauthorized context fallback). The same config feeds `usePageMeta` and `useBreadcrumbs` / `buildBreadcrumbs`; `useRegisterNavigation` registers it in the store at the root; `useSectionHash` / `useSectionOpen` / `useScrollState` keep section and scroll state in the URL. Tenant context never lives in the path: it rides in `?org=` / `?space=` / `?spoof=` / `?flow=`, synced with the tenant slice by `useAuthenticatedRouting` (context-free paths stay context-free). Switch context through `tenant.setOrganization` / `setSpace` / `setUser` / `setPublic` (the `ContextSelector`; a context switch redirects to the equivalent page) and move between pages with `navigation.navigatePreserving(to, 'context' | 'spoof' | 'all')` rather than the raw router navigate, which drops the context.
 
-Not here: route files, layout groups and guards are `frontend-apps-routing`; the store itself is `frontend-store`; `permissions-roles / permissions-rebac.check` and Permix setup are `permissions-roles / permissions-rebac`; the shell's visual layout is `theme-layout`.
+Not here: route files, layout groups and guards are `frontend-apps-routing`; the store itself is `frontend-store`; `permissions.check` and Permix setup are `permissions-roles / permissions-rebac`; the shell's visual layout is `theme-layout`.
 
 ## 3. Everything that exists here, by class
 
@@ -120,7 +120,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
 | build the breadcrumb trail from the nav chain; I'll assemble crumbs from the pathname; compute the crumbs for this page | **buildBreadcrumbs** · primitive `packages/ui/src/lib/buildBreadcrumbs.ts#buildBreadcrumbs` — Use instead of hand-assembling crumbs per page. | — | hand-assembling crumbs from the pathname and tenant context (catalog entry buildBreadcrumbs) |
-| does this context allow the page; the permission check the routing hook runs; I'll call the permission check in my route; internal helper, not for direct use | **checkContextPermission** · primitive `packages/ui/src/lib/checkContextPermission.ts#checkContextPermission` — Called by useAuthenticatedRouting; use that hook for route gating rather than calling this directly. | docs/claude/FRONTEND/ROUTING_NAVIGATION.md § Navigation; docs/claude/PERMISSIONS.md § Frontend Checks | — |
+| does this context allow the page; the permission check the routing hook runs; I'll call the permission check in my route; internal helper, not for direct use | **checkContextPermission** · primitive `packages/ui/src/lib/checkContextPermission.ts#checkContextPermission` — Used by useAuthenticatedRouting for page gating; for hiding individual nav items use the nav item's access directly. | docs/claude/FRONTEND/ROUTING_NAVIGATION.md § Navigation; docs/claude/PERMISSIONS.md § Frontend Checks | — |
 | the org and space switcher dropdown; I'll build my own org picker; switch tenants from the header; pass the tenant into the selector as props | **ContextSelector** · primitive `packages/ui/src/components/layout/ContextSelector.tsx#ContextSelector` — Included in AppShell; use standalone only when building a custom shell. Reads tenant/auth from store, don't pass them as props. | docs/claude/APPS.md § Context Switching; docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System | a custom org/space dropdown, or passing tenant/auth to ContextSelector as props (docs/claude/ZUSTAND.md § 3. TenantSlice (ContextSelector reads tenant and auth itself); catalog entry ContextSelector) |
 | which nav item matches this path; look up the route in the current context; wire up the sidenav highlighting to use it; I'll match the path with a regex | **findRoute** · primitive `packages/ui/src/lib/findRoute.ts#findRoute` — Path may belong to another context: findRouteAcrossContexts instead. | docs/claude/FRONTEND/ROUTING_NAVIGATION.md § Navigation | — |
 | the path might belong to a different context; find which context this route lives in; look up a route when the context is unknown; search every context's nav for the path | **findRouteAcrossContexts** · primitive `packages/ui/src/lib/findRoute.ts#findRouteAcrossContexts` — Context already known and fixed: findRoute instead. | — | — |
@@ -331,7 +331,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 
 #### Class `navigation`
 - **buildBreadcrumbs** `packages/ui/src/lib/buildBreadcrumbs.ts#buildBreadcrumbs` [primitive] derive breadcrumb trail from the matched route and tenant context Use: const crumbs = buildBreadcrumbs(match, tenantContext, pageContext);
-- **checkContextPermission** `packages/ui/src/lib/checkContextPermission.ts#checkContextPermission` [primitive] decide page access, falling back from space to org, user, then public context Use: checkContextPermission({ path, navConfig, permissions, ... })
+- **checkContextPermission** `packages/ui/src/lib/checkContextPermission.ts#checkContextPermission` [primitive] decide page access via nav item access, falling back through org, user, public contexts Use: checkContextPermission({ path, navConfig, permissions, ... })
 - **ContextSelector** `packages/ui/src/components/layout/ContextSelector.tsx#ContextSelector` [primitive] switch the active organization or space from tenant store state Use: <ContextSelector onManageOrganizations={...} locked={false} />
 - **findRoute** `packages/ui/src/lib/findRoute.ts#findRoute` [primitive] match a path to its nav config item within one context type Use: findRoute(pathname, navConfig, 'organization')
 - **findRouteAcrossContexts** `packages/ui/src/lib/findRoute.ts#findRouteAcrossContexts` [primitive] match a path to a nav item, searching beyond the current context Use: findRouteAcrossContexts(pathname, navConfig, currentContext)

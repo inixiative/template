@@ -7,7 +7,7 @@
 import { DbAction, type HookOptions, HookTiming, registerDbHook } from '@template/db';
 import { emailAddressSchema } from '@template/shared/contact';
 import { isPlainObject } from 'lodash-es';
-import { writtenPatches } from '#/hooks/shared/hookRows';
+import { writeData } from '#/hooks/shared/hookRows';
 import { makeError } from '#/lib/errors';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => isPlainObject(value);
@@ -23,7 +23,7 @@ const WRITE_ACTIONS = [
 // Only a write that names `email` is judged, so an unrelated update to a user with a legacy
 // malformed address still goes through.
 const emailsBeingWritten = (options: HookOptions): unknown[] =>
-  writtenPatches(options)
+  writeData(options)
     .filter((row) => 'email' in row)
     .map((row) => (isRecord(row.email) && 'set' in row.email ? row.email.set : row.email));
 

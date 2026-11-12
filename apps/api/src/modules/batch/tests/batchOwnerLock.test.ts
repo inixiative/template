@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type { Segment, Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -10,7 +10,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
+import { gate } from '@template/db/test/gate';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { batchRouter } from '#/modules/batch';
 import type { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';
@@ -31,14 +31,6 @@ const membersOf = (segmentId: string) => ({
 });
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const gate = () => {
-  let open!: () => void;
-  const opened = new Promise<void>((resolve) => {
-    open = resolve;
-  });
-  return { open, opened };
-};
 
 const settles = (promise: Promise<unknown>, withinMs: number) =>
   Promise.race([
@@ -72,8 +64,7 @@ describe('batch sub-requests under the owner lock', () => {
   const conditionsOf = async (segment: Segment) =>
     (await db.segment.findUnique({ where: { id: segment.id } }))?.conditions;
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
+  beforeEach(async () => {
     const { entity: organizationUser, context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
     const { entity: spaceUser } = await createSpaceUser({ role: 'admin' }, { ...context, space });
@@ -111,8 +102,7 @@ describe('batch sub-requests under the owner lock', () => {
     second = (await createSegment({ ownerModel: 'Space', conditions: acmeRule }, { space })).entity;
   });
 
-  afterAll(async () => {
-    clearHookRegistry();
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

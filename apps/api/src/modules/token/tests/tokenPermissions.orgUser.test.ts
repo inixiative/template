@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -25,7 +25,7 @@ describe('OrganizationUser Token Permissions', () => {
   let _viewerUser: User;
   let _viewerOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: o } = await createOrganization();
     org = o;
 
@@ -61,7 +61,7 @@ describe('OrganizationUser Token Permissions', () => {
     db = createTestApp().db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -120,7 +120,7 @@ describe('OrganizationUser Token Permissions', () => {
       expect(response.status).toBe(201);
     });
 
-    it('admin cannot create owner-role token', async () => {
+    it('an admin mints an owner-role token on their own member row: it holds their role or less (Aron, 2026-10-29)', async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser]);
       const response = await fetch(
         post(`/api/v1/organizationUser/${adminOrgUser.id}/tokens`, {
@@ -128,7 +128,7 @@ describe('OrganizationUser Token Permissions', () => {
           role: 'owner',
         }),
       );
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(201);
     });
 
     it('member can create member-role token', async () => {
@@ -142,7 +142,7 @@ describe('OrganizationUser Token Permissions', () => {
       expect(response.status).toBe(201);
     });
 
-    it('member cannot create admin-role token', async () => {
+    it('a member mints an admin-role token on their own member row: it holds their role or less (Aron, 2026-10-29)', async () => {
       const { fetch } = createApp(memberUser, [memberOrgUser]);
       const response = await fetch(
         post(`/api/v1/organizationUser/${memberOrgUser.id}/tokens`, {
@@ -150,7 +150,7 @@ describe('OrganizationUser Token Permissions', () => {
           role: 'admin',
         }),
       );
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(201);
     });
 
     it('cannot create token for another user', async () => {
@@ -187,17 +187,17 @@ describe('OrganizationUser Token Permissions', () => {
       expect(response.status).toBe(204);
     });
 
-    it('admin can delete member token via org permission', async () => {
+    it("an admin does not revoke a member's token: only the owner cleans up members' things", async () => {
       const { entity: token } = await createToken(
         { ownerModel: 'OrganizationUser', role: 'member' },
         { organizationUser: memberOrgUser },
       );
       const { fetch } = createApp(adminUser, [adminOrgUser]);
       const response = await fetch(del(`/api/v1/token/${token.id}`));
-      expect(response.status).toBe(204);
+      expect(response.status).toBe(403);
     });
 
-    it('admin cannot delete owner token', async () => {
+    it("an admin does not revoke an owner's token", async () => {
       const { entity: token } = await createToken(
         { ownerModel: 'OrganizationUser', role: 'owner' },
         { organizationUser: ownerOrgUser },

@@ -1,6 +1,8 @@
 // Database client with scope/transaction methods
 export { db } from './client';
 export type { Db, FinallyFn, FindForUpdateOptions } from './clientTypes';
+// Entitlement rows and the entries they hold
+export * from './entitlements';
 // Mutation lifecycle hooks
 export {
   clearHookRegistry,
@@ -12,14 +14,15 @@ export {
   type ManyAction,
   registerDbHook,
   type SingleAction,
+  snapshotHookRegistry,
   unregisterDbHook,
 } from './extensions/hookRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
+// Enum schemas (from prisma-zod-generator); object/input schemas live at @template/db/zod/*
+export * from './generated/zod/enums.gen';
 // Scalar schemas (model schemas without relations)
 export * from './generated/zod/scalarSchemas.gen';
-// Enum schemas and other zod types (from prisma-zod-generator)
-export * from './generated/zod/schemas';
 export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 // Hydration
 export { fetchOne, hydrate } from './hydrate';
@@ -41,16 +44,23 @@ export {
   createLock,
   FindForUpdateLockTimeoutError,
   type Lock,
-  type LockLostReason,
+  LockLostError,
   type LockOptions,
   type LockRedis,
   type LockReleaseResult,
+  type LockSetTarget,
   maxSafeHeartbeatMs,
+  singleFlightLock,
 } from './lock';
 // Redis client and cache utilities
 export {
+  CACHE_STATES,
+  type CacheCheck,
+  type CacheState,
+  COMMAND_TIMEOUT_MS,
   cache,
   cacheKey,
+  checkCache,
   clearKey,
   createRedisConnection,
   flushRedis,
@@ -62,24 +72,29 @@ export {
   MAX_ROLLING_CACHE_TARGETS,
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
   makeRollingCache,
+  markCacheWritten,
   type RedisEval,
   type RedisNamespace,
   type RegisteredRollingCache,
   ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_LEAF_BACKOFF_SECONDS,
   ROLLING_CACHE_TICK_SECONDS,
   type RollingCache,
+  type RollingCacheComputeContext,
   type RollingCacheConfig,
   type RollingCacheFindManyArgs,
+  type RollingCacheResultParams,
+  type RollingCacheResults,
   type RollingCacheTarget,
   type RollingCacheTargets,
+  type RollingCacheValue,
+  type RollingCacheWrite,
   redisNamespace,
   unregisterRollingCache,
   upsertCache,
 } from './redis';
 // Registries (schema-level configuration)
 export * from './registries';
-// Typed model IDs (phantom types for compile-time safety)
-export * from './typedModelIds';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
 export {
@@ -89,25 +104,37 @@ export {
   type RelationField,
   type ScalarField,
 } from '@inixiative/prisma-map';
+export { equalsSuppliedBind } from './registries/equalsSuppliedBind';
 export {
+  isArmColumns,
+  isOwnerKind,
   POLYMORPHIC_BINDS,
   type PolymorphicKind,
   polymorphicBindings,
   polymorphicIs,
   polymorphicKeyColumn,
+  polymorphicKeyColumns,
   polymorphicTarget,
 } from './registries/polymorphicIs';
+export { polymorphicSchema } from './registries/polymorphicSchema';
+export type {
+  PolymorphicAxisField,
+  PolymorphicAxisValue,
+  PolymorphicFkColumn,
+  PolymorphicModel,
+  PolymorphicSchema,
+  PolymorphicSchemaOptions,
+  PolymorphicTarget,
+} from './registries/polymorphicSchemaTypes';
 // User with relations type and schema
-export type { UserWithRelations } from './types/userWithRelations';
-export { UserWithRelationsSchema } from './types/userWithRelations';
-export {
-  admitRuleReferences,
-  type ReferenceScope,
-  type ReferenceScopes,
-  type RuleReferenceAdmission,
-} from './utils/admitRuleReferences';
+export type {
+  OrganizationUserWithEntitlements,
+  SpaceUserWithEntitlements,
+  UserWithRelations,
+} from './types/userWithRelations';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
+export { carryDelegatedKeys } from './utils/carryDelegatedKeys';
 // Type-safe delegate helpers (pass-the-delegate pattern)
 export {
   type AnyCrudDelegate,
@@ -129,6 +156,7 @@ export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './ut
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
 // Rule references: the rows a stored rule names, as edges
+export { loadParentRows } from './utils/loadParentRows';
 export { lockedTargetStates, type TargetState } from './utils/lockedTargetStates';
 // Model name utilities
 export {
@@ -145,17 +173,16 @@ export {
   toModelName,
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
+export { polymorphicArmRelation } from './utils/polymorphicArmKeys';
 export { getModelRelations } from './utils/prismaMapRelations';
+export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';
 export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
 export { RuleReferenceError } from './utils/ruleReferenceError';
 export {
-  liveRuleReferenceKeys,
-  liveRuleReferences,
-  type RuleReferenceIssue,
   type RuleReferenceRow,
-  ruleHealthFromEdges,
-  ruleReferenceIssues,
+  type RuleReferenceTarget,
+  ruleReferenceTargets,
 } from './utils/ruleReferenceHealth';
 export {
   type DynamicRuleReference,
@@ -168,12 +195,14 @@ export {
   sourceQueryValues,
 } from './utils/sourceQueryValues';
 export { sourceQueryWhere } from './utils/sourceQueryWhere';
-export {
-  type RuleReferenceGate,
-  type RuleReferenceSource,
-  syncRuleReferenceEdges,
-} from './utils/syncRuleReferenceEdges';
+export { type RuleReferenceSource, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
 export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
+export { assertRuleReferencesExist } from './validations/assertRuleReferencesExist';
+export {
+  type DeadRuleReference,
+  deadRuleReferences,
+  type ReferenceScope,
+} from './validations/deadRuleReferences';
 export {
   type RuleValidation,
   type ValidateRuleForLensOptions,

@@ -6,12 +6,13 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+export type ActorSnapshot = { model: string; record: Record<string, unknown> };
+
 export type AuditActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
   actorTokenId: string | null;
-  actorTokenName: string | null;
-  actorTokenKeyPrefix: string | null;
+  actor: ActorSnapshot | null;
   actorJobName: string | null;
   ipAddress: string | null;
   userAgent: string | null;
@@ -24,8 +25,7 @@ export const nullAuditActor: AuditActor = {
   actorUserId: null,
   actorSpoofUserId: null,
   actorTokenId: null,
-  actorTokenName: null,
-  actorTokenKeyPrefix: null,
+  actor: null,
   actorJobName: null,
   ipAddress: null,
   userAgent: null,

@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, feature:segment
  */
 import { actionRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
 import {
   segmentReachBodySchema,
@@ -18,7 +18,7 @@ export const organizationReachSegmentRoute = actionRoute({
   action: 'reach',
   bodySchema: segmentReachBodySchema,
   responseSchema: segmentReachResponseSchema,
-  middleware: [validatePermission('manage')],
+  middleware: [validateSubmodelPermission('create')],
   description:
     'Counts the customers of this organization a candidate segment rule matches today. Nothing is saved.',
 });

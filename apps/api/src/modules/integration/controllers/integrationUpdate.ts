@@ -1,13 +1,10 @@
-/**
- * @atlas
- * @kind controller
- * @partOf feature:integrations
- * @uses primitive:routeTemplates
- */
-import type { Prisma } from '@template/db';
+import { includeTargetEntitlements, type Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationUpdateRoute } from '#/modules/integration/routes/integrationUpdate';
+import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
+
+const permissionFields = ['role', 'full'];
 
 export const integrationUpdateController = makeController(
   integrationUpdateRoute,
@@ -16,9 +13,17 @@ export const integrationUpdateController = makeController(
     const integration = getResource<'integration'>(c);
     const body = c.req.valid('json');
 
-    const updated = await db.integration.update({
+    if (permissionFields.some((field) => field in body)) {
+      await validateIntegrationRole(c.get('permix'), integration);
+      await validateIntegrationRole(c.get('permix'), { ...integration, ...body });
+    }
+    await db.integration.update({
       where: { id: integration.id },
       data: body as Prisma.IntegrationUncheckedUpdateInput,
+    });
+    const updated = await db.integration.findUniqueOrThrow({
+      where: { id: integration.id },
+      include: includeTargetEntitlements('Integration'),
     });
 
     return respond.ok(updated);

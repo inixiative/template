@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import {
   cleanupTouchedTables,
@@ -12,7 +12,7 @@ import { composeComponent, composeTemplate } from '@template/email/render/compos
 import { parentOwner } from '@template/email/render/owner';
 
 describe('composeTemplate', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -233,7 +233,7 @@ describe('composeTemplate', () => {
 });
 
 describe('composeTemplate — the row that won the cascade names its owner', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -276,7 +276,7 @@ describe('parentOwner', () => {
 });
 
 describe('composeComponent', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

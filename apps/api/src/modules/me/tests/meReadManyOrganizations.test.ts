@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
@@ -20,7 +20,7 @@ describe('GET /me/organizations', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser();
     user = entity;
 
@@ -32,7 +32,7 @@ describe('GET /me/organizations', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -45,7 +45,7 @@ describe('GET /me/organizations', () => {
     expect(pagination!.total).toBe(0);
   });
 
-  it('returns user organizations with membership info', async () => {
+  it('returns user organizations with member info', async () => {
     const { entity: org } = await createOrganization();
     await createOrganizationUser(
       { role: Role.admin },
@@ -93,7 +93,7 @@ describe('GET /me/organizations', () => {
     expect(data.find((m) => m.id === org.id)).toBeUndefined();
   });
 
-  it('hides a soft-deleted membership row from the relation include', async () => {
+  it('hides a soft-deleted member row from the relation include', async () => {
     const { entity: org } = await createOrganization({ name: 'Stale Membership Org' });
     const { entity: membership } = await createOrganizationUser(
       { role: Role.member },

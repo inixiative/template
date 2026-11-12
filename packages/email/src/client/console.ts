@@ -9,7 +9,7 @@ import { LogScope, log } from '@template/shared/logger';
 
 export const createConsoleClient = (): EmailClient => {
   const send = async (options: SendEmailOptions): Promise<SendEmailResult> => {
-    const id = crypto.randomUUID();
+    const id = Bun.randomUUIDv7();
     const to = Array.isArray(options.to) ? options.to.join(', ') : options.to;
 
     log.info(`${options.subject} → ${to} (${options.html.length} chars)`, LogScope.email);

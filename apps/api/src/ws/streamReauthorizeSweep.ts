@@ -7,7 +7,7 @@
 import { LogScope, log } from '@template/shared/logger';
 import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
 import { reauthorizeStreams } from '#/ws/reauthorizeStreams';
-import { byId } from '#/ws/registry';
+import { byId, removeConnection } from '#/ws/registry';
 import type { WSSocket } from '#/ws/types';
 
 const REAUTHORIZE_INTERVAL_MS = 45_000;
@@ -23,6 +23,8 @@ const reauthorizeQueued = async (ws: WSSocket): Promise<void> => {
       `ws stream re-authorization failed: ${err instanceof Error ? err.message : String(err)}`,
       LogScope.ws,
     );
+    if (ws.readyState === WebSocket.OPEN) ws.close(1011, 're-authorization failed');
+    removeConnection(ws);
   } finally {
     pending.delete(ws);
   }

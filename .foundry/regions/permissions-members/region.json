@@ -1,0 +1,34 @@
+{
+  "id": "permissions-members",
+  "title": "Member rows and delegates",
+  "routing": "Is this about a member row or a delegate rather than a role tier: what operate, manage, own and leave mean on an OrganizationUser or SpaceUser (memberRowActions), the member self-grant (memberSelfGrant, isMemberSelfGrant, memberSelfGrantRules), assigning or removing a member (memberRoleWrite, memberRemoval), who reads, operates, manages or deletes an integration or a token by its owner kind (integrationAdministering, integrationAccess, tokenAdministering), minting or updating a token (createToken's rule, validateDelegateRole, validateTokenWrite), an integration's role (validateIntegrationRole, validateIntegrationGrant), full and delegateFull (validateFullGrant, the fullDelegate hook, delegatePermissionRules, delegateHoldsSomething), or the library's delegate? Roles, actions, entitlements in general and installing permissions are `permissions-roles`.",
+  "concepts": ["permissions-members"],
+  "tokens": 8183,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 606,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 8183
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/PERMISSIONS.md"],
+    "docUnits": [
+      "doc:docs/claude/PERMISSIONS.md#member-rows",
+      "doc:docs/claude/PERMISSIONS.md#integrations-and-tokens-by-owner-kind",
+      "doc:docs/claude/PERMISSIONS.md#writing-delegates"
+    ],
+    "catalogClusters": ["mutation-hooks", "roles-and-permissions"],
+    "codeEntries": 9,
+    "docMembers": 18
+  },
+  "bypassLines": 24,
+  "glossaryTerms": 21
+}

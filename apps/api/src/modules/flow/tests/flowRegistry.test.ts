@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import type { FlowKey } from '@template/db/generated/client/enums';
 import {
@@ -27,17 +27,18 @@ const mount = [
 
 const callerFor: Record<
   FlowKey,
-  () => Promise<{ app: Harness; bindings: Record<string, unknown> }>
+  () => Promise<{ app: Harness; userId: string; bindings: Record<string, unknown> }>
 > = {
   setUpOrganization: async () => {
     const { entity: user } = await createUser();
     const { entity: organization } = await createOrganization();
-    const { entity: seat } = await createOrganizationUser(
+    const { entity: member } = await createOrganizationUser(
       { role: 'owner' },
       { user, organization },
     );
     return {
-      app: createTestApp({ mockUser: user as User, mockOrganizationUsers: [seat], mount }),
+      app: createTestApp({ mockUser: user as User, mockOrganizationUsers: [member], mount }),
+      userId: user.id,
       bindings: { organizationId: organization.id },
     };
   },
@@ -46,7 +47,7 @@ const callerFor: Record<
 describe('flow registry', () => {
   let db: Harness['db'] | undefined;
 
-  afterAll(async () => {
+  afterEach(async () => {
     if (db) await cleanupTouchedTables(db);
   });
 
@@ -64,6 +65,18 @@ describe('flow registry', () => {
         const read = await app.fetch(get(step.readPath));
         expect({ step: step.key, status: read.status }).toEqual({ step: step.key, status: 200 });
       }
+    });
+
+    it(`${definition.key}: bindings never carry the caller`, async () => {
+      const { app, userId, bindings } = await callerFor[definition.key]();
+      db = app.db;
+      const response = await app.fetch(
+        post('/api/v1/me/flows', {
+          flowKey: definition.key,
+          bindings: { ...bindings, userId },
+        }),
+      );
+      expect(response.status).toBe(422);
     });
   }
 });

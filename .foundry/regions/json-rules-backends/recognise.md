@@ -18,22 +18,41 @@ A moment that says any of these, or something close, is this region's. Both voic
 - push the rule down into the database
 - filter rows by a rule
 - raw SQL or Prisma from a rule
+- put the engine defaults back
+- temporarily override an engine default for one call
 - run the compiled plan against Prisma
 - which map in the set is the root
+- the Prisma null sentinel from a different client
+- compile for a database that isn't Postgres
+- typo-tolerant contains on strings
 - compile the rule to a Prisma where
 - compile the rule to a parameterized SQL where
+- undo every global override after the test
+- set the default, run, then reset after
 - resolve the plan's steps and field references
 - passing a set of maps to the SQL compiler
+- Json null checks with another Prisma client
+- set the provider for one compile call
+- fuzzy matching in the in-memory filter
 - filter in the database with the rule
 - a raw SQL filter from the rule, with joins
+- restore the default time zone and provider
+- I'll set the global before and reset it in finally
 - I'll spread the plan's where into findMany
 - SQL compile over a lens or a map set
+- pass my own AnyNull instance
+- the default provider for every compile
+- approximate match in the search box
 - I'll hand-write the Prisma where to mirror the rule
 - I'll concatenate the values into the SQL string
+- a scoped override of the engine settings
 - the where from the plan, ready for Prisma
+- fuzzy only in memory
 - the resulting rule compiles like everything else
 - regex or day-of-week filtering in the database
+- run this with a different default zone
 - at least N related rows compiled as groupBy then id in
+- the compilers refuse it
 - push the rule down into the query
 - generates parameterized WHERE clauses from the rule
 

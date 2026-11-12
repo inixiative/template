@@ -3,18 +3,18 @@
   "title": "WebSocket connections",
   "routing": "Is this about the API WebSocket connection itself: the upgrade and handler (acceptWebSocket, websocketHandler), the authenticate frame and /api/v1/me identity (resolveIdentity, setIdentity, sanitizeWSHeaders), the connection registry (addConnection, removeConnection, byUser/byChannel/byStream), frame limits and per-connection serialization (WS_MAX_PENDING_FRAMES, WS_FRAME_LIMIT), retryable errors, heartbeat and the stale sweep, sendFrame and the senders (sendToChannel, sendToUser, broadcast, the *Local variants, Redis ws:broadcast), or the client socket (createApiWebsocket, useApiWebsocket, reconnect replay, streamSettleMs)?",
   "concepts": ["ws-connections"],
-  "tokens": 6633,
+  "tokens": 6783,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1419,
+      "tokens": 1274,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 6633
+      "tokens": 6783
     }
   },
   "runsAgreed": 0,
@@ -24,14 +24,9 @@
       "doc:docs/claude/WEBSOCKETS.md#channel-registry-and-authorization",
       "doc:docs/claude/WEBSOCKETS.md#connection-and-recovery"
     ],
-    "catalogClusters": [
-      "app-events-side-effects",
-      "rate-limiting",
-      "websocket-connection-management",
-      "websocket-realtime-delivery"
-    ],
-    "codeEntries": 28,
-    "docMembers": 11
+    "catalogClusters": ["websocket-connection-management", "websocket-realtime-delivery"],
+    "codeEntries": 29,
+    "docMembers": 13
   },
   "bypassLines": 9,
   "glossaryTerms": 23

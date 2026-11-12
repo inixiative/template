@@ -135,6 +135,5 @@ When creating a new project from this template:
 
 1. Update package names from `@template/*` to `@yourproject/*`
 2. Add your app-specific models to `packages/db/prisma/schema/`
-3. Update typed model IDs in `packages/db/src/typedModelIds.ts`
-4. Update CLAUDE.md with project-specific context
-5. Update reference repos if you have similar production codebases
+3. Update CLAUDE.md with project-specific context
+4. Update reference repos if you have similar production codebases

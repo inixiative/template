@@ -122,7 +122,7 @@ Originally, `@template/shared` was meant for code shared between frontend and ba
 - UI components need different testing strategies
 - Package grew too large and unfocused
 
-**Migration (2026-02-12):** Moved all frontend code from `@template/shared` to `@template/ui`:
+**The split:** all frontend code lives in `@template/ui`, not `@template/shared`:
 - Components, hooks, pages
 - Zustand store slices
 - Auth utilities
@@ -182,7 +182,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getActor } from '#/lib/context/getActor'` |
+| Within an app | `#/` | `import { getResource } from '#/lib/context/getResource'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -191,8 +191,8 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 ```typescript
 // In apps/api - use #/ for internal imports
-import { getActor } from '#/lib/context/getActor';
-import { authMiddleware } from '#/middleware/auth/authMiddleware';
+import { getResource } from '#/lib/context/getResource';
+import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 ```
 
 ### Package Imports (`@template/`)
@@ -201,7 +201,7 @@ import { authMiddleware } from '#/middleware/auth/authMiddleware';
 // Cross-package (from anywhere)
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { setupOrgContext } from '@template/permissions';
+import { actorOf } from '@template/permissions';
 
 // Within a shared package - ALSO use @template/
 // packages/db/src/extensions/mutationLifeCycle/mutationLifeCycleExtension.ts
@@ -256,8 +256,8 @@ Each package's `tsconfig.json` must map **all packages** to ensure consistent im
 
 **Special cases:**
 
-- `packages/db` includes `@template/db-test/*` → `./test/*` for test utilities
-- `packages/ui` includes `@template/ui/openapi.gen.json` → `./openapi.gen.json` for API spec
+- `packages/db` maps `@template/db/test` and `@template/db/test/*` to `packages/db/src/test/` for test utilities (in its tsconfig paths and its package exports)
+- `packages/ui` maps `@template/sdk/openapi.gen.json` to the SDK package's generated API spec
 - Apps use `#/*` → `./src/*` for internal imports instead of `@template/`
 
 **Generated file convention:**
@@ -358,11 +358,11 @@ bun add -d <package>
 
 ```typescript
 // Good - direct imports
-import { getActor } from '#/lib/context/getActor';
+import { getResource } from '#/lib/context/getResource';
 import { emailRegistry } from '#/lib/email';
 
 // Bad - intermediate barrel
-import { getActor, emailRegistry } from '#/lib';
+import { getResource, emailRegistry } from '#/lib';
 ```
 
 Direct imports:

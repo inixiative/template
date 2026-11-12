@@ -137,6 +137,8 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 
 **Response:** `inquirySentResponseSchema` — includes `targetUser`, `targetOrganization`, `targetSpace`.
 
+**Which `targetModel` and `content` a type takes:** `GET /api/v1/inquiry/info` (public) lists, for every registered handler, its `sources`, `targets`, the JSON Schema of `content`, of the extra resolve-body fields (`resolutionInput`) and of the stored `resolution`, plus `unique` and `defaultExpirationDays`. It is generated from `inquiryHandlers`, so a new handler appears there without route changes. A `targetModel` outside `targets` answers 422 (`validateInquiryHandler`); content that fails `contentSchema` answers 422 too.
+
 ### Lifecycle — on the inquiry resource directly
 
 | Method | Path | Permission | Description |
@@ -147,10 +149,13 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 | `POST` | `/api/v1/inquiry/:id/resolve` | `resolve` | Approve, deny, or request changes |
 | `DELETE` | `/api/v1/inquiry/:id/cancel` | `send` | Cancel (source only): sets `canceled`, clears `expiresAt`, soft-deletes |
 
+**Every state-changing action carries the version the actor saw.** `expectedUpdatedAt` is the inquiry's `updatedAt` as the actor read it: in the body of `PATCH`, `/send` and `/resolve`, and as a query parameter on `DELETE /cancel`. `lockInquiryAtVersion` row-locks the inquiry (`db.findForUpdate`, inside the action's `db.txn`) and answers **409** when the version moved, so an edit between reading and approving fails the approval instead of approving something nobody looked at. The status checks run on the locked row. The UI hooks send `inquiry.updatedAt` on every mutation.
+
 **Resolve body:**
 ```typescript
 {
   status: 'approved' | 'denied' | 'changesRequested';
+  expectedUpdatedAt: string;   // the updatedAt you read
   explanation?: string;
 }
 ```
@@ -193,13 +198,13 @@ POST /api/admin/inquiry          → sourceModel: admin (no FK)
 
 No create route sources an `OrganizationUser`, `SpaceUser`, `Integration` or `Token` inquiry; those sources are set by the service that already holds the party.
 
-The handler's `sources` config is checked by `validateInquiryHandler` to confirm the resolved source is valid for this inquiry type.
+The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/rebac/inquiryTypes.ts`) are checked by `validateInquiryHandler` to confirm the resolved source is valid for this inquiry type.
 
 ### Target
 
 `resolveInquiryTarget` resolves from `body.targetModel` (already validated by `validateInquiryHandler`):
 
-- `targetModel: User` → `targetUserId` OR `targetEmail` (creates guest if not found)
+- `targetModel: User` → `targetUserId` OR `targetEmail`: `findUserOrCreateGuest` (`apps/api/src/modules/user/services/findOrCreateGuest.ts`) returns the user with that normalized email or creates an unverified guest and emits `user.created` with `isGuest: true`
 - `targetModel: Organization` → `targetOrganizationId` OR `targetOrganizationSlug`
 - `targetModel: Space` → `targetSpaceId` OR `targetOrganizationSlug` + `targetSpaceSlug` (space slugs are org-scoped)
 - `targetModel: OrganizationUser` → `targetOrganizationId` + `targetUserId` (the membership must exist)
@@ -215,21 +220,19 @@ Every inquiry type maps to a handler registered in `handlers/index.ts`.
 
 ```typescript
 type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
-  sources: { sourceModel: InquiryResourceModel }[];
-  targets: { targetModel: InquiryResourceModel }[];
   contentSchema: z.ZodType<TContent>;            // parsed on create/update; stored in inquiry.content
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
   resolutionSchema: z.ZodType<TResolution>;      // full stored shape (includes computed fields from handleApprove)
-  validate?(db, inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
-  handleApprove(db, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
-  autoApprove(db, inquiry): Promise<boolean>;    // called after send; return true to skip human review
+  validate?(inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
+  handleApprove(inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
+  autoApprove(inquiry): Promise<boolean>;    // called after send; return true to skip human review
   unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
   defaultExpirationDays?: number;     // drives computeExpiresAt on send and changesRequested; undefined = no expiry
   appEvents?: InquiryAppEvents;       // per-status app event handlers: sent, approved, denied, changesRequested, resolved
 };
 ```
 
-`createInquiry` checks the resolved source and target against `sources` / `targets` (`validateInquiryHandler`, 422 on mismatch). `sendInquiry` flips the status to `sent`, sets `sentAt` (first send only) and `expiresAt`, then calls `autoApprove`; on `true` it runs `resolveInquiry(..., approved)` — and with it `handleApprove` — before emitting `inquiry.sent`.
+A type's parties are not on the handler: they are declared once, with their permission levels, in `INQUIRY_TYPES` (`packages/permissions/src/rebac/inquiryTypes.ts`). `createInquiry` checks the resolved source and target against them (`validateInquiryHandler`, 422 on mismatch). `sendInquiry` flips the status to `sent`, sets `sentAt` (first send only) and `expiresAt`, then calls `autoApprove`; on `true` it runs `resolveInquiry(..., approved)` — and with it `handleApprove` — before emitting `inquiry.sent`.
 
 All three type params default to `BaseResolution` (`{ explanation?: string }`), so simple handlers need no generics:
 
@@ -250,14 +253,14 @@ Setting `unique` on a handler is automatically enforced — no controller code n
 
 ### `validate` — pre-create and pre-update checks
 
-`validate(db, inquiry, content)` receives the **parsed, typed content** directly (not `inquiry.content`). The `inquiry` argument carries source/target FK fields needed for DB lookups. This is called:
+`validate(inquiry, content)` receives the **parsed, typed content** directly (not `inquiry.content`). The `inquiry` argument carries source/target FK fields needed for DB lookups. This is called:
 
 - **On create** — before the DB write, with the incoming content
 - **On update** — with the effective post-update content (incoming `content` merged over stored `inquiry.content`)
 
 ```typescript
 // createSpace handler
-const validate = async (db, inquiry, content: SpaceContent) => {
+const validate = async (inquiry, content: SpaceContent) => {
   const { slug } = content; // typed — no cast needed
   const [existingSpace, existingInquiry] = await Promise.all([
     db.space.findFirst({ where: { organizationId: inquiry.sourceOrganizationId, slug } }),
@@ -270,7 +273,7 @@ const validate = async (db, inquiry, content: SpaceContent) => {
 
 ### `resolvedContent` and the Override Pattern
 
-On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution body. Only keys declared in `resolutionInputSchema` can flow into `resolvedContent`. `explanation` is always excluded (resolution-only metadata), so it never overrides content fields.
+On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution body. `resolveContent` (`services/resolveContent.ts`) parses the resolution against `resolutionInputSchema` first and merges the **parsed** values, so defaults and transforms inside an override apply and a refined schema works the same as a plain object. Only keys the resolver actually sent that the schema keeps can flow into `resolvedContent`; a key the schema defaults but the resolver didn't send never overrides content. `explanation` is always excluded (resolution-only metadata), so it never overrides content fields.
 
 **Opt-in to allow resolver overrides** by declaring the field in `resolutionInputSchema`:
 ```typescript
@@ -291,24 +294,35 @@ const { role } = resolvedContent; // always from original inquiry.content
 
 | Type | Source | Target | Unique | Expiry | Side Effect |
 |------|--------|--------|--------|--------|-------------|
-| `inviteOrganizationUser` | Organization | User | `targeted` | 30 days | Creates `OrganizationUser` |
+| `inviteOrganizationUser` | Organization | User | `targeted` | 30 days | Creates `OrganizationUser`, or revives the user's removed one (`revive`) with the invited role |
 | `createSpace` | Organization | admin | — | 90 days | Creates `Space` under source org |
 | `updateSpace` | Space | admin | `untargeted` | 90 days | Updates `Space` with content fields |
-| `transferSpace` | Space | Organization | `untargeted` | 30 days | Sets `Space.organizationId` to target org |
+| `transferSpace` | Space | Organization | `untargeted` | 30 days | Moves the space and everything keyed to it into the target org; see *Transferring a space* |
 
 All four handlers return `autoApprove: async () => false` — no type currently auto-approves.
 
-**Send permissions by type:**
+### Transferring a space
 
-| Type | Role required | How |
-|------|--------------|-----|
-| `inviteOrganizationUser` (low role: member/viewer) | org `manage` | Admin+ can invite |
-| `inviteOrganizationUser` (high role: owner/admin) | org `own` | Owner only can invite |
-| `createSpace` | org `own` | Owner only |
-| `updateSpace` | space `own` | Space owner or org owner (via `space.own → org.own` delegation) |
-| `transferSpace` | org `own` (explicit 2-hop) | Org owner only — space owner alone is not enough |
+Approving a transfer moves the space, its members and everything downstream into the target org, in the resolution transaction. A member who already belongs to the target org keeps their membership. Every other member is removed; their space membership and its rows move to the target org as tombstones, and hiring them there later does not bring the space back. Nobody becomes a live member of an org they didn't join.
 
-`updateSpace` and `transferSpace` differ intentionally: `updateSpace` uses `{ rel: 'sourceSpace', action: 'own' }` which delegates through to org.own, so both direct space owners and org owners can update. `transferSpace` uses `{ rel: 'sourceSpace.organization', action: 'own' }` — dot-path traversal that explicitly resolves to the owning organization, bypassing any direct space.own check, ensuring only org owners can initiate a transfer.
+1. The space is locked (`db.findForUpdate`). Its slug in the target org is the resolution's `slug` when the approver gives one (a rename, merged into content by `resolveContent`), else its current slug. A slug the target org already holds, or an open `createSpace` request for it, refuses the transfer with a 409 (`validateSpaceSlugFree`, shared with `createSpace` and `updateSpace`). The target org's Review dialog offers the rename.
+2. One update tombstones every live `SpaceUser` whose user is not a live member of the target org, stamped with the transfer time; `softDeleteCascade` tombstones what they owned and deletes their tokens.
+3. Every space member, live or tombstoned, gets a tombstoned `member` row in the target org unless they already have one (`skipDuplicates`): the `SpaceUser` → `OrganizationUser` key needs it once step 4 re-keys their space membership. Its stamp is one no space membership carries, so hiring the person revives only their org membership. Putting them back in the space is a manual re-add; the transfer revives nothing.
+4. `Space.organizationId` is set. Every row keyed to the space or a space member carries the org in a composite key (`SpaceUser`; Integration, Token, EmailTemplate and EmailComponent; Inquiry and AuditLog rows keyed to a space member), so one statement re-keys them all by `ON UPDATE CASCADE`; Postgres runs every cascade of a statement before it checks the keys. `spaceKeys.test.ts` (`packages/db/src/registries`) fails when a Space- or SpaceUser-owned model carries an org column outside such a key.
+5. The rows the cascade re-keyed are cleared from the cache (`clearSpaceRowCaches`, through `queueCacheClear`). It finds them through every cached model's composite relation to `Space` or `SpaceUser` (`spaceKeyColumns`), so a prefixed pair such as `sourceSpaceId`/`sourceOrganizationId` counts; a space reference without an org column isn't re-keyed and is left alone.
+
+No row keyed to the space keeps the old org's membership, so reviving a membership in the old org revives nothing in the moved space. Audit rows record their context (`contextOrganizationId`) as it was when written, so the space's earlier history stays filed under the old org.
+
+**Who may send and resolve, by type** (declared in `INQUIRY_TYPES`):
+
+| Type | Send (source) | Resolve (target) |
+|------|---------------|------------------|
+| `inviteOrganizationUser` | Organization `own` for a high role (owner/admin), `manage` otherwise | User `manage` |
+| `createSpace` | Organization `own` | The platform (superadmin) |
+| `updateSpace` | Space `own` (a space owner, or an org owner through `space.own → org.own`) | The platform (superadmin) |
+| `transferSpace` | Space: `own` on the space's organization (`{ rel: 'sourceSpace.organization', action: 'own' }`) | Organization `own` |
+
+`updateSpace` and `transferSpace` differ intentionally. `updateSpace` asks `own` on the space, which an org owner also holds. `transferSpace` is a rule with a dot-path `rel` to the space's organization, so the check is `own` on the organization itself: a space owner alone cannot transfer it.
 
 ## Response Schemas
 
@@ -338,26 +352,29 @@ Each mutation uses the include that matches what its caller needs:
 
 | Action | Who can perform it |
 |--------|--------------------|
-| `read` | Source user/manage-on-source-org-or-space OR target user/manage-on-target-org-or-space |
-| `send` | Source-side permission (see handler table above). For user-sourced inquiry types, `{ self: 'sourceUserId' }` is also checked — add the type to that rule's `value: []` list in `schema.ts` when creating a user-sourced handler. |
-| `resolve` | Target user (self); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
+| `read` | Party-wide, whatever the type: the user on either side (`read`), or `manage` on the organization or space on either side (`INQUIRY_READ_LEVELS`) |
+| `send` | The source party's declared `send` level for that type (table above) |
+| `resolve` | The target party's declared `resolve` level for that type; a platform (`admin`) target has no relation, so only a superadmin resolves it |
+
+`db:inquiry` is the `inquiry` object built by `inquiryPermission(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
 
 ## Adding a New Handler
 
-1. Create `handlers/<type>/index.ts` implementing `InquiryHandler<TContent, TResolution>`
-2. Define `contentSchema` (stored on create) and `resolutionInputSchema` / `resolutionSchema` (validated on resolve)
+1. Declare the type's parties and their `send` / `resolve` levels in `INQUIRY_TYPES` (`packages/permissions/src/rebac/inquiryTypes.ts`); the record is keyed by `InquiryType`, so a new type does not compile until it does
+2. Create `handlers/<type>/index.ts` implementing `InquiryHandler<TContent, TResolution>`
+2. Define `contentSchema` (stored on create) and `resolutionInputSchema` / `resolutionSchema` (validated on resolve) in `packages/shared/src/inquiry/<type>.ts`, so web/admin type `inquiry.content` with the same schema the API parses; `baseResolutionInputSchema` lives there too
    - `resolutionInputSchema` — what the resolver submits; fields here (except `explanation`) can override content
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
    - If no computed fields, both can be the same schema
-3. Implement `handleApprove(db, inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
-4. Implement `autoApprove(db, inquiry)` — required; called immediately after send; return `true` to resolve as approved without human review, `async () => false` otherwise. Future: organizations may configure this via JSON rules stored on the organization record.
-5. Add `validate(db, inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
+3. Implement `handleApprove(inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
+4. Implement `autoApprove(inquiry)` — required; called immediately after send; return `true` to resolve as approved without human review, `async () => false` otherwise. Future: organizations may configure this via JSON rules stored on the organization record.
+5. Add `validate(inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
 6. Set `defaultExpirationDays` if the inquiry should auto-expire (e.g. `30` for invitations). Drives `computeExpiresAt` on send and changesRequested. Omit for no expiry.
 7. Set `unique: 'targeted'` (one per source+target+type) or `unique: 'untargeted'` (one per source+type regardless of target) if uniqueness should be enforced — automatic
 8. Register in `handlers/index.ts`
 9. Add the new type to `InquiryType` enum in `packages/db/prisma/schema/inquiry.prisma`
 10. Run `bun run db:generate` in `packages/db/`
-11. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`. If the source is a `User` (not an org or space), add the type string to the `value: []` list in the existing `self: 'sourceUserId'` rule block so the source user can cancel/edit/re-send from any context.
+11. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`. If the source is a `User` (not an org or space), add the type string to the `value: []` list in the existing `rel: 'sourceUser'` rule block so the source user can cancel/edit/re-send from any context.
 
 ### Status utilities (`validations/validateInquiryStatus.ts`)
 
@@ -422,7 +439,7 @@ Each handler that resolves in a list (e.g. `transferSpace` received by an org) m
 ```typescript
 // packages/ui/src/hooks/useInquiryPermission.ts
 useInquiryPermission(
-  inquiry: InquirySentItem | InquiryReceivedItem,
+  inquiry: CheckableInquiry, // { type, sourceModel, targetModel, content? }: a stored inquiry, or a draft
   action: ActionRule,
   side: 'source' | 'target',
 ): boolean
@@ -430,10 +447,12 @@ useInquiryPermission(
 
 Side-aware permission check. `side` determines which side of the inquiry the current tenant context fills:
 
-- `'source'` — fills `sourceOrganization` / `sourceSpace` from tenant context (used in sent-list views)
-- `'target'` — fills `targetOrganization` / `targetSpace` from tenant context (used in received-list views)
+- `'source'` — fills `sourceUser` / `sourceOrganization` / `sourceSpace` from tenant context (used in sent-list views and send forms)
+- `'target'` — fills `targetUser` / `targetOrganization` / `targetSpace` from tenant context (used in received-list views)
 
 The inquiry object carries the other side's FK data. This is needed because inquiries only partially hydrate relations in list responses (sent = targets only, received = sources only).
+
+`db:inquiry` gates every send and resolve branch on `sourceModel` / `targetModel`, so a check needs both models and the type. A form that offers sending an inquiry not yet created passes a draft (`{ type: 'transferSpace', sourceModel: 'Space', targetModel: 'Organization' }`). Where the parties come from a prop or the check runs per option (the invite form checks each role), build the record with `inquiryCheckRecord(inquiry, side, parties)` (`packages/ui/src/lib/inquiries/inquiryCheckRecord.ts`), the builder the hook uses, and pass it to `checkPermission`. Never hand-roll the record.
 
 ### UI Components
 

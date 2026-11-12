@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import {
   AuditSubjectModel,
@@ -28,7 +28,7 @@ describe('GET /api/admin/inquiry', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let superadmin: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser({ platformRole: PlatformRole.superadmin });
     superadmin = entity;
 
@@ -40,7 +40,7 @@ describe('GET /api/admin/inquiry', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

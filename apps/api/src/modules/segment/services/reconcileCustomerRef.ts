@@ -7,9 +7,10 @@
 import { check, narrowRule } from '@inixiative/json-rules';
 import { db, polymorphicTarget } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
-import type { ProviderModel } from '@template/db/generated/client/enums';
+import { type ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
-import { ownedSegments, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { ownedSegments } from '#/modules/customerRef/lib/ownedSegments';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
 import {
   applyMembershipDiff,
   type MembershipDiff,
@@ -34,8 +35,13 @@ const providerOf = (
   return target ? { ownerModel: target.kind as ProviderModel, ownerId: target.id } : null;
 };
 
-export const dynamicSegmentsOf = (ownerModel: ProviderModel, ownerId: string): Promise<Segment[]> =>
-  ownedSegments(ownerModel, ownerId, { type: 'dynamic' });
+export const dynamicSegmentsOf = async (
+  ownerModel: ProviderModel,
+  ownerId: string,
+): Promise<Segment[]> =>
+  (await ownedSegments(ownerModel, ownerId)).filter(
+    (segment) => segment.type === SegmentType.dynamic,
+  );
 
 const recordDecision = (row: HydratedCustomerRef, segment: Segment, matches: boolean): void => {
   const index = row.segmentMembers.findIndex((member) => member.segment?.id === segment.id);

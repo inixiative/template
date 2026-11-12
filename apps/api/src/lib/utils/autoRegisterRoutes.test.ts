@@ -2,11 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { OpenAPIHono } from '@hono/zod-openapi';
 import { toOpenApi } from '#/lib/routeTemplates/utils';
 import { autoRegisterRoutes } from '#/lib/utils/autoRegisterRoutes';
 import { adminSpaceReadManyRoute } from '#/modules/space/routes/adminSpaceReadMany';
-import type { AppEnv } from '#/types/appEnv';
+import { createTestApp } from '#tests/createTestApp';
 
 const moduleDir = mkdtempSync(resolve(tmpdir(), 'route-order-'));
 mkdirSync(resolve(moduleDir, 'routes'));
@@ -38,7 +37,7 @@ afterAll(() => rmSync(moduleDir, { recursive: true, force: true }));
 
 describe('autoRegisterRoutes', () => {
   it('registers static collection actions before resource routes regardless of file names', async () => {
-    const router = new OpenAPIHono<AppEnv>();
+    const { app: router } = createTestApp();
     await autoRegisterRoutes(router, moduleDir);
     const response = await router.request('/dashboard');
 
@@ -53,7 +52,7 @@ describe('autoRegisterRoutes', () => {
   });
 
   it('compares nested path specificity independently of parameter names', async () => {
-    const router = new OpenAPIHono<AppEnv>();
+    const { app: router } = createTestApp();
     await autoRegisterRoutes(router, moduleDir);
     const response = await router.request('/123/detail');
 
@@ -66,7 +65,7 @@ describe('autoRegisterRoutes', () => {
   });
 
   it('skips a route already mounted by hand, so it registers once and the hand mount serves it', async () => {
-    const router = new OpenAPIHono<AppEnv>();
+    const { app: router } = createTestApp();
     router.openapi(toOpenApi({ ...adminSpaceReadManyRoute, path: '/foo' }), (c) =>
       c.json({ route: 'byHand' }),
     );

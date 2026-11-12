@@ -26,14 +26,14 @@ describe('resolveSender', () => {
     ).toBe(false);
   });
 
-  it('is the sending membership, found by its user and organization', async () => {
-    const { entity: membership } = await createOrganizationUser();
+  it('is the sending member, found by its user and organization', async () => {
+    const { entity: organizationUser } = await createOrganizationUser();
     const sender = await resolveSender({
       type: 'OrganizationUser',
-      userId: membership.userId,
-      organizationId: membership.organizationId,
+      userId: organizationUser.userId,
+      organizationId: organizationUser.organizationId,
     });
-    expect(sender?.id).toBe(membership.id);
+    expect(sender?.id).toBe(organizationUser.id);
   });
 
   it('is absent for the platform and admin, which no lens describes', async () => {

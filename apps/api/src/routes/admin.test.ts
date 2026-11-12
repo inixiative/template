@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { CronJob, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -9,7 +9,10 @@ import {
 } from '@template/db/test';
 import { adminRouter } from '#/routes/admin';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 import { get, json } from '#tests/utils/request';
+
+useRealJobsQueue();
 
 describe('adminRouter', () => {
   let memberFetch: ReturnType<typeof createTestApp>['fetch'];
@@ -18,7 +21,7 @@ describe('adminRouter', () => {
   let cronJob: CronJob;
   let deletedOrganization: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const member: User = (await createUser()).entity;
     const superadmin: User = (await createUser({ platformRole: PlatformRole.superadmin })).entity;
     cronJob = (await createCronJob()).entity;
@@ -36,7 +39,7 @@ describe('adminRouter', () => {
     });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

@@ -35,8 +35,8 @@ export const transactionPerRound: StrategyExecutor = async (
 
       const roundResult = await db.txn(
         async () => {
-          const batchId = crypto.randomUUID();
-          registerBatch(batchId, db, baseContext);
+          const batchId = Bun.randomUUIDv7();
+          registerBatch(batchId, baseContext);
 
           try {
             const roundPromises = round.map(async (request): Promise<RequestResult> => {
@@ -83,8 +83,8 @@ export const transactionPerRound: StrategyExecutor = async (
       completedRounds++;
 
       if (roundIndex < rounds.length - 1) {
-        const batchId = crypto.randomUUID();
-        registerBatch(batchId, db, baseContext);
+        const batchId = Bun.randomUUIDv7();
+        registerBatch(batchId, baseContext);
         await refreshBatchContext(batchId);
         unregisterBatch(batchId);
       }

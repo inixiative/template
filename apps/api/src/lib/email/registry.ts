@@ -41,10 +41,10 @@ export const slotRowsLens = (slot: SlotLens | undefined, where: Condition): Lens
 
 const user: ModelNarrowing = { picks: ['id', 'name', 'email'] };
 
-const userEntity = (bind: string): LensNarrowing => ({
+const userEntity: LensNarrowing = {
   parent: lensFor('User'),
-  root: { where: { field: 'id', operator: 'equals', bind }, ...user },
-});
+  root: { where: { field: 'id', operator: 'equals', bind: 'userId' }, ...user },
+};
 
 const userData: LensNarrowing = { parent: lensFor('User'), root: user };
 
@@ -87,14 +87,14 @@ export const registry: Record<string, EmailEntry> = assertSubstitutes({
   },
 
   welcome: {
-    entity: userEntity('userId'),
+    entity: userEntity,
     data: userData,
     sender: { type: 'platform' },
     recipients: userRecipient('id'),
   },
 
   'email-verification': {
-    entity: userEntity('userId'),
+    entity: userEntity,
     sender: { type: 'platform' },
     recipients: userRecipient('id'),
     data: fieldsLens({ verificationUrl: 'String' }),

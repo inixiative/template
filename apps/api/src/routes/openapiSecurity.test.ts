@@ -13,20 +13,9 @@ type Spec = {
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
-const SESSION_ONLY = new Set([
-  'meCreateToken',
-  'organizationCreateToken',
-  'organizationUserCreateToken',
-  'spaceCreateToken',
-  'spaceUserCreateToken',
-  'organizationDelete',
-  'tokenDelete',
-]);
-
-const expectedSchemes = (path: string, operationId: string | undefined): string[] => {
+const expectedSchemes = (path: string): string[] => {
   if (path.startsWith('/api/internal')) return ['internalSecret'];
-  if (operationId && SESSION_ONLY.has(operationId)) return ['sessionToken'];
-  return ['sessionToken', 'apiToken'];
+  return ['userJwt', 'apiToken'];
 };
 
 const loadSpec = async (): Promise<Spec> => {
@@ -49,8 +38,8 @@ describe('OpenAPI security', () => {
     const spec = await loadSpec();
     const schemes = spec.components?.securitySchemes ?? {};
 
-    expect(Object.keys(schemes).sort()).toEqual(['apiToken', 'internalSecret', 'sessionToken']);
-    expect(schemes.sessionToken).toMatchObject({ type: 'http', scheme: 'bearer' });
+    expect(Object.keys(schemes).sort()).toEqual(['apiToken', 'internalSecret', 'userJwt']);
+    expect(schemes.userJwt).toMatchObject({ type: 'http', scheme: 'bearer' });
     expect(schemes.apiToken).toMatchObject({ type: 'http', scheme: 'bearer' });
     expect(schemes.internalSecret).toMatchObject({
       type: 'apiKey',
@@ -68,7 +57,7 @@ describe('OpenAPI security', () => {
 
     const wrong = all
       .map(({ path, method, op }) => {
-        const expectedSecurity = expectedSchemes(path, op.operationId).map((name) => ({
+        const expectedSecurity = expectedSchemes(path).map((name) => ({
           [name]: [],
         }));
         const ok =
@@ -91,15 +80,5 @@ describe('OpenAPI security', () => {
       .filter(({ name }) => !registered.includes(name));
 
     expect(unregistered).toEqual([]);
-  });
-
-  it('publishes session-only auth where a token is refused, and both credentials elsewhere', async () => {
-    const spec = await loadSpec();
-
-    expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual([{ sessionToken: [] }]);
-    expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual([
-      { sessionToken: [] },
-      { apiToken: [] },
-    ]);
   });
 });

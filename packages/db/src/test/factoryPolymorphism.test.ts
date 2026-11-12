@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db/client';
 import { cleanupTouchedTables } from '@template/db/test';
 import {
@@ -12,7 +12,7 @@ import {
 import { createFactory } from '@template/db/test/factory';
 
 describe('polymorphic factories', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

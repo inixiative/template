@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { AuthProvider } from '@template/db/generated/client/client';
+import type { AuthProvider, Jwks } from '@template/db/generated/client/client';
 import type { EncryptedModelConfig } from '@template/db/lib/encryption/types';
 import { upperFirst } from 'lodash-es';
 
@@ -19,6 +19,15 @@ export const ENCRYPTED_MODELS = {
       },
     },
   } satisfies EncryptedModelConfig<'authProvider'>,
+  jwks: {
+    model: 'jwks',
+    keys: {
+      privateKey: {
+        envPrefix: 'JWKS_PRIVATE_KEY',
+        buildAAD: (r: Pick<Jwks, 'id'>) => `jwks:${r.id}`,
+      },
+    },
+  } satisfies EncryptedModelConfig<'jwks'>,
 } as const;
 
 // Helper to derive field names from key name

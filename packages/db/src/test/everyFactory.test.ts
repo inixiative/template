@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db/client';
 import { discriminatorRequiresValue } from '@template/db/registries/discriminatorDefaults';
 import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
@@ -38,7 +38,7 @@ describe('every model', () => {
 });
 
 describe('every factory against the polymorphism registry', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

@@ -18,7 +18,6 @@ export const laneDepthCap = (lane: JobLane): number =>
 export const lowWater = (lane: JobLane = JobLane.fast): number =>
   Math.floor(laneDepthCap(lane) * 0.8);
 export const flushMaxRows = (): number => process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS;
-export const flushLinger = (): number => process.env.JOBS_OUTBOX_FLUSH_LINGER_MS;
 export const overflowStuckMs = (): number => process.env.JOBS_OVERFLOW_STUCK_MS;
 // Flag TTL — a safety net so a dead drain doesn't pin overflow forever; the drain heartbeats it
 // (withOverflowRenew) while alive. ms→s for Redis EX.
@@ -27,6 +26,8 @@ export const overflowTtlSec = (): number => Math.ceil(process.env.JOBS_OVERFLOW_
 // the FIFO head and starve newer rows.
 export const MAX_DRAIN_ATTEMPTS = 5;
 export const DEPTH_CACHE_MS = 1000;
+// How stale the enqueue-side depth estimate may get before the next add re-probes — the drain loop's cadence.
+export const DEPTH_PROBE_MS = 2000;
 export const SHUTDOWN_FLUSH_RETRIES = 3;
 
 export const flagKey = (lane: JobLane = JobLane.fast): string =>

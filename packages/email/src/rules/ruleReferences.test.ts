@@ -35,6 +35,11 @@ describe('ruleReferences — the rows an email rule names', () => {
     ]);
   });
 
+  it('a recipient named by id is a User reference: every rebac resource is referenceable, for entitlement wheres (2026-11-03)', () => {
+    const rule: Condition = { field: 'recipient.id', operator: 'equals', value: 'user-1' };
+    expect(emailRuleReferences(defaultEmailLens, rule)).toEqual([{ model: 'User', id: 'user-1' }]);
+  });
+
   it('vocabulary values, plain recipient fields, sender and data name no rows', () => {
     const rule: Condition = {
       all: [
@@ -93,6 +98,22 @@ describe('ruleReferences — the rows an email rule names', () => {
       { model: 'Space', id: 'space-1' },
       { model: 'Tag', id: 'tag-a' },
       { model: 'Tag', id: 'tag-b' },
+    ]);
+  });
+
+  it('loop-bound rules name their rows: an {{#if}} in a loop, an each filter, nested loops, subject and mjml', () => {
+    const json = (rule: Condition) => JSON.stringify(rule);
+    const inLoop = `{{#each recipient.tagAttachments as=t}}{{#if rule=${json({ field: 't.tag.id', operator: 'equals', value: 'tag-a' })}}}A{{/if}}{{/each}}`;
+    const filtered = `{{#each recipient.tagAttachments as=t filter=${json({ field: 't.tag.id', operator: 'equals', value: 'tag-b' })}}}B{{/each}}`;
+    const nested = `{{#each recipient.organizationUsers as=ou}}{{#each recipient.spaceUsers as=su filter=${json({ field: 'su.space.id', operator: 'in', value: ['space-2'] })}}}{{#if rule=${json({ field: 'su.space.id', operator: 'in', value: ['space-1'] })}}}S{{/if}}{{/each}}{{/each}}`;
+    const subject = `Hi ${block({ field: 'recipient.organizationUsers.organization.id', operator: 'equals', value: 'org-1' })}`;
+    const mjml = `<mj-text>${inLoop}${filtered}${nested}</mj-text>`;
+    expect(contentRuleReferences(defaultEmailLens, subject, mjml)).toEqual([
+      { model: 'Organization', id: 'org-1' },
+      { model: 'Tag', id: 'tag-a' },
+      { model: 'Tag', id: 'tag-b' },
+      { model: 'Space', id: 'space-2' },
+      { model: 'Space', id: 'space-1' },
     ]);
   });
 

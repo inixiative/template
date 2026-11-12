@@ -4,9 +4,11 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+
 import { Icon } from '@iconify/react';
 import type { HydratedRecord } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
+import { memberRemoval } from '@template/permissions/rebac/schemaHelpers';
 import {
   type OrganizationReadManyUsersResponse,
   type OrganizationUserDeleteData,
@@ -27,6 +29,7 @@ import { useCreateInquiryMutation } from '@template/ui/hooks/inquiry/useCreateIn
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
+import { inquiryCheckRecord } from '@template/ui/lib/inquiries/inquiryCheckRecord';
 import { useAppStore } from '@template/ui/store';
 
 type OrganizationUser = OrganizationReadManyUsersResponse['data'][number];
@@ -41,20 +44,20 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   const tenant = useAppStore((state) => state.tenant);
 
   // Filter roles to only those the current actor can invite via inquiry.send permission.
-  // REBAC checks content.role against highRoles to determine if own vs manage is required.
   const inviteRoles = (Object.values(Role) as Role[]).filter((role) =>
     checkPermission(
       permissions,
       'inquiry',
-      {
-        id: '',
-        type: 'inviteOrganizationUser',
-        content: { role },
-        sourceOrganization: { id: organizationId } as HydratedRecord,
-        sourceOrganizationId: organizationId,
-        sourceSpaceId: '',
-        targetOrganizationId: '',
-      } as unknown as HydratedRecord,
+      inquiryCheckRecord(
+        {
+          type: 'inviteOrganizationUser',
+          sourceModel: 'Organization',
+          targetModel: 'User',
+          content: { role },
+        },
+        'source',
+        { organization: { id: organizationId } },
+      ),
       'send',
     ),
   );
@@ -110,15 +113,26 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
       key: 'actions',
       label: '',
       render: (orgUser: OrganizationUser) => {
-        const orgUserRecord = { ...orgUser, organizationId };
+        const member = orgUser.organizationUser;
+        const memberRecord = {
+          ...member,
+          organization: { id: member.organizationId },
+          user: { id: member.userId },
+        } as unknown as HydratedRecord;
 
         return (
           <div className="flex justify-end gap-2">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => deleteMutation.mutate({ path: { id: orgUser.id } })}
-              show={checkPermission(permissions, 'organizationUser', orgUserRecord, 'manage')}
+              aria-label="Remove member"
+              onClick={() => deleteMutation.mutate({ path: { id: member.id } })}
+              show={checkPermission(
+                permissions,
+                'organizationUser',
+                memberRecord,
+                memberRemoval('organization'),
+              )}
             >
               <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
             </Button>
@@ -143,7 +157,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
             body: {
               type: 'inviteOrganizationUser',
               status: 'sent',
-              content: { email, role },
+              content: { role },
               targetModel: 'User',
               targetEmail: email,
             },
@@ -160,7 +174,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     <>
       <Page
         title="Members"
-        description="Manage who belongs to this organization and the role each person has."
+        description="Manage who belongs to this organization and the role each user has."
         actions={
           <Button onClick={() => setIsInviteModalOpen(true)} show={inviteRoles.length > 0}>
             <Icon icon="lucide:user-plus" className="h-4 w-4 mr-2" />

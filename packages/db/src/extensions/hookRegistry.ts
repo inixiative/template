@@ -132,19 +132,18 @@ export const unregisterDbHook = (name: string) => {
   hookRegistrations.delete(name);
 };
 
-// Order is implicit: model hooks before global ('*'), each in registration order — so a hook that
-// must run AFTER another (e.g. emailVersioning augments the snapshot auditLog writes, so it must
-// follow auditLog) relies on registration order, which per-model re-registration can silently break.
-// TODO (not urgent, mechanism TBD): a way for a hook to require running after another, with a cycle
-// check over the declared orderings.
 export const hasHooksFor = (model: string): boolean =>
   '*' in registeredHooks || model in registeredHooks;
+
+// why: global hooks wrap model hooks, so model hooks check the write global hooks shaped.
+const orderHooks = (timing: HookTiming, modelHooks: HookFunction[], globalHooks: HookFunction[]) =>
+  timing === HookTiming.before ? [...globalHooks, ...modelHooks] : [...modelHooks, ...globalHooks];
 
 export const executeHooks = async (timing: HookTiming, options: HookOptions) => {
   const modelHooks = registeredHooks[options.model]?.[timing]?.[options.action] || [];
   const globalHooks = registeredHooks['*']?.[timing]?.[options.action] || [];
 
-  for (const hook of [...modelHooks, ...globalHooks]) {
+  for (const hook of orderHooks(timing, modelHooks, globalHooks)) {
     await hook(options);
   }
 };
@@ -170,6 +169,15 @@ export const runInBridgedContext = <TResult>(
 // The test tracker belongs to the test process, not to any one test: the db client registers it
 // once, so clearing a test's hooks must not take it with them or every later file stops tracking.
 const PROCESS_HOOKS = new Set(['testTracker']);
+
+/** Returns a restore that unregisters every hook added since, leaving hooks registered before untouched. */
+export const snapshotHookRegistry = (): (() => void) => {
+  const before = new Set(hookRegistry);
+  return () => {
+    for (const name of [...hookRegistry])
+      if (!before.has(name) && !PROCESS_HOOKS.has(name)) unregisterDbHook(name);
+  };
+};
 
 export const clearHookRegistry = () => {
   for (const name of [...hookRegistry]) {

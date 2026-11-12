@@ -1,5 +1,5 @@
 import { planetscaleApi } from '../api/planetscale';
-import { execAsync } from '../utils/exec';
+import { execFileAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
 
 /**
@@ -8,9 +8,10 @@ import { getProjectConfig } from '../utils/getProjectConfig';
  */
 const initPrismaMigrationTable = async (connectionString: string): Promise<void> => {
   try {
-    await execAsync(`bun --cwd packages/db scripts/initMigrationTable.ts "${connectionString}"`, {
+    await execFileAsync('bun', ['--cwd', 'packages/db', 'scripts/initMigrationTable.ts'], {
       encoding: 'utf-8',
       timeout: 30000,
+      env: { ...process.env, DATABASE_URL: connectionString },
     });
   } catch (error) {
     throw new Error(

@@ -19,7 +19,6 @@
   - [Context Types](#context-types)
     - [TokenWithRelations](#tokenwithrelations)
   - [Complex Getters](#complex-getters)
-    - [getActor](#getactor)
     - [getResource / getResourceType](#getresource--getresourcetype)
     - [getValidatedBody / getValidatedQuery](#getvalidatedbody--getvalidatedquery)
     - [isSuperadmin](#issuperadmin)
@@ -28,6 +27,7 @@
 - [Resource Context](#resource-context)
   - [resourceContextMiddleware](#resourcecontextmiddleware)
   - [Enforcement Rules](#enforcement-rules)
+  - [Soft-Delete Invisibility](#soft-delete-invisibility)
   - [Lookup Parameter](#lookup-parameter)
   - [Custom Inclusions](#custom-inclusions)
 - [Database Scope](#database-scope)
@@ -59,22 +59,22 @@ prepareRequest
   - Initializes all context vars to null
   - Wraps request in db.scope(requestId)
     ↓
-authMiddleware (session)
-  - Checks BetterAuth session cookie
-  - Loads user + organizationUsers
-  - Calls setUserContext → sets up permix
+jwtAuthMiddleware (user JWT)
+  - Verifies a JWT-shaped `Authorization: Bearer` (never `?token=`); cookies are ignored
+  - Refuses a revoked JWT (401); keys or Redis unreachable → 503
+  - Loads user + organizationUsers, calls setUserContext → sets up permix
+    ↓
+tokenAuthMiddleware (API token)
+  - Skips if user already set (a JWT resolved the user)
+  - Parses Authorization header or ?token=
+  - Validates token hash, expiry, isActive
+  - Sets token, optionally user
+  - Calls setUserContext or sets up the token's org/space permissions
     ↓
 spoofMiddleware (superadmin only)
   - Checks spoof-user-email header
   - Replaces user context with spoofed user
   - Sets spoofedBy to original admin
-    ↓
-tokenAuthMiddleware (Bearer)
-  - Skips if user already set (session takes precedence)
-  - Parses Authorization header
-  - Validates token hash, expiry, isActive
-  - Sets token, optionally user
-  - Calls setupOrgPermissions/setupUserPermissions
     ↓
 resourceContextMiddleware (per-route)
   - Extracts :id param and model from path
@@ -82,7 +82,7 @@ resourceContextMiddleware (per-route)
   - Enforces 404 (0 results) or 409 (>1 results)
   - Sets resource, resourceType
     ↓
-Validation middleware (validatePermission, validateNotToken, etc.)
+Validation middleware (validatePermission, validateSubmodelPermission, etc.)
     ↓
 Route handler
   - Access context via getters
@@ -104,7 +104,6 @@ type AppVars = {
   organizations: Organization[] | null;
   spaceUsers: SpaceUser[] | null;
   spaces: Space[] | null;
-  session: Session | null;
   token: TokenWithRelations | null;
   spoofedBy: User | null;
   permix: Permix;
@@ -123,16 +122,15 @@ type AppEnv = { Variables: AppVars };
 | `db` | `Db` | Prisma client for database access |
 | `txn` | `TransactionClient \| undefined` | Active transaction client (if in txn) |
 | `app` | `Hono<AppEnv>` | App instance (for internal routing in batch API) |
-| `user` | `User \| null` | Authenticated user (session or token) |
-| `organizationUsers` | `OrganizationUser[] \| null` | User's org memberships |
+| `user` | `User \| null` | Authenticated user (user JWT or token) |
+| `organizationUsers` | `OrganizationUser[] \| null` | User's org members |
 | `organizations` | `Organization[] \| null` | All orgs user belongs to (flattened) |
-| `spaceUsers` | `SpaceUser[] \| null` | User's space memberships |
-| `spaces` | `Space[] \| null` | All spaces user has access to (membership + org owner) |
-| `session` | `Session \| null` | BetterAuth session |
+| `spaceUsers` | `SpaceUser[] \| null` | User's space members |
+| `spaces` | `Space[] \| null` | All spaces user has access to (member + org owner) |
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
 | `bracketQuery` | `Record<string, any>` | Parsed URL search params (bracket notation) |
-| `filterLens` | `LensNarrowing \| null` | Lens narrowing — controls FILTER surface (picks, enumOmits, server-enforced where). Set by route's static narrowing + scopeNarrowing middleware. NOT response shape. |
+| `filterLens` | `LensNarrowing \| null` | Lens narrowing — controls FILTER surface (picks, enumOmits, server-enforced where). Set from the route's static narrowing. NOT response shape. |
 | `permix` | `Permix` | Permission checker instance |
 | `requestId` | `string` | UUID for request tracing |
 | `resource` | `unknown` | Loaded resource from `:id` param |
@@ -155,7 +153,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     return;
   }
 
-  const requestId = crypto.randomUUID();
+  const requestId = Bun.randomUUIDv7();
 
   // Database client
   c.set('db', db);
@@ -172,7 +170,6 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
   // Initialize auth context to null
   c.set('user', null);
-  c.set('session', null);
   c.set('token', null);
   c.set('spoofedBy', null);
 
@@ -185,7 +182,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   // Initialize resource context to null
   c.set('resource', null);
   c.set('resourceType', null);
-  c.set('filterLens', null);  // Set by prepareMiddleware (from route's filterLens) + scopeNarrowing
+  c.set('filterLens', null);  // Set by prepareMiddleware (from route's filterLens)
 
   // Wrap in database scope for logging/tracing
   await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
@@ -196,7 +193,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
 1. **Creates request ID** - UUID for correlating logs and responses
 2. **Initializes permix** - Fresh permission instance (no permissions until auth runs)
-3. **Nulls all auth vars** - Ensures clean slate for auth middleware (user, session, token, spoofedBy, organizationUsers, organizations, spaceUsers, spaces)
+3. **Nulls all auth vars** - Ensures clean slate for auth middleware (user, token, spoofedBy, organizationUsers, organizations, spaceUsers, spaces)
 4. **Wraps in scopes** - Enables `db.getScopeId()` and log correlation throughout request
 
 ---
@@ -208,27 +205,24 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 Located in `apps/api/src/lib/context/setUserContext.ts`. Called by auth middleware after successful authentication.
 
 ```typescript
-export const setUserContext = async (c: Context<AppEnv>, userWithOrgs: UserWithOrganizationUsers) => {
-  const { organizationUsers, ...user } = userWithOrgs;
+export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {
+  const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userWithRelations;
 
-  // Set user data
   c.set('user', user);
   c.set('organizationUsers', organizationUsers);
+  c.set('organizations', organizations);
+  c.set('spaceUsers', spaceUsers);
+  c.set('spaces', spaces);
 
-  // Set up permissions
-  const permix = c.get('permix');
-  permix.setUserId(user.id);
-  if (isSuperadmin(user)) permix.setSuperadmin(true);
-  await setupUserPermissions(c);
-  await setupOrgPermissions(c);
+  await installPermissions(c);
 };
 ```
 
-**Note**: Space users are nested within `organizationUsers` (as `OrganizationUserWithSpaceUsers`). The `spaceUsers` context variable is set separately when needed for permission checks.
+`installPermissions` (`apps/api/src/lib/context/installPermissions.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's user, or the user behind a User, OrganizationUser or SpaceUser token), and installs either the user's table or the token's permissions over its owner. Every token goes through `setTokenContext`, which never sets a user: a User token carries its user's members as context, any other token none.
 
 ### What It Does
 
-1. **Splits user from org memberships** - Separates for individual access
+1. **Splits user from org members** - Separates for individual access
 2. **Sets user ID on permix** - Links permissions to the authenticated user
 3. **Sets superadmin flag** - Bypasses all permission checks
 4. **Sets up user permissions** - For user-owned resources
@@ -256,7 +250,6 @@ Most context values can be accessed directly via `c.get()`:
 ```typescript
 const user = c.get('user');                    // User | null
 const token = c.get('token');                  // TokenWithRelations | null
-const session = c.get('session');              // Session | null
 const organizationUsers = c.get('organizationUsers');  // OrganizationUser[] | null
 const organizations = c.get('organizations');  // Organization[] | null
 const spaceUsers = c.get('spaceUsers');        // SpaceUser[] | null
@@ -267,7 +260,7 @@ const bracketQuery = c.get('bracketQuery');    // Record<string, any>
 const filterLens = c.get('filterLens');        // LensNarrowing | null
 ```
 
-**Pattern change:** Previous versions had `getUser()`, `getToken()`, `getRequestId()` helper functions. These were removed in favor of direct `c.get()` access.
+There are no getter helpers for these values: read them with `c.get()`, which is typed by the app's context variables.
 
 #### bracketQuery
 
@@ -298,7 +291,7 @@ const users = await db.user.findMany({
 
 **Set by:**
 - `prepareMiddleware` (`apps/api/src/lib/routeTemplates/utils/prepareMiddleware.ts`) — its `filterLensSetter` reads the route's static `filterLens` and sets it on context
-- `scopeNarrowing` middleware — merges per-request ctx-aware where conditions into the narrowing
+- Nothing narrows it per request. A per-request value (a tenant id, the caller) is a `bind` token in the static `filterLens`, supplied by the controller as `paginate(c, delegate, { bindings })`
 
 **Example:**
 ```typescript
@@ -310,18 +303,17 @@ export const usersReadMany = readRoute({
   responseSchema,
   filterLens: {
     parent: lensFor('User'),
-    root: { picks: ['name', 'email'] },
+    root: {
+      picks: ['name', 'email'],
+      where: { field: 'organizationId', operator: 'equals', bind: 'organizationId' },
+    },
   },
-  middleware: [
-    // Optional: per-request scope
-    scopeNarrowing((c) => ({
-      root: { where: { field: 'organizationId', operator: 'equals', value: c.get('user')!.organizationId } },
-    })),
-  ],
 });
 
-// Controller — typically nothing to read; paginate() handles it
-const { data, pagination } = await paginate(c, db.user);
+// Controller — supplies the lens's bind tokens; paginate() refuses a missing one
+const { data, pagination } = await paginate(c, db.user, {
+  bindings: { organizationId: getResource<'organization'>(c).id },
+});
 ```
 
 **Used by:** `paginate()` → `buildWhereClause()` — applies picks-based whitelist + AND-merges `filterLens.root.where` into the final Prisma where. Superadmin's `skipFieldValidation` bypasses picks but still translates the where.
@@ -335,50 +327,31 @@ Located in `apps/api/src/lib/context/types.ts`.
 Tokens include all possible relations for permission setup:
 
 ```typescript
-type TokenWithRelations = Token & {
+type TokenWithRelations = WithTargetEntitlements<Token> & {
   user: User | null;
   organization: Organization | null;
-  organizationUser: (OrganizationUser & {
+  organizationUser: (WithTargetEntitlements<OrganizationUser> & {
     organization: Organization;
     user: User
   }) | null;
   space: Space | null;
-  spaceUser: (SpaceUser & {
+  spaceUser: (WithTargetEntitlements<SpaceUser> & {
     organization: Organization;
     organizationUser: OrganizationUser;
     space: Space;
     user: User
   }) | null;
+  integration: WithTargetEntitlements<Integration> | null;
 };
 ```
+
+Every holder carries `targetEntitlements: Entitlement[]`, its live rows as stored (`includeTargetEntitlements(model)`, `packages/db/src/entitlements`, which names the holder's model because a member arm keys on the owner chain and an `OrganizationUser`'s relation also reaches its `SpaceUser` rows). `loadTokenContext` reads the token with them, and `hydrate` loads the member and integration through `fetchOne`, which includes them for every holder. The rows become library entries only where a holder is handed to the permissions library (`entitlementsOf`, `@template/permissions`). The resource context loads the plain row; the read controllers include its rows.
 
 Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 
 ### Complex Getters
 
 Some getters have logic and remain as functions in `apps/api/src/lib/context/`.
-
-#### getActor
-
-```typescript
-import { getActor } from '#/lib/context/getActor';
-
-const { user, organization, organizationUser, space, spaceUser, token } = getActor(c);
-```
-
-Unified accessor that resolves the current actor from any auth method:
-- **Session auth**: user only
-- **User token**: user from token
-- **OrgUser token**: user + org from token's organizationUser
-- **SpaceUser token**: user + org + space from token's spaceUser
-- **Org token**: org only (no user)
-- **Space token**: space + org (no user)
-
-**Returns stripped objects** (relations removed to prevent circular refs):
-```typescript
-type OrgUserWithoutRelations = Omit<OrgUserFromToken, 'user' | 'organization'>;
-type SpaceUserWithoutRelations = Omit<SpaceUserFromToken, 'user' | 'organization' | 'organizationUser' | 'space'>;
-```
 
 #### getResource / getResourceType
 
@@ -422,28 +395,28 @@ if (isSuperadmin(user)) { /* ... */ }
 
 ### refreshUserContext
 
-Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's memberships and permissions mid-request.
+Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's members and permissions mid-request.
 
 ```typescript
 import { refreshUserContext } from '#/lib/context/refreshUserContext';
 
-await refreshUserContext(c, db);
+await refreshUserContext(c);
 ```
 
 **What it does:**
-1. Clears existing permissions (prevents stale permission data)
-2. Reloads user with all relations via cached `findUserWithRelations`
-3. Updates context using `setUserContext` (user, orgs, spaces, permissions)
+1. With a token: re-runs the token sign-in (`loadTokenContext` with the token's `keyHash`) and rebuilds through `setTokenContext`, so a member's token keeps exactly its own member row and a revoked token stops with a 401
+2. With a user: reloads the user with all relations via cached `findUserWithRelations` and rebuilds through `setUserContext`
+3. Either way the table is replaced, never added to
 
 **When to use:**
 - After adding/removing user from org or space
 - After changing user's role in org or space
-- When you need fresh membership data mid-request
+- When you need fresh member data mid-request
 - In batch operations between rounds (data may have changed)
 
 **Implementation:**
 ```typescript
-export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<void> => {
+export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
   const user = c.get('user');
   if (!user) return;
 
@@ -452,7 +425,7 @@ export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<vo
   await permix.setup([], { replace: true });
 
   // Reload user with all relations (uses cache, optimized queries)
-  const userWithRelations = await findUserWithRelations(db, user.id);
+  const userWithRelations = await findUserWithRelations(user.id);
   if (!userWithRelations) return;
 
   // Set up fresh context and permissions
@@ -465,7 +438,7 @@ export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<vo
 - Optimized queries: 1 query with include + 3 parallel queries
 - Much faster than sequential queries
 
-**Note:** Refreshes ALL permissions (user, org, space) to ensure consistency after membership changes.
+**Note:** Refreshes ALL permissions (user, org, space) to ensure consistency after member changes.
 
 ---
 
@@ -599,7 +572,6 @@ Jobs have their own context, separate from HTTP request context.
 ```typescript
 // apps/api/src/jobs/types.ts
 type WorkerContext = {
-  db: Db;
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;  // For superseding jobs
@@ -613,7 +585,7 @@ type WorkerContext = {
 ```typescript
 // worker.ts
 await db.scope(`job:${job.name}:${job.id}`, async () => {
-  const ctx: WorkerContext = { db, queue, job };
+  const ctx: WorkerContext = { queue, job };
   await handler(ctx, job.data.payload);
 });
 ```
@@ -624,7 +596,7 @@ await db.scope(`job:${job.name}:${job.id}`, async () => {
 import { makeJob } from '#/jobs/makeJob';
 
 export const myJob = makeJob<MyPayload>(async (ctx, payload) => {
-  // ctx.db - database client (scoped to this job)
+  // db (imported from '@template/db') resolves to this job's scope; it is not on ctx
   // ctx.queue - for enqueueing follow-up jobs
   // ctx.job - BullMQ job instance (id, attemptsMade, etc.)
   // ctx.signal - abort signal (if using makeSupersedingJob)

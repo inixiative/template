@@ -1,0 +1,21 @@
+// ============================================================================
+// JWKS (BetterAuth jwt plugin - signing keys for person JWTs)
+// ============================================================================
+
+model Jwks {
+  id                            String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt                     DateTime  @default(now())
+  expiresAt                     DateTime?
+  alg                           String
+  crv                           String?
+  publicKey                     String
+  encryptedPrivateKey           String
+  encryptedPrivateKeyMetadata   Json
+  encryptedPrivateKeyKeyVersion Int
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@index([encryptedPrivateKeyKeyVersion])
+}

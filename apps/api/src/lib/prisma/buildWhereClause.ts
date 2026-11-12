@@ -4,9 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import { getLensRoot, type LensNarrowing } from '@inixiative/json-rules';
+import { getLensRoot, type LensNarrowing, projectLens } from '@inixiative/json-rules';
 import { lookupField, type ModelField, type ModelName, toModelName } from '@template/db';
 import { dialect, searchablePaths } from '@template/db/lens';
+import { redactLens } from '@template/db/lens/redactLens';
 import {
   FIELD_OPERATORS,
   isArrayFieldOperator,
@@ -166,11 +167,43 @@ const transformOperatorValue = (
   return out;
 };
 
+type EnumValuesAt = (path: string) => readonly string[] | undefined;
+
+const enumValuesLookup = (filterLens: LensNarrowing): EnumValuesAt => {
+  const rootKey = getLensRoot(filterLens).model;
+  const byPath = projectLens(redactLens(filterLens));
+  return (path) => {
+    const segments = path.split('.');
+    const fieldName = segments.pop() as string;
+    const entry = byPath[[rootKey, ...segments].join('.')]?.fields[fieldName];
+    return entry?.kind === 'enum' ? entry.values : undefined;
+  };
+};
+
+const validateEnumValues = (
+  value: BracketQueryValue,
+  allowed: readonly string[] | undefined,
+  fieldPath: string,
+): void => {
+  if (!allowed) return;
+  const candidates = isRecord(value) ? Object.values(value).flat() : [value];
+  for (const candidate of candidates) {
+    if (candidate === null || candidate === undefined) continue;
+    if (!allowed.includes(String(candidate))) {
+      throw makeError({
+        status: 400,
+        message: `Value '${String(candidate)}' is not valid for field '${fieldPath}'. Valid: ${allowed.join(', ')}.`,
+      });
+    }
+  }
+};
+
 const validateAndTransformSearchFields = (
   obj: BracketQueryRecord,
   searchableFields: readonly string[],
   skipFieldValidation: boolean,
   model: ModelName,
+  enumValuesAt: EnumValuesAt,
   prefix = '',
   depth = 0,
 ): BracketQueryRecord => {
@@ -191,6 +224,7 @@ const validateAndTransformSearchFields = (
           searchableFields,
           skipFieldValidation,
           model,
+          enumValuesAt,
           prefix,
           depth + 1,
         ),
@@ -225,6 +259,9 @@ const validateAndTransformSearchFields = (
           status: 400,
           message: `Json field '${currentPath}' requires an operator (path, string_contains, …)`,
         });
+      }
+      if (field.kind === 'enum') {
+        validateEnumValues(value, enumValuesAt(stripRelationOperators(currentPath)), currentPath);
       }
       result[key] = wrapBareValue(field, value) as unknown as BracketQueryValue;
       continue;
@@ -274,6 +311,7 @@ const validateAndTransformSearchFields = (
             searchableFields,
             skipFieldValidation,
             model,
+            enumValuesAt,
             currentPath,
             depth + 1,
           ) as BracketQueryValue;
@@ -299,11 +337,15 @@ const validateAndTransformSearchFields = (
         result[key] = value;
         continue;
       }
-      result[key] = transformOperatorValue(
-        field,
-        value,
-        currentPath,
-      ) as unknown as BracketQueryValue;
+      const operatorValue = transformOperatorValue(field, value, currentPath) as BracketQueryRecord;
+      if (field.kind === 'enum') {
+        validateEnumValues(
+          operatorValue,
+          enumValuesAt(stripRelationOperators(currentPath)),
+          currentPath,
+        );
+      }
+      result[key] = operatorValue;
       continue;
     }
 
@@ -312,6 +354,7 @@ const validateAndTransformSearchFields = (
       searchableFields,
       skipFieldValidation,
       model,
+      enumValuesAt,
       currentPath,
       depth + 1,
     ) as BracketQueryValue;
@@ -410,6 +453,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
       searchableFields,
       skipFieldValidation,
       model,
+      enumValuesLookup(filterLens),
     );
     conditions.push(...toConditions(transformed, orNullFields));
   }

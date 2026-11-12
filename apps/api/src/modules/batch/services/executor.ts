@@ -6,6 +6,7 @@
  */
 import type { Context } from 'hono';
 import { getValidatedBody } from '#/lib/context/getValidatedData';
+import { assertBatchable } from '#/modules/batch/services/assertBatchable';
 import { allowFailures } from '#/modules/batch/services/strategies/allowFailures';
 import { failOnRound } from '#/modules/batch/services/strategies/failOnRound';
 import { transactionAll } from '#/modules/batch/services/strategies/transactionAll';
@@ -45,6 +46,7 @@ export const executeBatch = async (c: Context<AppEnv>): Promise<BatchResult> => 
   const timeout = calculateTimeout(totalRequests);
 
   const app = c.get('app');
+  assertBatchable(app, rounds);
   const baseRequest = c.req.raw;
 
   const executor = batchExecutionStrategies[strategy as keyof typeof batchExecutionStrategies];

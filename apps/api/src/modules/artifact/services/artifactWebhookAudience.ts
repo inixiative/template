@@ -6,7 +6,8 @@
  */
 import { db, polymorphicTarget } from '@template/db';
 import type { ArtifactPermission } from '@template/db/generated/client/client';
-import type { WebhookAudienceResolver, WebhookParty } from '#/hooks/webhooks/webhookParty';
+import type { WebhookAudienceResolver } from '#/hooks/webhooks/audiences';
+import type { Party as WebhookParty } from '#/hooks/webhooks/parties';
 import { type ArtifactPrincipal, granteePrincipal } from '#/modules/artifact/lib/artifactPrincipal';
 import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
 

@@ -22,6 +22,7 @@ import { queue } from '#/jobs/queue';
 import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { warmRollingCaches } from '#/jobs/warmRollingCaches';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -37,7 +38,9 @@ export const initializeWorker = async (): Promise<void> => {
   }
 
   // BullMQ Worker needs its own connection (separate from Queue)
-  workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl());
+  workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl(), {
+    isBlocking: true,
+  });
 
   const slowSlots = createSlowSlotPool(process.env.JOBS_WORKER_CONCURRENCY);
   jobsWorker = new Worker('jobs', (job: Job) => processJob(job, { slowSlots }), {
@@ -69,6 +72,7 @@ export const initializeWorker = async (): Promise<void> => {
   log.info('Job worker initialized', LogScope.worker);
 
   await registerCronJobs();
+  await warmRollingCaches();
 
   // Per-worker in-process drain, not a queued cron — see outbox/drain/loop.ts.
   startOutboxDrainLoop();

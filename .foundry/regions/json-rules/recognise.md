@@ -54,7 +54,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which rows does this email's content reference
 - collect references from the MJML
 - let rules reference this new model
-- refuse references the source's where can't reach
 - sum these up instead of looping over them
 - what does a sum over an empty list match
 - sum of the line items over a thousand
@@ -76,12 +75,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - pass now in rather than reading the clock
 - one column compared to a value
 - mark the column as never null
+- which map in the set is the root
 - include the references with the row
 - which comparisons can a sum or average use
 - which operators apply to a list field
 - the path across a one-to-many bridge reads undefined
-- just the set of still-live reference keys
-- the references that are still live, from the edges
 - lock the referenced rows while writing edges
 - all of these must hold
 - not equals should include never-set rows
@@ -102,7 +100,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - compile for a database that isn't Postgres
 - in-memory and database give the same answer
 - spread the plan's where into findMany
-- rebuild the reference edges by hand
 - thirty days ago
 - evaluate the rule against a list of rows
 - a custom message when the rule fails
@@ -110,11 +107,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - write the edges where the rule is saved
 - the stored rule can't be trusted right now
 - the rule blew up while running
-- a full health report for a rule from its edges
 - list what's wrong with this rule
 - which rules depend on this tag before I delete it
 - the rule names a row that doesn't exist, on save
-- which referenced rows were soft-deleted or purged
 - extract the ids a rule names
 - the tags array contains a value, through Prisma
 - refer to the parent row from inside the array rule
@@ -123,7 +118,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - type the rule so the operator matches the value type
 - typo-tolerant contains on strings
 - write the reference edges when the rule is saved
-- update the segment's reference edges after saving it
+- record which rows the template's rules reference on save
 - the week should start on Sunday
 - only first or last compiles to Prisma
 - validate the rule from the request body before running it
@@ -132,7 +127,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - in the last 7 days
 - evaluate a stored rule only if it's still sound
 - make segments able to point at this table
-- the referenced row is outside the owner's scope
 - these can be done all in aggregate functions, not individually
 - average of nothing, with nulls ignored
 - average of these values compared to a number
@@ -154,12 +148,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll compute thirty days ago in code and put the date in the rule
 - status equals active, as a rule
 - declare a relation hop nullable so the compiler adds null handling
+- passing a set of maps to the SQL compiler
 - I'll add a per-model include for segment references
 - the operator list for aggregate rules
 - operators for array and relation list fields
 - loop the bridged array with an array rule
-- a membership check for live references
-- drop references to deleted rows
 - guard the edge write against a concurrent delete
 - any one of these conditions
 - notIn matches null too
@@ -180,7 +173,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - set the provider for one compile call
 - where do the evaluator and the compilers disagree
 - use the compiled where directly
-- recompute edges outside the save hook
 - within the last week
 - a rule over the whole array in memory
 - tell the user why the rule rejected them
@@ -188,11 +180,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the save path records references
 - a missing binding or dead row, not a crash
 - evaluation itself failed, not a bad rule
-- live and dead references in one report
 - report the rule's problems without evaluating it
 - the rows a saved rule points at
 - reject a save pointing at a missing row
-- staleness from the edge rows alone
 - membership in a scalar list
 - compare an element against a column on the root
 - every stored rule runs through the health fork
@@ -200,7 +190,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - stop between from taking a single value at compile time
 - fuzzy matching in the in-memory filter
 - set-diff the edges on save
-- rebuild every segment's edges
+- keep the reference edges in sync with the content
 - evaluate dates in the user's time zone
 - skip and take don't compile to a query
 - a rule from the database straight into the evaluator
@@ -209,7 +199,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - sometime in the next month
 - branch on whether the rule is degraded
 - register a model as a rule target
-- only admit far rows the composed where allows
 - average across the related rows
 - an aggregate over an empty array
 - total across a list, not each element
@@ -231,12 +220,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the evaluator throws without a now
 - a single scalar comparison in the rule
 - tell the compiler which fields can be null
+- SQL compile over a lens or a map set
 - one generic include for every reference holder
 - what can I compare a total against
 - all, any, at least for a list field
 - a dotted path through a bridge list
-- which reference keys are still usable
-- usable reference objects, failing closed
 - I'll select for update on the referenced rows
 - AND and OR of rules
 - I'll add an OR is null to the negation
@@ -257,7 +245,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the default provider for every compile
 - same rule, same result on both rails
 - the where has placeholders Prisma rejects
-- a manual rebuild of the references
 - the start of this month
 - the data is an array, not a row
 - must be 18 or older as the failure text
@@ -265,11 +252,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - no hook for the edges
 - the error for a rule in a degraded state
 - what do I throw when running the rule crashes
-- how healthy is this rule
 - show the owner why their rule is degraded
 - I'll parse the conditions JSON to find references
 - a validation error for an invalid referenced row
-- deleted targets read off the edges
 - I'll walk the rule to pull out id values
 - a sum over a Json array isn't possible in Prisma
 - reach an outer scope from a nested condition
@@ -278,7 +263,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - typed rule authoring in TypeScript
 - approximate match in the search box
 - a new rule column needs its references recorded
-- segment references after a write
+- I'll pre-filter so we only sync when something changed
 - this month in New York time
 - the window rule needs in-memory evaluation
 - I'll trust the rule the editor sent
@@ -302,7 +287,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the field is required, so no null arm
 - operators for the threshold on a count
 - the operator menu for a to-many relation
-- which referenced rows still exist
 - a deadlock-free lock order over the referenced models
 - group the conditions together in a boolean tree
 - the negated operator already keeps the nulls
@@ -323,7 +307,20 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a rule type that rejects a mismatched operand
 - fuzzy only in memory
 - I'll add a mutation hook to create the edges
+- a write that changed nothing produces no edge writes
 - where do the week boundaries fall for last week
+- validate at the boundary with the engine's own validator
+- one gate for segments, email and every rule owner
+- take the top N and then test them
+- a rolling window relative to now
+- the one place a saved rule gets evaluated
+- count or sum over a list inside a rule
+- skip the condition when nothing is supplied
+- the email rule has placeholders, where do I fill them
+- run this with a different default zone
+- the condition should be one leaf, not a group
+- I'll hard-code the list of field types
+- a rolling window rather than a fixed date
 
 ## When this is not your domain
 

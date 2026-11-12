@@ -5,6 +5,7 @@ export type WSInstanceCommand =
   | { op: 'append'; stream: string; ids: string[]; userIds?: string[] }
   | { op: 'frames'; connectionId: string }
   | { op: 'dropSubscriber'; downMs: number }
+  | { op: 'awaitSubscriber' }
   | { op: 'failAppends'; count: number };
 
 export type WSInstanceReply =

@@ -23,8 +23,8 @@ export const allowFailures: StrategyExecutor = async (
   baseContext,
   _timeout,
 ) => {
-  const batchId = crypto.randomUUID();
-  registerBatch(batchId, db, baseContext);
+  const batchId = Bun.randomUUIDv7();
+  registerBatch(batchId, baseContext);
 
   const results: RequestResult[][] = [];
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);

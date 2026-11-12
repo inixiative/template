@@ -1,5 +1,5 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, revive } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db, revive } from '@template/db';
 import { ContactOwnerModel, InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -10,13 +10,6 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-
-registerSoftDeleteCascadeHook();
-registerRulesHook();
-registerContactRulesHook();
 
 const spaceById = (id: string) => db.withDeleted(() => db.space.findUnique({ where: { id } }));
 const contactById = (id: string) => db.withDeleted(() => db.contact.findUnique({ where: { id } }));
@@ -36,9 +29,8 @@ const tombstoneOrg = (id: string) =>
 const reviveOrg = (id: string) => revive(db.organization, { id });
 
 describe('softDeleteCascade hook', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('tombstones column-bearing descendants recursively with the parent timestamp', async () => {
@@ -55,6 +47,19 @@ describe('softDeleteCascade hook', () => {
 
     await tombstoneOrg(org.id);
     await reviveOrg(org.id);
+
+    expect((await spaceById(space.id))?.deletedAt).toBeNull();
+    expect((await contactById(contact.id))?.deletedAt).toBeNull();
+  });
+
+  it('a revive written as a set operation restores the subtree too', async () => {
+    const { org, space, contact } = await makeTree();
+
+    await tombstoneOrg(org.id);
+    await db.organization.updateManyAndReturn({
+      where: { id: org.id, deletedAt: { not: null } },
+      data: { deletedAt: { set: null } },
+    });
 
     expect((await spaceById(space.id))?.deletedAt).toBeNull();
     expect((await contactById(contact.id))?.deletedAt).toBeNull();

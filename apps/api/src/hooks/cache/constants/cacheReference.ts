@@ -10,35 +10,36 @@ import { cacheKey } from '@template/db';
 type CacheReference = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => string[] };
 
 export const cacheReference: CacheReference = {
-  User: (r) => [
-    cacheKey('user', r.id),
-    cacheKey('user', { email: r.email }),
-    cacheKey('user', r.id, ['relations']),
-  ],
+  User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
 
-  Session: (r) => [cacheKey('session', r.id), cacheKey('session', { userId: r.userId }, [], true)],
+  Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
 
-  Token: (r) => [cacheKey('token', { keyHash: r.keyHash })],
+  Integration: (r) => [cacheKey('integration', r.id)],
 
   Organization: (r) => [cacheKey('organization', r.id), cacheKey('organization', { slug: r.slug })],
 
   OrganizationUser: (r) => [
+    cacheKey('organizationUser', r.id),
     cacheKey('organizationUser', { organizationId: r.organizationId, userId: r.userId }),
     cacheKey('user', r.userId, ['organizationUsers']),
-    cacheKey('user', r.userId, ['relations']),
   ],
 
   Space: (r) => [
     cacheKey('space', r.id),
+    cacheKey('space', { organizationId: r.organizationId, id: r.id }),
     cacheKey('space', { organizationId: r.organizationId, slug: r.slug }),
     cacheKey('organization', r.organizationId, ['spaces']),
   ],
 
   SpaceUser: (r) => [
-    cacheKey('spaceUser', { spaceId: r.spaceId, userId: r.userId }),
+    cacheKey('spaceUser', r.id),
+    cacheKey('spaceUser', {
+      organizationId: r.organizationId,
+      spaceId: r.spaceId,
+      userId: r.userId,
+    }),
     cacheKey('user', r.userId, ['spaceUsers']),
     cacheKey('space', r.spaceId, ['spaceUsers']),
-    cacheKey('user', r.userId, ['relations']),
   ],
 
   CustomerRef: (r) => {

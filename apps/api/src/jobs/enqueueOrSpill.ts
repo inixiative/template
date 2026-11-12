@@ -11,9 +11,9 @@ import { withLanePriority } from '#/jobs/lanePriority';
 import {
   isLaneOverflowing,
   outboxLaneOf,
+  recordAddAndTripIfFull,
   shouldSpill,
   spillToOutbox,
-  tripIfFull,
 } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
 import { singletonDeduplicationId } from '#/jobs/singletonDeduplicationId';
@@ -34,6 +34,10 @@ export type EnqueueOrSpillArgs = {
 
 export type EnqueueOrSpillResult = { jobId: string; outboxed?: true };
 
+// Redis's refusal under maxmemory with noeviction; BullMQ's add script surfaces the ReplyError unchanged.
+const isRedisOutOfMemory = (err: unknown): boolean =>
+  err instanceof Error && err.message.includes('OOM command not allowed');
+
 export const enqueueOrSpill = async ({
   handlerName,
   jobId,
@@ -53,10 +57,9 @@ export const enqueueOrSpill = async ({
   // A flow child (`parent` set by a stage's enqueueChildJob) never spills: the drain's re-add would
   // lose its parent link, and the parent would wait on a child BullMQ never heard of.
   const isFlowChild = options.parent !== undefined;
-  const overflowing =
-    data.type === JobType.adhoc && !bypass && !isFlowChild && (await isLaneOverflowing(lane));
+  const canSpill = data.type === JobType.adhoc && !bypass && !isFlowChild;
 
-  if (shouldSpill(data.type, bypass, overflowing)) {
+  const spill = async (): Promise<EnqueueOrSpillResult> => {
     // Claim at SPILL time too, not just at drain: the newest enqueue must hold the baton even while
     // buffered, so an older in-flight run aborts now instead of finishing with stale data during the
     // outbox dwell. The drain re-claims under the same jobId when it re-adds (self-claim, no-op).
@@ -70,12 +73,15 @@ export const enqueueOrSpill = async ({
         options: jobOptions,
       });
     } catch (err) {
-      if (baton) await releaseLane(baton, jobId, previousHolder).catch(() => {});
+      if (baton) await releaseLane(baton, jobId, previousHolder);
       throw err;
     }
     log.info(`Spilled job ${handlerName} to outbox (${jobId}, ${lane} lane over pressure)`);
     return { jobId, outboxed: true };
-  }
+  };
+
+  const overflowing = canSpill && (await isLaneOverflowing(lane));
+  if (shouldSpill(data.type, bypass, overflowing)) return spill();
 
   // Claim the lane BEFORE adding so the job holds the baton the instant it starts. If the add then
   // fails, no job exists to hold the baton — roll the claim back (fenced, so a concurrent claim isn't
@@ -88,8 +94,12 @@ export const enqueueOrSpill = async ({
     const added = await queue.add(handlerName, data, { ...jobOptions, jobId });
     placedId = added?.id ?? jobId;
   } catch (err) {
-    if (baton) await releaseLane(baton, jobId, previousHolder).catch(() => {});
-    throw err;
+    if (baton) await releaseLane(baton, jobId, previousHolder);
+    // A full Redis (noeviction) refuses the add: spill instead of failing the caller. A superseding
+    // job's lane release or claim can itself be refused under a full Redis; that error surfaces.
+    if (!canSpill || !isRedisOutOfMemory(err)) throw err;
+    log.warn(`Redis refused ${handlerName} (out of memory); spilling to the outbox (${jobId})`);
+    return spill();
   }
   if (placedId !== jobId) {
     log.info(`Deduplicated job ${handlerName}: ${placedId} already holds its singleton key`);
@@ -97,7 +107,7 @@ export const enqueueOrSpill = async ({
   }
   if (jobOptions.delay && isSlowJobData(data))
     await recordDelayedSlowAdd(queue, jobId, jobOptions.delay);
-  if (data.type === JobType.adhoc) await tripIfFull();
+  if (data.type === JobType.adhoc) await recordAddAndTripIfFull(isSlowJobData(data));
 
   log.info(`Enqueued job ${handlerName} (${jobId})`);
   return { jobId };

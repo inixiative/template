@@ -5,6 +5,7 @@
  * @uses none
  */
 
+export { bindsAs } from './bindsAs';
 export { collectRules } from './collectRules';
 export { findJsonEnd } from './findJsonEnd';
 export {
@@ -25,3 +26,10 @@ export { isStructurallyBalanced } from './isStructurallyBalanced';
 export { parseEachBlock } from './parseEachBlock';
 export { parseIfBlock } from './parseIfBlock';
 export type { Branch, EachBlock, IfBlock } from './types';
+export {
+  type TemplateBlockPosition,
+  type TemplateBlockScope,
+  type TemplateBlockVisitor,
+  type TemplateLoop,
+  visitTemplateBlocks,
+} from './visitTemplateBlocks';

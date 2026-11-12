@@ -30,84 +30,65 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll check the token myself on connect
 - record the user on the socket
 - upgrade the http request to a websocket
-- I'll put the token in the socket url
 - is this socket allowed to subscribe to the channel
+- a channel you publish to must be registered
 - every subscribe must be authorized
 - drop sockets that stopped pinging
 - wipe every connection index
 - open a client socket with message and open callbacks
+- take the handler's websocket outputs and actually deliver them
 - re-auth as someone else should clear their channels
-- detect dead sockets with ping and pong
-- map a channel name to its http route
-- process one socket's frames in order
-- drop a closed socket from every index
+- make the list update when a row changes
 - figure out who this socket is from its headers
-- a 500 from me shouldn't log the socket out
 - was the probe granted, denied or should we retry
 - record the resolved user on the socket
+- debounce stream opens and closes so remounts send nothing
 - the route's permission decides the subscription
 - the open, message and close handlers for sockets
-- authenticate the socket through normal auth middleware
-- how many frames a socket may send per window
 - what a handler returns to push over the socket
 - handle the websocket upgrade in the server fetch
-- credentials go in a frame after connecting
 - authorize the subscription by hitting the real route
+- I'll publish on a channel name nobody registered
 - I'll trust the client's subscribe request
 - the periodic sweep of dead connections
 - reset the socket registry between tests
 - connect to the server socket from code
+- route stream appends to the sequencer and hints to the publisher
 - I'll keep the subscriptions after re-authenticating
-- reconnect if pong doesn't come back
-- the canonical channel name resolver
-- answer ping before the queued work
-- clean up when one socket closes
+- return a refetch hint from the app-event handler
 - turn the authenticate frame into a user or anonymous
-- tell the client to retry instead of dropping the frame
 - classify the status code for stream access
 - attach the user and headers to the connection
+- don't open and close the stream on every rerender
 - I'll write a separate access check for channels
 - where incoming frames are dispatched
-- spoof should work over the socket too
-- rate limit on socket frames
 - target channels or user ids from an app event
 - I'll check the upgrade header myself
-- how does the socket log in
 - I'll write a permission check for the channel
+- hints to channels need a registered family
 - no channel without a permission check
 - I'll track last-seen and close old ones
 - clear all sockets on shutdown
 - I'll construct a raw websocket and wire handlers
+- the step after the handler returns its socket work
 - a narrower token drops the streams
-- I'll add my own keepalive timer
-- I'll parse the channel string myself
-- I'll handle frames as they arrive in parallel
-- I'll delete it from each map myself
+- per-user membership changes: target the user ids instead of a channel
 - I'll decode the token on the socket myself
-- I'll treat the auth failure as no user
 - I'll treat anything but 200 as denied
 - I'll stash the user on the socket data object
+- wait a moment before telling the server a stream has no holders
 - same permission as the api route
 - I'll write my own socket event handlers
-- I'll verify the socket token separately from http
-- I'll count messages per second myself
 - the shape of a websocket push
 - where sockets get accepted
-- spoof sends a new authenticate frame
 - only a success from the route grants it
 - idle socket cleanup
 - I'll empty the maps by hand
 - the shared client-side socket opener
-- sweep connections idle too long
-- probe the route with the socket's credentials
-- bound the pending frame queue
-- deregister the connection
 - resolve the socket's user through the me endpoint
-- queue full should answer with retryable
 - map http status to access outcome
 - replace the socket's identity after re-auth
 - register the connection on open
-- the me probe decides who the socket is
 - hint handoff versus stream append handoff
 - check access before adding the socket to a channel
 - a failure from me is not the same as anonymous

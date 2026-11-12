@@ -1,6 +1,5 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import {
   cleanupTouchedTables,
@@ -13,20 +12,11 @@ import {
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { fieldsLens } from '@template/email/rules';
-import { registerContactRulesHook } from '#/hooks/contactRules/hook';
-import { registerOrderedListHook } from '#/hooks/orderedList/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { sendEmail } from '#/jobs/handlers/sendEmail';
 import { emailRegistry } from '#/lib/email';
 import { type EmailEntry, type RecipientTarget, registry } from '#/lib/email/registry';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { createTestApp } from '#tests/createTestApp';
-
-registerRulesHook();
-registerContactRulesHook();
-registerOrderedListHook();
-registerUserEmailContactHook();
 
 const ADAPTER = 'test-recorder';
 
@@ -75,7 +65,7 @@ describe('sendEmail handler', () => {
     added.push(slug);
   };
 
-  beforeAll(() => {
+  beforeEach(() => {
     testDb = createTestApp({}).db;
     const recorder: EmailClient = {
       send: async (options) => {
@@ -87,10 +77,9 @@ describe('sendEmail handler', () => {
     emailRegistry.register(ADAPTER, recorder);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     emailRegistry.unregister(ADAPTER);
     await cleanupTouchedTables(testDb);
-    clearHookRegistry();
   });
 
   afterEach(() => {

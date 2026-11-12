@@ -9,6 +9,7 @@ import { type Client, createClient } from '@template/sdk/generated/client';
 import { serializeBracketQuery } from '@template/shared/bracketQuery';
 import { getToken } from '@template/ui/lib/auth/token';
 import { telemetryFetch } from '@template/ui/lib/browserTelemetry';
+import { toRoutePattern } from '@template/ui/lib/toRoutePattern';
 
 export type ExtractSuccess<T> = T extends { data: infer _D; error?: never }
   ? T
@@ -91,17 +92,9 @@ export const apiFetchInternal = <
         )) as typeof fetch,
     });
 
-    // Hono generates :id style paths in the OpenAPI spec, but hey-api's
-    // defaultPathSerializer only handles {id} style. Fix all parametric endpoints.
     scopedClient.interceptors.request.use((request, opts) => {
-      routeTemplate = opts.url;
-      const path = opts.path;
-      if (!path) return request;
-      let url = request.url;
-      for (const [key, value] of Object.entries(path))
-        url = url.replace(new RegExp(`/:${key}(?=/|$)`), `/${String(value)}`);
-      if (url === request.url) return request;
-      return new Request(url, request);
+      routeTemplate = toRoutePattern(opts.url);
+      return request;
     });
 
     // Generated query keys are a single-element tuple: [requestOptions]

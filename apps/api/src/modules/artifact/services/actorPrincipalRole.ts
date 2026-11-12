@@ -12,12 +12,8 @@ import {
   polymorphicTarget,
 } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
-import {
-  rebacCheck,
-  rebacSchema,
-  roleHierarchy,
-  roleToStandardAction,
-} from '@template/permissions';
+import { rebacCheck, rebacSchema, roleToStandardAction } from '@template/permissions';
+import { roleHierarchy } from '@template/permissions/roles/shared';
 import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
 import type { ArtifactPrincipal } from '#/modules/artifact/lib/artifactPrincipal';
 

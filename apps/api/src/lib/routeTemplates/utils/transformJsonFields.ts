@@ -31,7 +31,10 @@ export const transformJsonFields = (
   shape: Record<string, z.ZodTypeAny>,
 ): Record<string, z.ZodTypeAny> => {
   const replaceUnknown = (field: z.ZodTypeAny): z.ZodTypeAny => {
-    if (field instanceof z.ZodUnknown) return InputJsonValueSchema;
+    if (field instanceof z.ZodUnknown)
+      return field.description
+        ? InputJsonValueSchema.openapi({ description: field.description })
+        : InputJsonValueSchema;
 
     if (field instanceof z.ZodOptional) {
       const inner = field.unwrap() as z.ZodTypeAny;

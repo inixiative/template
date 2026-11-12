@@ -6,7 +6,7 @@
 // columns; exactly one FK populated per row, enforced via the
 // falsePolymorphism hook + registry. New attachment models = add a FK column
 // here, add the PascalCase enum value to TagResource, register in
-// `apps/api/src/hooks/falsePolymorphism/registry.ts`.
+// `packages/db/src/registries/falsePolymorphism.ts`.
 
 model TagAttachment {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
@@ -20,6 +20,7 @@ model TagAttachment {
   userId         String?     @db.VarChar(36)
   organizationId String?     @db.VarChar(36)
   spaceId        String?     @db.VarChar(36)
+  projectId      String?     @db.VarChar(36)
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific resource FKs below (e.g. chatGroupId)
   // ==========================================================================
@@ -29,6 +30,7 @@ model TagAttachment {
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tag          Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   // Per-resource uniqueness — partial uniques (see Contact for rationale).
@@ -36,6 +38,7 @@ model TagAttachment {
   @@unique([userId, tagId], where: { userId: { not: null } })
   @@unique([organizationId, tagId], where: { organizationId: { not: null } })
   @@unique([spaceId, tagId], where: { spaceId: { not: null } })
+  @@unique([projectId, tagId], where: { projectId: { not: null } })
   @@index([tagId])
 }
 
@@ -48,6 +51,7 @@ enum TagResource {
   User
   Organization
   Space
+  Project
 
   // USE-CASE CONCEPTS — camelCase. Only valid in `Tag.resources`.
   userMessages

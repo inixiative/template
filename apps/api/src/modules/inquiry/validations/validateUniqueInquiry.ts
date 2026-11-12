@@ -4,7 +4,7 @@
  * @partOf feature:inquiry
  * @uses infrastructure:prisma
  */
-import { type Db, getPolymorphismConfig, type PolymorphicValue, type Prisma } from '@template/db';
+import { db, getPolymorphismConfig, type PolymorphicValue, type Prisma } from '@template/db';
 import type { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
@@ -21,21 +21,20 @@ type InquiryShape = Omit<Prisma.InquiryWhereInput, 'id'> & {
 type UniqueMode = 'targeted' | 'untargeted';
 
 export const validateUniqueInquiry = async (
-  db: Db,
   inquiry: InquiryShape,
   mode: UniqueMode,
 ): Promise<void> => {
   const config = getPolymorphismConfig('Inquiry');
   if (!config) throw new Error('Inquiry polymorphism config missing from registry');
 
-  const fkFieldsFor = (axisField: 'sourceModel' | 'targetModel'): string[] => {
+  const fkFieldsFor = (axisField: 'sourceModel' | 'targetModel'): readonly string[] => {
     const axis = config.axes.find((a) => a.field === axisField);
     if (!axis) return [];
     const value = (inquiry as Record<string, unknown>)[axisField] as PolymorphicValue | undefined;
     return value ? (axis.fkMap[value] ?? []) : [];
   };
 
-  const pickValues = (fields: string[]): Record<string, unknown> =>
+  const pickValues = (fields: readonly string[]): Record<string, unknown> =>
     Object.fromEntries(fields.map((f) => [f, (inquiry as Record<string, unknown>)[f]]));
 
   const where: Prisma.InquiryWhereInput = {

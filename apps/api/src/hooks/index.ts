@@ -5,16 +5,18 @@ import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
+import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
+import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
+import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerOrganizationUserFolderHook } from '#/hooks/organizationUserFolder/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 import { registerUserEmailInvariantHook } from '#/hooks/userEmail/hook';
@@ -23,6 +25,9 @@ import { registerWebhookSubscriptionUrlHook } from '#/hooks/webhookSubscriptionU
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
 
 export const registerHooks = () => {
+  registerDelegatedKeysHook();
+  registerFullDelegateHook();
+  registerMemberSelfGrantHook();
   registerRulesHook();
   registerArtifactAccessHook();
   registerAuditLogHook();
@@ -32,14 +37,13 @@ export const registerHooks = () => {
   registerContactRulesHook();
   registerCronJobSyncHook();
   registerImmutableFieldsHook();
-  registerLastLoginAtHook();
   registerOrderedListHook();
   registerOrganizationUserFolderHook();
   registerPreventHardDeleteHook();
+  registerRuleReferenceHook();
   registerRuleReferenceTargetHook();
   registerSegmentConditionsHook();
   registerSegmentMemberOwnerHook();
-  registerSegmentRuleReferencesHook();
   registerSoftDeleteCascadeHook();
   registerTagOwnerCategoryHook();
   registerUserEmailInvariantHook();

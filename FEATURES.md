@@ -7,8 +7,8 @@
 - [How to Read This](#how-to-read-this)
 - [Core Platform](#core-platform)
 - [API Architecture & Routing](#api-architecture--routing)
-- [Authentication & Sessions](#authentication--sessions)
-  - [Session Authentication (BetterAuth)](#session-authentication-betterauth)
+- [Authentication](#authentication)
+  - [Person JWT (BetterAuth sign-in)](#person-jwt-betterauth-sign-in)
   - [Multi-Provider Auth (AuthProvider)](#multi-provider-auth-authprovider)
   - [Token Authentication](#token-authentication)
   - [User Impersonation](#user-impersonation)
@@ -121,17 +121,20 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ---
 
-## Authentication & Sessions
+## Authentication
 
-### Session Authentication (BetterAuth)
+### Person JWT (BetterAuth sign-in)
 
-- ✅ **BetterAuth Integration** - Session auth via BetterAuth ^1.6. Handles email/password, OAuth, verification flows, and session lifecycle out of the box
-- ✅ **Email/Password Auth** - Password hashing via BetterAuth. Sign-in returns a session token; the SPAs store it in localStorage via `setToken()` and send it as `Authorization: Bearer <token>`. Email verification is required before sign-in
-- ✅ **OAuth Flow → Bearer Token** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the session token and stores it via `setToken()`. The session token never appears in a URL
-- ✅ **Redis-Backed Bearer Sessions** - The web apps send BetterAuth's session token as `Authorization: Bearer` (`apiFetchInternal`). It is an opaque token, not a JWT (only the `bearer()` plugin, no `jwt()`); its record lives in Redis (`secondaryStorage`, 7-day sliding TTL), so deleting the key revokes the session at once. BetterAuth's encrypted (JWE) cookie cache applies only to cookie-based clients. Details: [AUTH.md](docs/claude/AUTH.md#session-storage-strategy)
-- ✅ **Redis Secondary Storage** - BetterAuth's `secondaryStorage` is Redis: session records, each user's active-session list, and the OAuth one-time tokens (consumed atomically with `GETDEL`)
-- ✅ **OAuth Social Providers** - Google wired via BetterAuth social plugin (callback handling, account linking, token issuance). Microsoft/GitHub are scaffolded in `platformProviders` but not yet configured in the BetterAuth client — adding them is config, not code
-- ✅ **BetterAuth Models** - Verification (email verification tokens) and Account (OAuth provider linkage) models in Prisma. `Session` is BetterAuth's default model and is unused: sessions live in Redis
+- ✅ **BetterAuth Sign-in** - BetterAuth ^1.6 runs email/password, email verification and OAuth. Its session exists only for the sign-in handshake (10 minutes at most, in Redis); `jwtHandoff` swaps it for a JWT before the response leaves the API and deletes it
+- ✅ **Person JWT** - Sign-in answers with `{ token, expiresAt, user }`: an ES256 JWT (`sub` = user, `iss` = `aud` = `API_URL`, 30 days). The SPAs store it in localStorage and send it as `Authorization: Bearer <jwt>`. `jwtAuthMiddleware` verifies it from its signature; no session lookup. Details: [AUTH.md](docs/claude/AUTH.md#user-jwt)
+- ✅ **Email/Password Auth** - Password hashing via BetterAuth. Email verification is required before sign-in
+- ✅ **OAuth Flow → JWT** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the JWT. Neither the JWT nor a session token appears in a URL
+- ✅ **Signing Keys** - BetterAuth `jwt()` plugin keys, rotated every 90 days with a 30-day grace, published at `/api/auth/jwks`. Private keys are encrypted by the template field encryption (`jwks.privateKey`) and rotated by the same job as every other secret
+- ✅ **One Verification Path** - `verifyIssuerJwt` trusts this API's own keys and, when `AUTH_ISSUER` / `AUTH_JWKS_URL` / `AUTH_AUDIENCE` are set, one external issuer, so a JWT from a hub that issues for several apps works the same way
+- ✅ **Revocation** - Every person JWT carries the user's `jwtVersion` as `ver`; incrementing it refuses every JWT signed before, with no extra lookup (the user row is already loaded): `rotateUserJwts` from `POST /api/v1/me/rotateJwts`, the superadmin `POST /api/admin/user/:id/rotateJwts`, account deletion and password reset. `jwtVersion` is never returned in a response. Signing out of one browser drops the JWT there. Revocation is the control, not short expiry, so there is no refresh token
+- ✅ **No Session Endpoints** - Every BetterAuth endpoint that acts on a live session (`/get-session`, `/sign-out`, `/token`, `/change-password`, …) is disabled (404)
+- ✅ **OAuth Social Providers** - Google wired via BetterAuth social plugin (callback handling, token issuance). Microsoft/GitHub are scaffolded in `platformProviders` but not yet configured in the BetterAuth client — adding them is config, not code
+- ✅ **BetterAuth Models** - Verification (email verification tokens), Account (OAuth provider linkage) and Jwks (signing keys) models in Prisma. `Session` is BetterAuth's schema and holds no rows: handshake sessions live in Redis
 
 ### Multi-Provider Auth (AuthProvider)
 
@@ -143,7 +146,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ### Token Authentication
 
 - ✅ **Bearer Token Auth** - `Authorization: Bearer <key>` header for API access. SHA-256 hashed at rest. 10-minute Redis cache for frequently-used tokens avoids DB lookup per request
-- ✅ **URL Token Fallback** - `?token=<key>` query param for contexts that can't set headers (WebSocket upgrades, email links). Same validation pipeline as Bearer tokens
+- ✅ **URL Token Fallback** - `?token=<key>` query param for contexts that can't set headers (email links, downloads). Same validation pipeline as Bearer tokens. API tokens only; a person JWT is never read from a URL
 - ✅ **Hierarchical Token Scopes** - Tokens scoped to User (cross-org), Organization (all spaces in org), or Space (single space only). Scope determines which resources the token can access
 - ✅ **Personal Access Tokens** - Users create named tokens with optional expiry dates. Token value shown once at creation, only hash stored. `lastUsedAt` is touched on token-cache misses only (about every 10 minutes per token), keeping a write off every request
 - ✅ **Token CRUD** - Full lifecycle management. List tokens (with last-used metadata), create with name+expiry, delete by ID. Tokens scoped to the owning User/Org/Space
@@ -156,26 +159,32 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Roadmap
 
-- 🟡 **Session Refresh** - Silent re-authentication when session expires. Token refresh flow and auto-retry on 401 not yet implemented
+- 🟡 **Password Change and Account Linking** - BetterAuth's change-password and link-social endpoints need a session, so they are disabled; JWT-authenticated routes for them are not built yet
 - 🟣 **SAML/SSO** (ticket AUTH-001) - Schema and encryption infrastructure ready. Awaiting BetterAuth SAML plugin maturity for production-ready SAML 2.0 support
 
 ---
 
 ## Authorization & Permissions
 
-**Full RBAC/ABAC/ReBAC Authorization** - Comprehensive permission system supporting Role-Based (RBAC), Attribute-Based (ABAC), and Relationship-Based (ReBAC) access control powered by Permix with JSON-Rules support. This unified system lets you define permissions using simple roles, complex attribute-based rules, or relationship graphs - all within the same framework. JSON-Rules integration enables dynamic permission logic without code deployment.
+**Full RBAC/ABAC/ReBAC Authorization** - Comprehensive permission system supporting Role-Based (RBAC), Attribute-Based (ABAC), and Relationship-Based (ReBAC) access control powered by [`@inixiative/permissions`](https://github.com/inixiative/permissions), with conditions in json-rules. This unified system lets you define permissions using simple roles, complex attribute-based rules, or relationship graphs - all within the same framework. JSON-Rules integration enables dynamic permission logic without code deployment.
 
-- ✅ **Multi-Level RBAC** - Roles at platform (superadmin, user), organization (owner, admin, member), and space (owner, admin, member) levels with clear hierarchies
+- ✅ **Multi-Level RBAC** - Roles at platform (superadmin, user), organization and space (owner, admin, member, viewer), each mapping to one standard action (own, manage, operate, read)
 
-- ✅ **Attribute-Based Control (ABAC)** - JSON-based entitlements at org and space level allow custom permission logic based on user attributes, resource properties, or contextual conditions
+- ✅ **Attribute-Based Control (ABAC)** - Conditions in json-rules over the record and the acting user or token, nested freely with `any` and `all`, inside the same rules as role and relation checks
 
-- ✅ **Relationship-Based Control (ReBAC)** - Google Zanzibar-style relationship graphs (User → OrgUser → Org → Space) for modeling complex permission scenarios like delegated access or inherited permissions
+- ✅ **Relationship-Based Control (ReBAC)** - Relation walks over your own rows through the schema (member row, organization, space), with no separate tuple store to sync
+
+- ✅ **Entitlements** - An owner hands on an action on a resource from an anchor, narrowed by a `where`. Every check asks the grantor again, so demoting anyone up the chain stops what they handed on at the next request. Each entitlement is a row of one `Entitlement` table (anchor as source, holder as target), so "who holds what on this record?" is a query and every grant and revocation is audited on its own
+
+- ✅ **Delegates** - Tokens and integrations act for their owner: `full` (the owner whole, in sync), a role (the owner capped at that role) or entitlements. Setting `full` takes the person-only `delegateFull` action on the owner
+
+- ✅ **Tenant-Authored Record Rules** - A record can carry its own rule for an action (`Contact` for `read` today), validated before it is saved and ORed with the schema, so it can only widen access
 
 - ✅ **JSON-Rules Integration** - Define permission logic declaratively using @inixiative/json-rules without code deployment. Evaluate complex conditions, combine multiple rules, and update permission logic dynamically
 
-- ✅ **Hierarchical Inheritance** - Space permissions automatically inherit from parent organization. Org owners automatically get owner access to all spaces
+- ✅ **Hierarchical Inheritance** - An organization's owners own its spaces. Other organization roles reach a space only through a space member row
 
-- ✅ **Permission Middleware** - validatePermission() and validateOwnerPermission() enforce checks before controller execution. Routes declare required permissions in OpenAPI definitions
+- ✅ **Permission Middleware** - validatePermission() and validateSubmodelPermission() enforce checks before controller execution. Routes declare required permissions in OpenAPI definitions
 
 - ✅ **Superadmin Bypass** - Platform superadmins bypass all permission checks for support scenarios while maintaining audit trails
 
@@ -183,9 +192,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Per-Request Isolation** - Fresh Permix client instance per request ensures complete isolation between concurrent requests
 
-- ✅ **Redis Performance Caching** - Permission evaluation results cached in Redis (10min TTL) for sub-millisecond response times
+- ✅ **Redis Caching** - The rows a check loads are cached in Redis (one hour) and cleared on every write, so a check stays in-process and current
 
 - 🟣 Visual permissions builder UX (ticket FEAT-008, depends on INFRA-002)
+
+- 🟣 Listing what you can read as one query: permissions 1.0 compiles the same rules to Prisma and SQL, end of 2026 (ticket INFRA-026)
 
 [Learn more: PERMISSIONS.md](docs/claude/PERMISSIONS.md)
 
@@ -220,9 +231,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Database & ORM
 
-**Prisma 7 with Advanced Patterns** - Latest Prisma ORM with PostgreSQL 18, featuring typed model IDs, mutation hooks, post-transaction queues, robust false polymorphism, and split schema architecture. Built for type safety, testability, and maintainability.
-
-- ✅ **Typed Model IDs** - Branded ID types (OrganizationId, UserId, SpaceId) prevent accidentally mixing IDs from different models. TypeScript catches `function(userId: UserId)` called with `organizationId` at compile time. Eliminates an entire class of bugs
+**Prisma 7 with Advanced Patterns** - Latest Prisma ORM with PostgreSQL 18, featuring mutation hooks, post-transaction queues, robust false polymorphism, and split schema architecture. Built for type safety, testability, and maintainability.
 
 - ✅ **Automatic Transaction Merging** - Database client uses AsyncLocalStorage and Proxy pattern to auto-merge nested transactions. Call `db.txn()` anywhere and it merges into parent transaction if one exists, or creates new one if not. Eliminates manual transaction passing through call stacks. All mutations automatically wrapped in transactions via Prisma extension
 
@@ -248,7 +257,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories). The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
-- ✅ **23 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
+- ✅ **34 Database Models** - account, appEvent, auditLog, authProvider, communicationLog, communicationComponentVersion, contact, cronJob, customerRef, emailTemplate, emailComponent, flow, integrationRecord, integration, jobOutbox, inquiry, organizationUser, organization, project, jwks, segment, segmentMember, session, ruleReference, spaceUser, tag, space, tagAttachment, user, token, tagCategory, verification, webhookSubscription, webhookEvent
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -258,7 +267,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Runtime Schema Introspection** - Parse Prisma's runtime data model and inline schema to extract FK mappings, relations, and field metadata at runtime. Enables dynamic hydration, validation, and tooling without hardcoded model knowledge
 
-- ✅ **Advanced Constraints** - Helper functions for PostgreSQL features Prisma doesn't support natively: partial unique indexes (`addUniqueWhereNotNull`), CHECK constraints (`addCheckConstraint`), and GIST indexes (`addGistIndex`) for advanced queries
+- ✅ **Advanced Constraints** - Partial unique indexes are declared in the Prisma schema (the `partialIndexes` preview feature: `@@unique([...], where: { ... })`; `CustomerRef` keeps one row per customer/provider pair this way). Row checks the schema can't express are json-rules in `RulesRegistry` (`apps/api/src/hooks/rules/registry.ts`), enforced by the `rules` hook on every write, so the rule lives in the mutation lifecycle with the rest of the write guards instead of in hand-written SQL. [Learn more: HOOKS.md](docs/claude/HOOKS.md#rules-registry)
 
 - ✅ **False Polymorphism Registry** - Centralized configuration (`PolymorphismRegistry`) defining polymorphic patterns across models. Single source of truth for constraints, validation hooks, and FK resolution. Supports multi-axis polymorphism (Token owner + model, CustomerRef customer + provider)
 
@@ -270,7 +279,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Admin Operations
 
-- ✅ **Cache Clearing** - `POST /admin/cache/clear` flushes Redis caches (permissions, tokens, sessions) without server restart. Essential for invalidating stale permission caches after role changes
+- ✅ **Cache Clearing** - `POST /admin/cache/clear` flushes Redis caches (permissions, tokens, user lookups) without server restart. Essential for invalidating stale permission caches after role changes
 - ✅ **Cron Job CRUD** - Full create/read/update/delete for scheduled jobs. Persist schedule, description, and enabled state. Admin can view all registered crons, their last/next run times, and current status
 - ✅ **Manual Cron Triggering** - `POST /admin/cron/:name/trigger` runs any cron immediately regardless of schedule. Critical for one-off executions (key rotation, cache warming) without waiting for next scheduled run
 - ✅ **Job Enqueueing** - `POST /admin/jobs/enqueue` manually enqueues any registered job with custom payload. Useful for reprocessing failed records or triggering background work on demand
@@ -294,7 +303,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Staged jobs (fan out and wait)** - Every constructor takes `{ stages, finish }` in place of a handler: each stage adds children with `ctx.enqueueChildJob`, the job parks in BullMQ's `waiting-children` (holding no worker slot) until they report, and `finish` runs once after the last stage. The stage index lives on the job, so a resumed run never repeats a stage. Children keep their retries and then count as done (`ignoreDependencyOnFailure`). The `no-hand-rolled-flows` CI rule keeps the flow machinery in the primitive; `apps/api/scripts/jobFlowCheck.ts` proves it against real Redis
 
-- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, key, compute, targets })` keeps a computed value warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out a superseding slow-lane leaf per target under a per-attempt timeout (`rollingCache.leafStuck` app event when it runs over). Entries outlive every retry, so a read always hits; the `rolling-cache-registered` CI rule keeps every definition imported by the worker
+- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, targets, results, compute, channel })` keeps computed values warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args; `results` are key functions over one params object, all filled by one `compute` pass per target under one single-flight lock. Reads never compute: `checkCache` reports empty / queued / computing / fresh / stale from a write time stored beside each value, and `checkRollingCache` queues the target's leaf on a miss (one enqueue per target however many readers miss, through a queued marker) and returns the channel to wait on. The worker warms every cache on boot. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out superseding slow-lane leaves spread over `spreadSeconds`, each under a per-attempt timeout (`rollingCache.leafStuck` when it runs over, `rollingCache.refreshed` with a websocket refetch hint when it lands). Entries outlive every retry; the `rolling-cache-registered` CI rule keeps every definition imported by the worker
 
 - ✅ **BullMQ Integration** - Redis-backed persistent queue with automatic retries (3 attempts, exponential backoff 5s base). Jobs survive server restarts. One `jobs` queue serves registered handlers; `REDIS_BULLMQ_URL` can isolate it from cache Redis (fallback: `REDIS_URL`)
 
@@ -384,21 +393,21 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### General Security
 
-- ✅ **HTTP-Only Session Cookies** - BetterAuth also sets HTTP-only cookies on the API origin (a signed session-token cookie and the encrypted JWE cookie cache). The SPAs don't rely on them; they authenticate with the bearer token
-- ✅ **Bearer Session Token** - Both email/password and OAuth sign-ins store the opaque session token in localStorage and send it as `Authorization: Bearer <token>`. No cookie, so CSRF is not a risk, but XSS is (localStorage is JS-accessible). Trade-off accepted for cross-origin SPAs
+- ✅ **Cookies and Sessions Never Authenticate the API** - BetterAuth's cookies on the API origin are used only inside `/api/auth/*` (OAuth state); `jwtHandoff` expires the session cookie on every sign-in response. The CI rule `bearer-only-auth` fences cookie and session auth (cookie cache, `credentials: 'include'`, `withCredentials`, `document.cookie`, any `getSession` / `findSession` / session-table read, the BetterAuth `bearer` plugin)
+- ✅ **Bearer JWT** - Both email/password and OAuth sign-ins store the person JWT in localStorage and send it as `Authorization: Bearer <jwt>`. No cookie, so CSRF is not a risk, but XSS is (localStorage is JS-accessible); revocation ends a stolen JWT. Trade-off accepted for cross-origin SPAs
 - ✅ **SQL Injection Prevention** - Prisma uses parameterized queries exclusively. No string interpolation in queries. Raw SQL escape hatches disabled by convention
 - ✅ **XSS Prevention** - React escapes all interpolated values by default. No `dangerouslySetInnerHTML` usage. Content Security Policy headers configurable via Hono middleware
 - ✅ **Password Hashing** - scrypt via BetterAuth (`node:crypto`). Passwords never stored or logged in plaintext
 - ✅ **Token Hashing** - API tokens stored as SHA-256 hashes. Raw token shown once at creation, never retrievable. Token comparison done on hash
 - ✅ **Rate Limiting** - Atomic Redis fixed windows, AND-checked per user / space / organization plus an IP window on `/api/auth/*`; 429 with `Retry-After`, fail-open on a Redis outage. Limits resolve through one seam (`rateLimitMax`) awaiting subscriptions / feature flags (INFRA-027)
-- ✅ **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 10 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. Retention job and admin API shipped (FEAT-005 Complete); explorer UI deferred to FEAT-017
+- ✅ **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 10 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. A child with no tenant of its own (an entitlement row) is filed under its parent's, and the admin read takes `historyModel` + `historyId` for one record's history with its children's events in the same stream (parent edge registry). Retention job and admin API shipped (FEAT-005 Complete); explorer UI deferred to FEAT-017
 
 ---
 
 ## User Management
 
-- ✅ **User CRUD** - Create, read, update, delete users. Admin routes for platform-level user management; me routes for self-service operations. Typed IDs prevent accidental cross-model ID mixing
-- ✅ **Me Endpoint System** - Self-service API with 8+ endpoints under `/me`: read profile, update name, change password, list orgs, list spaces, list tokens, manage auth providers, delete account. Authenticated users manage their own data without needing admin access
+- ✅ **Users** - A user is created by sign-up (BetterAuth) or as an unverified guest when an inquiry targets an unknown email (`findUserOrCreateGuest`). Self-service under `/me`; superadmin routes redact a user and rotate their JWTs (`/api/admin/user/:id/redact`, `/rotateJwts`). No route updates a user yet (see Profile Editing)
+- ✅ **Me Endpoint System** - Self-service API under `/me`: read the profile, change password, rotate JWTs, redact (delete) the account; list the caller's organizations, spaces, segment memberships and inquiries received; list and create its tokens, contacts, integrations, inquiries (sent), segments and webhook subscriptions; create flows
 - ✅ **Email Verification** - BetterAuth verification flow: send verification email with signed token, verify token on click, mark email as verified. Verification model persists tokens with expiry
 - ✅ **Password Reset** - BetterAuth reset flow: request reset email, validate signed token, set new password. Tokens are single-use and expire after 1 hour
 - ✅ **User Redaction / GDPR** - Anonymize user PII on account deletion: email → `redacted-{uuid}@redacted.invalid`, name → `Redacted User`, avatar cleared. Preserves record for referential integrity while removing identifying data
@@ -441,7 +450,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Single Contact Model** - One `Contact` table covers phone, email, website, and 19 social/messaging handles (linkedin, github, twitter, whatsapp, telegram, discord, instagram, facebook, youtube, tiktok, bluesky, threads, reddit, signal, mastodon, line, wechat, viber, skype). False-polymorphic owner: `ownerModel` discriminator + nullable `userId`/`organizationId`/`spaceId`. Per-`(owner, type)` uniqueness on `valueKey` is enforced by three partial `@@unique([<fk>, type, valueKey], where: { <fk>: { not: null } })` — one per owner FK. Same `valueKey` is allowed across different types for one owner (a user can have the same handle for github and twitter); blocked only as a duplicate within the same `(owner, type)`. Partials are required because Postgres treats NULLs as distinct in a composite unique, so a single composite over the polymorphic FKs would let `(User, 'u1', null, null, …)` duplicate. Each partial doubles as a lookup index for that owner.
 
-- ✅ **Per-Type Registry** - `ContactRegistry` in `@template/shared/contact` maps each type to a `ContactTypeDef`: a loose `inputSchema` (accepts pasted URLs, structured input, etc.), a `parseInput` normalizer, a strict `valueSchema` for storage, a `toValueKey` projection (E.164 for phones, jid for whatsapp, `${classifier}:${handle}` for handles), an optional `toUrl` for display, and `subtype` rules (`forbidden`/`optional`/`required`). Adding a new contact type = drop a def file in `defs/`, register it, done — no schema change, no controller change
+- ✅ **Per-Type Registry** - `ContactRegistry` in `@template/shared/contact` maps each type to a `ContactTypeDef`: a loose `inputSchema` (accepts pasted URLs, structured input, etc.), a `parseInput` normalizer, a strict `valueSchema` for storage, a `toValueKey` projection (E.164 for phones, jid for whatsapp, `${classifier}:${handle}` for handles), an optional `toUrl` for display, and `subtype` rules (`forbidden`/`optional`/`required`). Adding a new contact type = drop a def file in `defs/`, register it, done — no schema change, no controller change. `GET /api/v1/contact/info` publishes each type's input and stored-value JSON Schema and subtype rule from the same registry
 
 - ✅ **`contactRules` Hook** - Single before-mutation hook validates and normalizes every Contact write across `create`, `createManyAndReturn`, `upsert`, `update`, `updateManyAndReturn`. Looks up the type def, runs subtype rules, parses + canonicalizes `value`, computes `valueKey`. Update paths shadow-merge with `previous` so partial updates validate against the merged record. `position` ordering is handled by the separate `orderedList` hook (below)
 
@@ -517,11 +526,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Context-Aware Routing** - Routes automatically include current context params (`?org=`, `?space=`). Navigate to organization settings and URL becomes `/settings?org=orgId`. Switch organizations and all links update automatically. `getContextParams()` generates params for any route based on current state
 
-- ✅ **Zustand State Management** - Six slices manage different concerns: **auth** (user/session), **tenant** (org/space), **permissions** (RBAC/ReBAC cache), **navigation** (breadcrumbs/menu state), **ui** (theme/modals/toasts), **client** (API base URL/headers). Slice factories enable testing without circular dependencies
+- ✅ **Zustand State Management** - Six slices manage different concerns: **auth** (user/JWT), **tenant** (org/space), **permissions** (RBAC/ReBAC cache), **navigation** (breadcrumbs/menu state), **ui** (theme/modals/toasts), **client** (API base URL/headers). Slice factories enable testing without circular dependencies
 
 - ✅ **Server State Caching** - TanStack Query v5 handles API response caching with smart invalidation. Auto-refetch on window focus, configurable stale times, request deduplication. Optimistic updates with automatic rollback on error maintain UI consistency
 
-- ✅ **API Client Wrappers** - `apiQuery()` for GET requests unwraps nested `data.data` for clean usage. `apiMutation()` for mutations returns full response enabling optimistic update patterns. Both handle auth headers (session/token) and spoof headers (`x-spoof-user-email`) automatically
+- ✅ **API Client Wrappers** - `apiQuery()` for GET requests unwraps nested `data.data` for clean usage. `apiMutation()` for mutations returns full response enabling optimistic update patterns. Both handle auth headers (JWT/token) and spoof headers (`x-spoof-user-email`) automatically
 
 - ✅ **Route Guards** - `requireAuth()` redirects unauthenticated users to `/login?redirectTo=currentPath`. `requirePublic()` redirects authenticated users away from login/signup. Guards preserve context params across redirects. Execute in route `beforeLoad` for instant feedback before component renders
 
@@ -571,7 +580,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **useValidateUniqueness()** - Real-time uniqueness validation for form fields (email, username, slug). Debounces input, calls API to check uniqueness, returns validation error. Integrates with React Hook Form
 
-- ✅ **useEventRefetch()** - Subscribes to custom events and refetches TanStack Query queries when events fire. Use for cross-component data invalidation (user created in modal, refetch user list in table)
+- ✅ **useApiWebsocket()** - Mounted once at each app root. Every mounted query whose family is in `LIVE_QUERIES` subscribes to its channel, and refetches when a business event publishes a refetch to that channel (a `websocket` handoff from the event handler). A change made by any user, request or job then refreshes every open view of that data, with no prop drilling or manual invalidation. [Learn more: WEBSOCKETS.md](docs/claude/WEBSOCKETS.md#publishing-a-refetch)
 
 - ✅ **useBreadcrumbs()** - Generates breadcrumb trail from current route using navigation config. Returns array of `{ label, path }` objects for rendering breadcrumb navigation
 
@@ -584,7 +593,6 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **useMediaQuery()** - Responsive design helper that returns boolean for media query matches. Use for conditional rendering based on screen size. Server-safe (returns false during SSR)
 
 - ✅ **useAuthProviders()** - Fetches available auth providers for current org or platform. Used by login/signup to render correct OAuth buttons, show SSO option, or show password field based on configured providers
-- ✅ **useAppEvents()** - Subscribes to named DOM custom events for cross-component communication. Pair with `useEventRefetch()` to trigger query invalidations without prop drilling or shared state
 - ✅ **useDarkMode()** - Reads and sets theme preference (light/dark/system). Syncs with Zustand ui slice, persists across sessions, applies Tailwind `dark:` class to document root. Returns `{ theme, setTheme, isDark }`
 - ✅ **useLanguage()** - Returns current locale string and setter. Backed by Zustand ui slice. Ready for i18n integration — currently returns `en` as default, locale-aware components read from this hook
 - ✅ **usePageMeta()** - Sets `document.title` and meta description for the current route. Accepts raw strings or template with app name. Called in page components to keep browser tab titles contextual
@@ -680,11 +688,15 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Caching & Performance
 
-- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ repeatables) opens its own connection
+- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ job schedulers) opens its own connection
 
-- ✅ **Redis Use Cases** - Session store (BetterAuth `secondaryStorage`, 7-day sliding TTL), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
+- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
-- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, job, ws, otp, session, limit, lock, lane) preventing collisions and enabling selective cache clearing
+- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, cacheGeneration, cacheQueued, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
+
+- ✅ **Transaction Cache Overlay** - `cache()` inside `db.txn` reads through a per-transaction overlay: the transaction reads its own writes, a rollback leaves nothing cached, and at commit each key is one Lua call behind its generation fence. Written keys are cleared before the transaction's locks are released and a failed clear makes `db.txn` throw; read-only keys are published after, and a failure only counts `cache.publish.failed`. [Learn more: REDIS.md](docs/claude/REDIS.md#cache-inside-a-transaction)
+
+- ✅ **Create-If-Missing Fence and Lock Sets** - `db.findForUpdate(model, where, { upserting: true })` fences a row that does not exist yet with a Redis key lock held until the transaction settles; one field may list values to fence a batch as one lock set (one token, one heartbeat, one release, one Lua call per step). A wait past `waitMs` throws `FindForUpdateLockTimeoutError`, answered 409. `db.withLockUntilSettled` holds any `createLock` lock the same way and joins a key the transaction already holds. [Learn more: DATABASE.md](docs/claude/DATABASE.md#row-locks-and-create-if-missing)
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 
@@ -717,7 +729,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## Architectural Patterns
 
 - ✅ **Context Isolation in Batch API** - Each request in a batch gets its own isolated AppEnv (db, auth, permissions). Prevents one batch operation from leaking context into another. Transaction strategies (transactionAll, transactionPerRound) wrap operations without sharing mutable state
-- ✅ **Multi-Strategy Authentication** - Single middleware chain handles session cookies, Bearer tokens, and URL token params. Strategy auto-detected from request headers — no route-level branching. Spoof header (`x-spoof-user-email`) layered on top for superadmin impersonation
+- ✅ **Multi-Strategy Authentication** - Single middleware chain handles person JWTs, Bearer API tokens, and API-token URL params (never cookies or sessions). Strategy auto-detected from request headers — no route-level branching. Spoof header (`x-spoof-user-email`) layered on top for superadmin impersonation
 - ✅ **False Polymorphism** - Polymorphic relationships (Token owner, CustomerRef) use explicit FK columns instead of type + ID string pairs. Each possible owner type has its own nullable FK. Prisma enforces referential integrity per FK. PolymorphismRegistry centralizes constraints, validation, and FK resolution
 - ✅ **Dynamic Schema Generation** - Prisma schema split across one file per model in `prisma/schema/`. Build step concatenates files before generation. Reduces merge conflicts, enables per-model organization, and makes large schemas navigable
 - ✅ **Permission-Based Menu Rendering** - Navigation config declares required permissions per item. Menu rendered by evaluating each item's permission against the Permix client. Items hidden (not just disabled) if user lacks permission. Re-evaluated on context switch (org/space change)

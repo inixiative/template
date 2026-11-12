@@ -14,6 +14,7 @@ import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
+import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
 import { sendInquiry } from '#/modules/inquiry/services/sendInquiry';
 import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
@@ -21,13 +22,11 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   const db = c.get('db');
   const permix = c.get('permix');
   const inquiry = getResource<'inquiry'>(c);
-  const { content, status } = c.req.valid('json');
-
-  validateInquiryIsEditable(inquiry);
+  const { content, status, expectedUpdatedAt } = c.req.valid('json');
 
   const handler = inquiryHandlers[inquiry.type];
   const effectiveContent = handler.contentSchema.parse(content ?? inquiry.content);
-  if (handler.validate) await handler.validate(db, inquiry, effectiveContent);
+  if (handler.validate) await handler.validate(inquiry, effectiveContent);
 
   const partial = await hydrate('inquiry', {
     ...inquiry,
@@ -37,15 +36,16 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
     throw makeError({ status: 403, message: 'Access denied' });
 
   const updated = await db.txn(async () => {
+    validateInquiryIsEditable(await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt));
     const saved = await db.inquiry.update({
       where: { id: inquiry.id },
       data: {
-        content: content as Prisma.InputJsonValue | undefined,
+        content: content === undefined ? undefined : (effectiveContent as Prisma.InputJsonValue),
         ...(status === InquiryStatus.draft && { status, expiresAt: null }),
       },
       include: includeInquirySent,
     });
-    return status === InquiryStatus.sent ? sendInquiry(c, saved) : saved;
+    return status === InquiryStatus.sent ? sendInquiry(c, saved, saved.updatedAt) : saved;
   });
 
   return respond.ok(updated);

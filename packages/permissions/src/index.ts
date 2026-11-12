@@ -1,43 +1,39 @@
 export { Role } from '@template/db/generated/client/enums';
+export { actorOf } from './actorOf';
 // Client
 export {
   type Action,
-  type ActionState,
+  type Actor,
+  ActorModel,
+  coversEntitlement,
   createPermissions,
-  type Entitlements,
-  InquiryAction,
+  delegate,
+  type EntitlementEntry,
+  installPermissions,
   OrganizationAction,
   type PermissionEntry,
+  type Permissions,
   type Permix,
-  SpaceAction,
-  StandardAction,
+  TokenAction,
   UserAction,
+  wellFormedEntitlements,
 } from './client';
+export { entitlementsOf, toEntitlementEntry, toEntitlementInput } from './entitlementRows';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
+export { INQUIRY_TYPES, type InquiryParty, type InquiryTypeParties } from './rebac/inquiryTypes';
 export { rebacSchema } from './rebac/schema';
-export type {
-  ActionRule,
-  RebacSchema,
-  RelationCheck,
-  ResourcePermission,
-  RuleCheck,
-} from './rebac/types';
+export type { ActionRule } from './rebac/types';
+export type { DelegatePermissions } from './roles/delegatePermissions';
+export { isMemberSelfGrant, type MemberResource, memberSelfGrant } from './roles/memberSelfGrant';
 // Organization permissions
-export { getOrgPermissions, organizationRoles } from './roles/organization';
-// Shared role utilities
+export { getOrgPermissions } from './roles/organization';
 export {
-  allTrue,
-  greaterRole,
-  intersectEntitlements,
-  isSuperadmin,
-  lesserRole,
-  roleHierarchy,
-  rolesAtOrAbove,
-  roleToStandardAction,
-} from './roles/shared';
-// Space permissions
-export { getSpacePermissions, spaceRoles } from './roles/space';
-// User permissions
-export { getUserPermissions, userRoles } from './roles/user';
+  organizationOwnerPermissions,
+  permissionsOfUser,
+  spaceOwnerPermissions,
+} from './roles/permissionsOfUser';
+// Shared role utilities
+export { isSuperadmin, roleToStandardAction } from './roles/shared';
+export { getSpacePermissions } from './roles/space';
 export type { PermissionsCheck } from './types';

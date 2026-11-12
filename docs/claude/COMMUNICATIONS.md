@@ -16,7 +16,7 @@
     - [Enums](#enums)
   - [Component System](#component-system)
     - [Syntax](#syntax)
-    - [Extraction (mapRefs)](#extraction-maprefs)
+    - [Extraction (decompose)](#extraction-decompose)
   - [Variable Interpolation](#variable-interpolation)
   - [The email lens](#the-email-lens)
   - [Cascade Resolution](#cascade-resolution)
@@ -84,29 +84,27 @@ Located in `packages/email` (`@template/email`).
 
 ```
 packages/email/src/
-├── client/               # Email providers
-│   ├── resend.ts         # createResendClient(apiKey)
-│   ├── console.ts        # createConsoleClient() - dev logging
-│   └── types.ts          # SendEmailOptions, EmailClient
+├── client/               # Email providers (adapter): resend.ts, console.ts, types.ts
+│   └── verification/     # Address verification (bouncer, noop)
+├── errors/               # EmailRenderError, MjmlValidationError, DivergentDuplicateSlugError, ...
+├── preflight/            # runPreflight + checks (alt text, preheader, unsubscribe link, ...)
 ├── render/               # Template pipeline
+│   ├── parseBlocks.ts    # MJML → text/component/slot node tree
+│   ├── decompose.ts      # Component extraction: strip inline bodies, collect refs + component writes
 │   ├── compose.ts        # composeTemplate/composeComponent
 │   ├── expand.ts         # Recursive component expansion
-│   ├── extractRefs.ts    # Component extraction (mapRefs)
 │   ├── interpolate.ts    # Variable substitution + conditionals
 │   ├── evaluateConditions.ts  # {{#if rule=...}} evaluation
+│   ├── settle/           # Token/branch/each settlement used by interpolate
 │   ├── lookup.ts         # Single-tier ownership lookup
 │   ├── lookupCascade.ts  # Cascade lookup across ownership tiers
 │   ├── lookupTemplate.ts # lookupTemplate/lookupComponent entrypoints
-│   ├── resolveVariants.ts # Match-or-create component variants
-│   ├── validateNoCycle.ts # Component ref cycle guard
 │   ├── save.ts           # saveEmailTemplate coordinator
 │   ├── saveComponents.ts # Component persistence
 │   ├── saveTemplate.ts   # Template persistence
-│   ├── errors.ts         # EmailRenderError
-│   └── types.ts          # SaveContext, etc.
-└── validations/          # MJML validation
-    ├── validateMjml.ts
-    └── MjmlValidationError.ts
+│   └── types.ts          # OwnerScope, EmailModel
+├── rules/                # emailLens + rule scoping/reference helpers
+└── validations/          # validateMjml, validateNoCycle, validateConditions, validateTokens
 ```
 
 ---
@@ -274,21 +272,22 @@ enum EmailOwnerModel {
 
 Pattern: `{{#component:slug}}...{{/component:slug}}`
 
-#### Extraction (mapRefs)
+#### Extraction (decompose)
 
 ```typescript
-import { mapRefs } from '@template/email/render';
+import { decompose } from '@template/email/render';
 
-const result = mapRefs(mjmlString);
-// result.map - { slug: [{ mjml, refs }] }
-// result.mjml - Tagged output with :N indices
-// result.refs - Top-level refs
+// resolve(slug) returns the body the owner's cascade already has for that slug, if any
+const { mjml, refs, writes } = decompose(mjmlString, (slug) => existing[slug]?.mjml);
+// mjml   - the template with every component's inline body stripped; only override slots stay
+// refs   - every component slug the template uses, nested refs included
+// writes - { slug, mjml, refs } for each inline body that differs from what the cascade resolves
 ```
 
 Handles:
-- Nested components (depth N)
-- Variant deduplication (same MJML = same component)
-- Variant indexing (`:0`, `:1` for different content)
+- Nested components (depth N): an inline body is decomposed in turn, and its refs bubble up
+- A ref with no inline body inherits the cascade's body; nothing is written for it
+- The same slug inlined twice with different bodies throws `DivergentDuplicateSlugError`
 
 ---
 
@@ -344,7 +343,10 @@ other lens. Everything a template does with a path or a rule goes through it:
   with `lensScopeSurface(lens, { at })`. Fetched options are keyed at the slot's path under `Email`
   (`emailSurfaceSourceValues`). `emailRuleDecoration` derives one facet per lens present.
 
-**The lens is the row owner's.** `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
+**The lens is the row owner's.** `emailOwnerProvider(owner)` (`packages/email/src/render/owner.ts`) turns
+an email row's owner reference into the lens owner the scope binds: an `Organization` or a `Space` is
+itself, and a `User`, `OrganizationUser` or `SpaceUser` owner is its user; platform rows (`default`,
+`admin`) have none. `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
 builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient
 over `DEFAULT_RECIPIENT_NARROWING`, a sender slot from the actual sender when no entry declares
 one; every prisma slot foreign-key-free and redacted) and narrows it by the slots stored on the
@@ -356,8 +358,12 @@ owner's, segments are the owner's (via `recipient.providerRefs.segmentMembers.se
 tiers see platform tags and no segments; the link rows are bound the same way — a tag attachment or
 segment membership by its far side, a customer ref by its provider.
 `OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The scope
-is merged into each slot's **first** narrowing (json-rules `clampLens`): json-rules 3.4 lets a later layer's
-clamp read only what its parent shows, and these clamps read columns the slot hides.
+is one of four static declarations in `packages/email/src/rules/scopes/` (tenant owner and sender,
+owner only, platform owner with a tenant sender, platform), chosen by `emailScopeFor(owner, sender)`
+and written into each slot's **first** narrowing, because json-rules lets a later layer's clamp read
+only what its parent shows and these clamps read columns the slot hides. Every owner id is an
+optional bind token (`equalsSuppliedBind`: the column exists and equals the token), so an
+unsupplied token matches no row; the row's `emailLensBindings(owner, sender)` go to `bindLens`.
 **Memberships are the sender's.** At send, `emailLensFor(slug, owner, stored, sender)` also clamps
 `OrganizationUser` / `SpaceUser` rows to the sending owner's tree (`senderLensOwner`): an
 Organization, OrganizationUser, Space or SpaceUser sender to its organization (the organization and
@@ -494,8 +500,8 @@ for (const recipient of recipients) {
 }
 ```
 
-`interpolate(template, variables, onError?, { locale, liveRefs, lens })` and
-`evaluateConditions(template, variables, onError?, liveRefs?)` take an optional
+`interpolate(template, variables, onError?, { locale, existingTargets, lens })` and
+`evaluateConditions(template, variables, onError?, existingTargets?)` take an optional
 `onError: RuleErrorSink` (`(issue: RenderIssue) => void`, `RenderIssue = { kind:
 'rule' | 'token' | 'each', path?, detail }`). Render has one behaviour: a block whose
 rule is degraded (`withRule`: a required binding missing, the lens no longer admits
@@ -514,27 +520,31 @@ Coordinates template + component persistence:
 ```typescript
 import { saveEmailTemplate } from '@template/email/render';
 
-const { template, components } = await saveEmailTemplate(db, {
-  slug: 'welcome',
-  name: 'Welcome Email',
-  subject: 'Welcome, {{recipient.firstName}}!',
-  mjml: '<mjml>...</mjml>',
-  category: 'system',
-  ownerModel: 'Organization',
-  organizationId: 'org_123',
-  locale: 'en',
-});
+const { template, components } = await saveEmailTemplate(
+  {
+    slug: 'welcome',
+    name: 'Welcome Email',
+    subject: 'Welcome, {{recipient.firstName}}!',
+    mjml: '<mjml>...</mjml>',
+    ownerModel: 'Organization',
+    organizationId: 'org_123',
+    locale: 'en',
+  },
+  { lens, lensFor }, // optional: validate tokens/rules against the email lens; re-check dependents
+);
 ```
 
 Pipeline steps:
-1. Validate MJML syntax + conditional rules in `mjml` and `subject`
-   (`assertValidConditions`) — fail fast instead of shipping a render-time time-bomb
-2. Extract component refs (`mapRefs`)
-3. Lookup existing components via cascade
-4. Resolve variants (match or create)
-5. Save template + components in transaction (each component re-validates its own
-   conditionals at the unit boundary; component MJML is a fragment, so it is not
-   run through the full-document MJML validator)
+1. Validate MJML syntax (`validateMjml`) and conditional rules in `mjml` and `subject`
+   (`assertValidConditions`): fail fast instead of shipping a render-time time-bomb
+2. Look up every referenced slug through the owner's cascade (`lookupCascade`)
+3. Extract components (`decomposeNodes`): inline bodies that differ from the cascade become component writes
+4. Refuse component reference cycles (`validateNoCycle`)
+5. Save components + template in one transaction (`db.txn`), then expand the saved template and
+   validate conditions and tokens on the composed MJML (`assertValidTokens`); a non-system template
+   must carry an unconditional `{{system.unsubscribeUrl}}`. With `lensFor`, every template that uses
+   a saved component is re-validated (`validateDependents`). Component MJML is a fragment, so it is
+   not run through the full-document MJML validator.
 
 ---
 
@@ -730,20 +740,21 @@ edges are persisted so that "who references X" is an index and a stale rule is n
 
 - **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
   (source row → target row), false-polymorphic on both ends — `sourceModel` + one typed FK per
-  rule-bearing model (`sourceEmailTemplateId` / `sourceEmailComponentId` / `sourceSegmentId`), `targetModel` + one typed FK per
-  referenceable model (`targetTagId` / `targetOrganizationId` / `targetSpaceId` / `targetSegmentId`), both axes in `PolymorphismRegistry`.
+  rule-bearing model (`sourceEmailTemplateId` / `sourceEmailComponentId` / `sourceSegmentId` / `sourceEntitlementId`), `targetModel` + one typed FK per
+  referenceable model (`targetTagId`, `targetOrganizationId`, `targetSpaceId`, `targetSegmentId`, and one per rebac resource an entitlement's `where` can name), both axes in `PolymorphismRegistry`.
   Real relations on both ends: the source side cascades, the target side is left to `SET NULL` on a
   purge. Edges are written by the sync (create, delete, restamp) and stamped by `ruleReference:target`.
 - **Which models are referenceable is the registry's answer, not any surface's.**
   `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `targetModel` axis of
   `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it.
 - **A rule-tracked lens has one spelling per reference: the row's `id`, never an FK column.**
-  `omitForeignKeys(lens)` (`packages/db/lens`, the same shape as `redactLens`) omits every FK
+  `omitForeignKeys(lens)` (`packages/db/src/lens/omitForeignKeys.ts`, the same shape as `redactLens`) omits every FK
   column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
   itself in it and declares its own id sources. Each model-rooted lens of the email lens
   (`emailLens`, `packages/email/src/rules/emailLens.ts`) wraps in `omitForeignKeys` and declares
-  `sources: { id: { label: 'name' } }` as a `mapDefaults` entry for each of
-  `RULE_REFERENCEABLE_MODELS`, so the id answers on every path to the model. The default
+  `sources: { id: { label: 'name' } }` (or `sources: { id: true }` for a model without a
+  `name`) as a `mapDefaults` entry for each of `RULE_REFERENCEABLE_MODELS`, so the id answers on
+  every path to the model. The default
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
   and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
@@ -761,27 +772,34 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   resolve — an FK spelling or typo path is a 422, never a silently unregistered rule; `withRule`
   asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
   to decide and only extraction runs.
-- **Edges are written by the save path, not a hook.** The writer is
-  `syncRuleReferenceEdges(owner, references, gate)` in `packages/db` — set-diff (survivors
-  keep their row), a newly added missing or soft-deleted target refused as a delta (a pre-existing
-  dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
-  reads them, and every kept edge restamped against its target. With `gate: { lenses }` (each
-  lens's `toSourceQueries`), a newly added reference the
-  source's composed `where` does not admit is refused too (`admitRuleReferences`): that is how
-  an Organization template cannot name another organization's tag or segment. Throws
-  `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
-  call from its save path. Email's `syncRuleReferences(source, contents, lens, mode)` is the
-  content-shaped front: it collects the rules out of MJML and subject (`contentRuleReferences`)
-  and hands the references down. `saveEmailTemplate` calls it inside
-  its transaction for the template and each saved component; it is the only writer of
-  `mjml`/`subject`, so nothing bypasses it.
+- **Edges are written by one hook over one declaration table.** `RULE_REFERENCE_SURFACES`
+  (`apps/api/src/hooks/ruleReference/surfaces.ts`) declares each rule-bearing model: its rule
+  columns, a label, the lens a row's rules are read under (`emailLensFor` for email rows, the
+  owner-bound customer-ref lens for segments) and the storage wrapper that reads rules out of the
+  stored value (MJML and subject for email, a condition tree for segments). The `ruleReference`
+  after-hook runs on every write to those models. When a row's rule columns differ from the
+  pre-image, it first checks the changed columns: `deadRuleReferences` (`packages/db`) reads the
+  rows they reference and reports each one that is soft-deleted, or absent from its scope's owner
+  scope (the lens's id source), as `{ model, id, state: 'deleted' | 'missing' }`. Any such row
+  refuses the write: `assertRuleReferencesExist` (`packages/db/src/validations`) throws a
+  `RuleReferenceError` carrying that list, which the API error handler answers as a 422 with `details`. A column resent unchanged is not
+  checked, so a subject-only edit passes over a body naming a dead tag. That is how an Organization
+  template cannot name another organization's tag or segment. Then it calls
+  `syncRuleReferenceEdges(source, references)`, the one edge writer, which mirrors exactly what the
+  rule references: it set-diffs (survivors keep their row), locks the referenced rows with
+  `db.findForUpdate`, stamps each edge with its target's `deletedAt`, and never refuses. Revive
+  regenerates through `syncRuleReferences(model, rows)` with the revived rows read whole, no check. Adding a rule-bearing
+  column means adding a declaration entry and a source FK on `RuleReference`.
 - **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
   referenced row is copied onto every edge naming it by `ruleReference:target` (one
   `updateManyAndReturn`, matched on `(targetModel, targetId)`, cleared on undelete); a
   purge `SET NULL`s the typed FK and leaves `targetId` naming the row that went. The referenced
   axis therefore carries true polymorphism beside the false — the FK is the relation and may go
-  null, `targetId` is the name and never changes, and the sync writes both from one value.
-  `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
+  null, `targetId` is the name and never changes. The false-polymorphism rules hook writes `sourceId`
+  and `targetId` from the set typed FK on create (`materialized` on the registry axis), refuses a
+  row where they disagree, and the immutable-fields hook refuses any update to an edge's typed FKs
+  or materialized ids, so the only updatable column on an edge is its `targetDeletedAt` stamp.
+  `ruleReferenceTargets(edges)` reads both from the edge rows alone (each target as `existing`, `deleted` or `purged`), so consumers
   write `include: { sourceRuleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the
   components the cascade resolved into one live set, and every branch goes through **`withRule`**

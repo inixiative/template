@@ -277,8 +277,8 @@ reads the visit the lens shows at that relation — and gates, coerces and descr
 rule against the narrowed lens itself (`useRuleBuilder().lens`), never against a projected
 surface. `narrowing` may also be a list of parent-less layers, outermost first, each
 narrowing the one before. `withAllRelations(source)` turns every relation on in the first
-layer, spells the anchor's own at the root, and spells there every path a later layer
-spells — the posture of a raw record or a first-layer grant. A view resolves each visit on demand (json-rules `lensVisit`), so nothing
+layer, and spells the anchor's own at the root — the posture of a raw record or a
+first-layer grant. A view resolves each visit on demand (json-rules `lensVisit`), so nothing
 is enumerated; `rawView(source)` is the raw-record view permissions and transitions gate.
 
 A sourced field's fetched options (`sourceValues`) ride the visit at their own path: the
@@ -664,7 +664,6 @@ with a registry stores its own by-name reference.
 - `resolve(source, { sourceValues })` → `LensView`: the narrowed lens (`view.lens`, the gate) and `view.visit(at)`, the fields the lens shows at a dotted path from the anchor (`'User'`, `'User.orders'`)
 - `createView(lensOrNarrowing, { sourceValues })` — the same over a lens in hand; `rawView(source)` — a raw record, every relation on (permissions, transitions)
 - `composeNarrowed(source)` — the source's narrowed lens; `withAllRelations(source)` — every relation turned on in its first layer
-- `builderSource(lens, { sourceValues })` — a lens in hand as a serializable source: its model-keyed surface plus one layer spelling, path by path, exactly what the lens shows (no clamp, no bridge) — what a server ships a builder
 - `describeScopeFields(viewAt(viewRoot(view), path), { labels, valueLabels, targets })` — the selectable fields + operator sets at one scope; `describeModelFields(lens, map, model, …)` reads a model-keyed Lens
 - `lensValuePicker` / `useLensValuePicker` — the field/path picker atom (`{ at, maxDepth }`)
 - `lensScopeSurface` / `useLensScopeSurface` — one scope's `{ values, loops }`: leaves flattened through the to-one relations the lens turns on (the lens decides how deep), to-many relations emitted as loop portals instead of being walked; a loop's own scope is `{ at: loop.at }`

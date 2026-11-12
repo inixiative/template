@@ -250,6 +250,8 @@ export const ProfilePage = () => {
 
 **Pages** (`packages/ui/src/pages/`): `LoginPage`, `SignupPage`, `AuthCallbackPage`, `HomePage`, `OrganizationsPage`, `OrganizationUsersPage`, `OrganizationSpacesPage`, `OrganizationProfilePage`, `SpaceProfilePage`, `UserProfilePage`, `ProfilePage`, `TokensPage`, `WebhooksPage`, `IntegrationsPage`, `OrganizationAuthProvidersPage`, `SegmentsPage`, inquiry pages (`InquiriesPage`, `AdminInquiriesPage`, `SpaceTransferInquiryPage`, `SpaceUpdateInquiryPage`, invitation / application / transfer list pages).
 
+A page that offers an inquiry action gates it with `useInquiryPermission`, or, when it checks per option (the invite form's roles), with `checkPermission` on the record `inquiryCheckRecord` builds (`packages/ui/src/lib/inquiries/inquiryCheckRecord.ts`). Never hand-roll the inquiry record: `db:inquiry` gates on `sourceModel` and `targetModel`, and a record without them shows the action to superadmins only. See `docs/claude/INQUIRIES.md#useinquirypermission`.
+
 List pages share one shape: a `Page` with a create action, a `Table`, and `useOptimisticMutation` for create / delete:
 
 ```typescript

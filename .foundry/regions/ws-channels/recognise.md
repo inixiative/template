@@ -36,7 +36,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - render the pushed rows
 - send this event to everyone connected, on every instance
 - fan out to every socket on this instance only
-- a channel you publish to must be registered
 - build the channel name for this record
 - do I need a stream for this or just a refetch
 - don't put the record in the socket message
@@ -46,7 +45,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the set of query keys that go live over the socket
 - add a third kind of socket message
 - can I make this channel reliable with an ack
-- make the list update when a row changes
 - push a nudge, not the data
 - tell the client to reload that query
 - invalidate and reload a query when the hint arrives
@@ -55,8 +53,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - send to this exact socket I already have
 - notify everyone subscribed to this topic, on every instance
 - same payload to every local subscriber of a channel
-- reach all of a user's open tabs and devices
-- send to one user's sockets on this instance
 - wire the query cache into the socket client
 - add this socket to a named channel
 - remove a socket from a channel
@@ -66,7 +62,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the shape of a realtime event the client dispatches by category and action
 - notify all clients at once
 - send to all local connections, not through Redis
-- I'll publish on a channel name nobody registered
 - I'll make the topic name with a template string
 - a refetch per change is fine here, don't add a stream
 - I'll include the updated fields in the channel event
@@ -76,7 +71,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - make this board live-updating by adding its query keys
 - I'll introduce a new handoff type for this feature
 - I'll add a retry flag to the stream
-- return a refetch hint from the app-event handler
 - push refetch hints, never payloads
 - just ping the UI to refresh after this change
 - client side: refresh the cached query on a socket message
@@ -85,8 +79,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - write to a single known connection
 - I'll iterate the connection registry and send to subscribers
 - fan out to this instance's subscribers only
-- message one user wherever they are connected
-- local delivery to a user, not a subscription
 - connect the realtime client to the query client and recovery
 - register a subscription for refetch hints
 - stop sending this connection hints for that query
@@ -96,7 +88,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the live-query event contract, push as a hint
 - I'll loop over all sockets and send the message
 - instance-wide send for an event everyone here should get
-- hints to channels need a registered family
 - the subscription key for one row's updates
 - I'll make a stream for status changes
 - the channel says something changed, not what
@@ -106,7 +97,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which cached queries get refetched on a hint
 - anything beyond messages and stream appends needs the whole stack
 - choose hint or stream, don't bolt on delivery guarantees
-- per-user membership changes: target the user ids instead of a channel
 - the socket just says what changed, the query is the source of truth
 - we push a hint and the client fetches again
 - I'll call invalidateQueries from the socket handler
@@ -115,8 +105,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll push a message to the connection object directly
 - deliver to a channel's subscribers across the cluster
 - send an identical event to local channel members
-- I'll find the user's sockets and send to each
-- message a user's connections here without Redis
 - I'll pass the query client into every socket handler
 - I'll push the socket into a set keyed by channel
 - drop the channel subscription on unsubscribe or close

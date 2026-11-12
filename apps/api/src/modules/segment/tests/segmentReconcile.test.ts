@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, type Prisma } from '@template/db';
+import { db, type Prisma } from '@template/db';
 import type {
   CustomerRef,
   Organization,
@@ -31,12 +31,12 @@ import {
   getNextSeq,
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { enqueueJob } from '#/jobs/enqueue';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
-import { reconcileCustomerRef } from '#/modules/segment/services/reconcileCustomerRef';
+import {
+  dynamicSegmentsOf,
+  reconcileCustomerRef,
+} from '#/modules/segment/services/reconcileCustomerRef';
 import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
 
 const idsRule = (ids: string[]) => ({ field: 'id', operator: Operator.in, value: ids });
@@ -82,11 +82,7 @@ describe('segment reconcile', () => {
       })
     ).entity;
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
-    registerSegmentMemberOwnerHook();
-    registerSegmentRuleReferencesHook();
-
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     organization = context.organization;
     space = (await createSpace({}, { organization })).entity;
@@ -96,9 +92,8 @@ describe('segment reconcile', () => {
     otherRef = await customerOf(other);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('a saved segment is not reconciled until its created event fires', async () => {
@@ -297,7 +292,10 @@ describe('segment reconcile', () => {
     await emitAppEvent('contact.created', { contact });
     expect(await memberIds(segment.id)).toEqual([otherRef.id]);
 
-    const deleted = await db.contact.delete({ where: { id: contact.id } });
+    const deleted = await db.contact.update({
+      where: { id: contact.id },
+      data: { deletedAt: new Date() },
+    });
     await emitAppEvent('contact.deleted', { contact: deleted });
     expect(await memberIds(segment.id)).toEqual([]);
   });
@@ -424,5 +422,20 @@ describe('segment reconcile', () => {
 
     await updateSegment(frozen, { type: SegmentType.dynamic });
     expect(await memberIds(segment.id)).toEqual([acmeRef.id, newcomerRef.id].sort());
+  });
+
+  it("the owner's dynamic segments are its owned segments filtered to dynamic", async () => {
+    const rule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+    const { entity: live } = await createSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.dynamic, conditions: rule },
+      { space },
+    );
+    const { entity: frozen } = await createSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.static, conditions: rule },
+      { space },
+    );
+    const ids = (await dynamicSegmentsOf(ProviderModel.Space, space.id)).map(({ id }) => id);
+    expect(ids).toContain(live.id);
+    expect(ids).not.toContain(frozen.id);
   });
 });

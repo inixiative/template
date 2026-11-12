@@ -164,7 +164,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
 
   // A fan-out wider than the threshold is slow work: its deliveries share the fleet's slow-lane slots.
   // Slow enqueues mostly buffer to the outbox, so they run concurrently — sequential awaits would
-  // each wait out the accumulator's linger instead of committing as one batch.
+  // each pay their own outbox write instead of committing together.
   const lane = fanOutLane(plan.length);
   const deliveries = plan.flatMap(({ user, recipient, idempotencyKey }) => {
     const communicationLogId = logByKey.get(idempotencyKey);

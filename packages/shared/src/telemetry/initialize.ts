@@ -37,7 +37,7 @@ const startTelemetry = (config: TelemetryConfig) => {
     'service.name': config.serviceName,
     'service.version': config.serviceVersion,
     'deployment.environment.name': config.environment,
-    'service.instance.id': crypto.randomUUID(),
+    'service.instance.id': Bun.randomUUIDv7(),
     'service.role': config.role,
   });
   const targets = {

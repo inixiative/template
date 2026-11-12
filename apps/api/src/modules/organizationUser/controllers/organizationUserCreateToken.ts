@@ -4,10 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
-import { roleToStandardAction } from '@template/permissions';
-import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
-import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { organizationUserCreateTokenRoute } from '#/modules/organizationUser/routes/organizationUserCreateToken';
@@ -15,31 +12,14 @@ import { organizationUserCreateTokenRoute } from '#/modules/organizationUser/rou
 export const organizationUserCreateTokenController = makeController(
   organizationUserCreateTokenRoute,
   async (c, respond) => {
-    const permix = c.get('permix');
     const orgUser = getResource<'organizationUser'>(c);
     const body = c.req.valid('json');
 
-    const checkLeave = check(permix, rebacSchema, 'organizationUser', orgUser, 'leave');
-    // Option A: User can create tokens at or below their own role level
-    const checkOrg = check(
-      permix,
-      rebacSchema,
-      'organization',
-      { id: orgUser.organizationId },
-      roleToStandardAction(body.role),
-    );
-    // Option B: Only admins+ can create tokens (uses 'assign' rules)
-    // const checkOrg = check(permix, rebacSchema, 'organization', { id: orgUser.organizationId, role: body.role }, 'assign');
-    if (!checkLeave || !checkOrg)
-      throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
-
     const token = await createToken(c, {
-      name: body.name,
+      ...body,
       ownerModel: 'OrganizationUser',
       userId: orgUser.userId,
       organizationId: orgUser.organizationId,
-      role: body.role,
-      expiresAt: body.expiresAt,
     });
 
     return respond.created(token);

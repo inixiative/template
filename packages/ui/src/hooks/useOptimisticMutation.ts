@@ -110,6 +110,26 @@ const readList = <TItem>(currentData: unknown): TItem[] =>
 const writeList = <TItem>(currentData: unknown, updated: TItem[]): unknown =>
   isWrappedList(currentData) ? { ...currentData, data: updated } : updated;
 
+const isInfiniteList = (currentData: unknown): currentData is { pages: unknown[] } =>
+  currentData !== undefined &&
+  !Array.isArray(currentData) &&
+  Array.isArray((currentData as { pages?: unknown }).pages);
+
+const updateList = <TItem>(
+  currentData: unknown,
+  update: (list: TItem[], isLastPage: boolean) => TItem[],
+): unknown => {
+  if (!isInfiniteList(currentData))
+    return writeList(currentData, update(readList<TItem>(currentData), true));
+  const lastPage = currentData.pages.length - 1;
+  return {
+    ...currentData,
+    pages: currentData.pages.map((page, index) =>
+      writeList(page, update(readList<TItem>(page), index === lastPage)),
+    ),
+  };
+};
+
 export const createOptimisticListTarget = <
   TItem extends { id: string },
   TVariables = unknown,
@@ -130,38 +150,33 @@ export const createOptimisticListTarget = <
       operation === 'create'
         ? (currentData: unknown, response: unknown) => {
             const created = itemFromResponse(response as TResponse);
-            return writeList(
-              currentData,
-              readList<TItem>(currentData).flatMap((item) =>
+            return updateList<TItem>(currentData, (list) =>
+              list.flatMap((item) =>
                 item.id !== OPTIMISTIC_ID ? [item] : created ? [created] : [],
               ),
             );
           }
         : undefined,
     optimisticUpdate: (currentData, variables) => {
-      const list = readList<TItem>(currentData);
-
       const vars = variables as Record<string, unknown>;
       const path = vars.path as Record<string, string> | undefined;
       const body = vars.body as Record<string, unknown> | undefined;
       const id = path?.id;
 
-      let updated: TItem[];
-      switch (operation) {
-        case 'create':
-          updated = [...list, { ...body, ...optimisticExtras, id: OPTIMISTIC_ID } as TItem];
-          break;
-        case 'update':
-          updated = !id ? list : list.map((item) => (item.id === id ? { ...item, ...body } : item));
-          break;
-        case 'delete':
-          updated = !id ? list : list.filter((item) => item.id !== id);
-          break;
-        default:
-          updated = list;
-      }
-
-      return writeList(currentData, updated);
+      return updateList<TItem>(currentData, (list, isLastPage) => {
+        switch (operation) {
+          case 'create':
+            return isLastPage
+              ? [...list, { ...body, ...optimisticExtras, id: OPTIMISTIC_ID } as TItem]
+              : list;
+          case 'update':
+            return !id ? list : list.map((item) => (item.id === id ? { ...item, ...body } : item));
+          case 'delete':
+            return !id ? list : list.filter((item) => item.id !== id);
+          default:
+            return list;
+        }
+      });
     },
   } satisfies OptimisticTarget<TVariables>;
 };

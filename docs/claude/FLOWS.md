@@ -17,8 +17,8 @@ Flows are registered in code: `apps/api/src/modules/flow/registry/flowRegistry.t
 ```ts
 type FlowDefinition = {
   key: FlowKey;
-  bindingsSchema: z.ZodObject;                          // what the caller must send, e.g. { organizationId }
-  steps(bindings, now: Date): Promise<FlowStep[]>;      // plain TS; interpolate bindings directly
+  bindingsSchema: z.ZodType<Record<string, unknown>>;   // what the caller must send, e.g. { organizationId }; strict
+  steps(bindings, { userId, now }): Promise<FlowStep[]>; // plain TS; userId is the flow's owner (the caller)
 };
 
 type FlowStep = {                // exactly what is stored on Flow.steps
@@ -34,6 +34,8 @@ type FlowStep = {                // exactly what is stored on Flow.steps
 - **`readPath`** comes from the generic `apiPath(operationId, pathParams?, query?)` (`apps/api/src/lib/openapi/apiPath.ts`): it resolves the SDK operationId to its path and serializes `query` with `serializeBracketQuery`. Put every predicate the route's own `searchFields` can express in `query`; the rule only judges what comes back.
 - **`rule`** runs with json-rules `check` over `{ data }`. For a list read, `data` is every matching row (`readAllAsCaller` walks the pages with `fetchAllPages`, capped); use `ArrayOperator.notEmpty` / `atLeast` / `any`. For a single read, `data` is the record.
 - **`advance`**: `auto` moves the user to the next step as soon as the step holds. `confirm` waits for the user (see [Client](#client)). Use `confirm` when the page shows something the user must see before leaving, like a token's one-time secret.
+- **Bindings never carry the caller.** A flow belongs to its user (`Flow.userId`), and `createFlow` hands `steps` that `userId`. Bindings schemas are strict (`z.strictObject`), so a `userId` in the body is a 422; the registry test sends one for every flow.
+- **Polymorphic targets** use `polymorphicSchema` ([HOOKS.md](HOOKS.md#request-validation)) with `omit: ['userId']`, so a personal target is just `{ ownerModel: 'User' }`, and `extend` for the flow's other bindings (`returnUrl`).
 - **`returnUrl`**: a flow may accept an optional `returnUrl` binding (`appPathSchema` from `@template/shared/utils`, in-app paths only). Without it the flow ends on `/dashboard`.
 
 ## Lifecycle
@@ -41,7 +43,7 @@ type FlowStep = {                // exactly what is stored on Flow.steps
 ```
 POST me/flows {flowKey, bindings}
   → bindings parsed by bindingsSchema (422, fieldErrors under bindings.*)
-  → steps(bindings) → stored on Flow.steps (immutable: editing the registry never touches a running flow)
+  → steps(bindings, { userId: caller, now }) → stored on Flow.steps (immutable: editing the registry never touches a running flow)
   → checkFlow
 
 GET flow/:id   (on mount, and after every successful mutation)
@@ -87,5 +89,5 @@ All of it is in `packages/ui`; pages need no flow code.
 ## Adding a flow
 
 1. Add the key to `enum FlowKey` (`packages/db/prisma/schema/flow.prisma`).
-2. Write `registry/<key>.ts` and add it to `flowRegistry`.
+2. Write `registry/<key>.ts` (strict bindings; the caller comes from `steps`' `userId`) and add it to `flowRegistry`.
 3. Add a caller to `callerFor` in `modules/flow/tests/flowRegistry.test.ts`. That test creates the flow with factory data and asserts every step's read is a real route that answers 200, which catches unknown operationIds and filters the route rejects.

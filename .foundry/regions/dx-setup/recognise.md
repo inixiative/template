@@ -60,8 +60,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - what's the normal loop: pull, run, change, test, push
 - local uploads disappear when the container restarts
 - the local env file is gitignored
-- I'm in a worktree, but I'll commit from the main checkout
-- I'll git worktree add a branch
 - rename the package scope for the new project
 - check with Aron before introducing a new pattern
 - every worktree shares one docker stack
@@ -69,9 +67,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the registry of local ports per project
 - which users and tokens exist in the local seed
 - where do new models go
-- changing init, read the patterns doc first
 - inspect the redis keys locally
-- a permanent script goes in a scripts subfolder
 - create the buckets for the main checkout
 - create the buckets for a worktree slot
 - create the test database when postgres first starts
@@ -82,10 +78,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - run only the api in watch mode
 - run only the web frontend
 - run only the job worker, watched
-- declare the typed id kind for a new model
 - update the agent instructions for the new project
 - wait for the services before running the script
-- each worktree gets its own ports, databases and buckets
 - why was my command in the main checkout denied
 - inspect failed jobs and their state
 - wipe webhook rows in the test database
@@ -101,8 +95,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - how do I work day to day in this repo
 - minio storage isn't persistent on purpose
 - I'll commit my env file so others get it
-- run the install in the worktree, not main
-- I'll rm -rf the worktrees folder to clean up
 - what do we call the packages after forking
 - when in doubt about a design, stop and ask
 - I'll start a second postgres for this branch
@@ -110,9 +102,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - where port assignments live
 - a ready-made token for an org or space scope
 - I'll add the model to the main schema file
-- which doc before touching init
 - see what's in the cache right now
-- where do I put a script that stays
 - bootstrap storage buckets on first container start
 - per-slot storage buckets
 - the container init that makes the test db
@@ -123,10 +113,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - start just the backend
 - start just the web app locally
 - start just the worker with reload
-- add the id type when adding a model
 - the fork still has the template's instructions
 - don't sleep, wait for readiness
-- two branches sharing one database clash
 - stop mutations landing in the main checkout
 - I'll query redis to see job status
 - I'll delete the subscriptions with a raw query
@@ -143,8 +131,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - when do I need to re-run setup
 - I'll add a volume so uploads survive
 - where do local env values live
-- the guard blocked my commit in the main checkout
-- never create or remove worktrees with git directly
 - I'll keep the template scope in the fork
 - I'll just go ahead with the new approach
 - why is the compose project name fixed
@@ -152,9 +138,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - nothing should use a default port
 - I'll create a test user by hand to log in locally
 - the schema folder for domain models
-- I'll change the init flow without reading the doc
 - I'll write a script to dump redis
-- I'll leave the helper script in tmp
 - I'll make the buckets through the console
 - I'll reuse the main buckets in the worktree
 - I'll create the test database manually
@@ -165,9 +149,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll start the whole stack to work on the api
 - I'll bring up everything for a frontend change
 - I'll run the api when I only need the worker
-- I'll use a plain string for the new model's id
 - I'll add a fixed sleep in the ci step
-- I'll point the branch at the main database
 - the guard refused my git worktree add
 - a dashboard for background jobs
 - I'll run the setup wizard by hand once
@@ -179,14 +161,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - look up our assigned local ports
 - idempotent container startup provisioning
 - the routine for a working session
-- don't touch main once working in a worktree
-- prune the stale worktrees by hand
 - don't give each worktree its own compose project
 - never hand-pick a port
 - I'll hardcode 5432 for postgres
 - the default accounts after seeding
 - poke at redis through the container
-- committed scripts have a home by category
 - the main stack's bucket setup
 - provision storage for a new slot
 - what does worktree create actually provision
@@ -194,12 +173,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - one service in watch mode
 - the worker alone in watch mode
 - block until postgres and redis answer
-- I'll pick a free port for this branch myself
 - a root command to run everything locally
 - get the repo running from scratch
 - make a new worktree for this feature
-- use the repo's worktree commands, not git's
-- isolate parallel work so nothing collides
 
 ## When this is not your domain
 

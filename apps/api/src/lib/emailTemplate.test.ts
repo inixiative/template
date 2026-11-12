@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -12,7 +12,6 @@ import {
 } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { saveEmailTemplate } from '@template/email/render';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { settleTemplate } from '#/lib/emailTemplate';
 
 const mjml = (content: string) =>
@@ -52,8 +51,7 @@ const variables = given({
 describe('settleTemplate — the registry entry decides what an issue does', () => {
   let organization: Organization;
 
-  beforeAll(async () => {
-    registerRulesHook();
+  beforeEach(async () => {
     organization = (await createOrganization()).entity;
     await save('clean', 'Hi {{recipient.name}}');
     await save('holey', 'Hi {{recipient.name}} {{data.missing}}');
@@ -66,9 +64,8 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     );
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('a clean render carries no issues', async () => {
@@ -201,7 +198,11 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     const { entity: template } = await createEmailTemplate({
       mjml: mjml('{{#component:already-missing}}{{/component:already-missing}}'),
       subject: 'Hello',
-      degradedComponentRefs: ['already-missing', 'previously-missing'],
+    });
+    // Raw: the versioning hook restamps a row's own marker on every hooked write.
+    const marked = await db.raw.emailTemplate.update({
+      where: { id: template.id },
+      data: { degradedComponentRefs: ['already-missing', 'previously-missing'] },
     });
     const settled = await settleTemplate(template.slug, platform, variables, undefined, {
       onIssue: 'fail',
@@ -209,8 +210,8 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     });
     expect(settled.slug).toBe('clean');
     const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
-    expect(stored.degradedComponentRefs).toEqual(template.degradedComponentRefs);
-    expect(stored.updatedAt).toEqual(template.updatedAt);
+    expect(stored.degradedComponentRefs).toEqual(['already-missing', 'previously-missing']);
+    expect(stored.updatedAt).toEqual(marked.updatedAt);
   });
 });
 
@@ -254,8 +255,7 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
       data: {},
     });
 
-  beforeAll(async () => {
-    registerRulesHook();
+  beforeEach(async () => {
     organization = (await createOrganization()).entity;
     other = (await createOrganization()).entity;
     myTag = (
@@ -310,9 +310,8 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
     await db.tag.update({ where: { id: goneTag.id }, data: { deletedAt: new Date() } });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it("a tag the owner can see matches; the same rule over another owner's tag does not", async () => {
@@ -331,7 +330,7 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
     expect(foreign.issues).toEqual([]);
   });
 
-  it('a segment whose own rule is degraded leaves the live set, so the branch degrades', async () => {
+  it('a segment whose own rule is degraded leaves the existing-target set, so the branch degrades', async () => {
     const settled = await settleTemplate(
       'scoped-segment',
       sender(),

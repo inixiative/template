@@ -13,13 +13,13 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "test": "bun test src/lenses/",
     "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
-    "@inixiative/json-rules": "^3.5.0"
+    "@inixiative/json-rules": "^3.6.0"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.97.3",

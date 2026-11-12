@@ -79,7 +79,7 @@ packages/db/src/index.ts
 | Prefix | Meaning |
 |--------|---------|
 | `_` | Unused binding (parameter, destructured field) |
-| `__` | Private / internal: class privates, module-private state, type brands, object-literal internals ([NAMING.md → Underscore Prefix](NAMING.md#underscore-prefix)) |
+| `__` | Private / internal: class privates, module-private state, object-literal internals ([NAMING.md → Underscore Prefix](NAMING.md#underscore-prefix)) |
 
 ```typescript
 // Unused parameter
@@ -88,9 +88,6 @@ app.get('/', (_req, res) => res.send('ok'));
 // Module-private state
 let __cache: Map<string, unknown> | null = null;
 export const getCache = () => __cache ??= new Map();
-
-// Type brand
-type UserId = string & { readonly __model: 'User' };
 ```
 
 ---

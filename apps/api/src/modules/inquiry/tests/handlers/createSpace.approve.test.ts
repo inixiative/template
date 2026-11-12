@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -24,7 +24,7 @@ describe('handler: createSpace — approve', () => {
   let org: Organization;
   let adminFetch: ReturnType<typeof createTestApp>['fetch'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: owner } = await createUser();
     const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
     const { entity: o } = await createOrganization();
@@ -36,7 +36,7 @@ describe('handler: createSpace — approve', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -51,7 +51,10 @@ describe('handler: createSpace — approve', () => {
     });
 
     const response = await adminFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
     );
     expect(response.status).toBe(200);
 
@@ -72,7 +75,12 @@ describe('handler: createSpace — approve', () => {
       content: { name: 'Denied Space', slug: 'denied-space' },
     });
 
-    await adminFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'denied' }));
+    await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+      }),
+    );
 
     const space = await db.space.findFirst({ where: { slug: 'denied-space' } });
     expect(space).toBeNull();

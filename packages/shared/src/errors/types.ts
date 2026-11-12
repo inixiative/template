@@ -40,5 +40,6 @@ export type ApiErrorBody = {
   message: string;
   guidance: Guidance;
   fieldErrors?: Record<string, string[]>;
+  details?: Record<string, unknown>[];
   requestId: string;
 };

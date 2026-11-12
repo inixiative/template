@@ -4,15 +4,23 @@
  * @partOf feature:users
  * @uses infrastructure:prisma, primitive:caching
  */
-import type { Db, UserWithRelations } from '@template/db';
-import { cache, cacheKey, upsertCache } from '@template/db';
-import type { User } from '@template/db/generated/client/client';
+import type { UserWithRelations } from '@template/db';
+import {
+  cache,
+  cacheKey,
+  db,
+  fetchOne,
+  includeTargetEntitlements,
+  type OrganizationUserWithEntitlements,
+  type SpaceUserWithEntitlements,
+} from '@template/db';
+import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
+import { compact, uniqBy } from 'lodash-es';
 
 const USER_CACHE_TTL = 60 * 10 + 6; // 10.1 minutes
-const RECORD_CACHE_TTL = 60 * 10; // 10 minutes
 
-export const findUserByEmail = async (db: Db, email: string): Promise<User | null> => {
+export const findUserByEmail = async (email: string): Promise<User | null> => {
   return cache<User | null>(
     cacheKey('User', { email }),
     () => db.user.findFirst({ where: { email } }),
@@ -20,92 +28,64 @@ export const findUserByEmail = async (db: Db, email: string): Promise<User | nul
   );
 };
 
-export const findUserWithRelations = async (
-  db: Db,
-  userId: string,
-): Promise<UserWithRelations | null> => {
-  return cache<UserWithRelations | null>(
-    cacheKey('User', userId, ['relations']),
-    async () => {
-      const user = await db.user.findUnique({
-        where: { id: userId },
-        include: {
-          organizationUsers: {
-            where: { organization: { deletedAt: null } },
-          },
-        },
-      });
-
-      if (!user) return null;
-
-      const ownedOrgIds = user.organizationUsers
-        .filter((ou) => ou.role === Role.owner)
-        .map((ou) => ou.organizationId);
-
-      const [organizations, spaceUsers, spaces] = await Promise.all([
-        db.organization.findMany({
-          where: {
-            organizationUsers: { some: { userId } },
-            deletedAt: null,
-          },
-        }),
-        db.spaceUser.findMany({
-          where: {
-            userId,
-            space: { deletedAt: null },
-          },
-        }),
-        db.space.findMany({
-          where: {
-            deletedAt: null,
-            OR: [{ spaceUsers: { some: { userId } } }, { organizationId: { in: ownedOrgIds } }],
-          },
-        }),
-      ]);
-
-      const result: UserWithRelations = {
-        ...user,
-        organizations,
-        spaceUsers,
-        spaces,
-      };
-
-      // Cache all records
-      upsertCache(cacheKey('user', user.id), user, { ttl: RECORD_CACHE_TTL });
-
-      for (const org of organizations) {
-        upsertCache(cacheKey('organization', org.id), org, { ttl: RECORD_CACHE_TTL });
-      }
-
-      for (const space of spaces) {
-        upsertCache(cacheKey('space', space.id), space, { ttl: RECORD_CACHE_TTL });
-      }
-
-      for (const orgUser of user.organizationUsers) {
-        upsertCache(
-          cacheKey('organizationUser', {
-            organizationId: orgUser.organizationId,
-            userId: orgUser.userId,
-          }),
-          orgUser,
-          { ttl: RECORD_CACHE_TTL },
-        );
-      }
-
-      for (const spaceUser of spaceUsers) {
-        upsertCache(
-          cacheKey('spaceUser', {
-            organizationId: spaceUser.organizationId,
-            spaceId: spaceUser.spaceId,
-            userId: spaceUser.userId,
-          }),
-          spaceUser,
-          { ttl: RECORD_CACHE_TTL },
-        );
-      }
-
-      return result;
-    },
+const organizationUsersOf = (userId: string): Promise<OrganizationUserWithEntitlements[]> =>
+  cache(
+    cacheKey('user', userId, ['organizationUsers']),
+    () =>
+      db.organizationUser.findMany({
+        where: { userId, organization: { deletedAt: null } },
+        include: includeTargetEntitlements('OrganizationUser'),
+      }),
     USER_CACHE_TTL,
   );
+
+const spaceUsersOf = (userId: string): Promise<SpaceUserWithEntitlements[]> =>
+  cache(
+    cacheKey('user', userId, ['spaceUsers']),
+    () =>
+      db.spaceUser.findMany({
+        where: { userId, space: { deletedAt: null } },
+        include: includeTargetEntitlements('SpaceUser'),
+      }),
+    USER_CACHE_TTL,
+  );
+
+const spacesOfOrganization = (organizationId: string): Promise<Space[]> =>
+  cache(
+    cacheKey('organization', organizationId, ['spaces']),
+    () => db.space.findMany({ where: { organizationId } }),
+    USER_CACHE_TTL,
+  );
+
+export const findUserWithRelations = async (userId: string): Promise<UserWithRelations | null> => {
+  const user = await fetchOne<User>('user', userId, USER_CACHE_TTL);
+  if (!user) return null;
+
+  const [organizationUsers, spaceUsers] = await Promise.all([
+    organizationUsersOf(userId),
+    spaceUsersOf(userId),
+  ]);
+  const ownedOrganizationIds = organizationUsers
+    .filter((organizationUser) => organizationUser.role === Role.owner)
+    .map((organizationUser) => organizationUser.organizationId);
+
+  const [organizations, memberSpaces, ownedSpaces] = await Promise.all([
+    Promise.all(
+      organizationUsers.map((organizationUser) =>
+        fetchOne<Organization>('organization', organizationUser.organizationId, USER_CACHE_TTL),
+      ),
+    ),
+    Promise.all(
+      spaceUsers.map((spaceUser) => fetchOne<Space>('space', spaceUser.spaceId, USER_CACHE_TTL)),
+    ),
+    Promise.all(ownedOrganizationIds.map(spacesOfOrganization)),
+  ]);
+
+  return {
+    ...user,
+    organizationUsers,
+    organizations: compact(organizations),
+    spaceUsers,
+    spaces: uniqBy(compact([...memberSpaces, ...ownedSpaces.flat()]), 'id'),
+  };
 };

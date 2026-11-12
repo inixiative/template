@@ -51,7 +51,7 @@
 
 ### Schemas
 - **Use generated Prisma schemas** - don't define custom schemas
-- Import from `@template/db/zod` (inputs) or `@template/db/zod/models` (responses)
+- Import from `@template/db/zod/objects/<Model>CreateInput.schema` (inputs, one file each) or `@template/db/zod/models` (responses)
 - Only extend/customize when truly necessary (e.g., adding non-DB field like `ownerEmail`)
 
 ### Routes

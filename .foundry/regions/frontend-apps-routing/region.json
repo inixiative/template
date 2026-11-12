@@ -3,18 +3,18 @@
   "title": "Frontend apps, routes and layouts",
   "routing": "Is this about the three frontend apps and their routes: web vs admin vs superadmin, TanStack file routes under app/routes (bun run generate:routes), the layout groups __root / _public / _authenticated / _fullscreen, AppShell vs FullscreenLayout, guards in beforeLoad (requireAuth / requirePublic, redirectPreservingContext, navigateToLogin / navigateToSignup), component-less redirect parents, nested settings routes, the shared pages mounted by thin route files (HomePage, ProfilePage, OrganizationsPage, SegmentsPage \u2026), or currentPath / currentLocation?",
   "concepts": ["frontend-routing"],
-  "tokens": 14108,
+  "tokens": 14966,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2793,
+      "tokens": 3032,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 14108
+      "tokens": 14966
     }
   },
   "runsAgreed": 0,
@@ -48,11 +48,14 @@
       "module-layout-monorepo",
       "multi-tenancy-membership",
       "roles-and-permissions",
+      "rule-references-registry",
+      "segments-membership",
       "structured-logging",
-      "superadmin-operations"
+      "superadmin-operations",
+      "ui-components"
     ],
-    "codeEntries": 50,
-    "docMembers": 33
+    "codeEntries": 51,
+    "docMembers": 42
   },
   "bypassLines": 25,
   "glossaryTerms": 13

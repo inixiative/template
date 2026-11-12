@@ -1,15 +1,13 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
+import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
+import { cleanupTouchedTables, createInquiry, createOrganizationUser } from '@template/db/test';
 import {
   clearImmutableFieldsCache,
   setImmutableFieldsCache,
 } from '#/hooks/immutableFields/registry';
 
-registerImmutableFieldsHook();
-
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
@@ -22,7 +20,7 @@ describe('immutableFields hook', () => {
     clearImmutableFieldsCache();
   });
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: orgUser } = await createOrganizationUser();
     userId = orgUser.userId;
     orgId = orgUser.organizationId;
@@ -62,10 +60,11 @@ describe('immutableFields hook', () => {
     const result = await db.organizationUser.upsert({
       where: { id: orgUserId },
       create: { userId, organizationId: orgId, role: 'member' },
-      update: { userId: 'should-strip', role: 'member' },
+      update: { userId: 'should-strip', organizationId: 'should-strip', role: 'member' },
     });
 
     expect(result.userId).toBe(userId);
+    expect(result.organizationId).toBe(orgId);
     expect(result.role).toBe('member');
   });
 
@@ -98,25 +97,23 @@ describe('immutableFields hook', () => {
     });
 
     it('can lock nested JSON paths via cache', async () => {
-      const initialEntitlements = { canInvite: true, maxProjects: 5 };
-      const { entity: testOrgUser } = await createOrganizationUser({
-        entitlements: initialEntitlements,
+      const { entity: inquiry } = await createInquiry({
+        type: InquiryType.inviteOrganizationUser,
+        sourceModel: InquiryResourceModel.Organization,
+        sourceOrganizationId: orgId,
+        targetModel: InquiryResourceModel.User,
+        targetUserId: userId,
+        content: { canInvite: true, maxProjects: 5 },
       });
 
-      // Lock only the canInvite path, not the whole entitlements object
-      setImmutableFieldsCache('OrganizationUser', [
-        'userId',
-        'organizationId',
-        'entitlements.canInvite',
-      ]);
+      setImmutableFieldsCache('Inquiry', ['content.canInvite']);
 
-      const result = await db.organizationUser.update({
-        where: { id: testOrgUser.id },
-        data: { entitlements: { canInvite: false, maxProjects: 100 } },
+      const result = await db.inquiry.update({
+        where: { id: inquiry.id },
+        data: { content: { canInvite: false, maxProjects: 100 } },
       });
 
-      // canInvite should be stripped, maxProjects should update
-      expect(result.entitlements).toEqual({ maxProjects: 100 });
+      expect(result.content).toEqual({ maxProjects: 100 });
     });
   });
 });

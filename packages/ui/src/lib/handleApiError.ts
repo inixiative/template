@@ -35,7 +35,7 @@ export const handleApiError = (error: unknown) => {
     fixInput: () => toast.error(`${message}. Please double check your data.`),
     tryAgain: () => toast.error(`${message}. Please try again.`),
     reauthenticate: () =>
-      toast.error('Session expired. Please log in again.', {
+      toast.error('Your sign-in has ended. Please log in again.', {
         action: { label: 'Login', onClick: () => navigateToLogin(useAppStore.getState) },
       }),
     requestPermission: () => toast.error(`${message}. Contact an administrator to request access.`),

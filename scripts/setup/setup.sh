@@ -32,6 +32,7 @@ fi
 "$SCRIPT_DIR/sync-env.sh"
 
 bun install
+"$ROOT_DIR/scripts/worktree/ports.sh"
 docker-compose up -d
 "$ROOT_DIR/scripts/db/wait-postgres.sh"
 "$ROOT_DIR/scripts/db/wait-redis.sh"
@@ -55,5 +56,7 @@ else
   echo "Seeding database..."
   bun run with local api bun run db:seed
 fi
+
+"$SCRIPT_DIR/playwright-mcp.sh"
 
 echo "Setup complete. Run: bun run local"

@@ -16,7 +16,6 @@
   - [AuthProvider Module](#authprovider-module)
     - [Module Structure](#module-structure)
     - [Endpoints](#endpoints)
-    - [Platform vs Organization Providers](#platform-vs-organization-providers)
     - [Example: Read Platform Providers (Public)](#example-read-platform-providers-public)
     - [Example: Create Organization Provider (Encrypted)](#example-create-organization-provider-encrypted)
     - [Example: Read Organization Providers (Permission-Aware)](#example-read-organization-providers-permission-aware)
@@ -27,7 +26,7 @@
   - [paginate() Utility](#paginate-utility)
   - [Search & Filtering](#search--filtering)
   - [Route declaration (lens narrowing)](#route-declaration-lens-narrowing)
-  - [Dynamic per-request scope — `scopeNarrowing` middleware](#dynamic-per-request-scope--scopenarrowing-middleware)
+  - [Per-request scope — bind tokens](#per-request-scope--bind-tokens)
   - [Admin routes](#admin-routes)
   - [Controller — `paginate()` integration](#controller--paginate-integration)
   - [How it works](#how-it-works)
@@ -49,6 +48,7 @@
   - [Colocation Rule](#colocation-rule)
   - [Cross-Field Validations](#cross-field-validations)
 - [Router Exports](#router-exports)
+  - [Info routes](#info-routes)
 - [File Organization](#file-organization)
   - [Core (always present)](#core-always-present)
   - [Common Folders (as needed)](#common-folders-as-needed)
@@ -85,6 +85,8 @@ Pattern: `resourceActionSubresource`
 
 **Always use templates** from `#/lib/routeTemplates` - never raw `createRoute`.
 
+Route paths write parameters the OpenAPI way, `{id}`. `@hono/zod-openapi` converts them to Hono's `:id` when it registers the route, so the spec, the SDK and every reader of the spec see `{id}`, and Hono's runtime (`c.req.routePath`) sees `:id`. The `openapi-path-params` CI rule refuses a `:param` in a route definition, and any parameter other than `{id}` until a route needs one (the rule says how to widen it). The frontend converts back to `:id` in one place, `@template/ui/lib/toRoutePattern`, for telemetry and MSW handlers.
+
 ```typescript
 import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#/lib/routeTemplates';
 ```
@@ -94,13 +96,14 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | Arg | Type | Description |
 |-----|------|-------------|
 | `model` | Module | Resource name (singular) - **required** |
-| `submodel` | Module | Nested resource (e.g., `token` → `/:id/tokens`) |
-| `action` | string | Verb action (e.g., `activate` → `/:id/activate`) |
-| `many` | boolean | List endpoint (affects path, operationId) |
+| `submodel` | Module | Nested resource (e.g., `token` → `/{id}/tokens`) |
+| `action` | string | Verb action (e.g., `activate` → `/{id}/activate`) |
+| `many` | boolean | List endpoint, or a create-many / delete-many over a submodel collection (affects path, body, operationId) |
 | `paginate` | boolean | Add pagination query params (requires `many`) |
 | `admin` | boolean | Adds 'Admin' prefix to operationId and tag |
 | `skipId` | boolean | Omit `:id` param from path |
-| `bodySchema` | ZodSchema | Request body validation |
+| `bodySchema` | ZodSchema | Request body validation (no object-level `.refine()`; route build throws) |
+| `bodyRefinement` / `queryRefinement` / `paramsRefinement` | `(value, ctx) => void` | Cross-field checks on the validated body/query/params, run before the controller; not in OpenAPI/SDK |
 | `responseSchema` | ZodSchema | Response shape |
 | `query` | ZodSchema | Query params (merged with pagination if enabled) |
 | `params` | ZodSchema | Path params (merged with id if not skipped) |
@@ -119,8 +122,9 @@ readRoute({ model: 'user', many: true, paginate: true, responseSchema })
 // Create
 createRoute({ model: 'user', bodySchema, responseSchema })
 
-// Create many
-createRoute({ model: 'user', many: true, bodySchema: z.array(schema), responseSchema })
+// Create many: bodySchema is one item; the body is an array of them, the 201 an array of responseSchema
+createRoute({ model: 'token', submodel: 'entitlement', many: true, bodySchema, responseSchema })
+// → POST /{id}/entitlements, operationId tokenCreateManyEntitlements
 
 // Update
 updateRoute({ model: 'user', bodySchema, responseSchema })
@@ -128,13 +132,17 @@ updateRoute({ model: 'user', bodySchema, responseSchema })
 // Delete
 deleteRoute({ model: 'user' })
 
+// Delete many: the body is a JSON array of ids (deleteManyBodySchema), the answer 204
+deleteRoute({ model: 'token', submodel: 'entitlement', many: true })
+// → DELETE /{id}/entitlements, operationId tokenDeleteManyEntitlements
+
 // Subresource
 createRoute({ model: 'organization', submodel: 'token', bodySchema, responseSchema })
 
 // Action
 actionRoute({ model: 'user', action: 'activate', bodySchema, responseSchema })
 
-// Action on a subresource collection → POST /:id/segments/reach
+// Action on a subresource collection → POST /{id}/segments/reach
 actionRoute({ model: 'space', submodel: 'segment', action: 'reach', bodySchema, responseSchema })
 
 // Admin
@@ -147,7 +155,7 @@ readRoute({ model: 'user', many: true, admin: true, responseSchema })
 
 A lens narrowing can declare a `where` in three places, and they assert three different things.
 
-**Root where** (`root.where`, plus any stacked `scopeNarrowing` layers) — a predicate on the root rows themselves: through this lens, the only rows that exist are the ones matching. Its rule may traverse relations (`tokens.isActive`-style fields), but the traversal qualifies *roots*: "give me Users such that…". It answers **which rows are in the result set**.
+**Root where** (`root.where`, plus any parent layer's) — a predicate on the root rows themselves: through this lens, the only rows that exist are the ones matching. Its rule may traverse relations (`tokens.isActive`-style fields), but the traversal qualifies *roots*: "give me Users such that…". It answers **which rows are in the result set**.
 
 **Relation-node where** (`root.relations.<rel>.where`) — a standing condition on that edge: whenever a query traverses this relation, the related rows are scoped by this condition. It says nothing about which roots qualify — a User with zero matching tokens is still in the set. It answers **what the related collection looks like when you traverse to it**. Declared per *path*, not per model: two edges reaching the same model can carry different wheres.
 
@@ -199,7 +207,7 @@ Complete real-world examples showing all patterns together.
 
 **Location:** `apps/api/src/modules/authProvider/`
 
-Manages authentication providers (OAuth, SAML) at platform and organization level. Demonstrates encryption, permissions, and public/private endpoints.
+A worked example of the route patterns: encryption, permissions, and public and private endpoints in one module. What the providers are and who may manage them is [AUTH.md § Multi-Provider Authentication](./AUTH.md#multi-provider-authentication-authprovider); this section shows only the code.
 
 #### Module Structure
 
@@ -229,20 +237,6 @@ authProvider/
 | PATCH | `/authProviders/:id` | `own` | Update auth provider |
 | DELETE | `/authProviders/:id` | `own` | Delete auth provider |
 | GET | `/admin/authProviders` | Superadmin | List all providers (admin only) |
-
-#### Platform vs Organization Providers
-
-**Platform providers:**
-- Created by superadmins
-- Available to all users/orgs (Google, GitHub, etc.)
-- Immutable by organization owners
-- No encrypted secrets (OAuth configured at platform level)
-
-**Organization providers:**
-- Created by organization owners
-- Only available to that organization (e.g., custom SAML)
-- Can be updated/deleted by org owners
-- Secrets encrypted using encryption service (see ENCRYPTION.md)
 
 #### Example: Read Platform Providers (Public)
 
@@ -280,7 +274,7 @@ export const organizationCreateAuthProviderController = makeController(
 
     const data = {
       ...body,
-      id: crypto.randomUUID(),
+      id: Bun.randomUUIDv7(),
       organizationId: organizationId(org.id),
       createdBy: userId(user.id),
     };
@@ -547,7 +541,7 @@ The two combinators differ in one place. `AND` is associative with the enclosing
 
 **Bare values default to the field's operator** — `searchFields[email]=foo` is shorthand for the field's default op (String → `contains`, others → `equals`). The leaf schema accepts either the bare value or the operator object.
 
-**JSON fields** filter (not order) via their own operators: `path` (dotted string or array), `string_contains`, `string_starts_with`, `string_ends_with`, `equals`, `not`. The `path` shape is provider-specific (Postgres key array / MySQL JSONPath) — handled by `dialect` (`apps/api/src/lib/prisma/dialect.ts`).
+**JSON fields** filter (not order) via their own operators: `path` (dotted string or array), `string_contains`, `string_starts_with`, `string_ends_with`, `equals`, `not`. The `path` shape is provider-specific (Postgres key array / MySQL JSONPath) — handled by `dialect` (`packages/db/src/lens/dialect.ts`, imported from `@template/db/lens`).
 ```
 GET /api/v1/events?searchFields[meta][path]=user.id&searchFields[meta][string_contains]=abc
 ```
@@ -595,7 +589,7 @@ root: {
 
 **Server-enforced filtering — `root.where`:**
 
-For static (route-wide) filters use `root.where`. For per-request / context-dependent filters use the `scopeNarrowing` middleware (see below). Both go through `toPrisma` and AND-merge into the final Prisma where.
+Filters go in `root.where`. A per-request value is a `bind` token in it (see below). The where goes through `toPrisma` and AND-merges into the final Prisma where.
 
 ```typescript
 filterLens: {
@@ -613,48 +607,24 @@ filterLens: {
 },
 ```
 
-**Defense in depth — `enumOmits` + `where`:** `enumOmits` hides values from the SDK type surface (consumer types can't even express the omitted enum value). `where` enforces the same filter server-side. **Both are needed**: type narrowing prevents accidental misuse, server `where` enforces under raw API calls.
+**Defense in depth — `enumOmits` + `where`:** `enumOmits` hides values from the SDK type surface (consumer types can't even express the omitted enum value). `where` enforces the same filter server-side. **Both are needed**: type narrowing prevents accidental misuse, server `where` enforces under raw API calls. `paginate()` reads `searchFields` from the raw bracket query, not the schema-validated query, so `buildWhereClause` re-checks enum values against the lens: an omitted or unknown value is a 400, never an empty 200 or a Prisma 500.
 
-### Dynamic per-request scope — `scopeNarrowing` middleware
+### Per-request scope — bind tokens
 
-For ctx-aware where conditions (tenant scope, user ownership, etc.), use the `scopeNarrowing` middleware. It merges into the narrowing already on context. Supports both sync and async callbacks:
+A lens is static: nothing narrows it per request. A ctx-aware condition (tenant scope, user ownership) is a `bind` token in the route's static `filterLens`, and the controller supplies its value to `paginate`, which refuses a lens whose required tokens are missing:
 
 ```typescript
-import { scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
-
-readRoute({
-  model: Modules.organization,
-  submodel: Modules.inquiry,
-  action: 'received',
-  many: true,
-  paginate: true,
-  filterLens: inquiryReceivedNarrowing,  // static part
-  responseSchema,
-  middleware: [
-    validatePermission('manage'),
-    scopeNarrowing((c) => ({
-      root: {
-        where: { field: 'targetOrganizationId', operator: 'equals', value: getResource<'organization'>(c).id },
-      },
-    })),
-  ],
-});
-```
-
-Async (e.g., integration-source lookup):
-```typescript
-scopeNarrowing(async (c) => {
-  const tenantId = await resolveTenant(c);
-  return { root: { where: { field: 'tenantId', operator: 'equals', value: tenantId } } };
-}),
-```
-
-`WhereScope` mirrors the narrowing shape:
-```typescript
-type WhereScope = {
-  root?: { where?: Condition; relations?: Record<string, /* recursive */> };
-  mapDefaults?: Record<string, { models?: Record<string, { where?: Condition }> }>;
+const inquiryReceivedNarrowing: LensNarrowing = {
+  parent: lensFor('Inquiry'),
+  root: {
+    picks: inquiryPicks,
+    where: { field: 'targetOrganizationId', operator: 'equals', bind: 'organizationId' },
+  },
 };
+
+const { data, pagination } = await paginate(c, db.inquiry, {
+  bindings: { organizationId: getResource<'organization'>(c).id },
+});
 ```
 
 ### Admin routes
@@ -696,9 +666,8 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 1. `prepareRequest` middleware parses bracket notation (`?searchFields[name]=value`) into nested objects
 2. `prepareMiddleware` injects an inline middleware that sets `filterLens` on context from the route's static `filterLens`
-3. `scopeNarrowing` middleware(s) merge ctx-aware wheres into the narrowing
-4. `paginate()` reads the final narrowing + bracket-query searchFields, calls `buildWhereClause`
-5. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), translates the lens's wheres via `toPrisma`, AND-merges everything
+3. `paginate()` binds the narrowing's tokens from its `bindings`, reads bracket-query searchFields, calls `buildWhereClause`
+4. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), validates enum values against the same lens projection the `searchFields` query schema is built from, translates the lens's wheres via `toPrisma`, AND-merges everything
 
 ### Security
 
@@ -706,7 +675,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 - **Superadmin bypass:** users with `platformRole: 'superadmin'` skip the whitelist (`skipFieldValidation: true`). Path notation validation still applies.
 - Path notation: camelCase enforced, rejects snake_case, prevents injection
 - Supports Prisma meta-fields (`_count`, `_max`, `_min`, `_avg`, `_sum`)
-- Relations must be turned on by the route's `filterLens` (non-superadmin); a `scopeNarrowing` layer can only narrow them
+- Relations must be turned on by the route's `filterLens` (non-superadmin)
 - Max 10 levels of nesting in the bracket query
 - Routes without a `filterLens` skip search entirely (`paginate` no-ops the search path)
 - `root.where` is AND-merged into the prisma where — server enforces even when the SDK type would allow a value through
@@ -792,7 +761,7 @@ filterLens: {
 // Superadmin: all valid fields allowed regardless of the lens (skipFieldValidation bypass)
 ```
 
-A `scopeNarrowing` layer stacked on top can only narrow: it may hide a relation (`omits`) or restate one the route turned on to add a `where`, and its wheres may read only what the route's lens shows. Turn on everything a route crosses in its `filterLens`.
+A narrowing layered on another can only narrow: it may hide a relation (`omits`) or restate one its parent turned on to add a `where`, and its wheres may read only what the parent shows. Turn on everything a route crosses in its `filterLens`.
 
 **Validation:**
 - The full path must be shown by the lens (non-superadmin users)
@@ -1058,8 +1027,7 @@ Add route-level middleware via the `middleware` option:
 
 ```typescript
 import { validatePermission } from '#/middleware/validations/validatePermission';
-import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 
 // ReBAC permission check on loaded resource
 readRoute({
@@ -1068,19 +1036,22 @@ readRoute({
   responseSchema,
 });
 
-// Polymorphic resource permission (User or Organization owner)
-updateRoute({
-  model: 'webhookSubscription',
-  middleware: [validateOwnerPermission({ action: 'operate' })],
+// A create or a list under an owner: the action on a pseudo record of the submodel under the owner
+createRoute({
+  model: 'organization',
+  submodel: 'contact',
+  middleware: [validateSubmodelPermission('create')],
   bodySchema,
   responseSchema,
 });
 
-// Forbid token auth (session only)
-createRoute({
-  model: 'token',
-  middleware: [validateNotToken],
-  bodySchema,
+// The /me router loads me(c) as the owner
+readRoute({
+  model: 'me',
+  submodel: 'integration',
+  many: true,
+  skipId: true,
+  middleware: [validateSubmodelPermission('read')],
   responseSchema,
 });
 ```
@@ -1100,7 +1071,7 @@ import { UserScalarSchema } from '@template/db/zod/models';
 ### Inputs from Generated
 
 ```typescript
-import { UserCreateInputObjectZodSchema } from '@template/db/zod';
+import { UserCreateInputObjectZodSchema } from '@template/db/zod/objects/UserCreateInput.schema';
 ```
 
 ### Colocation Rule
@@ -1119,27 +1090,24 @@ export const userBodySchema = z.object({ ... });
 
 ### Cross-Field Validations
 
-**Don't use `.refine()` on route schemas** - it creates `ZodEffects` types that break hono-zod-openapi.
-
-Instead, create validation files and call `.parse()` manually in controller:
+Route build throws on a `bodySchema` that carries an object-level `.refine()`/`.superRefine()`: sanitizing rebuilds its shape and would drop them silently. Pass cross-field checks as `bodyRefinement`, `queryRefinement` or `paramsRefinement`: optional `superRefine` callbacks on the route args, annotated with the value's type. `makeController` runs each on the validated value before the handler; a failure throws its `ZodError` into the same 422 `VALIDATION_ERROR` envelope as a schema failure. With `many`, the body refinement runs per item. An omitted optional body skips it. None of them reach the OpenAPI document or SDK.
 
 ```typescript
-// validations/organizationCreateUserBody.ts
-const schema = z.object({
-  userId: z.string().uuid().optional(),
-  email: z.string().email().optional(),
-}).refine((data) => data.userId || data.email, {
-  message: 'Either userId or email is required',
+createRoute({
+  model: Modules.organization,
+  submodel: Modules.organizationUser,
+  bodySchema,
+  bodyRefinement: (body: z.infer<typeof bodySchema>, ctx) => {
+    if (!body.userId && !body.email)
+      ctx.addIssue({ code: 'custom', message: 'Either userId or email is required' });
+  },
+  responseSchema,
 });
-
-export const validateOrganizationCreateUserBody = (body: unknown) => schema.parse(body);
 ```
 
-```typescript
-// In controller
-const body = c.req.valid('json');
-validateOrganizationCreateUserBody(body);  // Throws ZodError if invalid
-```
+Field-level refinements (inside the shape) stay on the schema.
+
+A body that names a false-polymorphic target uses `polymorphicBodyRefinement` as its `bodyRefinement`; see [HOOKS.md#request-validation](HOOKS.md#request-validation).
 
 ---
 
@@ -1162,6 +1130,21 @@ adminUserRouter.openapi(adminUserReadManyRoute, adminUserReadManyController);
 export { userRouter, adminUserRouter };
 ```
 
+### Info routes
+
+A body field stored in a Prisma `Json` column (inquiry `content`, contact `value`, segment `conditions`) reaches the OpenAPI spec as a generic JSON value, because its shape depends on another field. Request bodies stay plain (no discriminated unions); validation stays where it is. A public `GET /api/v1/<module>/info` route lists every type and its shape instead, generated from the registry that validates it, never hand-listed:
+
+| Route | Generated from | Lists |
+|-------|---------------|-------|
+| `/webhookSubscription/info` | `webhookOwnerAllowedModels` | `models` per owner, `signature` key |
+| `/inquiry/info` | `inquiryHandlers` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
+| `/contact/info` | `ContactRegistry` | per type: `input` and stored `value` JSON Schema, `subtype` rule, `uniqueness`, label and icon |
+| `/segment/info` | `customerRefLens` | every readable field with its kind; `conditions` is tagged `rule` and points at json-rules |
+
+Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `schemaGuide(responseSchema)` (`lib/jsonSchema/schemaGuide.ts`) reads those descriptions back through `z.toJSONSchema`. `schemaGuide.test.ts` fails on any key left undescribed.
+
+An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand ahead of `autoRegisterRoutes` (see `modules/inquiry/index.ts`). It checks no action, so it answers without a session. Zod schemas become JSON Schema through `toJsonSchema` (`lib/jsonSchema/toJsonSchema.ts`, zod 4 `z.toJSONSchema`): `input` for what a caller sends, `output` for what is stored. The body field points at its route with `z.unknown().describe('… see GET /api/v1/<module>/info')`; `transformJsonFields` keeps that description on the JSON value it substitutes.
+
 ---
 
 ## File Organization
@@ -1183,11 +1166,11 @@ modules/<resource>/
 | `services/` | Complex business logic |
 | `schemas/` | Shared Zod schemas (when not colocated) |
 | `transformers/` | Data transformation functions |
-| `validations/` | Cross-field validation with `.refine()` |
+| `validations/` | Validation helpers that need the DB or context |
 | `utils/` | Module-specific utilities |
 | `handlers/` | Job handlers (in jobs module) |
 | `tests/` | Test files |
 
 ### Also
 
-- `apps/api/src/integrations/` - External service integrations
+- External services: adapter modules in `apps/api/src/lib/` (`storage/`, `errorReporter/`) and `packages/email/src/client/`, each one interface over swappable providers (see [ADAPTERS.md](ADAPTERS.md)); a single-provider SDK client goes in `apps/api/src/lib/clients/`

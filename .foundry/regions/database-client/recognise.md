@@ -32,6 +32,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - unique only when the column is not null
 - run logic inside the transaction when a row is created
 - build a test user with sensible defaults
+- find it or create it without a race
 - copy the database from staging to my machine
 - I'll create a new Prisma client here
 - lock the row while I update it
@@ -59,11 +60,13 @@ A moment that says any of these, or something close, is this region's. Both voic
 - re-enter the transaction that's already open
 - which models have a deleted-at column
 - where does a new Prisma model go
+- create-if-missing keyed on an in list or an operator
 - enforce a row-level rule at the database layer
 - index for range or geometric queries
 - one per owner but the owner column is nullable
 - do something right after a row updates, inside the write
 - seed a row for this test
+- two requests both try to create the same row
 - snapshot the database and load it elsewhere
 - which database client do I import
 - read the row, then update it, without a race
@@ -91,11 +94,13 @@ A moment that says any of these, or something close, is this region's. Both voic
 - run this callback inside the existing transaction scope
 - list a model's fields at runtime
 - one schema file per model
+- the find-or-create key has to be plain field equals value
 - Prisma can't express this constraint, write the check
 - no two bookings may overlap at the database level
 - partial unique index over a nullable foreign key
 - in-transaction logic around a model's writes
 - make a test organization and override one field
+- I'll catch the unique violation and re-read
 - move database state between environments
 - spin up a second client instance for this script
 - two requests could read-modify-write the same row
@@ -123,9 +128,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - get back into the open transaction from a detached callback
 - hand-declare the model metadata in a map
 - add the model to the big schema file
+- the upserting mode only takes a single-row equality predicate
 - end date must be after start date in the database
 - composite unique across all the nullable polymorphic FKs
 - fixture objects for tests
+- I'll just upsert on the slug
 - thread the transaction client through every function argument
 - create it if missing without a duplicate race
 - which scope am I in right now
@@ -138,10 +145,12 @@ A moment that says any of these, or something close, is this region's. Both voic
 - one function to count or find for whatever model
 - look up relations from the schema in code
 - hand-write a unique index with a where clause
+- the create race hand-rolled at every call site
 - services shouldn't need the connection passed in
 - select for update on this row inside the transaction
 - I'll keep a list of callbacks to run after the save
 - write both rows in one go so neither lands alone
+- return the existing row if someone else created it first
 - only one of the concurrent accepts should win on this row
 - side effects fired inline before commit
 - the transition and the delete aren't transactional

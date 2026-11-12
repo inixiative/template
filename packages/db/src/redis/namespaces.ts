@@ -6,6 +6,10 @@
 export const redisNamespace = {
   bull: 'bull',
   cache: 'cache',
+  // When the value under a cache key was written (epoch ms), set and cleared with the value itself.
+  cacheWritten: 'cachewritten',
+  cacheGeneration: 'cachegen',
+  cacheQueued: 'cachequeued',
   job: 'job',
   ws: 'ws',
   otp: 'otp',

@@ -73,19 +73,13 @@ type WSChannelsHandoff = {
   message: { data: Record<string, unknown> };
 };
 
-type WSUsersHandoff = {
-  kind: 'users';
-  target: { userIds: string[] };
-  message: { data: Record<string, unknown> };
-};
-
 type WSStreamAppendHandoff = {
   kind: 'stream';
   target: { stream: string; userIds?: string[] };
   append: { type: string; payload: unknown };
 };
 
-type WSHandoff = WSChannelsHandoff | WSUsersHandoff | WSStreamAppendHandoff;
+type WSHandoff = WSChannelsHandoff | WSStreamAppendHandoff;
 
 type AppEventHandlerDefinition<T> = {
   email?: (data: T) => EmailHandoff[] | null;
@@ -122,7 +116,7 @@ websocket: (data) => [{
 }],
 ```
 
-`deliverWSHandoffs` sends a message handoff through `sendToChannel` or `sendToUser`, and a
+`deliverWSHandoffs` sends a message handoff through `sendToChannel`, and a
 stream handoff through `appendToStream`. The frontend handles query-refetch hints and
 data-stream actions. New payload kinds require their own consumer and recovery design.
 Subscription and stream-open checks use the underlying authorized route; see

@@ -4,9 +4,11 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { PrismaClient } from '@template/db/generated/client/client';
-import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
+import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
+import type { CacheOverlay } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import type { ConcurrencyType, SerializedQueue } from '@template/shared/utils';
 
@@ -15,8 +17,10 @@ export type AfterCommitFn = () => Promise<void> | void;
 export type FinallyFn = () => Promise<void> | void;
 
 // `upserting` fences a where-key whose rows may not exist yet: a Redis lock on it is taken before
-// the SELECT ... FOR UPDATE and dropped when the transaction ends. `waitMs` bounds the wait for it.
-export type FindForUpdateOptions = { upserting?: boolean; waitMs?: number };
+// the row lock and dropped when the transaction ends. `waitMs` bounds the wait for it.
+// `changesKey` is for a transaction that will delete the row or change a column other rows reference:
+// it also holds off inserts of rows that point at the locked row.
+export type FindForUpdateOptions = { upserting?: boolean; waitMs?: number; changesKey?: boolean };
 
 export type ScopeContext = 'api' | 'worker';
 
@@ -49,13 +53,14 @@ export type DbMethods = {
   getScopeId: () => string | null;
   getScope: () => ScopeContext | null;
   isInTxn: () => boolean;
+  cacheOverlay: () => CacheOverlay | null;
   findForUpdate: <T = unknown>(
     model: string,
     where: Record<string, unknown>,
     options?: FindForUpdateOptions,
   ) => Promise<T[]>;
   withLockUntilSettled: <T>(
-    options: LockOptions,
+    options: LockOptions & LockTarget,
     fn: () => Promise<T>,
     acquireOptions?: AcquireOptions,
   ) => Promise<T>;
@@ -93,4 +98,5 @@ export type OpenTransaction = {
   // Set once the transaction has settled, before its finally queue drains.
   settled: boolean;
   bridgedContext: BridgedContext;
+  cacheOverlay: CacheOverlay;
 };

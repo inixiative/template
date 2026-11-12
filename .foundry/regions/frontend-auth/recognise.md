@@ -126,7 +126,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 These mention this region's words but belong elsewhere; the answer is no, and the region named answers instead.
 
 - Where do I store this login or credential → authentication
+- How does the API know who's calling → auth-middleware-users
 - Who is allowed to hit this endpoint → permissions-roles
 - Set which org or space we're acting in → frontend-store
 - Read or write data from a component → api-client
-- Which folder does this page go in → frontend-apps-routing

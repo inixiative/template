@@ -1,0 +1,3 @@
+model Note {
+  id String @id @default(dbgenerated("uuidv7()"))
+}

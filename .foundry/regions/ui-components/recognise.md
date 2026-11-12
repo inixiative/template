@@ -49,7 +49,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a placeholder for a feature we haven't built
 - one page that changes with user, org or space
 - a button that copies text to the clipboard
-- is there already a component for this
 - keep the button visible but say why it's disabled
 - a menu that opens from a trigger
 - what to show when the list is empty
@@ -78,7 +77,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - hide this entirely when they can't use it
 - a field that formats as a url slug
 - the standard list table with empty and loading states
-- paged table with page numbers
 - the light, dark, system switch
 - show a success or error message
 - mount the toast container once at root
@@ -98,7 +96,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - show a coming soon card
 - I'll make a route file per context
 - I'll call the clipboard api and show copied for a second
-- I'll build a bespoke button
 - I'll add a tooltip to the disabled button
 - actions menu on each row
 - I'll write a no items yet message
@@ -127,7 +124,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll wrap the card in a conditional
 - I'll lowercase and replace spaces in onchange
 - I'll write a table with hand-rolled rows
-- load more as they scroll
 - I'll build a theme switch writing local storage
 - I'll import the toaster library directly
 - where do the notifications render
@@ -147,7 +143,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - stub page for unbuilt reports
 - the page picks its view from the tenant
 - copy this value with feedback
-- raw html controls with hand-written styles
 - explain why the action is unavailable
 - I'll build a popover menu by hand
 - the empty table placeholder
@@ -176,7 +171,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - render nothing for unauthorized users
 - slug field that cleans as you type
 - a list page table with infinite scroll
-- I'll build my own page buttons
 - put the theme toggle in the profile form
 - notify the user after saving
 - I'll add a toast provider in each app
@@ -189,7 +183,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a disabled button that explains why
 - import clsx for class merging
 - fire-and-forget clipboard write with no signal
-- reuse before creating a new component
 - greyed out with a reason
 - the three-dots menu
 - a new visually identical empty screen component
@@ -207,7 +200,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - pass a condition to hide the component
 - the handle or identifier input
 - hand-rolled colspan loading and empty rows
-- infinite scroll on a list
 - dark mode toggle control
 - error popup when the request fails
 - set the options once instead of per call site

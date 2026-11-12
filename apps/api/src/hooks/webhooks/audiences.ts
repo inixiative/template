@@ -5,11 +5,13 @@
  * @uses feature:files
  */
 import type { WebhookModel } from '@template/db/generated/client/enums';
-import type { WebhookAudienceResolver } from '#/hooks/webhooks/webhookParty';
+import type { Party, WebhookRow } from '#/hooks/webhooks/parties';
 import {
   artifactPermissionGranteeAudience,
   artifactWebhookAudience,
 } from '#/modules/artifact/services/artifactWebhookAudience';
+
+export type WebhookAudienceResolver = (rows: WebhookRow[]) => Promise<Map<string, Party[]>>;
 
 export const webhookGrantedAudiences: Partial<Record<WebhookModel, WebhookAudienceResolver>> = {
   Artifact: artifactWebhookAudience,

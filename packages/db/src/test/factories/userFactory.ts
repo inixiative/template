@@ -17,6 +17,7 @@ const userFactory = createFactory('User', {
     image: faker.image.avatar(),
     platformRole: PlatformRole.user,
     lastLoginAt: null,
+    jwtVersion: 0,
   }),
 });
 

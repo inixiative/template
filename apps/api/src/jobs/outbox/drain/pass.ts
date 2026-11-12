@@ -14,7 +14,12 @@ import {
   hasPendingSpills,
 } from '#/jobs/outbox/accumulator';
 import { laneDepthCap, lowWater, MAX_DRAIN_ATTEMPTS } from '#/jobs/outbox/config';
-import { clearOverflow, warnIfOverflowStuck, withOverflowRenew } from '#/jobs/outbox/flag';
+import {
+  clearOverflow,
+  tripFromDepths,
+  warnIfOverflowStuck,
+  withOverflowRenew,
+} from '#/jobs/outbox/flag';
 import { runOnOutboxQueue } from '#/jobs/outbox/mutex';
 import { laneDepth, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
@@ -69,7 +74,7 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
         // retry; don't leave the prior job superseded by a job that never got created. A self-claim
         // (the spill-time baton, previousHolder === jobId) must survive the retry — keep it.
         if (baton && previousHolder !== jobId) {
-          await releaseLane(baton, jobId, previousHolder).catch(() => {});
+          await releaseLane(baton, jobId, previousHolder);
         }
         failed.push(row.id);
         log.error(
@@ -158,6 +163,8 @@ export const runDrainOutboxPass = async (): Promise<void> => {
     const slowRoom = Math.min(room - fastAdmitted, laneDepthCap(JobLane.slow) - depths.slow);
     await admitLaneRows(JobLane.slow, slowRoom);
 
-    await settleFlags((await readSlowLaneState()).depths);
+    const { depths: settled } = await readSlowLaneState();
+    await tripFromDepths(settled);
+    await settleFlags(settled);
   });
 };
