@@ -108,7 +108,7 @@ without a request. `featureFlag.changed` refetches the payload.
 boolean flag reads `false`, never its default variant. No row for the context, a missing slug, or a type
 mismatch also reads as the zero. On/off flags are therefore plain booleans in the UI.
 
-**`useFeatureFlag(slug, type)`** returns the selected value for the current context, typed by `type`.
+**A flag hook (planned) taking a slug and a type** returns the selected value for the current context, typed by that type.
 
 **Nav items.** `NavItem` gains `flag?: string`, next to `access`. It names a platform flag (a bare slug); `custom:` flags do not gate nav, because the nav ships with the product. Customer-built navigation in spaces could change that later. The sidebar drops the item when the flag
 reads false in the current context, the same way it drops an item whose `access` returns false. It is a
