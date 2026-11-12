@@ -30,6 +30,8 @@ export type InquiryTypeParties = {
 // Reading an inquiry is party-wide, whatever its type: the person on a side reads it, and an
 // organization or space reads what it sent and received with manage (the entitlement rulings,
 // R74/R76). Sending and resolving are per type, below.
+// Open: lower-level types may want an operator to read, possibly per type and side. Left
+// party-wide because the received/sent lists filter by party in the query.
 export const INQUIRY_READ_LEVELS: Partial<Record<InquiryPartyModel, string>> = {
   User: 'read',
   Organization: 'manage',
