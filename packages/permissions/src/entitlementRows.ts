@@ -13,7 +13,7 @@ import {
   type EntitlementEntry,
   wellFormedEntitlements,
 } from '@template/permissions/client';
-import { lowerFirst, upperFirst } from 'lodash-es';
+import { isEqual, lowerFirst, upperFirst } from 'lodash-es';
 
 /** A row as stored, written, or serialized to a client: what the transformer reads. */
 export type EntitlementFields = {
@@ -47,6 +47,10 @@ export const sameEntitlement = (left: EntitlementFields, right: EntitlementField
   const [one, other] = [toEntitlementEntry(left), toEntitlementEntry(right)];
   return coversEntitlement(one, other) && coversEntitlement(other, one);
 };
+
+/** Two rows narrow and shape what they grant the same way: no lens is a lens of its own. */
+export const sameLens = (left: { lens?: unknown }, right: { lens?: unknown }): boolean =>
+  isEqual(left.lens ?? null, right.lens ?? null);
 
 /** An entry the library hands back (a self-grant), as the row a writer stores: held actions only. */
 export const toEntitlementInput = (entry: EntitlementEntry): EntitlementInput => ({

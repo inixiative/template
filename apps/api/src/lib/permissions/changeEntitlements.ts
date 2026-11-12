@@ -20,10 +20,11 @@ import {
   entitlementsOf,
   type Permix,
   sameEntitlement,
+  sameLens,
   toEntitlementEntry,
   toEntitlementInput,
 } from '@template/permissions';
-import { isEqual, partition, uniq } from 'lodash-es';
+import { partition, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
@@ -50,8 +51,6 @@ type Granted = Pick<
   EntitlementInput,
   'resource' | 'actions' | 'where' | 'sourceModel' | 'sourceId' | 'sourcePath' | 'lens'
 >;
-
-const sameLens = (left: Granted, right: Granted) => isEqual(left.lens ?? null, right.lens ?? null);
 
 const covers = (holding: Granted, input: Granted) =>
   sameLens(holding, input) &&

@@ -42,7 +42,12 @@ const scene = async () => {
           orderBy: { createdAt: 'asc' },
         }),
       )
-    ).map((row) => ({ actions: row.actions, lens: row.lens, live: row.deletedAt == null }));
+    ).map((row) => ({
+      actions: row.actions,
+      ...(row.where != null ? { where: row.where } : {}),
+      lens: row.lens,
+      live: row.deletedAt == null,
+    }));
   const live = async () => (await rows()).filter((row) => row.live);
   return { member, onOrganization, write, rows, live };
 };
@@ -102,6 +107,28 @@ describe('one lens per entitlement: an equal entitlement with a new lens replace
     expect(await live()).toEqual([
       { actions: ['operate', 'read'], lens: name, live: true },
       { actions: ['read'], lens: { fields: ['slug'] }, live: true },
+      { actions: ['operate', 'read'], where: named, lens: { fields: ['slug'] }, live: true },
+    ]);
+  });
+
+  it('the same grant with a where of its own and another lens is its own row, beside the held one', async () => {
+    const { onOrganization, write, live } = await scene();
+    const named = { field: 'name', operator: 'equals', value: 'Acme' };
+    await write(onOrganization({ lens: { fields: ['name'] } }));
+    await write(onOrganization({ where: named, lens: { fields: ['slug'] } }));
+    expect(await live()).toEqual([
+      { actions: ['read'], lens: { fields: ['name'] }, live: true },
+      { actions: ['read'], where: named, lens: { fields: ['slug'] }, live: true },
+    ]);
+  });
+
+  it('a replace whose new entry a broader held row with its lens covers only tombstones the old row', async () => {
+    const { onOrganization, write, rows } = await scene();
+    await write(onOrganization({ lens: { fields: ['name'] } }));
+    await write(onOrganization({ actions: ['operate', 'read'], lens: { fields: ['slug'] } }));
+    await write(onOrganization({ lens: { fields: ['slug'] } }));
+    expect(await rows()).toEqual([
+      { actions: ['read'], lens: { fields: ['name'] }, live: false },
       { actions: ['operate', 'read'], lens: { fields: ['slug'] }, live: true },
     ]);
   });
