@@ -163,10 +163,8 @@ describe('falsePolymorphism hook', () => {
   it('pass: platform provider on a CustomerRef carries no provider key', async () => {
     const { entity: user } = await createUser();
 
-    const { entity: ref } = await createCustomerRef({
-      customerModel: 'User',
-      providerModel: 'platform',
-      customerUserId: user.id,
+    const ref = await db.customerRef.findFirstOrThrow({
+      where: { customerUserId: user.id, providerModel: 'platform' },
     });
 
     expect(ref.providerModel).toBe('platform');
@@ -186,6 +184,6 @@ describe('falsePolymorphism hook', () => {
         providerOrganizationId: org.id,
         customerUserId: user.id,
       }),
-    ).rejects.toThrow('Invalid providerModel value on CustomerRef');
+    ).rejects.toThrow('CustomerRef providerModel=platform cannot have providerOrganizationId');
   });
 });

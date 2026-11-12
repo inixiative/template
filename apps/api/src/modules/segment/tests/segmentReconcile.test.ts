@@ -109,20 +109,12 @@ describe('segment reconcile', () => {
   });
 
   it('the platform owns segments over its own customer refs and never another provider’s', async () => {
-    const platformAcme = (
-      await createCustomerRef({
-        customerModel: 'User',
-        providerModel: 'platform',
-        customerUserId: acme.id,
-      })
-    ).entity;
-    const platformOrg = (
-      await createCustomerRef({
-        customerModel: 'Organization',
-        providerModel: 'platform',
-        customerOrganizationId: organization.id,
-      })
-    ).entity;
+    const platformAcme = await db.customerRef.findFirstOrThrow({
+      where: { providerModel: 'platform', customerUserId: acme.id },
+    });
+    const platformOrg = await db.customerRef.findFirstOrThrow({
+      where: { providerModel: 'platform', customerOrganizationId: organization.id },
+    });
 
     const segment = await saveSegment(
       { ownerModel: ProviderModel.platform, type: SegmentType.dynamic, conditions: acmeRule },

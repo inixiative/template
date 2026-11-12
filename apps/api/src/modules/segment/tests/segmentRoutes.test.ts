@@ -136,7 +136,7 @@ describe('segment routes', () => {
       { space },
     );
     const { entity: internal } = await createSegment(
-      { conditions: acmeRule, featureFlagInternal: true },
+      { ownerModel: 'Space', conditions: acmeRule, featureFlagInternal: true },
       { space },
     );
     await createFeatureFlagVariant({}, { segment: internal, featureFlag: flag });

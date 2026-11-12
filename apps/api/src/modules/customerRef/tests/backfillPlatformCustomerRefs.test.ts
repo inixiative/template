@@ -1,20 +1,11 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
-import {
-  cleanupTouchedTables,
-  createCustomerRef,
-  createOrganization,
-  createSpace,
-  createUser,
-} from '@template/db/test';
+import { describe, expect, it } from 'bun:test';
+import { db, unregisterDbHook } from '@template/db';
+import { createCustomerRef, createOrganization, createSpace, createUser } from '@template/db/test';
 import { backfillPlatformCustomerRefs } from '#/modules/customerRef/services/backfillPlatformCustomerRefs';
 
 describe('backfillPlatformCustomerRefs', () => {
-  afterAll(async () => {
-    await cleanupTouchedTables(db);
-  });
-
   it('writes the missing platform refs once, revives tombstones, and leaves present ones alone', async () => {
+    unregisterDbHook('platformCustomerRef:create');
     const { entity: user } = await createUser();
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });

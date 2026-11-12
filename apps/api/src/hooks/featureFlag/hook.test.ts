@@ -1,30 +1,21 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization, Space } from '@template/db/generated/client/client';
 import { ProviderModel } from '@template/db/generated/client/enums';
 import {
-  cleanupTouchedTables,
   createFeatureFlag,
   createFeatureFlagVariant,
   createOrganization,
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { registerFeatureFlagHook } from '#/hooks/featureFlag/hook';
 
 describe('featureFlag hook', () => {
   let organization: Organization;
   let space: Space;
 
-  beforeAll(async () => {
-    registerFeatureFlagHook();
+  beforeEach(async () => {
     organization = (await createOrganization()).entity;
     space = (await createSpace({}, { organization })).entity;
-  });
-
-  afterAll(async () => {
-    await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('only the platform defines a bare slug; every owner may define custom: ones', async () => {

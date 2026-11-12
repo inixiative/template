@@ -46,7 +46,9 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
       'subjectModel',
       'valueType',
     ],
+    exclude: ['segmentId'],
   },
+  FeatureFlagVariant: { ...polymorphismImmutableFields.FeatureFlagVariant, exclude: ['segmentId'] },
   Segment: {
     ...polymorphismImmutableFields.Segment,
     include: [...(polymorphismImmutableFields.Segment?.include ?? []), 'featureFlagInternal'],

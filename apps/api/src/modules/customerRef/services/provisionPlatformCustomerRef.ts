@@ -4,7 +4,7 @@
  * @partOf feature:customer
  * @uses infrastructure:prisma
  */
-import { db, polymorphicKeyColumn } from '@template/db';
+import { db, polymorphicKeyColumn, revive } from '@template/db';
 import type { CustomerRef } from '@template/db/generated/client/client';
 import type { CustomerModel } from '@template/db/generated/client/enums';
 
@@ -23,11 +23,8 @@ export const provisionPlatformCustomerRef = async (
   });
   if (existing && !existing.deletedAt) return { customerRef: existing, outcome: 'present' };
   if (existing) {
-    const customerRef = await db.customerRef.update({
-      where: { id: existing.id },
-      data: { deletedAt: null },
-    });
-    return { customerRef, outcome: 'revived' };
+    const [customerRef] = await revive(db.customerRef, { id: existing.id });
+    return { customerRef: customerRef!, outcome: 'revived' };
   }
   const customerRef = await db.customerRef.create({
     data: { customerModel, [customerFk]: customerId, providerModel: 'platform' },

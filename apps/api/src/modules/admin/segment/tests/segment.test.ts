@@ -1,22 +1,13 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry } from '@template/db';
-import type {
-  Organization,
-  OrganizationUser,
-  Segment,
-  User,
-} from '@template/db/generated/client/client';
+import type { Organization, Segment, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
-  cleanupTouchedTables,
   createCustomerRef,
   createOrganizationUser,
   createUser,
   getNextSeq,
 } from '@template/db/test';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { organizationRouter } from '#/modules/organization';
 import { segmentRouter } from '#/modules/segment';
 import { adminRouter } from '#/routes/admin';
@@ -29,27 +20,17 @@ const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, val
 describe('admin/segment', () => {
   let superadminFetch: ReturnType<typeof createTestApp>['fetch'];
   let orgAdminFetch: ReturnType<typeof createTestApp>['fetch'];
-  let db: ReturnType<typeof createTestApp>['db'];
   let org: Organization;
-  let orgUser: OrganizationUser;
   let platformCustomer: User;
+  let orgCustomer: User;
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
-    registerSegmentMemberOwnerHook();
-
+  beforeEach(async () => {
     const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
-    const { entity: ou, context } = await createOrganizationUser({ role: 'admin' });
-    orgUser = ou;
+    const { entity: orgUser, context } = await createOrganizationUser({ role: 'admin' });
     org = context.organization;
 
     platformCustomer = (await createUser({ email: `platform-${getNextSeq()}${domain}` })).entity;
-    await createCustomerRef({
-      customerModel: 'User',
-      providerModel: 'platform',
-      customerUserId: platformCustomer.id,
-    });
-    const orgCustomer = (await createUser({ email: `org-${getNextSeq()}${domain}` })).entity;
+    orgCustomer = (await createUser({ email: `org-${getNextSeq()}${domain}` })).entity;
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Organization',
@@ -64,9 +45,7 @@ describe('admin/segment', () => {
         app.route('/api/v1/organization', organizationRouter);
       },
     ];
-    const harness = createTestApp({ mockUser: superadmin, mount });
-    superadminFetch = harness.fetch;
-    db = harness.db;
+    superadminFetch = createTestApp({ mockUser: superadmin, mount }).fetch;
     orgAdminFetch = createTestApp({
       mockUser: context.user,
       mockOrganizationUsers: [orgUser],
@@ -74,14 +53,7 @@ describe('admin/segment', () => {
     }).fetch;
   });
 
-  afterAll(async () => {
-    await cleanupTouchedTables(db);
-    clearHookRegistry();
-  });
-
-  let segment: Segment;
-
-  it('the superadmin creates a platform segment and it reconciles over platform customers only', async () => {
+  const createPlatformSegment = async (): Promise<Segment> => {
     const response = await superadminFetch(
       post('/api/admin/segment', {
         name: `platform-acme-${getNextSeq()}`,
@@ -90,14 +62,22 @@ describe('admin/segment', () => {
       }),
     );
     expect(response.status).toBe(201);
-    segment = (await json<Segment>(response)).data;
+    return (await json<Segment>(response)).data;
+  };
+
+  it('the superadmin creates a platform segment and it reconciles over platform customers only', async () => {
+    const segment = await createPlatformSegment();
     expect(segment.ownerModel).toBe('platform');
     expect(segment.userId).toBeNull();
     expect(segment.organizationId).toBeNull();
 
     const members = await superadminFetch(get(`/api/v1/segment/${segment.id}/segmentMembers`));
-    const { data } = await json<{ customerRef: { customerUserId: string } }[]>(members);
-    expect(data.map((member) => member.customerRef.customerUserId)).toEqual([platformCustomer.id]);
+    const { data } =
+      await json<{ customerRef: { customerUserId: string; providerModel: string } }[]>(members);
+    expect(data.map((member) => member.customerRef.customerUserId).sort()).toEqual(
+      [platformCustomer.id, orgCustomer.id].sort(),
+    );
+    expect(data.every((member) => member.customerRef.providerModel === 'platform')).toBe(true);
   });
 
   it('reach counts the platform’s customers, not another provider’s', async () => {
@@ -105,10 +85,11 @@ describe('admin/segment', () => {
       post('/api/admin/segment/reach', { conditions: acmeRule }),
     );
     expect(response.status).toBe(200);
-    expect((await json<{ count: number }>(response)).data.count).toBe(1);
+    expect((await json<{ count: number }>(response)).data.count).toBe(2);
   });
 
   it('the admin list carries every owner’s segments and filters to the platform’s own', async () => {
+    const segment = await createPlatformSegment();
     const all = await superadminFetch(get('/api/admin/segment'));
     expect(all.status).toBe(200);
     expect((await json<Segment[]>(all)).data.map((each) => each.id)).toContain(segment.id);
@@ -122,6 +103,7 @@ describe('admin/segment', () => {
   });
 
   it('an organization admin is refused the admin routes and cannot read a platform segment', async () => {
+    const segment = await createPlatformSegment();
     expect((await orgAdminFetch(get('/api/admin/segment'))).status).toBe(403);
     expect(
       (await orgAdminFetch(post('/api/admin/segment', { name: 'x', conditions: acmeRule }))).status,

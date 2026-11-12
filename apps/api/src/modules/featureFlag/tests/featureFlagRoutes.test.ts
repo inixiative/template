@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db } from '@template/db';
+import { db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -9,7 +9,6 @@ import type {
 } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
-  cleanupTouchedTables,
   createCustomerRef,
   createFeatureFlag,
   createOrganization,
@@ -19,13 +18,6 @@ import {
   getNextSeq,
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerFeatureFlagHook } from '#/hooks/featureFlag/hook';
-import { registerFeatureFlagVariantHook } from '#/hooks/featureFlagVariant/hook';
-import { registerOrderedListHook } from '#/hooks/orderedList/hook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { featureFlagRouter } from '#/modules/featureFlag';
 import { createVariant } from '#/modules/featureFlag/services/writeVariant';
 import { featureFlagVariantRouter } from '#/modules/featureFlagVariant';
@@ -63,7 +55,6 @@ describe('feature flag routes', () => {
   let ownerFetch: ReturnType<typeof createTestApp>['fetch'];
   let memberFetch: ReturnType<typeof createTestApp>['fetch'];
   let superadminFetch: ReturnType<typeof createTestApp>['fetch'];
-  let testDb: ReturnType<typeof createTestApp>['db'];
   let org: Organization;
   let orgUser: OrganizationUser;
   let owner: User;
@@ -72,14 +63,7 @@ describe('feature flag routes', () => {
 
   const domain = `@flags-${getNextSeq()}.test`;
 
-  beforeAll(async () => {
-    registerClearCacheHook();
-    registerFeatureFlagHook();
-    registerFeatureFlagVariantHook();
-    registerOrderedListHook();
-    registerSegmentConditionsHook();
-    registerSegmentMemberOwnerHook();
-    registerSoftDeleteCascadeHook();
+  beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = ou;
     owner = context.user;
@@ -120,7 +104,6 @@ describe('feature flag routes', () => {
     ];
     const harness = createTestApp({ mockUser: owner, mockOrganizationUsers: [orgUser], mount });
     ownerFetch = harness.fetch;
-    testDb = harness.db;
     memberFetch = createTestApp({
       mockUser: member,
       mockOrganizationUsers: [memberOu],
@@ -129,12 +112,19 @@ describe('feature flag routes', () => {
     superadminFetch = createTestApp({ mockUser: superadmin, mount }).fetch;
   });
 
-  afterAll(async () => {
-    await cleanupTouchedTables(testDb);
-    clearHookRegistry();
-  });
-
-  let flag: Flag;
+  const createDarkMode = async (): Promise<Flag> => {
+    const response = await ownerFetch(
+      post(`/api/v1/organization/${org.id}/featureFlags`, {
+        slug: 'custom:dark-mode',
+        name: 'Dark mode',
+        subjectModel: 'User',
+        valueType: 'boolean',
+        enabled: true,
+      }),
+    );
+    expect(response.status).toBe(201);
+    return (await json<Flag>(response)).data;
+  };
 
   it('an organization admin creates a custom: boolean flag and gets its on variant over an internal open segment', async () => {
     const refused = await ownerFetch(
@@ -147,17 +137,7 @@ describe('feature flag routes', () => {
     );
     expect(refused.status).toBe(422);
 
-    const response = await ownerFetch(
-      post(`/api/v1/organization/${org.id}/featureFlags`, {
-        slug: 'custom:dark-mode',
-        name: 'Dark mode',
-        subjectModel: 'User',
-        valueType: 'boolean',
-        enabled: true,
-      }),
-    );
-    expect(response.status).toBe(201);
-    flag = (await json<Flag>(response)).data;
+    const flag = await createDarkMode();
     expect(flag.ownerModel).toBe('Organization');
     expect(flag.variants).toHaveLength(1);
     expect(flag.variants[0]!.label).toBe('on');
@@ -165,6 +145,7 @@ describe('feature flag routes', () => {
   });
 
   it('the internal segment is hidden from the owner’s segment list and the member sees the value', async () => {
+    const flag = await createDarkMode();
     const listed = await ownerFetch(get(`/api/v1/organization/${org.id}/segments`));
     expect((await json<Segment[]>(listed)).data.map((each) => each.id)).not.toContain(
       flag.variants[0]!.segmentId,
@@ -249,7 +230,7 @@ describe('feature flag routes', () => {
         valueText: 'x',
       }),
     );
-    expect(inverted.status).toBe(400);
+    expect(inverted.status).toBe(422);
     expect(theme).not.toHaveProperty('sampleOffset');
 
     const both = await ownerFetch(
@@ -352,6 +333,7 @@ describe('feature flag routes', () => {
   });
 
   it('deleting a variant tombstones its internal segment; a member cannot manage the flag', async () => {
+    const flag = await createDarkMode();
     const onVariant = flag.variants[0]!;
     expect(
       (await memberFetch(patch(`/api/v1/featureFlag/${flag.id}`, { enabled: false }))).status,
@@ -359,7 +341,9 @@ describe('feature flag routes', () => {
 
     const deleted = await ownerFetch(del(`/api/v1/featureFlagVariant/${onVariant.id}`));
     expect(deleted.status).toBe(204);
-    const internal = await db.segment.findUnique({ where: { id: onVariant.segmentId! } });
+    const internal = await db.withDeleted(() =>
+      db.segment.findUnique({ where: { id: onVariant.segmentId! } }),
+    );
     expect(internal?.deletedAt).not.toBeNull();
 
     const values = (await json<Value[]>(await memberFetch(get('/api/v1/me/featureFlagValues'))))
@@ -396,7 +380,9 @@ describe('feature flag routes', () => {
     );
     expect(toShared.status).toBe(200);
     expect((await json<Variant>(toShared)).data.segmentId).toBe(audience.id);
-    const released = await db.segment.findUnique({ where: { id: firstInternal } });
+    const released = await db.withDeleted(() =>
+      db.segment.findUnique({ where: { id: firstInternal } }),
+    );
     expect(released?.deletedAt).not.toBeNull();
 
     const backInternal = await ownerFetch(
@@ -411,6 +397,10 @@ describe('feature flag routes', () => {
   });
 
   it('a deleted label and a deleted slug can be reused', async () => {
+    const flag = await createDarkMode();
+    expect(
+      (await ownerFetch(del(`/api/v1/featureFlagVariant/${flag.variants[0]!.id}`))).status,
+    ).toBe(204);
     const recreated = await ownerFetch(
       post(`/api/v1/featureFlag/${flag.id}/featureFlagVariants`, {
         label: 'on',
@@ -444,7 +434,6 @@ describe('feature flag routes', () => {
       }),
     );
     expect(again.status).toBe(201);
-    flag = (await json<Flag>(again)).data;
   });
 
   it('tombstoning the owner tombstones its flags, variants and internal segments', async () => {
@@ -485,11 +474,11 @@ describe('feature flag routes', () => {
         featureFlagInternal: true,
       }),
     );
-    expect(created.status).toBe(400);
+    expect(created.status).toBe(422);
     const flipped = await ownerFetch(
       patch(`/api/v1/segment/${audience.id}`, { featureFlagInternal: true }),
     );
-    expect(flipped.status).toBe(400);
+    expect(flipped.status).toBe(422);
     expect((await db.segment.findUnique({ where: { id: audience.id } }))?.featureFlagInternal).toBe(
       false,
     );
@@ -516,6 +505,7 @@ describe('feature flag routes', () => {
   });
 
   it('the superadmin creates a bare platform flag and lists every owner’s flags', async () => {
+    await createDarkMode();
     const created = await superadminFetch(
       post('/api/admin/featureFlag', {
         slug: 'new-nav',

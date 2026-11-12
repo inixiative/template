@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type { CustomerRef, FeatureFlag, Segment, User } from '@template/db/generated/client/client';
 import {
   CustomerModel,
@@ -7,8 +7,6 @@ import {
   ProviderModel,
 } from '@template/db/generated/client/enums';
 import {
-  cleanupTouchedTables,
-  createCustomerRef,
   createFeatureFlag,
   createFeatureFlagVariant,
   createOrganization,
@@ -17,7 +15,6 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { checkFlag } from '#/modules/featureFlag/services/checkFlag';
 import { resolveFlags } from '#/modules/featureFlag/services/resolveFlags';
 import { bucketOf } from '#/modules/segment/lib/sample';
@@ -36,25 +33,15 @@ describe('resolveFlags', () => {
   const check = async <T extends FeatureFlagValueType>(flag: FeatureFlag, type: T, subject = ref) =>
     checkFlag('platform', flag.slug, type, await flagFor(subject));
 
-  beforeAll(async () => {
-    registerClearCacheHook();
+  beforeEach(async () => {
     user = (await createUser()).entity;
-    ref = (
-      await createCustomerRef({
-        customerModel: 'User',
-        providerModel: 'platform',
-        customerUserId: user.id,
-      })
-    ).entity;
+    ref = await db.customerRef.findFirstOrThrow({
+      where: { providerModel: 'platform', customerUserId: user.id },
+    });
     everyone = await platformSegment();
     beta = await platformSegment();
     await createSegmentMember({}, { segment: everyone, customerRef: ref });
     await createSegmentMember({}, { segment: beta, customerRef: ref });
-  });
-
-  afterAll(async () => {
-    await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('walks variants in position order and the first membership wins; a reorder flips the overlap', async () => {
@@ -125,13 +112,9 @@ describe('resolveFlags', () => {
 
   it('a member of the wrong customer kind is not addressed', async () => {
     const { entity: organization } = await createOrganization();
-    const orgRef = (
-      await createCustomerRef({
-        customerModel: 'Organization',
-        providerModel: 'platform',
-        customerOrganizationId: organization.id,
-      })
-    ).entity;
+    const orgRef = await db.customerRef.findFirstOrThrow({
+      where: { providerModel: 'platform', customerOrganizationId: organization.id },
+    });
     await createSegmentMember({}, { segment: everyone, customerRef: orgRef });
     const { entity: flag } = await createFeatureFlag({
       ownerModel: 'platform',

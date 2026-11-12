@@ -1,25 +1,20 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, revive } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { db, revive } from '@template/db';
 import type { FeatureFlag, Organization, Segment } from '@template/db/generated/client/client';
 import { FeatureFlagValueType, ProviderModel } from '@template/db/generated/client/enums';
 import {
-  cleanupTouchedTables,
   createFeatureFlag,
   createFeatureFlagVariant,
   createOrganization,
   createSegment,
 } from '@template/db/test';
-import { registerFeatureFlagVariantHook } from '#/hooks/featureFlagVariant/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 
 describe('featureFlagVariant hook', () => {
   let organization: Organization;
   let audience: Segment;
   let flag: FeatureFlag;
 
-  beforeAll(async () => {
-    registerFeatureFlagVariantHook();
-    registerSoftDeleteCascadeHook();
+  beforeEach(async () => {
     organization = (await createOrganization()).entity;
     audience = (await createSegment({ ownerModel: ProviderModel.Organization }, { organization }))
       .entity;
@@ -29,11 +24,6 @@ describe('featureFlagVariant hook', () => {
         { organization },
       )
     ).entity;
-  });
-
-  afterAll(async () => {
-    await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('a rule row names a segment; the default row names none', async () => {
@@ -129,18 +119,25 @@ describe('featureFlagVariant hook', () => {
       where: { id: variant.id },
       data: { deletedAt: new Date() },
     });
-    expect((await db.segment.findUnique({ where: { id: internal.id } }))?.deletedAt).toEqual(
-      deleted.deletedAt,
-    );
+    expect(
+      (await db.withDeleted(() => db.segment.findUnique({ where: { id: internal.id } })))
+        ?.deletedAt,
+    ).toEqual(deleted.deletedAt);
 
     await db.featureFlagVariant.update({
       where: { id: shared.id },
       data: { deletedAt: new Date() },
     });
-    expect((await db.segment.findUnique({ where: { id: audience.id } }))?.deletedAt).toBeNull();
+    expect(
+      (await db.withDeleted(() => db.segment.findUnique({ where: { id: audience.id } })))
+        ?.deletedAt,
+    ).toBeNull();
 
     await revive(db.featureFlagVariant, { id: variant.id });
-    expect((await db.segment.findUnique({ where: { id: internal.id } }))?.deletedAt).toBeNull();
+    expect(
+      (await db.withDeleted(() => db.segment.findUnique({ where: { id: internal.id } })))
+        ?.deletedAt,
+    ).toBeNull();
   });
 
   it('a flag’s tombstone cascades through its variants to their internal segments with one timestamp', async () => {
@@ -162,16 +159,22 @@ describe('featureFlagVariant hook', () => {
       data: { deletedAt: new Date() },
     });
     expect(
-      (await db.featureFlagVariant.findUnique({ where: { id: variant.id } }))?.deletedAt,
+      (await db.withDeleted(() => db.featureFlagVariant.findUnique({ where: { id: variant.id } })))
+        ?.deletedAt,
     ).toEqual(dead.deletedAt);
-    expect((await db.segment.findUnique({ where: { id: internal.id } }))?.deletedAt).toEqual(
-      dead.deletedAt,
-    );
+    expect(
+      (await db.withDeleted(() => db.segment.findUnique({ where: { id: internal.id } })))
+        ?.deletedAt,
+    ).toEqual(dead.deletedAt);
 
     await revive(db.featureFlag, { id: doomed.id });
     expect(
-      (await db.featureFlagVariant.findUnique({ where: { id: variant.id } }))?.deletedAt,
+      (await db.withDeleted(() => db.featureFlagVariant.findUnique({ where: { id: variant.id } })))
+        ?.deletedAt,
     ).toBeNull();
-    expect((await db.segment.findUnique({ where: { id: internal.id } }))?.deletedAt).toBeNull();
+    expect(
+      (await db.withDeleted(() => db.segment.findUnique({ where: { id: internal.id } })))
+        ?.deletedAt,
+    ).toBeNull();
   });
 });

@@ -56,15 +56,20 @@ describe('segmentConditions hook', () => {
   });
 
   it('a platform segment may name only platform segments', async () => {
-    const { entity: theirs } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity: theirs } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
     const naming = (id: string) => ({
       field: 'segmentMembers',
       arrayOperator: 'any',
       condition: { field: 'segment.id', operator: Operator.equals, value: id },
     });
-    await expect(
-      createSegment({ ownerModel: ProviderModel.platform, conditions: naming(theirs.id) }, {}),
-    ).rejects.toThrow('this platform does not own');
+    expect(
+      await deadReferencesOf(
+        createSegment({ ownerModel: ProviderModel.platform, conditions: naming(theirs.id) }, {}),
+      ),
+    ).toEqual([{ model: 'Segment', id: theirs.id, state: 'missing' }]);
 
     const { entity: ours } = await createSegment(
       { ownerModel: ProviderModel.platform, conditions: acmeRule },
@@ -83,7 +88,7 @@ describe('segmentConditions hook', () => {
       { space },
     );
     const { entity: internal } = await createSegment(
-      { conditions: acmeRule, featureFlagInternal: true },
+      { ownerModel: 'Space', conditions: acmeRule, featureFlagInternal: true },
       { space },
     );
     await createFeatureFlagVariant({}, { segment: internal, featureFlag: flag });
@@ -92,7 +97,9 @@ describe('segmentConditions hook', () => {
       arrayOperator: 'any',
       condition: { field: 'segment.id', operator: Operator.equals, value: internal.id },
     };
-    await expect(createSegment({ conditions: naming }, { space })).rejects.toThrow('does not own');
+    expect(
+      await deadReferencesOf(createSegment({ ownerModel: 'Space', conditions: naming }, { space })),
+    ).toEqual([{ model: 'Segment', id: internal.id, state: 'missing' }]);
   });
 
   it('accepts a valid rule and writes the normalized tree back', async () => {
