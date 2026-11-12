@@ -5,18 +5,13 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import {
-  CustomerModel,
-  FeatureFlagValueType,
-  ProviderModel,
-} from '@template/db/generated/client/enums';
+import { CustomerModel, FeatureFlagValueType } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const featureFlagFactory = createFactory('FeatureFlag', {
   defaults: () => ({
     slug: `${faker.word.adjective()}-${faker.string.alphanumeric(6).toLowerCase()}`,
     name: faker.commerce.productName(),
-    ownerModel: ProviderModel.platform,
     subjectModel: CustomerModel.User,
     valueType: FeatureFlagValueType.boolean,
     enabled: true,

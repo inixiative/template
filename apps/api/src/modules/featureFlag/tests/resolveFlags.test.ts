@@ -59,6 +59,7 @@ describe('resolveFlags', () => {
 
   it('walks variants in position order and the first membership wins; a reorder flips the overlap', async () => {
     const { entity: flag } = await createFeatureFlag({
+      ownerModel: 'platform',
       slug: slug('theme'),
       valueType: FeatureFlagValueType.string,
     });
@@ -80,7 +81,11 @@ describe('resolveFlags', () => {
   });
 
   it('disabled serves the type’s zero, never the default variant; enabled with no match serves the default', async () => {
-    const { entity: flag } = await createFeatureFlag({ slug: slug('kill'), enabled: false });
+    const { entity: flag } = await createFeatureFlag({
+      ownerModel: 'platform',
+      slug: slug('kill'),
+      enabled: false,
+    });
     await createFeatureFlagVariant(
       { label: 'default', isDefault: true, valueBoolean: true },
       { featureFlag: flag },
@@ -94,6 +99,7 @@ describe('resolveFlags', () => {
   it('no match and no default is the zero of the type', async () => {
     const stranger = await platformSegment();
     const { entity: flag } = await createFeatureFlag({
+      ownerModel: 'platform',
       slug: slug('limit'),
       valueType: FeatureFlagValueType.number,
     });
@@ -107,7 +113,7 @@ describe('resolveFlags', () => {
   it('the gate refuses non-members to the default, and admits members to the rules', async () => {
     const outside = await platformSegment();
     const { entity: gated } = await createFeatureFlag(
-      { slug: slug('gated') },
+      { ownerModel: 'platform', slug: slug('gated') },
       { segment: outside },
     );
     await createFeatureFlagVariant({ label: 'on' }, { segment: everyone, featureFlag: gated });
@@ -128,6 +134,7 @@ describe('resolveFlags', () => {
     ).entity;
     await createSegmentMember({}, { segment: everyone, customerRef: orgRef });
     const { entity: flag } = await createFeatureFlag({
+      ownerModel: 'platform',
       slug: slug('org-only'),
       subjectModel: CustomerModel.Organization,
     });
@@ -146,7 +153,10 @@ describe('resolveFlags', () => {
   it('a soft-deleted segment no longer matches', async () => {
     const doomed = await platformSegment();
     await createSegmentMember({}, { segment: doomed, customerRef: ref });
-    const { entity: flag } = await createFeatureFlag({ slug: slug('doomed') });
+    const { entity: flag } = await createFeatureFlag({
+      ownerModel: 'platform',
+      slug: slug('doomed'),
+    });
     await createFeatureFlagVariant({ label: 'on' }, { segment: doomed, featureFlag: flag });
     expect(await check(flag, 'boolean')).toBe(true);
 
@@ -155,7 +165,10 @@ describe('resolveFlags', () => {
   });
 
   it('a missing flag or a reader asking for the wrong type gets null', async () => {
-    const { entity: flag } = await createFeatureFlag({ slug: slug('typed') });
+    const { entity: flag } = await createFeatureFlag({
+      ownerModel: 'platform',
+      slug: slug('typed'),
+    });
     await createFeatureFlagVariant({ label: 'on' }, { segment: everyone, featureFlag: flag });
     expect(await check(flag, 'string')).toBeNull();
     expect(checkFlag('platform', 'never-defined', 'boolean', await flagFor(ref))).toBeNull();
@@ -163,6 +176,7 @@ describe('resolveFlags', () => {
 
   it('json values come back as stored', async () => {
     const { entity: flag } = await createFeatureFlag({
+      ownerModel: 'platform',
       slug: slug('layout'),
       valueType: FeatureFlagValueType.json,
     });
@@ -175,6 +189,7 @@ describe('resolveFlags', () => {
 
   it("a sampled variant serves only the subjects whose id bucket sits in its range, at the flag's offset", async () => {
     const { entity: flag } = await createFeatureFlag({
+      ownerModel: 'platform',
       slug: slug('sampled'),
       valueType: FeatureFlagValueType.string,
     });

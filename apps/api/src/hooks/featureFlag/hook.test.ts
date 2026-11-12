@@ -39,13 +39,15 @@ describe('featureFlag hook', () => {
       { organization },
     );
     expect(custom.slug).toBe('custom:dark-mode');
-    const { entity: bare } = await createFeatureFlag({ slug: 'dark-mode' });
+    const { entity: bare } = await createFeatureFlag({ ownerModel: 'platform', slug: 'dark-mode' });
     expect(bare.ownerModel).toBe('platform');
   });
 
   it('refuses a slug outside the shape', async () => {
     for (const slug of ['Dark Mode', 'dark--mode', 'rollout:dark-mode', 'custom:']) {
-      await expect(createFeatureFlag({ slug })).rejects.toThrow('optionally prefixed custom:');
+      await expect(createFeatureFlag({ ownerModel: 'platform', slug })).rejects.toThrow(
+        'optionally prefixed custom:',
+      );
     }
   });
 

@@ -82,7 +82,7 @@ describe('hydrate', () => {
   });
 
   it('walks only the edges the permission check names: a variant reaches its flag, never its audience', async () => {
-    const { entity: flag } = await createFeatureFlag({});
+    const { entity: flag } = await createFeatureFlag({ ownerModel: 'platform' });
     const { entity: audience } = await createSegment({ ownerModel: 'platform' });
     const { entity: variant } = await createFeatureFlagVariant(
       { segmentId: audience.id },
