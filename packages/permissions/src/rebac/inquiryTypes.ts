@@ -6,7 +6,6 @@
  */
 import { Operator } from '@inixiative/json-rules';
 import type { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
-import type { BaseActionOf, BaseResource } from '@template/permissions/rebac/schema';
 import { highRoles, lowRoles } from '@template/permissions/rebac/schemaHelpers';
 import type { ActionRule } from '@template/permissions/rebac/types';
 
@@ -14,20 +13,13 @@ import type { ActionRule } from '@template/permissions/rebac/types';
 // relation to check, so only a superadmin acts for it.
 export type InquiryPartyModel = Exclude<InquiryResourceModel, 'admin'>;
 
-type ResourceOf<M extends InquiryPartyModel> = Extract<`db:${Uncapitalize<M>}`, BaseResource>;
-
-// An action of the party model's own resource: the schema's vocabulary, checked at compile time.
-export type PartyAction<M extends InquiryPartyModel> = BaseActionOf<ResourceOf<M>>;
-
-// The level a party needs: an action of the party's own resource, asked on its relation; or, for a
-// case one action cannot say, a plain rebac rule in the schema's own vocabulary (rel, any, all,
-// rule), used as written.
-export type PartyLevel<M extends InquiryPartyModel> = PartyAction<M> | Exclude<ActionRule, string>;
+// The level a party needs: an action of the party model's own resource, asked on its relation
+// (inquiryPermission.test.ts checks every one exists); or, for a case one action cannot say, a plain
+// rebac rule in the schema's own vocabulary (rel, any, all, rule), used as written.
+export type PartyLevel = string | Exclude<ActionRule, string>;
 
 export type InquiryParty =
-  | {
-      [M in InquiryPartyModel]: { model: M; send?: PartyLevel<M>; resolve?: PartyLevel<M> };
-    }[InquiryPartyModel]
+  | { model: InquiryPartyModel; send?: PartyLevel; resolve?: PartyLevel }
   | { model: 'admin' };
 
 export type InquiryTypeParties = {
@@ -38,7 +30,7 @@ export type InquiryTypeParties = {
 // Reading an inquiry is party-wide, whatever its type: the person on a side reads it, and an
 // organization or space reads what it sent and received with manage (the entitlement rulings,
 // R74/R76). Sending and resolving are per type, below.
-export const INQUIRY_READ_LEVELS: { [M in InquiryPartyModel]?: PartyAction<M> } = {
+export const INQUIRY_READ_LEVELS: Partial<Record<InquiryPartyModel, string>> = {
   User: 'read',
   Organization: 'manage',
   Space: 'manage',

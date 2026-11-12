@@ -1,14 +1,39 @@
 import { describe, expect, it } from 'bun:test';
 import { InquiryType } from '@template/db/generated/client/enums';
 import { inquiryPartyRule, inquiryPermission } from '@template/permissions/rebac/inquiryPermission';
-import { INQUIRY_TYPES } from '@template/permissions/rebac/inquiryTypes';
+import {
+  INQUIRY_READ_LEVELS,
+  INQUIRY_TYPES,
+  type InquiryParty,
+} from '@template/permissions/rebac/inquiryTypes';
 import { rebacSchema } from '@template/permissions/rebac/schema';
+import { lowerFirst } from 'lodash-es';
 
 type Gated = { any: { all: [{ rule: { operator: string; value: string } }, unknown] }[] };
 
 describe('inquiryPermission', () => {
   it('declares parties for every inquiry type', () => {
     expect(Object.keys(INQUIRY_TYPES).sort()).toEqual(Object.values(InquiryType).sort());
+  });
+
+  it('names only actions the party model actually has', () => {
+    const actionsOf = (model: string) =>
+      Object.keys(rebacSchema.permissions[`db:${lowerFirst(model)}`]?.actions ?? {});
+    const declared = [
+      ...Object.values(INQUIRY_TYPES).flatMap(({ sources, targets }) =>
+        [...sources, ...targets].flatMap((party) =>
+          party.model === 'admin'
+            ? []
+            : [
+                (party as InquiryParty & { send?: unknown }).send,
+                (party as { resolve?: unknown }).resolve,
+              ].flatMap((level) => (typeof level === 'string' ? [[party.model, level]] : [])),
+        ),
+      ),
+      ...Object.entries(INQUIRY_READ_LEVELS),
+    ] as [string, string][];
+
+    for (const [model, action] of declared) expect(actionsOf(model)).toContain(action);
   });
 
   it('gates each grant on the party model and asks the relation named for its side and model', () => {

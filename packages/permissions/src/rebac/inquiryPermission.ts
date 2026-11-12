@@ -9,6 +9,7 @@ import { Operator } from '@inixiative/json-rules';
 import type { InquiryType } from '@template/db/generated/client/enums';
 import {
   INQUIRY_READ_LEVELS,
+  INQUIRY_TYPES,
   type InquiryParty,
   type InquiryPartyModel,
   type InquiryTypeParties,
@@ -18,7 +19,6 @@ import type { ActionRule, ResourcePermission } from '@template/permissions/rebac
 
 export type InquirySide = 'source' | 'target';
 type Verb = 'send' | 'resolve';
-type AnyLevel = PartyLevel<InquiryPartyModel>;
 
 const isType = (type: InquiryType): ActionRule => ({
   rule: { field: 'type', operator: Operator.equals, value: type },
@@ -30,7 +30,7 @@ const isPartyModel = (side: InquirySide, model: InquiryPartyModel): ActionRule =
 
 // The party's relation on the inquiry is named for its side and model: sourceOrganization,
 // targetUser, sourceSpaceUser. An action is asked on it; a rule is used as written.
-const levelRule = (rel: string, level: AnyLevel): ActionRule =>
+const levelRule = (rel: string, level: PartyLevel): ActionRule =>
   typeof level === 'string' ? { rel, action: level } : level;
 
 // The party's grant for one verb, gated on the inquiry naming that party model on that side.
@@ -41,7 +41,7 @@ export const inquiryPartyRule = (
   verb: Verb,
 ): ActionRule | null => {
   if (party.model === 'admin') return null;
-  const level = (party as Partial<Record<Verb, AnyLevel>>)[verb];
+  const level = (party as Partial<Record<Verb, PartyLevel>>)[verb];
   if (!level) return null;
   return { all: [isPartyModel(side, party.model), levelRule(`${side}${party.model}`, level)] };
 };
@@ -78,3 +78,5 @@ export const inquiryPermission = (
     },
   },
 });
+
+export const inquiry = inquiryPermission(INQUIRY_TYPES);

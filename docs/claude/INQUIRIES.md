@@ -356,7 +356,7 @@ Each mutation uses the include that matches what its caller needs:
 | `send` | The source party's declared `send` level for that type (table above) |
 | `resolve` | The target party's declared `resolve` level for that type; a UserEvidence (`admin`) target has no relation, so only a superadmin resolves it |
 
-`db:inquiry` is built by `inquiryPermission(INQUIRY_TYPES)`: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource, checked at compile time, or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
+`db:inquiry` is the `inquiry` object built by `inquiryPermission(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
 
 ## Adding a New Handler
 
