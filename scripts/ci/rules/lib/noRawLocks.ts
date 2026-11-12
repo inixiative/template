@@ -76,7 +76,8 @@ for (const file of listFiles(['apps', 'packages'], /\.(tsx?|sql)$/)) {
         file,
         line,
         key: `raw-for-update: ${statement}`,
-        detail: 'raw FOR UPDATE; use db.findForUpdate(model, where, opts?) inside db.txn()',
+        detail:
+          'raw FOR UPDATE; use db.findForUpdate(model, where, opts?) inside db.txn() (FOR NO KEY UPDATE by default; { changesKey: true } for FOR UPDATE)',
       });
   }
 }
@@ -86,7 +87,8 @@ finishFence({
   violations,
   explain: [
     'Raw row-lock SQL outside the db client. Lock rows with the primitive, inside db.txn():',
-    '  db.findForUpdate(model, where)                       // SELECT * ... FOR UPDATE',
+    '  db.findForUpdate(model, where)                       // SELECT * ... FOR NO KEY UPDATE',
+    '  db.findForUpdate(model, where, { changesKey: true }) // FOR UPDATE: the transaction deletes the row or changes a referenced column',
     '  db.findForUpdate(model, where, { upserting: true })  // also fences a row that does not exist yet',
     'There is no shared (FOR SHARE) mode: docs/claude/CONCURRENCY.md, Row locks.',
   ],
