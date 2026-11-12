@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { db, organizationId } from '@template/db';
+import { db, revive } from '@template/db';
 import { encryptField } from '@template/db/lib/encryption/helpers';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
@@ -16,22 +16,36 @@ export const organizationCreateAuthProviderController = makeController(
     const org = getResource<'organization'>(c);
     const { secrets, ...body } = c.req.valid('json');
 
-    const data = {
-      ...body,
-      id: crypto.randomUUID(),
-      organizationId: organizationId(org.id),
-    };
+    const provider = await db.txn(async () => {
+      const [revived] = await revive(db.authProvider, {
+        organizationId: org.id,
+        provider: body.provider,
+        type: body.type,
+      });
 
-    const encryptedData = await encryptField('authProvider', 'secrets', { ...data, secrets });
+      const data = {
+        enabled: true,
+        ...body,
+        id: revived?.id ?? Bun.randomUUIDv7(),
+        organizationId: org.id,
+      };
 
-    const provider = await db.authProvider.create({
-      data: {
-        ...data,
-        ...encryptedData,
-      },
+      const encryptedData = await encryptField('authProvider', 'secrets', { ...data, secrets });
+
+      if (revived)
+        return db.authProvider.update({
+          where: { id: revived.id },
+          data: { enabled: data.enabled, ...body, ...encryptedData },
+        });
+      return db.authProvider.create({ data: { ...data, ...encryptedData } });
     });
 
-    const { encryptedSecrets, encryptedSecretsMetadata, encryptedSecretsKeyVersion, ...safeProvider } = provider;
+    const {
+      encryptedSecrets,
+      encryptedSecretsMetadata,
+      encryptedSecretsKeyVersion,
+      ...safeProvider
+    } = provider;
 
     return respond.created(safeProvider);
   },

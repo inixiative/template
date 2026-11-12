@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind factory
+ * @kind query
  * @partOf primitive:ui
  * @uses primitive:sdk
  */

@@ -1,0 +1,59 @@
+{
+  "id": "jobs-cron",
+  "title": "Background jobs",
+  "routing": "Is this about running work outside the request: defining, registering or enqueuing a background job? Signals: makeJob / makeSingletonJob / makeSupersedingJob, enqueueJob and buildJobData, staged jobs (ctx.enqueueChildJob / ctx.enqueueChildJobs, makeEnqueueChildJobs), handlers/index.ts registration, WorkerContext / ctx.log / ctx.signal, job ids (validateJobId / isValidJobId), the BullMQ queue, processJob and initializeWorker, rolling caches (coordinateRollingCaches), BullBoard, POST /api/admin/job, or a fire-and-forget promise or setTimeout standing in for a job. CronJob schedules are `cron`; fast/slow lanes and the JobOutbox overflow buffer are `job-lanes-outbox`.",
+  "concepts": ["jobs"],
+  "tokens": 16212,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1680,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 16212
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/CONTEXT.md", "docs/claude/JOBS.md"],
+    "docUnits": [
+      "doc:docs/claude/CONTEXT.md#job-context",
+      "doc:docs/claude/JOBS.md#job-system",
+      "doc:docs/claude/JOBS.md#built-in-handlers",
+      "doc:docs/claude/JOBS.md#creating-handlers",
+      "doc:docs/claude/JOBS.md#handler-patterns",
+      "doc:docs/claude/JOBS.md#handler-patterns/ctx-log-dual-write-logging",
+      "doc:docs/claude/JOBS.md#handler-patterns/singleton-job",
+      "doc:docs/claude/JOBS.md#handler-patterns/staged-job-fan-out-and-wait",
+      "doc:docs/claude/JOBS.md#enqueuing-jobs",
+      "doc:docs/claude/JOBS.md#bullboard",
+      "doc:FEATURES.md#background-jobs-cron"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "auth-middleware-validation",
+      "authentication-methods",
+      "caching-and-invalidation",
+      "cron-and-recurring-work",
+      "environment-config",
+      "graceful-shutdown-lifecycle",
+      "job-definition-and-enqueue",
+      "job-overflow-outbox",
+      "locks-and-serialization",
+      "redis-infrastructure",
+      "segments-membership",
+      "structured-logging",
+      "superadmin-operations",
+      "supersede-lanes",
+      "testing-helpers"
+    ],
+    "codeEntries": 24,
+    "docMembers": 68
+  },
+  "bypassLines": 14,
+  "glossaryTerms": 18
+}

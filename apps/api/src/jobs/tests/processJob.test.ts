@@ -1,12 +1,25 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+import { type AuditActor, auditActorContext } from '@template/db/lib/auditActorContext';
+import { jobHandlers } from '#/jobs/handlers';
 import { processJob } from '#/jobs/processJob';
-import { type JobData, JobLane, JobType } from '#/jobs/types';
+import { queue } from '#/jobs/queue';
+import { slowLastFinishedKey } from '#/jobs/slowLaneSignals';
+import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { type JobData, JobLane, JobType, type WorkerContext } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
 
 const jobWith = (id: string, data: Partial<JobData> & { lane?: JobLane }) =>
-  createMockJob({ id, name: 'sendWebhook', data: { type: JobType.adhoc, payload: { id }, ...data } });
+  createMockJob({
+    id,
+    name: 'sendWebhook',
+    data: { type: JobType.adhoc, payload: { id }, ...data },
+  });
 
 describe('processJob', () => {
+  afterEach(async () => {
+    await queue.redis.flushdb();
+  });
+
   it('runs the handler for every lane, including legacy lane-less envelopes', async () => {
     const ran: unknown[] = [];
     const handlers = {
@@ -20,6 +33,84 @@ describe('processJob', () => {
     await processJob(jobWith('legacy-job', {}), { handlers: handlers as never });
 
     expect(ran).toEqual([{ id: 'slow-job' }, { id: 'fast-job' }, { id: 'legacy-job' }]);
+  });
+
+  it('releases the slow slot and stamps the slow finish when a slow handler throws', async () => {
+    const slowSlots = createSlowSlotPool(2);
+    const handlers = {
+      sendWebhook: async () => {
+        throw new Error('handler failed');
+      },
+    };
+
+    await expect(
+      processJob(jobWith('slow-fails', { lane: JobLane.slow }), {
+        handlers: handlers as never,
+        slowSlots,
+      }),
+    ).rejects.toThrow('handler failed');
+
+    expect(slowSlots.held()).toBe(0);
+    expect(await queue.redis.get(slowLastFinishedKey(queue.name))).not.toBeNull();
+  });
+
+  it('stamps no slow finish for a fast job', async () => {
+    const handlers = { sendWebhook: async () => {} };
+
+    await processJob(jobWith('fast-job', { lane: JobLane.fast }), { handlers: handlers as never });
+
+    expect(await queue.redis.get(slowLastFinishedKey(queue.name))).toBeNull();
+  });
+
+  it('runs the handler as the job actor, carrying the payload integrationId', async () => {
+    const actors: (AuditActor | null)[] = [];
+    const handlers = {
+      sendWebhook: async () => {
+        actors.push(auditActorContext.getScope());
+      },
+    };
+
+    await processJob(jobWith('integration-job', { payload: { integrationId: 'integration-1' } }), {
+      handlers: handlers as never,
+    });
+    await processJob(jobWith('plain-job', {}), { handlers: handlers as never });
+
+    expect(actors.map((actor) => actor?.actorJobName)).toEqual(['sendWebhook', 'sendWebhook']);
+    expect(actors.map((actor) => actor?.integrationId)).toEqual(['integration-1', null]);
+  });
+
+  it('a cron tick does not run its handler: it enqueues the real run, marked with the cron row', async () => {
+    const ranDirectly: unknown[] = [];
+    const enqueuedRuns: unknown[] = [];
+    const realRun = spyOn(jobHandlers, 'sweepSegments').mockImplementation(
+      async (ctx: WorkerContext) => {
+        enqueuedRuns.push(ctx.job.data);
+      },
+    );
+
+    try {
+      await processJob(
+        createMockJob({
+          id: 'tick-job',
+          name: 'sweepSegments',
+          data: { type: JobType.cron, id: 'cron-row-id', lane: JobLane.slow, payload: null },
+        }),
+        {
+          handlers: {
+            sweepSegments: async () => {
+              ranDirectly.push('tick');
+            },
+          } as never,
+        },
+      );
+    } finally {
+      realRun.mockRestore();
+    }
+
+    expect(ranDirectly).toEqual([]);
+    expect(enqueuedRuns).toMatchObject([
+      { type: JobType.cronTrigger, id: 'cron-row-id', lane: JobLane.slow },
+    ]);
   });
 
   it('rejects an unknown handler', async () => {

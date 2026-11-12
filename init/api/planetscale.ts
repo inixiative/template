@@ -8,10 +8,18 @@ import { getProjectConfig } from '../utils/getProjectConfig';
 const PLANETSCALE_API = 'https://api.planetscale.com/v1';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/planetscale');
 const SANITIZE_KEYS = ['plain_text', 'username', 'connection_strings.general'];
-const CLI_PATH = ['/opt/homebrew/bin', join(homedir(), '.bun/bin'), process.env.PATH].filter(Boolean).join(':');
+const CLI_PATH = ['/opt/homebrew/bin', join(homedir(), '.bun/bin'), process.env.PATH]
+  .filter(Boolean)
+  .join(':');
 
 const withCliEnv = (
-  options: { cwd?: string; encoding?: BufferEncoding; env?: NodeJS.ProcessEnv; shell?: string; timeout?: number } = {},
+  options: {
+    cwd?: string;
+    encoding?: BufferEncoding;
+    env?: NodeJS.ProcessEnv;
+    shell?: string;
+    timeout?: number;
+  } = {},
 ) => ({
   ...options,
   env: {
@@ -73,7 +81,10 @@ class PlanetScaleApi {
     const projectId = config.infisical.projectId;
     if (!projectId) throw new Error('Infisical project not configured. Run Infisical setup first.');
 
-    const tokenId = await getSecretAsync('PLANETSCALE_TOKEN_ID', { projectId, environment: 'root' });
+    const tokenId = await getSecretAsync('PLANETSCALE_TOKEN_ID', {
+      projectId,
+      environment: 'root',
+    });
     const token = await getSecretAsync('PLANETSCALE_TOKEN', { projectId, environment: 'root' });
 
     const response = await fetch(`${PLANETSCALE_API}${endpoint}`, {
@@ -85,13 +96,17 @@ class PlanetScaleApi {
       },
     });
 
-    if (!response.ok) throw new Error(`PlanetScale API error (${response.status}): ${await response.text()}`);
+    if (!response.ok)
+      throw new Error(`PlanetScale API error (${response.status}): ${await response.text()}`);
     return (await response.json()) as T;
   }
 
   async listOrganizations(): Promise<PlanetScaleOrganization[]> {
     return this.vcr.capture('listOrganizations', async () => {
-      const { stdout } = await execAsync('pscale org list --format json', withCliEnv({ encoding: 'utf-8' }));
+      const { stdout } = await execAsync(
+        'pscale org list --format json',
+        withCliEnv({ encoding: 'utf-8' }),
+      );
       const orgs = JSON.parse(stdout) as Array<{ name: string; slug?: string }>;
       return orgs.map((org) => ({ name: org.name, slug: org.slug }));
     });
@@ -172,10 +187,13 @@ class PlanetScaleApi {
     },
   ): Promise<void> {
     return this.vcr.capture('updateDatabaseSettings', async () => {
-      await this.request<PlanetScaleDatabase>(`/organizations/${organizationName}/databases/${databaseName}`, {
-        method: 'PATCH',
-        body: JSON.stringify(settings),
-      });
+      await this.request<PlanetScaleDatabase>(
+        `/organizations/${organizationName}/databases/${databaseName}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(settings),
+        },
+      );
     });
   }
 
@@ -204,7 +222,11 @@ class PlanetScaleApi {
     });
   }
 
-  async getBranch(organizationName: string, databaseName: string, branchName: string): Promise<PlanetScaleBranch> {
+  async getBranch(
+    organizationName: string,
+    databaseName: string,
+    branchName: string,
+  ): Promise<PlanetScaleBranch> {
     return this.vcr.capture('getBranch', async () => {
       const { stdout } = await execAsync(
         `pscale branch show ${databaseName} ${branchName} --org ${organizationName} --format json`,
@@ -241,7 +263,9 @@ class PlanetScaleApi {
         name: result.name || roleName,
         username: result.username,
         plain_text: result.password,
-        connection_strings: { general: `postgresql://${result.username}:${result.password}@${host}:5432/postgres` },
+        connection_strings: {
+          general: `postgresql://${result.username}:${result.password}@${host}:5432/postgres`,
+        },
       };
     });
   }
@@ -284,7 +308,11 @@ class PlanetScaleApi {
     });
   }
 
-  async promoteBranch(organizationName: string, databaseName: string, branchName: string): Promise<PlanetScaleBranch> {
+  async promoteBranch(
+    organizationName: string,
+    databaseName: string,
+    branchName: string,
+  ): Promise<PlanetScaleBranch> {
     return this.vcr.capture('promoteBranch', async () => {
       const { stdout } = await execAsync(
         `pscale branch promote ${databaseName} ${branchName} --org ${organizationName} --format json`,
@@ -308,7 +336,11 @@ class PlanetScaleApi {
     );
   }
 
-  async deleteBranch(organizationName: string, databaseName: string, branchName: string): Promise<void> {
+  async deleteBranch(
+    organizationName: string,
+    databaseName: string,
+    branchName: string,
+  ): Promise<void> {
     return this.vcr.capture('deleteBranch', async () => {
       await execAsync(
         `pscale branch delete ${databaseName} ${branchName} --org ${organizationName} --force`,
@@ -319,10 +351,13 @@ class PlanetScaleApi {
 
   async createServiceToken(orgName: string): Promise<ServiceToken> {
     return this.vcr.capture('createServiceToken', async () => {
-      const { stdout } = await execAsync(`pscale service-token create --org ${orgName} --format json`, {
-        ...withCliEnv(),
-        encoding: 'utf-8',
-      });
+      const { stdout } = await execAsync(
+        `pscale service-token create --org ${orgName} --format json`,
+        {
+          ...withCliEnv(),
+          encoding: 'utf-8',
+        },
+      );
       const result = JSON.parse(stdout);
       return { id: result.id, token: result.token };
     });

@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
 import { execAsync } from '../utils/exec';
 

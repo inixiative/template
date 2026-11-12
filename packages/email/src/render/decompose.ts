@@ -14,7 +14,8 @@ export type ComponentWrite = { slug: string; mjml: string; refs: string[] };
 
 export type DecomposeResult = { mjml: string; refs: string[]; writes: ComponentWrite[] };
 
-const slotTag = (name: string, isDefault: boolean): string => `slot:${name}${isDefault ? ':default' : ''}`;
+const slotTag = (name: string, isDefault: boolean): string =>
+  `slot:${name}${isDefault ? ':default' : ''}`;
 
 export const serialize = (nodes: Node[]): string =>
   nodes
@@ -60,7 +61,10 @@ const processCaller = (nodes: Node[], ctx: Ctx): { mjml: string; refs: string[] 
   return { mjml, refs };
 };
 
-const processComponentRef = (node: ComponentNode, ctx: Ctx): { mjml: string; bubbledRefs: string[] } => {
+const processComponentRef = (
+  node: ComponentNode,
+  ctx: Ctx,
+): { mjml: string; bubbledRefs: string[] } => {
   const overrides: Node[] = [];
   const body: Node[] = [];
   for (const child of node.children) {
@@ -80,7 +84,10 @@ const processComponentRef = (node: ComponentNode, ctx: Ctx): { mjml: string; bub
   }
 
   const ov = processCaller(overrides, ctx);
-  return { mjml: `{{#component:${node.slug}}}${ov.mjml}{{/component:${node.slug}}}`, bubbledRefs: ov.refs };
+  return {
+    mjml: `{{#component:${node.slug}}}${ov.mjml}{{/component:${node.slug}}}`,
+    bubbledRefs: ov.refs,
+  };
 };
 
 export const decomposeNodes = (nodes: Node[], resolve: ResolveCascade): DecomposeResult => {

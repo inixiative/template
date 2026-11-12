@@ -18,6 +18,7 @@
   - [Styles](#styles)
 - [Database](#database)
   - [Prisma Schema](#prisma-schema)
+  - [Polymorphic Sides](#polymorphic-sides)
   - [IDs](#ids)
 - [Files & Directories](#files--directories)
   - [Backend Structure](#backend-structure)
@@ -50,7 +51,7 @@
 | Route handler | `<model><Action><Submodel?>`.ts | `userCreate.ts`, `organizationReadManySpaces.ts` |
 | Hook | `<model><Timing><Purpose>.ts` | `userAfterCreate.ts` |
 | Job | `<verb><Noun>.ts` | `sendWebhook.ts`, `processInquiry.ts` |
-| Middleware | `<purpose>Middleware.ts` | `authMiddleware.ts` |
+| Middleware | `<purpose>Middleware.ts` | `jwtAuthMiddleware.ts` |
 | Utility | `<verb><Noun>.ts` or `<noun>.ts` | `makeController.ts`, `cache.ts` |
 
 **ReadMany subresources use plural form:**
@@ -63,15 +64,16 @@
 | Type | Convention | Example |
 |------|------------|---------|
 | Route handler | `<model><Action>` | `userCreate`, `organizationReadMany` |
-| Getter | `get<Thing>` | `getUser`, `getOrganization` |
+| Getter | `get<Thing>` | `getResource` |
 | Boolean getter | `is<Condition>` | `isAuthenticated`, `isSuperadmin` |
-| Factory | `create<Thing>` | `createUser`, `createOrganization` |
+| Constructor / factory | `make<Thing>` | `makeError`, `makeJob`, `makeController` |
+
+`create<Thing>` is reserved for writing a record (`createInquiry`, the DB test factories `createUser` / `createSpace` in `packages/db/src/test/factories`), not for constructing a value.
 
 ### Variables
 
 | Type | Convention | Example |
 |------|------------|---------|
-| ID types | `<Model>Id` | `UserId`, `OrganizationId` |
 | Context values | camelCase | `user`, `organization`, `permix` |
 | Primitive constants | SCREAMING_SNAKE | `DEFAULT_PAGE_SIZE`, `MAX_RETRIES` |
 | Object constants (enums/registries) | PascalCase | `Modules`, `JobType`, `BatchStatus` |
@@ -84,13 +86,12 @@ Two distinct meanings — **don't mix them**:
 | Prefix | Meaning | Example |
 |--------|---------|---------|
 | `_name` | **Unused** variable/parameter | `(_input, key) => …`, `const { x: _drop, ...rest } = obj` |
-| `__name` | **Private / internal** — not for outside use | `private __body`, `__model` phantom-type brand, `__send()` |
+| `__name` | **Private / internal** — not for outside use | `private __body`, `__send()` |
 
-**Why both?** TypeScript's `private` keyword only works on class members. For module-level helpers, object literal keys, type brands, and other plain-data internals, there is no language-level private. The double-underscore convention covers those cases. Single underscore is reserved for the universal "ignored" meaning (matches `argsIgnorePattern: "^_"`).
+**Why both?** TypeScript's `private` keyword only works on class members. For module-level helpers, object literal keys, and other plain-data internals, there is no language-level private. The double-underscore convention covers those cases. Single underscore is reserved for the universal "ignored" meaning (matches `argsIgnorePattern: "^_"`).
 
 **Apply consistently:**
 - Class private methods/fields: `private __methodName()`, `private __field` (the keyword *and* the prefix reinforce intent).
-- Type brand keys on phantom types: `string & { readonly __model: Model }`.
 - Object-literal helpers a consumer shouldn't reach into: `{ __cache: …, lookup() { … } }`.
 - Unused destructured fields: `const { legacy: _legacy, ...rest }`.
 - Unused callback params: `(_event, payload) => …`.
@@ -101,7 +102,7 @@ Two distinct meanings — **don't mix them**:
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getUser } from '#/lib/context/getUser'` |
+| Within an app | `#/` | `import { getResource } from '#/lib/context/getResource'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -110,7 +111,7 @@ Two distinct meanings — **don't mix them**:
 // apps/api/src/modules/user/routes/userCreate.ts
 import { db } from '@template/db';                    // Shared package
 import { log } from '@template/shared/logger';        // Shared package
-import { getUser } from '#/lib/context/getUser';      // Internal to app
+import { getResource } from '#/lib/context/getResource';    // Internal to app
 
 // packages/shared/src/logger/index.ts (top-level barrel)
 export { log } from './logger';                       // Relative OK here
@@ -206,11 +207,63 @@ TODO: Tailwind conventions
 | Enum | PascalCase | `Role`, `PlatformRole` |
 | Relation | camelCase, descriptive | `organization`, `members`, `createdBy` |
 
+### Polymorphic Sides
+
+A polymorphic slot is named for the role the row plays, as `<side>Model` + typed FKs.
+
+| Side | Meaning | Example |
+|------|---------|---------|
+| `owner` | Tenancy only — who the row belongs to | `Contact.ownerModel` |
+| `source` / `target` | The two ends of a directed edge | `Inquiry`, `RuleReference` `sourceModel` / `targetModel` |
+| `resource` | A one-sided slot | `TagAttachment.resourceModel` |
+| `subject` | The row a record is about | `AuditLog.subjectModel` |
+| `actor` | Who acted | `AuditLog.actorUserId` |
+
+Never `referenced*`.
+
+A side whose typed FKs are `onDelete: SetNull` keeps a plain id beside them: register the axis with
+`materialized` (`sourceId`, `targetId`) in `packages/db/src/registries/falsePolymorphism.ts`. Why:
+SetNull nulls the typed key when the row it points at is hard-deleted, and only the plain id still says
+what it was; the required-FK rule accepts it in the key's place. CI rule
+`set-null-polymorphism-materialized` enforces this; `Cascade` arms are exempt.
+
+Each side gets its own enum, named for the question it answers, even when the two lists overlap:
+`TagOwnerModel` (who can own a tag: `Tag.ownerModel`, `TagCategory.ownerModel`) and `TagResource`
+(where a tag can be applied: `TagAttachment.resourceModel`, `Tag.resources`). A value that is only
+meaningful on one side (`platform`, an owner with no row) never appears in the other side's enum.
+
+The typed FKs and relations carry the side too, so both ends read the same way: `sourceSegmentId` /
+`sourceSegment`, `targetTagId` / `targetTag` (as `Inquiry.sourceUserId` / `targetUserId`). The
+back-relations do the same, side plus the full model name: `sourceRuleReferences` on a source model,
+`targetRuleReferences` on a target model, both on a model that is both (`Segment`).
+
+### Entitlement: source, target and the library's anchor
+
+An `Entitlement` row is a directed edge, so it uses `source` / `target` like `RuleReference`. The
+**source** is the anchor the entitlement acts from, the **target** the holder (`Token`,
+`Integration`, `OrganizationUser`, `SpaceUser`); `resource` is the model its actions apply to. The
+permissions library keeps its own words, and one transformer in `@template/permissions`
+(`toEntitlementEntry` / `toEntitlementInput`, `packages/permissions/src/entitlementRows.ts`) moves
+between them, only where a holder is handed to the library:
+
+| Library entry | Row |
+|---|---|
+| `anchor.resource` (`db:space`) | `sourceModel` (`Space`) and the typed FK `sourceSpaceId` |
+| `anchor.id` | `sourceId` |
+| `anchor.path` | `sourcePath` |
+| `resource` (`db:integration`) | `resource` (`Integration`) |
+| `actions` (`{ read: true }`) | `actions` (`['read']`) |
+| the holder it is installed on | `targetModel`, `targetId` and the arm's keys: `targetTokenId`, `targetIntegrationId`, or a member's owner chain (`targetOrganizationId`, `targetSpaceId`, `targetUserId`, as `Inquiry`'s) |
+
+Back-relations follow the side rule: `targetEntitlements` on a holder, `sourceEntitlements` on every
+model an entitlement can anchor at. An API response carries the holder's live rows as stored, under
+`targetEntitlements`; a create body's `entitlements` is a list of `EntitlementInput` rows. Entries
+never cross the API. The grantor has no name on the row: it is the target's owner.
+
 ### IDs
 
 TODO: Document ID format
 - UUIDv7 for sortability
-- Type-safe branded IDs
 
 ---
 

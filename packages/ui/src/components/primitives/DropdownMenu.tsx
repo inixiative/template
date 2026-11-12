@@ -21,7 +21,9 @@ export type DropdownMenuTriggerProps = {
 };
 
 export const DropdownMenuTrigger = ({ children, className }: DropdownMenuTriggerProps) => {
-  return <Ariakit.MenuButton className={cn('cursor-pointer', className)}>{children}</Ariakit.MenuButton>;
+  return (
+    <Ariakit.MenuButton className={cn('cursor-pointer', className)}>{children}</Ariakit.MenuButton>
+  );
 };
 
 export type DropdownMenuContentProps = {
@@ -30,7 +32,11 @@ export type DropdownMenuContentProps = {
   align?: 'start' | 'end';
 };
 
-export const DropdownMenuContent = ({ children, className, align = 'start' }: DropdownMenuContentProps) => {
+export const DropdownMenuContent = ({
+  children,
+  className,
+  align = 'start',
+}: DropdownMenuContentProps) => {
   return (
     <Ariakit.Menu
       gutter={8}
@@ -97,7 +103,11 @@ export type DropdownMenuLabelProps = {
 };
 
 export const DropdownMenuLabel = ({ children, className }: DropdownMenuLabelProps) => {
-  return <div className={cn('px-2 py-1.5 text-xs font-semibold text-muted-foreground', className)}>{children}</div>;
+  return (
+    <div className={cn('px-2 py-1.5 text-xs font-semibold text-muted-foreground', className)}>
+      {children}
+    </div>
+  );
 };
 
 export const DropdownMenuSeparator = ({ className }: { className?: string }) => {

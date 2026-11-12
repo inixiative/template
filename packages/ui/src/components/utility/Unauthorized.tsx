@@ -54,7 +54,8 @@ export const Unauthorized = ({
         <p className="mt-2 text-sm text-muted-foreground">{message}</p>
         {isAuthenticated && (
           <p className="mt-1 text-sm text-muted-foreground">
-            If this page belongs to an organization or space, switch to it from the selector at the top left.
+            If this page belongs to an organization or space, switch to it from the selector at the
+            top left.
           </p>
         )}
         <div className="mt-6 flex gap-2">

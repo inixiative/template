@@ -1,15 +1,16 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createContact, createUser, getNextSeq } from '@template/db/test';
 import { resolveUserByContact } from '#/lib/identity/resolveUserByContact';
 
 describe('resolveUserByContact', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
-  const jid = (phoneSuffix: number) => `1555${String(phoneSuffix).padStart(7, '0').slice(-7)}@s.whatsapp.net`;
+  const jid = (phoneSuffix: number) =>
+    `1555${String(phoneSuffix).padStart(7, '0').slice(-7)}@s.whatsapp.net`;
 
   it('returns the existing userId when a Contact is already registered for the JID', async () => {
     const seq = getNextSeq();
@@ -23,7 +24,7 @@ describe('resolveUserByContact', () => {
         valueKey: targetJid,
         value: { jid: targetJid },
       },
-      { context: { user } },
+      { user },
     );
 
     const resolvedId = await resolveUserByContact({

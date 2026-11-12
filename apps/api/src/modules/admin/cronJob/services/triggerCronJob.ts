@@ -5,18 +5,19 @@
  * @uses primitive:jobs
  */
 import type { CronJob } from '@template/db/generated/client/client';
-import { enqueueJob } from '#/jobs/enqueue';
-import type { JobPayloads } from '#/jobs/handlers';
-import { type JobLane, JobType } from '#/jobs/types';
+import { enqueueCronRun } from '#/jobs/enqueueCronRun';
+import type { JobLane } from '#/jobs/types';
 
 export const triggerCronJob = async (cronJob: CronJob, lane?: JobLane) => {
-  // Route through enqueueJob so production code goes through one queue seam,
-  // and so the in-test no-op + jobId synthesis applies here too.
-  const handler = cronJob.handler as keyof JobPayloads;
-  const result = await enqueueJob(handler, cronJob.payload as JobPayloads[typeof handler], {
-    id: cronJob.id,
-    type: JobType.cronTrigger,
+  // The same path a scheduled tick takes, so a manual trigger collides with a scheduled run of the row
+  // like any two enqueues (a singleton is deduplicated on the row id).
+  const result = await enqueueCronRun({
+    handlerName: cronJob.handler,
+    cronJobId: cronJob.id,
+    payload: cronJob.payload,
     lane,
+    attempts: cronJob.maxAttempts,
+    backoff: { type: 'exponential', delay: cronJob.backoffMs },
   });
 
   return { jobId: result.jobId, handler: cronJob.handler };

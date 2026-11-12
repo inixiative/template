@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import type { Account, Organization, Space, Token, User } from '@template/db/generated/client/client';
+import type {
+  Account,
+  Organization,
+  Space,
+  Token,
+  User,
+} from '@template/db/generated/client/client';
 import type { SeedFile } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
 import { isUuidV7 } from '@template/shared/utils';
@@ -62,7 +68,9 @@ describe('Seed System', () => {
 
   describe('Prime Seed Data', () => {
     test('prime users exist', () => {
-      const userSeed = seeds.find((s: SeedFile) => s.model === 'user') as SeedFile<User> | undefined;
+      const userSeed = seeds.find((s: SeedFile) => s.model === 'user') as
+        | SeedFile<User>
+        | undefined;
       expect(userSeed).toBeDefined();
 
       const primeUsers = userSeed!.records.filter((r) => r.prime);
@@ -93,7 +101,9 @@ describe('Seed System', () => {
     });
 
     test('prime organization exists', () => {
-      const orgSeed = seeds.find((s) => s.model === 'organization') as SeedFile<Organization> | undefined;
+      const orgSeed = seeds.find((s) => s.model === 'organization') as
+        | SeedFile<Organization>
+        | undefined;
       expect(orgSeed).toBeDefined();
 
       const primeOrgs = orgSeed!.records.filter((r) => r.prime);

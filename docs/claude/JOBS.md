@@ -18,11 +18,16 @@
   - [ctx.log() - Dual-Write Logging](#ctxlog---dual-write-logging)
   - [Singleton Job](#singleton-job)
   - [Superseding Job](#superseding-job)
+  - [Staged Job (Fan Out and Wait)](#staged-job-fan-out-and-wait)
+  - [Rolling Caches (Root, Branch, Leaf)](#rolling-caches-root-branch-leaf)
 - [Enqueuing Jobs](#enqueuing-jobs)
 - [Fast and Slow Lanes](#fast-and-slow-lanes)
   - [Choosing a Lane](#choosing-a-lane)
   - [Priority: Fast Work Is Always Picked First](#priority-fast-work-is-always-picked-first)
+  - [Slots: Slow Work Uses at Most Its Share](#slots-slow-work-uses-at-most-its-share)
   - [Pressure: One Budget, Divided by Lane](#pressure-one-budget-divided-by-lane)
+    - [The Deferral List](#the-deferral-list)
+    - [Slow-Lane Signals](#slow-lane-signals)
   - [Lane Configuration](#lane-configuration)
   - [Validating Against Real Infrastructure](#validating-against-real-infrastructure)
 - [Overflow Buffer](#overflow-buffer)
@@ -60,19 +65,35 @@ jobs/
 ├── outbox/             # Durable overflow buffer (see Overflow Buffer)
 │   ├── drain/          # Per-worker drain loop + pass
 │   ├── accumulator.ts  # Batched outbox writes (spillToOutbox/flushOutbox)
-│   ├── config.ts       # Caps, linger, TTLs (from the env schema)
+│   ├── config.ts       # Caps, TTLs (from the env schema)
 │   ├── flag.ts         # Redis overflow flag (set-once + TTL/heartbeat)
 │   ├── mutex.ts        # Serialized queue shared by flush + drain
 │   ├── queueDepth.ts   # Cached waiting+active depth probe
 │   └── types.ts        # OutboxRow + shouldSpill
-├── admitEnvelope.ts    # Routes a built envelope: BullMQ (at its lane's priority) or the outbox
+├── enqueueOrSpill.ts   # Routes a built envelope: BullMQ (at its lane's priority) or the outbox
+├── claimSlotOrRequeue.ts # Job-start check: slow slot cap, and returning a line-jumper to its priority
 ├── buildJobData.ts     # The one job-data envelope every producer builds (lane resolved here)
-├── enqueue.ts          # enqueueJob function
+├── enqueue.ts          # enqueueJob function (singleton deduplication applied here)
+├── enqueueCronRun.ts   # A cron tick's whole action: enqueue the real run as cronTrigger
 ├── lanePriority.ts     # Slow lane → lowest BullMQ priority
-├── makeJob.ts          # Job wrapper constructors
-├── processJob.ts       # Per-job processor: scopes, tracing, lane dispatch
+├── makeJob.ts          # Plain job constructor
+├── makeSingletonJob.ts # At most one run per key; a busy key skips
+├── makeSupersedingJob.ts # Newer run of a key takes over; children honour a parent's tombstone
+├── toJobHandler.ts     # Handler or { stages, finish } → handler (every constructor)
+├── runJobStages.ts     # Staged jobs: stages, parking in waiting-children, finish
+├── makeEnqueueChildJob.ts # A stage's ctx.enqueueChildJob (parent link + ignoreDependencyOnFailure, optional delay)
+├── makeEnqueueChildJobs.ts # A stage's ctx.enqueueChildJobs (fan-out with starts spread over spreadSeconds)
+├── spreadDelays.ts     # Even start offsets for a spread fan-out
+├── checkRollingCache.ts # The api read of a rolling cache: queue the leaf on a miss, answer with the channel
+├── parkOnUnfinishedChildren.ts # moveToWaitingChildren → WaitingChildrenError
+├── validateChildJobHandler.ts # A superseding parent only adds superseding children
+├── singletonDeduplicationId.ts # BullMQ deduplication id for a singleton key
+├── rollingCacheTimerKey.ts # A rolling cache's timer key (rollingcache:timer:<name>)
+├── processJob.ts       # Per-job processor: cron hand-off, slot claim, scopes, tracing
 ├── queue.ts            # BullMQ queue setup
 ├── registerCronJobs.ts # Cron registration on worker startup
+├── slowSlotPool.ts     # Per-worker count of slots running slow jobs
+├── traceJob.ts         # Job span; BullMQ wait signals end it OK, not as an error
 ├── types.ts            # Type definitions
 ├── validateJobId.ts    # BullMQ custom-id rules, shared by enqueue and the drain
 └── worker.ts           # Worker entry point
@@ -92,7 +113,8 @@ jobs/
 |----------|-------|-----------------|
 | Ad-hoc / superseding | `jobOptions.jobId ?? uuidv7()` | the logical `id` is data-only (the singleton-lock identity) — never the jobId |
 | Superseding | (as above) | supersession is by `dedupeKey` → a per-lane claim (`claimLane`/`watchLane`, last-wins), not the jobId |
-| Cron | `cronJob.jobId` (repeatable scheduler key) | `cronJob.id` — the singleton-lock identity |
+| Cron tick | `cronJob.jobId` (job scheduler key) | `cronJob.id`; the tick only enqueues the real run (see [Cron Jobs](#cron-jobs)) |
+| Cron run (`cronTrigger`) | `uuidv7()` | `cronJob.id` — the singleton key (lock and deduplication) |
 
 Scope ID format for logging: `[worker][{handlerName}:{jobId}]`
 
@@ -116,9 +138,11 @@ await enqueueJob('sendWebhook', {
 | Feature | Detail |
 |---------|--------|
 | Signing | RSA-SHA256 (`X-Webhook-Signature` header) |
-| Timeout | 5 seconds per delivery |
-| Circuit breaker | Disables after 5 consecutive failures |
-| Logging | Creates `WebhookEvent` record per attempt |
+| Timeout | 5 seconds per attempt |
+| Retries | Network error, timeout, 5xx, 404 and 429 rethrow so the job retries (queue default 3 attempts, exponential backoff); the last attempt (`isFinalAttempt`) settles the delivery. 400/422, 401/403 and redirects settle on the first attempt |
+| Circuit breaker | Disables after 5 consecutive failed deliveries; a retry cycle counts once |
+| Poisoned records | Integration-owned subscriptions skip a record after 3 rejections (HTTP 400/422) while other records deliver |
+| Logging | Creates a `WebhookEvent` per attempt: `retrying` for an attempt that will be retried, the settled status for the last |
 
 ### reconcileSegment / reconcileCustomerRefSegments / sweepSegments
 
@@ -208,9 +232,21 @@ export const jobHandlers = {
 
 | Pattern | Use Case |
 |---------|----------|
-| `makeJob` | Basic job wrapper |
-| `makeSingletonJob` | Redis lock prevents concurrent runs |
-| `makeSupersedingJob` | Newer job cancels older with same key |
+| `makeJob` | Parallel work; every run happens (emails, webhooks, fire-and-forget side effects) |
+| `makeSingletonJob` | At most one run per key; a busy key skips (cron jobs, draining a queue, one open fan-out per key) |
+| `makeSupersedingJob` | Newer job cancels older with same key (recomputations where only the latest matters) |
+| `{ stages, finish }` | Any of the three, when the job fans out children and waits for them (see [Staged Job](#staged-job-fan-out-and-wait)) |
+
+**Collision policy is binary: a singleton skips the new run, superseding takes over. Nothing parks.**
+No job is ever put back with `moveToDelayed` + `DelayedError` to "try again in a moment" because a key
+is busy: that quietly serializes a plain job, every run queues behind the slowest, and a hung holder
+parks the rest forever. The only sanctioned park is the slow-lane capacity gate (`claimSlotOrRequeue`),
+which is admission control. The `no-job-parking` CI rule enforces it.
+
+A delivery (a webhook, a message) is a plain job, never a singleton: a skip would drop it. If a
+receiver needs ordering or refuses a concurrent write, make the receiving side idempotent (an upsert,
+newest-wins on `updatedAt`) and retry the refusal like any failure. Never serialize deliveries with a
+lock. `sendWebhook` is a plain job.
 
 ### ctx.log() - Dual-Write Logging
 
@@ -240,7 +276,27 @@ Benefits:
 export const dailyCleanup = makeSingletonJob(async (ctx, payload) => {
   // Only one instance runs at a time
 });
+
+export const refreshRollingCache = makeSingletonJob<RefreshRollingCachePayload>(
+  { stages: [/* … */], finish: async () => {} },
+  { lockKey: ({ name }) => name },
+);
 ```
+
+- **The key:** `lockKey(payload)` when given; otherwise `data.id` (the cron row's id for a cron run, or
+  an `id` passed to `enqueueJob`). A run with neither locks on the handler name.
+- **Deduplicated at enqueue:** when there is a key, `enqueueOrSpill` adds the job with BullMQ's
+  `deduplication: { id: <handler>-<key> }` (`singletonDeduplicationId`; kept on an outbox spill), so
+  while a job with that key exists — queued, running, retrying, or parked waiting on its children —
+  another add is a no-op and `enqueueJob` returns the holder's `jobId`.
+  That covers what the lock cannot: a staged singleton releases its lock while it waits in
+  `waiting-children`, but it still exists, so the skip holds.
+- **Locked while it runs:** each run takes `lock:job-singleton:<handler>:<key>` (keyed) or
+  `lock:job-singleton:<id or handler>` through `createLock` on the queue's connection. A busy key returns
+  without running. A Redis error while acquiring throws, and BullMQ retries it. Release is a fenced
+  compare-and-delete; lock loss is reported, never cancels the handler.
+- **Cron:** a tick never runs its handler (see [Cron Jobs](#cron-jobs)), so a scheduled run and a
+  manual trigger collide like any two enqueues.
 
 ### Superseding Job
 
@@ -263,6 +319,53 @@ How it works:
 1. Enqueue/drain claims the lane: `claimLane(job:lane:{handler}:{dedupeKey}, jobId)` (last claim wins)
 2. The running job's `watchLane` polls its lane (~500ms); a different holder means it was usurped
 3. Usurped jobs abort via `ctx.signal` and exit gracefully
+
+4. A staged superseding job's children listen to their parent too: a tombstone on the parent stops them
+   at start or on their next poll, and they tombstone themselves so their own children stop (see
+   [Staged Job](#staged-job-fan-out-and-wait)).
+
+**Superseding does not kill.** `makeSupersedingJob` stops *waiting* for the old run; it does not stop it. Workers run handlers in-process, so the superseded handler's promise keeps running to the end. The signal is cooperative: `fetch`, timers and your own loops can honour it, Prisma queries cannot. A superseded run must therefore never write: check `ctx.signal.aborted` before every write, or fence the write against the lane.
+
+### Staged Job (Fan Out and Wait)
+
+When a job fans out work and must not finish (or run again) until every piece is done, give the constructor stages instead of a handler. All three take `{ stages, finish }`: `makeJob`, `makeSingletonJob` (one open per key, held across the wait by deduplication), and `makeSupersedingJob`. Fanning out and waiting is not a collision policy, so it is a form of every constructor (`toJobHandler`), not a fourth one. Never hand-roll the waiting: no pending hash in Redis, no polling loop, no "refire whatever is still pending", no singleton that returns right after enqueueing.
+
+```typescript
+export const refreshThings = makeJob<RefreshThingsPayload>({
+  stages: [
+    async (ctx, payload) => {
+      for (const thing of await listThings(payload)) {
+        await ctx.enqueueChildJob('refreshThing', { thingId: thing.id });
+      }
+    },
+    // a second stage runs only after every child of the first has reported
+  ],
+  finish: async (ctx, payload) => { /* runs once, after the last stage's children */ },
+});
+```
+
+- **Stages run in order; each waits for the children it added.** The job is a BullMQ flow parent run as a step job (`runJobStages`). The current stage is stored on the job envelope (`data.stage`), so a resumed run starts there and an earlier stage never runs twice. After each stage the job parks in `waiting-children` if any child is unfinished (`parkOnUnfinishedChildren`), holding no worker slot, and BullMQ runs it again once the last child has reported. With nothing unfinished the next stage runs straight away.
+- **A run that resumes past stage 0 parks first** if children are still unfinished: a worker that died between recording the stage and parking would otherwise retry straight into the next stage while the previous stage's children were still running.
+- **`ctx.enqueueChildJob` exists only inside a stage**, so only a job can have children (`makeEnqueueChildJob`). It adds the child with the running job as its `parent` and `ignoreDependencyOnFailure`: a child keeps the queue's retries (3 attempts, exponential backoff), and only after its last attempt fails does it count as done, so a dead child never holds its parent open. Never pass `parent` to `enqueueJob` yourself. The `no-hand-rolled-flows` CI rule keeps BullMQ's flow machinery inside these files.
+- **`ctx.enqueueChildJobs(handler, payloads, { spreadSeconds })`** adds one child per payload and spaces their starts evenly across the window (`spreadDelays`: child `i` starts at `i × spread / count`; the first starts at once). Spacing is BullMQ's `delay` on each child (`ctx.enqueueChildJob(handler, payload, { delay })`), so the parent still waits for all of them. In an inline test run a delayed child returns unrun, so tests that need every child to run pass no spread.
+- **A flow child never spills to the outbox** (see [Spill Routing](#spill-routing)): the drained re-add would lose its parent link.
+- **A superseding child listens to its superseding parent as well as to itself.** A superseding parent may only add superseding children (`validateChildJobHandler`, checked when the child is added). When the parent is replaced, the existing lane claim tombstones it; each child treats that tombstone as its own, at start and on every lane poll (`watchLane(lane, jobId, onUsurped, parentId)`), and tombstones itself (`tombstoneJob`) so its own children stop too, at any depth. Nothing evicts children. The old parent then wakes, finds its tombstone at start, and exits without `finish`. A parked superseding parent stretches its lane to the tombstone's lifetime (`holdLaneWhileParked`) so a newer enqueue still finds and tombstones it. A singleton or plain parent is never superseded and may have any children.
+- **One open parent at a time:** make the parent a keyed singleton (deduplication holds while it is parked), or add it under a fixed `jobId` with `removeOnComplete`/`removeOnFail`. Whatever adds the parent (a cron root, say) just adds it and finishes: it is not itself a parent.
+- **Tests:** `enqueueJob` runs children inline (an inline run has no worker token and no parent), so the stages and `finish` run in order within one call, and a child that throws fails the parent's call. Child-failure tolerance (`ignoreDependencyOnFailure`) is BullMQ's; `apps/api/scripts/jobFlowCheck.ts` exercises it against real Redis (see [Validating Against Real Infrastructure](#validating-against-real-infrastructure)).
+- A worker that dies mid-stage reruns that stage and may add its children twice. Children must be idempotent.
+- `traceJob` treats BullMQ's wait signals (`WaitingChildrenError`, and the slot gate's `DelayedError` / `WaitingError`) as the job working as designed: the span ends OK with outcome `waiting`, nothing logs as a failed attempt, and BullMQ still gets the signal.
+
+### Rolling Caches (Root, Branch, Leaf)
+
+A job whose only work is recomputing a cached value on a timer is not a new handler or a `CronJob` row: it is a rolling cache (`makeRollingCache`, see [REDIS.md](REDIS.md#rolling-caches)). Three handlers serve every registered cache, one per layer, each built from the primitive that fits it:
+
+- **Root:** `coordinateRollingCaches`, `makeSingletonJob`, one seeded cron row (`coordinateRollingCaches`, every minute — `ROLLING_CACHE_TICK_SECONDS`). Each cache keeps its own timer in Redis (`rollingcache:timer:<name>`, TTL = one interval), so caches with different intervals share the root. Every cache whose timer has a tick or less left gets its branch enqueued; deduplication makes that a no-op while a branch is open. Nothing else: there is no supervisor, and BullMQ keeps the branch open until its leaves report. The branch sets the timer, so a failed enqueue leaves the cache due and the next tick tries again.
+- **Branch:** `refreshRollingCache`, a keyed staged singleton (`makeSingletonJob({ stages, finish }, { lockKey: ({ name }) => name })`). Its stage resolves the target selector, adds one leaf per target as a child through `ctx.enqueueChildJobs`, their starts spread over the cache's `spreadSeconds` (default: half the interval), and then starts the timer, so passes start one interval apart however long their leaves take. A stage that throws is retried while the branch's deduplication id holds; one that never reaches the timer sets none, so the cache stays due once the branch has finally failed. The coordinator enqueues the branch with `bypass`, so it never waits in the outbox, where it would hold no deduplication id. The branch stays open until every leaf has reported, and never refires while it is open: a pass that outlasts its interval lets its timer run out, each tick's enqueue is a no-op, and the next pass starts on the first tick after it closes (the manual check `apps/api/scripts/jobFlowCheck.ts` runs this against real Redis).
+- **Leaf:** `refreshRollingCacheTarget`, a child, `makeSupersedingJob` keyed by the target's `targetKey` (cache name + target fields), slow lane. Refreshes one target: runs its `compute` once, which writes every result of that target. A refresh that lands emits `rollingCache.refreshed` (`{ rollingCache, key, channel? }`); when the cache declares a `channel`, its websocket handoff sends subscribers a `query`/`refetch` hint keyed by the parsed channel. A leaf that fails all its attempts keeps the last good value, and the next interval tries again. An unregistered cache name or a failed write throws; nothing in this path swallows an error. A forced refresh is just enqueueing the leaf; it supersedes a running copy by key. `checkRollingCache` does exactly that on a read that finds the entry empty, or stale with nothing computing.
+
+Each leaf attempt runs under `timeoutSeconds` (`settleWithin` from `@template/shared/utils`, with the deadline combined into the refresh signal via `AbortSignal.any`). Past it the leaf emits `rollingCache.leafStuck` (`{ rollingCache, key, target, timeoutSeconds, attempt }`) and throws, so BullMQ retries it and, after the last attempt, counts it done so the branch closes. The hung compute cannot be stopped, but the aborted signal keeps its late result from being written. Entries outlive every attempt of the next pass's leaf (`ttlSeconds`, enforced at registration: the longer of an interval and the longest pass, plus a tick, plus the longest pass again, where a pass is the spread plus every attempt and its backoff; time spent waiting in the queue is not in it), so a read always hits. The template has no platform alert rules: the `rollingCache.leafStuck` app event (recorded as an `AppEvent` row by the observe adapter) is the hook an app wires its alert to.
+
+The schedule lives in the definition: changing the interval is a code change, deleting the definition stops the refreshes, and there is nothing to prune. The worker sees every definition because `jobs/worker.ts` imports `apps/api/src/lib/rollingCaches.ts`; the `rolling-cache-registered` CI rule keeps that barrel complete. Full rebuild only: each interval refreshes every target.
 
 ---
 
@@ -293,13 +396,15 @@ A custom `jobId` must satisfy BullMQ's rules (`validateJobId`): not `'0'`, no `'
 
 When overflow is active, an `adhoc` enqueue returns `{ jobId, name, outboxed: true }` (spilled to the buffer) instead of adding to BullMQ directly. See [Overflow Buffer](#overflow-buffer).
 
-In test (`isTest`), `enqueueJob` skips BullMQ entirely and runs the handler inline — cascading effects happen for real, errors propagate, no queue/overflow machinery involved. The inline job still receives the resolved envelope (lane included). To test routing, call `admitEnvelope` directly (see `jobs/tests/`).
+A keyed singleton (or a singleton's cron run) is added with BullMQ's `deduplication` id (see [Singleton Job](#singleton-job)): while one exists, another add is a no-op.
+
+In test (`isTest`), `enqueueJob` skips BullMQ entirely and runs the handler inline — cascading effects happen for real, errors propagate, no queue/overflow machinery involved. The inline job still receives the resolved envelope (lane included). To test routing, call `enqueueOrSpill` directly (see `jobs/tests/`).
 
 ---
 
 ## Fast and Slow Lanes
 
-One large send is thousands of jobs on the same worker pool every other kind of work shares; in plain FIFO order, everything else waits behind it. Slow work instead waits in the same queue at the lowest priority, so any idle slot runs it and fast work always goes first, and it may fill only its share of the queue's depth budget. Capacity stays shared: with no fast work waiting, every slot runs slow work.
+One large send is thousands of jobs on the same worker pool every other kind of work shares; in plain FIFO order, everything else waits behind it. Slow work instead waits in the same queue at the lowest priority, so fast work is always picked first; it runs in at most its share of each worker's slots, so the rest stay free for fast work; and it may fill only its share of the queue's depth budget.
 
 ### Choosing a Lane
 
@@ -309,24 +414,50 @@ A lane is a label on the job envelope (`JobData.lane`, next to `type`), not a ki
 export const bulkThing = makeJob<Payload>(async (ctx, payload) => { ... }, { lane: JobLane.slow });
 ```
 
-A producer that knows the work's size sets the lane per enqueue instead — `sendEmail` puts its per-recipient `deliverEmail` fan-out on the slow lane when it has more than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` recipients (`fanOutLane`), and keeps smaller sends fast. Every `queue.add` site stamps the lane (and the slow lane's priority): `enqueueJob`, `registerCronJobs`, the `cronJobSync` hook, and the drain. The superadmin enqueue (`options.lane`) and cron trigger (`{ lane }` body) accept an override. The worker reads only `job.data.lane`; an envelope with no lane (queued before lanes existed) is fast everywhere.
+A producer that knows the work's size sets the lane per enqueue instead — `sendEmail` puts its per-recipient `deliverEmail` fan-out on the slow lane when it has more than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` recipients (`fanOutLane`), and keeps smaller sends fast. Every `queue.add` site stamps the lane (and the slow lane's priority): `enqueueJob`, `upsertCronJobScheduler` (used by `registerCronJobs` and the `cronJobSync` hook), and the drain. The superadmin enqueue (`options.lane`) and cron trigger (`{ lane }` body) accept an override. The worker reads only `job.data.lane`; an envelope with no lane (queued before lanes existed) is fast everywhere.
 
 `makeSingletonJob` and `makeSupersedingJob` carry the wrapped handler's declared lane.
 
 ### Priority: Fast Work Is Always Picked First
 
-BullMQ moves a job to active from the plain wait list first and from the prioritized set only when the wait list is empty. Slow jobs are added with `priority: SLOW_LANE_PRIORITY` (BullMQ's `PRIORITY_LIMIT`, the lowest priority it allows) by `withLanePriority` (`jobs/lanePriority.ts`), which every add site applies. So a fast job never queues behind a slow backlog — it waits at most for the next slot to free, roughly half of one slow job's duration — and any job given an explicit priority still ranks ahead of slow work. Within the slow lane BullMQ keeps FIFO order.
+BullMQ moves a job to active from the plain wait list first and from the prioritized set only when the wait list is empty. Slow jobs are added with `priority: SLOW_LANE_PRIORITY` (`2^21 - 1`, one below BullMQ's `PRIORITY_LIMIT`) by `withLanePriority` (`jobs/lanePriority.ts`), which every add site applies. BullMQ scores a prioritized job `priority × 2^32 + counter` in a Redis double; at `PRIORITY_LIMIT` that passes `2^53`, equal-priority jobs collide, and the slow lane loses its FIFO order. The admin enqueue caps `priority` at `SLOW_LANE_PRIORITY` for the same reason. So a fast job never queues behind a slow backlog, and a job given an explicit priority (the admin enqueue accepts one) is served after all unprioritized fast work and, below `SLOW_LANE_PRIORITY`, ahead of all slow work; at `SLOW_LANE_PRIORITY` it waits and counts as slow work. Within one priority BullMQ keeps FIFO order.
 
-There is no slot cap: a slow job that starts always runs. The cost is that a fast job arriving while every slot holds a slow job waits for one to finish, which is short for per-recipient work (hundreds of ms) and long for multi-second handlers — keep slow handlers short.
+### Slots: Slow Work Uses at Most Its Share
+
+Priority decides which job starts next, but BullMQ never preempts a running job, so ordering alone would let slow work fill every slot and make a fast job wait for a slow one to finish. Each worker therefore runs slow jobs in at most `JOBS_SLOW_SLOT_FRACTION` of its `JOBS_WORKER_CONCURRENCY` slots (at least one), counted by the worker's own `SlowSlotPool` (`jobs/slowSlotPool.ts`). When a slow job starts on a worker whose slow share is full, `claimSlotOrRequeue` (`jobs/claimSlotOrRequeue.ts`) parks it: it moves to delayed and returns to the slow band at its stored priority when it comes due. `moveToDelayed` skips the attempt count, so parking never uses up retries. The park is uniform between `SLOW_PARK_MIN_MS` (2 s) and a window that widens by 20 ms for each queued slow job, capped at `JOBS_SLOW_PARK_MAX_MS` (60 s), so refused jobs do not come due together and a large send is not refetched and refused every second. Each park counts `jobs.slow.parked`. The other slots stay free for fast work. Fast work is not capped: it may use every slot, including the slow share when no slow work is running.
+
+`claimSlotOrRequeue` also keeps a job at its priority when BullMQ does not. Stalled-job recovery and a manual retry (`job.retry()`, `queue.retryJobs()`, the Bull Board retry button) put a job on the plain wait list whatever its priority, ahead of all fast work. A job with a priority can legitimately start only when the plain wait list is empty, so a prioritized job that starts while fast work is waiting is moved back with `job.moveToWait`, which returns it to its priority band. Automatic retries and delayed promotion already keep the priority.
+
+The slot share needs no shared state: every worker applies the same fraction to its own concurrency, so the fleet-wide share follows.
+
+The slow slot is released in `processJob`'s `finally` however the handler ends, and a slow job's finish, success or failure, stamps the lane's idle clock (`recordSlowFinished`). A Redis error while stamping is logged and never fails the job.
 
 ### Pressure: One Budget, Divided by Lane
 
-The overflow buffer's depth budget (`JOBS_MAX_QUEUE_DEPTH`) is shared by both lanes and counts everything waiting or running (`waiting + prioritized + active`). Slow jobs — BullMQ's `prioritized` count — may fill only `JOBS_SLOW_QUEUE_DEPTH_FRACTION` of it. Each lane has its own overflow flag:
+The overflow buffer's depth budget (`JOBS_MAX_QUEUE_DEPTH`) is shared by both lanes and counts everything waiting or running (`waiting + prioritized + active`) plus the slow jobs the lane deferred into `delayed`. Slow jobs — BullMQ's count for the slow priority band plus those deferred slow jobs — may fill only `JOBS_SLOW_QUEUE_DEPTH_FRACTION` of it. Each lane has its own overflow flag:
 
 - **Fast** spills when the whole budget is full.
 - **Slow** spills when its share is full, or when the whole budget is.
 
 The drain refills fast rows up to the budget's free room, then slow rows up to what is left of both the budget and the slow share — batched, one read and one delete per lane per pass. Each lane's flag clears below its own low-water once none of its rows wait. Every slow row re-enters BullMQ at the slow priority.
+
+#### The Deferral List
+
+While the slot share has a send parked, nearly all of it sits in BullMQ's `delayed` set at any moment. A count that skipped `delayed` read a queued send as an empty lane: the drain admitted past the slow share and every signal read zero. But `delayed` cannot simply be counted — it also holds scheduled cron repeats, backoff retries and deliberately delayed fast jobs, and BullMQ keeps it as one set ordered by due time with no priority to count by.
+
+So the slow lane keeps its own list of the slow jobs it put there (`jobs/slowLaneSignals.ts`): a Redis sorted set per queue, `job:<queue>:slow:deferred`, of job ids scored by due time. A job goes on it when `claimSlotOrRequeue` parks it (recorded before `moveToDelayed`, so a parked job is never outside the count) or when a slow job is added with a delay (`enqueueOrSpill`, or the drain re-adding a delayed slow row), and comes off when a worker picks it back up — when `claimSlotOrRequeue` gives it a slow slot or sends it back as a line-jumper. Keyed by job id, so parking the same job again moves its score instead of counting it twice. The list is a signal, not part of delivery: a Redis error while writing it is logged and never fails or blocks the job.
+
+It cannot go by due time: BullMQ promotes delayed jobs only when a worker fetches, and parked jobs were measured sitting in `delayed` 2–21 s past due, so a count by due-time band undercounts. An entry stays counted until a worker picks the job up; only one nobody picks up within `SLOW_DEFERRED_GRACE_MS` (five minutes) of its due time — a delayed job deleted by hand, say — stops counting, and the drain pass prunes it. The depth probe caps the list at BullMQ's own `delayed` count, because a listed job that was promoted and is waiting to be fetched is in the slow band too.
+
+#### Slow-Lane Signals
+
+The worker registers three observable gauges beside `messaging.queue.messages`, read from one snapshot (`readSlowLaneState`):
+
+- `jobs.slow.queued` — the slow band plus the deferred slow jobs: the number the slow share is enforced against.
+- `jobs.slow.deferred` — the deferred part alone: jobs parked by the slot share and delayed slow adds.
+- `jobs.slow.idle_ms` — how long slow work has been queued without a slow job finishing. It is 0 while nothing slow is queued (reading it then clears the stamp, so the next send's clock starts when its work is first seen, not at a finish from an earlier send). A draining send keeps it near one job's duration; a climbing value while `jobs.slow.queued` is above 0 is a slow lane that is not moving — hung handlers, or no workers — which the queue depth alone cannot tell apart from a large send draining normally.
+
+The counter `jobs.slow.parked` counts refusals by the slot share. The drain pass reads the same snapshot at the end of every pass, so the flag-settling decisions use the same depths the gauges show and the idle clock advances every ~2 s.
 
 ### Lane Configuration
 
@@ -335,20 +466,30 @@ Defined in the env schema (`apps/api/src/config/env.ts`) with defaults in `apps/
 | Env var | Default | Description |
 |---------|---------|-------------|
 | `JOBS_WORKER_CONCURRENCY` | `10` | BullMQ worker concurrency |
+| `JOBS_SLOW_SLOT_FRACTION` | `0.5` | Share of each worker's slots slow jobs may run in (at least one) |
 | `JOBS_SLOW_QUEUE_DEPTH_FRACTION` | `0.5` | Share of `JOBS_MAX_QUEUE_DEPTH` slow jobs may fill before spilling |
+| `JOBS_SLOW_PARK_MAX_MS` | `60000` | Longest park for a slow job refused by a full slot share (min `1000`); parks start at 2 s and widen by 20 ms per queued slow job |
 | `EMAIL_SLOW_LANE_MIN_RECIPIENTS` | `25` | `sendEmail` fan-outs wider than this are slow |
 
 ### Validating Against Real Infrastructure
 
-`apps/api/scripts/slowLaneCheck.ts` runs the whole path against real Redis, a real BullMQ worker pair, and Postgres: it enqueues a large slow send through `enqueueJob`, injects fast jobs mid-send, and reports fast-job start latency, peak slow jobs held in the queue against their share, how many spilled to the outbox, completions, duplicates, and losses. Set a small `JOBS_MAX_QUEUE_DEPTH` to exercise the spill-and-drain path. It obliterates the queue and empties `JobOutbox`, so it refuses to run without `ENVIRONMENT=local` and `SLOW_LANE_CHECK_CONFIRM=wipe`:
+`apps/api/scripts/slowLaneCheck.ts` runs the whole path against real Redis, a real BullMQ worker pair, and Postgres, and exits non-zero on any failure. It enqueues a slow send of multi-second jobs through `enqueueJob`, waits until slow work fills its slot share, then injects fast jobs and asserts that slow work ran in exactly its share of slots and never more, that fast jobs started within `SLOW_LANE_CHECK_FAST_WAIT_MS` (p95), and that every slow job ran once. It then spills a send larger than the slow share (`SLOW_LANE_CHECK_SEND_JOBS`, 200, of `SLOW_LANE_CHECK_SEND_JOB_MS`, 5 s) to `JobOutbox` and lets the real drain loop meter it in. Every 250 ms it compares the slow count the lane enforces (`queueDepths().slow`) with the slow jobs actually in Redis (`prioritized + delayed`), and it counts parks from the queue's `delayed` events. It fails if the send does not exceed the share, if the drain lets more than 110% of the slow share into Redis, if the signal reads under 0.8 or over 1.25 of the truth, if a queued slow job is parked more than 1.1× once per `SLOW_PARK_MIN_MS`, if the slow slots are busy less than 80% of the send (parked jobs coming back too late leave slots idle), or if a payload is lost or runs twice. A hung-handler case holds one slow slot for 3 s with five slow jobs queued and fails unless `jobs.slow.idle_ms` reads at least 80% of the hang, never more queued than jobs exist, and 0 once the lane empties. It also checks that 200 jobs at `SLOW_LANE_PRIORITY` keep distinct scores and FIFO order (reporting the collision at `PRIORITY_LIMIT` beside it), and that a manually retried slow job runs after waiting fast work with its priority intact. Its polling loops stop through a shared object (`loops.isRunning`), never a captured `let` — under Bun a loop was observed reading a captured `let` flag stale for 30 s — and every teardown await runs under a 30 s deadline. It obliterates the queue and empties `JobOutbox`, so it refuses to run without `ENVIRONMENT=local` and `SLOW_LANE_CHECK_CONFIRM=wipe`:
 
 ```bash
 bun run with test api env ENVIRONMENT=local SLOW_LANE_CHECK_CONFIRM=wipe \
-  REDIS_URL=redis://localhost:6379/9 REDIS_BULLMQ_URL=redis://localhost:6379/9 JOBS_MAX_QUEUE_DEPTH=600 \
+  REDIS_URL=redis://localhost:6379/9 REDIS_BULLMQ_URL=redis://localhost:6379/9 JOBS_MAX_QUEUE_DEPTH=200 \
   bun apps/api/scripts/slowLaneCheck.ts
 ```
 
-`SLOW_LANE_CHECK_JOBS`, `SLOW_LANE_CHECK_JOB_MS`, and `SLOW_LANE_CHECK_WORKERS` vary the run.
+`apps/api/scripts/jobFlowCheck.ts` does the same for staged jobs and the collision policy, because the test suite's Redis mock cannot run BullMQ's flow, deduplication or parent scripts. Against real Redis and a real worker it fails unless a staged job parks in `waiting-children` while its leaves run, runs its stage once and `finish` once after the last leaf; a child that fails every attempt is retried and then lets its parent finish; a staged singleton skips a second enqueue while it is parked and its key frees once it finishes; superseding a staged job aborts its running children within two seconds, the replaced parent never runs `finish` and the aborted children never write; and a cron tick enqueues the real run while a second tick during that run is skipped. It obliterates the jobs queue, so it refuses to run without `ENVIRONMENT=local` and `JOB_FLOW_CHECK_CONFIRM=wipe`:
+
+```bash
+bun run with local api env JOB_FLOW_CHECK_CONFIRM=wipe \
+  REDIS_URL=redis://localhost:6379/12 REDIS_BULLMQ_URL=redis://localhost:6379/12 \
+  bun apps/api/scripts/jobFlowCheck.ts
+```
+
+Point `REDIS_URL` at your own Redis (`REDIS_PORT` in the root `.env`). `SLOW_LANE_CHECK_JOBS`, `SLOW_LANE_CHECK_JOB_MS`, `SLOW_LANE_CHECK_WORKERS`, `SLOW_LANE_CHECK_FAST_WAIT_MS`, `SLOW_LANE_CHECK_SEND_JOBS`, and `SLOW_LANE_CHECK_SEND_JOB_MS` vary the run. Setting `JOBS_SLOW_SLOT_FRACTION=1` removes the reservation and the fast-wait assertion fails.
 
 ---
 
@@ -360,13 +501,13 @@ A durable buffer in front of BullMQ. When queue depth crosses a cap, an overflow
 
 ### Spill Routing
 
-`shouldSpill(type, bypass, overflowing)` is a pure predicate: spill only when `type === 'adhoc' && !bypass && overflowing`. Cron and cronTrigger jobs always go direct — only `adhoc` jobs are ever buffered. On a direct `adhoc` add, `tripIfFull()` flips the flag if that add crossed the cap (fresh, uncached probe to avoid overshoot on a ramp).
+`shouldSpill(type, bypass, overflowing)` is a pure predicate: spill only when `type === 'adhoc' && !bypass && overflowing`. A flow child (an enqueue carrying `parent`, added by a staged job's `enqueueChildJob`) never counts as overflowing and always goes direct: the drain's re-add would lose its parent link. Cron and cronTrigger jobs always go direct — only `adhoc` jobs are ever buffered. On a direct `adhoc` add, `recordAddAndTripIfFull()` counts it into a rough per-process depth estimate (last probe + adds since, re-probed every `DEPTH_PROBE_MS` = 2s); reaching a cap forces a fresh probe and the flag trips on what it reads, so a 20k or 100k wave turns spilling on part-way through. A fast add forces that probe only at the total cap, a slow add at either cap, so a full slow lane does not put a probe on every fast enqueue. The drain tick also trips the flag from the depths it reads (`tripFromDepths`). If Redis refuses an add as out of memory (`noeviction`), the job spills instead of failing; flow children and `bypass`/cron jobs still throw.
 
 ### Accumulator
 
 `spillToOutbox` routes every spill (fan-out and superseding) through an in-memory accumulator that batches DB writes:
 
-- Flush triggers: size (`flushMaxRows`, default 1000) flushes inline; otherwise a `flushLinger` timer (default 200ms) arms for the partial tail.
+- Flush triggers: a spill with no flush in flight is written at once; while a flush is queued or running, spills wait and go out as one batch when it settles (group commit). Size (`flushMaxRows`, default 1000) still splits a large burst. There is no linger timer.
 - Within a batch, superseding lanes (`handlerName`+`dedupeKey`) collapse to the latest row (`dedupeLatestPerLane`); null-`dedupeKey` rows are all kept.
 - One txn per flush: plain rows via `createManyAndReturn({ skipDuplicates })`, superseding lanes via `upsert` (last-writer-wins, no silent drop).
 - Resolves on COMMIT, never on accumulation — a crash in the flush window must not drop a job.
@@ -380,7 +521,7 @@ A pass:
 1. Reads the lane depths (`queueDepths`). Fetches up to the budget's free room of non-quarantined **fast** rows oldest-first (FIFO) and re-enqueues them, re-claiming the supersede lane first when `dedupeKey` is set. A stored job id BullMQ would reject is replaced with a fresh one rather than failing forever.
 2. Does the same for **slow** rows, up to what is left of the budget and of the slow share, re-adding each at the slow priority.
 3. Deletes drained rows per lane in one statement; increments `attempts` on rows that failed re-enqueue. After `MAX_DRAIN_ATTEMPTS` (5) failures a row is quarantined (skipped) so a poison row at the head can't starve newer rows.
-4. Under the outbox mutex: clears each lane's flag once that lane is below its own low-water with no admittable row and no pending spill of that lane; resets quarantined rows to `attempts: 0` only when the queue is below low-water and neither lane has an admittable row or a pending spill.
+4. Reads the slow-lane snapshot (`readSlowLaneState`: prunes the deferral list, fresh lane depths, idle clock). Under the outbox mutex: clears each lane's flag once that lane is below its own low-water with no admittable row and no pending spill of that lane; resets quarantined rows to `attempts: 0` only when the queue is below low-water and neither lane has an admittable row or a pending spill.
 
 The whole pass runs inside `withOverflowRenew` so a long pass can't let either flag's TTL lapse mid-tick.
 
@@ -394,7 +535,7 @@ One Redis key per lane — `job:overflow` (the whole budget) and `job:overflow:s
 
 ### Queue Depth Probe
 
-`queueDepths()` returns `{ total, slow }`: `total` counts `waiting + prioritized + active`, `slow` counts `prioritized` (NOT `delayed` — scheduled cron repeats are a standing floor, not pressure), cached ~1s (`DEPTH_CACHE_MS`). Pass `fresh = true` to bypass the cache (used by `tripIfFull` and the drain). A job given an explicit priority also lands in `prioritized` and counts against the slow share.
+`queueDepths()` returns `{ total, slow, slowDeferred }`: `slowDeferred` is the slow lane's deferral list capped at BullMQ's `delayed` count (see [The Deferral List](#the-deferral-list)); `total` counts `waiting + prioritized + active + slowDeferred`; `slow` counts the jobs waiting at `SLOW_LANE_PRIORITY` via BullMQ's `getCountsPerPriority` plus `slowDeferred`. The rest of `delayed` stays out — scheduled cron repeats and backoff retries are a standing floor, not pressure. Cached ~1s (`DEPTH_CACHE_MS`). Pass `fresh = true` to bypass the cache (used by the depth estimate's probe, `tripIfFull` and the drain). A job given an explicit priority between the lanes lands in `prioritized` and counts against the whole budget, not the slow share.
 
 All `JobOutbox` writes — accumulator flushes AND the drain — run through one shared serialized queue (`flushQueue` / `runOnOutboxQueue`, via `createSerializedQueue`), so a flush and a drain can never touch the table concurrently.
 
@@ -404,10 +545,9 @@ Defined in the env schema (`apps/api/src/config/env.ts`), read lazily through `o
 
 | Env var | Default | Description |
 |---------|---------|-------------|
-| `JOBS_MAX_QUEUE_DEPTH` | `10000` | Depth cap that trips overflow |
+| `JOBS_MAX_QUEUE_DEPTH` | `100000` | Depth cap that trips overflow |
 | (derived) | `0.8 × cap` | Low-water mark for clearing |
 | `JOBS_OUTBOX_FLUSH_MAX_ROWS` | `1000` | Accumulator size-flush threshold |
-| `JOBS_OUTBOX_FLUSH_LINGER_MS` | `200` | Accumulator partial-batch linger |
 | `JOBS_OVERFLOW_TTL_MS` | `60000` | Flag TTL (drain heartbeats it) |
 | `JOBS_OVERFLOW_STUCK_MS` | `300000` | Age before stuck-overflow warning |
 
@@ -415,7 +555,19 @@ Defined in the env schema (`apps/api/src/config/env.ts`), read lazily through `o
 
 ## Cron Jobs
 
-Stored in DB, registered on worker startup.
+Stored in DB, scheduled as BullMQ job schedulers keyed by the row's `jobId` (`queue.upsertJobScheduler` / `removeJobScheduler`, never the deprecated `add({ repeat })` repeatable API). **A tick never runs its handler:** `processJob` hands a `cron` job to `enqueueCronRun`, which enqueues the real run through `enqueueJob` as a `cronTrigger` job carrying the row's `id`, with the tick's attempts and backoff (the row's `maxAttempts` / `backoffMs`, set on the scheduler template). The admin trigger (`triggerCronJob`) goes through the same `enqueueCronRun`. So a scheduled run and a manual trigger collide like any two enqueues (a singleton is deduplicated on the row; a superseding job takes over). A scheduler's job template cannot carry a deduplication id, which is why the tick hands off.
+
+**Validation.** `validateCronJob` (`modules/admin/cronJob/validations/`) is the one answer to "can BullMQ schedule this row": the `jobId` passes `validateJobId` (a key with `:` is read as a legacy repeatable), the handler is registered, and BullMQ's own `defaultRepeatStrategy` computes a next run for the pattern. It throws a 422 `makeError`; it never returns a message. Only a row that ends up enabled is checked, so turning a row off always works. The row is checked once, at the entry point: the `cronJobSync` after-hook validates the written row (Prisma defaults included), and its throw rolls the write back; the boot reconcile validates the rows it reads. `upsertCronJobScheduler` trusts its row and does not re-check the handler.
+
+**Sync.** Every scheduler write holds one Redis lock (`withCronJobsLock`, a `createLock` with a wait; admin writes answer 409 when it times out) and calls `lock.assertHeld()` (on `createLock`'s `Lock`) before each write, which throws `LockLostError` once `lock.isWithinLease()` is false; the API error boundary answers it 409. After a create, update or upsert commits, the hook's `db.onCommit` sync re-reads the row under the lock and makes its scheduler match it (enabled upserts, disabled removes, a changed `jobId` removes the old key). There is no did-anything-change check: the sync is idempotent and always runs. A delete removes the scheduler inside the transaction before it commits, so a failed removal rolls the delete back. A failed sync throws out of `db.onCommit`, so the request errors; re-sending the same request repairs it (admin create is an upsert on `jobId`, and an update re-syncs even when nothing changed).
+
+**Worker start.** `registerCronJobs` reconciles under the same lock (longer wait). An enabled row that fails `validateCronJob` is turned off — the one caller that catches the validator — in a single `updateManyAndReturn` (`enabled: false`, which the `cronJobSync` hook does not fire on) with an error log: fix it and re-enable it. It then upserts every remaining row's scheduler and removes every scheduler whose key is not a live row's `jobId` — schedulers left by deleted, disabled or renamed rows, and the md5-keyed repeatables older code registered. A failed upsert or a lost lease throws out of the pass before the sweep, so the sweep never removes a working legacy schedule whose replacement was never written, and the throw fails `initializeWorker`. Rolling back past the scheduler change double-fires every cron (md5 and `jobId` keys do not dedupe) until a worker on the newer code boots and sweeps.
+
+The scheduler tests (`apps/api/src/jobs/tests/cronJobSchedulers.test.ts`, `apps/api/src/modules/admin/cronJob/tests/cronJobSchedulers.test.ts`) need a real Redis at `REDIS_BULLMQ_URL` (BullMQ's Lua cannot run on the in-memory mock); `useRealJobsQueue()` (`apps/api/tests/utils/realJobsQueue.ts`) points the `queue` singleton's scheduler methods at a randomly named queue there for each test, obliterates and closes it after the test, and throws rather than skips when the URL is missing.
+
+### System Cron Jobs (seeded)
+
+The system's own jobs are rows in `packages/db/prisma/seeds/cronJob.seed.ts` with stable ids. The seed runner writes each record inside `db.txn`, so with the api seed (`bun run db:seed`, hooks registered) every deploy's seed brings `name`, `jobId`, `handler` and `description` back in line with the code and the hook moves the scheduler: renaming a handler is a code change plus a seed. `pattern`, `enabled`, `payload`, `maxAttempts` and `backoffMs` are admin-tunable in superadmin, so the seed sets them on insert only (`updateOmitFields`).
 
 ### Cron Patterns (UTC)
 
@@ -462,8 +614,8 @@ POST   /api/admin/cronJob/:id/trigger  # Run immediately (optional body { lane }
 
 | Type | Description |
 |------|-------------|
-| `cron` | Scheduled by BullMQ repeater |
-| `cronTrigger` | Manually triggered cron |
+| `cron` | The BullMQ job scheduler tick; it only enqueues a `cronTrigger` run |
+| `cronTrigger` | A cron row's real run, scheduled (from a tick) or manual (admin trigger) |
 | `adhoc` | One-off job |
 
 `type` gates overflow routing: only `adhoc` jobs ever spill to the buffer; `cron`/`cronTrigger` always go direct to BullMQ. See [Overflow Buffer](#overflow-buffer).
@@ -478,7 +630,7 @@ Web UI for monitoring and managing BullMQ jobs at `/bullBoard`.
 
 | Environment | Auth | URL |
 |-------------|------|-----|
-| Local | None required | `http://localhost:8000/bullBoard` |
+| Local | None required | `<API_URL>/bullBoard` |
 | Non-local | Basic auth required | Requires credentials |
 
 ### Configuration
@@ -502,6 +654,7 @@ BULL_BOARD_PASSWORD=secret
 |----------|----------|
 | Unknown handler name | Logs error, throws (job fails) |
 | Handler throws | Logs error, re-throws (BullMQ retries based on `attempts`) |
+| Handler parks (`WaitingChildrenError`, slot-gate `DelayedError`/`WaitingError`) | Span ends OK with outcome `waiting`; not logged as a failure; BullMQ moves the job |
 | Test environment | Worker skipped entirely |
 | Graceful shutdown | Waits for active jobs, closes connections |
 

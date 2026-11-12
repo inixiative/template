@@ -27,7 +27,11 @@ export const useEmailRuleSurface = (slug: string | undefined, locale?: string) =
       const { spoofUserEmail } = useAppStore.getState().auth;
       const { data } = await apiFetchInternal(
         (requestOptions) =>
-          adminEmailTemplateRuleSurface({ ...requestOptions, body: { slug: slug ?? '', locale }, throwOnError: true }),
+          adminEmailTemplateRuleSurface({
+            ...requestOptions,
+            body: { slug: slug ?? '', locale },
+            throwOnError: true,
+          }),
         { spoofUserEmail },
       )();
       return {

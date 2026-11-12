@@ -4,9 +4,14 @@
  * @partOf primitive:ui
  * @uses none
  */
+import {
+  type ChangePasswordInput,
+  changePassword as changePasswordFn,
+} from '@template/ui/lib/auth/changePassword';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { signIn as signInFn } from '@template/ui/lib/auth/signin';
 import { signUp as signUpFn } from '@template/ui/lib/auth/signup';
+import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
 import { clearToken, getToken } from '@template/ui/lib/auth/token';
 import type { AuthMethod } from '@template/ui/lib/auth/types';
 import type { AppStore } from '@template/ui/store/types';
@@ -33,6 +38,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         ...state.auth,
         user: null,
         organizations: null,
+        organizationUsers: null,
         spaces: null,
         spaceUsers: null,
         spoofUserEmail: null,
@@ -49,6 +55,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       client,
       user: null,
       organizations: null,
+      organizationUsers: null,
       spaces: null,
       spaceUsers: null,
       strategy: { type: 'login' },
@@ -97,6 +104,13 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         return result;
       },
 
+      changePassword: async (input: ChangePasswordInput) => {
+        const handoff = await changePasswordFn(input);
+        if (get().auth.spoofUserEmail || !handoff.token) return;
+        storeJwtHandoff(handoff);
+        syncWsAuth();
+      },
+
       setStrategy: (strategy) =>
         set((state) => ({
           auth: {
@@ -117,16 +131,8 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       },
 
       logout: async () => {
-        try {
-          const token = getToken();
-          const { error } = await client.signOut({
-            fetchOptions: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-          });
-          if (error) throw new Error(error.message || error.statusText);
-        } finally {
-          clearLocalAuth();
-          get().navigation.navigate?.({ to: '/login' });
-        }
+        clearLocalAuth();
+        get().navigation.navigate?.({ to: '/login' });
       },
     },
   };

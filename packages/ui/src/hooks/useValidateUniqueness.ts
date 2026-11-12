@@ -38,14 +38,20 @@ export const useValidateUniqueness = (
       const { auth } = useAppStore.getState();
       const reader = modelReaders[model];
       const params: LookupOptions =
-        !field || field === 'id' ? { path: { id: value } } : { path: { id: value }, query: { lookup: field } };
+        !field || field === 'id'
+          ? { path: { id: value } }
+          : { path: { id: value }, query: { lookup: field } };
 
       // Use throwOnError: false so we can inspect response.status
       // (throwOnError: true throws the parsed JSON body which has no .status field)
       const result = (await apiFetchInternal(
         (requestOptions: LookupOptions) => reader({ ...params, ...requestOptions }),
         { spoofUserEmail: auth.spoofUserEmail, throwOnError: false },
-      )()) as { response?: { status: number }; error?: unknown; data?: { data?: { id: string } } | { id: string } };
+      )()) as {
+        response?: { status: number };
+        error?: unknown;
+        data?: { data?: { id: string } } | { id: string };
+      };
 
       if (result?.response?.status === 404) {
         return { available: true, existingId: undefined };

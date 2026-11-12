@@ -74,7 +74,9 @@ export const Sidebar = ({ className }: SidebarProps) => {
 
     const fullPath = parentPath + (item.path || '');
     const visibleChildren =
-      item.items?.filter((child) => !child.alias && (!child.access || child.access(permissions, context))) ?? [];
+      item.items?.filter(
+        (child) => !child.alias && (!child.access || child.access(permissions, context)),
+      ) ?? [];
     const hasChildren = visibleChildren.length > 0;
     const isExpanded = expandedItems.has(item.label);
     const isActive = activeChain.includes(item);
@@ -122,7 +124,9 @@ export const Sidebar = ({ className }: SidebarProps) => {
           )}
         </div>
         {hasChildren && isExpanded && (
-          <div className="mt-1 space-y-1">{visibleChildren.map((child) => renderItem(child, depth + 1, fullPath))}</div>
+          <div className="mt-1 space-y-1">
+            {visibleChildren.map((child) => renderItem(child, depth + 1, fullPath))}
+          </div>
         )}
       </div>
     );

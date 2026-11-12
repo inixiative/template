@@ -52,9 +52,13 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
   const { data, isLoading } = useQuery({
     // searchFields supported server-side for all fields; cast because generated type omits it
     queryKey: adminInquiryReadManyQueryKey(
-      hasSearchFields ? ({ query: { searchFields } } as Parameters<typeof adminInquiryReadManyQueryKey>[0]) : undefined,
+      hasSearchFields
+        ? ({ query: { searchFields } } as Parameters<typeof adminInquiryReadManyQueryKey>[0])
+        : undefined,
     ),
-    queryFn: apiQuery((opts: Parameters<typeof adminInquiryReadMany>[0]) => adminInquiryReadMany(opts)),
+    queryFn: apiQuery((opts: Parameters<typeof adminInquiryReadMany>[0]) =>
+      adminInquiryReadMany(opts),
+    ),
   });
 
   const inquiries = Array.isArray(data?.data) ? data.data : [];
@@ -111,12 +115,14 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
             {
               key: 'sentAt',
               label: 'Sent',
-              render: (inq: Inquiry) => (inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—'),
+              render: (inq: Inquiry) =>
+                inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—',
             },
             {
               key: 'expiresAt',
               label: 'Expires',
-              render: (inq: Inquiry) => (inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—'),
+              render: (inq: Inquiry) =>
+                inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—',
             },
           ]}
           data={inquiries}

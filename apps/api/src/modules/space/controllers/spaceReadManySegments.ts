@@ -11,14 +11,17 @@ import { includeSegmentRuleReferences } from '#/modules/segment/queries/segmentI
 import { withSegmentsRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 import { spaceReadManySegmentsRoute } from '#/modules/space/routes/spaceReadManySegments';
 
-export const spaceReadManySegmentsController = makeController(spaceReadManySegmentsRoute, async (c, respond) => {
-  const db = c.get('db');
-  const space = getResource<'space'>(c);
+export const spaceReadManySegmentsController = makeController(
+  spaceReadManySegmentsRoute,
+  async (c, respond) => {
+    const db = c.get('db');
+    const space = getResource<'space'>(c);
 
-  const { data, pagination } = await paginate(c, db.segment, {
-    where: { ownerModel: 'Space', spaceId: space.id },
-    include: includeSegmentRuleReferences,
-  });
+    const { data, pagination } = await paginate(c, db.segment, {
+      where: { ownerModel: 'Space', spaceId: space.id },
+      include: includeSegmentRuleReferences,
+    });
 
-  return respond.ok(await withSegmentsRuleIssues(data), { pagination });
-});
+    return respond.ok(await withSegmentsRuleIssues(data), { pagination });
+  },
+);

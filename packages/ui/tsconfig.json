@@ -1,11 +1,6 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "@inixiative/config/tsconfig/react.json",
   "compilerOptions": {
-    "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["bun"],
-    "outDir": "./dist",
-    "baseUrl": ".",
     "paths": {
       "@template/db": ["../db/src/index.ts"],
       "@template/db/*": ["../db/src/*"],

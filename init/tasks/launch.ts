@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
-import { findCommittedMigrations } from '../../scripts/db/release';
 import { setLaunched } from '../utils/configHelpers';
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig';
+import { baselineDeployedDatabases } from './baselineDeployedDatabases';
 import { configureCicd } from './cicdSettings';
 
 export type PreflightCheck = {
@@ -50,7 +50,9 @@ const sectionHasError = (config: ProjectConfig, key: keyof ProjectConfig): strin
  * Run all preflight checks against the current config.
  * Returns check results and whether all passed.
  */
-export const runPreflightChecks = (config: ProjectConfig): { checks: PreflightCheck[]; allPassed: boolean } => {
+export const runPreflightChecks = (
+  config: ProjectConfig,
+): { checks: PreflightCheck[]; allPassed: boolean } => {
   const checks: PreflightCheck[] = [];
 
   // Check each required section
@@ -72,13 +74,6 @@ export const runPreflightChecks = (config: ProjectConfig): { checks: PreflightCh
     detail: config.project.name.length > 0 ? config.project.name : 'Not set',
   });
 
-  const migrations = findCommittedMigrations(resolve(import.meta.dir, '../..'));
-  checks.push({
-    label: 'Migration baseline committed',
-    passed: migrations.length > 0,
-    detail: migrations.length > 0 ? undefined : 'No migration SQL under packages/db/prisma — create a baseline first',
-  });
-
   // Check not already launched
   checks.push({
     label: 'Not already launched',
@@ -91,9 +86,11 @@ export const runPreflightChecks = (config: ProjectConfig): { checks: PreflightCh
 };
 
 /**
- * Execute the launch: releases switch to migrations, then the launched flag flips.
+ * Execute the launch: the baseline migration is recorded on every deployed database, releases
+ * switch to migrations, then the launched flag flips.
  */
 export const executeLaunch = async (): Promise<void> => {
+  await baselineDeployedDatabases(await getProjectConfig());
   await configureCicd(['--database=migrations'], resolve(import.meta.dir, '../..'));
   await setLaunched(true);
 };

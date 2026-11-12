@@ -2,7 +2,15 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
-import { liveOrders, mkEmail, phone, phoneRow, positions, posOf, softDelete } from '#/hooks/orderedList/tests/setup';
+import {
+  liveOrders,
+  mkEmail,
+  phone,
+  phoneRow,
+  positions,
+  posOf,
+  softDelete,
+} from '#/hooks/orderedList/tests/setup';
 
 describe('reorder via direct position update', () => {
   it('3→1: shifts [1,3) up', async () => {
@@ -95,11 +103,13 @@ describe('upsert', () => {
     const b = await phone(u.id); // 2
     await softDelete(b.id);
 
-    await db.contact.upsert({
-      where: { id: b.id },
-      create: { ...phoneRow(u.id) },
-      update: { deletedAt: null },
-    });
+    await db.withDeleted(() =>
+      db.contact.upsert({
+        where: { id: b.id },
+        create: { ...phoneRow(u.id) },
+        update: { deletedAt: null },
+      }),
+    );
 
     const rows = await liveOrders(u.id);
     expect(posOf(rows, b.id)).toBe(2);

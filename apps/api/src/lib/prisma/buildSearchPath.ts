@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { lookupField } from '#/lib/prisma/fieldMetadata';
+import { lookupField } from '@template/db';
 
 export const buildSearchPath = (
   model: string,

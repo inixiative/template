@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
-
+import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useDebouncedCallback } from '@template/ui/hooks/useDebounce';
 import { resolveSectionTarget } from '@template/ui/lib/resolveSectionTarget';
 import * as React from 'react';
@@ -156,4 +156,15 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
   }, []);
 
   return { activeSection, scrollToSection };
+}
+
+export function useSectionOpen(sectionId: string): [boolean, (open: boolean) => void] {
+  const { hash, pathname } = useLocation();
+  const navigate = useNavigate();
+  const setOpen = React.useCallback(
+    (open: boolean) =>
+      void navigate({ to: pathname, search: true, hash: open ? sectionId : '', replace: true }),
+    [navigate, pathname, sectionId],
+  );
+  return [hash === sectionId, setOpen];
 }

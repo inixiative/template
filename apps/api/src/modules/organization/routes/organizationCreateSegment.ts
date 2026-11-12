@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, feature:segment
  */
 import { createRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
 import {
   SEGMENT_CREATE_IMMUTABLE_FIELDS,
@@ -18,6 +18,6 @@ export const organizationCreateSegmentRoute = createRoute({
   submodel: Modules.segment,
   bodySchema: segmentCreateBodySchema,
   responseSchema: segmentReadResponseSchema,
-  middleware: [validatePermission('manage')],
+  middleware: [validateSubmodelPermission('create')],
   sanitizeKeys: SEGMENT_CREATE_IMMUTABLE_FIELDS,
 });

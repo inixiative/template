@@ -3,15 +3,18 @@
  * @kind controller
  * @partOf feature:tenancy
  */
-import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
+import { submodelOwnerWhere } from '#/lib/prisma/submodelOwnerWhere';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceReadManyContactsRoute } from '#/modules/space/routes/spaceReadManyContacts';
 
-export const spaceReadManyContactsController = makeController(spaceReadManyContactsRoute, async (c, respond) => {
-  const db = c.get('db');
-  const { data, pagination } = await paginate(c, db.contact, {
-    where: { spaceId: getResource<'space'>(c).id },
-  });
-  return respond.ok(data, { pagination });
-});
+export const spaceReadManyContactsController = makeController(
+  spaceReadManyContactsRoute,
+  async (c, respond) => {
+    const db = c.get('db');
+    const { data, pagination } = await paginate(c, db.contact, {
+      where: submodelOwnerWhere(c),
+    });
+    return respond.ok(data, { pagination });
+  },
+);

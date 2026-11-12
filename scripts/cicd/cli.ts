@@ -13,13 +13,22 @@ const eventSchema = z.discriminatedUnion('kind', [
     closed: z.boolean(),
   }),
   z.strictObject({ kind: z.literal('deploy'), target: z.enum(['production', 'staging']) }),
-  z.strictObject({ kind: z.literal('deploy-preview'), number, sameRepository: z.boolean(), closed: z.boolean() }),
+  z.strictObject({
+    kind: z.literal('deploy-preview'),
+    number,
+    sameRepository: z.boolean(),
+    closed: z.boolean(),
+  }),
   z.strictObject({ kind: z.literal('teardown'), number }),
 ]);
 
 export const runCicdCommand = async (args: string[]) => {
   const [command, eventPath, ...extra] = args.filter((arg) => arg !== '--');
-  if (extra.length || !['validate', 'plan'].includes(command ?? '') || (command === 'validate' && eventPath))
+  if (
+    extra.length ||
+    !['validate', 'plan'].includes(command ?? '') ||
+    (command === 'validate' && eventPath)
+  )
     throw new Error('Usage: bun run cicd validate | bun run cicd plan <event.json>');
   const config = await loadCicdConfig();
   if (command === 'validate') return { valid: true, version: config.version };

@@ -4,12 +4,25 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
-import type { AfterCommitFn, Db, OpenTransaction, Scope, ScopeContext } from '@template/db/clientTypes';
+import type {
+  AfterCommitFn,
+  Db,
+  FinallyFn,
+  FindForUpdateOptions,
+  OpenTransaction,
+  Scope,
+  ScopeContext,
+} from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
-import { captureBridgedContext, hasHooksFor, runInBridgedContext } from '@template/db/extensions/hookRegistry';
-import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
+import {
+  captureBridgedContext,
+  hasHooksFor,
+  runInBridgedContext,
+} from '@template/db/extensions/hookRegistry';
+import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle/mutationLifeCycleExtension';
 import { softDeleteScopeExtension } from '@template/db/extensions/softDeleteScopeExtension';
 import { telemetryExtension } from '@template/db/extensions/telemetryExtension';
 import {
@@ -20,10 +33,29 @@ import {
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { type ModelName, toModelName } from '@template/db/utils/modelNames';
+import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
+import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
+import { withLockUntilSettled } from '@template/db/lock/withLockUntilSettled';
+import { cacheAccessor } from '@template/db/redis/cache/telemetry/cacheAccessor';
+import {
+  type CacheOverlay,
+  isWrittenInTransaction,
+  newCacheOverlay,
+} from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
+import { publishKey } from '@template/db/redis/cache/transactionOverlay/publishKey';
+import { registerTestTracker } from '@template/db/test/testTracker';
+import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import {
+  type AccessorName,
+  isAccessorName,
+  toAccessor,
+  toModelName,
+} from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
-import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import { incrementCounter } from '@template/shared/telemetry';
+import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
+import { uuidv7 } from 'uuidv7';
 
 const store = new AsyncLocalStorage<Scope>();
 
@@ -46,13 +78,36 @@ const throwIfFailures = (context: string, errors: unknown[]): void => {
   throw new AggregateError(errors, `${context}: ${errors.length} callback failures`);
 };
 
+// Every callback runs even when one throws, and a failure is logged, never thrown: the finally
+// queue runs on the rollback path too, where rethrowing would mask the transaction's own error.
+// Every key runs even when one fails (db.parallel's allSettled, as the on-commit batches use); each
+// caller decides what a failure means.
+const publishKeys = (
+  overlay: CacheOverlay,
+  keys: string[],
+): Promise<PromiseSettledResult<void>[]> =>
+  db.parallel(
+    keys.map((key) => () => publishKey(overlay, key)),
+    { concurrency: getConcurrency([ConcurrencyType.redis]), resolution: 'allSettled' },
+  );
+
+const drainFinally = async (openTransaction: OpenTransaction | null): Promise<void> => {
+  if (!openTransaction?.finallyFns.length) return;
+  const fns = openTransaction.finallyFns.splice(0);
+  const results = await Promise.allSettled(fns.map((fn) => Promise.resolve().then(fn)));
+  for (const result of results) {
+    if (result.status === 'rejected')
+      log.error('db.onFinally() callback failed', result.reason, LogScope.db);
+  }
+};
+
 const createClient = (): Db => {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter, log: [], transactionOptions: { timeout: 30_000 } });
   // You would add read replicas here via additional $extends
   return prisma
     .$extends(telemetryExtension)
-    .$extends(mutationLifeCycleExtension())
+    .$extends(mutationLifeCycleExtension)
     .$extends(softDeleteScopeExtension()) as unknown as Db;
 };
 
@@ -62,58 +117,103 @@ const dbMethods = {
     return __raw;
   },
 
-  scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext): Promise<T> => {
+  delegate: (model: string): RuntimeDelegate =>
+    (db as unknown as Record<AccessorName, RuntimeDelegate>)[toAccessor(model)],
+
+  scope: async <T>(
+    scopeId: string | undefined,
+    fn: () => Promise<T>,
+    context?: ScopeContext,
+  ): Promise<T> => {
     if (store.getStore()) return fn();
     // Await inside the store — a returned lazy thenable would otherwise execute after the scope exits.
     return store.run(newScope(scopeId ?? null, context ?? null), async () => await fn());
   },
 
-  txn: async <T>(fn: () => Promise<T>, options?: { timeout?: number }): Promise<T> => {
+  txn: async <T>(
+    fn: () => Promise<T>,
+    options?: { timeout?: number; maxWait?: number },
+  ): Promise<T> => {
     const existing = store.getStore();
     if (existing?.openTransaction) return fn();
 
-    const scope = existing ?? newScope(crypto.randomUUID(), null);
+    const scope = existing ?? newScope(uuidv7(), null);
     // The caller frame is the last point at which async-local storage is reliable.
     const bridgedContext = captureBridgedContext();
 
     const run = async () => {
-      const { result, openTransaction } = await db.raw.$transaction(
-        async (transactionClient) => {
-          const openTransaction: OpenTransaction = {
-            scope,
-            client: transactionClient as Db,
-            prismaTransactionId: null,
-            afterCommitBatches: [],
-            bridgedContext,
-          };
-          scope.openTransaction = openTransaction;
-          const registrationToken = openTransactionRegistration(openTransaction);
-          try {
-            // Tells the mutation extension which Prisma transaction id belongs to this transaction;
-            // a write it cannot match to a registration is one db.txn() did not open.
-            await openTransaction.client[registrationProbe.model].findFirst({
-              where: { [registrationProbe.field]: registrationToken },
-            });
-            if (!openTransaction.prismaTransactionId) {
-              throw new Error(
-                'db.txn() failed to register its transaction with the mutation extension — the mutationLifeCycle extension is missing from this client',
-              );
+      let opened: OpenTransaction | null = null;
+      let settled: { result: T; openTransaction: OpenTransaction };
+      let cacheFailures: unknown[] = [];
+      try {
+        settled = await db.raw.$transaction(
+          async (transactionClient) => {
+            const openTransaction: OpenTransaction = {
+              scope,
+              client: transactionClient as Db,
+              prismaTransactionId: null,
+              afterCommitBatches: [],
+              finallyFns: [],
+              heldLocks: new Map(),
+              settled: false,
+              bridgedContext,
+              cacheOverlay: newCacheOverlay(),
+            };
+            opened = openTransaction;
+            scope.openTransaction = openTransaction;
+            const registrationToken = openTransactionRegistration(openTransaction);
+            try {
+              // Tells the mutation extension which Prisma transaction id belongs to this transaction;
+              // a write it cannot match to a registration is one db.txn() did not open.
+              await openTransaction.client[registrationProbe.model].findFirst({
+                where: { [registrationProbe.field]: registrationToken },
+              });
+              if (!openTransaction.prismaTransactionId) {
+                throw new Error(
+                  'db.txn() failed to register its transaction with the mutation extension — the mutationLifeCycle extension is missing from this client',
+                );
+              }
+              return { result: await fn(), openTransaction };
+            } finally {
+              closeTransactionRegistration(registrationToken, openTransaction);
+              scope.openTransaction = null;
             }
-            return { result: await fn(), openTransaction };
-          } finally {
-            closeTransactionRegistration(registrationToken, openTransaction);
-            scope.openTransaction = null;
-          }
-        },
-        options?.timeout ? { timeout: options.timeout } : undefined,
+          },
+          {
+            ...(options?.timeout ? { timeout: options.timeout } : {}),
+            ...(options?.maxWait ? { maxWait: options.maxWait } : {}),
+          },
+        );
+        const written = await publishKeys(settled.openTransaction.cacheOverlay, [
+          ...settled.openTransaction.cacheOverlay.written,
+        ]);
+        cacheFailures = written.flatMap((r) => (r.status === 'rejected' ? [r.reason] : []));
+      } finally {
+        // why: after $transaction settles — the callback's own finally runs before the commit, and a
+        // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
+        // why: batches, so no waiter stalls behind slow side effects.
+        if (opened) (opened as OpenTransaction).settled = true;
+        await drainFinally(opened);
+      }
+      const { result, openTransaction } = settled;
+      // Keys the transaction only read publish after the locks drop; a failure costs only the warm-up.
+      const overlay = openTransaction.cacheOverlay;
+      const warmKeys = [...overlay.values.keys()].filter(
+        (key) => !isWrittenInTransaction(overlay, key),
       );
+      const warm = await publishKeys(overlay, warmKeys);
+      for (const [i, key] of warmKeys.entries()) {
+        const r = warm[i];
+        if (r?.status !== 'rejected') continue;
+        log.error(`Failed to publish cache key ${key} after commit:`, r.reason, LogScope.db);
+        incrementCounter('cache.publish.failed', 1, { accessor: cacheAccessor(key) });
+      }
 
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
       // onCommit handler) drains its own and a rollback discards these with the object.
       const batches = openTransaction.afterCommitBatches;
-      const totalCallbacks = batches.reduce((sum, b) => sum + b.fns.length, 0);
-      if (totalCallbacks > 0) {
-        const start = performance.now();
+      const failures = [...cacheFailures];
+      try {
         for (const batch of batches) {
           const results = await db.parallel(
             batch.fns.map((fn) => () => Promise.resolve(fn())),
@@ -125,23 +225,20 @@ const dbMethods = {
             results.filter((result) => result.status === 'rejected').map((result) => result.reason),
           );
         }
-        const duration = performance.now() - start;
-        const slowThreshold = scope.scopeContext === 'worker' ? 30000 : 5000;
-        if (duration > slowThreshold) {
-          const types = [...new Set(batches.flatMap((b) => b.types ?? []))];
-          log.warn(
-            `afterCommit slow: ${totalCallbacks} callbacks (${types.join(', ') || 'untyped'}) took ${(duration / 1000).toFixed(2)}s`,
-            LogScope.db,
-          );
-        }
+      } catch (error) {
+        failures.unshift(error);
       }
+      throwIfFailures('db.txn() after-commit work failed', failures);
       return result;
     };
 
     return existing ? run() : store.run(scope, run);
   },
 
-  onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]): void => {
+  onCommit: (
+    callbacks: AfterCommitFn | AfterCommitFn[],
+    types?: ConcurrencyType | ConcurrencyType[],
+  ): void => {
     const openTransaction = store.getStore()?.openTransaction;
     if (!openTransaction) throw new Error('db.onCommit() requires db.txn()');
     const callbackList = castArray(callbacks);
@@ -151,6 +248,12 @@ const dbMethods = {
       concurrency: getConcurrency(typeList),
       types: typeList,
     });
+  },
+
+  onFinally: (callbacks: FinallyFn | FinallyFn[]): void => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.onFinally() requires db.txn()');
+    openTransaction.finallyFns.push(...castArray(callbacks));
   },
 
   parallel: async <T>(
@@ -164,7 +267,7 @@ const dbMethods = {
     }
     const parent = store.getStore();
     const inOwnScope = (thunk: () => Promise<T>) =>
-      store.run(newScope(crypto.randomUUID(), parent?.scopeContext ?? null), thunk);
+      store.run(newScope(uuidv7(), parent?.scopeContext ?? null), thunk);
     if (options?.resolution === 'allSettled') {
       return resolveAll(
         thunks.map((thunk) => async (): Promise<PromiseSettledResult<T>> => {
@@ -183,7 +286,11 @@ const dbMethods = {
     );
   },
 
-  withDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => auditActorContext.withSoftDeleteBypass(fn),
+  withDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
+    auditActorContext.withDeleted(fn),
+
+  withoutDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
+    auditActorContext.withoutDeleted(fn),
 
   getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 
@@ -191,27 +298,47 @@ const dbMethods = {
 
   isInTxn: (): boolean => !!store.getStore()?.openTransaction,
 
-  // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
-  findForUpdate: <T = unknown>(model: ModelName, where: Record<string, unknown>): Promise<T[]> => {
-    if (!dbMethods.isInTxn()) throw new Error('db.findForUpdate() requires db.txn()');
+  cacheOverlay: (): CacheOverlay | null => store.getStore()?.openTransaction?.cacheOverlay ?? null,
+
+  // Raw SELECT * FOR NO KEY UPDATE (the lock an UPDATE takes): other lockers, updaters and deleters of
+  // the row wait, inserts of rows that reference it do not. `changesKey: true` takes FOR UPDATE.
+  // Scalar columns only, no relations/includes; load related data separately.
+  // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
+  // the where-key itself (see acquireFindForUpdateLock) and returns the rows it currently names. One
+  // field may list values as `{ in: [...] }` to fence a batch of such rows, each under the key a
+  // single-row fence on it takes.
+  findForUpdate: async <T = unknown>(
+    model: string,
+    where: Record<string, unknown>,
+    options?: FindForUpdateOptions,
+  ): Promise<T[]> => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.findForUpdate() requires db.txn()');
     const keys = Object.keys(where);
     if (!keys.length) throw new Error('db.findForUpdate() requires at least one predicate');
-    const meta = prismaMap.models[model];
-    const table = meta?.dbName ?? model;
+    const modelName = toModelName(model);
+    const meta = prismaMap.models[modelName];
+    const table = meta.dbName ?? modelName;
     // why: prismaMap carries no per-field dbName, so a predicate on an @map'd column would build
     // why: SQL against a name that does not exist. No column in this schema is mapped; the field
     // why: check is what keeps that true, by refusing any predicate the map cannot account for.
     const columnFor = (key: string): string => {
-      const fields = meta?.fields as Record<string, unknown> | undefined;
-      if (!fields?.[key]) throw new Error(`db.findForUpdate(): unknown field '${key}' on model '${model}'`);
+      const fields = meta.fields as Record<string, unknown>;
+      if (!fields[key])
+        throw new Error(`db.findForUpdate(): unknown field '${key}' on model '${model}'`);
       return key;
     };
     const conds = keys.map((key) => {
       const column = Prisma.raw(`"${columnFor(key)}"`);
       const value = where[key];
-      if (value !== null && typeof value === 'object' && 'in' in (value as Record<string, unknown>)) {
+      if (
+        value !== null &&
+        typeof value === 'object' &&
+        'in' in (value as Record<string, unknown>)
+      ) {
         const list = (value as { in: unknown[] }).in;
-        if (!Array.isArray(list)) throw new Error(`db.findForUpdate(): the 'in' for '${key}' must be an array`);
+        if (!Array.isArray(list))
+          throw new Error(`db.findForUpdate(): the 'in' for '${key}' must be an array`);
         // why: an empty list locks nothing, which is what a batch caller with no rows means. Widening
         // why: to the whole table would be the one unrecoverable reading, and `IN ()` is a syntax error.
         if (!list.length) return Prisma.sql`1 = 0`;
@@ -219,9 +346,21 @@ const dbMethods = {
       }
       return Prisma.sql`${column} = ${value}`;
     });
+    if (options?.upserting)
+      await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
     return db.$queryRaw<T[]>(
-      Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
+      Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} ${Prisma.raw(options?.changesKey ? 'FOR UPDATE' : 'FOR NO KEY UPDATE')}`,
     );
+  },
+
+  withLockUntilSettled: async <T>(
+    options: LockOptions & LockTarget,
+    fn: () => Promise<T>,
+    acquireOptions?: AcquireOptions,
+  ): Promise<T> => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.withLockUntilSettled() requires db.txn()');
+    return withLockUntilSettled(openTransaction, options, fn, acquireOptions);
   },
 };
 
@@ -249,8 +388,9 @@ const bareDelegate = (model: string | symbol): unknown => {
   if (cached) return cached;
 
   const target = (db.raw as unknown as Record<string | symbol, unknown>)[model];
-  const modelName = typeof model === 'string' ? toModelName(model) : undefined;
-  if (!target || typeof target !== 'object' || !modelName) return target;
+  if (!target || typeof target !== 'object' || typeof model !== 'string' || !isAccessorName(model))
+    return target;
+  const modelName = toModelName(model);
 
   const delegate = new Proxy(target as Record<string, unknown>, {
     get(t, op) {
@@ -262,9 +402,12 @@ const bareDelegate = (model: string | symbol): unknown => {
           return (member as (a: unknown) => Promise<unknown>).call(t, args);
         }
         return dbMethods.txn(() => {
-          const live = (db as unknown as Record<string | symbol, Record<string, (a: unknown) => Promise<unknown>>>)[
-            model
-          ];
+          const live = (
+            db as unknown as Record<
+              string | symbol,
+              Record<string, (a: unknown) => Promise<unknown>>
+            >
+          )[model];
           return live[op as string]!(args);
         });
       };
@@ -278,7 +421,12 @@ export const db: Db = new Proxy({} as Db, {
   get(_, prop: string) {
     if (prop in dbMethods) return (dbMethods as Record<string, unknown>)[prop];
     const openTransaction = store.getStore()?.openTransaction;
-    if (openTransaction) return (openTransaction.client as unknown as Record<string, unknown>)[prop];
+    if (openTransaction)
+      return (openTransaction.client as unknown as Record<string, unknown>)[prop];
     return bareDelegate(prop);
   },
 });
+
+// Every process that loads the client in a test environment tracks the tables it writes, so a test
+// never registers the tracker itself and can't forget to. Outside test this is a no-op.
+registerTestTracker();

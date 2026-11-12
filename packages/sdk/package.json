@@ -13,18 +13,17 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "test": "bun test src/lenses/",
     "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
-    "@inixiative/json-rules": "^2.25.0"
+    "@inixiative/json-rules": "^3.6.0"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.97.3",
-    "@tanstack/react-query": "^5.90.21",
-    "typescript": "^5"
+    "@tanstack/react-query": "^5.90.21"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.0.0"

@@ -1,17 +1,16 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { ProviderModel, SegmentType } from '@template/db/generated/client/enums';
+import { SegmentType } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const segmentFactory = createFactory('Segment', {
   defaults: () => ({
     name: `${faker.word.adjective()}-${faker.string.alphanumeric(6).toLowerCase()}`,
-    ownerModel: ProviderModel.Space,
     type: SegmentType.static,
     conditions: { all: [] },
   }),

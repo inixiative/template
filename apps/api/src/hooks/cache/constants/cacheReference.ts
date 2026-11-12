@@ -10,40 +10,47 @@ import { cacheKey } from '@template/db';
 type CacheReference = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => string[] };
 
 export const cacheReference: CacheReference = {
-  User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email }), cacheKey('user', r.id, ['relations'])],
+  User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
 
-  Session: (r) => [cacheKey('session', r.id), cacheKey('session', { userId: r.userId }, [], true)],
+  Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
 
-  Token: (r) => [cacheKey('token', { keyHash: r.keyHash })],
+  Integration: (r) => [cacheKey('integration', r.id)],
 
   Organization: (r) => [cacheKey('organization', r.id), cacheKey('organization', { slug: r.slug })],
 
   OrganizationUser: (r) => [
+    cacheKey('organizationUser', r.id),
     cacheKey('organizationUser', { organizationId: r.organizationId, userId: r.userId }),
     cacheKey('user', r.userId, ['organizationUsers']),
-    cacheKey('user', r.userId, ['relations']),
   ],
 
   Space: (r) => [
     cacheKey('space', r.id),
+    cacheKey('space', { organizationId: r.organizationId, id: r.id }),
     cacheKey('space', { organizationId: r.organizationId, slug: r.slug }),
     cacheKey('organization', r.organizationId, ['spaces']),
   ],
 
   SpaceUser: (r) => [
-    cacheKey('spaceUser', { spaceId: r.spaceId, userId: r.userId }),
+    cacheKey('spaceUser', r.id),
+    cacheKey('spaceUser', {
+      organizationId: r.organizationId,
+      spaceId: r.spaceId,
+      userId: r.userId,
+    }),
     cacheKey('user', r.userId, ['spaceUsers']),
     cacheKey('space', r.spaceId, ['spaceUsers']),
-    cacheKey('user', r.userId, ['relations']),
   ],
 
   CustomerRef: (r) => {
     const keys: string[] = [cacheKey('customerRef', r.id)];
     if (r.customerUserId) keys.push(cacheKey('user', r.customerUserId, ['customerRefs']));
-    if (r.customerOrganizationId) keys.push(cacheKey('organization', r.customerOrganizationId, ['customerRefs']));
+    if (r.customerOrganizationId)
+      keys.push(cacheKey('organization', r.customerOrganizationId, ['customerRefs']));
     if (r.customerSpaceId) keys.push(cacheKey('space', r.customerSpaceId, ['customerRefs']));
     if (r.providerUserId) keys.push(cacheKey('user', r.providerUserId, ['providerRefs']));
-    if (r.providerOrganizationId) keys.push(cacheKey('organization', r.providerOrganizationId, ['providerRefs']));
+    if (r.providerOrganizationId)
+      keys.push(cacheKey('organization', r.providerOrganizationId, ['providerRefs']));
     if (r.providerSpaceId) keys.push(cacheKey('space', r.providerSpaceId, ['providerRefs']));
     return keys;
   },
@@ -62,7 +69,10 @@ export const cacheReference: CacheReference = {
   },
 };
 
-export const fetchCacheKeys = (model: Prisma.ModelName, record: Record<string, unknown>): string[] => {
+export const fetchCacheKeys = (
+  model: Prisma.ModelName,
+  record: Record<string, unknown>,
+): string[] => {
   const fn = cacheReference[model] as ((r: Record<string, unknown>) => string[]) | undefined;
   if (!fn) return [];
   return fn(record);

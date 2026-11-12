@@ -22,9 +22,13 @@ export const evaluateApprovals = (
   }
   const eligible = [...latest.values()].filter(
     (review) =>
-      review.authorId !== authorId && review.canApprove && (policy.allowBotApprovals || review.authorType === 'User'),
+      review.authorId !== authorId &&
+      review.canApprove &&
+      (policy.allowBotApprovals || review.authorType === 'User'),
   );
-  const approvals = eligible.filter((review) => review.state === 'APPROVED' && review.commitId === headSha);
+  const approvals = eligible.filter(
+    (review) => review.state === 'APPROVED' && review.commitId === headSha,
+  );
   const changesRequested = eligible.some((review) => review.state === 'CHANGES_REQUESTED');
   return {
     approved: approvals.length >= policy.requiredApprovals && !changesRequested,

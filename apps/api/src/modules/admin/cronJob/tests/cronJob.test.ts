@@ -1,17 +1,20 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { CronJob, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createCronJob, createUser, getNextSeq } from '@template/db/test';
 import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { createTestApp } from '#tests/createTestApp';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 import { del, get, json, jsonError, patch, post } from '#tests/utils/request';
+
+useRealJobsQueue();
 
 describe('admin/cronJob', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
   let superadmin: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: admin } = await createUser({ platformRole: PlatformRole.superadmin });
     superadmin = admin;
 
@@ -23,7 +26,7 @@ describe('admin/cronJob', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -101,7 +104,10 @@ describe('admin/cronJob', () => {
 
   describe('PATCH /api/admin/cronJob/:id', () => {
     it('updates a cron job', async () => {
-      const { entity: cronJob } = await createCronJob({ name: `update-test-${getNextSeq()}`, enabled: true });
+      const { entity: cronJob } = await createCronJob({
+        name: `update-test-${getNextSeq()}`,
+        enabled: true,
+      });
 
       const response = await fetch(
         patch(`/api/admin/cronJob/${cronJob.id}`, {
@@ -139,15 +145,21 @@ describe('admin/cronJob', () => {
     it('triggers with no request body at all', async () => {
       const { entity: cronJob } = await createCronJob({ name: `trigger-no-body-${getNextSeq()}` });
 
-      const response = await fetch(new Request(`http://t/api/admin/cronJob/${cronJob.id}/trigger`, { method: 'POST' }));
+      const response = await fetch(
+        new Request(`http://t/api/admin/cronJob/${cronJob.id}/trigger`, { method: 'POST' }),
+      );
       expect(response.status).toBe(204);
     });
 
     it('accepts a lane override and rejects an unknown lane', async () => {
       const { entity: cronJob } = await createCronJob({ name: `trigger-lane-${getNextSeq()}` });
 
-      expect((await fetch(post(`/api/admin/cronJob/${cronJob.id}/trigger`, { lane: 'slow' }))).status).toBe(204);
-      expect((await fetch(post(`/api/admin/cronJob/${cronJob.id}/trigger`, { lane: 'medium' }))).status).toBe(400);
+      expect(
+        (await fetch(post(`/api/admin/cronJob/${cronJob.id}/trigger`, { lane: 'slow' }))).status,
+      ).toBe(204);
+      expect(
+        (await fetch(post(`/api/admin/cronJob/${cronJob.id}/trigger`, { lane: 'medium' }))).status,
+      ).toBe(422);
     });
   });
 });

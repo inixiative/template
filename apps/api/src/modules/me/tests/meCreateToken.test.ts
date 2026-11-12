@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
@@ -14,7 +14,7 @@ describe('POST /me/tokens', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser();
     user = entity;
 
@@ -26,7 +26,7 @@ describe('POST /me/tokens', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -60,7 +60,9 @@ describe('POST /me/tokens', () => {
   });
 
   it('stores token in database', async () => {
-    const response = await fetch(post('/api/v1/me/tokens', { name: 'Stored Token', role: 'owner' }));
+    const response = await fetch(
+      post('/api/v1/me/tokens', { name: 'Stored Token', role: 'owner' }),
+    );
     const { data } = await json<CreateTokenResponse>(response);
 
     const dbToken = await db.token.findUnique({ where: { id: data.id } });

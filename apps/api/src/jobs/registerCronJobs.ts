@@ -1,53 +1,64 @@
 /**
  * @atlas
  * @kind service
- * @partOf primitive:jobs
- * @uses infrastructure:prisma
+ * @partOf primitive:jobs, feature:cronJob
+ * @uses infrastructure:prisma, infrastructure:redis
  */
 import { db } from '@template/db';
+import type { CronJob } from '@template/db/generated/client/client';
 import { LogScope, log } from '@template/shared/logger';
-import { buildJobData } from '#/jobs/buildJobData';
-import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
-import { withLanePriority } from '#/jobs/lanePriority';
-import { queue as defaultQueue } from '#/jobs/queue';
-import { type JobsQueue, JobType } from '#/jobs/types';
+import { queue } from '#/jobs/queue';
+import { upsertCronJobScheduler } from '#/jobs/upsertCronJobScheduler';
+import { withCronJobsLock } from '#/jobs/withCronJobsLock';
+import { validateCronJob } from '#/modules/admin/cronJob/validations/validateCronJob';
 
-export const registerCronJobs = async (queue: JobsQueue = defaultQueue): Promise<void> => {
-  const cronJobs = await db.cronJob.findMany({
-    where: { enabled: true },
-  });
+const STARTUP_LOCK_WAIT_MS = 30_000;
 
-  if (cronJobs.length === 0) {
-    log.info('No enabled cron jobs to register', LogScope.job);
-    return;
-  }
+export const registerCronJobs = (): Promise<void> =>
+  withCronJobsLock(async (lock) => {
+    const cronJobs = await db.cronJob.findMany({ where: { enabled: true } });
+    log.info(`Registering ${cronJobs.length} enabled cron jobs...`, LogScope.job);
 
-  log.info(`Registering ${cronJobs.length} enabled cron jobs...`, LogScope.job);
-
-  for (const cronJob of cronJobs) {
-    if (!isValidHandlerName(cronJob.handler)) {
-      log.warn(`Cron job "${cronJob.name}" has unknown handler: ${cronJob.handler} - skipping`, LogScope.job);
-      continue;
+    const liveCronJobs: CronJob[] = [];
+    const unschedulableIds: string[] = [];
+    for (const cronJob of cronJobs) {
+      try {
+        validateCronJob(cronJob);
+        liveCronJobs.push(cronJob);
+      } catch (err) {
+        log.error(
+          `Turning off unschedulable cron "${cronJob.name}": ${(err as Error).message} - fix the row and re-enable it`,
+          LogScope.job,
+        );
+        unschedulableIds.push(cronJob.id);
+      }
     }
 
-    try {
-      const data = buildJobData(jobHandlers[cronJob.handler], {
-        id: cronJob.id,
-        type: JobType.cron,
-        payload: cronJob.payload,
+    if (unschedulableIds.length) {
+      lock.assertHeld();
+      await db.cronJob.updateManyAndReturn({
+        where: { id: { in: unschedulableIds } },
+        data: { enabled: false },
       });
-      await queue.add(
-        cronJob.handler,
-        data,
-        withLanePriority(data, {
-          repeat: { pattern: cronJob.pattern, jobId: cronJob.jobId },
-          attempts: cronJob.maxAttempts,
-          backoff: { type: 'exponential', delay: cronJob.backoffMs },
-        }),
-      );
-      log.info(`Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`, LogScope.job);
-    } catch (error) {
-      log.error(`Failed to register cron "${cronJob.name}": ${error}`, LogScope.job);
     }
-  }
-};
+
+    for (const cronJob of liveCronJobs) {
+      lock.assertHeld();
+      await upsertCronJobScheduler(cronJob);
+      log.info(
+        `Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`,
+        LogScope.job,
+      );
+    }
+
+    const liveJobIds = new Set(liveCronJobs.map((cronJob) => cronJob.jobId));
+    for (const scheduler of await queue.getJobSchedulers()) {
+      if (liveJobIds.has(scheduler.key)) continue;
+      lock.assertHeld();
+      await queue.removeJobScheduler(scheduler.key);
+      log.info(
+        `Removed orphaned cron scheduler: ${scheduler.name} - ${scheduler.pattern}`,
+        LogScope.job,
+      );
+    }
+  }, STARTUP_LOCK_WAIT_MS);

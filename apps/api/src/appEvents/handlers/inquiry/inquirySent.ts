@@ -12,5 +12,6 @@ export type InquirySentPayload = InquiryWithIncludes;
 
 export const inquirySent = makeAppEvent<InquirySentPayload>({
   email: (inquiry) => inquiryHandlers[inquiry.type]?.appEvents?.sent?.email?.(inquiry) ?? null,
-  websocket: (inquiry) => inquiryHandlers[inquiry.type]?.appEvents?.sent?.websocket?.(inquiry) ?? null,
+  websocket: (inquiry) =>
+    inquiryHandlers[inquiry.type]?.appEvents?.sent?.websocket?.(inquiry) ?? null,
 });

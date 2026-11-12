@@ -1,5 +1,6 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
+import { cleanupTouchedTables } from '@template/db/test';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import type { AppEventPayload } from '#/appEvents/types';
 import { observeRegistry } from '#/lib/observe';
@@ -22,17 +23,17 @@ const createEvent = (name: string, data: Record<string, unknown>): AppEventPaylo
 
 describe('makeAppEvent', () => {
   const observed: AppEventPayload[] = [];
-  beforeAll(() => {
+  beforeEach(() => {
     observeRegistry.register('test-recorder', {
       record: async (event) => {
         observed.push(event);
       },
     });
   });
-  afterAll(() => observeRegistry.unregister('test-recorder'));
+  afterEach(() => observeRegistry.unregister('test-recorder'));
   afterEach(async () => {
     observed.length = 0;
-    await db.appEvent.deleteMany({ where: { name: 'test' } });
+    await cleanupTouchedTables(db);
   });
 
   it('returns a handler function', () => {
@@ -75,13 +76,21 @@ describe('makeAppEvent', () => {
     });
 
     it('redacts sensitive keys anywhere in the persisted payload', async () => {
-      const event = createEvent('test', { userId: 'u1', keyHash: 'super-secret', nested: { password: 'p' } });
+      const event = createEvent('test', {
+        userId: 'u1',
+        keyHash: 'super-secret',
+        nested: { password: 'p' },
+      });
 
       await makeAppEvent({})(event);
 
       const rows = await db.appEvent.findMany({ where: { name: 'test' } });
       expect(rows).toHaveLength(1);
-      expect(rows[0].data).toEqual({ userId: 'u1', keyHash: '[REDACTED]', nested: { password: '[REDACTED]' } });
+      expect(rows[0].data).toEqual({
+        userId: 'u1',
+        keyHash: '[REDACTED]',
+        nested: { password: '[REDACTED]' },
+      });
     });
   });
 
@@ -121,7 +130,13 @@ describe('makeAppEvent', () => {
       const handler = makeAppEvent({
         websocket: (data) => {
           received = data;
-          return [{ target: { userIds: ['user-1'] }, message: { data: { test: true } } }];
+          return [
+            {
+              kind: 'channels',
+              target: { channels: ['test'] },
+              message: { data: { category: 'query', action: 'refetch', key: { _id: 'test' } } },
+            },
+          ];
         },
       });
 

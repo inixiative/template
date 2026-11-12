@@ -28,11 +28,14 @@ describe('serialize (parseBlocks inverse)', () => {
   });
 
   test('round-trips a bare component ref', () => {
-    expect(roundtrip('{{#component:footer}}{{/component:footer}}')).toBe('{{#component:footer}}{{/component:footer}}');
+    expect(roundtrip('{{#component:footer}}{{/component:footer}}')).toBe(
+      '{{#component:footer}}{{/component:footer}}',
+    );
   });
 
   test('round-trips a ref with an override slot', () => {
-    const s = '{{#component:card}}{{#slot:body}}<mj-text>x</mj-text>{{/slot:body}}{{/component:card}}';
+    const s =
+      '{{#component:card}}{{#slot:body}}<mj-text>x</mj-text>{{/slot:body}}{{/component:card}}';
     expect(roundtrip(s)).toBe(s);
   });
 
@@ -56,7 +59,8 @@ describe('decompose — template use (refs, no bodies)', () => {
   });
 
   test('ref with an override slot → override stays inline on the caller, no write', () => {
-    const src = '{{#component:card}}{{#slot:header}}<mj-text>Hi</mj-text>{{/slot:header}}{{/component:card}}';
+    const src =
+      '{{#component:card}}{{#slot:header}}<mj-text>Hi</mj-text>{{/slot:header}}{{/component:card}}';
     const r = decompose(src, noCascade);
     expect(r.mjml).toBe(src);
     expect(r.refs).toEqual(['card']);
@@ -97,8 +101,10 @@ describe('decompose — component edit (body present)', () => {
   });
 
   test('body diverges from cascade → shadow write of the new body', () => {
-    const stored = '<mj-section>{{#slot:x:default}}<mj-text>old</mj-text>{{/slot:x:default}}</mj-section>';
-    const edited = '<mj-section>{{#slot:x:default}}<mj-text>new</mj-text>{{/slot:x:default}}</mj-section>';
+    const stored =
+      '<mj-section>{{#slot:x:default}}<mj-text>old</mj-text>{{/slot:x:default}}</mj-section>';
+    const edited =
+      '<mj-section>{{#slot:x:default}}<mj-text>new</mj-text>{{/slot:x:default}}</mj-section>';
     const src = `{{#component:cta}}${edited}{{/component:cta}}`;
     const r = decompose(src, (slug) => (slug === 'cta' ? stored : undefined));
     expect(r.writes).toHaveLength(1);
@@ -191,7 +197,8 @@ describe('decompose — a bare ref + an inlined body for the same slug', () => {
   const cascadeBody = '<mj-text>Cascade</mj-text>';
 
   test('bare ref + inlined body that DIVERGES from the cascade → throws', () => {
-    const src = '{{#component:cta}}{{/component:cta}}{{#component:cta}}<mj-text>Edited</mj-text>{{/component:cta}}';
+    const src =
+      '{{#component:cta}}{{/component:cta}}{{#component:cta}}<mj-text>Edited</mj-text>{{/component:cta}}';
     expect(() => decompose(src, (slug) => (slug === 'cta' ? cascadeBody : undefined))).toThrow(
       DivergentDuplicateSlugError,
     );
@@ -216,7 +223,8 @@ describe('decompose — a bare ref + an inlined body for the same slug', () => {
 describe('decompose — write ordering', () => {
   test('children are written before parents (FK-safe, depth-first)', () => {
     // editing hero, whose default body inlines a diverged child `panel` body
-    const panelBody = '<mj-section>{{#slot:p:default}}<mj-text>p</mj-text>{{/slot:p:default}}</mj-section>';
+    const panelBody =
+      '<mj-section>{{#slot:p:default}}<mj-text>p</mj-text>{{/slot:p:default}}</mj-section>';
     const heroBody = `{{#slot:body:default}}{{#component:panel}}${panelBody}{{/component:panel}}{{/slot:body:default}}`;
     const src = `{{#component:hero}}${heroBody}{{/component:hero}}`;
     const r = decompose(src, noCascade);

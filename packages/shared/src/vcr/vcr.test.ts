@@ -28,12 +28,20 @@ describe('VCR', () => {
 
       expect(result).toEqual({ secret: 'REDACTED', visible: 'hi' });
       const saved = JSON.parse(readFileSync(join(dir, 'fetch.default.json'), 'utf-8')) as Fixture;
-      expect(saved).toEqual({ version: '1.0.0', status: 200, body: { secret: 'REDACTED', visible: 'hi' } });
+      expect(saved).toEqual({
+        version: '1.0.0',
+        status: 200,
+        body: { secret: 'REDACTED', visible: 'hi' },
+      });
     });
 
     it('returns identical sanitized shape on replay as on capture', async () => {
       const realFn = mock(async () => ({ secret: 'shh', visible: 'hi' }));
-      const opts = { service: 'svc', version: () => '1.0.0', sanitizers: { fetch: { keys: ['secret'] } } };
+      const opts = {
+        service: 'svc',
+        version: () => '1.0.0',
+        sanitizers: { fetch: { keys: ['secret'] } },
+      };
 
       const first = await new VCR(dir, opts).queue('fetch', 'default').capture('fetch', realFn);
       const second = await new VCR(dir, opts).queue('fetch', 'default').capture('fetch', realFn);
@@ -60,7 +68,10 @@ describe('VCR', () => {
     });
 
     it('refreshes cassette with no version field (legacy)', async () => {
-      writeFileSync(join(dir, 'fetch.default.json'), JSON.stringify({ status: 200, body: { stale: true } }));
+      writeFileSync(
+        join(dir, 'fetch.default.json'),
+        JSON.stringify({ status: 200, body: { stale: true } }),
+      );
       const realFn = mock(async () => ({ stale: false }));
 
       const result = await new VCR(dir, { service: 'svc', version: () => '1.0.0' })
@@ -116,7 +127,9 @@ describe('VCR', () => {
 
       await vcr.capture('download', async () => bytes);
 
-      const cassette = JSON.parse(readFileSync(join(dir, 'download.icon.json'), 'utf-8')) as Fixture;
+      const cassette = JSON.parse(
+        readFileSync(join(dir, 'download.icon.json'), 'utf-8'),
+      ) as Fixture;
       expect(cassette.bodyFile).toBe('download.icon.png');
       const sidecar = readFileSync(join(dir, 'download.icon.png'));
       expect(sidecar.equals(bytes)).toBe(true);
@@ -152,8 +165,12 @@ describe('VCR', () => {
       const aFn = mock(async () => 'a-v1');
       const bFn = mock(async () => 'b-v1');
 
-      await new VCR(dir, { service: 'a', version: aFn }).queue('x', 'default').capture('x', async () => 1);
-      await new VCR(dir, { service: 'b', version: bFn }).queue('y', 'default').capture('y', async () => 1);
+      await new VCR(dir, { service: 'a', version: aFn })
+        .queue('x', 'default')
+        .capture('x', async () => 1);
+      await new VCR(dir, { service: 'b', version: bFn })
+        .queue('y', 'default')
+        .capture('y', async () => 1);
 
       expect(aFn).toHaveBeenCalledTimes(1);
       expect(bFn).toHaveBeenCalledTimes(1);
@@ -199,7 +216,9 @@ describe('VCR', () => {
 
     it('throws when no cassette queued for a method', async () => {
       const vcr = new VCR(dir, { service: 'svc', version: () => '1.0.0' });
-      await expect(vcr.capture('unqueued', async () => 1)).rejects.toThrow('VCR: no cassette queued for "unqueued"');
+      await expect(vcr.capture('unqueued', async () => 1)).rejects.toThrow(
+        'VCR: no cassette queued for "unqueued"',
+      );
     });
 
     it('isEmpty + clear track queue state', () => {
@@ -238,11 +257,17 @@ describe('VCR', () => {
         service: 'svc',
         version: () => '1.0.0',
         sanitizers: {
-          list: { isArray: true, fn: (item: unknown) => ({ ...(item as Record<string, unknown>), seen: true }) },
+          list: {
+            isArray: true,
+            fn: (item: unknown) => ({ ...(item as Record<string, unknown>), seen: true }),
+          },
         },
       }).queue('list', 'default');
 
-      const result = await vcr.capture<Array<Record<string, unknown>>>('list', async () => [{ id: 1 }, { id: 2 }]);
+      const result = await vcr.capture<Array<Record<string, unknown>>>('list', async () => [
+        { id: 1 },
+        { id: 2 },
+      ]);
 
       expect(result).toEqual([
         { id: 1, seen: true },
@@ -253,17 +278,29 @@ describe('VCR', () => {
 
   describe('captureResponse', () => {
     it('preserves status/headers + sanitizes body the same on capture and replay', async () => {
-      const opts = { service: 'svc', version: () => '1.0.0', sanitizers: { fetch: { keys: ['token'] } } };
+      const opts = {
+        service: 'svc',
+        version: () => '1.0.0',
+        sanitizers: { fetch: { keys: ['token'] } },
+      };
       const headers = { 'x-rate-limit': '99' };
 
-      const realFn = mock(async () => ({ status: 201, body: { token: 'shh', id: 'abc' }, headers }));
-      const first = await new VCR(dir, opts).queue('fetch', 'default').captureResponse('fetch', realFn);
+      const realFn = mock(async () => ({
+        status: 201,
+        body: { token: 'shh', id: 'abc' },
+        headers,
+      }));
+      const first = await new VCR(dir, opts)
+        .queue('fetch', 'default')
+        .captureResponse('fetch', realFn);
 
       expect(first.status).toBe(201);
       expect(first.headers).toEqual(headers);
       expect(first.body).toEqual({ token: 'REDACTED', id: 'abc' });
 
-      const second = await new VCR(dir, opts).queue('fetch', 'default').captureResponse('fetch', realFn);
+      const second = await new VCR(dir, opts)
+        .queue('fetch', 'default')
+        .captureResponse('fetch', realFn);
       expect(second).toEqual(first);
       expect(realFn).toHaveBeenCalledTimes(1);
     });

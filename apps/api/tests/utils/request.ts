@@ -1,10 +1,11 @@
 // Test request helpers
 
+import type { ApiErrorBody } from '@template/shared/errors';
 import { LogScope, log } from '@template/shared/logger';
 import type { PaginationMetadata } from '#/lib/routeTemplates';
 
 type SuccessResponse<T> = { data: T; pagination?: PaginationMetadata };
-type ErrorResponse = { error: string; message: string; stack?: string; guidance?: string };
+type ErrorResponse = ApiErrorBody;
 
 export type ApiResponse<T = unknown> = SuccessResponse<T> | ErrorResponse;
 
@@ -54,6 +55,6 @@ export const patch = (path: string, body?: unknown, headers?: Record<string, str
   return createRequest('PATCH', path, { body, headers });
 };
 
-export const del = (path: string, headers?: Record<string, string>) => {
-  return createRequest('DELETE', path, { headers });
+export const del = (path: string, headers?: Record<string, string>, body?: unknown) => {
+  return createRequest('DELETE', path, { body, headers });
 };

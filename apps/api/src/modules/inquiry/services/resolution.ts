@@ -12,18 +12,19 @@ import { emitAppEvent } from '#/appEvents/emit';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
 import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
+import type { InquiryResolutionStatus } from '#/modules/inquiry/schemas/inquiryResolutionStatusSchema';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
+import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
 import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 import { validateInquiryIsResolvable } from '#/modules/inquiry/validations/validateInquiryStatus';
 import type { AppEnv } from '#/types/appEnv';
 
-type ResolutionStatus = 'approved' | 'denied' | 'changesRequested';
-
 export const resolveInquiry = async (
   c: Context<AppEnv>,
   inquiry: Inquiry,
-  status: ResolutionStatus,
+  status: InquiryResolutionStatus,
   resolutionData: Record<string, unknown>,
+  expectedUpdatedAt?: Date,
 ): Promise<Inquiry> => {
   const db = c.get('db');
 
@@ -31,32 +32,35 @@ export const resolveInquiry = async (
 
   try {
     return await db.txn(async () => {
-      // Row-lock first: serializes concurrent resolves so the second re-reads the committed status and the validator rejects.
-      const [fresh] = await db.findForUpdate<Inquiry>('Inquiry', { id: inquiry.id });
-      validateInquiryIsResolvable(fresh!);
+      const fresh = await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt);
+      validateInquiryIsResolvable(fresh);
 
+      const handler = inquiryHandlers[fresh.type];
       let approvalOutput: Record<string, unknown> = {};
 
       if (status === InquiryStatus.approved) {
-        const handler = inquiryHandlers[fresh.type];
         const content = handler.contentSchema.parse(fresh.content);
         const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
-        approvalOutput = (await handler.handleApprove(db, fresh, merged)) ?? {};
+        approvalOutput = (await handler.handleApprove(fresh, merged)) ?? {};
       }
 
-      const expiresAt = status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;
+      const expiresAt =
+        status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;
 
       const updated = await db.inquiry.update({
         where: { id: fresh.id },
         data: {
           status,
-          resolution: { ...resolutionData, ...approvalOutput } as Prisma.InputJsonValue,
+          resolution: handler.resolutionSchema.parse({
+            ...resolutionData,
+            ...approvalOutput,
+          }) as Prisma.InputJsonValue,
           expiresAt,
         },
         include: includeInquiryReceived,
       });
 
-      await emitAppEvent('inquiry.resolved', { ...updated, _resolution: status });
+      await emitAppEvent('inquiry.resolved', updated);
 
       return updated;
     });

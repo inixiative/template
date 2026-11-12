@@ -5,8 +5,12 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
-import { EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
+import type {
+  EmailComponent,
+  EmailOwnerModel,
+  EmailTemplate,
+} from '@template/db/generated/client/client';
+import { visitTemplateBlocks } from '@template/email/render/conditionParser';
 import { decomposeNodes } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
@@ -14,10 +18,9 @@ import { collectSlugsFromNodes } from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
-import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import type { OwnerScope } from '@template/email/render/types';
 import { validateDependents } from '@template/email/render/validateDependents';
-import { type EmailLens, syncRuleReferences } from '@template/email/rules';
+import type { EmailLens } from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 import { validateNoCycle } from '@template/email/validations/validateNoCycle';
@@ -47,20 +50,17 @@ export type SaveTemplateOptions = {
 
 const withoutConditionals = (mjml: string): string => {
   let out = '';
-  let i = 0;
-  while (i < mjml.length) {
-    const ifIdx = mjml.indexOf(IF, i);
-    const eachIdx = mjml.indexOf(EACH, i);
-    if (ifIdx === -1 && eachIdx === -1) {
-      out += mjml.slice(i);
-      break;
-    }
-    const isEach = eachIdx !== -1 && (ifIdx === -1 || eachIdx < ifIdx);
-    const open = isEach ? eachIdx : ifIdx;
-    out += mjml.slice(i, open);
-    const block = isEach ? parseEachBlock(mjml, open) : parseIfBlock(mjml, open);
-    i = block ? block.end : open + (isEach ? EACH.length : IF.length);
-  }
+  visitTemplateBlocks<boolean>(
+    mjml,
+    {
+      text: (text, { state: isNested }) => {
+        if (!isNested) out += text;
+      },
+      branch: () => true,
+      loop: () => true,
+    },
+    { bindings: new Map(), state: false },
+  );
   return out;
 };
 
@@ -71,6 +71,12 @@ export const ownerScopeOf = (input: SaveTemplateInput): OwnerScope => ({
   userId: input.userId,
   locale: input.locale ?? 'en',
 });
+
+export const saveEmailComponents = (
+  inputs: EmailComponent[],
+  ctx: OwnerScope,
+  lens?: EmailLens,
+): Promise<EmailComponent[]> => saveComponents(inputs, ctx, lens);
 
 export const saveEmailTemplate = async (
   input: SaveTemplateInput,
@@ -108,21 +114,16 @@ export const saveEmailTemplate = async (
         await validateNoCycle(component.slug, component.componentRefs ?? [], ctx);
       }
 
-      const components = finalComponents.length ? await saveComponents(finalComponents, ctx) : [];
+      const components = finalComponents.length
+        ? await saveEmailComponents(finalComponents, ctx, options.lens)
+        : [];
       const template = await saveTemplate(finalTemplate, ctx);
 
-      for (const component of components) {
-        await syncRuleReferences({ model: 'EmailComponent', id: component.id }, [component.mjml], options.lens);
-      }
-      await syncRuleReferences(
-        { model: 'EmailTemplate', id: template.id },
-        [template.subject ?? '', stripComponentBodies(template.mjml)],
-        options.lens,
-      );
-
       const composed = await expand(template.mjml, ctx);
+      assertValidConditions(composed, { lens: options.lens });
       assertValidTokens(composed, { lens: options.lens });
-      if (template.subject) assertValidTokens(template.subject, { lens: options.lens, isSubject: true });
+      if (template.subject)
+        assertValidTokens(template.subject, { lens: options.lens, isSubject: true });
 
       if (template.kind && template.kind !== 'system') {
         if (!withoutConditionals(composed).includes('{{system.unsubscribeUrl}}')) {

@@ -2,7 +2,14 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { createUser, getNextSeq } from '@template/db/test';
-import { email, liveOrders, phone, phoneRow, positions, posOf } from '#/hooks/orderedList/tests/setup';
+import {
+  email,
+  liveOrders,
+  phone,
+  phoneRow,
+  positions,
+  posOf,
+} from '#/hooks/orderedList/tests/setup';
 
 describe('create', () => {
   it('appends to end when position omitted', async () => {
@@ -43,7 +50,7 @@ describe('create', () => {
     const { entity: u2 } = await createUser();
     await phone(u1.id);
     await phone(u1.id);
-    expect((await email(u1.id)).position).toBe(1); // different type
+    expect((await email(u1.id)).position).toBe(2); // different type, after the user's own email
     expect((await phone(u2.id)).position).toBe(1); // different owner
   });
 });
@@ -52,7 +59,9 @@ describe('createManyAndReturn', () => {
   it('sequential append (all omitted)', async () => {
     const { entity: u } = await createUser();
     await phone(u.id); // existing: 1
-    const res = await db.contact.createManyAndReturn({ data: [phoneRow(u.id), phoneRow(u.id), phoneRow(u.id)] });
+    const res = await db.contact.createManyAndReturn({
+      data: [phoneRow(u.id), phoneRow(u.id), phoneRow(u.id)],
+    });
     expect(res.map((r) => r.position).sort()).toEqual([2, 3, 4]);
   });
 
@@ -152,6 +161,6 @@ describe('multi-scope isolation — createManyAndReturn', () => {
     });
 
     expect(positions(await liveOrders(u.id, ContactType.phone))).toEqual([1, 2, 3]);
-    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1]);
+    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2]);
   });
 });

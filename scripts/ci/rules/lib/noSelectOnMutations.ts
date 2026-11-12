@@ -83,8 +83,12 @@ for (const file of files) {
 }
 
 if (all.length > 0) {
-  console.log('Found select/omit on Prisma writes (these narrow the result the lifecycle hooks consume):');
-  console.log('Writes must return full rows. Drop the select/omit and shape the result after the write.');
+  console.log(
+    'Found select/omit on Prisma writes (these narrow the result the lifecycle hooks consume):',
+  );
+  console.log(
+    'Writes must return full rows. Drop the select/omit and shape the result after the write.',
+  );
   console.log('');
   for (const v of all) console.log(`  ${v.file}:${v.line}  ${v.method}(...) [${v.key}]`);
   process.exit(1);

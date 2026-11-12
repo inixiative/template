@@ -54,3 +54,14 @@ export const recordDuration = (name: string, seconds: number, attributes: Attrib
     })
     .record(seconds, attributes);
 export { context, metrics, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
+
+export const incrementCounter = (
+  name: string,
+  value: number,
+  attributes: Attributes,
+  unit?: string,
+): void =>
+  metrics
+    .getMeter('template')
+    .createCounter(name, unit ? { unit } : undefined)
+    .add(value, attributes);

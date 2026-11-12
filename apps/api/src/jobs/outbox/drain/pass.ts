@@ -8,12 +8,23 @@ import { claimLane, db, getJobSupersededBy, laneKey, releaseLane } from '@templa
 import { LogScope, log } from '@template/shared/logger';
 import type { JobsOptions } from 'bullmq';
 import { withLanePriority } from '#/jobs/lanePriority';
-import { hasPendingFastSpills, hasPendingSlowSpills, hasPendingSpills } from '#/jobs/outbox/accumulator';
+import {
+  hasPendingFastSpills,
+  hasPendingSlowSpills,
+  hasPendingSpills,
+} from '#/jobs/outbox/accumulator';
 import { laneDepthCap, lowWater, MAX_DRAIN_ATTEMPTS } from '#/jobs/outbox/config';
-import { clearOverflow, warnIfOverflowStuck, withOverflowRenew } from '#/jobs/outbox/flag';
+import {
+  clearOverflow,
+  tripFromDepths,
+  warnIfOverflowStuck,
+  withOverflowRenew,
+} from '#/jobs/outbox/flag';
 import { runOnOutboxQueue } from '#/jobs/outbox/mutex';
 import { laneDepth, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
+import { readSlowLaneState } from '#/jobs/readSlowLaneState';
+import { recordDelayedSlowAdd } from '#/jobs/slowLaneSignals';
 import { type JobData, JobLane } from '#/jobs/types';
 import { isValidJobId } from '#/jobs/validateJobId';
 
@@ -36,7 +47,7 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
       const opts = withLanePriority({ lane }, (row.options ?? {}) as JobsOptions);
       const baton = data.dedupeKey ? laneKey(row.handlerName, data.dedupeKey) : undefined;
       // Rows buffered before enqueue validated custom ids would otherwise fail every re-add and
-      // quarantine deliverable work; admission mints a replacement instead.
+      // quarantine deliverable work; the re-add mints a replacement instead.
       const jobId = isValidJobId(row.jobId) ? row.jobId : Bun.randomUUIDv7();
       let previousHolder: string | null = null;
       try {
@@ -47,18 +58,23 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
           continue;
         }
         if (jobId !== row.jobId) {
-          log.info(`drainOutbox: replaced invalid buffered job id ${row.jobId} with ${jobId}`, LogScope.job);
+          log.info(
+            `drainOutbox: replaced invalid buffered job id ${row.jobId} with ${jobId}`,
+            LogScope.job,
+          );
         }
         // Claim TTL stretches by the re-added job's delay, same as the direct enqueue path.
         if (baton) previousHolder = await claimLane(baton, jobId, opts.delay);
         await queue.add(row.handlerName, data, { ...opts, jobId });
+        if (lane === JobLane.slow && opts.delay)
+          await recordDelayedSlowAdd(queue, jobId, opts.delay);
         drained.push(row.id);
       } catch (e) {
         // The re-add failed, so roll back the lane claim (fenced) — the row stays buffered for a
         // retry; don't leave the prior job superseded by a job that never got created. A self-claim
         // (the spill-time baton, previousHolder === jobId) must survive the retry — keep it.
         if (baton && previousHolder !== jobId) {
-          await releaseLane(baton, jobId, previousHolder).catch(() => {});
+          await releaseLane(baton, jobId, previousHolder);
         }
         failed.push(row.id);
         log.error(
@@ -72,10 +88,16 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
     if (drained.length || displaced.length) {
       await db.jobOutbox.deleteMany({ where: { id: { in: [...drained, ...displaced] } } });
       if (drained.length) {
-        log.info(`drainOutbox: admitted ${drained.length}/${rows.length} buffered ${lane} jobs`, LogScope.job);
+        log.info(
+          `drainOutbox: admitted ${drained.length}/${rows.length} buffered ${lane} jobs`,
+          LogScope.job,
+        );
       }
       if (displaced.length) {
-        log.info(`drainOutbox: dropped ${displaced.length} superseded buffered row(s)`, LogScope.job);
+        log.info(
+          `drainOutbox: dropped ${displaced.length} superseded buffered row(s)`,
+          LogScope.job,
+        );
       }
     }
     if (failed.length) {
@@ -109,7 +131,12 @@ const settleFlags = async (depths: QueueDepths): Promise<void> => {
     );
     // Quarantined rows get another chance only on full recovery: the queue healthy and no admittable
     // row in either lane.
-    if (belowLowWater(JobLane.fast) && fastAdmittable === 0 && slowAdmittable === 0 && !hasPendingSpills()) {
+    if (
+      belowLowWater(JobLane.fast) &&
+      fastAdmittable === 0 &&
+      slowAdmittable === 0 &&
+      !hasPendingSpills()
+    ) {
       await db.jobOutbox.updateManyAndReturn({
         where: { attempts: { gte: MAX_DRAIN_ATTEMPTS } },
         data: { attempts: 0 },
@@ -136,6 +163,8 @@ export const runDrainOutboxPass = async (): Promise<void> => {
     const slowRoom = Math.min(room - fastAdmitted, laneDepthCap(JobLane.slow) - depths.slow);
     await admitLaneRows(JobLane.slow, slowRoom);
 
-    await settleFlags(await queueDepths(true));
+    const { depths: settled } = await readSlowLaneState();
+    await tripFromDepths(settled);
+    await settleFlags(settled);
   });
 };

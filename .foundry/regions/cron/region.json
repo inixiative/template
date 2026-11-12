@@ -1,0 +1,37 @@
+{
+  "id": "cron",
+  "title": "Cron jobs and schedulers",
+  "routing": "Is this about recurring work stored as a CronJob row: its UTC pattern, handler, payload, enabled flag and retries, the BullMQ job scheduler behind it (upsertCronJobScheduler, syncCronJobScheduler, the cronJobSync hook, registerCronJobs at worker start, never the repeatable API), a tick handing off to a cronTrigger run (enqueueCronRun), validateCronJob, the admin cron routes and manual trigger (triggerCronJob, POST /api/admin/cronJob/:id/trigger), the seeded system cron rows, or retention handlers (cleanStaleData, archiveStaleRecords)? Defining and enqueuing jobs in general is `jobs-cron`.",
+  "concepts": ["cron"],
+  "tokens": 8045,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 999,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 8045
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/JOBS.md"],
+    "docUnits": ["doc:docs/claude/JOBS.md#cron-jobs", "doc:FEATURES.md#background-jobs-cron"],
+    "catalogClusters": [
+      "cron-and-recurring-work",
+      "data-access-rules",
+      "job-overflow-outbox",
+      "locks-and-serialization",
+      "seeding-data",
+      "testing-rules"
+    ],
+    "codeEntries": 11,
+    "docMembers": 22
+  },
+  "bypassLines": 14,
+  "glossaryTerms": 16
+}

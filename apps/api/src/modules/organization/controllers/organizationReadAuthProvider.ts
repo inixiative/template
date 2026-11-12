@@ -15,11 +15,10 @@ export const organizationReadAuthProviderController = makeController(
   async (c, respond) => {
     const db = c.get('db');
     const organization = getResource(c);
-    const user = c.get('user');
     const permix = c.get('permix');
 
     // Check if user has owner permissions - owners see all providers (enabled + disabled)
-    const isOwner = user && check(permix, rebacSchema, 'organization', organization, 'own');
+    const isOwner = check(permix, rebacSchema, 'organization', organization, 'own');
 
     const platformProviders = getPlatformProviders();
 

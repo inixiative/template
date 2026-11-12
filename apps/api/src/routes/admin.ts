@@ -16,7 +16,9 @@ import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
 import { adminInquiryRouter } from '#/modules/inquiry';
 import { adminIntegrationRouter } from '#/modules/integration';
 import { adminOrganizationRouter } from '#/modules/organization';
+import { adminProjectRouter } from '#/modules/project';
 import { adminSpaceRouter } from '#/modules/space';
+import { adminUserRouter } from '#/modules/user';
 import { adminWebhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -35,4 +37,6 @@ adminRouter.route('/inquiry', adminInquiryRouter);
 adminRouter.route('/integration', adminIntegrationRouter);
 adminRouter.route('/organization', adminOrganizationRouter);
 adminRouter.route('/space', adminSpaceRouter);
+adminRouter.route('/user', adminUserRouter);
 adminRouter.route('/webhookSubscription', adminWebhookSubscriptionRouter);
+adminRouter.route('/project', adminProjectRouter);

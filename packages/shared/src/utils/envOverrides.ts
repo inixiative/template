@@ -24,7 +24,9 @@ export const withEnv = async <T>(
   overrides: Record<string, string | undefined>,
   fn: () => T | Promise<T>,
 ): Promise<T> => {
-  const prior = Object.keys(overrides).map((key) => [key, key in envOverrides, envOverrides[key]] as const);
+  const prior = Object.keys(overrides).map(
+    (key) => [key, key in envOverrides, envOverrides[key]] as const,
+  );
   for (const [key, value] of Object.entries(overrides)) envOverrides[key] = value;
   try {
     return await fn();
@@ -36,7 +38,11 @@ export const withEnv = async <T>(
   }
 };
 
-export type EnvOverrideParser = (key: string, override: string | undefined, current: unknown) => unknown;
+export type EnvOverrideParser = (
+  key: string,
+  override: string | undefined,
+  current: unknown,
+) => unknown;
 
 const passOverrideThrough: EnvOverrideParser = (_key, override) => override;
 

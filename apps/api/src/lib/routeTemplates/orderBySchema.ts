@@ -25,5 +25,8 @@ export const orderByRequestSchema = z
 export const parseOrderBy = (orderBy: string[]): Record<string, unknown>[] =>
   orderBy.map((item) => {
     const [field, direction] = item.split(':');
-    return buildNestedPath(field, direction.toLowerCase() === 'asc' ? Prisma.SortOrder.asc : Prisma.SortOrder.desc);
+    return buildNestedPath(
+      field,
+      direction.toLowerCase() === 'asc' ? Prisma.SortOrder.asc : Prisma.SortOrder.desc,
+    );
   });

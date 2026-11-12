@@ -107,7 +107,9 @@ export function writeToHistoryStateAndUrl(key: string | undefined, state: Persis
   }
 }
 
-export function parseOrderByStrings(strings: string[]): Array<{ field: string; direction: 'asc' | 'desc' }> {
+export function parseOrderByStrings(
+  strings: string[],
+): Array<{ field: string; direction: 'asc' | 'desc' }> {
   return strings.map((s) => {
     const [field, direction] = s.split(':');
     return { field, direction: direction === 'desc' ? 'desc' : 'asc' };

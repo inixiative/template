@@ -5,28 +5,25 @@
  * @uses infrastructure:prisma, primitive:authz
  */
 import type { UserWithRelations } from '@template/db';
-import type { UserId } from '@template/db/typedModelIds';
-import { isSuperadmin } from '@template/permissions';
 import type { Context } from 'hono';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
-import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
+import { installPermissions } from '#/lib/context/installPermissions';
 import type { AppEnv } from '#/types/appEnv';
+
+type Members = Pick<
+  UserWithRelations,
+  'organizationUsers' | 'organizations' | 'spaceUsers' | 'spaces'
+>;
+
+export const setMemberContext = (c: Context<AppEnv>, members: Members | null) => {
+  c.set('organizationUsers', members?.organizationUsers ?? []);
+  c.set('organizations', members?.organizations ?? []);
+  c.set('spaceUsers', members?.spaceUsers ?? []);
+  c.set('spaces', members?.spaces ?? []);
+};
 
 export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {
   const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userWithRelations;
-
   c.set('user', user);
-  c.set('organizationUsers', organizationUsers);
-  c.set('organizations', organizations);
-  c.set('spaceUsers', spaceUsers);
-  c.set('spaces', spaces);
-
-  const permix = c.get('permix');
-  permix.setUserId(user.id as UserId);
-  // Set both ways: a superadmin spoofing a normal user must not retain the flag.
-  permix.setSuperadmin(isSuperadmin(user));
-  await setupUserPermissions(c);
-  await setupOrgPermissions(c);
-  await setupSpacePermissions(c);
+  setMemberContext(c, { organizationUsers, organizations, spaceUsers, spaces });
+  await installPermissions(c);
 };

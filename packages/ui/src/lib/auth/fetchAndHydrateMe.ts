@@ -12,7 +12,9 @@ import { keyBy } from 'lodash-es';
 type _MeData = MeReadResponses[200]['data'];
 
 export const fetchAndHydrateMe = async (
-  set: (partial: AppStore | Partial<AppStore> | ((state: AppStore) => AppStore | Partial<AppStore>)) => void,
+  set: (
+    partial: AppStore | Partial<AppStore> | ((state: AppStore) => AppStore | Partial<AppStore>),
+  ) => void,
   get: () => AppStore,
 ) => {
   const spoofUserEmail = get().auth.spoofUserEmail;
@@ -30,6 +32,7 @@ export const fetchAndHydrateMe = async (
 
   const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userData;
   const organizationsDict = keyBy(organizations || [], 'id');
+  const organizationUsersDict = keyBy(organizationUsers || [], 'organizationId');
   const spacesDict = keyBy(spaces || [], 'id');
   const spaceUsersDict = keyBy(spaceUsers || [], 'spaceId');
 
@@ -38,6 +41,7 @@ export const fetchAndHydrateMe = async (
       ...state.auth,
       user,
       organizations: organizationsDict,
+      organizationUsers: organizationUsersDict,
       spaces: spacesDict,
       spaceUsers: spaceUsersDict,
       spoofingUserEmail: spoofingEmail && spoofedEmail ? spoofingEmail : null,

@@ -1,4 +1,5 @@
 export { RuleDegradedError, RuleEvaluationError } from './errors';
+export { type LensField, lensFields } from './lensFields';
 export {
   type RuleArms,
   type RuleHealth,

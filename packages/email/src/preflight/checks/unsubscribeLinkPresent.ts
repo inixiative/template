@@ -16,7 +16,8 @@ export const unsubscribeLinkPresent: SyncPreflightCheck = ({ html }) =>
         {
           code: 'unsubscribe.missing',
           severity: 'warning',
-          message: 'No unsubscribe link in the rendered body — link {{system.unsubscribeUrl}} or an unsubscribe page.',
+          message:
+            'No unsubscribe link in the rendered body — link {{system.unsubscribeUrl}} or an unsubscribe page.',
           location: 'html',
         },
       ];

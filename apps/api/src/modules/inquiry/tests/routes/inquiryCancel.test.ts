@@ -1,6 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -21,20 +25,27 @@ describe('DELETE /api/v1/inquiry/:id/cancel', () => {
   let org: Organization;
   let adminOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: admin, organization: org },
+    );
     adminOrgUser = ou;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOrgUser],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -50,7 +61,11 @@ describe('DELETE /api/v1/inquiry/:id/cancel', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}/cancel`));
+    const response = await fetch(
+      del(
+        `/api/v1/inquiry/${inquiry.id}/cancel?expectedUpdatedAt=${encodeURIComponent(new Date(inquiry.updatedAt).toISOString())}`,
+      ),
+    );
     expect(response.status).toBe(204);
   });
 
@@ -67,10 +82,16 @@ describe('DELETE /api/v1/inquiry/:id/cancel', () => {
       expiresAt: new Date('2099-01-01'),
     });
 
-    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}/cancel`));
+    const response = await fetch(
+      del(
+        `/api/v1/inquiry/${inquiry.id}/cancel?expectedUpdatedAt=${encodeURIComponent(new Date(inquiry.updatedAt).toISOString())}`,
+      ),
+    );
     expect(response.status).toBe(204);
 
-    const updated = await db.inquiry.findUnique({ where: { id: inquiry.id } });
+    const updated = await db.withDeleted(() =>
+      db.inquiry.findUnique({ where: { id: inquiry.id } }),
+    );
     expect(updated?.expiresAt).toBeNull();
   });
 
@@ -86,7 +107,11 @@ describe('DELETE /api/v1/inquiry/:id/cancel', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}/cancel`));
+    const response = await fetch(
+      del(
+        `/api/v1/inquiry/${inquiry.id}/cancel?expectedUpdatedAt=${encodeURIComponent(new Date(inquiry.updatedAt).toISOString())}`,
+      ),
+    );
     expect(response.status).toBe(400);
   });
 });

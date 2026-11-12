@@ -28,12 +28,19 @@ test('init and shell environment selection agree when delivery policy overrides 
     config.staging.enabled = true;
     await saveCicdConfig(config, root);
     const run = () =>
-      Bun.spawnSync(['bash', join(root, 'scripts/deployment/read-project-config.sh'), 'features.staging.enabled'], {
-        cwd: root,
-        env: { PATH: process.env.PATH, USE_INTERNAL_CONFIG: 'false' },
-        stdout: 'pipe',
-        stderr: 'pipe',
-      });
+      Bun.spawnSync(
+        [
+          'bash',
+          join(root, 'scripts/deployment/read-project-config.sh'),
+          'features.staging.enabled',
+        ],
+        {
+          cwd: root,
+          env: { PATH: process.env.PATH, USE_INTERNAL_CONFIG: 'false' },
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
     const enabled = run();
     expect(enabled.exitCode).toBe(0);
     expect(enabled.stdout.toString()).toBe('true');

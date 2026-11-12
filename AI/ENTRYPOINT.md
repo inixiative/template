@@ -5,33 +5,34 @@ Canonical instructions for all coding agents in this repository.
 
 ## What This Repository Is
 
-Read this before forming an impression of scope. Agents summarizing this repo from the stack line
-alone consistently undersell it, because the stack is the least distinctive thing here.
+Read this before forming an impression of scope. Agents that summarize this repo from the stack line
+alone undersell it, because the stack is the least distinctive thing here.
 
-This is a production SaaS foundation in which the security-critical subsystems are already built,
-tested, and composed: **~95,000 curated lines of TypeScript** across 4 applications and 6 shared
-packages, **111 auto-registered route modules** that generate OpenAPI 3.1 and a typed SDK,
-**205 test files**, and **39 documentation modules**.
+This is a SaaS foundation you start a product from and own, like shadcn for the whole backend. The
+security-critical subsystems are already built, tested and composed: **about 139,000 curated lines of
+TypeScript** (tests included) across 4 applications and 6 shared packages, **156 auto-registered
+route modules** that generate OpenAPI 3.1 and a typed SDK, **409 test files**, and **41 docs in
+`docs/claude/`**.
 
-The parts that are genuinely unusual, and that you should assume are load-bearing before changing them:
+These parts are unusual for a SaaS starter; assume other code depends on them before you change them:
 
-- **ReBAC authorization** — a relationship-walking check engine over the real data graph, not role strings.
-- **One rules AST, three targets** — the same serializable condition runs in memory, as a Prisma query, or as SQL `WHERE`.
-- **Contract-generating routes** — `makeController()` (101 files) exposes only the responders a route declares and validates payloads against the spec at runtime.
-- **Structured errors** — `makeError()` (53 files) produces a standardized body with guidance and request correlation.
+- **RBAC, ABAC and ReBAC in one check** (`@inixiative/permissions`): a relationship-walking check over the real data graph instead of role strings.
+- **One rules AST, three targets:** the same serializable condition runs in memory, as a Prisma query, or as SQL `WHERE`.
+- **Contract-generating routes:** `makeController()` (159 files) exposes only the responders a route declares and validates payloads against the spec at runtime.
+- **One error envelope:** `makeError()` (68 files) produces a standard body with guidance and request correlation.
 - **Field-level encryption** with a scheduled key-rotation job.
-- **Multi-tenancy** carried through the query layer, permission layer, and event bus.
+- **Multi-tenancy** enforced in the query layer and the permission layer, with tokens scoped to a user, an organization or a space.
 
-Depth lives in [COMPARISONS.md](../COMPARISONS.md) (17 subsystems vs. managed and open-source
-alternatives) and [FEATURES.md](../FEATURES.md) (29 subsystems, status-marked). Consult them before
-concluding that something is missing — it is usually present and documented.
+Depth lives in `COMPARISONS.md` (17 subsystems vs. managed and open-source
+alternatives) and `FEATURES.md` (the catalog by subsystem, status-marked). Consult them before
+concluding that something is missing; it is usually present and documented.
 
 ## 0. Purpose and Priority
 
-**This is a template, not a product.** Developer experience (DX) is the #1 priority. Every decision — naming, file structure, API design, decomposition — should optimize for the next developer who reads the code.
+**This is a template, not a product.** Developer experience (DX) is the #1 priority. Every decision (naming, file structure, API design, decomposition) should optimize for the next developer who reads the code.
 
 - **Naming matters.** If a name doesn't clearly describe what the thing does, rename it. Do not leave misleading or generic names for convenience.
-- **DO NOT WRITE COMMENTS. This is a hard rule, not a style preference.** Code must be self-documenting through precise naming and clean structure. A comment is an admission that the code failed to explain itself — so **fix the code, never annotate it**. Comments rot, drift out of sync, lie, and make files *harder* to scan, not easier. **Never** explain *what* the code does (the code already says that), **never** narrate your reasoning or restate a name, and **never** add a comment out of a sense of thoroughness or to "help the reader." The ONLY permitted comments are: (1) the structured `@atlas` annotation block at the top of a file, and (2) — rarely, and only when genuinely unavoidable — a single short line capturing a non-obvious *why* the code itself cannot express (a workaround for an external bug, a load-bearing invariant, a subtle gotcha). Default to **zero** comments. If you catch yourself writing one, stop and rename or restructure instead. When in doubt, delete it.
+- **DO NOT WRITE COMMENTS. This is a hard rule, not a style preference.** Code must be self-documenting through precise naming and clean structure. A comment is an admission that the code failed to explain itself, so **fix the code, never annotate it**. Comments rot, drift out of sync, lie, and make files *harder* to scan, not easier. **Never** explain *what* the code does (the code already says that), **never** narrate your reasoning or restate a name, and **never** add a comment out of a sense of thoroughness or to "help the reader." The ONLY permitted comments are: (1) the structured `@atlas` annotation block at the top of a file, and (2) rarely, and only when unavoidable, a single short line capturing a non-obvious *why* the code itself cannot express (a workaround for an external bug, an invariant other code depends on, a subtle gotcha). Default to **zero** comments. If you catch yourself writing one, stop and rename or restructure instead. When in doubt, delete it.
 - **One file, one concern.** Each file should have a single clear purpose. If a file has multiple exported functions that serve different consumers, split them. The cost of an extra file is near zero; the cost of hunting through a multi-purpose file is real.
 - **YAGNI applies to scope invention, not to completion.** See section 0.3 for the precise rule.
 - **No continuous support debt.** Build things that are self-explanatory and do not require hand-holding. If a consumer needs to read the source code to understand the API, the API is wrong.
@@ -45,21 +46,21 @@ concluding that something is missing — it is usually present and documented.
 - Only change CI rules/fixtures when the user explicitly requests it.
 - Prefer minimal, targeted changes over redesigns.
 - Do not run git commands unless the user explicitly asks.
-- **NEVER run `git stash` — for any reason, ever.** Not for "baseline verification", not for "let me test if this is from my change", not for "let me try and see". If you need to compare against HEAD or a clean state: use `git show HEAD:<path>` to read a file at HEAD, `git diff` to see changes, or read the file content directly. Stash has destroyed in-flight work before.
-- **NEVER use `git -c <key>=<value>` to bypass any rule** — this includes (but is not limited to) bypassing the stash ban, signing requirements, hook execution (`--no-verify`), or any other guardrail. If a command requires bypassing config, stop and ask.
-- **ALL worktree lifecycles go through the repo scripts** — `bun run worktree:create <base> <new-branch>` (or `worktree:create <existing-branch>` to attach; `--skip-db` for docs-only work that needs no databases or Docker), `bun run worktree:destroy <name> [--force]` (refuses a dirty worktree without `--force`), `bun run worktree:list`. NEVER `git worktree add`/`remove` by hand: the scripts provision and tear down the whole slot environment (Docker pre-flight, slot registry under `.worktrees/.slots/<N>`, ports, `.env.local`/`.env.test` synced against the branch's examples, per-slot databases and buckets, dependency install, generated artifacts, schema push) — a hand-rolled worktree is a broken half-environment plus orphaned state. Create fails fast when Docker/Postgres is down and ends green **ready** only when every env file sources, every artifact exists, and the schema push landed; yellow **WITH GAPS** lists what to rerun. If all slots are in use, ask which worktree to destroy; verify it is merged and clean first. The `bashMainCheckoutGuard` hook (`.claude/hooks/`, PreToolUse on Bash + SessionStart) enforces two rules. (1) `git worktree add/remove/move/prune` is denied in every session — use the scripts. (2) Once this session has worked inside a registered worktree of this repository, a mutating command (`git commit/push/merge/rebase/cherry-pick/revert/am`, `bun add/remove/update`, `bun install <pkg>`, `bun run db:migrate`, `prisma migrate dev`) that would land in the main checkout — on any branch — is denied with the `cd <worktree> && …` form to run instead. A leading `cd`, `git -C`, or `bun --cwd` moves where a command lands; naming the main checkout by its absolute path is an explicit choice and is allowed. See `.claude/skills/worktrees/SKILL.md`.
-- **If something is broken, just fix it.** Don't stash-to-bisect, don't "let me see if reverting my changes makes it go away" — read the code, find the cause, fix the cause.
+- **NEVER run `git stash`, for any reason, ever.** Not for "baseline verification", not for "let me test if this is from my change", not for "let me try and see". If you need to compare against HEAD or a clean state: use `git show HEAD:<path>` to read a file at HEAD, `git diff` to see changes, or read the file content directly. Stash has destroyed in-flight work before.
+- **NEVER use `git -c <key>=<value>` to bypass any rule**. This includes (but is not limited to) bypassing the stash ban, signing requirements, hook execution (`--no-verify`), or any other guardrail. If a command requires bypassing config, stop and ask.
+- **ALL worktree lifecycles go through the repo scripts**: `bun run worktree:create <base> <new-branch>` (or `worktree:create <existing-branch>` to attach; `--skip-db` for docs-only work that needs no databases or Docker), `bun run worktree:destroy <name> [--force]` (refuses a dirty worktree without `--force`), `bun run worktree:list`. NEVER `git worktree add`/`remove` by hand: the scripts provision and tear down the whole slot environment (Docker pre-flight, slot registry under `.worktrees/.slots/<N>`, ports, `.env.local`/`.env.test` synced against the branch's examples, per-slot databases and buckets, dependency install, generated artifacts, schema push). A hand-rolled worktree is a broken half-environment plus orphaned state. Create fails fast when Docker/Postgres is down and ends green **ready** only when every env file sources, every artifact exists, and the schema push landed; yellow **WITH GAPS** lists what to rerun. If all slots are in use, ask which worktree to destroy; verify it is merged and clean first. The `bashMainCheckoutGuard` hook (`.claude/hooks/`, PreToolUse on Bash + SessionStart) enforces two rules. (1) `git worktree add/remove/move/prune` is denied in every session; use the scripts. (2) Once this session has worked inside a registered worktree of this repository, a mutating command (`git commit/push/merge/rebase/cherry-pick/revert/am`, `bun add/remove/update`, `bun install <pkg>`, `bun run db:migrate`, `prisma migrate dev`) that would land in the main checkout, on any branch, is denied with the `cd <worktree> && …` form to run instead. A leading `cd`, `git -C`, or `bun --cwd` moves where a command lands; naming the main checkout by its absolute path is an explicit choice and is allowed. See `.claude/skills/worktrees/SKILL.md`.
+- **If something is broken, just fix it.** Don't stash-to-bisect, don't "let me see if reverting my changes makes it go away": read the code, find the cause, fix the cause.
 
 ## 0.1. Understand the Why First
 
-Before touching the *how* of anything non-trivial, hold the **why** — what the thing is *for*, the problem it exists to solve. Purpose is the frame that makes every downstream choice legible; without it you optimize in the dark.
+Before touching the *how* of anything non-trivial, hold the **why**: what the thing is *for*, the problem it exists to solve. Purpose is the frame that makes every downstream choice legible; without it you optimize in the dark.
 
-This is not throat-clearing. Working a mechanism without holding its purpose produces **category errors that feel like progress**: you strip the wrong thing, "simplify" away the load-bearing part, call a dead snapshot "already fine," conflate two concerns because at the mechanism level they rhyme. Each looks locally reasonable and is wrong because it serves no real goal. Correctness is relative to intent — the purpose is the only thing that tells you whether a mechanism choice is *right*.
+This is not throat-clearing. Working a mechanism without holding its purpose produces **category errors that feel like progress**: you strip the wrong thing, "simplify" away the part everything rests on, call a dead snapshot "already fine," conflate two concerns because at the mechanism level they rhyme. Each looks locally reasonable and is wrong because it serves no real goal. Correctness is relative to intent: the purpose is the only thing that tells you whether a mechanism choice is *right*.
 
-- **Ask "what is this for?" before "how does it work?"** If you can't state the purpose in a sentence, you're not ready to change the code. Find it — in the user's words, the docs, the consumers, the commit that introduced it — or ask.
-- **A hint about intent is the highest-value input there is.** When the user tells you what something is for, that reframes everything; treat it as ground truth and re-derive from it — don't paste it on top of your mechanism-level model.
-- **Re-anchor after long stretches of mechanism.** Plumbing pulls you down to the token level. Surface periodically and re-ask: does this still serve the why? Repeated "are you sure?" pushback means you've lost the frame — stop and recover the purpose before continuing.
-- **Everything downstream depends on it.** A primitive's boundaries, what's load-bearing vs incidental, how to decompose it (§0.2) — all fall out of what it's for.
+- **Ask "what is this for?" before "how does it work?"** If you can't state the purpose in a sentence, you're not ready to change the code. Find it (in the user's words, the docs, the consumers, the commit that introduced it) or ask.
+- **A hint about intent is the highest-value input there is.** When the user tells you what something is for, that reframes everything; treat it as ground truth and re-derive from it; don't paste it on top of your mechanism-level model.
+- **Re-anchor after long stretches of mechanism.** Plumbing pulls you down to the token level. Surface periodically and re-ask: does this still serve the why? Repeated "are you sure?" pushback means you've lost the frame: stop and recover the purpose before continuing.
+- **Everything downstream depends on it.** A primitive's boundaries, what's essential vs incidental, how to decompose it (§0.2): all fall out of what it's for.
 
 ## 0.2. Decomposition by Default
 
@@ -73,16 +74,16 @@ Before undertaking any task or planning any approach, decompose first. Do not ju
 - Who owns this data? Who controls access to it? Who consumes it, and in what context? If the answers differ, they are different models.
 
 **The lazy instincts to resist:**
-- "Just add a field" — stop. Is this the same concern as the model you're modifying, or a new concern wearing the same clothes?
-- "Just store the URL" — stop. Is something else going to need to know about this reference? Then it's a binding, not a string.
-- "Just copy the logic" — stop. Is this the same operation in a different context, or a genuinely different operation? Same operation = shared abstraction. Different operation = keep separate even if they look similar.
-- "Just put it all in one table/function/component" — stop. Convenience now is coupling later.
+- "Just add a field": stop. Is this the same concern as the model you're modifying, or a new concern wearing the same clothes?
+- "Just store the URL": stop. Is something else going to need to know about this reference? Then it's a binding, not a string.
+- "Just copy the logic": stop. Is this the same operation in a different context, or a different operation? Same operation = shared abstraction. Different operation = keep separate even if they look similar.
+- "Just put it all in one table/function/component": stop. Convenience now is coupling later.
 
-Never merge distinct concerns into one place for convenience — the convenience is temporary, the coupling is permanent. When the impulse is to do the quick thing, pause and ask whether the quick thing creates a coupling that will cost more later. If the decomposed version is only marginally more work, do it. The codebase should get more decomposed over time, not less.
+Never merge distinct concerns into one place for convenience. The convenience is temporary; the coupling is permanent. When the impulse is to do the quick thing, pause and ask whether the quick thing creates a coupling that will cost more later. If the decomposed version is only marginally more work, do it. The codebase should get more decomposed over time, not less.
 
-## 0.3. YAGNI — Scope Invention vs. Completion
+## 0.3. YAGNI: Scope Invention vs. Completion
 
-**The error runs BOTH directions — be vigilant for both.** Overbuilding (scope invention) and underbuilding (trimming real completion) are equal failure modes, and both feel virtuous from the inside: trimming feels *disciplined*, adding feels *thorough*. Neither is the safe default. The danger in both is the **silent** call — quietly adding coupling the author didn't want, or quietly deleting a thing the author wanted. Watch yourself in both directions, not just the one that's salient.
+**The error runs BOTH directions; be vigilant for both.** Overbuilding (scope invention) and underbuilding (trimming real completion) are equal failure modes, and both feel virtuous from the inside: trimming feels *disciplined*, adding feels *thorough*. Neither is the safe default. The danger in both is the **silent** call: quietly adding coupling the author didn't want, or quietly deleting a thing the author wanted. Watch yourself in both directions, not just the one that's salient.
 
 **Overbuild (scope invention).** Adding things adjacent to the task that nobody asked for. Symptoms:
 
@@ -94,7 +95,7 @@ Never merge distinct concerns into one place for convenience — the convenience
 - Re-exports / barrels that nothing imports
 - Comments explaining what well-named code already says
 
-**Underbuild (trimming real completion).** When the work IS "build primitive X," all the features that make X actually usable are in scope. Symptoms of *wrongly* trimming:
+**Underbuild (trimming real completion).** When the work IS "build primitive X," all the features that make X usable are in scope. Symptoms of *wrongly* trimming:
 
 - Shipping a v1 that forces a v2 in a week (binary support, version-awareness, config flexibility)
 - Hardcoding what should be parameterized (CLI flag, regex)
@@ -102,30 +103,30 @@ Never merge distinct concerns into one place for convenience — the convenience
 - Skipping the API that makes the thing testable / setup-able (static cache, global setup)
 - Deferring a primitive/seam/foundation the codebase deliberately builds ahead of its first consumer
 
-**Discriminator:** "is this in service of what was asked, or adjacent to it?" Clear in-service → build. Clearly adjacent noise (dead barrel, redundant comment) → skip. **A genuine judgment call in EITHER direction → flag and ask, don't decide silently** (per §0.4): name it, say which way it leans and why, and ask build-now / defer / drop. Don't silently add on a guess of "thorough," and don't silently trim on a guess of "needed."
+**Discriminator:** "is this in service of what was asked, or adjacent to it?" Clear in-service → build. Clearly adjacent noise (dead barrel, redundant comment) → skip. **A real judgment call in EITHER direction → flag and ask, don't decide silently** (per §0.4): name it, say which way it leans and why, and ask build-now / defer / drop. Don't silently add on a guess of "thorough," and don't silently trim on a guess of "needed."
 
-**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Lean build-it-complete. Is it feature code? Lean trim. Either way, if it's a real judgment call, surface it — don't bury the add *or* the trim.
+**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Lean build-it-complete. Is it feature code? Lean trim. Either way, if it's a real judgment call, surface it; don't bury the add *or* the trim.
 
 ## 0.4. Interrogate Before Proposing (Discovery Work)
 
-For anything where the **shape is not yet known** — design, taxonomy, modeling, naming, architecture — the shape is discovered by **interrogation, not assertion**. Lead with questions; hold the confident synthesis until the shape has been interrogated.
+For anything where the **shape is not yet known** (design, taxonomy, modeling, naming, architecture), the shape is discovered by **interrogation, not assertion**. Lead with questions; hold the confident synthesis until the shape has been interrogated.
 
-- **Interrogate before you propose.** Open the design space before closing it. Ask what you'd need to know; surface the forks. Questions are the deliverable here, not a failure to deliver — a premature closed proposal forecloses the discovery.
-- **At a fork, ASK — do not assume.** When more than one defensible shape exists and the choice depends on intent you don't have, stop and ask. Do not pick the option your prior pattern-matches to and present it as the answer.
-- **Name your assumptions and mark confidence.** Distinguish *recommendation* from *low-confidence guess*. Tag the soft calls so they're easy to spot and challenge — for you as much as for the reader.
+- **Interrogate before you propose.** Open the design space before closing it. Ask what you'd need to know; surface the forks. Questions are the deliverable here, not a failure to deliver: a premature closed proposal forecloses the discovery.
+- **At a fork, ASK; do not assume.** When more than one defensible shape exists and the choice depends on intent you don't have, stop and ask. Do not pick the option your prior pattern-matches to and present it as the answer.
+- **Name your assumptions and mark confidence.** Distinguish *recommendation* from *low-confidence guess*. Tag the soft calls so they're easy to spot and challenge, for you as much as for the reader.
 - **Prefer options with tradeoffs over a single recommendation** when the shape is unsettled. Breadth first, commitment later.
 - **Small piece → validate → extend.** Propose one concrete sample, get it validated, then widen. Caps the blast radius of any wrong assumption to one batch.
 - **If you catch yourself assuming, stop.** To assume is to make an *ass* of *u* and *me*. Beware especially of applying a good heuristic (e.g. "keep taxonomies minimal") as a *conclusion* before you've confirmed it fits the actual goal.
 
-This does **not** override section 1's bias to act on clear, in-scope requests. It applies when the work is genuinely shape-finding, not execution.
+This does **not** override section 1's bias to act on clear, in-scope requests. It applies when the work is shape-finding, not execution.
 
 ## 0.5. Verification Discipline
 
 Rigor comes from evidence and gates, not goodwill. Each rule below closes a failure that *feels* productive from the inside.
 
-- **Verify before you assert.** Any claim about existing behavior — a bug, a regression, "this is unsound," "this drops rows" — must be backed by a reproduction: a probe, a failing test, or a traced execution path. "I read it and it looks like X" is a hypothesis, not a finding — do not state it as one. A claim relayed from a subagent, a review tool, or a prior assumption is **unverified until you reproduce it yourself.** Adversarial claims about *working* code carry the highest burden of proof, especially when you're contradicting the author — run the probe before you say it.
-- **No deferral as an escape hatch.** "Ticket it," "not reachable yet," "good enough for now" are honest only when the work is genuinely out of scope. They are **not** a way to dodge in-scope work that is correct to do. If it's correct and in scope, do it now; if it's a real scope fork, surface it per §0.4 — never bury the decision behind a convenient defer. "Defer" is a recommendation you justify, not a reflex you reach for when the work turns fiddly.
-- **Exhaust validation before caveating.** "Couldn't run it here" is a last resort *after* genuinely trying to make it run — crack the env, find the gate, run the thing. A caveat is what remains when the work is *actually* blocked, not when running it is inconvenient. Scoped checks passing is not "validated" (§10), and "typecheck-clean" is not "it works."
+- **Verify before you assert.** Any claim about existing behavior (a bug, a regression, "this is unsound," "this drops rows") must be backed by a reproduction: a probe, a failing test, or a traced execution path. "I read it and it looks like X" is a hypothesis, not a finding; do not state it as one. A claim relayed from a subagent, a review tool, or a prior assumption is **unverified until you reproduce it yourself.** Adversarial claims about *working* code carry the highest burden of proof, especially when you're contradicting the author: run the probe before you say it.
+- **No deferral as an escape hatch.** "Ticket it," "not reachable yet," "good enough for now" are honest only when the work is out of scope. They are **not** a way to dodge in-scope work that is correct to do. If it's correct and in scope, do it now; if it's a real scope fork, surface it per §0.4; never bury the decision behind a convenient defer. "Defer" is a recommendation you justify, not a reflex you reach for when the work turns fiddly.
+- **Exhaust validation before caveating.** "Couldn't run it here" is a last resort *after* trying in earnest to make it run: crack the env, find the gate, run the thing. A caveat is what remains when the work is blocked, not when running it is inconvenient. Scoped checks passing is not "validated" (§10), and "typecheck-clean" is not "it works."
 
 ## 1. Mandatory Task Intake (Always)
 
@@ -185,36 +186,25 @@ Before writing new code (especially non-trivial tasks):
 3. Confirm pattern choice with user when uncertain/high-impact.
 4. Then implement.
 
-Testing-specific pattern discovery:
+Every plan, ticket and PR names, for each concern it touches (auth, permissions, db access, requests, locks, jobs, events, errors), the existing primitive it uses with its path, or says why none fits.
 
-- Prefer factories in `packages/db/src/test/factories`.
-- Use `build*` (in-memory) and `create*` (persisted) patterns.
-- Avoid hand-built DB records when a factory exists.
+"Why none fits" shows the bridge: what would make the existing primitive fit (extend it, add a parameter, compose two), what was tried, and why that bridge is wrong if it is. "It doesn't match exactly" is not a reason. Adversarially review the bridge analysis before building.
+
+Every adversarial review checks the diff for parallel machinery first.
+
+Why: parallel machinery multiplies the cost of every later fix.
+
+Tests use the factories in `packages/db/src/test/factories` (`docs/claude/TESTING.md#factories`).
 
 ## 5. Monorepo Map
 
 - Apps: `/apps/web`, `/apps/admin`, `/apps/superadmin`, `/apps/api`
-- Packages: `/packages/db`, `/packages/shared`, `/packages/ui`, `/packages/permissions`, `/packages/email`
+- Packages: `/packages/db`, `/packages/shared`, `/packages/ui`, `/packages/sdk`, `/packages/permissions`, `/packages/email`
 - Docs source of truth: `/docs/claude/*`
 
 ## 6. App Events & Side Effects
 
-Business logic NEVER calls email, SMS, analytics, or notification services directly. All side effects go through app events.
-
-**Why:** Every SaaS starts with direct calls (`sendEmail()` in controllers), accumulates coupling (adding SMS means touching every controller), hits reliability issues (email provider down → API fails), and eventually migrates to an event bus. We skip that migration.
-
-**Pattern:** `emitAppEvent(name, data)` → handler → bridges (email/websocket/observe) → jobs/pub-sub/adapters → external services. Nothing synchronous hits external services in the request path.
-
-**Key rules:**
-- `emitAppEvent` mirrors `enqueueJob` — typed name, typed payload, centralized map in `appEvents/handlers/index.ts`.
-- `makeAppEvent(handler)` returns a handler function — like `makeJob`.
-- Each bridge (email, websocket, observe) is independent via `Promise.allSettled`.
-- Actor context auto-enriches from `auditActorContext` (AsyncLocalStorage) — never pass actorId manually.
-- Events inside `db.txn()` defer to `onCommit`. Events outside run immediately.
-- Adapter registries use `makeBroadcastRegistry` — `get()` for pick-one, `broadcast()` for fan-out.
-- Observe is implicit and always on: every `makeAppEvent` handler broadcasts the full envelope (`{id, name, actor, data}`) to the observe registry. No per-handler opt-in or curation — the db adapter upserts the `AppEvent` row on the envelope id (idempotent, best-effort, not a retry substrate).
-- Email targeting is declarative (`userIds`, `orgRole`, `spaceRole`, `raw`) — resolution happens in the job worker.
-- Read `docs/claude/APP_EVENTS.md` before modifying the event system.
+Business logic NEVER calls email, SMS, analytics, or notification services directly. All side effects go through `emitAppEvent`. Read `docs/claude/APP_EVENTS.md` before modifying the event system.
 
 ## 7. Core Engineering Standards
 
@@ -224,6 +214,9 @@ Business logic NEVER calls email, SMS, analytics, or notification services direc
 - Security defaults: auth checks, permission checks, tenant boundaries.
 - Secrets: encrypted at rest; never returned in API responses.
 - Type safety: avoid `any`; import canonical types from source modules.
+- **A catch that doesn't rethrow is a bug unless it acts on the failure.** Logging and carrying on is not acting: it hides the failure from the error boundary and from your caller, and the next step runs on a broken state. Acting means a state change the caller needs: turning off a row that failed validation, translating a library's plain `Error` into a `makeError`. Cleanup runs in `finally`, never in a `catch` that swallows. If you can't name the action, don't catch; let it fail. Never wrap a call in try/catch, or chain `.catch(log)`, just to log it.
+- **Validators throw.** A validator throws `makeError` (or a domain error); it never returns a problem string or `undefined` for the caller to inspect. A caller that must survive a bad record (a boot-time reconcile turning the row off) catches it at that one site.
+- **Check once, at the entry point.** Validate in the validator the controller, hook or job entry runs; the services below trust their input instead of re-checking the same fact. Duplicated checks drift apart and leave you unsure which one is in force.
 
 Top-tier feature bar (auth/permissions/CRUD/nav/forms/notifications/settings):
 
@@ -238,47 +231,17 @@ Top-tier feature bar (auth/permissions/CRUD/nav/forms/notifications/settings):
 
 ## 8. Imports and Exports
 
-- In apps: use `#/` for app-local imports.
-- In packages: use `@template/<pkg>/*` absolute imports.
-- No relative imports in source (`./`, `../`) except barrel/index files.
-- App code must not use `##/` or `~/`.
-- Package code must not use `#/`, `##/`, or `~/`.
-- Prefer package subpath imports over broad root imports.
+`#/` inside apps, `@template/<pkg>/*` everywhere else, relative only in barrels. Rules: `docs/claude/MONOREPO.md#path-aliases`.
 
-## 9. Frontend/Store/Auth Conventions
+## 9. Frontend Conventions
 
-- Zustand slice composition is standard.
-- Web/Admin: tenant-context aware slices.
-- Superadmin: user-context first, no forced tenant behavior.
-- Prefer existing permix checks and guards.
-- OAuth/provider credentials must support encrypt/decrypt (not hashing).
-- Platform role `superadmin` is explicit bypass in permission checks.
+See `docs/claude/FRONTEND.md#conventions`.
 
 ## 10. Testing and Validation
 
-Use focused checks first:
+Run focused checks first (`bun run --cwd <workspace> typecheck`, `bun run --cwd <workspace> test`), then `bun run check`, the canonical full sweep (generated outputs via `bun run check:setup`, Biome/lint, monorepo typecheck, backend/package tests, frontend tests, CI rules). Do not report work as validated on a subset unless the user narrowed validation. If cross-package types/imports changed, typecheck each affected workspace.
 
-- `bun run --cwd <workspace> typecheck`
-- `bun run --cwd <workspace> test`
-
-Canonical completion rule:
-
-- For code changes, do not declare the task complete after only scoped checks unless the user explicitly narrowed validation.
-- After focused checks pass, run `bun run check` as the repo-level final verification command.
-- `bun run check` is the canonical full sweep: Biome/lint, monorepo typecheck, backend/package tests, frontend tests, and CI rules.
-- Do not substitute a partial subset of those checks and report the work as fully validated.
-
-If cross-package types/imports changed, typecheck each affected workspace.
-
-CI rule runner:
-
-- Normal: `bash scripts/ci/run-ci-rules.sh`
-- Self-test: `bash scripts/ci/run-ci-rules.sh --test`
-
-Rule fixture layout:
-
-- `scripts/ci/rule-violations/<rule>/pass[/<case>]`
-- `scripts/ci/rule-violations/<rule>/fail[/<case>]`
+CI rule runner and fixtures: `docs/claude/SCRIPTS.md`.
 
 ## 11. Quick Doc Routing
 
@@ -286,36 +249,25 @@ Read docs based on task type:
 
 - API/routes/controllers: `docs/claude/API_ROUTES.md`
 - DB/schema/hooks: `docs/claude/DATABASE.md`, `docs/claude/HOOKS.md`
-- Permissions/auth: `docs/claude/PERMISSIONS.md`, `docs/claude/AUTH.md`
-- Frontend/state/tables: `docs/claude/FRONTEND.md`, `docs/claude/ZUSTAND.md`
-- Jobs/Redis/logging: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
+- Authentication: `docs/claude/AUTH.md`; authorization: `docs/claude/PERMISSIONS.md`
+- Frontend: `docs/claude/FRONTEND.md` (index of `docs/claude/FRONTEND/*`), `docs/claude/ZUSTAND.md`
+- Flows (short-lived guided walks through app pages, server-checked steps): `docs/claude/FLOWS.md`
+- Jobs/Redis/logging/monitoring: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
 - Concurrency (serialized queue, locks, parallel caps): `docs/claude/CONCURRENCY.md`
-- App events/email/notifications: `docs/claude/APP_EVENTS.md`
+- App events: `docs/claude/APP_EVENTS.md`; email/messaging: `docs/claude/COMMUNICATIONS.md`
 - Adapter modules (storage, errorReporter, email client, etc.): `docs/claude/ADAPTERS.md`
 - Init script work: read `docs/claude/INIT_SCRIPT_PATTERNS.md` first
 - Scripts/tooling/env: `docs/claude/SCRIPTS.md`, `docs/claude/ENVIRONMENTS.md`, `docs/claude/DEVELOPER.md`
 - Architecture/monorepo: `docs/claude/ARCHITECTURE.md`, `docs/claude/MONOREPO.md`
 
-## 11.5 Atlas — the code map
+## 11.5 Atlas: the code map
 
-This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP.md`).
-
-**To navigate by concept instead of crawling folders:**
-- Read `MAP.md` for the high-level concept map (features / primitives / infrastructure, each with its files + role breakdown).
-- Run `bunx atlas graph --json` for reverse indexes (concept → files, concept → consumers) and `bunx atlas query --kind controller --partOf feature:inquiry` (or a json-rules predicate) to find files by axis.
-- A file's top-of-file `@atlas` block tells you its role + memberships + dependencies before you open it.
-- Prefer these over `grep` for "what touches X" / "what's part of Y".
-
-**When you add or move a file, keep its `@atlas` block true:**
-- `@kind` = the file's ROLE (controller/service/query/schema/handler/client/type/component/hook/page/…), never a layer.
-- `@partOf` = the concept(s) it composes (`feature:*` / `primitive:*` / `infrastructure:*`, or the `superadmin` tag). Multiple is normal.
-- `@uses` = load-bearing dependencies only (the concepts this file's behavior is built on), or `@uses none` if truly none. Not every import.
-- `bunx atlas stamp <path>` fills the derivable `@kind`/`@partOf` from the rules; you curate `@uses` by hand. Validate names exist in `.atlas/concepts.ts`. See the atlas README for the full authoring guide.
+This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP.md`). Navigate by concept (`MAP.md`, `bunx atlas graph --json`, `bunx atlas query`) before grepping, and keep a file's `@atlas` block true when you add or move it. Guide: `docs/claude/ATLAS.md`.
 
 ## 12. Tickets and AI Workspace
 
 - Tickets: `tickets/README.md`
-- Put deep analysis/reports in `/tmp/AI_WORKSPACE/` to keep chat concise.
+- Put deep analysis/reports in the repo's `tmp/AI_WORKSPACE/` (gitignored except its README; see `docs/claude/SCRIPTS.md`) to keep chat concise.
 
 ## 13. Change Checklist
 
@@ -324,4 +276,5 @@ This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP
 3. Keep imports aligned with alias rules.
 4. Remove stale/duplicate logic/exports.
 5. Run targeted validation.
-6. Summarize exactly what changed and why.
+6. Before pushing, run the cleanup scan (`.claude/skills/cleanup-scan/SKILL.md`): duplicates and parallel machinery, in-flight branches and PRs, doctrine drift, template parity, leftovers. The `cleanupScanGate` hook refuses `git push` until the commit being pushed has been scanned.
+7. Summarize exactly what changed and why.

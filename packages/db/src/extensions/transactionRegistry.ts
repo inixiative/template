@@ -4,8 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+
 import type { OpenTransaction } from '@template/db/clientTypes';
 import { readPrismaTransaction } from '@template/db/extensions/prismaTransaction';
+import { uuidv7 } from 'uuidv7';
 
 // Prisma never hands the caller the id of the interactive transaction it just opened, but every
 // query interceptor is told which transaction its op is executing on. db.txn() therefore opens a
@@ -19,20 +21,28 @@ const itxToOpenTransaction = new Map<string, OpenTransaction>();
 export const registrationProbe = { model: 'session', field: 'id' } as const;
 
 export const openTransactionRegistration = (openTransaction: OpenTransaction): string => {
-  const registrationToken = crypto.randomUUID();
+  const registrationToken = uuidv7();
   pendingRegistrations.set(registrationToken, openTransaction);
   return registrationToken;
 };
 
-export const closeTransactionRegistration = (registrationToken: string, openTransaction: OpenTransaction): void => {
+export const closeTransactionRegistration = (
+  registrationToken: string,
+  openTransaction: OpenTransaction,
+): void => {
   pendingRegistrations.delete(registrationToken);
-  if (openTransaction.prismaTransactionId) itxToOpenTransaction.delete(openTransaction.prismaTransactionId);
+  if (openTransaction.prismaTransactionId)
+    itxToOpenTransaction.delete(openTransaction.prismaTransactionId);
   openTransaction.prismaTransactionId = null;
 };
 
 const registrationTokenFrom = (args: unknown): string | undefined => {
-  const identifier = (args as { where?: Record<string, unknown> } | undefined)?.where?.[registrationProbe.field];
-  return typeof identifier === 'string' && pendingRegistrations.has(identifier) ? identifier : undefined;
+  const identifier = (args as { where?: Record<string, unknown> } | undefined)?.where?.[
+    registrationProbe.field
+  ];
+  return typeof identifier === 'string' && pendingRegistrations.has(identifier)
+    ? identifier
+    : undefined;
 };
 
 // Runs on every findFirst, so the token lookup is the cheap first gate.
@@ -52,7 +62,11 @@ export const claimPendingRegistration = (params: { args: unknown }): void => {
 };
 
 // Null = no transaction: the mutation came in on db.raw, which opts out of the life cycle.
-export const getCurrentTransaction = (model: string, operation: string, params: unknown): OpenTransaction | null => {
+export const getCurrentTransaction = (
+  model: string,
+  operation: string,
+  params: unknown,
+): OpenTransaction | null => {
   const prismaTransaction = readPrismaTransaction(params);
   if (!prismaTransaction) return null;
 

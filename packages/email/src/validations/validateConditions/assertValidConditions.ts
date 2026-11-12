@@ -8,7 +8,10 @@ import { ConditionValidationError } from '@template/email/errors/ConditionValida
 import type { ValidateConditionsOptions } from '@template/email/validations/validateConditions/types';
 import { validateConditions } from '@template/email/validations/validateConditions/validateConditions';
 
-export const assertValidConditions = (content: string, options: ValidateConditionsOptions = {}): void => {
+export const assertValidConditions = (
+  content: string,
+  options: ValidateConditionsOptions = {},
+): void => {
   const issues = validateConditions(content, options);
   if (issues.length > 0) throw new ConditionValidationError(issues);
 };

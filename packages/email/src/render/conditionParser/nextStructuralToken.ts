@@ -17,7 +17,8 @@ export const nextStructuralToken = (
     if (content.startsWith(EACH, j)) return { kind: 'each', isClose: false, index: j };
     if (content.startsWith(END_EACH, j)) return { kind: 'each', isClose: true, index: j };
     if (content.startsWith(END, j)) return { kind: 'if', isClose: true, index: j };
-    if (content.startsWith(IF, j) && readRuleMarker(content, j, IF)) return { kind: 'if', isClose: false, index: j };
+    if (content.startsWith(IF, j) && readRuleMarker(content, j, IF))
+      return { kind: 'if', isClose: false, index: j };
     if (content.startsWith(ELSE_IF, j)) {
       const marker = readRuleMarker(content, j, ELSE_IF);
       if (marker) j = marker.next - 1;

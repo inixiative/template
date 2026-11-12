@@ -4,15 +4,20 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db, liveRuleReferences, type RuleReferenceRow } from '@template/db';
+import { db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expand, expandWith } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { lookupComponent, lookupTemplate, templateLens } from '@template/email/render/lookupTemplate';
+import {
+  lookupComponent,
+  lookupTemplate,
+  templateLens,
+} from '@template/email/render/lookupTemplate';
 import { rowOwner } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 import type { RuleReference } from '@template/shared/rules';
+import { uniqBy } from 'lodash-es';
 
 export type ComposeTemplateResult = {
   id: string;
@@ -24,26 +29,35 @@ export type ComposeTemplateResult = {
   owner: OwnerScope;
   lens: unknown;
   componentResolutions: Record<string, string>;
-  liveRuleRefs: RuleReference[];
+  existingTargets: RuleReference[];
 };
 
 export type ComposeComponentResult = {
   mjml: string;
 };
 
-const liveRuleReferencesOf = async (templateId: string, componentIds: string[]): Promise<RuleReference[]> => {
+const existingTargetsOf = async (
+  templateId: string,
+  componentIds: string[],
+): Promise<RuleReference[]> => {
   const edges = (await db.ruleReference.findMany({
     where: {
       OR: [
-        { emailTemplateId: templateId },
-        ...(componentIds.length ? [{ emailComponentId: { in: componentIds } }] : []),
+        { sourceEmailTemplateId: templateId },
+        ...(componentIds.length ? [{ sourceEmailComponentId: { in: componentIds } }] : []),
       ],
     },
   })) as RuleReferenceRow[];
-  return liveRuleReferences(edges);
+  return uniqBy(
+    ruleReferenceTargets(edges).filter((target) => target.state === 'existing'),
+    'key',
+  ).map(({ model, id }) => ({ model, id }));
 };
 
-export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<ComposeTemplateResult> => {
+export const composeTemplate = async (
+  slug: string,
+  ctx: OwnerScope,
+): Promise<ComposeTemplateResult> => {
   const template = await lookupTemplate(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
@@ -56,7 +70,9 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     }
     return components;
   });
-  const liveRuleRefs = await liveRuleReferencesOf(template.id, [...new Set(Object.values(componentResolutions))]);
+  const existingTargets = await existingTargetsOf(template.id, [
+    ...new Set(Object.values(componentResolutions)),
+  ]);
 
   return {
     id: template.id,
@@ -68,11 +84,14 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     owner: rowOwner(template),
     lens: await templateLens(slug, template),
     componentResolutions,
-    liveRuleRefs,
+    existingTargets,
   };
 };
 
-export const composeComponent = async (slug: string, ctx: OwnerScope): Promise<ComposeComponentResult> => {
+export const composeComponent = async (
+  slug: string,
+  ctx: OwnerScope,
+): Promise<ComposeComponentResult> => {
   const component = await lookupComponent(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');
 

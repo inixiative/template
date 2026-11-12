@@ -9,6 +9,12 @@
             "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/bashMainCheckoutGuard.ts\"",
             "timeout": 10,
             "statusMessage": "worktrees: did this session's cwd drift back to the main checkout?"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/cleanupScanGate.ts\"",
+            "timeout": 10,
+            "statusMessage": "cleanup scan: has this commit been scanned before it is pushed?"
           }
         ]
       }
@@ -21,6 +27,30 @@
             "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/bashMainCheckoutGuard.ts\"",
             "timeout": 10,
             "statusMessage": "worktrees: recording which checkout this session started in"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -e \"$CLAUDE_PROJECT_DIR/node_modules/.bin/atlas\" ] && bun \"$CLAUDE_PROJECT_DIR/node_modules/.bin/atlas\" hook read || true",
+            "timeout": 20,
+            "statusMessage": "atlas: concept neighbourhood of this file"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -e \"$CLAUDE_PROJECT_DIR/node_modules/.bin/atlas\" ] && bun \"$CLAUDE_PROJECT_DIR/node_modules/.bin/atlas\" hook grep || true",
+            "timeout": 20,
+            "statusMessage": "atlas: concepts matching this pattern"
           }
         ]
       }

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
@@ -25,14 +25,17 @@ describe('Organizations Tokens', () => {
   let org: Organization;
   let orgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
     const { entity: o } = await createOrganization();
     org = o;
 
-    const { entity: ou } = await createOrganizationUser({ role: 'owner' }, { user, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'owner' },
+      { user, organization: org },
+    );
     orgUser = ou;
 
     const harness = createTestApp({
@@ -44,7 +47,7 @@ describe('Organizations Tokens', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -64,9 +67,28 @@ describe('Organizations Tokens', () => {
     });
   });
 
+  describe('POST /api/v1/organization/:id/tokens from outside', () => {
+    it('a user with no seat in the organization mints nothing, a token without a role included', async () => {
+      const { entity: outsider } = await createUser();
+      const { fetch: outsiderFetch } = createTestApp({
+        mockUser: outsider,
+        mockOrganizationUsers: [],
+        mount: [(app) => app.route('/api/v1/organization', organizationRouter)],
+      });
+      for (const role of ['viewer', null])
+        expect(
+          (await outsiderFetch(post(`/api/v1/organization/${org.id}/tokens`, { name: 'k', role })))
+            .status,
+        ).toBe(403);
+    });
+  });
+
   describe('GET /api/v1/organization/:id/tokens', () => {
     it('returns organization tokens without keyHash', async () => {
-      await createToken({ name: 'Listed Token', ownerModel: TokenOwnerModel.Organization }, { organization: org });
+      await createToken(
+        { name: 'Listed Token', ownerModel: TokenOwnerModel.Organization },
+        { organization: org },
+      );
 
       const response = await fetch(get(`/api/v1/organization/${org.id}/tokens`));
       const { data } = await json<ReadManyTokensResponse>(response);

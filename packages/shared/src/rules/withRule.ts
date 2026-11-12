@@ -6,11 +6,11 @@
  */
 import {
   type Condition,
-  checkRuleAgainstLens,
   type Lens,
   type LensNarrowing,
+  listBindings,
   type RuleValue,
-  requiredBindings,
+  validateRuleInLens,
 } from '@inixiative/json-rules';
 
 export type RuleLens = Lens | LensNarrowing;
@@ -21,7 +21,8 @@ export type RuleVocabulary = { vocabularyIssues: (rule: Condition) => string[] }
 /** A row a stored rule names by id. `model` is the lens's model name for that source. */
 export type RuleReference = { model: string; id: string };
 
-export const referenceKey = (reference: RuleReference): string => `${reference.model}|${reference.id}`;
+export const referenceKey = (reference: RuleReference): string =>
+  `${reference.model}|${reference.id}`;
 
 /** One way a stored rule has stopped having a correct evaluation. */
 export type RuleIssue =
@@ -35,7 +36,7 @@ export type RuleHealth = {
   /** The rows the rule names, extracted by the caller's rules module — it knows which sources are ids. */
   references: RuleReference[];
   /** Reference keys confirmed usable by the caller's own read. Absent means none were confirmed. */
-  live?: ReadonlySet<string>;
+  existingTargets?: ReadonlySet<string>;
   /** The bindings the caller evaluates with. A required name outside this map is an issue. */
   bindings?: Record<string, RuleValue>;
 };
@@ -51,19 +52,29 @@ export type RuleArms<T> = {
 export const ruleVocabularyIssues = (lens: RuleLens | RuleVocabulary, rule: Condition): string[] =>
   'vocabularyIssues' in lens
     ? lens.vocabularyIssues(rule)
-    : checkRuleAgainstLens(rule, lens).violations.map((violation) => `${violation.path}: ${violation.reason}`);
+    : validateRuleInLens(rule, lens).errors.map((error) => `${error.path}: ${error.message}`);
 
-export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealth): RuleIssue[] => {
+export const ruleIssues = ({
+  lens,
+  rule,
+  references,
+  existingTargets,
+  bindings,
+}: RuleHealth): RuleIssue[] => {
   const issues: RuleIssue[] = [];
-  for (const name of requiredBindings(rule)) {
+  for (const name of listBindings(rule, { required: true })) {
     if (bindings && Object.hasOwn(bindings, name)) continue;
-    issues.push({ kind: 'binding', name, detail: `rule requires a binding that was not supplied: ${name}` });
+    issues.push({
+      kind: 'binding',
+      name,
+      detail: `rule requires a binding that was not supplied: ${name}`,
+    });
   }
   for (const issue of ruleVocabularyIssues(lens, rule)) {
     issues.push({ kind: 'vocabulary', detail: `rule is outside the lens vocabulary — ${issue}` });
   }
   for (const reference of references) {
-    if (live?.has(referenceKey(reference))) continue;
+    if (existingTargets?.has(referenceKey(reference))) continue;
     issues.push({
       kind: 'reference',
       reference,
@@ -76,7 +87,7 @@ export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealt
 /**
  * Evaluate a stored rule through one fork: `degraded` when it cannot be evaluated correctly,
  * `sound` when it can. Two questions: is every binding the rule requires supplied, and is the
- * rule still valid — admitted by the current lens, every row it names still live.
+ * rule still valid — valid in the current lens, every row it references among the existing targets.
  */
 export const withRule = <T>(health: RuleHealth, arms: RuleArms<T>): T => {
   const issues = ruleIssues(health);

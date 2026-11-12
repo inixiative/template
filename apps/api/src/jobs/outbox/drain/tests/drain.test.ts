@@ -1,16 +1,17 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { claimLane, getJobSupersededBy, laneKey, watchLane } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { claimLane, db, getJobSupersededBy, laneKey, watchLane } from '@template/db';
 import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import {
+  createDepthEstimator,
   flushOutbox,
   hasPendingFastSpills,
   hasPendingSlowSpills,
   hasPendingSpills,
   isOverflowing,
   type OutboxRow,
-  queueDepth,
+  queueDepths,
   shouldSpill,
   spillToOutbox,
   tripIfFull,
@@ -31,6 +32,72 @@ const fanRow = (jobId: string): OutboxRow => ({
   dedupeKey: null,
   data: { type: JobType.adhoc, lane: JobLane.fast, payload: { jobId } },
   options: {},
+});
+
+describe('depth estimate', () => {
+  afterEach(async () => {
+    await queue.redis.del(FLAG_KEY, SLOW_FLAG_KEY);
+  });
+
+  const depthsOf = (total: number) => ({ total, slow: 0, slowDeferred: 0 });
+
+  it('trips the flag once the adds since the last probe reach the cap', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+    let depth = 4;
+    const estimator = createDepthEstimator(async () => depthsOf(depth), 60_000);
+    const add = () => {
+      depth++;
+      return estimator.recordAdd(false);
+    };
+
+    for (let i = 0; i < 5; i++) await add();
+    expect(await isOverflowing(JobLane.fast)).toBe(false);
+
+    await add();
+    expect(await isOverflowing(JobLane.fast)).toBe(true);
+  });
+
+  it('trips the slow flag when slow work reaches the slow share, and the budget flag at the total cap', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+    setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
+    let depths = { total: 5, slow: 5, slowDeferred: 0 };
+    const estimator = createDepthEstimator(async () => depths, 0);
+
+    await estimator.recordAdd(true);
+    expect(await isOverflowing(JobLane.slow)).toBe(true);
+    expect(await isOverflowing(JobLane.fast)).toBe(false);
+
+    depths = { total: 10, slow: 5, slowDeferred: 0 };
+    await estimator.recordAdd(false);
+    expect(await isOverflowing(JobLane.fast)).toBe(true);
+  });
+
+  it('does not probe again on a fast add because the slow lane is full', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+    setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
+    let probes = 0;
+    const estimator = createDepthEstimator(async () => {
+      probes++;
+      return { total: 6, slow: 5, slowDeferred: 0 };
+    }, 60_000);
+
+    await estimator.recordAdd(false);
+    expect(await isOverflowing(JobLane.slow)).toBe(true);
+    await estimator.recordAdd(false);
+    await estimator.recordAdd(false);
+
+    expect(probes).toBe(1);
+    expect(await isOverflowing(JobLane.fast)).toBe(false);
+  });
+
+  it('never trips on stale add counts: reaching the cap re-probes first', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+    const estimator = createDepthEstimator(async () => depthsOf(4), 60_000);
+
+    for (let i = 0; i < 20; i++) await estimator.recordAdd(false);
+
+    expect(await isOverflowing(JobLane.fast)).toBe(false);
+  });
 });
 
 // Pure routing decision — no DB/queue needed.
@@ -59,7 +126,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   const poison = new Set<string>(); // handlerNames whose queue.add throws — drives the quarantine path
   let restoreQueueSpies = (): void => {};
 
-  beforeAll(() => {
+  beforeEach(() => {
     ctx = createTestWorker();
 
     const add = spyOn(queue, 'add').mockImplementation((async (
@@ -76,11 +143,20 @@ describe('jobs overflow buffer (spill + drain)', () => {
       const prioritized = [...queued.values()].filter((job) => job.priority).length;
       return { waiting: queued.size - prioritized, prioritized, active: 0 };
     }) as never);
-    const getJob = spyOn(queue, 'getJob').mockImplementation((async (id: string) => queued.get(id)) as never);
-    const getJobs = spyOn(queue, 'getJobs').mockImplementation((async () => [...queued.values()]) as never);
+    const perPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation((async () => ({
+      [SLOW_LANE_PRIORITY]: [...queued.values()].filter(
+        (job) => job.priority === SLOW_LANE_PRIORITY,
+      ).length,
+    })) as never);
+    const getJob = spyOn(queue, 'getJob').mockImplementation((async (id: string) =>
+      queued.get(id)) as never);
+    const getJobs = spyOn(queue, 'getJobs').mockImplementation((async () => [
+      ...queued.values(),
+    ]) as never);
     restoreQueueSpies = () => {
       add.mockRestore();
       counts.mockRestore();
+      perPriority.mockRestore();
       getJob.mockRestore();
       getJobs.mockRestore();
     };
@@ -92,26 +168,26 @@ describe('jobs overflow buffer (spill + drain)', () => {
   afterEach(async () => {
     queued.clear();
     poison.clear();
-    await ctx.db.jobOutbox.deleteMany({});
+    await cleanupTouchedTables(db);
     await ctx.queue.redis.flushdb(); // clears the flag
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     restoreQueueSpies();
-    await cleanupTouchedTables(ctx.db);
+    await cleanupTouchedTables(db);
     await ctx.queue.redis.flushdb();
   });
 
   it('persists spilled fan-out rows (resolve-on-commit)', async () => {
     await spillToOutbox(fanRow('a'));
     await spillToOutbox(fanRow('b'));
-    expect(await ctx.db.jobOutbox.count()).toBe(2);
+    expect(await db.jobOutbox.count()).toBe(2);
   });
 
   it('dedupes the same jobId across flushes (@unique jobId + skipDuplicates)', async () => {
     await spillToOutbox(fanRow('dup'));
     await spillToOutbox(fanRow('dup'));
-    expect(await ctx.db.jobOutbox.count()).toBe(1);
+    expect(await db.jobOutbox.count()).toBe(1);
   });
 
   it('superseding spills across flushes collapse to the latest (upsert)', async () => {
@@ -126,13 +202,13 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await spillToOutbox(supRow(1)); // size=1 → its own flush
     await spillToOutbox(supRow(2)); // flush deletes lane-1's prior row, inserts this one
 
-    const rows = await ctx.db.jobOutbox.findMany({ where: { dedupeKey: 'lane-1' } });
+    const rows = await db.jobOutbox.findMany({ where: { dedupeKey: 'lane-1' } });
     expect(rows).toHaveLength(1);
     expect((rows[0].data as { payload: { n: number } }).payload.n).toBe(2);
   });
 
   it('superseding spills within one batch collapse to the latest', async () => {
-    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '3'); // hold all three; flush on the 3rd (size trip)
+    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '3'); // the 1st writes at once; the 2nd and 3rd wait and share a batch
     const supRow = (n: number): OutboxRow => ({
       handlerName: 'cleanStaleData',
       jobId: `b-${n}`,
@@ -141,9 +217,13 @@ describe('jobs overflow buffer (spill + drain)', () => {
       options: {},
     });
 
-    await Promise.all([spillToOutbox(supRow(1)), spillToOutbox(supRow(2)), spillToOutbox(supRow(3))]);
+    await Promise.all([
+      spillToOutbox(supRow(1)),
+      spillToOutbox(supRow(2)),
+      spillToOutbox(supRow(3)),
+    ]);
 
-    const rows = await ctx.db.jobOutbox.findMany({ where: { dedupeKey: 'lane-batch' } });
+    const rows = await db.jobOutbox.findMany({ where: { dedupeKey: 'lane-batch' } });
     expect(rows).toHaveLength(1);
     expect((rows[0].data as { payload: { n: number } }).payload.n).toBe(3);
   });
@@ -153,7 +233,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
 
-    await queueDepth(true); // prime the cache to the current depth
+    await queueDepths(true); // prime the cache to the current depth
     await tripIfFull();
 
     expect(await isOverflowing()).toBe(true);
@@ -163,12 +243,12 @@ describe('jobs overflow buffer (spill + drain)', () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '3');
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     for (const id of ['r1', 'r2', 'r3', 'r4', 'r5']) await spillToOutbox(fanRow(id));
-    expect(await ctx.db.jobOutbox.count()).toBe(5);
+    expect(await db.jobOutbox.count()).toBe(5);
 
     await runDrainOutboxPass();
 
     // room = cap(3) − depth(0) → 3 admitted, 2 remain buffered
-    expect(await ctx.db.jobOutbox.count()).toBe(2);
+    expect(await db.jobOutbox.count()).toBe(2);
     expect((await ctx.queue.getJobCounts('waiting')).waiting).toBe(3);
   });
 
@@ -179,7 +259,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
     await runDrainOutboxPass();
 
-    expect(await ctx.db.jobOutbox.count()).toBe(0);
+    expect(await db.jobOutbox.count()).toBe(0);
     expect(await isOverflowing()).toBe(false);
   });
 
@@ -205,7 +285,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await runDrainOutboxPass();
 
     // the displaced row is deleted without re-adding — re-claiming would tombstone 'newer' right back
-    expect(await ctx.db.jobOutbox.count()).toBe(0);
+    expect(await db.jobOutbox.count()).toBe(0);
     expect(await ctx.queue.getJob('older')).toBeUndefined();
     expect(await ctx.queue.redis.get(lane)).toBe('newer');
     expect(await getJobSupersededBy('newer')).toBeNull();
@@ -226,7 +306,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
     await runDrainOutboxPass();
 
-    const rows = await ctx.db.jobOutbox.findMany();
+    const rows = await db.jobOutbox.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].attempts).toBe(1);
     expect(await ctx.queue.redis.get(lane)).toBe('p-lane');
@@ -270,7 +350,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await runDrainOutboxPass();
 
     // good row admitted + deleted; the poison row stays buffered with attempts bumped, not stranded
-    const rows = await ctx.db.jobOutbox.findMany();
+    const rows = await db.jobOutbox.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].jobId).toBe('p1');
     expect(rows[0].attempts).toBe(1);
@@ -290,7 +370,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await runDrainOutboxPass();
 
     // fresh row admitted despite the older quarantined row; quarantined row untouched (not bumped, not reset)
-    const rows = await ctx.db.jobOutbox.findMany();
+    const rows = await db.jobOutbox.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].jobId).toBe('quarantined');
     expect(rows[0].attempts).toBe(5);
@@ -307,20 +387,28 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await runDrainOutboxPass();
 
     // queue healthy + nothing admittable → the quarantined row gets another chance and the flag clears
-    const row = await ctx.db.jobOutbox.findFirst();
+    const row = await db.jobOutbox.findFirst();
     expect(row?.attempts).toBe(0);
     expect(await isOverflowing()).toBe(false);
   });
 
+  it('trips the overflow flag from the depth it reads, with nothing buffered', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '2');
+    for (const id of ['d1', 'd2', 'd3']) queued.set(id, { id, name: 'sendWebhook', data: {} });
+
+    await runDrainOutboxPass();
+
+    expect(await isOverflowing()).toBe(true);
+  });
+
   it('flushOutbox persists rows still buffered at shutdown', async () => {
-    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100'); // no size trip — rows linger in the accumulator
-    setEnvOverride('JOBS_OUTBOX_FLUSH_LINGER_MS', '60000'); // no linger flush inside the test window
+    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100'); // no size trip — sd2 waits behind sd1's write
     const spills = [spillToOutbox(fanRow('sd1')), spillToOutbox(fanRow('sd2'))];
 
     await flushOutbox();
     await Promise.all(spills);
 
-    expect(await ctx.db.jobOutbox.count()).toBe(2);
+    expect(await db.jobOutbox.count()).toBe(2);
   });
 
   it('rejects the spill promise when the commit fails (resolves on commit, not accumulation)', async () => {
@@ -337,6 +425,50 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await expect(spillToOutbox(collide)).rejects.toThrow();
   });
 
+  describe('group commit', () => {
+    // Resolves true if the promise settles within ms, so a regression fails instead of hanging.
+    const settlesWithin = (promise: Promise<unknown>, ms: number) =>
+      Promise.race([
+        promise.then(() => true),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), ms)),
+      ]);
+
+    it('spills arriving while a write is running wait and go out together as soon as it finishes', async () => {
+      setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '1000');
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const writeInProgress = flushQueue.run(() => gate);
+
+      const first = spillToOutbox(fanRow('gc1'), { flushImmediately: true });
+      const rest = [spillToOutbox(fanRow('gc2')), spillToOutbox(fanRow('gc3'))];
+      try {
+        release();
+        await writeInProgress;
+        expect(await settlesWithin(Promise.all([first, ...rest]), 5_000)).toBe(true);
+
+        const rows = await db.jobOutbox.findMany({
+          orderBy: [{ createdAt: 'asc' }, { jobId: 'asc' }],
+        });
+        expect(rows.map((r) => r.jobId)).toEqual(['gc1', 'gc2', 'gc3']);
+        expect(rows[1]?.createdAt.getTime()).toBe(rows[2]?.createdAt.getTime()); // one batch, one txn
+      } finally {
+        await flushOutbox();
+      }
+    });
+
+    it('a producer that awaits each spill pays one write per spill, with no linger', async () => {
+      setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '1000');
+      const started = performance.now();
+
+      for (let i = 0; i < 10; i += 1) await spillToOutbox(fanRow(`seq${i}`));
+
+      expect(performance.now() - started).toBeLessThan(1_000);
+      expect(await db.jobOutbox.count()).toBe(10);
+    });
+  });
+
   describe('lanes', () => {
     const slowRow = (jobId: string): OutboxRow => ({
       handlerName: 'sendWebhook',
@@ -349,7 +481,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     it('persists the lane column from the envelope', async () => {
       await spillToOutbox(fanRow('lane-fast'));
       await spillToOutbox(slowRow('lane-slow'));
-      const rows = await ctx.db.jobOutbox.findMany({ orderBy: { id: 'asc' } });
+      const rows = await db.jobOutbox.findMany({ orderBy: { id: 'asc' } });
       expect(rows.map((row) => [row.jobId, row.lane])).toEqual([
         ['lane-fast', JobLane.fast],
         ['lane-slow', JobLane.slow],
@@ -376,7 +508,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       await runDrainOutboxPass();
 
       expect([...queued.keys()]).toEqual(['s1', 's2', 's3']);
-      expect(await ctx.db.jobOutbox.count()).toBe(2);
+      expect(await db.jobOutbox.count()).toBe(2);
     });
 
     it('gives slow rows only the budget left after fast rows', async () => {
@@ -401,13 +533,17 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
       expect(await isOverflowing(JobLane.fast)).toBe(false);
       expect(await isOverflowing(JobLane.slow)).toBe(true);
-      expect(await ctx.db.jobOutbox.count()).toBe(1);
+      expect(await db.jobOutbox.count()).toBe(1);
     });
 
     it('resets quarantined rows only once no slow row is admittable either', async () => {
       setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
       setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.1');
-      await ctx.queue.add('sendWebhook', {}, { jobId: 'slow-in-queue', priority: SLOW_LANE_PRIORITY });
+      await ctx.queue.add(
+        'sendWebhook',
+        {},
+        { jobId: 'slow-in-queue', priority: SLOW_LANE_PRIORITY },
+      );
       await createJobOutbox({
         jobId: 'q',
         lane: JobLane.fast,
@@ -417,16 +553,15 @@ describe('jobs overflow buffer (spill + drain)', () => {
       await spillToOutbox(slowRow('blocked'));
 
       await runDrainOutboxPass();
-      expect((await ctx.db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(5);
+      expect((await db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(5);
 
-      await ctx.db.jobOutbox.deleteMany({ where: { jobId: 'blocked' } });
+      await db.jobOutbox.deleteMany({ where: { jobId: 'blocked' } });
       await runDrainOutboxPass();
-      expect((await ctx.db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(0);
+      expect((await db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(0);
     });
 
     it('tracks pending spills per lane', async () => {
       setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100');
-      setEnvOverride('JOBS_OUTBOX_FLUSH_LINGER_MS', '60000');
       const slow = spillToOutbox(slowRow('pending-slow'));
       expect(hasPendingSlowSpills()).toBe(true);
       expect(hasPendingFastSpills()).toBe(false);
@@ -440,11 +575,15 @@ describe('jobs overflow buffer (spill + drain)', () => {
     });
 
     it('re-adds a stored invalid job id under a fresh one instead of quarantining it', async () => {
-      await createJobOutbox({ jobId: 'a:b:c:d', lane: JobLane.fast, data: { type: JobType.adhoc, payload: {} } });
+      await createJobOutbox({
+        jobId: 'a:b:c:d',
+        lane: JobLane.fast,
+        data: { type: JobType.adhoc, payload: {} },
+      });
 
       await runDrainOutboxPass();
 
-      expect(await ctx.db.jobOutbox.count()).toBe(0);
+      expect(await db.jobOutbox.count()).toBe(0);
       expect([...queued.keys()]).toHaveLength(1);
       expect([...queued.keys()][0]).not.toContain(':');
     });
@@ -452,15 +591,26 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   it('rejects spills accepted mid-drain when the shutdown flush gives up (no hung awaits)', async () => {
     setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100');
-    setEnvOverride('JOBS_OUTBOX_FLUSH_LINGER_MS', '60000');
+    // Hold a write in flight so `buffered` waits in the accumulator instead of being written on accept.
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const gate = flushQueue.run(() => held);
+    const inFlight = spillToOutbox(fanRow('in-flight'), { flushImmediately: true });
+    const buffered = spillToOutbox(fanRow('buffered')).catch((e) => e);
+
     let straggler: Promise<unknown> | null = null;
     const run = spyOn(flushQueue, 'run').mockImplementation((async () => {
       straggler ??= spillToOutbox(fanRow('mid-drain')).catch((e) => e); // lands while flushOutbox is draining
       throw new Error('db down');
     }) as never);
 
-    const buffered = spillToOutbox(fanRow('buffered')).catch((e) => e);
-    await expect(flushOutbox()).rejects.toThrow('db down');
+    const drained = flushOutbox();
+    release();
+    await gate;
+    await inFlight;
+    await expect(drained).rejects.toThrow('db down');
     run.mockRestore();
 
     expect(String(await buffered)).toContain('db down');

@@ -11,7 +11,11 @@ const branchSchema = z
   .refine(
     (value) =>
       !value.includes('..') &&
-      value.split('/').every((part) => part && !part.startsWith('.') && !part.endsWith('.') && !part.endsWith('.lock')),
+      value
+        .split('/')
+        .every(
+          (part) => part && !part.startsWith('.') && !part.endsWith('.') && !part.endsWith('.lock'),
+        ),
   );
 const deployMode = z.enum(['auto', 'manual']);
 
@@ -49,14 +53,18 @@ export const saveCicdConfig = async (value: CicdConfig, root = process.cwd()): P
   const path = join(root, 'cicd.config.ts');
   const temporary = `${path}.${randomUUID()}.tmp`;
   const source = `import type { CicdConfig } from './scripts/cicd/config';\n\nexport const cicdConfig = ${JSON.stringify(config, null, 2)} satisfies CicdConfig;\n`;
-  const formatter = Bun.spawn(['bun', 'x', '--no-install', 'biome', 'format', '--stdin-file-path=cicd.config.ts'], {
-    cwd: resolve(import.meta.dir, '../..'),
-    stdin: new Blob([source]),
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
+  const formatter = Bun.spawn(
+    ['bun', 'x', '--no-install', 'biome', 'format', '--stdin-file-path=cicd.config.ts'],
+    {
+      cwd: resolve(import.meta.dir, '../..'),
+      stdin: new Blob([source]),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  );
   const formatted = await new Response(formatter.stdout).text();
-  if ((await formatter.exited) !== 0) throw new Error('Unable to format delivery settings; existing file preserved');
+  if ((await formatter.exited) !== 0)
+    throw new Error('Unable to format delivery settings; existing file preserved');
   try {
     await writeFile(temporary, formatted, { flag: 'wx' });
     await rename(temporary, path);

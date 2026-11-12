@@ -25,9 +25,17 @@ export const hydrateCascade = (mjml: string, ctx: OwnerScope): Promise<string> =
   return hydrate(mjml, resolve);
 };
 
-const hydrateNodes = async (nodes: Node[], resolve: ResolveHydrateBodies, path: string[]): Promise<Node[]> => {
+const hydrateNodes = async (
+  nodes: Node[],
+  resolve: ResolveHydrateBodies,
+  path: string[],
+): Promise<Node[]> => {
   const slugs = [
-    ...new Set(nodes.filter((node): node is ComponentNode => node.type === 'component').map((node) => node.slug)),
+    ...new Set(
+      nodes
+        .filter((node): node is ComponentNode => node.type === 'component')
+        .map((node) => node.slug),
+    ),
   ];
   const bodies = slugs.length ? await resolve(slugs) : {};
 
@@ -52,18 +60,25 @@ const hydrateComponentRef = async (
   resolve: ResolveHydrateBodies,
   path: string[],
 ): Promise<ComponentNode> => {
-  const overrideNodes = node.children.filter((child): child is SlotNode => child.type === 'slot' && !child.isDefault);
+  const overrideNodes = node.children.filter(
+    (child): child is SlotNode => child.type === 'slot' && !child.isDefault,
+  );
   const overrides = await hydrateNodes(overrideNodes, resolve, path);
 
   if (body === undefined) return { ...node, children: overrides };
 
-  if (path.includes(node.slug)) throw new EmailRenderError(node.slug, 'circular_ref', [...path, node.slug]);
+  if (path.includes(node.slug))
+    throw new EmailRenderError(node.slug, 'circular_ref', [...path, node.slug]);
 
-  const hydratedBody = markOwnBodySlotsDefault(await hydrateNodes(parseBlocks(body), resolve, [...path, node.slug]));
+  const hydratedBody = markOwnBodySlotsDefault(
+    await hydrateNodes(parseBlocks(body), resolve, [...path, node.slug]),
+  );
   return { ...node, children: [...hydratedBody, ...overrides] };
 };
 
 const markOwnBodySlotsDefault = (nodes: Node[]): Node[] =>
   nodes.map((node) =>
-    node.type === 'slot' ? { ...node, isDefault: true, children: markOwnBodySlotsDefault(node.children) } : node,
+    node.type === 'slot'
+      ? { ...node, isDefault: true, children: markOwnBodySlotsDefault(node.children) }
+      : node,
   );

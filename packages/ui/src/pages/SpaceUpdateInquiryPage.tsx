@@ -4,12 +4,23 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { HydratedRecord } from '@template/db';
-import { spaceCreateInquiry, spaceSentManyInquiries, spaceSentManyInquiriesQueryKey } from '@template/sdk';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Page } from '@template/ui/components';
+import {
+  spaceCreateInquiry,
+  spaceSentManyInquiries,
+  spaceSentManyInquiriesQueryKey,
+} from '@template/sdk';
+import type { UpdateSpaceContent } from '@template/shared/inquiry';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Page,
+} from '@template/ui/components';
 import { InquirySourceControls } from '@template/ui/components/inquiries';
-import { useCreateInquiryMutation, useQuery } from '@template/ui/hooks';
-import { checkPermission } from '@template/ui/hooks/usePermission';
+import { useCreateInquiryMutation, useInquiryPermission, useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { INQUIRY_STATUS_COLORS, isTerminalInquiry } from '@template/ui/lib/inquiries/queryKeys';
 import { useAppStore } from '@template/ui/store';
@@ -18,7 +29,6 @@ import { useState } from 'react';
 
 export const SpaceUpdateInquiryPage = () => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
-  const permissions = useAppStore((state) => state.permissions);
   const spaceId = context.space!.id;
   const organizationId = context.organization?.id ?? '';
 
@@ -37,22 +47,14 @@ export const SpaceUpdateInquiryPage = () => {
 
   const createMutation = useCreateInquiryMutation();
 
-  const canRequestUpdate = checkPermission(
-    permissions,
-    'inquiry',
-    {
-      id: '',
-      type: 'updateSpace',
-      sourceSpaceId: spaceId,
-      sourceOrganizationId: organizationId,
-      targetOrganizationId: '',
-      sourceSpace: { id: spaceId } as HydratedRecord,
-    } as unknown as HydratedRecord,
+  const canRequestUpdate = useInquiryPermission(
+    { type: 'updateSpace', sourceModel: 'Space', targetModel: 'admin' },
     'send',
+    'source',
   );
 
   const handleSubmit = () => {
-    const content: { name?: string; slug?: string } = {};
+    const content: UpdateSpaceContent = {};
     if (name.trim()) content.name = name.trim();
     if (slug.trim()) content.slug = slug.trim();
 
@@ -83,7 +85,7 @@ export const SpaceUpdateInquiryPage = () => {
     setSlug('');
   };
 
-  const activeContent = activeInquiry?.content as { name?: string; slug?: string } | null | undefined;
+  const activeContent = activeInquiry?.content as UpdateSpaceContent | null | undefined;
 
   return (
     <Page

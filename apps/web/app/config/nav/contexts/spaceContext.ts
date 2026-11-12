@@ -10,4 +10,10 @@ import { segmentsItem } from '#/config/nav/features/segments';
 import { settingsItem } from '#/config/nav/features/settings';
 import { usersItem } from '#/config/nav/features/users';
 
-export const spaceContext: NavItem[] = [dashboardItem, usersItem, segmentsItem, communicationsItem, settingsItem];
+export const spaceContext: NavItem[] = [
+  dashboardItem,
+  usersItem,
+  segmentsItem,
+  communicationsItem,
+  settingsItem,
+];

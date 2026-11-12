@@ -68,7 +68,6 @@
   - [ ] Dynamic UI that renders available auth methods
   - [ ] Move auth methods into Zustand (remove createAuthClient prop pattern)
   - [ ] Standardized sign-in/sign-up experience across all methods
-  - [ ] Session handling consistent regardless of auth type
 - [ ] Feature flags system
   - [ ] Backend: Feature flag model with polymorphic ownership
     - Uses `ownerModel` pattern: 'Platform' | 'Organization' | 'Space'
@@ -135,7 +134,7 @@
 
 ### Database
 
-- [ ] Wire constraint helpers into db lifecycle (local setup + CI/CD) if using them
+- [ ] DB-level constraint helpers (CHECK constraints, partial unique indexes, GIST indexes, exactly-one-FK polymorphic guards) in `packages/db/src/constraints/`, wired into the db lifecycle (local setup + CI/CD). App-level validation is the rules hook today ([HOOKS.md](docs/claude/HOOKS.md#rules-registry))
 
 ### Developer Experience
 
@@ -172,10 +171,7 @@
 ## Notes
 
 ### Auth Documentation
-- Both BetterAuth strategies use JWT tokens
-- "Session" auth = JWT in httpOnly cookies
-- "Token" auth = JWT in Authorization header
-- Update docs to clarify this
+- Done: a person presents a self-issued JWT and a program an API token, both bearer-only (docs/claude/AUTH.md). A BetterAuth session exists only for the sign-in handshake; cookies and sessions never authenticate an API request
 
 ### Optimistic Updates
 - ✅ Already implemented in `@template/shared`

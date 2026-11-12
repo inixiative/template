@@ -8,6 +8,7 @@ import { AccessorNames } from '@template/db';
 export const Modules = {
   ...AccessorNames,
   me: 'me',
+  identify: 'identify',
   job: 'job',
   cache: 'cache',
   provider: 'provider',

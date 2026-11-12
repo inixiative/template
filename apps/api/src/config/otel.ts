@@ -6,7 +6,10 @@ let telemetry:
   | Awaited<ReturnType<typeof import('@template/shared/telemetry/initialize').initializeTelemetry>>
   | undefined;
 export const initializeOpenTelemetry = async (role: 'api' | 'worker' = 'api') => {
-  setLogService({ 'service.name': `${process.env.OTEL_SERVICE_NAME || 'template'}-${role}`, 'service.role': role });
+  setLogService({
+    'service.name': `${process.env.OTEL_SERVICE_NAME || 'template'}-${role}`,
+    'service.role': role,
+  });
   const config = readTelemetryConfig(role);
   if (!config) return;
   const { initializeTelemetry } = await import('@template/shared/telemetry/initialize');

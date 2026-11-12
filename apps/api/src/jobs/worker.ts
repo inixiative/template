@@ -5,6 +5,7 @@
  * @uses infrastructure:redis, infrastructure:prisma
  */
 import '#/config/env';
+import '#/lib/rollingCaches';
 import { createRedisConnection, db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { metrics } from '@template/shared/telemetry';
@@ -18,7 +19,10 @@ import { flushOutbox } from '#/jobs/outbox';
 import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
+import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
+import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { warmRollingCaches } from '#/jobs/warmRollingCaches';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -34,26 +38,41 @@ export const initializeWorker = async (): Promise<void> => {
   }
 
   // BullMQ Worker needs its own connection (separate from Queue)
-  workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl());
+  workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl(), {
+    isBlocking: true,
+  });
 
-  jobsWorker = new Worker('jobs', (job: Job) => processJob(job), {
+  const slowSlots = createSlowSlotPool(process.env.JOBS_WORKER_CONCURRENCY);
+  jobsWorker = new Worker('jobs', (job: Job) => processJob(job, { slowSlots }), {
     connection: workerRedis,
     concurrency: process.env.JOBS_WORKER_CONCURRENCY,
     lockDuration: 5 * 60 * 1000,
   });
 
-  metrics
-    .getMeter('template.worker')
-    .createObservableGauge('messaging.queue.messages')
-    .addCallback(async (result) => {
-      const counts = await queue.getJobCounts('wait', 'active', 'delayed', 'failed');
-      for (const [state, count] of Object.entries(counts))
-        result.observe(count, { 'messaging.destination.name': 'jobs', state });
-    });
+  const meter = metrics.getMeter('template.worker');
+  meter.createObservableGauge('messaging.queue.messages').addCallback(async (result) => {
+    const counts = await queue.getJobCounts('wait', 'prioritized', 'active', 'delayed', 'failed');
+    for (const [state, count] of Object.entries(counts))
+      result.observe(count, { 'messaging.destination.name': 'jobs', state });
+  });
+  const slowQueued = meter.createObservableGauge('jobs.slow.queued');
+  const slowDeferred = meter.createObservableGauge('jobs.slow.deferred');
+  const slowIdle = meter.createObservableGauge('jobs.slow.idle_ms', { unit: 'ms' });
+  meter.addBatchObservableCallback(
+    async (result) => {
+      const slowLane = await readSlowLaneState();
+      const attributes = { 'messaging.destination.name': 'jobs' };
+      result.observe(slowQueued, slowLane.queued, attributes);
+      result.observe(slowDeferred, slowLane.deferred, attributes);
+      result.observe(slowIdle, slowLane.idleMs, attributes);
+    },
+    [slowQueued, slowDeferred, slowIdle],
+  );
 
   log.info('Job worker initialized', LogScope.worker);
 
   await registerCronJobs();
+  await warmRollingCaches();
 
   // Per-worker in-process drain, not a queued cron — see outbox/drain/loop.ts.
   startOutboxDrainLoop();

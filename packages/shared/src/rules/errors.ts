@@ -11,7 +11,9 @@ export class RuleDegradedError extends Error {
   readonly issues: RuleIssue[];
 
   constructor(subject: RuleReference, issues: RuleIssue[]) {
-    super(`${subject.model} ${subject.id} rule is degraded: ${issues.map((issue) => issue.detail).join('; ')}`);
+    super(
+      `${subject.model} ${subject.id} rule is degraded: ${issues.map((issue) => issue.detail).join('; ')}`,
+    );
     this.name = 'RuleDegradedError';
     this.subject = subject;
     this.issues = issues;

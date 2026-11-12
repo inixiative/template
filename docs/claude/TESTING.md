@@ -6,6 +6,7 @@
 
 - [Running Tests](#running-tests)
   - [Concurrency](#concurrency)
+  - [Real Redis](#real-redis)
   - [Environment Composition](#environment-composition)
 - [Test Structure](#test-structure)
   - [Basic Test](#basic-test)
@@ -20,8 +21,10 @@
   - [TypedBuildResult (Type Safety)](#typedbuildresult-type-safety)
   - [FK Auto-Inference](#fk-auto-inference)
   - [Composite Foreign Keys](#composite-foreign-keys)
+  - [Factory Data the Rules Expect](#factory-data-the-rules-expect)
   - [Cleanup](#cleanup)
   - [Test Data Patterns](#test-data-patterns)
+- [VCR (external services)](#vcr-external-services)
 - [Test App](#test-app)
 - [Request Helpers](#request-helpers)
 - [Frontend Testing (happy-dom)](#frontend-testing-happy-dom)
@@ -39,13 +42,34 @@ bun run --cwd apps/api test        # Run API tests only
 bun run --cwd packages/db test     # Run DB package tests only
 ```
 
+### Order
+
+Every suite runs in random order (`randomize = true` under `[test]` in each workspace's `bunfig.toml`): Bun shuffles the test files and the tests inside each file, and prints the seed it used (`--seed=3777827461`). A test may not rely on another test or another file having run first. To replay a failing run, pass its seed: `bun run --cwd apps/api test --seed=3777827461`.
+
+Three things keep a test independent of what ran before it:
+
+- **Rows:** seed in `beforeEach`, clean in `afterEach` ([Cleanup](#cleanup)).
+- **Database hooks:** every API test runs with the hooks production registers, restored around each test. A test registers only a hook of its own, and removes it ([Hooks in tests](#hooks-in-tests)).
+- **Everything else that outlives a test** (spies, env overrides, timers, cached keys): restore it in the test that changed it.
+
 ### Concurrency
 
-DB-backed tests must run with `--max-concurrency=1` to prevent cross-file interference. All packages that hit the database use a shared `registerTestTracker` singleton; concurrent file execution causes `cleanupTouchedTables` from one file to truncate tables used by another.
+DB-backed tests must run with `--max-concurrency=1` to prevent cross-file interference. Every test process tracks the tables it writes in one shared set (see [Cleanup](#cleanup)); concurrent file execution would let `cleanupTouchedTables` from one file clear tables another file is still using.
+
+One API test run per database: `apps/api/tests/globalSetup.ts` takes a Postgres advisory lock (`pg_try_advisory_lock`) on a dedicated connection before it truncates, and holds it until the process exits. A second run against the same slot database fails at once with `another test run is using <database>`.
 
 ```json
 "test": "bun run --cwd ../.. with test api bun test --max-concurrency=1"
 ```
+
+### Real Redis
+
+Tests use the in-memory Redis mock, so one process stands in for every instance. Behaviour that
+only exists across processes (shared counters, one subscriber per instance) runs through
+`startWsCluster` (`apps/api/tests/wsInstance/`): it starts a throwaway `redis:7-alpine` container
+and spawns each instance as its own `bun` process. Those tests need Docker and fail without it.
+The container is labelled with the test run's pid; a later run removes any whose run has died, so
+an interrupted run leaves nothing behind.
 
 ### Environment Composition
 
@@ -70,14 +94,14 @@ modules/user/
 ### Basic Test
 
 ```typescript
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestApp } from '#tests/createTestApp';
 import { createUser } from '@template/db/test';
 
 describe('userRead', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const harness = createTestApp({ ... });
     fetch = harness.fetch;
   });
@@ -95,6 +119,10 @@ describe('userRead', () => {
 ## Factories
 
 Located in `packages/db/src/test/factories/`.
+
+**Every model has a factory, and every test row is made with one.** A model gets its factory when the model is added; if you find one without, adding it is part of your change. `everyFactory.test.ts` fails while any model lacks one. A test never writes a row through the client (`db.<model>.create`); `scripts/ci/rules/no-direct-prisma-in-tests.sh` fails a changed test file that does.
+
+Why: the dependency inference depends on it. A factory infers a dependency from every foreign-key relation on its model and builds it from the target model's factory, so a model without a factory breaks every factory that points at it (see [FK Auto-Inference](#fk-auto-inference)). The factories are also the one place that knows how to make a valid row: they reuse what the context already holds and record the touched tables for cleanup, which a raw create skips.
 
 ### build vs create
 
@@ -174,6 +202,8 @@ context.organizationUser  // Now exists
 context.user              // Also created
 context.organization      // Also created
 ```
+
+An optional relation is not built by default, but its target model's factory is still required: the engine resolves it for every relation before deciding whether to build it.
 
 ### Context Keys
 
@@ -274,15 +304,62 @@ Compare to simple FK:
 foreignKey: 'webhookSubscriptionId'
 ```
 
+### Factory Data the Rules Expect
+
+Every API test runs with every production hook ([Hooks in tests](#hooks-in-tests)), so a row a test writes passes the same hooks and rules (`apps/api/src/hooks/rules/registry.ts`) as a row production writes:
+
+- **Members:** every `OrganizationUser` and `SpaceUser` holds its self-grant as an `Entitlement` row, which the `memberSelfGrant` hook writes after create. Expect it among a member's rows: `toEntitlementInput(memberSelfGrant('db:organizationUser', member))` beside `heldEntitlements`.
+- **Integrations and tokens:** a delegate that is not `full` may have no role and no entitlement rows; it is not refused and holds nothing. `createIntegration` defaults to `role: 'viewer'`; a test that wants an integration with entitlements only passes `role: null` with its entitlements. A `full` delegate keeps no role, and writing `full` tombstones its rows (`fullDelegate`).
+- **Users:** every user gets an email contact, first in its email list (`userEmailContact`).
+- **Soft-delete models:** `delete` and `deleteMany` are refused (`preventHardDelete`). Remove a row the way production does, with `deletedAt`.
+- **Foreign keys:** an update drops a change to a foreign key, `id` or `createdAt` (`immutableFields`, with its overrides in `apps/api/src/hooks/immutableFields/registry.ts`).
+- **Cron jobs:** a `CronJob` write syncs its BullMQ scheduler, which the Redis mock cannot run. A file that writes one calls `useRealJobsQueue()` from `#tests/utils/realJobsQueue` at its top level: it connects the real queue before each test and tears it down after, and returns a getter for the queue (`jobs().realQueue`, `jobs().schedulerOf(jobId)`).
+- **Audit:** an audited model's create writes its audit row.
+
+### Entitlements in Tests
+
+`createToken`, `createIntegration`, `createOrganizationUser` and `createSpaceUser` take an `entitlements` option: a list of `EntitlementInput` rows, written targeted at the new row (`storeEntitlements`, `packages/db/src/test/factories/entitlementFactory.ts`). Like any factory, it skips the grant check; the writer's own rules are tested through the routes. `createEntitlement` builds a single row. `entry(resource, [anchorResource, id, path?], actions)` (`apps/api/tests/utils/entitlementEntry.ts`) builds an input from the library's words. In `apps/api/tests/utils/entitlements.ts`: `heldEntitlements(target)` reads the rows a target holds as inputs (`asInput`), `entitlementIds(target, inputs)` finds the rows storing them, and `grantEntitlements` / `revokeEntitlements` / `changeEntitlements` call the `POST` / `DELETE` `…/:id/entitlements` routes.
+
+### Hooks in tests
+
+The hook registry is one per test process. `apps/api/tests/globalSetup.ts` fills it with `registerHooks()` (`apps/api/src/hooks/index.ts`), the same set the API, the worker and the seed script register, and restores it before and after every test. So:
+
+- **Tests do not register production hooks.** They are already on, all of them, in every API test.
+- **A test-only hook is registered in the test that needs it** (or the file's `beforeEach`), never at import time or in `beforeAll`: the registry is restored around every test, so anything registered earlier is gone by the first one.
+
+```typescript
+registerDbHook('test:failRotation', 'User', HookTiming.before, [DbAction.update], failRotation);
+try {
+  expect((await changePassword(jwt, body)).status).toBe(500);
+} finally {
+  unregisterDbHook('test:failRotation');
+}
+```
+
+- **A test that proves behaviour production's hooks forbid lifts that one hook by name**, in the test or its `describe`'s `beforeEach`, with a line saying why when the test's name does not: `unregisterDbHook('preventHardDelete')` in a test of what a hard delete leaves behind. The next test gets it back.
+- `scripts/ci/rules/test-hooks-cleared.sh` fails a test file that registers hooks and never clears them, or registers at import time.
+
+Outside the API (`packages/db`), there is no production set: a test file registers the hooks it needs in `beforeEach` and clears them with `clearHookRegistry()` in `afterEach`.
+
+Why every API test runs with every production hook: a test that registers only the hooks it thinks it needs writes rows production would refuse or rewrite, and passes for the wrong reason. [TEST-002](../../tickets/archived/TEST-002-hook-registration-in-tests.md) first settled on each file registering and clearing its own hooks; registering the production set around every test replaced that once the failures it exposed were fixed.
+
 ### Cleanup
+
+Tests are DB-backed: they write real rows through the real client with the factories, and reset with `cleanupTouchedTables`. Mocks stay minimal.
 
 ```typescript
 import { cleanupTouchedTables } from '@template/db/test';
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 ```
+
+- **The tracker is always on.** `packages/db/src/client.ts` calls `registerTestTracker()` when the client loads; in a test environment it records every table a create/update/upsert/delete touches (outside test it's a no-op). Never call `registerTestTracker()` in a test file: `scripts/lint/check-test-tracker-registration.sh` fails it.
+- **`cleanupTouchedTables(db)` empties those tables** and resets the set (`packages/db/src/test/testTracker.ts`). It bypasses the soft-delete scope, so soft-deleted rows go too.
+- **Cleanup is per test.** Seed in `beforeEach` and clean in `afterEach`, so no test sees another test's rows and the order they run in does not matter. A `beforeAll` seed would be deleted by the first test's cleanup.
+- **The API suite also cleans after every test on its own** (`apps/api/tests/globalSetup.ts`), so a test that writes rows through a shared fixture is covered even when its file has no cleanup.
+- **Never delete rows by hand** (`delete`/`deleteMany`/`TRUNCATE`/`DELETE FROM`) in an after hook: `scripts/lint/check-test-hand-cleanup.sh` fails it. A hand delete either duplicates the cleanup or hides a write the tracker missed; fix the blind spot instead. Ruling: [DB-004](../../tickets/DB-004-test-tracker-always-on.md).
 
 ### Test Data Patterns
 
@@ -335,13 +412,11 @@ const authProviderFactory = createFactory('AuthProvider', {
 });
 ```
 
-**When to Create a New Factory:**
+**Adding a Factory:**
 
-Before writing test data manually:
-1. Check if factory exists: `/packages/db/src/test/factories/`
-2. If not, create factory following existing patterns
-3. Export from `/packages/db/src/test/factories/index.ts`
-4. Use in tests with minimal overrides
+1. Add `<model>Factory.ts` in `packages/db/src/test/factories/` with `createFactory`, following the pattern below.
+2. Export it from `packages/db/src/test/factories/index.ts`.
+3. Use it in tests with minimal overrides.
 
 **Factory Creation Pattern:**
 
@@ -367,6 +442,25 @@ export const createModel = modelFactory.create;
 ```
 
 ---
+
+## VCR (external services)
+
+Tests never call a live provider. A client that talks to an external service wraps each call in `VCR` from `@template/shared/vcr`:
+
+```typescript
+readonly vcr = new VCR(FIXTURES_DIR, { service: 'resend', version: () => '…', sanitizers });
+
+send(options) {
+  return this.vcr.capture('send', () => this.__send(options));
+}
+```
+
+- Outside tests `capture` calls straight through.
+- In tests the test queues a cassette per call (`client.vcr.queue('send', 'accepted')`); `capture` replays it, or records a sanitized one when the file is missing or its `version` differs from the service's current version.
+- A recorded `status >= 400` replays as a thrown error.
+- Sanitizers redact keys before a cassette is written; commit only sanitized cassettes.
+
+Used by `packages/email` (Resend, Bouncer) and the `init/api/*` clients (all but `cloudflare` and `resend`).
 
 ## Test App
 

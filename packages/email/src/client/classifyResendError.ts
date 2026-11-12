@@ -30,7 +30,10 @@ const CLASSIFICATION_BY_CODE: Record<string, EmailProviderErrorClassification> =
   method_not_allowed: 'validation',
 };
 
-export const classifyResendError = ({ name, statusCode }: ResendErrorResponse): EmailProviderErrorClassification => {
+export const classifyResendError = ({
+  name,
+  statusCode,
+}: ResendErrorResponse): EmailProviderErrorClassification => {
   if (statusCode === null || statusCode === 408) return 'ambiguous';
   const byCode = CLASSIFICATION_BY_CODE[name];
   if (byCode) return byCode;

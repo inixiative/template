@@ -1,0 +1,3 @@
+# Formatting-only commits. Run: git config blame.ignoreRevsFile .git-blame-ignore-revs
+# style: apply the shared biome formatter (lineWidth 100)
+6206c898fddfe333c6e1d17ec709d1953c5a182e

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   Inquiry,
   Organization,
@@ -7,7 +7,11 @@ import type {
   SpaceUser,
   User,
 } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -21,8 +25,6 @@ import { spaceRouter } from '#/modules/space';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
 
-type InquiryList = { data: Inquiry[]; pagination: unknown };
-
 const mount: MountFn[] = [(app) => app.route('/api/v1/space', spaceRouter)];
 
 describe('GET /api/v1/space/:id/inquiries/sent', () => {
@@ -35,7 +37,7 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
   let adminSu: SpaceUser;
   let otherSpace: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -62,7 +64,7 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -86,7 +88,7 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
     });
 
     const response = await fetch(get(`/api/v1/space/${space.id}/inquiries/sent`));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
@@ -99,7 +101,10 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
       { role: 'member' },
       { user: viewer, organization: org },
     );
-    const { entity: viewerSu } = await createSpaceUser({ role: 'viewer' }, { ...viewerOuCtx, space });
+    const { entity: viewerSu } = await createSpaceUser(
+      { role: 'viewer' },
+      { ...viewerOuCtx, space },
+    );
 
     const viewerFetch = createTestApp({
       mockUser: viewer,
@@ -122,7 +127,7 @@ describe('POST /api/v1/space/:id/inquiries', () => {
   let adminSu: SpaceUser;
   let targetOrg: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
@@ -149,7 +154,7 @@ describe('POST /api/v1/space/:id/inquiries', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -200,7 +205,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
   let ownerSu: SpaceUser;
   let otherSpace: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     owner = u;
     const { entity: o } = await createOrganization();
@@ -227,7 +232,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -275,11 +280,13 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     });
 
     const response = await fetch(get(`/api/v1/space/${space.id}/inquiries/received`));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
     expect(data.every((i) => i.targetSpaceId === space.id)).toBe(true);
-    expect(data.every((i) => i.status !== InquiryStatus.draft && i.status !== InquiryStatus.canceled)).toBe(true);
+    expect(
+      data.every((i) => i.status !== InquiryStatus.draft && i.status !== InquiryStatus.canceled),
+    ).toBe(true);
   });
 });

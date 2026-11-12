@@ -9,4 +9,6 @@ import { type DeliverEmailPayload, deliverEmailMessage } from '#/lib/email/deliv
 
 export type { DeliverEmailPayload };
 
-export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) => deliverEmailMessage(payload));
+export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =>
+  deliverEmailMessage(payload),
+);

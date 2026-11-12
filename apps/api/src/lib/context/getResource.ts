@@ -19,5 +19,5 @@ export const getResource = <T extends AccessorName>(c: Context): ResourceType<T>
 };
 
 export const getResourceType = (c: Context): AccessorName | null => {
-  return c.get('resourceType') as AccessorName | null;
+  return c.get('resourceType');
 };

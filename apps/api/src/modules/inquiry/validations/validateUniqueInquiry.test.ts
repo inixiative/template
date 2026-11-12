@@ -1,10 +1,19 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createInquiry,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { validateUniqueInquiry } from '#/modules/inquiry/validations/validateUniqueInquiry';
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
@@ -19,7 +28,6 @@ describe('validateUniqueInquiry', () => {
       const { entity: org } = await createOrganization();
       await expect(
         validateUniqueInquiry(
-          db,
           {
             type: InquiryType.createSpace,
             sourceModel: InquiryResourceModel.Organization,
@@ -51,7 +59,6 @@ describe('validateUniqueInquiry', () => {
 
       await expect(
         validateUniqueInquiry(
-          db,
           {
             type: InquiryType.createSpace,
             sourceModel: InquiryResourceModel.Organization,
@@ -83,7 +90,6 @@ describe('validateUniqueInquiry', () => {
 
       await expect(
         validateUniqueInquiry(
-          db,
           {
             type: InquiryType.createSpace,
             sourceModel: InquiryResourceModel.Organization,
@@ -107,7 +113,6 @@ describe('validateUniqueInquiry', () => {
       const { entity: target } = await createUser();
       await expect(
         validateUniqueInquiry(
-          db,
           {
             type: InquiryType.inviteOrganizationUser,
             sourceModel: InquiryResourceModel.User,
@@ -141,7 +146,6 @@ describe('validateUniqueInquiry', () => {
 
       await expect(
         validateUniqueInquiry(
-          db,
           {
             type: InquiryType.inviteOrganizationUser,
             sourceModel: InquiryResourceModel.User,
@@ -177,7 +181,6 @@ describe('validateUniqueInquiry', () => {
 
       await expect(
         validateUniqueInquiry(
-          db,
           {
             type: InquiryType.inviteOrganizationUser,
             sourceModel: InquiryResourceModel.User,
@@ -212,7 +215,6 @@ describe('validateUniqueInquiry', () => {
       // Different type → allowed even with identical source+target
       await expect(
         validateUniqueInquiry(
-          db,
           {
             type: InquiryType.transferSpace,
             sourceModel: InquiryResourceModel.User,
@@ -247,7 +249,6 @@ describe('validateUniqueInquiry', () => {
       // Re-validating the same row (e.g. on an update path) — must skip itself.
       await expect(
         validateUniqueInquiry(
-          db,
           {
             id: existing.id,
             type: InquiryType.createSpace,
@@ -282,7 +283,6 @@ describe('validateUniqueInquiry', () => {
 
       await expect(
         validateUniqueInquiry(
-          db,
           {
             id: existing.id,
             type: InquiryType.inviteOrganizationUser,
@@ -333,7 +333,6 @@ describe('validateUniqueInquiry', () => {
 
       await expect(
         validateUniqueInquiry(
-          db,
           {
             id: secondDraft.id,
             type: InquiryType.inviteOrganizationUser,

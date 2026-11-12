@@ -11,6 +11,6 @@ import { Modules } from '#/modules/modules';
 
 export const integrationDeleteRoute = deleteRoute({
   model: Modules.integration,
-  middleware: [validatePermission('manage')],
+  middleware: [validatePermission('delete')],
   responseSchema: IntegrationScalarSchema,
 });

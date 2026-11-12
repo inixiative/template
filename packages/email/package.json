@@ -19,10 +19,11 @@
   },
   "scripts": {
     "test": "bun run --cwd ../.. with test api bun run --cwd packages/db db:push:force && bun run --cwd ../.. with test api bun test --max-concurrency=1 --cwd packages/email src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bun check"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^2.25.0",
+    "@inixiative/json-rules": "^3.6.0",
+    "@inixiative/rules-builder": "^0.32.0",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
     "html-to-text": "^10.0.1",

@@ -7,8 +7,14 @@
 import type { FlexibleRef } from '@template/db/registries/falsePolymorphism';
 
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
-  User: [{ model: 'CustomerRef', axis: 'customerModel', value: 'User' }],
-  Organization: [{ model: 'CustomerRef', axis: 'customerModel', value: 'Organization' }],
+  User: [
+    { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
+    { model: 'CustomerRef', axis: 'providerModel', value: 'User' },
+  ],
+  Organization: [
+    { model: 'CustomerRef', axis: 'customerModel', value: 'Organization' },
+    { model: 'CustomerRef', axis: 'providerModel', value: 'Organization' },
+  ],
   Space: [
     { model: 'CustomerRef', axis: 'customerModel', value: 'Space' },
     { model: 'CustomerRef', axis: 'providerModel', value: 'Space' },

@@ -4,38 +4,74 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { PrismaClient } from '@template/db/generated/client/client';
-import type { ModelName } from '@template/db/utils/modelNames';
-import type { ConcurrencyType } from '@template/shared/utils';
+import type { AcquireOptions, LockOptions, LockTarget } from '@template/db/lock/types';
+import type { CacheOverlay } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
+import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import type { ConcurrencyType, SerializedQueue } from '@template/shared/utils';
 
 export type AfterCommitFn = () => Promise<void> | void;
+
+export type FinallyFn = () => Promise<void> | void;
+
+// `upserting` fences a where-key whose rows may not exist yet: a Redis lock on it is taken before
+// the row lock and dropped when the transaction ends. `waitMs` bounds the wait for it.
+// `changesKey` is for a transaction that will delete the row or change a column other rows reference:
+// it also holds off inserts of rows that point at the locked row.
+export type FindForUpdateOptions = { upserting?: boolean; waitMs?: number; changesKey?: boolean };
 
 export type ScopeContext = 'api' | 'worker';
 
 export type DbMethods = {
   raw: Db;
-  scope: <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext) => Promise<T>;
-  txn: <T>(fn: () => Promise<T>, options?: { timeout?: number }) => Promise<T>;
-  onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]) => void;
+  delegate: (model: string) => RuntimeDelegate;
+  scope: <T>(
+    scopeId: string | undefined,
+    fn: () => Promise<T>,
+    context?: ScopeContext,
+  ) => Promise<T>;
+  txn: <T>(fn: () => Promise<T>, options?: { timeout?: number; maxWait?: number }) => Promise<T>;
+  onCommit: (
+    callbacks: AfterCommitFn | AfterCommitFn[],
+    types?: ConcurrencyType | ConcurrencyType[],
+  ) => void;
+  onFinally: (callbacks: FinallyFn | FinallyFn[]) => void;
   parallel: {
-    <T>(thunks: Array<() => Promise<T>>, options?: { concurrency?: number; resolution?: 'all' }): Promise<T[]>;
+    <T>(
+      thunks: Array<() => Promise<T>>,
+      options?: { concurrency?: number; resolution?: 'all' },
+    ): Promise<T[]>;
     <T>(
       thunks: Array<() => Promise<T>>,
       options: { concurrency?: number; resolution: 'allSettled' },
     ): Promise<PromiseSettledResult<T>[]>;
   };
   withDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
+  withoutDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
   getScopeId: () => string | null;
   getScope: () => ScopeContext | null;
   isInTxn: () => boolean;
-  findForUpdate: <T = unknown>(model: ModelName, where: Record<string, unknown>) => Promise<T[]>;
+  cacheOverlay: () => CacheOverlay | null;
+  findForUpdate: <T = unknown>(
+    model: string,
+    where: Record<string, unknown>,
+    options?: FindForUpdateOptions,
+  ) => Promise<T[]>;
+  withLockUntilSettled: <T>(
+    options: LockOptions & LockTarget,
+    fn: () => Promise<T>,
+    acquireOptions?: AcquireOptions,
+  ) => Promise<T>;
 };
 
 export type Db = PrismaClient & DbMethods;
 
 // Async-local stores a hook declared it needs, paired with the value read at db.txn() open.
 export type BridgedContext = [AsyncLocalStorage<unknown>, unknown][];
+
+export type HeldLock = { acquired: Promise<void>; holders: SerializedQueue };
 
 export type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
 
@@ -54,5 +90,13 @@ export type OpenTransaction = {
   client: Db;
   prismaTransactionId: string | null;
   afterCommitBatches: CommitBatch[];
+  // Drained once the database transaction has settled, commit or rollback, before the on-commit
+  // batches run.
+  finallyFns: FinallyFn[];
+  // Redis lock keys held until this transaction settles; a second take of a key joins its entry.
+  heldLocks: Map<string, HeldLock>;
+  // Set once the transaction has settled, before its finally queue drains.
+  settled: boolean;
   bridgedContext: BridgedContext;
+  cacheOverlay: CacheOverlay;
 };

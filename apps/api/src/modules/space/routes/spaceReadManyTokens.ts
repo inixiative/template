@@ -6,7 +6,7 @@
  */
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 import { tokenReadResponseSchema } from '#/modules/token/schemas/tokenSchemas';
@@ -18,6 +18,6 @@ export const spaceReadManyTokensRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('Token') },
   responseSchema: tokenReadResponseSchema,
-  middleware: [validatePermission('operate')],
+  middleware: [validateSubmodelPermission('read')],
   tags: [Tags.token],
 });

@@ -6,7 +6,14 @@ import { initializeOpenTelemetry, shutdownOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
 import { flushOutbox } from '#/jobs/outbox';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
-import { acceptWebSocket, drainConnections, initWebSocketPubSub, startStaleSweep, websocketHandler } from '#/ws';
+import {
+  acceptWebSocket,
+  drainConnections,
+  initWebSocketPubSub,
+  startStaleSweep,
+  startStreamReauthorizeSweep,
+  websocketHandler,
+} from '#/ws';
 
 await initializeOpenTelemetry();
 
@@ -21,6 +28,7 @@ initWebSocketPubSub();
 
 // Start the periodic stale-connection sweep
 startStaleSweep();
+startStreamReauthorizeSweep();
 
 const server = Bun.serve({
   port: process.env.PORT,

@@ -1,13 +1,18 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { faker } from '@faker-js/faker';
-import { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
+import { Role } from '@template/db/generated/client/enums';
+import {
+  type EntitlementsOverride,
+  storeEntitlements,
+} from '@template/db/test/factories/entitlementFactory';
 import { createFactory } from '@template/db/test/factory';
+import type { BuildContext, CreateInputOf } from '@template/db/test/factoryTypes';
 
 const tokenFactory = createFactory('Token', {
   defaults: () => {
@@ -17,7 +22,6 @@ const tokenFactory = createFactory('Token', {
       name: faker.lorem.words(2),
       keyHash,
       keyPrefix: rawKey.slice(0, 16),
-      ownerModel: TokenOwnerModel.User,
       role: Role.member,
       isActive: true,
     };
@@ -50,8 +54,20 @@ const tokenFactory = createFactory('Token', {
       foreignKey: { organizationId: 'organizationId', spaceId: 'spaceId', userId: 'userId' },
       required: false,
     },
+    integration: {
+      modelName: 'Integration',
+      foreignKey: { id: 'integrationId' },
+      required: false,
+    },
   },
 });
 
 export const buildToken = tokenFactory.build;
-export const createToken = tokenFactory.create;
+export const createToken = async (
+  { entitlements, ...overrides }: Partial<CreateInputOf<'Token'>> & EntitlementsOverride = {},
+  context?: BuildContext,
+) => {
+  const result = await tokenFactory.create(overrides, context);
+  await storeEntitlements({ model: 'Token', row: result.entity }, entitlements ?? []);
+  return result;
+};

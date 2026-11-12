@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import type { HydratedRecord } from '@template/db';
 import type { MeReadResponses } from '@template/sdk';
+import { useAppStore } from '@template/ui/store';
 import { createTestStore } from '@template/ui/test';
 
 type UserWithRelations = MeReadResponses[200]['data'];
@@ -25,7 +26,9 @@ describe('permissions slice', () => {
 
   describe('check', () => {
     it('should return false for unauthorized actions', () => {
-      const result = store.getState().permissions.check('organization', organizationRecord, 'delete');
+      const result = store
+        .getState()
+        .permissions.check('organization', organizationRecord, 'delete');
 
       expect(result).toBe(false);
     });
@@ -39,12 +42,37 @@ describe('permissions slice', () => {
       }).not.toThrow();
 
       // After clear, check should return false
-      const result = store.getState().permissions.check('organization', organizationRecord, 'delete');
+      const result = store
+        .getState()
+        .permissions.check('organization', organizationRecord, 'delete');
       expect(result).toBe(false);
     });
   });
 
   describe('setup', () => {
+    it('a second setup replaces the first: a removed membership grants nothing', async () => {
+      const member = (role: string) =>
+        ({
+          id: 'user-1',
+          organizationUsers: [
+            { id: 'orgUser-1', role, organizationId: 'org-1', targetEntitlements: [] },
+          ],
+          spaceUsers: [],
+        }) as unknown as UserWithRelations;
+      const { permissions } = useAppStore.getState();
+      permissions.clear();
+      await useAppStore.getState().permissions.setup(member('owner'));
+      expect(
+        useAppStore.getState().permissions.check('organization', organizationRecord, 'own'),
+      ).toBe(true);
+      await useAppStore
+        .getState()
+        .permissions.setup({ ...member('owner'), organizationUsers: [] } as UserWithRelations);
+      expect(
+        useAppStore.getState().permissions.check('organization', organizationRecord, 'read'),
+      ).toBe(false);
+    });
+
     it('should configure permissions from user data', async () => {
       const mockUser = {
         id: 'user-1',
@@ -53,7 +81,7 @@ describe('permissions slice', () => {
           {
             role: 'owner',
             organizationId: 'org-1',
-            entitlements: {},
+            targetEntitlements: [],
           },
         ],
         spaceUsers: [],
@@ -93,14 +121,14 @@ describe('permissions slice', () => {
           {
             role: 'owner',
             organizationId: 'org-1',
-            entitlements: {},
+            targetEntitlements: [],
           },
         ],
         spaceUsers: [
           {
             role: 'member',
             spaceId: 'space-1',
-            entitlements: {},
+            targetEntitlements: [],
           },
         ],
       } as unknown as UserWithRelations;

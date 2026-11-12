@@ -1,5 +1,25 @@
 # Concurrency
 
+<!-- toc:start -->
+
+## Contents
+
+- [Serialized Queue (`createSerializedQueue`)](#serialized-queue-createserializedqueue)
+  - [When to use](#when-to-use)
+  - [When NOT to use](#when-not-to-use)
+  - [Error model](#error-model)
+  - [Implementation](#implementation)
+- [Concurrency Limits (`getConcurrency`)](#concurrency-limits-getconcurrency)
+- [Bounded Batch (`resolveAll`)](#bounded-batch-resolveall)
+- [Distributed Lock (`createLock`)](#distributed-lock-createlock)
+- [Supersede Lanes (`claimLane` / `watchLane`)](#supersede-lanes-claimlane--watchlane)
+- [Job Lanes (`withLanePriority`)](#job-lanes-withlanepriority)
+- [Recurring Beat (`heartbeat`)](#recurring-beat-heartbeat)
+- [Row Locks (`db.findForUpdate`)](#row-locks-dbfindforupdate)
+- [Cross-references](#cross-references)
+
+<!-- toc:end -->
+
 Mechanisms for coordinating async operations. Different concerns, different tools.
 
 | Concern | Tool | Scope |
@@ -7,10 +27,13 @@ Mechanisms for coordinating async operations. Different concerns, different tool
 | Cap parallelism (don't open 1000 DB connections at once) | `getConcurrency` + `ConcurrencyType` | in-process |
 | Run a batch with a concurrency cap, get ordered results | `resolveAll` | in-process |
 | Serialize writes to one resource (no interleaving) | `createSerializedQueue` | in-process |
+| Lock rows you read and then write inside a transaction | `db.findForUpdate` | in-transaction (Postgres row lock) |
 | Only one process owns this resource | `createLock` | cross-process (Redis) |
 | Newest job for a key wins; older ones bow out | `claimLane` / `watchLane` | cross-process (Redis) |
 | Background work yields to foreground work in one shared queue | job lanes (`withLanePriority`) | cross-process (BullMQ priority) |
 | Run a recurring beat without overlapping itself | `heartbeat` | in-process timer |
+
+The ordering and mutual-exclusion primitives — `createSerializedQueue`, `createLock` and `claimLane` / `watchLane` — carry the atlas tag `mutex`: `bunx atlas query --partOf mutex` lists them.
 
 Combine when needed: a per-resource Redis lock + a per-resource serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes" — `createLock` to claim ownership, `createSerializedQueue` to order that owner's writes.
 
@@ -37,6 +60,8 @@ Illustrative example — an encrypted-blob auth adapter where two writers share 
 - `keys.set` and `creds.update` both rewrite the entire encrypted blob
 - Both fire during normal operation (key rotation, session updates)
 - Without the queue, an in-memory `stored` value would be read+modified by overlapping writes and silently lose data on persist
+
+WebSocket data streams use one queue per stream key (`apps/api/src/ws/streamPublishOrder.ts`) so an instance publishes a stream's appends in the order they were emitted, including when a publish falls back to local delivery. See [WEBSOCKETS.md](./WEBSOCKETS.md#ordering).
 
 ### When NOT to use
 
@@ -110,7 +135,13 @@ No cap (or cap ≥ length) → degrades to a plain `Promise.all`. `getConcurrenc
 
 ## Distributed Lock (`createLock`)
 
-`@template/db`. Single-node Redis lock with heartbeat. See [REDIS.md](./REDIS.md#distributed-locks) for the full API and footguns.
+`@template/db` (`packages/db/src/lock/createLock.ts`; options and return types in `packages/db/src/lock/types.ts`). Single-node Redis lock with heartbeat. Its footguns:
+
+- It is not Redlock: don't rely on it across Redis cluster nodes.
+- A holder suspended longer than `ttlMs` (debugger pause, OS sleep) loses the key to the next holder and wakes up believing it still holds it. Keep `ttlMs` well above any pause you expect.
+- `verify()` is point-in-time: it reads Redis on every call and answers true only while every key holds this lock's token (there is no local loss latch before `release()`). For exactly-once effects, fence at the resource as well.
+
+`heartbeat: false` makes a one-shot claim (`acquire()` returns `{ claimed, holder }`) that is never renewed and expires at its TTL. A `{ service, identifier }` target is keyed under the `lock:*` namespace ([REDIS.md](./REDIS.md#job-coordination-job-lock)); a `{ key }` target is used as given. A `{ service, identifiers: [...] }` target is one lock over several keys: one token, one heartbeat, one release ([DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends)); a claim takes a single key only.
 
 ```ts
 import { createLock } from '@template/db';
@@ -129,7 +160,11 @@ try {
 }
 ```
 
+`acquire({ waitMs, pollMs, onTimeout })` keeps trying until it wins or `waitMs` runs out, first after 1 ms and then doubling up to `pollMs` (default 50 ms), so a lock held for a few milliseconds is taken over within a millisecond or two of its release; a timed-out wait throws `onTimeout()` if given, else returns false. `heartbeatMs` must leave room for one failed refresh before `ttlMs` (`2 * heartbeatMs < ttlMs`, checked at construction); `maxSafeHeartbeatMs({ ttlMs })` is the tighter ceiling that also budgets the Redis command timeout. `isWithinLease()` is the local lease check, and `assertHeld()` throws `LockLostError` once it is false (the API answers 409). `release()` resolves to `released`, `notHeld` (the key, or any key of a set, was no longer this lock's) or `unconfirmed` (the delete errored; the key frees at its TTL).
+
 Use when multiple processes can race for the same resource (multiple golem instances both wanting to own the same bot session, multiple workers wanting to run a singleton cron, etc.).
+
+**Inside a transaction, release at the end of the transaction, not the critical section.** A lock that guards a check-then-write must stay held until that write commits, or the next holder checks against state from before it. `db.withLockUntilSettled(lockOptions, fn)` holds a `createLock` lock until the open transaction settles, joins a key the transaction already holds (including one an upserting `findForUpdate` took) instead of waiting on itself, and runs the transaction's own holders of the key one at a time (the lock + serialized-queue pair above, scoped to the transaction). A holder whose turn comes after the transaction settled throws instead of running. `withOwnerLock` switches to it whenever it runs inside a transaction, which is how a `transactionAll` batch's sub-requests keep the owner lock until the batch commits. Its scopes are one per owner-wide invariant: `rules` (an owner's rule graph) and `entitlements` (a holder's set of entitlement rows, held by `changeEntitlements` so two writers on one target can't race: each reads the rows the other committed before it checks and writes). See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
 
 ---
 
@@ -180,7 +215,21 @@ This is the primitive under both `createLock` (lease renewal) and `watchLane` (u
 
 ---
 
+## Row Locks (`db.findForUpdate`)
+
+The one way to lock rows. `db.findForUpdate(model, where, { upserting?, changesKey? })` runs `SELECT * ... FOR NO KEY UPDATE` inside `db.txn()`; `upserting: true` also fences a row that does not exist yet. Full contract: [DATABASE.md § Row Locks and Create-If-Missing](./DATABASE.md#row-locks-and-create-if-missing).
+
+**What the lock holds off.** `FOR NO KEY UPDATE` is the lock a plain `UPDATE` takes. Every other locker, updater and deleter of the row waits. An insert of a row that *references* the locked row does not wait: its foreign-key check takes `KEY SHARE`, which this lock allows. That is deliberate. Under `FOR UPDATE` such an insert waited, so a transaction that inserted children while another walked a chain of locked parents could deadlock, and unrelated creates queued behind any held parent. A transaction that counts or reads a parent's children and relies on none appearing must have every writer of those children take the same lock first; the lock alone no longer keeps them out.
+
+**`changesKey: true`** takes `FOR UPDATE`. Use it only when the transaction will delete the row or change a column other rows reference (the primary key, or a unique column a foreign key targets), as `transferSpace` does to `Space.organizationId`. Postgres would upgrade the lock at that write anyway; taking it up front keeps a child insert from slipping in between and deadlocking the upgrade.
+
+**Exclusive only; there is no shared mode.** No `FOR SHARE`, `FOR KEY SHARE` or `LOCK IN SHARE MODE`, in the primitive or around it. The `no-raw-locks` CI rule fails on raw row-lock SQL anywhere but the primitive, and on a shared lock anywhere ([SCRIPTS.md § CI Rule Scripts](./SCRIPTS.md#ci-rule-scripts)).
+
+**Why.** A shared mode looks like the fix when parallel creates queue on one parent row (let the creates share it, block only its delete). It has been tried: a `shared` option on `findForUpdate` that emitted `FOR SHARE`, plus a call-site helper to hold the parent. The shared hold deadlocked against the exclusive locks taken on other rows in the same writes, and each fix opened a new hole. Letting creates share a row while blocking deletes needs a read/write lock, which this codebase does not have, and a call-site helper only patches that gap. The queueing was a connection-pool problem: with a larger `connection_limit` and a longer `maxWait`, creates wait on the row instead of failing, which is fine at this scale. So when exclusive locks queue, size the pool. Don't add a lock mode: a shared lock beside exclusive ones creates lock orders nobody reasons about.
+
+---
+
 ## Cross-references
 
-- [REDIS.md](./REDIS.md) — `createLock` details, namespace conventions
+- [REDIS.md](./REDIS.md) — namespace conventions, including the `lock:*` keys `createLock` writes
 - [JOBS.md](./JOBS.md) — BullMQ workers, supersede pattern (the consumer of `claimLane`/`watchLane`), fast/slow lanes

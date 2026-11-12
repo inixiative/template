@@ -121,7 +121,7 @@ satisfy. Needs a preview route (compose + interpolate against the fixture → HT
 has one).
 
 **Shell** — platform-level authoring lands in `apps/superadmin`, matching the admin routes, in the
-rail / editor / inspector layout `docs/email-builder-mockup.html` shows. Regions drive the
+rail (palette) / editor / inspector layout. Regions drive the
 inspector: per-component tier badges (inherited / shadowed / forked / dangling), collapse-to-ref,
 remove-override, revert-to-default.
 

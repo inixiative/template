@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [Direction: pre-launch → launched (in progress)](#direction-pre-launch--launched-in-progress)
 - [Architecture Overview](#architecture-overview)
 - [Core Patterns](#core-patterns)
   - [1. Root-Level Config State (Context Provider)](#1-root-level-config-state-context-provider)
@@ -27,7 +28,8 @@
     - [Boolean Flags - Execution State](#boolean-flags---execution-state)
     - [Complete Example](#complete-example)
     - [Animation/Loading State Pattern](#animationloading-state-pattern)
-  - [16. Bun-Native Resume Tests with VCR Fixtures](#16-bun-native-resume-tests-with-vcr-fixtures)
+  - [17. Bun-Native Resume Tests with VCR Fixtures](#17-bun-native-resume-tests-with-vcr-fixtures)
+- [Resource Naming](#resource-naming)
 - [File Structure](#file-structure)
 - [Creating a New Task View](#creating-a-new-task-view)
   - [1. Create View Component](#1-create-view-component)
@@ -48,7 +50,26 @@ Automated infrastructure provisioning via Terminal UI (Ink). Full implementation
 - Task coverage uses Bun-native tests plus fixture-backed VCR helpers under `init/tests/`
 - Launch is part of the init flow: preflight checks gate flipping `launched = true`
 
----
+## Direction: pre-launch → launched (in progress)
+
+Init provisions a project in two phases, and Launch is the cut-over between them.
+
+**Pre-launch:** every deployed database is disposable. Releases push the schema (`prisma db push --accept-data-loss`), `setup.sh` pushes and seeds, and a provider task may be re-run or reset. The TUI (`bun run init`) and the headless `init:agent` both work here.
+
+**Launched:** nothing may clobber a database again. Releases apply committed migrations only (`prisma migrate deploy`), schema changes go through `db:migrate`, and `setup.sh` skips push and seed. Details: [DATABASE.md](DATABASE.md#schema-changes-push-before-launch-migrations-after).
+
+**Launch** (`init/tasks/launch.ts`, `LaunchView`) runs preflight checks over the required sections, creates the baseline migration (`prisma/migrations/0_init`), checks each deployed database matches the schema and records the baseline as applied there, then flips `launched = true` in `project.config.ts` (the baseline steps land with [#197](https://github.com/inixiative/template/pull/197)).
+
+| Piece | Status |
+|-------|--------|
+| Launch preflight + flag, `setup.sh` guard, `release.sh` branch on the flag | Built |
+| Baseline migration created and recorded on deployed databases at launch | [#197](https://github.com/inixiative/template/pull/197) |
+| A deploy hook that runs `scripts/db/release.sh` (Railway pre-deploy) | Not built: deployed schema is released by hand |
+| Launch from the headless `init:agent` | Not built (`init:agent` covers project, Infisical, PlanetScale, Railway, `--section=monitoring`) |
+| Post-launch Vercel preview deploys per PR | Not built (`LaunchView` lists it as a post-launch TODO) |
+| `scripts/setup/init.sh` | TODO stub, superseded by `init/`; not run by anything |
+
+Provider coverage today: options marked `implemented: true` in `init/providers.ts` (Vercel, Cloudflare Pages, PlanetScale, Railway Postgres, Railway API/worker/Redis, Resend, no email) plus the tasks every project runs (project config, Infisical, Railway Buckets, Bouncer, monitoring). Netlify, Neon, Supabase, Fly.io, Render, Upstash, Postmark and SES are listed but cannot be selected; Optional Integrations, DNS, Database Seeding, GitHub Actions and Documentation Generation are menu items with no task.
 
 ## Architecture Overview
 
@@ -340,14 +361,14 @@ await onStepComplete?.(); // View updates via config sync
 **Implementation:**
 ```typescript
 // ❌ Bad: Rely on password object from previous step
-if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
+if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
   const prodConnectionString = productionPassword.connection_strings.general; // undefined if resuming!
   await initPrismaMigrationTable(prodConnectionString);
 }
 
 // ✅ Good: Fetch from Infisical (where step 8 stored it)
-if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
-  const prodConnectionString = getSecret('DATABASE_URL', {
+if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
+  const prodConnectionString = await getSecretAsync('DATABASE_URL', {
     projectId: infisicalProjectId,
     environment: 'prod',
     path: '/api',
@@ -356,7 +377,7 @@ if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
 }
 
 // ✅ Good: Re-read from config (don't trust local variables)
-if (!(await isProgressComplete('planetscale', 'configureDB'))) {
+if (!(await isComplete('planetscale', 'configureDB'))) {
   const latestConfig = await getProjectConfig();
   const orgName = latestConfig.planetscale.organization;
   const dbName = latestConfig.planetscale.database;
@@ -365,7 +386,7 @@ if (!(await isProgressComplete('planetscale', 'configureDB'))) {
 ```
 
 **Rule of thumb:**
-- Secrets → Always fetch from Infisical with `getSecret()`
+- Secrets → Always fetch from Infisical with `getSecretAsync()`
 - Config metadata → Always re-read from config with `getProjectConfig()`
 - Never pass connection strings, passwords, or API keys between steps
 
@@ -520,6 +541,8 @@ await execAsync('infisical org list --format json', { encoding: 'utf-8' });
 
 **Rule:** If you see `execSync` anywhere in `init/api/`, it's a bug. Convert to async immediately.
 
+**Rule:** A secret never goes in a command's arguments, where a process listing and a failed command's message both show it. Hand it on stdin with `execFileWithInput` (`init/utils/exec.ts`; Infisical reads `KEY=@/dev/stdin`), pass a connection string through `env`, and call HTTP APIs with `fetch` rather than `curl`.
+
 ### 11. Railway CLI vs GraphQL API
 
 **Pattern:** Use Railway CLI commands for simple queries, GraphQL API for mutations.
@@ -543,54 +566,48 @@ await execAsync('infisical org list --format json', { encoding: 'utf-8' });
 - ✅ No unexpected view changes or blank screens
 - ❌ Common bug: setting running state at wrong time causes blank screen
 
-**Implementation:**
+**Implementation:** the storing state is a `useAsyncAction()` (`init/components/useAsyncAction.ts`): `run(label, fn)` sets `running` and `actionLabel` while `fn` runs, and returns the error message (or `null`) instead of throwing. From `init/views/RailwaySetupView.tsx`:
 ```typescript
+const tokenAction = useAsyncAction();
+
 const handleTokenSubmit = async () => {
   if (!config || !workspaceToken.trim()) return;
 
-  setStoringToken(true);  // Show "Storing..." spinner
-
-  try {
-    // Store token in Infisical
-    await setSecret(projectId, 'root', 'RAILWAY_TOKEN', workspaceToken.trim());
-
-    setStoringToken(false);  // Hide storing spinner
+  const actionError = await tokenAction.run('Storing token and continuing setup...', async () => {
+    await setSecretAsync(config.infisical.projectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
 
     // Determine next step
     const existingWorkspace = config.railway?.workspaceId;
-
     if (existingWorkspace) {
-      // Have workspace - go directly to setup
       setRunning(true);
       setViewState('status');
       await runSetup(existingWorkspace);
-    } else if (workspaces.length === 1) {
-      // Only one workspace - auto-select it
+    } else if (workspaces?.length === 1) {
       setRunning(true);
       setViewState('status');
-      await runSetup(workspaces[0].id);
+      await runSetup(workspaces[0].id!);
     } else {
-      // Multiple workspaces - need to select
       setRunning(false);  // ⚠️ CRITICAL: Must set false for selector
       setViewState('workspace-select');
     }
-  } catch (error) {
-    setStoringToken(false);
+  });
+
+  if (actionError) {
     setRunning(false);
-    throw error;
+    setViewState('status');
+    await setError('railway', actionError);
   }
 };
 ```
 
 **Key rules:**
 1. **Set loading states BEFORE changing viewState**
-   - ✅ `setStoringToken(true)` → show spinner in current view
+   - ✅ `tokenAction.run(...)` → spinner in the current view while the token is stored
    - ✅ `setRunning(true)` → show spinner in status view
    - ❌ Never switch views without setting appropriate loading state first
 
-2. **Clear loading states BEFORE next transition**
-   - ✅ `setStoringToken(false)` after storage completes
-   - ✅ Then set next state (`setRunning` or `setViewState`)
+2. **One loading state per transition**
+   - ✅ `run` clears `running` when its action settles; the next state (`setRunning` or `setViewState`) is set inside it
    - ❌ Don't leave multiple loading states active simultaneously
 
 3. **Always set running=false before showing selectors**
@@ -599,17 +616,13 @@ const handleTokenSubmit = async () => {
 
 **Visual feedback in token input:**
 ```typescript
-{storingToken ? (
-  <Box marginTop={1}>
-    <Text color="cyan">
-      <Spinner type="dots" /> Storing token and continuing setup...
-    </Text>
-  </Box>
+{tokenAction.running ? (
+  <ActionSpinner label={tokenAction.actionLabel} />
 ) : (
   <>
     <Box marginTop={1}>
       <Text>Token: </Text>
-      <TextInput value={token} onChange={setToken} onSubmit={handleSubmit} mask="*" />
+      <TextInput value={workspaceToken} onChange={setWorkspaceToken} onSubmit={handleTokenSubmit} mask="*" />
     </Box>
     <Box marginTop={1}>
       <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
@@ -617,6 +630,8 @@ const handleTokenSubmit = async () => {
   </>
 )}
 ```
+
+A flow that collects several tokens and only stores them uses `TokenInputView` (`init/components/TokenInputView.tsx`), which walks the fields, saves each to Infisical and shows the spinner itself.
 
 ### 13. Atomic Progress Flags + Idempotent API Calls
 
@@ -804,7 +819,7 @@ const runSetup = async (workspaceId: string) => {
   // Check if token exists in Infisical
   let hasToken = false;
   try {
-    const token = getSecret('RAILWAY_WORKSPACE_TOKEN', {
+    const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
       projectId: infisicalProjectId,
       environment: 'root',
     });
@@ -860,7 +875,7 @@ const handleTokenSubmit = async () => {
   if (!workspaceToken.trim()) return;
 
   // Store in Infisical
-  setSecret(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
+  await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
 
   // Continue with setup
   await runSetup(workspaceId);
@@ -948,7 +963,7 @@ const setupState = useMemo(
 **Naming conventions:**
 - **`running`**: Main setup task is executing
 - **`loading<Entity>`**: Specific entity is loading (e.g., `loadingOrgs`, `loadingWorkspaces`, `loadingRegions`)
-- **`storing<Action>`**: Async storage operation in progress (e.g., `storingToken`)
+- **`<action>Action`**: One async operation in progress, a `useAsyncAction()` (e.g., `tokenAction`, `confirmAction`): read `running`, `actionLabel`, `error`
 
 ```typescript
 const [running, setRunning] = useState(false);           // Setup is running
@@ -959,7 +974,7 @@ const [loadingRegions, setLoadingRegions] = useState(false); // Fetching regions
 **Rules:**
 - ✅ Use `running` for main setup execution
 - ✅ Use `loading<Entity>` pattern for data fetching
-- ✅ Use `storing<Action>` for specific async operations
+- ✅ Use `useAsyncAction()` for specific async operations (store a token, confirm a prompt)
 - ❌ Never duplicate execution state (e.g., don't have `running` boolean AND `'running'` ViewState)
 
 #### Complete Example
@@ -1015,9 +1030,9 @@ const handleAction = async () => {
 - ❌ Never use IIFE pattern `(async () => { ... })()` - make handler async instead
 - ❌ Never use `setTimeout` before showing loading state
 
-### 16. Bun-Native Resume Tests with VCR Fixtures
+### 17. Bun-Native Resume Tests with VCR Fixtures
 
-**Pattern:** Provider task tests use `bun:test`, `mock.module(...)`, and fixture-backed `VCR` helpers.
+**Pattern:** Provider task tests use `bun:test`, `mock.module(...)`, and the shared `VCR` (`@template/shared/vcr`, see [TESTING.md](TESTING.md#vcr-external-services)). The `init/api/*` clients (all but `cloudflare` and `resend`) own a `vcr`; tests queue cassettes with `api.vcr.queue(method, fixture)`.
 
 **Why:**
 - ✅ Fast, deterministic task coverage without live provider calls
@@ -1034,21 +1049,33 @@ init/
 │   ├── railwayResume.test.ts
 │   └── vercelBootstrapResume.test.ts
 └── tests/
-    ├── fixtures/
-    │   ├── infisical/
-    │   ├── railway/
-    │   └── vercel/
-    └── mocks/
-        └── VCR.ts
+    ├── fixtures/              # One folder per provider client (github, infisical, planetscale, railway, vercel, …)
+    └── mocks/                 # config.mock.ts, system.mock.ts
 ```
 
 **Testing guidance:**
 - Unit test pure helpers directly
 - Use task-level resume tests for provider workflows
-- Record sanitized fixture values, then replay them via `VCR.require()`
+- Record sanitized cassettes, then replay them by queueing them per call
 - Mock module boundaries, not internal implementation details
 
 ---
+
+## Resource Naming
+
+Railway resources are named **`{project}-{env}-{app}`**: project name from `project.config.ts`, then `prod` / `staging`, then the app. Always project → environment → app, so a dashboard filters by `{project}-*` and several projects share one workspace without collisions.
+
+| Resource | Names | Source |
+|----------|-------|--------|
+| Railway services | `{project}-prod-api`, `{project}-prod-worker`, `{project}-prod-redis` (and `-staging-`) | `railwaySetup.ts` |
+| Redis volumes | `{project}-prod-redis-data`, `{project}-staging-redis-data` | `railwaySetup.ts` |
+| Railway Postgres | `{project}-prod-postgres`, volume `{project}-prod-postgres-data` (and `-staging-`) | `railwayPostgresSetup.ts` |
+| Infisical → Railway syncs | `{project}-prod-api-service-sync`, `{project}-prod-worker-service-sync` (and `-staging-`) | `railwaySetup.ts` |
+| Railway buckets | `{project}-prod-system`, `{project}-prod-user` (and `-staging-`) | `railwayBucketsSetup.ts` |
+| Vercel projects | `{project}-web`, `{project}-admin` (no environment) | `vercelSetup.ts` |
+| PlanetScale branches | `{project}-production-init`, `{project}-staging-init` | `planetscaleSetup.ts` |
+
+Names are template literals over the config's project name in `init/tasks/*Setup.ts`; never hardcode one.
 
 ## File Structure
 
@@ -1079,7 +1106,7 @@ init/
 │   └── ...
 ├── tasks/tests/               # Bun-native provider resume tests
 ├── tests/fixtures/            # Sanitized provider fixtures
-├── tests/mocks/               # Shared VCR/config/system mocks
+├── tests/mocks/               # Shared config/system mocks
 └── components/                # Reusable components
     └── OrgSelector.tsx
 ```

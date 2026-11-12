@@ -1,7 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganization, createOrganizationUser, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganization,
+  createOrganizationUser,
+  createUser,
+} from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import type { organizationReadRoute } from '#/modules/organization/routes/organizationRead';
 import { createTestApp } from '#tests/createTestApp';
@@ -16,14 +21,17 @@ describe('GET /api/v1/organization/:id', () => {
   let org: Organization;
   let orgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
     const { entity: o } = await createOrganization();
     org = o;
 
-    const { entity: ou } = await createOrganizationUser({ role: 'member' }, { user, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'member' },
+      { user, organization: org },
+    );
     orgUser = ou;
 
     const harness = createTestApp({
@@ -35,7 +43,7 @@ describe('GET /api/v1/organization/:id', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -48,7 +56,7 @@ describe('GET /api/v1/organization/:id', () => {
     expect(data.name).toBe(org.name);
   });
 
-  it('is accessible without org membership (public)', async () => {
+  it('is accessible without being an org member (public)', async () => {
     const { entity: otherUser } = await createUser();
 
     const otherHarness = createTestApp({

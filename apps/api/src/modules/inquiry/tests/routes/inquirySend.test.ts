@@ -1,6 +1,15 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import type { Inquiry, Organization, OrganizationUser, User } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type {
+  Inquiry,
+  Organization,
+  OrganizationUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -22,20 +31,27 @@ describe('POST /api/v1/inquiry/:id/send', () => {
   let org: Organization;
   let adminOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: admin, organization: org },
+    );
     adminOrgUser = ou;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOrgUser],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -51,7 +67,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -71,7 +91,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -91,7 +115,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Record<string, unknown>>(response);
 
     expect(response.status).toBe(200);
@@ -99,11 +127,15 @@ describe('POST /api/v1/inquiry/:id/send', () => {
     expect(data.sourceOrganization).toBeUndefined();
   });
 
-  it('rejects sending an already sent inquiry', async () => {
+  it('is a no-op for an already sent inquiry', async () => {
     const { entity: invitee } = await createUser();
+    const sentAt = new Date(Date.now() - 86_400_000);
+    const expiresAt = new Date(Date.now() + 86_400_000);
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
       status: InquiryStatus.sent,
+      sentAt,
+      expiresAt,
       sourceModel: InquiryResourceModel.Organization,
       sourceOrganizationId: org.id,
       targetModel: InquiryResourceModel.User,
@@ -111,7 +143,65 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe(InquiryStatus.sent);
+    expect(new Date(data.sentAt!).getTime()).toBe(sentAt.getTime());
+    expect(new Date(data.expiresAt!).getTime()).toBe(expiresAt.getTime());
+  });
+
+  it('re-sends a changesRequested inquiry, keeping sentAt and refreshing expiresAt', async () => {
+    const { entity: invitee } = await createUser();
+    const sentAt = new Date(Date.now() - 86_400_000);
+    const expiresAt = new Date(Date.now() + 60_000);
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.changesRequested,
+      sentAt,
+      expiresAt,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe(InquiryStatus.sent);
+    expect(new Date(data.sentAt!).getTime()).toBe(sentAt.getTime());
+    expect(new Date(data.expiresAt!).getTime()).toBeGreaterThan(expiresAt.getTime());
+  });
+
+  it('rejects sending a resolved inquiry', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.denied,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     expect(response.status).toBe(400);
   });
 });
@@ -124,15 +214,22 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
   let adminOrgUser: OrganizationUser;
   const origAutoApprove = inquiryHandlers.inviteOrganizationUser.autoApprove;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: admin, organization: org },
+    );
     adminOrgUser = ou;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOrgUser],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
@@ -145,7 +242,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
     inquiryHandlers.inviteOrganizationUser.autoApprove = origAutoApprove;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -161,7 +258,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -180,7 +281,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
 
     const record = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
     expect(record.status).toBe(InquiryStatus.approved);
@@ -199,7 +304,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     expect(response.status).toBe(200);
 
     const membership = await db.organizationUser.findUnique({
@@ -221,7 +330,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Record<string, unknown>>(response);
 
     expect(data.targetUser).toBeDefined();
@@ -240,8 +353,14 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
-    const { data } = await json<Record<string, unknown> & { auditLogsAsSubject?: unknown[] }>(response);
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
+    const { data } = await json<Record<string, unknown> & { auditLogsAsSubject?: unknown[] }>(
+      response,
+    );
 
     const record = await db.inquiry.findUniqueOrThrow({
       where: { id: inquiry.id },

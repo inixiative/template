@@ -6,10 +6,10 @@
  */
 import type { Prisma } from '@template/db';
 import type { ContactType } from '@template/db/generated/client/enums';
-import { contactId as toContactId } from '@template/db/typedModelIds';
 import { ContactRegistry } from '@template/shared/contact';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
+import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 import type { AppEnv } from '#/types/appEnv';
 
 export const redactUser = async (c: Context<AppEnv>, userId: string) => {
@@ -26,7 +26,8 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
       where: { id: { in: singleMemberOrgs.map((o) => o.id) } },
       data: { deletedAt: now },
     });
-    for (const organization of organizations) await emitAppEvent('organization.deleted', { organization });
+    for (const organization of organizations)
+      await emitAppEvent('organization.deleted', { organization });
   }
 
   const singleMemberSpaces = await db.space.findMany({
@@ -41,13 +42,17 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
     for (const space of spaces) await emitAppEvent('space.deleted', { space });
   }
 
+  // Tokens keep their audit trail: tombstoned, never revived.
+  await db.token.updateManyAndReturn({
+    where: { userId, deletedAt: null },
+    data: { deletedAt: now },
+  });
+
   // Ephemeral auth state — hard delete.
-  await db.token.deleteMany({ where: { userId } });
-  await db.session.deleteMany({ where: { userId } });
   await db.account.deleteMany({ where: { userId } });
   await db.webhookSubscription.deleteMany({ where: { userId, ownerModel: 'User' } });
 
-  // Memberships, attachments — soft delete. (AuthProvider is org-scoped.)
+  // Members, attachments — soft delete. (AuthProvider is org-scoped.)
   await db.organizationUser.updateManyAndReturn({
     where: { userId, deletedAt: null },
     data: { deletedAt: now },
@@ -68,13 +73,14 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
   });
   for (const c of contacts) {
     const def = ContactRegistry[c.type as ContactType];
-    const scrubbed = def.redact(toContactId(c.id), c.value as never);
+    const scrubbed = def.redact(c.id, c.value as never);
     await db.contact.update({
       where: { id: c.id },
       data: { value: scrubbed as Prisma.InputJsonValue, deletedAt: now },
     });
   }
 
+  await rotateUserJwts(userId);
   await db.user.update({
     where: { id: userId },
     data: {

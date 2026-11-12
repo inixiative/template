@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
@@ -22,7 +22,7 @@ describe('GET /me/providers', () => {
   let org: Organization;
   let space: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
@@ -40,7 +40,7 @@ describe('GET /me/providers', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -57,8 +57,8 @@ describe('GET /me/providers', () => {
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Space',
-      customerUser: user,
-      providerSpace: space,
+      customerUserId: user.id,
+      providerSpaceId: space.id,
     });
 
     const response = await fetch(get('/api/v1/me/providers'));
@@ -88,12 +88,15 @@ describe('GET /me/providers', () => {
   it('excludes providers for other users', async () => {
     const { entity: otherUser } = await createUser();
     const { context: otherContext } = await createOrganizationUser({}, { user: otherUser });
-    const { entity: otherSpace } = await createSpace({}, { organization: otherContext.organization });
+    const { entity: otherSpace } = await createSpace(
+      {},
+      { organization: otherContext.organization },
+    );
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Space',
-      customerUser: otherUser,
-      providerSpace: otherSpace,
+      customerUserId: otherUser.id,
+      providerSpaceId: otherSpace.id,
     });
 
     const response = await fetch(get('/api/v1/me/providers'));

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
@@ -12,7 +12,7 @@ describe('DELETE /api/v1/organizationUser/:id', () => {
   let org: Organization;
   let adminOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     adminOrgUser = entity;
     user = context.user;
@@ -27,12 +27,15 @@ describe('DELETE /api/v1/organizationUser/:id', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
   it('deletes the organizationUser', async () => {
-    const { entity: toDelete } = await createOrganizationUser({ role: 'viewer' }, { organization: org });
+    const { entity: toDelete } = await createOrganizationUser(
+      { role: 'viewer' },
+      { organization: org },
+    );
 
     const response = await fetch(del(`/api/v1/organizationUser/${toDelete.id}`));
     expect(response.status).toBe(204);

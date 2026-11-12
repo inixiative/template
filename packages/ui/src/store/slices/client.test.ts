@@ -11,6 +11,7 @@ const recordingWebsocket = () => {
   const closes: string[] = [];
   const websocket = {
     connect: () => {},
+    disconnect: () => {},
     authenticate: () => {},
     spoof: () => {},
     unspoof: () => {},
@@ -19,6 +20,7 @@ const recordingWebsocket = () => {
     unsubscribe: (channel: string) => unsubs.push(channel),
     open: (stream: string) => opens.push(stream),
     close: (stream: string) => closes.push(stream),
+    resync: () => {},
   } satisfies ApiWebsocket;
   return { subs, unsubs, opens, closes, websocket };
 };

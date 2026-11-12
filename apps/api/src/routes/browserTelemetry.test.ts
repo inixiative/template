@@ -52,10 +52,13 @@ it('validates browser events and forwards sanitized OTLP without exposing creden
     expect(received.join('')).toContain('browser');
     expect(received.join('')).not.toContain('private-value');
     expect((await send('https://untrusted.example.test')).status).toBe(403);
-    expect((await send('https://admin.example.test', { ...payload, endpoint: 'https://attacker.test' })).status).toBe(
-      400,
+    expect(
+      (await send('https://admin.example.test', { ...payload, endpoint: 'https://attacker.test' }))
+        .status,
+    ).toBe(400);
+    expect((await send('https://admin.example.test', { noise: 'x'.repeat(70_000) })).status).toBe(
+      413,
     );
-    expect((await send('https://admin.example.test', { noise: 'x'.repeat(70_000) })).status).toBe(413);
   });
 });
 
@@ -66,11 +69,14 @@ it('rejects ingestion when disabled', async () => {
 });
 
 it('accepts exact configured HTTP origins with URL paths and rejects lookalikes', async () => {
-  await withEnv({ ...environment, SUPERADMIN_URL: 'https://admin.example.test/dashboard/' }, async () => {
-    expect((await send('https://admin.example.test')).status).toBe(202);
-    expect((await send('https://admin.example.test.attacker.test')).status).toBe(403);
-    expect((await send('http://admin.example.test')).status).toBe(403);
-  });
+  await withEnv(
+    { ...environment, SUPERADMIN_URL: 'https://admin.example.test/dashboard/' },
+    async () => {
+      expect((await send('https://admin.example.test')).status).toBe(202);
+      expect((await send('https://admin.example.test.attacker.test')).status).toBe(403);
+      expect((await send('http://admin.example.test')).status).toBe(403);
+    },
+  );
   await withEnv(
     { ...environment, SUPERADMIN_URL: 'file:///admin', WEB_URL: undefined, ADMIN_URL: 'invalid' },
     async () => {

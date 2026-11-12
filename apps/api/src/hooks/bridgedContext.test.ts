@@ -1,8 +1,7 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { clearHookRegistry, DbAction, db, HookTiming, registerDbHook } from '@template/db';
+import { DbAction, db, HookTiming, registerDbHook, unregisterDbHook } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
-import { registerTestTracker } from '@template/db/test/testTracker';
 import { saveEmailTemplate } from '@template/email/render';
 
 // saveEmailTemplate is the deterministic case in this repo where async-local storage does not
@@ -46,36 +45,37 @@ const observe = (hook: string, model: string) => {
   });
 };
 
-registerTestTracker();
-
 // Declared across two hooks with an overlapping subset: beta is named twice, and the stores are a
 // single union applied to every hook, so hookA observes gamma even though hookB declared it.
-registerDbHook(
-  'probeMatrixA',
-  '*',
-  HookTiming.after,
-  [DbAction.create],
-  async ({ model }) => {
-    observe('probeMatrixA', model);
-    const alpha = probeAlpha.getStore();
-    if (alpha) alpha.touchedByHook = true;
-  },
-  [probeAlpha, probeBeta],
-);
+beforeEach(() => {
+  registerDbHook(
+    'probeMatrixA',
+    '*',
+    HookTiming.after,
+    [DbAction.create],
+    async ({ model }) => {
+      observe('probeMatrixA', model);
+      const alpha = probeAlpha.getStore();
+      if (alpha) alpha.touchedByHook = true;
+    },
+    [probeAlpha, probeBeta],
+  );
 
-registerDbHook(
-  'probeMatrixB',
-  '*',
-  HookTiming.after,
-  [DbAction.create],
-  async ({ model }) => {
-    observe('probeMatrixB', model);
-  },
-  [probeBeta, probeGamma, probeDelta],
-);
+  registerDbHook(
+    'probeMatrixB',
+    '*',
+    HookTiming.after,
+    [DbAction.create],
+    async ({ model }) => {
+      observe('probeMatrixB', model);
+    },
+    [probeBeta, probeGamma, probeDelta],
+  );
+});
 
-afterAll(async () => {
-  clearHookRegistry();
+afterEach(async () => {
+  unregisterDbHook('probeMatrixA');
+  unregisterDbHook('probeMatrixB');
   await cleanupTouchedTables(db);
 });
 
@@ -112,8 +112,12 @@ describe('bridged hook context across a frame that loses async-local storage', (
 
     // (b) hook frame: both hooks ran, on both email models, inside the transaction.
     expect(observations.length).toBeGreaterThan(0);
-    expect(new Set(observations.map((entry) => entry.hook))).toEqual(new Set(['probeMatrixA', 'probeMatrixB']));
-    expect(new Set(observations.map((entry) => entry.model))).toEqual(new Set(['EmailComponent', 'EmailTemplate']));
+    expect(new Set(observations.map((entry) => entry.hook))).toEqual(
+      new Set(['probeMatrixA', 'probeMatrixB']),
+    );
+    expect(new Set(observations.map((entry) => entry.model))).toEqual(
+      new Set(['EmailComponent', 'EmailTemplate']),
+    );
 
     for (const entry of observations) {
       const where = `${entry.hook}/${entry.model}`;

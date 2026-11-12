@@ -1,15 +1,28 @@
-import { DbAction, type HookOptions, HookTiming, registerDbHook, type SingleAction } from '@template/db';
-import { queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
+import type { Prisma } from '@template/db';
+import {
+  DbAction,
+  type HookOptions,
+  HookTiming,
+  registerDbHook,
+  type SingleAction,
+} from '@template/db';
+import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { applyOrderedListUpsert } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListUpsertHook = () => {
-  registerDbHook('orderedList:upsert', '*', HookTiming.before, [DbAction.upsert], async (options) => {
-    const { args, previous, model } = options as HookOptions & { action: SingleAction };
-    const affected = await applyOrderedListUpsert(
-      model,
-      args as Record<string, unknown>,
-      previous as Record<string, unknown> | undefined,
-    );
-    queueOrderedListCacheInvalidation(model, affected);
-  });
+  registerDbHook(
+    'orderedList:upsert',
+    '*',
+    HookTiming.before,
+    [DbAction.upsert],
+    async (options) => {
+      const { args, previous, model } = options as HookOptions & { action: SingleAction };
+      const affected = await applyOrderedListUpsert(
+        model,
+        args as Record<string, unknown>,
+        previous as Record<string, unknown> | undefined,
+      );
+      await queueCacheClear(model as Prisma.ModelName, affected);
+    },
+  );
 };

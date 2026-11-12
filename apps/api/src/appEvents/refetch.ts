@@ -6,4 +6,8 @@
  */
 import type { WSQueryEvent } from '@template/shared/ws';
 
-export const refetch = (key: WSQueryEvent['key']): WSQueryEvent => ({ category: 'query', action: 'refetch', key });
+export const refetch = (key: WSQueryEvent['key']): WSQueryEvent => ({
+  category: 'query',
+  action: 'refetch',
+  key,
+});

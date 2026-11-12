@@ -4,53 +4,68 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import { type Condition, type NarrowingDefaults, Operator, resolveLensBindings } from '@inixiative/json-rules';
+import { bindLens, type NarrowingDefaults } from '@inixiative/json-rules';
 import { polymorphicBindings } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { boundAndLive, platformOrBound } from '@template/db/lens';
-import { type EmailLens, narrowEmailLens } from '@template/email/rules/emailLens';
+import {
+  type EmailLens,
+  type EmailLensInput,
+  emailLens,
+  narrowEmailLens,
+} from '@template/email/rules/emailLens';
+import { OWNER_EMAIL_SCOPE } from '@template/email/rules/scopes/ownerEmailScope';
+import { PLATFORM_EMAIL_SCOPE } from '@template/email/rules/scopes/platformEmailScope';
+import { PLATFORM_OWNER_EMAIL_SCOPE } from '@template/email/rules/scopes/platformOwnerEmailScope';
+import { TENANT_EMAIL_SCOPE } from '@template/email/rules/scopes/tenantEmailScope';
 import type { RuleLens } from '@template/shared/rules';
 
-export type EmailLensOwner = { ownerModel: ProviderModel; ownerId: string; organizationId?: string | null } | null;
-
-const tag = platformOrBound('Tag', 'ownerModel');
-const segment = boundAndLive('Segment', 'ownerModel');
-const platformDefaults: NarrowingDefaults = {
-  models: {
-    Tag: { where: tag, sources: { id: { where: tag } } },
-    Segment: { where: segment, sources: { id: { where: segment } } },
-  },
-};
-
-const is = (field: string, value: string): Condition => ({ field, operator: Operator.equals, value });
+export type EmailLensOwner = {
+  ownerModel: ProviderModel;
+  ownerId: string;
+  organizationId?: string | null;
+} | null;
 
 type Owner = NonNullable<EmailLensOwner>;
 
-const organizationScope = (owner: Owner): Condition =>
-  owner.ownerModel === 'Organization'
-    ? is('id', owner.ownerId)
-    : owner.organizationId
-      ? is('id', owner.organizationId)
-      : false;
+const senderOrganizationId = (sender: Owner): string | null | undefined =>
+  sender.ownerModel === 'Organization'
+    ? sender.ownerId
+    : sender.ownerModel === 'Space'
+      ? sender.organizationId
+      : null;
 
-const spaceScope = (owner: Owner): Condition =>
-  owner.ownerModel === 'Space'
-    ? is('id', owner.ownerId)
-    : owner.ownerModel === 'Organization'
-      ? is('organizationId', owner.ownerId)
-      : false;
-
-const ownerDefaults = (owner: Owner): NarrowingDefaults => ({
-  models: {
-    ...platformDefaults.models,
-    Organization: { where: organizationScope(owner), sources: { id: { where: organizationScope(owner) } } },
-    Space: { where: spaceScope(owner), sources: { id: { where: spaceScope(owner) } } },
-  },
+export const emailLensBindings = (
+  owner: EmailLensOwner,
+  sender: EmailLensOwner,
+): Record<string, string> => ({
+  ...(owner ? polymorphicBindings(owner.ownerModel, owner.ownerId) : {}),
+  ...(owner?.organizationId ? { ownerOrganizationId: owner.organizationId } : {}),
+  ...(sender && senderOrganizationId(sender)
+    ? { senderOrganizationId: senderOrganizationId(sender)! }
+    : {}),
+  ...(sender?.ownerModel === 'Space' ? { senderSpaceId: sender.ownerId } : {}),
 });
 
-export const scopeEmailLens = (lens: EmailLens, owner: EmailLensOwner): EmailLens =>
-  narrowEmailLens(lens, (_root, slot) => {
-    if (!owner) return { parent: slot, mapDefaults: { prisma: platformDefaults } };
-    const scoped: RuleLens = { parent: slot, mapDefaults: { prisma: ownerDefaults(owner) } };
-    return resolveLensBindings(scoped, polymorphicBindings(owner.ownerModel, owner.ownerId)) as RuleLens;
-  });
+export const emailScopeFor = (
+  owner: EmailLensOwner,
+  sender: EmailLensOwner,
+): NarrowingDefaults['models'] =>
+  owner
+    ? sender
+      ? TENANT_EMAIL_SCOPE
+      : OWNER_EMAIL_SCOPE
+    : sender
+      ? PLATFORM_OWNER_EMAIL_SCOPE
+      : PLATFORM_EMAIL_SCOPE;
+
+export const scopeEmailLens = (
+  input: EmailLensInput,
+  owner: EmailLensOwner,
+  sender: EmailLensOwner = owner,
+): EmailLens => {
+  const bindings = emailLensBindings(owner, sender);
+  return narrowEmailLens(
+    emailLens({ ...input, scope: emailScopeFor(owner, sender) }),
+    (_root, slot) => bindLens(slot, bindings) as RuleLens,
+  );
+};

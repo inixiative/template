@@ -19,7 +19,11 @@ export type ResendDomain = {
   created_at: string;
 };
 
-const resendFetch = async (apiKey: string, path: string, options: RequestInit = {}): Promise<unknown> => {
+const resendFetch = async (
+  apiKey: string,
+  path: string,
+  options: RequestInit = {},
+): Promise<unknown> => {
   const response = await fetch(`${RESEND_API}${path}`, {
     ...options,
     headers: {

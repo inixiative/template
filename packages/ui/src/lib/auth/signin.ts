@@ -4,8 +4,13 @@
  * @partOf primitive:ui
  * @uses none
  */
-import { setToken } from '@template/ui/lib/auth/token';
-import type { AuthMethod, EmailAuthMethod, OAuthAuthMethod, SamlAuthMethod } from '@template/ui/lib/auth/types';
+import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
+import type {
+  AuthMethod,
+  EmailAuthMethod,
+  OAuthAuthMethod,
+  SamlAuthMethod,
+} from '@template/ui/lib/auth/types';
 import { createAuthClient } from 'better-auth/client';
 import { oneTimeTokenClient } from 'better-auth/client/plugins';
 
@@ -26,12 +31,7 @@ const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
     throw new Error(error.message || error.statusText);
   }
 
-  if (!data?.token) {
-    throw new Error('No token returned from sign in');
-  }
-
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  setToken(data.token, expiresAt);
+  storeJwtHandoff(data);
 };
 
 const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
@@ -55,7 +55,7 @@ export const completeOAuthSignIn = async (oneTimeToken: string): Promise<void> =
     throw new Error(error.message || error.statusText);
   }
 
-  setToken(data.session.token, new Date(data.session.expiresAt));
+  storeJwtHandoff(data);
 };
 
 const signInWithSaml = async (_method: SamlAuthMethod): Promise<void> => {

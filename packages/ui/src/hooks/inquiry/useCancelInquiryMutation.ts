@@ -12,7 +12,12 @@ import { sourceMutations } from '@template/ui/lib/inquiries/queryKeys';
 
 export const useCancelInquiryMutation = () => {
   return useOptimisticMutation<unknown, Error, InquiryMeta>({
-    mutationFn: apiMutation((inquiry: InquiryMeta) => inquiryCancel({ path: { id: inquiry.id } })),
+    mutationFn: apiMutation((inquiry: InquiryMeta) =>
+      inquiryCancel({
+        path: { id: inquiry.id },
+        query: { expectedUpdatedAt: inquiry.updatedAt },
+      }),
+    ),
     targets: (inquiry) =>
       sourceMutations[inquiry.type](inquiry).map((queryKey) => ({
         queryKey,
@@ -21,7 +26,9 @@ export const useCancelInquiryMutation = () => {
           if (!cached?.data) return cached;
           return {
             ...cached,
-            data: cached.data.map((inq) => (inq.id === inquiry.id ? { ...inq, status: 'canceled' } : inq)),
+            data: cached.data.map((inq) =>
+              inq.id === inquiry.id ? { ...inq, status: 'canceled' } : inq,
+            ),
           };
         },
       })),

@@ -40,7 +40,9 @@ export const Header = ({ onMenuClick, className }: HeaderProps) => {
         <AppIdentity className="shrink-0 text-base lg:hidden" />
         <Breadcrumbs className="hidden min-w-0 sm:block" />
       </div>
-      <div className="flex items-center gap-2">{context && context.type !== 'public' && <ShareButton />}</div>
+      <div className="flex items-center gap-2">
+        {context && context.type !== 'public' && <ShareButton />}
+      </div>
     </header>
   );
 };

@@ -4,9 +4,23 @@
  * @partOf primitive:authz
  * @uses none
  */
-import type { UserId } from '@template/db';
-import { castArray } from 'lodash-es';
-import { createPermix } from 'permix';
+import {
+  createPermissions as createEnginePermissions,
+  type ActionState as EngineActionState,
+  type EntitlementEntry as EngineEntitlementEntry,
+  type PermissionEntry as EnginePermissionEntry,
+  type Permissions as EnginePermissions,
+  type Permix as EnginePermix,
+  type PermixLike,
+} from '@inixiative/permissions';
+
+export {
+  coversEntitlement,
+  delegate,
+  installPermissions,
+  permixOf,
+  wellFormedEntitlements,
+} from '@inixiative/permissions';
 
 // Base actions - most resources use these
 export const StandardAction = {
@@ -18,14 +32,26 @@ export const StandardAction = {
 export type StandardAction = (typeof StandardAction)[keyof typeof StandardAction];
 
 // Resource-specific actions (extend StandardAction, can add more)
-export const OrganizationAction = { ...StandardAction } as const;
+export const OrganizationAction = {
+  ...StandardAction,
+  create: 'create',
+  delete: 'delete',
+} as const;
 export type OrganizationAction = (typeof OrganizationAction)[keyof typeof OrganizationAction];
 
 export const SpaceAction = { ...StandardAction } as const;
 export type SpaceAction = (typeof SpaceAction)[keyof typeof SpaceAction];
 
-export const UserAction = { ...StandardAction } as const;
+export const UserAction = {
+  ...StandardAction,
+  redactUser: 'user.redact',
+  rotateUserJwts: 'user.rotateJwts',
+  changePassword: 'user.changePassword',
+} as const;
 export type UserAction = (typeof UserAction)[keyof typeof UserAction];
+
+export const TokenAction = { create: 'create', delete: 'delete' } as const;
+export type TokenAction = (typeof TokenAction)[keyof typeof TokenAction];
 
 export const InquiryAction = {
   read: 'read',
@@ -34,56 +60,19 @@ export const InquiryAction = {
 } as const;
 export type InquiryAction = (typeof InquiryAction)[keyof typeof InquiryAction];
 
-export type Action = UserAction | OrganizationAction | SpaceAction | InquiryAction;
+export type Action = UserAction | OrganizationAction | SpaceAction | TokenAction | InquiryAction;
 
-export type Entitlements = Record<string, boolean> | null;
+export const ActorModel = { User: 'User', Token: 'Token' } as const;
+export type ActorModel = (typeof ActorModel)[keyof typeof ActorModel];
 
-export type ActionState = Partial<Record<Action, boolean | ((data?: unknown) => boolean)>>;
-export type PermissionEntry = { resource: string; id?: string; actions: ActionState };
-type PermissionState = Record<string, ActionState>;
+// Who is acting: a user or a token, and its row. A rule reads it as `__actor`.
+export type Actor = { model: ActorModel; record: Record<string, unknown> };
 
-export type Permix = {
-  check: (resource: string, action: Action, id?: string, data?: unknown) => boolean;
-  setup: (perms: PermissionEntry | PermissionEntry[], options?: { replace?: boolean }) => Promise<void>;
-  setSuperadmin: (value: boolean) => void;
-  isSuperadmin: () => boolean;
-  setUserId: (id: UserId) => void;
-  getUserId: () => UserId | null;
-  getJSON: () => Record<string, Record<string, boolean>> | null;
-};
+export type ActionState = EngineActionState<Action>;
+export type PermissionEntry = EnginePermissionEntry<Action>;
+export type EntitlementEntry = EngineEntitlementEntry<Action>;
+export type Permissions = EnginePermissions<Action>;
+// The engine reads any permix back through PermixLike (string actions); ours narrows them to Action.
+export type Permix = EnginePermix<Action, Actor> & PermixLike;
 
-export const createPermissions = (): Permix => {
-  const permix = createPermix<Record<string, { action: Action }>>();
-  let isSuperadmin = false;
-  let userId: UserId | null = null;
-  let accumulated: PermissionState = {};
-
-  return {
-    check: (resource, action, id, data) => {
-      if (isSuperadmin) return true;
-      const key = id ? `${resource}:${id}` : resource;
-      return permix.check(key, action, data);
-    },
-    setup: async (perms, options) => {
-      if (options?.replace) accumulated = {};
-
-      const entries = castArray(perms);
-      for (const { resource, id, actions } of entries) {
-        const key = id ? `${resource}:${id}` : resource;
-        accumulated[key] = { ...actions };
-      }
-      // TODO: make this typesafe — PermixSetup requires all actions present but ActionState is Partial
-      // biome-ignore lint/suspicious/noExplicitAny: PermixSetup<> requires exhaustive actions; ActionState is Partial which TypeScript can't reconcile without widening
-      await permix.setup(accumulated as any);
-    },
-    setSuperadmin: (value) => {
-      isSuperadmin = value;
-    },
-    isSuperadmin: () => isSuperadmin,
-    setUserId: (id) => {
-      userId = id;
-    },
-    getUserId: () => userId,
-    getJSON: () => permix.dehydrate() as Record<string, Record<string, boolean>>,
-  };
-};
+export const createPermissions = (): Permix => createEnginePermissions<Action, Actor>() as Permix;

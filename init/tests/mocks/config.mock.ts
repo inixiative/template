@@ -5,7 +5,8 @@ import type { ProjectConfig } from '../../utils/getProjectConfig';
 process.env.NODE_ENV = 'test';
 
 const envProjectName = process.env.PROJECT_NAME ?? 'template';
-const envOrganizationName = process.env.ORGANIZATION_NAME ?? process.env.PLANETSCALE_ORG ?? 'test-org';
+const envOrganizationName =
+  process.env.ORGANIZATION_NAME ?? process.env.PLANETSCALE_ORG ?? 'test-org';
 
 /** Default test config — override fields as needed */
 const defaultConfig: ProjectConfig = {
@@ -98,6 +99,10 @@ const defaultConfig: ProjectConfig = {
       storeSuperadminAppNameSecret: false,
       ensureProdApiAuthSecret: false,
       ensureStagingApiAuthSecret: false,
+      ensureProdWebhookSigningKeys: false,
+      ensureStagingWebhookSigningKeys: false,
+      ensureProdEncryptionKeys: false,
+      ensureStagingEncryptionKeys: false,
     },
     error: '',
   },

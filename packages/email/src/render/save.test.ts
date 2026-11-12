@@ -1,13 +1,15 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import {
   cleanupTouchedTables,
   createEmailComponent,
+  createEmailTemplate,
   createOrganization,
   createSpace,
   createUser,
 } from '@template/db/test';
+import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { DependentTemplateError } from '@template/email/errors/DependentTemplateError';
 import { DivergentDuplicateSlugError } from '@template/email/errors/DivergentDuplicateSlugError';
 import { MjmlValidationError } from '@template/email/errors/MjmlValidationError';
@@ -20,13 +22,12 @@ const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
 
 describe('saveEmailTemplate', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('saves template with no components', async () => {
@@ -44,7 +45,7 @@ describe('saveEmailTemplate', () => {
     expect(result.components).toEqual([]);
   });
 
-  it('re-saving a soft-deleted slug creates a live row instead of updating the tombstone', async () => {
+  it('re-saving a soft-deleted slug revives the same row with the new body', async () => {
     const input = {
       slug: 'revived',
       name: 'Revived',
@@ -54,24 +55,158 @@ describe('saveEmailTemplate', () => {
       ownerModel: 'default' as const,
     };
     const first = await saveEmailTemplate(input);
-    await db.emailTemplate.update({ where: { id: first.template.id }, data: { deletedAt: new Date() } });
+    await db.emailTemplate.update({
+      where: { id: first.template.id },
+      data: { deletedAt: new Date() },
+    });
 
     const second = await saveEmailTemplate({ ...input, mjml: mjml('<mj-text>v2</mj-text>') });
 
-    expect(second.template.id).not.toBe(first.template.id);
+    expect(second.template.id).toBe(first.template.id);
     expect(second.template.deletedAt).toBeNull();
-    const tombstone = await db.emailTemplate.findUnique({ where: { id: first.template.id } });
-    expect(tombstone?.deletedAt).not.toBeNull();
-    expect(tombstone?.mjml).toContain('v1');
+    expect(second.template.mjml).toContain('v2');
+    expect(await db.emailTemplate.count({ where: { slug: 'revived' } })).toBe(1);
+  });
+
+  it('re-saving a template revives its soft-deleted same-tier component in place', async () => {
+    const input = {
+      slug: 'with-footer',
+      name: 'With Footer',
+      subject: 'Hello',
+      kind: 'system' as const,
+      mjml: mjml('{{#component:footer}}<mj-text>v1</mj-text>{{/component:footer}}'),
+      ownerModel: 'default' as const,
+    };
+    const first = await saveEmailTemplate(input);
+    const [footer] = first.components;
+    await db.emailComponent.update({ where: { id: footer.id }, data: { deletedAt: new Date() } });
+
+    const second = await saveEmailTemplate({
+      ...input,
+      mjml: mjml('{{#component:footer}}<mj-text>v2</mj-text>{{/component:footer}}'),
+    });
+
+    expect(second.components.map((c) => c.id)).toEqual([footer.id]);
+    expect(second.components[0].deletedAt).toBeNull();
+    expect(second.components[0].mjml).toBe('<mj-text>v2</mj-text>');
+    expect(await db.emailComponent.count({ where: { slug: 'footer' } })).toBe(1);
+  });
+
+  it('delete, re-create, delete, re-create keeps one template row and one id throughout', async () => {
+    const input = {
+      slug: 'cycled',
+      name: 'Cycled',
+      subject: 'Hello',
+      kind: 'system' as const,
+      mjml: mjml('{{#component:badge}}<mj-text>v1</mj-text>{{/component:badge}}'),
+      ownerModel: 'default' as const,
+    };
+    const rowsFor = () =>
+      db.withDeleted(async () => ({
+        templates: await db.emailTemplate.findMany({ where: { slug: 'cycled' } }),
+        components: await db.emailComponent.findMany({ where: { slug: 'badge' } }),
+      }));
+    const softDelete = async (templateId: string, componentId: string) => {
+      const deletedAt = new Date();
+      await db.emailTemplate.update({ where: { id: templateId }, data: { deletedAt } });
+      await db.emailComponent.update({ where: { id: componentId }, data: { deletedAt } });
+    };
+
+    const first = await saveEmailTemplate(input);
+    const templateId = first.template.id;
+    const componentId = first.components[0].id;
+
+    for (const version of ['v2', 'v3']) {
+      await softDelete(templateId, componentId);
+      const deleted = await rowsFor();
+      expect(deleted.templates.map((t) => [t.id, t.deletedAt !== null])).toEqual([
+        [templateId, true],
+      ]);
+      expect(deleted.components.map((c) => [c.id, c.deletedAt !== null])).toEqual([
+        [componentId, true],
+      ]);
+
+      const saved = await saveEmailTemplate({
+        ...input,
+        mjml: mjml(`{{#component:badge}}<mj-text>${version}</mj-text>{{/component:badge}}`),
+      });
+      expect(saved.template.id).toBe(templateId);
+      expect(saved.components.map((c) => c.id)).toEqual([componentId]);
+
+      const revived = await rowsFor();
+      expect(revived.templates.map((t) => [t.id, t.deletedAt])).toEqual([[templateId, null]]);
+      expect(revived.components.map((c) => [c.id, c.deletedAt, c.mjml])).toEqual([
+        [componentId, null, `<mj-text>${version}</mj-text>`],
+      ]);
+    }
+  });
+
+  it('the natural-key unique covers tombstones, so a key can never hold a second row', async () => {
+    const { entity: tombstone } = await createEmailTemplate({
+      slug: 'one-row',
+      ownerModel: 'default',
+      deletedAt: new Date(),
+    });
+
+    await expect(
+      createEmailTemplate({ slug: 'one-row', ownerModel: 'default', deletedAt: new Date() }),
+    ).rejects.toThrow();
+    await expect(createEmailTemplate({ slug: 'one-row', ownerModel: 'default' })).rejects.toThrow();
+
+    const rows = await db.withDeleted(() =>
+      db.emailTemplate.findMany({ where: { slug: 'one-row' } }),
+    );
+    expect(rows.map((row) => row.id)).toEqual([tombstone.id]);
+  });
+
+  it('a soft-deleted parent-tier component is never inherited', async () => {
+    const { entity: org } = await createOrganization();
+    const parent = await createEmailComponent({
+      slug: 'shared',
+      mjml: '<mj-text>Shared</mj-text>',
+      ownerModel: 'default',
+    });
+    await db.emailComponent.update({
+      where: { id: parent.entity.id },
+      data: { deletedAt: new Date() },
+    });
+
+    const result = await saveEmailTemplate({
+      slug: 'org-uses-shared',
+      name: 'Org Uses Shared',
+      subject: 'Hello',
+      kind: 'system',
+      mjml: mjml('{{#component:shared}}<mj-text>Shared</mj-text>{{/component:shared}}'),
+      ownerModel: 'Organization',
+      organizationId: org.id,
+    });
+
+    expect(result.components.map((c) => [c.slug, c.ownerModel])).toEqual([
+      ['shared', 'Organization'],
+    ]);
   });
 
   it("a User-owned save lands on that user's row, never on another user's same-slug row", async () => {
     const { entity: alice } = await createUser();
     const { entity: bob } = await createUser();
-    const input = { slug: 'mine', name: 'Mine', subject: 'Hi', kind: 'system' as const, ownerModel: 'User' as const };
+    const input = {
+      slug: 'mine',
+      name: 'Mine',
+      subject: 'Hi',
+      kind: 'system' as const,
+      ownerModel: 'User' as const,
+    };
 
-    const first = await saveEmailTemplate({ ...input, userId: alice.id, mjml: mjml('<mj-text>alice</mj-text>') });
-    const second = await saveEmailTemplate({ ...input, userId: bob.id, mjml: mjml('<mj-text>bob</mj-text>') });
+    const first = await saveEmailTemplate({
+      ...input,
+      userId: alice.id,
+      mjml: mjml('<mj-text>alice</mj-text>'),
+    });
+    const second = await saveEmailTemplate({
+      ...input,
+      userId: bob.id,
+      mjml: mjml('<mj-text>bob</mj-text>'),
+    });
 
     expect(second.template.id).not.toBe(first.template.id);
     expect(first.template.userId).toBe(alice.id);
@@ -127,7 +262,9 @@ describe('saveEmailTemplate', () => {
         name: 'Promo',
         subject: 'News',
         kind: 'marketing',
-        mjml: mjml(`<mj-text>News</mj-text>{{#if rule=${rule}}}<mj-text>{{system.unsubscribeUrl}}</mj-text>{{/if}}`),
+        mjml: mjml(
+          `<mj-text>News</mj-text>{{#if rule=${rule}}}<mj-text>{{system.unsubscribeUrl}}</mj-text>{{/if}}`,
+        ),
         ownerModel: 'default',
       }),
     ).rejects.toThrow(/unconditional/i);
@@ -139,7 +276,9 @@ describe('saveEmailTemplate', () => {
       name: 'With Header',
       subject: 'Hello',
       kind: 'system',
-      mjml: mjml('{{#component:header}}<mj-text>Header</mj-text>{{/component:header}}<mj-text>Body</mj-text>'),
+      mjml: mjml(
+        '{{#component:header}}<mj-text>Header</mj-text>{{/component:header}}<mj-text>Body</mj-text>',
+      ),
       ownerModel: 'default',
     });
 
@@ -157,7 +296,9 @@ describe('saveEmailTemplate', () => {
         name: 'Doc Component',
         subject: 'Hello',
         kind: 'system',
-        mjml: mjml('{{#component:whole}}<mjml><mj-body><mj-text>Nope</mj-text></mj-body></mjml>{{/component:whole}}'),
+        mjml: mjml(
+          '{{#component:whole}}<mjml><mj-body><mj-text>Nope</mj-text></mj-body></mjml>{{/component:whole}}',
+        ),
         ownerModel: 'default',
       }),
     ).rejects.toThrow(MjmlValidationError);
@@ -170,7 +311,9 @@ describe('saveEmailTemplate', () => {
         name: 'Bad Fragment',
         subject: 'Hello',
         kind: 'system',
-        mjml: mjml('{{#component:broken}}<mj-not-a-real-tag>x</mj-not-a-real-tag>{{/component:broken}}'),
+        mjml: mjml(
+          '{{#component:broken}}<mj-not-a-real-tag>x</mj-not-a-real-tag>{{/component:broken}}',
+        ),
         ownerModel: 'default',
       }),
     ).rejects.toThrow();
@@ -335,17 +478,50 @@ describe('saveEmailTemplate', () => {
     expect(outer?.componentRefs).toEqual(['inner']);
   });
 
-  it('admin template - no cascade', async () => {
+  it('an admin template inherits an unchanged default component instead of copying it', async () => {
+    await createEmailComponent({
+      slug: 'footer',
+      mjml: '<mj-text>Default Footer</mj-text>',
+      ownerModel: 'default',
+    });
+
     const result = await saveEmailTemplate({
-      slug: 'admin-only',
-      name: 'Admin Only',
+      slug: 'admin-uses-default',
+      name: 'Admin Uses Default',
       subject: 'Hello',
       kind: 'system',
-      mjml: mjml('<mj-text>Admin</mj-text>'),
+      mjml: mjml('{{#component:footer}}<mj-text>Default Footer</mj-text>{{/component:footer}}'),
       ownerModel: 'admin',
     });
 
     expect(result.template.ownerModel).toBe('admin');
+    expect(result.components).toEqual([]);
+    expect(result.template.componentRefs).toEqual(['footer']);
+  });
+
+  it('an admin template that changes a default component writes its own admin copy', async () => {
+    await createEmailComponent({
+      slug: 'footer',
+      mjml: '<mj-text>Default Footer</mj-text>',
+      ownerModel: 'default',
+    });
+
+    const result = await saveEmailTemplate({
+      slug: 'admin-own-footer',
+      name: 'Admin Own Footer',
+      subject: 'Hello',
+      kind: 'system',
+      mjml: mjml(
+        '{{#component:footer}}<mj-text>UserEvidence Footer</mj-text>{{/component:footer}}',
+      ),
+      ownerModel: 'admin',
+    });
+
+    expect(result.components.map((c) => [c.slug, c.ownerModel])).toEqual([['footer', 'admin']]);
+    const defaultFooter = await db.emailComponent.findFirst({
+      where: { slug: 'footer', ownerModel: 'default' },
+    });
+    expect(defaultFooter?.mjml).toBe('<mj-text>Default Footer</mj-text>');
   });
 
   it('a component outside the tier cascade is written at the current tier', async () => {
@@ -367,7 +543,9 @@ describe('saveEmailTemplate', () => {
       name: 'Space No Inherit',
       subject: 'Hello',
       kind: 'system',
-      mjml: mjml('{{#component:org-private}}<mj-text>Org Private</mj-text>{{/component:org-private}}'),
+      mjml: mjml(
+        '{{#component:org-private}}<mj-text>Org Private</mj-text>{{/component:org-private}}',
+      ),
       ownerModel: 'Space',
       organizationId: org.id,
       spaceId: space.id,
@@ -440,13 +618,12 @@ describe('saveEmailTemplate — the lens decides at save', () => {
   const lens = emailLens({ sender: lensFor('Organization') });
   const strict = emailLens();
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   const input = (slug: string, content: string, subject = 'Hi {{recipient.email}}') => ({
@@ -463,7 +640,10 @@ describe('saveEmailTemplate — the lens decides at save', () => {
       saveEmailTemplate(input('t', '<mj-text>{{recipient.nickname}}</mj-text>'), { lens }),
     ).rejects.toBeInstanceOf(TokenValidationError);
     await expect(
-      saveEmailTemplate(input('t', '<mj-text>{{recipient.email}}</mj-text>', 'Code {{data.code}}'), { lens }),
+      saveEmailTemplate(
+        input('t', '<mj-text>{{recipient.email}}</mj-text>', 'Code {{data.code}}'),
+        { lens },
+      ),
     ).rejects.toThrow(/may be empty/);
     const ok = await saveEmailTemplate(
       input('t', `<mj-text>{{recipient.email}} ${guardedToken('data.code', 'none')}</mj-text>`),
@@ -475,7 +655,10 @@ describe('saveEmailTemplate — the lens decides at save', () => {
   it('a component is judged through the template that embeds it', async () => {
     await expect(
       saveEmailTemplate(
-        input('t', '{{#component:greeting}}<mj-text>{{sender.nickname}}</mj-text>{{/component:greeting}}'),
+        input(
+          't',
+          '{{#component:greeting}}<mj-text>{{sender.nickname}}</mj-text>{{/component:greeting}}',
+        ),
         {
           lens,
         },
@@ -486,7 +669,10 @@ describe('saveEmailTemplate — the lens decides at save', () => {
   it('a component save that would break a same-owner template embedding it is refused', async () => {
     const lensFor = async (slug: string) => (slug === 'strict' ? strict : lens);
     await saveEmailTemplate(
-      input('strict', '{{#component:greeting}}<mj-text>{{recipient.email}}</mj-text>{{/component:greeting}}'),
+      input(
+        'strict',
+        '{{#component:greeting}}<mj-text>{{recipient.email}}</mj-text>{{/component:greeting}}',
+      ),
       {
         lens: strict,
         lensFor,
@@ -495,7 +681,10 @@ describe('saveEmailTemplate — the lens decides at save', () => {
 
     await expect(
       saveEmailTemplate(
-        input('loose', '{{#component:greeting}}<mj-text>{{sender.name}}</mj-text>{{/component:greeting}}'),
+        input(
+          'loose',
+          '{{#component:greeting}}<mj-text>{{sender.name}}</mj-text>{{/component:greeting}}',
+        ),
         {
           lens,
           lensFor,
@@ -505,5 +694,42 @@ describe('saveEmailTemplate — the lens decides at save', () => {
 
     const untouched = await db.emailComponent.findFirst({ where: { slug: 'greeting' } });
     expect(untouched?.mjml).toContain('recipient.email');
+  });
+
+  const probe = JSON.stringify({
+    field: 'recipient.organizationUsers',
+    arrayOperator: 'any',
+    condition: { field: 'organization.name', operator: 'equals', value: 'Theirs' },
+  });
+
+  it('refuses a rule inside a loop over an opaque slot that reads a lens-backed root', async () => {
+    await expect(
+      saveEmailTemplate(
+        input('t', `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{/if}}{{/each}}`),
+        { lens },
+      ),
+    ).rejects.toBeInstanceOf(ConditionValidationError);
+  });
+
+  it("a cascade-resolved component's rules are judged against the embedding template's lens", async () => {
+    await expect(
+      saveEmailTemplate(
+        input(
+          'carrier',
+          `{{#component:probe}}{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{/if}}{{/each}}{{/component:probe}}`,
+        ),
+      ),
+    ).rejects.toBeInstanceOf(ConditionValidationError);
+    await createEmailComponent({
+      slug: 'probe',
+      locale: 'en',
+      ownerModel: 'default',
+      componentRefs: [],
+      mjml: `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{/if}}{{/each}}`,
+    });
+
+    await expect(
+      saveEmailTemplate(input('embedder', '{{#component:probe}}{{/component:probe}}'), { lens }),
+    ).rejects.toBeInstanceOf(ConditionValidationError);
   });
 });

@@ -36,13 +36,20 @@ const ownedColumns = [
     label: 'Name',
     render: (segment: OwnedSegment) => <span className="font-medium">{segment.name}</span>,
   },
-  { key: 'type', label: 'Type', render: (segment: OwnedSegment) => <span className="capitalize">{segment.type}</span> },
+  {
+    key: 'type',
+    label: 'Type',
+    render: (segment: OwnedSegment) => <span className="capitalize">{segment.type}</span>,
+  },
   {
     key: 'ruleIssues',
     label: 'Status',
     render: (segment: OwnedSegment) =>
       segment.ruleIssues.length ? (
-        <span className="text-destructive" title={segment.ruleIssues.map((issue) => issue.detail).join('\n')}>
+        <span
+          className="text-destructive"
+          title={segment.ruleIssues.map((issue) => issue.detail).join('\n')}
+        >
           Degraded: {segment.ruleIssues.map((issue) => issue.kind).join(', ')}
         </span>
       ) : (
@@ -52,7 +59,9 @@ const ownedColumns = [
   {
     key: 'createdAt',
     label: 'Created',
-    render: (segment: OwnedSegment) => <span className="text-muted-foreground">{formatDate(segment.createdAt)}</span>,
+    render: (segment: OwnedSegment) => (
+      <span className="text-muted-foreground">{formatDate(segment.createdAt)}</span>
+    ),
   },
 ];
 
@@ -60,12 +69,16 @@ const membershipColumns = [
   {
     key: 'segment',
     label: 'Segment',
-    render: (membership: Membership) => <span className="font-medium">{membership.segment.name}</span>,
+    render: (membership: Membership) => (
+      <span className="font-medium">{membership.segment.name}</span>
+    ),
   },
   {
     key: 'owner',
     label: 'Owner',
-    render: (membership: Membership) => <span className="capitalize">{membership.segment.ownerModel}</span>,
+    render: (membership: Membership) => (
+      <span className="capitalize">{membership.segment.ownerModel}</span>
+    ),
   },
   {
     key: 'createdAt',

@@ -22,14 +22,16 @@ export type PolymorphicValue = ModelName | SpecialOwner;
 
 export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
-  fkMap: Partial<Record<PolymorphicValue, string[]>>; // typeValue → required FK fields
+  fkMap: Partial<Record<PolymorphicValue, readonly string[]>>; // typeValue → required FK fields
+  materialized?: string; // the plain column holding the one id the set typed FK points at
+  delegates?: Partial<Record<PolymorphicValue, ModelName>>;
 };
 
 export type PolymorphicConfig = {
-  axes: PolymorphicAxis[];
+  axes: readonly PolymorphicAxis[];
   // If multiple axes, which combinations are valid (axis0Value → allowed axis1Values)
   // Only needed when there are restrictions
-  allowedCombinations?: Partial<Record<PolymorphicValue, PolymorphicValue[]>>;
+  allowedCombinations?: Partial<Record<PolymorphicValue, readonly PolymorphicValue[]>>;
 };
 
 // ============================================================================
@@ -40,7 +42,7 @@ export type PolymorphicConfig = {
 export type FalsePolymorphismRef = {
   model: ModelName; // The polymorphic model (e.g., CustomerRef)
   axis: string; // Which axis (e.g., customerModel, providerModel)
-  value: PolymorphicValue; // The type value (e.g., User, Organization, Space)
+  value: string; // The type value (e.g., User, Organization, Space)
 };
 
 // Flexible reference: either a direct model name or a false polymorphism reference
@@ -50,20 +52,7 @@ export type FlexibleRef = ModelName | FalsePolymorphismRef;
 export const isFalsePolymorphismRef = (ref: FlexibleRef): ref is FalsePolymorphismRef =>
   typeof ref === 'object' && 'model' in ref;
 
-// Resolve FalsePolymorphismRef to FK field using the registry
-export const resolveFalsePolymorphismRef = (ref: FalsePolymorphismRef): string | null => {
-  const config = PolymorphismRegistry[ref.model];
-  if (!config) return null;
-
-  const axis = config.axes.find((a) => a.field === ref.axis);
-  if (!axis) return null;
-
-  const fkFields = axis.fkMap[ref.value];
-  // Return the first FK field (usually there's just one per type)
-  return fkFields?.[0] ?? null;
-};
-
-export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>> = {
+export const PolymorphismRegistry = {
   Token: {
     axes: [
       {
@@ -74,7 +63,9 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           OrganizationUser: ['organizationId', 'userId'],
           Space: ['organizationId', 'spaceId'],
           SpaceUser: ['organizationId', 'spaceId', 'userId'],
+          Integration: ['integrationId'],
         },
+        delegates: { Integration: 'Integration' },
       },
     ],
   },
@@ -98,8 +89,10 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
         field: 'ownerModel',
         fkMap: {
           User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
           Organization: ['organizationId'],
-          Space: ['spaceId'],
+          Space: ['organizationId', 'spaceId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
         },
       },
     ],
@@ -113,6 +106,22 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           User: ['userId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],
+          Project: ['projectId'],
+        },
+      },
+    ],
+  },
+
+  Project: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
+          Organization: ['organizationId'],
+          Space: ['organizationId', 'spaceId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
         },
       },
     ],
@@ -200,20 +209,71 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
   RuleReference: {
     axes: [
       {
-        field: 'ownerModel',
+        field: 'sourceModel',
+        materialized: 'sourceId',
         fkMap: {
-          EmailTemplate: ['emailTemplateId'],
-          EmailComponent: ['emailComponentId'],
-          Segment: ['segmentId'],
+          EmailTemplate: ['sourceEmailTemplateId'],
+          EmailComponent: ['sourceEmailComponentId'],
+          Segment: ['sourceSegmentId'],
+          Entitlement: ['sourceEntitlementId'],
         },
       },
       {
-        field: 'referencedModel',
+        field: 'targetModel',
+        materialized: 'targetId',
         fkMap: {
-          Tag: ['tagId'],
-          Organization: ['organizationId'],
-          Space: ['spaceId'],
-          Segment: ['referencedSegmentId'],
+          Tag: ['targetTagId'],
+          Organization: ['targetOrganizationId'],
+          Space: ['targetSpaceId'],
+          Segment: ['targetSegmentId'],
+          User: ['targetUserId'],
+          OrganizationUser: ['targetOrganizationUserId'],
+          SpaceUser: ['targetSpaceUserId'],
+          Integration: ['targetIntegrationId'],
+          Project: ['targetProjectId'],
+          Token: ['targetTokenId'],
+          Contact: ['targetContactId'],
+          SegmentMember: ['targetSegmentMemberId'],
+          Inquiry: ['targetInquiryId'],
+          Flow: ['targetFlowId'],
+          AuthProvider: ['targetAuthProviderId'],
+          WebhookSubscription: ['targetWebhookSubscriptionId'],
+        },
+      },
+    ],
+  },
+
+  Entitlement: {
+    axes: [
+      {
+        field: 'sourceModel',
+        materialized: 'sourceId',
+        fkMap: {
+          User: ['sourceUserId'],
+          Organization: ['sourceOrganizationId'],
+          OrganizationUser: ['sourceOrganizationId', 'sourceUserId'],
+          Space: ['sourceSpaceId'],
+          SpaceUser: ['sourceOrganizationId', 'sourceSpaceId', 'sourceUserId'],
+          Integration: ['sourceIntegrationId'],
+          Project: ['sourceProjectId'],
+          Token: ['sourceTokenId'],
+          Contact: ['sourceContactId'],
+          Segment: ['sourceSegmentId'],
+          SegmentMember: ['sourceSegmentMemberId'],
+          Inquiry: ['sourceInquiryId'],
+          Flow: ['sourceFlowId'],
+          AuthProvider: ['sourceAuthProviderId'],
+          WebhookSubscription: ['sourceWebhookSubscriptionId'],
+        },
+      },
+      {
+        field: 'targetModel',
+        materialized: 'targetId',
+        fkMap: {
+          Token: ['targetTokenId'],
+          Integration: ['targetIntegrationId'],
+          OrganizationUser: ['targetOrganizationId', 'targetUserId'],
+          SpaceUser: ['targetOrganizationId', 'targetSpaceId', 'targetUserId'],
         },
       },
     ],
@@ -226,8 +286,12 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
         fkMap: {
           admin: [],
           User: ['sourceUserId'],
+          OrganizationUser: ['sourceOrganizationId', 'sourceUserId'],
           Organization: ['sourceOrganizationId'],
           Space: ['sourceSpaceId'],
+          SpaceUser: ['sourceOrganizationId', 'sourceSpaceId', 'sourceUserId'],
+          Integration: ['sourceIntegrationId'],
+          Token: ['sourceTokenId'],
         },
       },
       {
@@ -235,8 +299,12 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
         fkMap: {
           admin: [],
           User: ['targetUserId'],
+          OrganizationUser: ['targetOrganizationId', 'targetUserId'],
           Organization: ['targetOrganizationId'],
           Space: ['targetSpaceId'],
+          SpaceUser: ['targetOrganizationId', 'targetSpaceId', 'targetUserId'],
+          Integration: ['targetIntegrationId'],
+          Token: ['targetTokenId'],
         },
       },
     ],
@@ -298,6 +366,7 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           CustomerRef: ['subjectCustomerRefId'],
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
+          Entitlement: ['subjectEntitlementId'],
         },
       },
     ],
@@ -311,6 +380,17 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           User: ['userId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  IntegrationRecord: {
+    axes: [
+      {
+        field: 'model',
+        fkMap: {
+          CustomerRef: ['customerRefId'],
         },
       },
     ],
@@ -332,8 +412,25 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       },
     ],
   },
-};
+} as const satisfies Partial<Record<ModelName, PolymorphicConfig>>;
+
+const polymorphicConfigs: Partial<Record<ModelName, PolymorphicConfig>> = PolymorphismRegistry;
 
 // Helper to get config for a model
 export const getPolymorphismConfig = (model: ModelName): PolymorphicConfig | null =>
-  PolymorphismRegistry[model] ?? null;
+  polymorphicConfigs[model] ?? null;
+
+export const polymorphicAxis = (model: ModelName, axisField: string): PolymorphicAxis => {
+  const axis = getPolymorphismConfig(model)?.axes.find(
+    (candidate) => candidate.field === axisField,
+  );
+  if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
+  return axis;
+};
+
+export const delegatedKeys = (axis: PolymorphicAxis, value: unknown): string[] => {
+  const parent = axis.delegates?.[value as PolymorphicValue];
+  if (!parent) return [];
+  const parentAxis = polymorphicAxis(parent, axis.field);
+  return [...new Set(Object.values(parentAxis.fkMap).flat())] as string[];
+};

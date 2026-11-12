@@ -43,19 +43,39 @@ describe('delivery policy', () => {
   test('manual previews bypass auto selection, never fork or closed-PR restrictions', () => {
     const config = fresh();
     expect(
-      planDelivery(config, { kind: 'deploy-preview', number: 12, sameRepository: true, closed: false }).action,
+      planDelivery(config, {
+        kind: 'deploy-preview',
+        number: 12,
+        sameRepository: true,
+        closed: false,
+      }).action,
     ).toBe('deploy');
     expect(
-      planDelivery(config, { kind: 'deploy-preview', number: 12, sameRepository: false, closed: false }).action,
+      planDelivery(config, {
+        kind: 'deploy-preview',
+        number: 12,
+        sameRepository: false,
+        closed: false,
+      }).action,
     ).toBe('skip');
     expect(
-      planDelivery(config, { kind: 'deploy-preview', number: 12, sameRepository: true, closed: true }).action,
+      planDelivery(config, {
+        kind: 'deploy-preview',
+        number: 12,
+        sameRepository: true,
+        closed: true,
+      }).action,
     ).toBe('skip');
   });
   test('close/merge always plans cleanup, including manual drafts and formerly untrusted PRs', () => {
     expect(
-      planDelivery(fresh(), { kind: 'pull-request', number: 12, draft: true, sameRepository: false, closed: true })
-        .action,
+      planDelivery(fresh(), {
+        kind: 'pull-request',
+        number: 12,
+        draft: true,
+        sameRepository: false,
+        closed: true,
+      }).action,
     ).toBe('teardown');
     expect(planDelivery(fresh(), { kind: 'teardown', number: 12 }).target).toBe('pr-12');
     expect(() => planDelivery(fresh(), { kind: 'teardown', number: -1 })).toThrow();
@@ -67,13 +87,18 @@ describe('delivery policy', () => {
     expect(() => updateCicdSettings(fresh(), ['--pr=auto', '--pr=manual'])).toThrow();
     expect(() => updateCicdSettings(fresh(), ['--unknown=true'])).toThrow();
     expect(() => updateCicdSettings(fresh(), ['--staging-branch=main'])).toThrow();
-    expect(updateCicdSettings(fresh(), ['--approvals=100']).pullRequests.requiredApprovals).toBe(100);
+    expect(updateCicdSettings(fresh(), ['--approvals=100']).pullRequests.requiredApprovals).toBe(
+      100,
+    );
   });
   test('headless settings persist independently without stale reads', async () => {
     const root = await mkdtemp(join(tmpdir(), 'template-cicd-'));
     try {
       await saveCicdConfig(fresh(), root);
-      await configureCicd(['--section=cicd', '--approvals=3', '--bot-approvals=on', '--staging=on'], root);
+      await configureCicd(
+        ['--section=cicd', '--approvals=3', '--bot-approvals=on', '--staging=on'],
+        root,
+      );
       expect((await loadCicdConfig(root)).pullRequests.requiredApprovals).toBe(3);
       await configureCicd(['--approvals=0', '--pr=auto'], root);
       const value = await loadCicdConfig(root);
@@ -88,7 +113,11 @@ describe('delivery policy', () => {
 });
 
 describe('merge approvals', () => {
-  const review = (id: number, authorId: number, overrides: Partial<PullRequestReview> = {}): PullRequestReview => ({
+  const review = (
+    id: number,
+    authorId: number,
+    overrides: Partial<PullRequestReview> = {},
+  ): PullRequestReview => ({
     id,
     authorId,
     authorType: 'User',
@@ -106,7 +135,10 @@ describe('merge approvals', () => {
       review(4, 3, { commitId: 'old' }),
       review(5, 4, { canApprove: false }),
     ];
-    expect(evaluateApprovals(policy, 'head', 1, reviews)).toMatchObject({ approved: false, count: 1 });
+    expect(evaluateApprovals(policy, 'head', 1, reviews)).toMatchObject({
+      approved: false,
+      count: 1,
+    });
     expect(evaluateApprovals(policy, 'head', 1, [...reviews, review(6, 5)])).toMatchObject({
       approved: true,
       count: 2,
@@ -116,17 +148,23 @@ describe('merge approvals', () => {
     const policy = fresh().pullRequests;
     const reviews = [review(1, 2, { authorType: 'Bot' })];
     expect(evaluateApprovals(policy, 'head', 1, reviews).approved).toBe(false);
-    expect(evaluateApprovals({ ...policy, allowBotApprovals: true }, 'head', 1, reviews).approved).toBe(true);
-    expect(evaluateApprovals({ ...policy, requiredApprovals: 0 }, 'head', 1, []).approved).toBe(true);
+    expect(
+      evaluateApprovals({ ...policy, allowBotApprovals: true }, 'head', 1, reviews).approved,
+    ).toBe(true);
+    expect(evaluateApprovals({ ...policy, requiredApprovals: 0 }, 'head', 1, []).approved).toBe(
+      true,
+    );
   });
   test('dismissal and change requests revoke approval; comments do not; arrival order is irrelevant', () => {
     const policy = fresh().pullRequests;
-    expect(evaluateApprovals(policy, 'head', 1, [review(3, 2, { state: 'DISMISSED' }), review(1, 2)]).approved).toBe(
-      false,
-    );
-    expect(evaluateApprovals(policy, 'head', 1, [review(1, 2), review(2, 2, { state: 'COMMENTED' })]).approved).toBe(
-      true,
-    );
+    expect(
+      evaluateApprovals(policy, 'head', 1, [review(3, 2, { state: 'DISMISSED' }), review(1, 2)])
+        .approved,
+    ).toBe(false);
+    expect(
+      evaluateApprovals(policy, 'head', 1, [review(1, 2), review(2, 2, { state: 'COMMENTED' })])
+        .approved,
+    ).toBe(true);
     expect(
       evaluateApprovals(policy, 'head', 1, [
         review(1, 2),
@@ -144,18 +182,23 @@ describe('database release policy', () => {
   });
   test('releases seed system data under both strategies', () => {
     expect(databaseReleaseCommands('schema-push', [], true)[1]?.slice(-1)).toEqual(['db:seed']);
-    expect(databaseReleaseCommands('migrations', ['0_init/migration.sql'], true)[1]?.slice(-1)).toEqual(['db:seed']);
+    expect(
+      databaseReleaseCommands('migrations', ['0_init/migration.sql'], true)[1]?.slice(-1),
+    ).toEqual(['db:seed']);
   });
   test('seeding can be turned off explicitly', () => {
     expect(databaseReleaseCommands('schema-push', [], false).flat()).not.toContain('db:seed');
-    expect(databaseReleaseCommands('migrations', ['0_init/migration.sql'], false).flat()).not.toContain('db:seed');
+    expect(
+      databaseReleaseCommands('migrations', ['0_init/migration.sql'], false).flat(),
+    ).not.toContain('db:seed');
   });
   test('migration mode requires a baseline and schema push cannot bypass existing migrations', () => {
     expect(() => databaseReleaseCommands('migrations', [], true)).toThrow('baseline');
-    expect(() => databaseReleaseCommands('schema-push', ['0_init/migration.sql'], true)).toThrow('Select migrations');
-    expect(databaseReleaseCommands('migrations', ['0_init/migration.sql'], true)[0].slice(-2)).toEqual([
-      'migrate',
-      'deploy',
-    ]);
+    expect(() => databaseReleaseCommands('schema-push', ['0_init/migration.sql'], true)).toThrow(
+      'Select migrations',
+    );
+    expect(
+      databaseReleaseCommands('migrations', ['0_init/migration.sql'], true)[0].slice(-2),
+    ).toEqual(['migrate', 'deploy']);
   });
 });

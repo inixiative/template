@@ -10,16 +10,25 @@ export {
   hasPendingSpills,
   spillToOutbox,
 } from '#/jobs/outbox/accumulator';
-export { laneDepthCap, lowWater, MAX_DRAIN_ATTEMPTS, maxQueueDepth, maxSlowQueueDepth } from '#/jobs/outbox/config';
+export {
+  laneDepthCap,
+  lowWater,
+  MAX_DRAIN_ATTEMPTS,
+  maxQueueDepth,
+  maxSlowQueueDepth,
+} from '#/jobs/outbox/config';
 export {
   clearOverflow,
+  createDepthEstimator,
   isLaneOverflowing,
   isOverflowing,
+  recordAddAndTripIfFull,
   renewOverflow,
+  tripFromDepths,
   tripIfFull,
   warnIfOverflowStuck,
   withOverflowRenew,
 } from '#/jobs/outbox/flag';
 export { runOnOutboxQueue } from '#/jobs/outbox/mutex';
-export { laneDepth, type QueueDepths, queueDepth, queueDepths } from '#/jobs/outbox/queueDepth';
+export { laneDepth, laneDepthsFrom, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 export { type OutboxRow, outboxLaneOf, type SpillOptions, shouldSpill } from '#/jobs/outbox/types';

@@ -1,10 +1,14 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import { Role } from '@template/db/generated/client/enums';
+import {
+  type EntitlementsOverride,
+  storeEntitlements,
+} from '@template/db/test/factories/entitlementFactory';
 import { createFactory } from '@template/db/test/factory';
 import type { BuildContext, CreateInputOf, TypedBuildResult } from '@template/db/test/factoryTypes';
 
@@ -29,7 +33,11 @@ export const buildSpaceUser = (
   context?: BuildContext,
 ): Promise<Result> => spaceUserFactory.build(overrides, context) as Promise<Result>;
 
-export const createSpaceUser = (
-  overrides?: Partial<CreateInputOf<'SpaceUser'>>,
+export const createSpaceUser = async (
+  { entitlements, ...overrides }: Partial<CreateInputOf<'SpaceUser'>> & EntitlementsOverride = {},
   context?: BuildContext,
-): Promise<Result> => spaceUserFactory.create(overrides, context) as Promise<Result>;
+): Promise<Result> => {
+  const result = (await spaceUserFactory.create(overrides, context)) as Result;
+  await storeEntitlements({ model: 'SpaceUser', row: result.entity }, entitlements ?? []);
+  return result;
+};

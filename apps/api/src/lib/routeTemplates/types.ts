@@ -8,11 +8,13 @@ import type { RouteConfig, z } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { Module } from '#/modules/modules';
 
-// biome-ignore lint/suspicious/noExplicitAny: Allow any Zod object for params/query
-export type ZodSchema = z.ZodObject<any>;
+export type ZodSchema = z.ZodObject<Record<string, z.ZodType>>;
 
-// biome-ignore lint/suspicious/noExplicitAny: Allow any Zod type for responses
-export type ZodResponseSchema = z.ZodObject<any> | z.ZodUnion<any> | z.ZodArray<any> | z.ZodTypeAny;
+export type ZodResponseSchema = z.ZodType;
+
+export type RequestRefinement = {
+  bivarianceHack(value: unknown, ctx: z.RefinementCtx): void | Promise<void>;
+}['bivarianceHack'];
 
 export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'request'> & {
   model: Module;
@@ -23,6 +25,9 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   responseSchema?: ZodResponseSchema;
   bodySchema?: ZodSchema;
   bodyRequired?: boolean;
+  bodyRefinement?: RequestRefinement;
+  queryRefinement?: RequestRefinement;
+  paramsRefinement?: RequestRefinement;
   sanitizeKeys?: readonly string[];
   skipId?: boolean;
   many?: boolean;
@@ -30,4 +35,5 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   admin?: boolean;
   internal?: boolean;
   filterLens?: LensNarrowing;
+  includeDeleted?: boolean;
 };

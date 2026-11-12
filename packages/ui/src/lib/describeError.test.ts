@@ -17,14 +17,20 @@ describe('describeError', () => {
   });
 
   it('reads better-auth client error objects', () => {
-    expect(describeError({ status: 401, statusText: 'Unauthorized', code: 'INVALID_TOKEN' }, 'x').detail).toBe(
-      'INVALID_TOKEN',
-    );
+    expect(
+      describeError({ status: 401, statusText: 'Unauthorized', code: 'INVALID_TOKEN' }, 'x').detail,
+    ).toBe('INVALID_TOKEN');
   });
 
   it('omits detail when there is no raw message or it repeats the friendly one', () => {
-    expect(describeError(undefined, 'Log in failed.')).toEqual({ message: 'Log in failed.', detail: undefined });
-    expect(describeError('Log in failed.', 'Log in failed.')).toEqual({ message: 'Log in failed.', detail: undefined });
+    expect(describeError(undefined, 'Log in failed.')).toEqual({
+      message: 'Log in failed.',
+      detail: undefined,
+    });
+    expect(describeError('Log in failed.', 'Log in failed.')).toEqual({
+      message: 'Log in failed.',
+      detail: undefined,
+    });
   });
 
   it('without a friendly message, shows the raw error with stack or body as detail', () => {

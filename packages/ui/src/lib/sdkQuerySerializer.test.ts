@@ -25,7 +25,8 @@ const ADMIN_READ_MANY_FNS = [
   'adminWebhookSubscriptionReadMany',
 ];
 
-const QUERY_SERIALIZER_LITERAL = "querySerializer: { parameters: { searchFields: { object: { style: 'form' } } } }";
+const QUERY_SERIALIZER_LITERAL =
+  "querySerializer: { parameters: { searchFields: { object: { style: 'form' } } } }";
 
 describe('admin readMany SDK querySerializer', () => {
   const sdk = readFileSync(SDK_PATH, 'utf8');

@@ -6,27 +6,24 @@
  */
 import { channelKey } from '@template/shared/ws/channelKey';
 
-// Live queries and data streams, keyed by operationId and named by channelKey(queryKey). Authorization is the
-// route itself — subscribe probes the operation with the connection's credential; open requests it.
 export const WS_CHANNELS = {
   inquiryRead: {
-    type: 'query',
     name: (id: string) => channelKey({ _id: 'inquiryRead', path: { id } }),
   },
-  segmentReadManySegmentMembers: {
-    type: 'query',
-    name: (id: string) => channelKey({ _id: 'segmentReadManySegmentMembers', path: { id } }),
+  meReadManySegmentMemberships: {
+    name: () => channelKey({ _id: 'meReadManySegmentMemberships' }),
+    me: true,
   },
-  organizationReadManyContacts: {
-    type: 'stream',
-    name: (id: string) => channelKey({ _id: 'organizationReadManyContacts', path: { id } }),
+  organizationReadManySegmentMemberships: {
+    name: (id: string) =>
+      channelKey({ _id: 'organizationReadManySegmentMemberships', path: { id } }),
+  },
+  spaceReadManySegmentMemberships: {
+    name: (id: string) => channelKey({ _id: 'spaceReadManySegmentMemberships', path: { id } }),
+  },
+  segmentReadManySegmentMembers: {
+    name: (id: string) => channelKey({ _id: 'segmentReadManySegmentMembers', path: { id } }),
   },
 } as const;
 
 export type WSChannelFamily = keyof typeof WS_CHANNELS;
-
-export type WSChannelType = (typeof WS_CHANNELS)[WSChannelFamily]['type'];
-
-export type WSStreamFamily = {
-  [F in WSChannelFamily]: (typeof WS_CHANNELS)[F]['type'] extends 'stream' ? F : never;
-}[WSChannelFamily];

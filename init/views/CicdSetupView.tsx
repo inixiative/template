@@ -6,7 +6,13 @@ import { type CicdConfig, loadCicdConfig } from '../../scripts/cicd/config';
 import { configureCicd } from '../tasks/cicdSettings';
 import { useConfig } from '../utils/configState';
 
-export const CicdSetupView = ({ onComplete, onCancel }: { onComplete: () => void; onCancel: () => void }) => {
+export const CicdSetupView = ({
+  onComplete,
+  onCancel,
+}: {
+  onComplete: () => void;
+  onCancel: () => void;
+}) => {
   const { syncConfig } = useConfig();
   const [config, setConfig] = useState<CicdConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +75,10 @@ export const CicdSetupView = ({ onComplete, onCancel }: { onComplete: () => void
               label: `Staging: ${config.staging.enabled ? 'on' : 'off'}`,
               value: `--staging=${config.staging.enabled ? 'off' : 'on'}`,
             },
-            { label: `Required merge approvals: ${config.pullRequests.requiredApprovals}`, value: 'approvals' },
+            {
+              label: `Required merge approvals: ${config.pullRequests.requiredApprovals}`,
+              value: 'approvals',
+            },
             {
               label: `Bot approvals: ${config.pullRequests.allowBotApprovals ? 'allowed' : 'excluded'}`,
               value: `--bot-approvals=${config.pullRequests.allowBotApprovals ? 'off' : 'on'}`,
@@ -93,7 +102,9 @@ export const CicdSetupView = ({ onComplete, onCancel }: { onComplete: () => void
       ) : !error ? (
         <Text>Loading…</Text>
       ) : null}
-      <Text dimColor>Pre/post checks and cleanup on merge/close remain enabled. Esc to go back.</Text>
+      <Text dimColor>
+        Pre/post checks and cleanup on merge/close remain enabled. Esc to go back.
+      </Text>
     </Box>
   );
 };

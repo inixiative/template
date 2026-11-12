@@ -7,6 +7,7 @@
 export {
   captureTraceContext,
   context,
+  incrementCounter,
   metrics,
   recordDuration,
   SpanKind,

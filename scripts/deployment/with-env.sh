@@ -45,9 +45,10 @@ run_with_env_overrides() {
 # CI builds run this (e.g. generate:sdk via `with local api`) with NO infisical
 # CLI and rely on injected env / .env files. If the CLI is absent we MUST skip to
 # .env composition, never exit non-zero.
-# When the CLI IS present + a projectId is configured (local dev), infisical is the
-# source of truth: don't silently fall back to .env, and fail loudly if the dev
-# isn't logged in (probe below) rather than running against missing secrets.
+# Infisical is a try, not a requirement: when it is there and authenticated it is
+# the base layer, and when it is not we say so on stderr and carry on with .env
+# files. Nothing here should make a developer log in to generate an artifact or
+# push a local schema.
 if [ "$ENV" != "test" ] && command -v infisical &> /dev/null; then
     PROJECT_ID=$(bash "$SCRIPT_DIR/read-project-config.sh" infisical.projectId)
 
@@ -66,18 +67,17 @@ if [ "$ENV" != "test" ] && command -v infisical &> /dev/null; then
             fi
         fi
 
-        # Probe auth with a no-op so a logged-out shell gets a clear error
-        # instead of infisical's cryptic interactive-login failure.
-        if ! infisical run --projectId="$PROJECT_ID" --env="$INFISICAL_ENV" --path="/$APP" -- true </dev/null >/dev/null 2>&1; then
-            echo "ERROR: not authenticated with Infisical (env '$INFISICAL_ENV', path '/$APP')." >&2
-            echo "Run 'infisical login' and try again." >&2
-            exit 1
+        # Probe auth with a no-op. A logged-out shell falls back to .env files
+        # rather than stopping: whatever lives only in Infisical will be absent,
+        # and the warning says so, so a missing value is not a mystery.
+        if infisical run --projectId="$PROJECT_ID" --env="$INFISICAL_ENV" --path="/$APP" -- true </dev/null >/dev/null 2>&1; then
+            # Infisical injects first, then run_with_env_overrides sources .env
+            # files which overwrite any Infisical-set vars by the same name.
+            export -f run_with_env_overrides
+            exec infisical run --projectId="$PROJECT_ID" --env="$INFISICAL_ENV" --path="/$APP" --include-imports -- bash -c 'run_with_env_overrides "$@"' bash "$@"
         fi
 
-        # Infisical injects first, then run_with_env_overrides sources .env
-        # files which overwrite any Infisical-set vars by the same name.
-        export -f run_with_env_overrides
-        exec infisical run --projectId="$PROJECT_ID" --env="$INFISICAL_ENV" --path="/$APP" --include-imports -- bash -c 'run_with_env_overrides "$@"' bash "$@"
+        echo "warning: not authenticated with Infisical (env '$INFISICAL_ENV', path '/$APP') — using .env files only; secrets kept only in Infisical will be missing. Run 'infisical login' if you need them." >&2
     fi
 fi
 

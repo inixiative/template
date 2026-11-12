@@ -9,7 +9,10 @@ import type { AppEventPayload, EmailHandoff } from '#/appEvents/types';
 import { enqueueJob } from '#/jobs/enqueue';
 import { plannerJobId } from '#/lib/email/idempotency';
 
-export const deliverEmailHandoffs = async (event: AppEventPayload, handoffs: EmailHandoff[]): Promise<void> => {
+export const deliverEmailHandoffs = async (
+  event: AppEventPayload,
+  handoffs: EmailHandoff[],
+): Promise<void> => {
   await Promise.all(
     handoffs.map(async (handoff) => {
       const job = await enqueueJob(

@@ -31,7 +31,9 @@ describe('makeBroadcastRegistry', () => {
 
   it('getOrDefault throws when fallback is missing', () => {
     const registry = makeBroadcastRegistry<{ value: number }>();
-    expect(() => registry.getOrDefault(undefined, 'missing')).toThrow('Default adapter not found: missing');
+    expect(() => registry.getOrDefault(undefined, 'missing')).toThrow(
+      'Default adapter not found: missing',
+    );
   });
 
   it('broadcasts to all registered adapters', async () => {

@@ -12,12 +12,13 @@ const { fields: encryptionFields, applyRefinements: applyEncryptionRefinements }
 
 const jobEnvFields = {
   JOBS_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
-  JOBS_MAX_QUEUE_DEPTH: z.coerce.number().int().positive().default(10_000),
+  JOBS_MAX_QUEUE_DEPTH: z.coerce.number().int().positive().default(100_000),
   JOBS_OUTBOX_FLUSH_MAX_ROWS: z.coerce.number().int().positive().default(1000),
-  JOBS_OUTBOX_FLUSH_LINGER_MS: z.coerce.number().int().nonnegative().default(200),
   JOBS_OVERFLOW_STUCK_MS: z.coerce.number().int().positive().default(300_000),
   JOBS_OVERFLOW_TTL_MS: z.coerce.number().int().positive().default(60_000),
   JOBS_SLOW_QUEUE_DEPTH_FRACTION: z.coerce.number().min(0).max(1).default(0.5),
+  JOBS_SLOW_SLOT_FRACTION: z.coerce.number().min(0).max(1).default(0.5),
+  JOBS_SLOW_PARK_MAX_MS: z.coerce.number().int().min(1_000).default(60_000),
   EMAIL_SLOW_LANE_MIN_RECIPIENTS: z.coerce.number().int().nonnegative().default(25),
 };
 
@@ -27,10 +28,13 @@ const parseJobEnvOverride: EnvOverrideParser = (key, override, current) => {
   return parsedOverride.success ? parsedOverride.data : current;
 };
 
-const preprocessEnv = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
+const preprocessEnv = (
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> => {
   return Object.fromEntries(
     Object.entries(env).filter(
-      ([key, value]) => value !== '' || (key.startsWith('OTEL_EXPORTER_OTLP_') && key.endsWith('_HEADERS')),
+      ([key, value]) =>
+        value !== '' || (key.startsWith('OTEL_EXPORTER_OTLP_') && key.endsWith('_HEADERS')),
     ),
   );
 };
@@ -48,7 +52,9 @@ const baseEnvSchema = z
 
     // Core (defaults)
     PORT: z.coerce.number().default(8000),
-    LOG_LEVEL: z.enum(['silent', 'fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose']).optional(),
+    LOG_LEVEL: z
+      .enum(['silent', 'fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose'])
+      .optional(),
 
     // URLs
     API_URL: z.string().url(),
@@ -108,4 +114,6 @@ const parsed = isTest
   ? baseEnvSchema.partial().parse(preprocessEnv(process.env))
   : envSchema.parse(preprocessEnv(process.env));
 // In test the parsed env is wrapped so setEnvOverride/withEnv overrides win over reads.
-process.env = (isTest ? wrapEnvWithOverrides(parsed, parseJobEnvOverride) : parsed) as unknown as NodeJS.ProcessEnv;
+process.env = (isTest
+  ? wrapEnvWithOverrides(parsed, parseJobEnvOverride)
+  : parsed) as unknown as NodeJS.ProcessEnv;

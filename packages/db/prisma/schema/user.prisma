@@ -3,10 +3,12 @@
 // ============================================================================
 
 model User {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
 
   email         String  @unique
   emailVerified Boolean @default(false)
@@ -14,9 +16,11 @@ model User {
   displayName   String?
   image         String?
 
-  // Stamped on sign-in by the lastLoginAt hook (off Session create). Operational, not
+  // Stamped on sign-in by jwtHandoff when it issues the JWT. Operational, not
   // versioned — see registries/ignoreFields.
   lastLoginAt DateTime?
+  // Every person JWT carries it as `ver`; incrementing it signs the user out everywhere.
+  jwtVersion  Int       @default(0)
 
   // Platform-level role (for superadmin access)
   platformRole PlatformRole @default(user)
@@ -30,6 +34,7 @@ model User {
   cronJobsCreated        CronJob[]
   webhookSubscriptions   WebhookSubscription[]
   integrations           Integration[]
+  projects               Project[]
   contacts               Contact[]
   tagAttachments         TagAttachment[]
   tags                   Tag[]
@@ -45,6 +50,7 @@ model User {
   communicationsSent     CommunicationLog[]    @relation("CommunicationSenderUser")
   communicationsReceived CommunicationLog[]    @relation("CommunicationRecipientUser")
   segments               Segment[]
+  flows                  Flow[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind registry
+ * @kind constructor, registry
+ * @constructs adapterRegistry
  * @partOf primitive:shared
  * @uses none
  */

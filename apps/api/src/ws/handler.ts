@@ -6,22 +6,24 @@
  */
 import { LogScope, log } from '@template/shared/logger';
 import { createSerializedQueue } from '@template/shared/utils';
+import { WS_MAX_PENDING_FRAMES } from '@template/shared/ws';
 import type { Server } from 'bun';
 import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import { closeDataStream, openDataStream } from '#/ws/dataStreams';
 import { sendTo } from '#/ws/delivery';
+import { frameError } from '#/ws/frameError';
+import { overFrameLimit } from '#/ws/frameRateLimit';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
+import { isMeChannel, meChannel } from '#/ws/meChannel';
 import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
 import { addConnection, byId, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
-import type { WSData, WSMessage, WSSocket } from '#/ws/types';
+import type { StreamFrame, WSData, WSMessage, WSSocket } from '#/ws/types';
 
 type WSServer = Server<WSData>;
 
-// Periodic stale-connection sweep. Started explicitly from server startup (not a
-// module-load side effect, so importing the handler in tests doesn't spin a timer).
 const staleSweep = makeUnrefInterval({
   intervalMs: 60_000,
   tick: () => {
@@ -32,109 +34,114 @@ const staleSweep = makeUnrefInterval({
 export const startStaleSweep = staleSweep.start;
 export const stopStaleSweep = staleSweep.stop;
 
-// Promote an HTTP request to a WebSocket. Anonymous by default — identity is set
-// later by the authenticate message, never at the handshake. server.upgrade
-// returns true when Bun took over the connection (return undefined); false means
-// we must return a Response ourselves.
 export const acceptWebSocket = (req: Request, server: WSServer): Response | undefined => {
   const now = Date.now();
   const data: WSData = {
-    connectionId: crypto.randomUUID(),
+    connectionId: Bun.randomUUIDv7(),
     userId: null,
     headers: {},
     channels: new Set(),
     streams: new Set(),
     heldAppends: new Map(),
+    latestStreamFrames: new Map(),
     connectedAt: now,
     lastPing: now,
     queue: createSerializedQueue(),
   };
-  return server.upgrade(req, { data }) ? undefined : new Response('Upgrade failed', { status: 426 });
+  return server.upgrade(req, { data })
+    ? undefined
+    : new Response('Upgrade failed', { status: 426 });
 };
 
-// Parse an untrusted client frame. Malformed JSON → null (dropped). This is the
-// one network-boundary parse that legitimately guards against a throw; the caller
-// then guards on null.
 const parseFrame = (raw: string | Buffer): WSMessage | null => {
   try {
-    return JSON.parse(raw.toString()) as WSMessage;
+    const parsed: unknown = JSON.parse(raw.toString());
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    return typeof (parsed as { action?: unknown }).action === 'string'
+      ? (parsed as WSMessage)
+      : null;
   } catch {
     return null;
   }
+};
+
+const isStreamFrame = (msg: WSMessage): msg is StreamFrame =>
+  msg.action === 'open' || msg.action === 'close';
+
+// An open a later open or close of the same stream superseded while queued skips its snapshot read;
+// it is still answered, since the client counts one answer per open it sent.
+const takeLatestStreamFrame = (ws: WSSocket, msg: StreamFrame): boolean => {
+  if (ws.data.latestStreamFrames.get(msg.stream) !== msg) return false;
+  ws.data.latestStreamFrames.delete(msg.stream);
+  return true;
+};
+
+const filedUnder = (ws: WSSocket, channel: string): string | null => {
+  if (!isMeChannel(channel)) return channel;
+  return ws.data.userId ? meChannel(channel, ws.data.userId) : null;
 };
 
 const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
   switch (msg.action) {
     case 'authenticate': {
       const headers = sanitizeWSHeaders(msg.headers);
-      const me = await resolveIdentity(headers);
-      // Socket may have closed during the probe; skip re-indexing a connection already gone from byId.
+      const identity = await resolveIdentity(headers);
       if (!byId.has(ws.data.connectionId)) return;
-      // A spoof header /me doesn't honor (non-superadmin) is a rejection, not a silent keep.
+      if (identity.status === 'retryable') {
+        sendTo(ws, frameError(msg));
+        return;
+      }
+      const actor = identity.status === 'resolved' ? identity : null;
+      // A spoof header /identify doesn't honor (non-superadmin) is a rejection, not a silent keep.
       const spoofEmail = headers['x-spoof-user-email'];
-      if (spoofEmail && (!me || normalizeEmail(me.email) !== normalizeEmail(spoofEmail))) {
+      if (
+        spoofEmail &&
+        (!actor?.email || normalizeEmail(actor.email) !== normalizeEmail(spoofEmail))
+      ) {
         sendTo(ws, { type: 'spoofRejected' });
         return;
       }
-      setIdentity(ws, me?.id ?? null);
-      ws.data.headers = me ? headers : {};
-      sendTo(ws, { type: 'identity', userId: me?.id ?? null });
+      setIdentity(ws, actor?.userId ?? null, actor ? headers : {});
+      sendTo(ws, { type: 'identity', userId: actor?.userId ?? null });
       return;
     }
     case 'logout': {
-      setIdentity(ws, null);
-      ws.data.headers = {};
+      setIdentity(ws, null, {});
       sendTo(ws, { type: 'identity', userId: null });
       return;
     }
     case 'subscribe': {
       const granted = await canSubscribe(ws.data.headers, msg.channel);
       if (!byId.has(ws.data.connectionId)) return;
-      if (!granted) {
+      const indexed = filedUnder(ws, msg.channel);
+      if (!granted || !indexed) {
         sendTo(ws, { type: 'subscribeRejected', channel: msg.channel });
         return;
       }
-      subscribeToChannel(ws, msg.channel);
+      subscribeToChannel(ws, indexed);
       sendTo(ws, { type: 'subscribed', channel: msg.channel });
       return;
     }
     case 'unsubscribe': {
-      unsubscribeFromChannel(ws, msg.channel);
+      const indexed = filedUnder(ws, msg.channel);
+      if (indexed) unsubscribeFromChannel(ws, indexed);
       sendTo(ws, { type: 'unsubscribed', channel: msg.channel });
       return;
     }
     case 'open': {
+      if (!takeLatestStreamFrame(ws, msg)) {
+        sendTo(ws, { type: 'opened', stream: msg.stream });
+        return;
+      }
       await openDataStream(ws, msg.stream);
       return;
     }
     case 'close': {
+      takeLatestStreamFrame(ws, msg);
       closeDataStream(ws, msg.stream);
       return;
     }
-    case 'ping': {
-      updateLastPing(ws);
-      sendTo(ws, { type: 'pong' });
-      return;
-    }
   }
-};
-
-// Backpressure: a socket flooding frames grows the per-connection queue without bound (each
-// dispatch awaits I/O). Cap pending dispatches and overall frame rate; abusers are closed.
-const MAX_PENDING_FRAMES = 32;
-const FRAME_LIMIT = 120;
-const FRAME_WINDOW_MS = 10_000;
-const frameWindows = new WeakMap<WSSocket, { start: number; count: number }>();
-
-const overFrameLimit = (ws: WSSocket): boolean => {
-  const now = Date.now();
-  const window = frameWindows.get(ws);
-  if (!window || now - window.start > FRAME_WINDOW_MS) {
-    frameWindows.set(ws, { start: now, count: 1 });
-    return false;
-  }
-  window.count++;
-  return window.count > FRAME_LIMIT;
 };
 
 export const websocketHandler = {
@@ -145,17 +152,25 @@ export const websocketHandler = {
   close(ws: WSSocket) {
     removeConnection(ws);
   },
-  // Returns the dispatch promise (Bun ignores it; tests await it). Per-connection
-  // serializedQueue keeps async identity actions from interleaving; the catch is the ws
-  // error boundary — a failed dispatch stays scoped to its connection.
+  // Returns the dispatch promise: Bun ignores it, tests await it.
   message(ws: WSSocket, raw: string | Buffer) {
     if (overFrameLimit(ws)) {
       ws.close(1008, 'rate limit exceeded');
       return;
     }
-    if (ws.data.queue.size() >= MAX_PENDING_FRAMES) return;
     const msg = parseFrame(raw);
     if (!msg) return;
+    // Liveness must not wait behind queued snapshot reads or the re-authorization sweep.
+    if (msg.action === 'ping') {
+      updateLastPing(ws);
+      sendTo(ws, { type: 'pong' });
+      return;
+    }
+    if (ws.data.queue.size() >= WS_MAX_PENDING_FRAMES) {
+      sendTo(ws, frameError(msg));
+      return;
+    }
+    if (isStreamFrame(msg)) ws.data.latestStreamFrames.set(msg.stream, msg);
     return ws.data.queue
       .run(() => dispatch(ws, msg))
       .catch((err) => {
@@ -163,7 +178,7 @@ export const websocketHandler = {
           `ws dispatch failed (${msg.action}): ${err instanceof Error ? err.message : String(err)}`,
           LogScope.ws,
         );
-        sendTo(ws, { type: 'error', action: msg.action, ...('stream' in msg ? { stream: msg.stream } : {}) });
+        sendTo(ws, frameError(msg));
       });
   },
 };

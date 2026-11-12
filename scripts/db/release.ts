@@ -13,7 +13,9 @@ export const databaseReleaseCommands = (
   seedOnRelease: boolean,
 ) => {
   if (strategy === 'migrations' && migrations.length === 0)
-    throw new Error('Migration mode requires committed migration SQL. Create or verify a baseline before release.');
+    throw new Error(
+      'Migration mode requires committed migration SQL. Create or verify a baseline before release.',
+    );
   if (strategy === 'schema-push' && migrations.length > 0)
     throw new Error(
       'Migration SQL exists but database.strategy is schema-push. Select migrations before release: bun run init:agent --section=cicd --database=migrations',
@@ -40,7 +42,12 @@ if (import.meta.main) {
     config.database.seedOnRelease,
   );
   for (const command of commands) {
-    const child = Bun.spawn(command, { cwd: root, stdin: 'inherit', stdout: 'inherit', stderr: 'inherit' });
+    const child = Bun.spawn(command, {
+      cwd: root,
+      stdin: 'inherit',
+      stdout: 'inherit',
+      stderr: 'inherit',
+    });
     const code = await child.exited;
     if (code !== 0) process.exit(code);
   }

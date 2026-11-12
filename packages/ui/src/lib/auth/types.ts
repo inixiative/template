@@ -29,15 +29,3 @@ export type SignUpResult =
   | { status: 'authenticated' }
   | { status: 'verification-pending'; email: string }
   | { status: 'redirecting' };
-
-export type AuthSession = {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-  };
-  session: {
-    token: string;
-    expiresAt: Date;
-  };
-};

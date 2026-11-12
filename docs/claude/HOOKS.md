@@ -8,27 +8,34 @@
   - [Hook Options](#hook-options)
   - [Action Types](#action-types)
 - [Registering Hooks](#registering-hooks)
+  - [Run order](#run-order)
 - [Application Hooks](#application-hooks)
 - [Audit Log](#audit-log)
   - [Enabling Audit for a Model](#enabling-audit-for-a-model)
   - [Data Captured](#data-captured)
   - [Field Processing Pipeline](#field-processing-pipeline)
+  - [Reading the Log](#reading-the-log)
   - [Soft Delete Detection](#soft-delete-detection)
   - [Registries](#registries)
   - [Actor Context](#actor-context)
 - [Webhooks](#webhooks)
   - [Enabling Webhooks for a Model](#enabling-webhooks-for-a-model)
   - [How It Works](#how-it-works)
+  - [Tenancy (AUTH-006 stopgap)](#tenancy-auth-006-stopgap)
   - [Webhook Payload](#webhook-payload)
+  - [Retries](#retries)
   - [Circuit Breaker](#circuit-breaker)
+  - [Poisoned Records](#poisoned-records)
   - [Ignored Fields](#ignored-fields)
   - [Related Models](#related-models)
 - [Cache Invalidation](#cache-invalidation)
   - [How It Works](#how-it-works)
+  - [Parent edges](#parent-edges)
   - [Wildcard Keys](#wildcard-keys)
 - [False Polymorphism](#false-polymorphism)
   - [Registry](#registry)
   - [Auto-Generated Validation](#auto-generated-validation)
+  - [Request Validation](#request-validation)
   - [Validation Errors](#validation-errors)
 - [Contact Rules](#contact-rules)
   - [Adding a Contact Type](#adding-a-contact-type)
@@ -40,6 +47,7 @@
   - [What it covers](#what-it-covers)
   - [Soft-deleted rows](#soft-deleted-rows)
   - [Bulk-friendly by construction](#bulk-friendly-by-construction)
+  - [Cache invalidation](#cache-invalidation)
   - [Scope strictness](#scope-strictness)
   - [Adding a Model](#adding-a-model)
   - [Limitations](#limitations)
@@ -48,11 +56,10 @@
   - [**FK fields are automatically immutable**](#fk-fields-are-automatically-immutable)
   - [Why Strip Instead of Throw?](#why-strip-instead-of-throw)
 - [Supported Operations](#supported-operations)
-  - [Slow Mutation Logging](#slow-mutation-logging)
 - [Limitations](#limitations)
   - [Rules: Nested Updates Skip Validation](#rules-nested-updates-skip-validation)
   - [Rules: updateManyAndReturn Validates After](#rules-updatemanyandreturn-validates-after)
-  - [Immutable Fields: Only Strips, Never Throws](#immutable-fields-only-strips-never-throws)
+  - [Immutable Fields: Strips Unless Refused](#immutable-fields-strips-unless-refused)
 
 <!-- toc:end -->
 
@@ -70,8 +77,10 @@ All Prisma mutations wrapped with before/after hooks via `mutationLifeCycle` ext
 | `model` | string | Prisma model name |
 | `action` | DbAction | create, update, delete, etc. |
 | `args` | object | Prisma query args |
-| `result` | object/array | Mutation result (after only) |
+| `result` | object/array | Mutation result projected onto the model's columns (after only). An `include` on the write never reaches hooks, so `result` and `previous` have the same shape |
 | `previous` | object/array | Previous state (if fetched) |
+
+To read what a write sets, call `writeData({ action, args })` (`apps/api/src/hooks/shared/hookRows.ts`): it returns the rows as an array, coalesced across single and bulk `create`/`update` and both arms of an `upsert` (`isManyAction(action)` tells single from bulk). Hooks that need the written values read them there, not `args.data` by hand, which misses the bulk and upsert shapes.
 
 ### Action Types
 
@@ -98,6 +107,10 @@ registerDbHook(
 );
 ```
 
+### Run order
+
+Global (`'*'`) hooks wrap model hooks. Before a write, global hooks run first, then model hooks: `immutableFields` strips or refuses the fields an update may not change before any model hook validates the write, so a validator (`rules:update`, `contactRules:update`) only ever sees fields that will be written, and the outcome never depends on which validators read a stripped field. After a write, model hooks run first, then global hooks: `emailVersioning` (global) reads the audit row `auditLog` (model) has just written. Within each group, hooks run in registration order (`registerHooks()` in `apps/api/src/hooks/index.ts`). The rule is `orderHooks` in `packages/db/src/extensions/hookRegistry.ts`.
+
 ---
 
 ## Application Hooks
@@ -107,16 +120,20 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | Hook | Purpose |
 |------|---------|
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
-| `cache` | Cache invalidation on mutations (post-commit) |
+| `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
+| `fullDelegate` | On `Token` and `Integration`: a row written `full` gets `role: null` before the write, and its live entitlement rows are tombstoned after it. On `Entitlement`, a create whose target is a `full` delegate is refused (422 `full takes no entitlements`), whoever writes it |
 | `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
+| `memberSelfGrant` | After an `OrganizationUser` or `SpaceUser` is created (`create`, `createManyAndReturn`, an `upsert` that creates), writes its self-grant as an `Entitlement` row, tombstoned with the member's own `deletedAt` when the member is created tombstoned. `memberSelfGrant:kept` refuses (422) tombstoning a live member's self-grant; only the member's own tombstone takes it ([PERMISSIONS.md](PERMISSIONS.md#the-member-self-grant)) |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
+| `ruleReference` | Keeps `RuleReference` edges in step with each rule-bearing column (`RULE_REFERENCE_SURFACES`, `apps/api/src/hooks/ruleReference/surfaces.ts`: email templates and components, segment `conditions`, `Entitlement.where` read through `entitlementWhereLens`, which names the entitled record by id) |
+| `ruleReference:target` | Copies a named row's `deletedAt` onto the edges that name it, for every edge in `NAMING_EDGES` (`targetHook.ts`): `RuleReference.targetDeletedAt` and `Entitlement.sourceDeletedAt`. A purged row is left to the null FK |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
-| `segmentConditions` | Segment `conditions` required, validated against `segmentLensFor(owner)` + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
+| `segmentConditions` | Segment `conditions` required, validated by `validateSegmentConditions` (against `customerRefLens`, compiled with `resolvedCustomerRefLens(ownerModel, …)`) + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
 | `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
-| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). `HARD_DELETE_ON_TOMBSTONE` hard-deletes ephemeral grants that must not survive a revive — `Session`, `Token`, `WebhookSubscription` |
-| `tagOwnerCategory` | Tag.ownerModel + FK must match its TagCategory's owner |
+| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). Each delete behavior has its own registry, keyed by the child model: `HARD_DELETE_ON_TOMBSTONE` (`@template/db` registries) hard-deletes ephemeral rows that must not survive a revive — `Session`, `WebhookSubscription`, `WebhookEvent`, `RuleReference`, `Flow`; `REGENERATE_ON_REVIVE` rebuilds the derived ones (`RuleReference`) when the parent is revived; `SKIP_REVIVE` (`@template/db` registries: `Token`) tombstones a grant with its parent and never revives it, so a new one has to be issued, and the cascade never reaches its children (a token's entitlement rows stay dead); `CASCADE_EXEMPT` lists the reference relations that never cascade (every `Entitlement` source, every `Inquiry` party, every `RuleReference` target); `validateDeleteBehavior` refuses an inconsistent registry at boot |
+| `tagOwnerCategory` | A created Tag's ownerModel + FK must match its TagCategory's owner. A tag never moves: `tagCategoryId` is refused on update (422) and the owner fields are stripped |
 | `webhooks` | Webhook delivery on mutations (post-commit) |
 
 `apps/api/src/hooks/falsePolymorphism/` lives under `hooks/` but is **not** a runtime hook — it's a pair of transformers (`toRules.ts`, `toImmutableFields.ts`) that inject polymorphism constraints into the rules and immutableFields registries at module load time.
@@ -144,25 +161,33 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 |-------|-------------|
 | `action` | `create`, `update`, or `delete` |
 | `subjectModel` | Which model was mutated |
-| `before` / `after` | Full record state (filtered + redacted) |
+| `before` / `after` | The record's own columns (filtered + redacted). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
 | `changes` | Field-level diff for updates only |
-| `actorUserId` | Who triggered the mutation |
-| `actorSpoofUserId` | Admin acting on behalf of a user |
-| `actorTokenId` | API token used |
+| `actorUserId` | `me(c)`: the JWT's or spoofed user, or the user of an acting User token (a member's, organization's, space's or integration's token names none) |
+| `actorSpoofUserId` | The superadmin spoofing, when spoofing |
+| `actorTokenId` | The acting token (nulled when the token is deleted) |
 | `actorJobName` | Background job name (if triggered by a job) |
+| `actorIntegrationId` | The integration the actor acted through (its token's owner key, or a job's payload) |
+| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorOf` sanitized (redact fields removed); survives the token's deletion |
 | `ipAddress` / `userAgent` | Request metadata |
 | `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
-| `contextOrganizationId` / `contextSpaceId` | Org/space context of the record |
+| `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's tenancy, for filtering the log: its own `organizationId` / `spaceId` / `userId`, or, for a child with none ([parent edges](DATABASE.md#parent-edges)), its parent's (`contextRows`, `apps/api/src/hooks/auditLog/contextRows.ts`). An entitlement row is filed under its holder's tenancy, so an organization's audit view shows the entitlements its members' tokens gained and lost |
+| `subject*Id` | The mutated record, by `subjectModel` |
 
 ### Field Processing Pipeline
 
-Before storing, each record goes through:
+`buildAuditEntry` (`apps/api/src/hooks/auditLog/hook.ts`) runs each record through:
 
-1. **Ignore fields** — strip noise fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`) that don't represent meaningful changes
-2. **Redact fields** — replace sensitive values with `[REDACTED]` (passwords, token hashes, auth secrets)
-3. **Diff** — for updates, compute which fields actually changed (after filtering/redacting)
+1. **Filter** (`filterForAudit` → `filterFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
+2. **Diff** — for updates, `computeDiff` compares the filtered, **unredacted** before/after, so a change to a sensitive column is still detected.
+3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
+4. **Redact** — `redactSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `redactChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
-If an update produces an empty diff (only ignored/redacted fields changed), no audit log is written.
+`processAuditData` (filter + redact) builds the same column-only snapshot for the email-versioning hook.
+
+### Reading the Log
+
+`GET /api/admin/auditLog` (`apps/api/src/modules/admin/auditLog`) pages the log newest first, filtered like any admin list (`searchFields[contextOrganizationId]=…` is an organization's view). `historyModel` + `historyId` narrow it to one record's history: the record's own entries and those of every registered child whose parent it is, in one stream (`auditHistoryWhere`). A child is joined through its row, tombstones included, so a token's history keeps the entitlement rows it lost.
 
 ### Soft Delete Detection
 
@@ -185,20 +210,21 @@ import { auditActorContext } from '@template/db/lib/auditActorContext';
 
 auditActorContext.scope(
   {
-    actorUserId: user.id,
-    actorSpoofUserId: spoofUser?.id,
+    actorUserId: (user ?? token?.user)?.id,
+    actorSpoofUserId: spoofedBy?.id,
     actorTokenId: token?.id,
+    actor: token ? { token: { id, name, keyPrefix, ownerModel, userId, organizationId, spaceId, integrationId } } : null,
+    integrationId: token?.integrationId,
     ipAddress: c.req.header('x-forwarded-for'),
     userAgent: c.req.header('user-agent'),
     sourceInquiryId: inquiry?.id,
-    platformSuperadmin: isSuperadmin(c), // bypasses soft-delete read scoping
-    bypassSoftDeleteScope: false,        // flipped by db.withDeleted()
+    bypassSoftDeleteScope: false, // flipped by db.withDeleted()
   },
   () => next(),
 );
 ```
 
-The same store carries the soft-delete read-scope flags, so anything that bridges this context across a boundary (e.g. into a transaction) carries them too.
+The same store carries the soft-delete bypass flag, so anything that bridges this context across a boundary (e.g. into a transaction) carries them too.
 
 ---
 
@@ -217,10 +243,14 @@ export const webhookEnabledModels: WebhookModel[] = [
 
 ### How It Works
 
-1. DB mutation triggers `webhookDelivery` hook (after commit)
-2. Hook finds active subscriptions for the model
-3. Enqueues `sendWebhook` job for each subscription
-4. Job signs payload with RSA-SHA256 and delivers
+1. A mutation runs the `webhookDelivery` hook (after the write; jobs are scheduled with `db.onCommit`). It acts when the model is webhook-enabled, or when `webhookRelatedModels` lists it as a party of one
+2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRef's parties are its customer and its provider. A related row (a User, Organization or Space) takes the counterparty of every live CustomerRef it sits on, on either axis
+3. It loads only the active subscriptions owned by those parties, and enqueues one `sendWebhook` job per (subscription, changed row), skipping the write's origin integration and no-op updates
+4. The job signs the payload with RSA-SHA256 and delivers it
+
+### Tenancy (AUTH-006 stopgap)
+
+A subscription receives a CustomerRef change when its owner (User, Organization or Space) is one of its two parties. It receives a party's own change when its owner is that party's counterparty on a live CustomerRef: a provider hears its customers, a customer hears its providers. The changed party does not hear its own change, and nothing travels past one CustomerRef. A row that sits on several CustomerRefs, or on both axes, reaches each subscription once. A soft delete (`deletedAt` set) is delivered as `delete`. When a party is soft-deleted, its counterparties still hear it through CustomerRefs the cascade tombstoned with the same `deletedAt`; CustomerRefs deleted earlier stay silent. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
 
 ### Webhook Payload
 
@@ -229,22 +259,43 @@ export const webhookEnabledModels: WebhookModel[] = [
   model: 'User',
   action: 'create' | 'update' | 'delete',
   resourceId: '...',
-  data: { ...fields },
-  previousData: { ...fields },  // For updates only
+  data: { ...columns },
+  previousData: { ...columns },  // For updates only
   timestamp: '2024-01-15T12:00:00.000Z'
 }
 ```
 
 Headers: `Content-Type: application/json`, `X-Webhook-Signature: <base64>`
 
+### Retries
+
+A delivery is one `sendWebhook` job, and its BullMQ attempts (the queue default: 3, exponential
+backoff from 5 s) are its retry cycle. A failure that says the receiver could not take it right now —
+a network error or timeout, any 5xx, 404 or 429 — is recorded as a `retrying` event and rethrown, so
+BullMQ retries the job. The last attempt (`isFinalAttempt(ctx.job)` in `jobs/`) settles the delivery
+as `unreachable` (or `error` for a 429) and the job completes. Every other failure settles on its
+first attempt and is not retried: a blocked redirect, 401 and 403 are configuration the receiver has
+to change, and 400 / 422 are about the record's content, so resending the same bytes gets the same
+answer (see [Poisoned Records](#poisoned-records)).
+
 ### Circuit Breaker
 
-After 5 consecutive failures, subscription auto-disables:
+After 5 consecutive failed deliveries, the subscription auto-disables (`isActive = false`). Only
+settled events count: `retrying` attempts are left out, so a retry cycle counts once, as its outcome.
 
-```typescript
-const FAILURE_THRESHOLD = 5;
-// If last 5 events all failed → isActive = false
-```
+### Poisoned Records
+
+On a subscription with an `integrationId`, one record the receiver keeps rejecting is poisoned
+instead of tripping the circuit. A rejection is an `error` event with `httpStatus` 400 or 422
+(`RECORD_REJECTION` in `sendWebhook.ts`); rejections are never retried, so each one is a delivery.
+Other failures such as redirects, 401, 403 or 429 do not count, and neither do `unreachable` or
+`retrying`. When a record has 3 rejections since its own last
+success, and some other record has delivered since the first of them, `poisonIntegrationRecord`
+stamps `IntegrationRecord.poisonedAt`. `isIntegrationRecordPoisoned({ integrationId, model, resourceId })`
+(`apps/api/src/modules/integration/services/isIntegrationRecordPoisoned.ts`) is the check: `sendWebhook`
+calls it first, and later deliveries of that record are skipped before signing,
+with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp yet. See
+`tickets/INFRA-032-webhook-poisoned-records.md`.
 
 ### Ignored Fields
 
@@ -275,14 +326,19 @@ Use cases:
 
 ### Related Models
 
-Child models can trigger parent webhooks:
+A party's own row changes reach its counterparties on its CustomerRefs. Each party model is registered on both axes:
 
 ```typescript
 // packages/db/src/registries/webhook/relatedModels.ts
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
-  User: [{ model: 'CustomerRef', axis: 'customerModel', value: 'User' }],
+  User: [
+    { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
+    { model: 'CustomerRef', axis: 'providerModel', value: 'User' },
+  ],
 };
 ```
+
+Private fields of a party stay off the row (a settings or config table that is not related), or are dropped from webhooks in `WEBHOOK_NOOP_FIELDS` (`User.platformRole`). A change that touches only dropped fields emits nothing.
 
 ---
 
@@ -297,24 +353,27 @@ Automatic cache clearing on mutations via `cacheReference`.
 ```typescript
 // hooks/cache/constants/cacheReference.ts
 export const cacheReference: CacheReference = {
-  User: (r) => [
-    cacheKey('User', r.id),
-    cacheKey('User', r.email, ['email']),
-  ],
-  Token: (r) => [
-    cacheKey('Token', r.keyHash, ['keyHash']),
-  ],
+  User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
+  Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
+  // ...
 };
 ```
 
-On mutation, all matching cache keys are deleted.
+On mutation, the hook marks the keys of both the previous and the resulting row in the transaction's cache overlay (`queueCacheClear` → `markCacheWritten`). They are cleared when the transaction commits, before its held locks are released and before its `db.onCommit` batches; a failed clear makes `db.txn` throw after those batches run ([REDIS.md - cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)).
+
+### Parent edges
+
+A child whose change is a change to its parent names that parent once, in the parent edge registry (`packages/db/src/registries/parentEdges.ts`, [DATABASE.md](DATABASE.md#parent-edges)). `Entitlement`'s parent is its target: the hook loads the parent rows (`loadParentRows` (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheReference` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
 
 ### Wildcard Keys
 
 ```typescript
-// Delete all sessions for a user
-cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
+cacheKey('user', userId, [], true)  // → cache:user:id:abc:*
 ```
+
+A wildcard clear cancels the `cache()` computes in flight under its pattern (found by their
+single-flight locks), then scans and deletes. Prefer exact keys in the reference map: an exact clear
+is one Lua call, a wildcard clear is two scans.
 
 ---
 
@@ -327,21 +386,23 @@ cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
 Single source of truth in `@template/db` - used by both validation hooks and DB constraints:
 
 ```typescript
-import { FalsePolymorphismRegistry } from '@template/db';
+import { PolymorphismRegistry } from '@template/db';
 
 // packages/db/src/registries/falsePolymorphism.ts
-FalsePolymorphismRegistry = {
-  Token: [{
-    typeField: 'ownerModel',
-    fkMap: {
-      User: ['userId'],                          // Requires userId only
-      Organization: ['organizationId'],          // Requires organizationId only
-      OrganizationUser: ['organizationId', 'userId'],  // Requires both
-    },
-  }],
-  WebhookSubscription: [{ ... }],
-  Inquiry: [{ ... }],  // sourceModel + targetModel
-};
+PolymorphismRegistry = {
+  Token: {
+    axes: [{
+      field: 'ownerModel',
+      fkMap: {
+        User: ['userId'],                          // Requires userId only
+        Organization: ['organizationId'],          // Requires organizationId only
+        OrganizationUser: ['organizationId', 'userId'],  // Requires both
+      },
+    }],
+  },
+  WebhookSubscription: { ... },
+  Inquiry: { ... },  // sourceModel + targetModel axes
+} as const;
 ```
 
 ### Auto-Generated Validation
@@ -351,6 +412,119 @@ The registry auto-generates:
 1. **Rules** - Type field must be a valid enum value
 2. **FK validation** - Required FK fields must be present and non-null
 3. **Immutable fields** - Type field can't change after creation
+
+### Request Validation
+
+Use `polymorphicSchema` (`@template/db`) wherever a request names a false-polymorphic target, such
+as a flow's bindings. It builds the Zod schema from the same registry the write rule
+reads, so the request check and the database check cannot drift. Never hand-write
+`z.object({ ownerModel, organizationId?, ... }).refine(...)` for a registered axis.
+
+**What it produces.** A `z.discriminatedUnion` on the axis field with one strict arm per value.
+Each arm carries exactly that value's FKs as `uuidV7Schema`:
+
+```typescript
+const integrationOwner = polymorphicSchema('Integration', 'ownerModel');
+// { ownerModel: 'User', userId }
+// | { ownerModel: 'OrganizationUser', organizationId, userId }
+// | { ownerModel: 'Organization', organizationId }
+// | { ownerModel: 'Space', organizationId, spaceId }
+// | { ownerModel: 'SpaceUser', organizationId, spaceId, userId }
+```
+
+A missing FK, an FK from another arm, or an unknown key is a 422.
+
+**Options.** Each one is checked against the registry at the type level and again when the schema
+is built:
+
+| Option | Does | Example |
+|--------|------|---------|
+| `only` | Keeps these values; the default is every value | `only: ['User', 'Organization', 'Space']` |
+| `omit` | Drops a column from every arm, for one the server fills; sending it is a 422 | `omit: ['userId']` |
+| `extend` | Adds fields shared by every arm; it may not redefine the discriminator or an axis FK | `extend: { returnUrl: appPathSchema.optional() }` |
+
+**In a route body.** Route templates take a plain `ZodObject` `bodySchema`, so the route
+declares the axis field and every FK as optional, and `polymorphicBodyRefinement`
+(`#/lib/routeTemplates`) runs the strict per-arm check as its `bodyRefinement`. It takes the
+same `only` and `omit`, checks only the axis columns, reads a `null` FK as absent (as the
+write rule does), and fails with the standard validation 422:
+
+```typescript
+createRoute({
+  model: Modules.me,
+  submodel: Modules.integration,
+  bodySchema: z.object({
+    ownerModel: z.enum(['User', 'Organization', 'Space']),
+    userId: z.string().optional(),
+    organizationId: z.string().optional(),
+    spaceId: z.string().optional(),
+    provider: z.string(),
+  }),
+  bodyRefinement: polymorphicBodyRefinement('Integration', 'ownerModel', {
+    only: ['User', 'Organization', 'Space'],
+    omit: ['userId'],
+  }),
+  responseSchema,
+});
+// { ownerModel: 'Space', organizationId, spaceId, provider } passes
+// { ownerModel: 'Space', organizationId, spaceId: null, provider } is a 422 at spaceId
+// { ownerModel: 'Organization', organizationId, spaceId, provider } is a 422: spaceId is unrecognized
+// { ownerModel: 'Organization', organizationId, spaceId: null, provider } passes
+// { ownerModel: 'User', userId, provider } is a 422: userId is omitted, the server fills it
+```
+
+An omitted column must still be declared in `bodySchema`: a plain `z.object` strips undeclared
+keys before the refinement runs, so an undeclared `userId` is dropped silently, not rejected.
+
+**In flow bindings.** Bindings never carry the caller (see [FLOWS.md](FLOWS.md)), so omit
+`userId` and take it from `steps`' context:
+
+```typescript
+const bindingsSchema = polymorphicSchema('Integration', 'ownerModel', {
+  only: ['User', 'Organization', 'Space'],
+  omit: ['userId'],
+  extend: { returnUrl: appPathSchema.optional() },
+});
+// { ownerModel: 'User', returnUrl? }
+// | { ownerModel: 'Organization', organizationId, returnUrl? }
+// | { ownerModel: 'Space', organizationId, spaceId, returnUrl? }
+
+steps: async (owner, { userId }) => {
+  const target = owner.ownerModel === 'User' ? { ...owner, userId } : owner;
+  // ...
+};
+```
+
+An omitted column is gone from **every** arm, and nothing puts it back. Before writing, add the
+caller to each arm whose registry entry needs that column. Otherwise the write rule rejects the row.
+
+**Reading the parsed value.** Narrow on the discriminator; TypeScript knows each arm's FKs:
+
+```typescript
+if (owner.ownerModel === 'Space') owner.spaceId;
+```
+
+**Types.** The type helpers live in `packages/db/src/registries/polymorphicSchemaTypes.ts`, next to
+the builder. You rarely name them, because inference gives the result type:
+
+| Type | Is |
+|------|----|
+| `PolymorphicModel` | A model with a registered axis |
+| `PolymorphicAxisField<Model>` | That model's axis fields (`'ownerModel'`) |
+| `PolymorphicAxisValue<Model, Field>` | The allowed values on that axis |
+| `PolymorphicFkColumn<Model, Field>` | Every FK column any value on the axis needs |
+| `PolymorphicTarget<Model, Field, Value, Omitted>` | The union of arms, before `extend` |
+| `PolymorphicSchema<...>` | The Zod type `polymorphicSchema` returns |
+| `PolymorphicSchemaOptions<...>` | The `{ only, omit, extend }` argument |
+
+**Edges:**
+
+- Values with no FKs (`platform`, `admin`) get an arm that carries only the discriminator.
+- Arms are strict, so put every other field in `extend` rather than intersecting the schema.
+- Strict is a little tighter than the write rule: an explicit `null` on a foreign FK passes the
+  rule's `isEmpty` check but is an unknown key here.
+- One call covers one axis.
+- `toRules.test.ts` checks the schema against the write rule for every model with a single axis.
 
 ### Validation Errors
 
@@ -395,6 +569,8 @@ The hook fires for `create`, `createManyAndReturn`, `upsert`, `update`, and `upd
 3. Parses `value` through `inputSchema` → `parseInput` → `valueSchema`.
 4. Sets `valueKey = def.toValueKey(canonical)` so the per-owner unique constraint resolves.
 
+A deleted contact is a tombstone, and the unique key still covers it, so the create routes (`me`, `organization`, `space` → `reviveOrCreateContact`, `apps/api/src/modules/contact/services/`) revive the owner's tombstone with the same `type` and `valueKey` (`revive`, `packages/db/src/utils/revive.ts`) and write the new body onto it instead of answering 409. `organizationCreateAuthProvider` does the same on `(organizationId, provider, type)`.
+
 The `position` column is managed by the separate `orderedList` hook (see below) — Contact is registered against it, so position assignment, shifts, soft-delete sentinels, and bulk re-densification all happen automatically.
 
 Update paths shadow-merge the partial update with `previous` so type-aware validation runs against the merged record, then mirror hook-computed fields (`value`, `valueKey`) back into `args.data`.
@@ -405,7 +581,9 @@ Update paths shadow-merge the partial update with `previous` so type-aware valid
 2. Add the type literal to the `ContactType` enum in `packages/db/prisma/schema/contact.prisma` and regenerate.
 3. Register the def in `ContactRegistry` (`packages/shared/src/contact/registry.ts`).
 
-No controller, route, or hook change needed — the hook discovers new types through the registry.
+No controller, route, or hook change needed — the hook discovers new types through the registry, and `GET /api/v1/contact/info` lists the new type's `input` / `value` JSON Schema and subtype rule.
+
+A type whose contacts can arrive before their person has an account (an inbound WhatsApp message, say) also defines `toStubEmail`. `resolveUserByContact` (`apps/api/src/lib/identity/resolveUserByContact.ts`) returns the user that owns a contact of that type and value, or creates one with the stub email; a phone-keyed type builds it with `phoneToStubEmail(digits, type)` (`packages/shared/src/contact/stubEmail.ts`, `<digits>@<type>.<PROJECT_NAME>`). A type with no `toStubEmail` cannot stub-create a user (500). Don't invent placeholder emails at the call site.
 
 ---
 
@@ -477,7 +655,7 @@ Nested updates log a warning (can't fetch previous for each nested record withou
 
 ## Ordered List
 
-Registry-driven hook that maintains dense `[1..N]` position columns for any model that opts in. Lives at `apps/api/src/hooks/orderedList/`, with the SQL primitives in `apps/api/src/lib/prisma/orderedList.ts`.
+Registry-driven hook that maintains dense `[1..N]` position columns for any model that opts in. Lives at `apps/api/src/hooks/orderedList/`, with the SQL primitives in `apps/api/src/lib/prisma/orderedList.ts`. Those primitives (`nextSortOrderRaw`, `insertAtRaw`, `compactAfterRemove`, `reDensifyLive`) are raw SQL that bypass the mutation lifecycle, so they are the hook's internals: to append, create the row with no position; to move it, update its position. Don't compute `MAX(position) + 1` at the call site.
 
 ### Registry
 
@@ -500,7 +678,7 @@ The key is the Prisma model name. The value maps each ordered field to its scope
 
 | Action | Behavior |
 |---|---|
-| `create` (single) | If `position` is null → append (MAX+1). If provided → clamp to `[1, MAX+1]` and shift siblings up |
+| `create` (single) | If `position` is null → append (MAX+1, `nextSortOrderRaw`). If provided → clamp to `[1, MAX+1]` and shift siblings up (`insertAtRaw`) |
 | `createManyAndReturn` | Per scope, one SELECT MAX + one CTE `UPDATE … FROM (VALUES …)` shifts existing rows; new rows are inserted at pre-computed positions |
 | `update` | Soft-delete → sets `position` to the next distinct negative, compacts siblings. Restore → appends to live tail. Explicit position change → shifts only siblings using a predicate that excludes the target row, then Prisma writes the new position |
 | `updateManyAndReturn` (BEFORE) | **Throws** if `data` writes any ordered field — bulk position arithmetic can't be reconciled with `[1..N]` semantics. Use single `update()` per row or chunk at the app layer |
@@ -518,7 +696,7 @@ Every bulk hook is O(scopes), not O(rows). Importing a 1000-row CSV of Contacts 
 
 ### Cache invalidation
 
-Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `HOOK_IGNORE_FIELDS` (auto-composed from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook queues per-row cache invalidation on commit using the same `fetchCacheKeys` + `clearKey` primitives the cache hook uses. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
+Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `HOOK_IGNORE_FIELDS` (auto-composed from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook marks the affected rows' keys in the transaction's cache overlay through `queueCacheClear` (`apps/api/src/hooks/cache/queueCacheClear.ts`), the same call the cache hook makes, and they are cleared at commit. Anything else that changes rows outside the lifecycle (a key change that reaches rows by `ON UPDATE CASCADE`) uses it too. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
 
 ### Scope strictness
 
@@ -558,6 +736,9 @@ export const ImmutableFieldsOverrides = {
   // updatable for the transferSpace inquiry handler
   Space: { exclude: ['organizationId'] },
 
+  // A tag never moves between categories: naming another one is a 422.
+  Tag: { ...polymorphismImmutableFields.Tag, refuse: ['tagCategoryId'] },
+
   // Other examples:
   // SomeModel: { exclude: ['categoryId'] },  // Allow this FK to change
   // SomeModel: { include: ['status'] },      // Make this non-FK immutable
@@ -566,7 +747,11 @@ export const ImmutableFieldsOverrides = {
 
 **Important:** When a new inquiry handler needs to update a FK field (e.g. moving a resource between owners), add an `exclude` override here. The silent-strip behavior would otherwise make the `handleApprove` update a no-op with a 200 response, with no error.
 
-Supports dot notation for JSON paths: `'entitlements.canInvite'`
+Supports dot notation for JSON paths: `'payload.canInvite'` on a `CronJob` locks one key of the JSON column.
+
+`Entitlement` rows are immutable: an update naming `resource`, `actions`, `where`, `lens`, `sourcePath` or either axis is a 422; only `deletedAt` and `sourceDeletedAt` move.
+
+`getImmutableFields(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with materialized columns, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`getRefusedFields`).
 
 ### Why Strip Instead of Throw?
 
@@ -577,7 +762,7 @@ Immutable fields are **silently stripped** rather than throwing errors because:
 3. **API stability** - Adding immutable fields doesn't break existing clients
 4. **Idempotency** - Sending the same value back is harmless, not an error
 
-If you need strict validation (throw on attempt to change), use the Rules Registry instead.
+If you need strict validation (throw on attempt to change), add the field to the override's `refuse` list (a 422), or use the Rules Registry for a conditional rule.
 
 ---
 
@@ -598,14 +783,6 @@ The mutation lifecycle wraps these Prisma operations:
 | `deleteMany` | ✅ | Fetches `previous[]` automatically |
 
 `createMany`/`updateMany` are disabled because they don't return records, breaking hooks that need `result` (webhooks, cache invalidation).
-
-### Slow Mutation Logging
-
-Mutations exceeding 5 seconds log a warning:
-
-```
-[db] slow mutation: User.update took 6.23s [scope: abc12345]
-```
 
 ---
 
@@ -644,6 +821,6 @@ await db.txn(async () => {
 
 For `updateManyAndReturn`, rules run **after** the mutation (in the same transaction) because we can't merge `previous` with update data for each record efficiently. If validation fails, the transaction rolls back.
 
-### Immutable Fields: Only Strips, Never Throws
+### Immutable Fields: Strips Unless Refused
 
-By design, immutable field violations are silently fixed, not rejected. If you need to reject attempts to change a field, use a rule instead.
+By design, immutable field violations are silently fixed, not rejected. Only a field on the model's `refuse` list is rejected (422); to reject another, add it to `refuse` or use a rule.

@@ -5,10 +5,14 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { refreshBatchContext, registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';
+import {
+  refreshBatchContext,
+  registerBatch,
+  unregisterBatch,
+} from '#/modules/batch/services/batchRegistry';
 import { interpolateRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
-import type { StrategyExecutor } from '#/modules/batch/services/strategies/types';
+import type { RequestResult, StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
 export const transactionAll: StrategyExecutor = async (
   app,
@@ -18,10 +22,9 @@ export const transactionAll: StrategyExecutor = async (
   baseContext,
   timeout,
 ) => {
-  const batchId = crypto.randomUUID();
+  const batchId = Bun.randomUUIDv7();
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
-  // biome-ignore lint/suspicious/noExplicitAny: batch results are heterogeneous — each request returns a different shape
-  const results: any[][] = [];
+  const results: RequestResult[][] = [];
   let completedRounds = 0;
   let successfulRequests = 0;
   let failedRequests = 0;
@@ -29,15 +32,32 @@ export const transactionAll: StrategyExecutor = async (
   try {
     await db.txn(
       async () => {
-        registerBatch(batchId, db, baseContext);
+        registerBatch(batchId, baseContext);
 
         try {
           for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
             const round = rounds[roundIndex];
 
-            const roundPromises = round.map(async (request) => {
-              const interpolatedRequest = interpolateRequest(request, { results, currentRound: roundIndex });
-              return await executeRequest(app, interpolatedRequest, batchId, sharedHeaders, baseRequest);
+            const roundPromises = round.map(async (request): Promise<RequestResult> => {
+              try {
+                const interpolatedRequest = interpolateRequest(request, {
+                  results,
+                  currentRound: roundIndex,
+                });
+                return await executeRequest(
+                  app,
+                  interpolatedRequest,
+                  batchId,
+                  sharedHeaders,
+                  baseRequest,
+                );
+              } catch (error) {
+                return {
+                  status: 500,
+                  body: null,
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                };
+              }
             });
 
             const roundResults = await Promise.all(roundPromises);

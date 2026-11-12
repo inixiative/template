@@ -13,7 +13,10 @@ export type OrganizationUpdatedPayload = { organization: Organization };
 export const organizationUpdated = makeAppEvent<OrganizationUpdatedPayload>({
   cb: [
     async ({ organization }) => {
-      await enqueueJob('reconcileCustomerRefSegments', { customerModel: 'Organization', customerId: organization.id });
+      await enqueueJob('reconcileCustomerRefSegments', {
+        customerModel: 'Organization',
+        customerId: organization.id,
+      });
     },
   ],
 });

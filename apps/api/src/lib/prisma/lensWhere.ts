@@ -5,29 +5,33 @@
  * @uses none
  */
 import {
-  type Condition,
+  andWhere,
   describeRule,
-  executePrismaQueryPlan,
+  executePrismaPlan,
+  getLensRoot,
   type LensNarrowing,
-  projectByPath,
+  projectLens,
   toPrisma,
 } from '@inixiative/json-rules';
-import { db } from '@template/db';
-import { rootLens } from '@template/db/lens';
+import { db, modelFields, walkWhere } from '@template/db';
 import { makeError } from '#/lib/errors';
-import { modelFields } from '#/lib/prisma/fieldMetadata';
-import { liveWhere } from '#/lib/prisma/softDeleteScope';
-import { walkWhere } from '#/lib/prisma/whereWalker';
 
-type Visit = { modelName: string; mapName: string; whereClauses: Condition[] };
-type PlanStep = { operation: string; model?: string; args?: { by?: string[]; where?: Record<string, unknown> } };
+type PlanStep = {
+  operation: string;
+  model?: string;
+  args?: { by?: string[]; where?: Record<string, unknown> };
+};
 
 // Count-operator plans group the related model by its FK back to the visit's
 // model. The subquery is correct unscoped (the id-set is ANDed with the
 // caller's where anyway) but would scan globally — fold the caller's scope in
 // through the back-relation so the scan stays inside it. Root visits only:
 // that's whose rows `scope` describes.
-const scopePlan = (plan: { steps: unknown[] }, rootModel: string, scope: Record<string, unknown>) => {
+const scopePlan = (
+  plan: { steps: unknown[] },
+  rootModel: string,
+  scope: Record<string, unknown>,
+) => {
   const step = plan.steps[0] as PlanStep;
   const fk = step.args?.by?.[0];
   if (!step.model || !fk || !step.args) return;
@@ -35,21 +39,14 @@ const scopePlan = (plan: { steps: unknown[] }, rootModel: string, scope: Record<
     ([, def]) => def.kind === 'object' && def.type === rootModel && def.fromFields?.includes(fk),
   );
   if (!back) return;
-  step.args.where = step.args.where ? { AND: [step.args.where, { [back[0]]: scope }] } : { [back[0]]: scope };
-};
-
-// Count plans run before paginate's outer liveWhere; scope each groupBy to live rows or a soft-deleted child satisfies count narrowing (fail-open).
-const liveScopePlan = (plan: { steps: unknown[] }) => {
-  for (const raw of plan.steps) {
-    const step = raw as PlanStep;
-    if (step.operation !== 'groupBy' || !step.model || !step.args) continue;
-    step.args.where = liveWhere(step.model, step.args.where ?? {});
-  }
+  step.args.where = step.args.where
+    ? andWhere([step.args.where, { [back[0]]: scope }])
+    : { [back[0]]: scope };
 };
 
 // Bridge conditions cross into another source and can never run inside the
 // query — 'throw' (paginate: a paginated where must be complete) or 'defer'
-// (non-paginated consumers over-fetch and post-filter via applyLens).
+// (non-paginated consumers over-fetch and post-filter via narrowRule).
 export type LensWhereOptions = { bridges?: 'throw' | 'defer' };
 
 // Every narrowing where — the root visit keys to '' — compiled per visit.
@@ -61,11 +58,10 @@ const visitWheres = async (
   bridges: 'throw' | 'defer',
   rootScope: Record<string, unknown>,
 ): Promise<Map<string, Record<string, unknown>[]>> => {
-  const lens = rootLens(filterLens);
-  const byPath = projectByPath(filterLens) as Map<string, Visit>;
-  const rootKey = byPath.keys().next().value;
+  const lens = getLensRoot(filterLens);
+  const rootKey = lens.model;
   const wheres = new Map<string, Record<string, unknown>[]>();
-  for (const [key, visit] of byPath) {
+  for (const [key, visit] of Object.entries(projectLens(filterLens))) {
     if (!visit.whereClauses.length) continue;
     const clauses: Record<string, unknown>[] = [];
     for (const clause of visit.whereClauses) {
@@ -78,19 +74,18 @@ const visitWheres = async (
         }
         continue;
       }
-      const plan = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.modelName });
+      const plan = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.model });
       const step = plan.steps[0];
       let where: Record<string, unknown>;
       if (plan.steps.length === 1 && step && 'where' in step) {
         where = step.where;
       } else {
-        if (key === rootKey) scopePlan(plan, visit.modelName, rootScope);
-        liveScopePlan(plan);
-        where = await executePrismaQueryPlan(plan, db as never);
+        if (key === rootKey) scopePlan(plan, visit.model, rootScope);
+        where = await executePrismaPlan(plan, db as never);
       }
       if (Object.keys(where).length > 0) clauses.push(where);
     }
-    if (clauses.length) wheres.set(key === rootKey ? '' : key.slice((rootKey as string).length + 1), clauses);
+    if (clauses.length) wheres.set(key === rootKey ? '' : key.slice(rootKey.length + 1), clauses);
   }
   return wheres;
 };
@@ -106,5 +101,5 @@ export const lensWhere = async (
 ): Promise<Record<string, unknown>> => {
   const wheres = await visitWheres(filterLens, options?.bridges ?? 'throw', where);
   if (!wheres.size) return where;
-  return walkWhere(rootLens(filterLens).model, where, ({ path }) => wheres.get(path) ?? []);
+  return walkWhere(getLensRoot(filterLens).model, where, ({ path }) => wheres.get(path) ?? []);
 };

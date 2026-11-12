@@ -18,7 +18,15 @@ export const BRACKET_NUMBER_SEGMENT = '$';
 
 // Lenient parse-side spellings; the serializer only ever emits the canonical
 // null/true/false tokens.
-const SYMBOLS = { null: null, true: true, false: false, '1': true, '0': false, t: true, f: false } as const;
+const SYMBOLS = {
+  null: null,
+  true: true,
+  false: false,
+  '1': true,
+  '0': false,
+  t: true,
+  f: false,
+} as const;
 
 export type BracketSymbol = (typeof SYMBOLS)[keyof typeof SYMBOLS]; // null | boolean
 
@@ -26,7 +34,8 @@ export type BracketSymbol = (typeof SYMBOLS)[keyof typeof SYMBOLS]; // null | bo
 export const castBracketSymbol = (token: string): BracketSymbol | undefined =>
   token in SYMBOLS ? SYMBOLS[token as keyof typeof SYMBOLS] : undefined;
 
-export const isBracketSymbol = (value: unknown): value is BracketSymbol => value === null || typeof value === 'boolean';
+export const isBracketSymbol = (value: unknown): value is BracketSymbol =>
+  value === null || typeof value === 'boolean';
 
 // Encode a symbol back to its wire token (null → "null", true → "true").
 export const bracketSymbolToken = (value: BracketSymbol): string => String(value);
@@ -40,6 +49,7 @@ export const castBracketNumber = (token: string): number | undefined => {
 
 // NaN / Infinity are excluded: they have no finite wire token, so they serialize
 // as plain strings rather than a marker the parser would drop.
-export const isBracketNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+export const isBracketNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
 
 export const bracketNumberToken = (value: number): string => String(value);

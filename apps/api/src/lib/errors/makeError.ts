@@ -1,8 +1,9 @@
 /**
  * @atlas
- * @kind factory, error
+ * @kind constructor, error
  * @partOf primitive:errors
  * @uses primitive:shared
+ * @constructs error
  */
 import { type Guidance, HTTP_ERROR_MAP, type HttpErrorCode } from '@template/shared/errors';
 import { HTTPException } from 'hono/http-exception';
@@ -12,6 +13,7 @@ type MakeErrorOptions = {
   message?: string;
   guidance?: Guidance;
   fieldErrors?: Record<string, string[]>;
+  details?: Record<string, unknown>[];
   headers?: Record<string, string>;
 };
 
@@ -45,6 +47,7 @@ export const makeError = (options: MakeErrorOptions): AppError => {
       message: options.message ?? meta.name,
       guidance: options.guidance ?? meta.guidance,
       fieldErrors: options.fieldErrors,
+      details: options.details,
     },
     options.headers,
   );

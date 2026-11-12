@@ -4,11 +4,32 @@
  * @partOf primitive:websockets
  * @uses primitive:shared
  */
-import type { WSDataEvent } from '@template/shared/ws';
+import type { WSStreamAppendEvent, WSStreamSnapshotEvent } from '@template/shared/ws';
 
-export const dataFrame = (action: WSDataEvent['action'], stream: string, payload: unknown): WSDataEvent => ({
+export type StreamAppend = { type: string; payload: unknown; revive?: true };
+
+export const streamSnapshotFrame = (
+  stream: string,
+  seq: number,
+  payload: unknown,
+): WSStreamSnapshotEvent => ({
   category: 'data',
-  action,
+  action: 'snapshot',
   stream,
+  seq,
   payload,
+});
+
+export const streamAppendFrame = (
+  stream: string,
+  seq: number,
+  { type, payload, revive }: StreamAppend,
+): WSStreamAppendEvent => ({
+  category: 'data',
+  action: 'append',
+  stream,
+  seq,
+  type,
+  payload,
+  ...(revive ? { revive: true } : {}),
 });

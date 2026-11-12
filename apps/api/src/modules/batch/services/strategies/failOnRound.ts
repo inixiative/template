@@ -5,17 +5,28 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { refreshBatchContext, registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';
+import { ConcurrencyType, getConcurrency } from '@template/shared/utils';
+import {
+  refreshBatchContext,
+  registerBatch,
+  unregisterBatch,
+} from '#/modules/batch/services/batchRegistry';
 import { interpolateRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
-import type { StrategyExecutor } from '#/modules/batch/services/strategies/types';
+import type { RequestResult, StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
-export const failOnRound: StrategyExecutor = async (app, rounds, sharedHeaders, baseRequest, baseContext, _timeout) => {
-  const batchId = crypto.randomUUID();
-  registerBatch(batchId, db, baseContext);
+export const failOnRound: StrategyExecutor = async (
+  app,
+  rounds,
+  sharedHeaders,
+  baseRequest,
+  baseContext,
+  _timeout,
+) => {
+  const batchId = Bun.randomUUIDv7();
+  registerBatch(batchId, baseContext);
 
-  // biome-ignore lint/suspicious/noExplicitAny: batch results are heterogeneous — each request returns a different shape
-  const results: any[][] = [];
+  const results: RequestResult[][] = [];
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
   let completedRounds = 0;
   let successfulRequests = 0;
@@ -25,10 +36,19 @@ export const failOnRound: StrategyExecutor = async (app, rounds, sharedHeaders, 
     for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
       const round = rounds[roundIndex];
 
-      const roundPromises = round.map(async (request) => {
+      const roundThunks = round.map((request) => async (): Promise<RequestResult> => {
         try {
-          const interpolatedRequest = interpolateRequest(request, { results, currentRound: roundIndex });
-          const result = await executeRequest(app, interpolatedRequest, batchId, sharedHeaders, baseRequest);
+          const interpolatedRequest = interpolateRequest(request, {
+            results,
+            currentRound: roundIndex,
+          });
+          const result = await executeRequest(
+            app,
+            interpolatedRequest,
+            batchId,
+            sharedHeaders,
+            baseRequest,
+          );
           if (result.error) {
             failedRequests++;
           } else {
@@ -45,7 +65,9 @@ export const failOnRound: StrategyExecutor = async (app, rounds, sharedHeaders, 
         }
       });
 
-      const roundResults = await Promise.all(roundPromises);
+      const roundResults = await db.parallel(roundThunks, {
+        concurrency: getConcurrency([ConcurrencyType.db]),
+      });
       results.push(roundResults);
       completedRounds++;
 
@@ -59,7 +81,12 @@ export const failOnRound: StrategyExecutor = async (app, rounds, sharedHeaders, 
       }
     }
 
-    const status = failedRequests === 0 ? 'success' : failedRequests === totalRequests ? 'failed' : 'partialSuccess';
+    const status =
+      failedRequests === 0
+        ? 'success'
+        : failedRequests === totalRequests
+          ? 'failed'
+          : 'partialSuccess';
 
     return {
       batch: results,

@@ -8,7 +8,10 @@ type InfisicalProgressGroup = {
   getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
-const countCompletedActions = (progress: InfisicalProgress, actions: readonly InfisicalAction[]): number => {
+const countCompletedActions = (
+  progress: InfisicalProgress,
+  actions: readonly InfisicalAction[],
+): number => {
   return actions.filter((action) => progress[action]).length;
 };
 
@@ -259,22 +262,30 @@ const infisicalProgressGroups: readonly InfisicalProgressGroup[] = [
   {
     actions: ['createProject'],
     getLabel: (config) =>
-      config.infisical.projectSlug ? `Project created: ${config.infisical.projectSlug}` : 'Project created',
+      config.infisical.projectSlug
+        ? `Project created: ${config.infisical.projectSlug}`
+        : 'Project created',
   },
   {
     actions: ['renameEnv'],
     getLabel: () => 'Environments configured',
   },
   {
-    actions: infisicalFolderSteps.filter((step) => step.environment === 'root').map((step) => step.action),
+    actions: infisicalFolderSteps
+      .filter((step) => step.environment === 'root')
+      .map((step) => step.action),
     getLabel: countLabel('Root app folders created'),
   },
   {
-    actions: infisicalFolderSteps.filter((step) => step.environment === 'staging').map((step) => step.action),
+    actions: infisicalFolderSteps
+      .filter((step) => step.environment === 'staging')
+      .map((step) => step.action),
     getLabel: countLabel('Staging app folders created'),
   },
   {
-    actions: infisicalFolderSteps.filter((step) => step.environment === 'prod').map((step) => step.action),
+    actions: infisicalFolderSteps
+      .filter((step) => step.environment === 'prod')
+      .map((step) => step.action),
     getLabel: countLabel('Production app folders created'),
   },
   {
@@ -330,7 +341,9 @@ export type InfisicalProgressSummary = {
   totalCount: number;
 };
 
-export const getInfisicalProgressSummaries = (config: ProjectConfig): InfisicalProgressSummary[] => {
+export const getInfisicalProgressSummaries = (
+  config: ProjectConfig,
+): InfisicalProgressSummary[] => {
   return infisicalProgressGroups.map((group) => {
     const completedCount = countCompletedActions(config.infisical.progress, group.actions);
     const totalCount = group.actions.length;

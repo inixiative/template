@@ -57,12 +57,19 @@ export const CreateWebhookModal = memo(({ isOpen, onClose, onSubmit }: CreateWeb
             placeholder="https://example.com/webhooks"
             autoFocus
           />
-          <p className="text-xs text-muted-foreground">We send a signed POST request here when the model changes.</p>
+          <p className="text-xs text-muted-foreground">
+            We send a signed POST request here when the model changes.
+          </p>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="webhook-model">Model</Label>
-          <Select id="webhook-model" value={model} onChange={setModel} options={webhookModelOptions} />
+          <Select
+            id="webhook-model"
+            value={model}
+            onChange={setModel}
+            options={webhookModelOptions}
+          />
         </div>
 
         <div className="flex justify-end gap-2 pt-4">

@@ -1,7 +1,17 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
-import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSpace,
+  createSpaceUser,
+} from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { json, post } from '#tests/utils/request';
@@ -15,7 +25,7 @@ describe('POST /api/v1/space/:id/tokens', () => {
   let space: Space;
   let spaceUser: SpaceUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = ou;
     user = context.user;
@@ -24,14 +34,10 @@ describe('POST /api/v1/space/:id/tokens', () => {
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
 
-    spaceUser = await db.spaceUser.create({
-      data: {
-        role: 'admin',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: user.id,
-      },
-    });
+    ({ entity: spaceUser } = await createSpaceUser(
+      { role: 'admin' },
+      { user, organization: org, organizationUser: orgUser, space },
+    ));
 
     const harness = createTestApp({
       mockUser: user,
@@ -43,12 +49,14 @@ describe('POST /api/v1/space/:id/tokens', () => {
     testDb = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
   });
 
   it('creates a space token', async () => {
-    const response = await fetch(post(`/api/v1/space/${space.id}/tokens`, { name: 'New Token', role: 'member' }));
+    const response = await fetch(
+      post(`/api/v1/space/${space.id}/tokens`, { name: 'New Token', role: 'member' }),
+    );
     expect(response.status).toBe(201);
 
     const { data } = await json<{ id: string; name: string; key: string }>(response);
@@ -56,19 +64,15 @@ describe('POST /api/v1/space/:id/tokens', () => {
     expect(data.key).toBeDefined();
   });
 
-  it('returns 403 for non-admin user', async () => {
+  it('a member mints a member token and nothing above it', async () => {
     const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
       { role: 'member' },
       { organization: org },
     );
-    const memberSpaceUser = await db.spaceUser.create({
-      data: {
-        role: 'member',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: memberCtx.user.id,
-      },
-    });
+    const { entity: memberSpaceUser } = await createSpaceUser(
+      { role: 'member' },
+      { ...memberCtx, organizationUser: memberOrgUser, space },
+    );
 
     const memberHarness = createTestApp({
       mockUser: memberCtx.user,
@@ -77,9 +81,9 @@ describe('POST /api/v1/space/:id/tokens', () => {
       mount: [(app) => app.route('/api/v1/space', spaceRouter)],
     });
 
-    const response = await memberHarness.fetch(
-      post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role: 'member' }),
-    );
-    expect(response.status).toBe(403);
+    const asMember = (role: string) =>
+      memberHarness.fetch(post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role }));
+    expect((await asMember('member')).status).toBe(201);
+    expect((await asMember('admin')).status).toBe(403);
   });
 });

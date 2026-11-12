@@ -8,20 +8,24 @@ import { inquiryResolve } from '@template/sdk';
 import { useInquiryResolutionEffects } from '@template/ui/hooks/inquiry/useInquiryResolutionEffects';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';
-import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
+import type { InquiryMeta, InquiryResolutionStatus } from '@template/ui/lib/inquiries/queryKeys';
 import { targetMutations } from '@template/ui/lib/inquiries/queryKeys';
 
 type ResolveVars = {
   inquiry: InquiryMeta;
-  status: 'approved' | 'denied' | 'changesRequested';
+  status: InquiryResolutionStatus;
+  resolution?: Record<string, unknown>;
 };
 
 export const useResolveInquiryMutation = () => {
   const applyResolutionEffects = useInquiryResolutionEffects();
 
   return useOptimisticMutation<unknown, Error, ResolveVars>({
-    mutationFn: apiMutation(({ inquiry, status }: ResolveVars) =>
-      inquiryResolve({ path: { id: inquiry.id }, body: { status } }),
+    mutationFn: apiMutation(({ inquiry, status, resolution }: ResolveVars) =>
+      inquiryResolve({
+        path: { id: inquiry.id },
+        body: { ...resolution, status, expectedUpdatedAt: inquiry.updatedAt },
+      }),
     ),
     targets: ({ inquiry, status }) =>
       targetMutations[inquiry.type](inquiry).map((queryKey) => ({

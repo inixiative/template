@@ -65,13 +65,17 @@ export const WebhooksPage = () => {
     {
       key: 'model',
       label: 'Model',
-      render: (item: WebhookSubscription) => <span className="text-muted-foreground">{item.model}</span>,
+      render: (item: WebhookSubscription) => (
+        <span className="text-muted-foreground">{item.model}</span>
+      ),
     },
     {
       key: 'createdAt',
       label: 'Created',
       render: (item: WebhookSubscription) => (
-        <span className="text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</span>
+        <span className="text-muted-foreground">
+          {new Date(item.createdAt).toLocaleDateString()}
+        </span>
       ),
     },
     {
@@ -79,7 +83,11 @@ export const WebhooksPage = () => {
       label: '',
       render: (item: WebhookSubscription) => (
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => deleteMutation.mutate({ path: { id: item.id } })}
+          >
             <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
           </Button>
         </div>
@@ -113,12 +121,17 @@ export const WebhooksPage = () => {
           emptyMessage="No webhooks configured yet"
           empty={{
             icon: 'lucide:webhook',
-            description: 'Webhooks send an HTTP request to your URL whenever a subscribed model changes.',
+            description:
+              'Webhooks send an HTTP request to your URL whenever a subscribed model changes.',
             action: { label: 'Create webhook', onClick: () => setIsModalOpen(true) },
           }}
         />
       )}
-      <CreateWebhookModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />
+      <CreateWebhookModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreate}
+      />
     </Page>
   );
 };

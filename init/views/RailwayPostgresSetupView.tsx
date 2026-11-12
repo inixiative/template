@@ -16,7 +16,10 @@ type RailwayPostgresSetupViewProps = {
 
 type SetupState = 'new' | 'incomplete' | 'complete';
 
-export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> = ({ onComplete, onCancel }) => {
+export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> = ({
+  onComplete,
+  onCancel,
+}) => {
   const { config, syncConfig } = useConfig();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,8 +94,8 @@ export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> =
 
       <Box marginBottom={1}>
         <Text dimColor>
-          Provisions Postgres via Railway CLI ({stagingEnabled ? 'prod + staging' : 'prod only'}) and stores
-          DATABASE_URL in Infisical at /api.
+          Provisions Postgres via Railway CLI ({stagingEnabled ? 'prod + staging' : 'prod only'})
+          and stores DATABASE_URL in Infisical at /api.
         </Text>
       </Box>
 
@@ -109,7 +112,8 @@ export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> =
       {!running && setupState === 'complete' && (
         <Box marginBottom={1}>
           <Text color="green" bold>
-            ✓ Postgres ready — DATABASE_URL stored in Infisical for {stagingEnabled ? 'prod + staging' : 'prod'}.
+            ✓ Postgres ready — DATABASE_URL stored in Infisical for{' '}
+            {stagingEnabled ? 'prod + staging' : 'prod'}.
           </Text>
         </Box>
       )}

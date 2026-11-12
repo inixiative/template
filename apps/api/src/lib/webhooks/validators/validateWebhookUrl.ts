@@ -14,7 +14,10 @@ export type ValidateOptions = {
 };
 
 // Synchronous SSRF policy check — throws on the first violation, returns nothing.
-export const validateWebhookUrl = (url: string, { enforce = isEnforcedEnvironment() }: ValidateOptions = {}): void => {
+export const validateWebhookUrl = (
+  url: string,
+  { enforce = isEnforcedEnvironment() }: ValidateOptions = {},
+): void => {
   let parsed: URL;
   // must be a parseable URL
   try {
@@ -31,10 +34,14 @@ export const validateWebhookUrl = (url: string, { enforce = isEnforcedEnvironmen
   if (!enforce) return;
 
   // deployed environments require https
-  if (parsed.protocol !== 'https:') throw makeError({ status: 400, message: 'Webhook URL must use https' });
+  if (parsed.protocol !== 'https:')
+    throw makeError({ status: 400, message: 'Webhook URL must use https' });
 
   // ...and must not target localhost or a literal private/internal address
   const hostname = hostnameOf(parsed);
   if (hostname === 'localhost' || hostname.endsWith('.localhost') || isPrivateAddress(hostname))
-    throw makeError({ status: 400, message: 'Webhook URL must not target a private or internal address' });
+    throw makeError({
+      status: 400,
+      message: 'Webhook URL must not target a private or internal address',
+    });
 };

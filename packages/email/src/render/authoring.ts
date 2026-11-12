@@ -5,7 +5,10 @@
  * @uses none
  */
 
-export { componentTagPattern, SLUG_PATTERN as COMPONENT_SLUG_PATTERN } from '@template/email/render/blockTags';
+export {
+  componentTagPattern,
+  SLUG_PATTERN as COMPONENT_SLUG_PATTERN,
+} from '@template/email/render/blockTags';
 export {
   EACH,
   type EachBlock,
@@ -40,4 +43,8 @@ export {
   removeSlotOverride,
   slotDefaultContent,
 } from '@template/email/render/regions';
-export { SYSTEM_TOKENS, type SystemToken, type SystemTokenName } from '@template/email/render/systemTokens';
+export {
+  SYSTEM_TOKENS,
+  type SystemToken,
+  type SystemTokenName,
+} from '@template/email/render/systemTokens';

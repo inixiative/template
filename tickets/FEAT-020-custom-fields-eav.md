@@ -4,7 +4,7 @@
 **Assignee**: Aron
 **Priority**: Medium (every multi-tenant app with integrations ends up here; Zealot paid for the map)
 **Created**: 2026-08-27
-**Updated**: 2026-08-31 (performance landmines + Postgres specifics)
+**Updated**: 2026-10-02 (json-rules 2.26: rules name the typed column — Zealot ZLT-5178 / #2534)
 
 ---
 
@@ -71,6 +71,10 @@ CustomFieldDefinition ──┐                        IntegrationSource ──�
 - Retargeting a comparison to the right column is done by **`differentiateEnrichmentValueTypeArgs(model, args)`** — a registry-driven util in `packages/db` (`registries/enrichmentValueColumns.ts`: `{ pinField, valueField, columns }` per participating model), a DMMF walker over root wheres, relation filters, nested include/select wheres, and orderBy, with a fast no-op for unregistered trees so the **two compilers** that produce every ordered comparison (`paginate`, `conditionsToWhere`) call it unconditionally. Ordered ops only; equality/`in`/`contains`/aggregates untouched (DECIMAL would round 18-digit identifiers).
 - Rejected, argued through, don't re-propose: a rule-AST rewrite that pattern-matched pin vocabularies (silently reverted to lexicographic on unknown shapes); lens-level typed bindings (the type is per-row-group — depends on the sibling FK's row); an always-on Prisma client extension (fights scripts, changes aggregate shapes, "sometimes you want the raw controls"); a throwing guard (the primitive's own fallback arm is an ordered op on `value`).
 - FE parity is a **hydration** question, not a query one: `readEnrichmentValue`/`hydrateUserContext` hand the in-memory evaluator typed JS values (a number, not a numeric string).
+- **json-rules 2.26 moved the typing into the rule (Zealot ZLT-5178, #2534).** The 2.26 lens gate checks operator and literal against each column's declared type, so `enrichments any (label = "Employee Count" AND value >= 600)` is now refused at save — `value` is a String column. The post-compile reroute can't rescue it, because the gate runs first. The lens still can't type it either: the column types are fixed, and that this row group fills `valueNumber` is a fact on the field's map, one relation away from anything the rule names (the same reason lens-level typed bindings were rejected above). So **a rule names the typed column itself** — `valueNumber >= 600`, a date rule on `valueDate` — and every emitter writes it that way: the rule builder, the AI prompt (Zealot's match-filter prompt now teaches `valueNumber` / `valueDate`), migrations.
+- **What the gate can't see is an app-level check, owned by the EAV layer.** A `valueDate` clause on a field stored as number passes the lens (both columns exist and are typed) and silently matches nobody, because that column is empty for the field's rows. Zealot's match-filter validator reads **every** value-column comparison under an `enrichments` selector — nested groups included, not the first `find()` hit — and checks each against the map's `valueType` (`typedColumnMismatch`, `compareTypedColumn`). The template's version of this belongs beside the contribution writer, run by every save gate that accepts enrichment rules.
+- **Stamped literals.** The rule builder stamps `coerceType` on every leaf and keeps text-input literals as strings (`'10'` for an Int list, Decimal strings unrounded — `Number()` would round them, day-only dates). 2.26 compiles a stamped literal the way `check()` coerces it, on every rail; an **unstamped** `'5'` on an Int column is refused. Rules written by AI, scripts or hand-edited JSON may not stamp, so either they stamp or the gate's refusal is the expected outcome — never a lenient compile.
+- **Retyping stored rules is a migration, not a service.** Zealot's one-off retyper had no runtime consumer and got moved out of `modules/` into `apps/api/src/scripts/`, built on two primitives: `rewriteConditionLeaves` now tells the rewriter each node's **scope** (the nearest relation or aggregate whose `condition`/`filter` holds it) — `value` is only an enrichment's value when its scope is `enrichments`, and the field that types it is read off that relation (label selector read through nested `all`s) — and the rule-surface registry's `trees` / `mapTrees` (every stored rule column and band, string-encoded JSON stays a string), with validate-after-rewrite and a `findForUpdate` re-read before each write. The template has neither fold helper yet; port both with the rules engine rather than spelling the tree walk out per caller.
 - **Template:** typed columns from day one, no legacy `value`, so no fallback arm; the registry + `differentiate…` util ported as-is. **Decision needed (below):** where the declaration lives — Zealot has both `CustomFieldDefinition.valueType` (string, display) and `IntegrationMap.valueType` (enum, storage) and they can disagree.
 
 ### 5. Value sets: options and vocabulary are the same thing — one table, never a blob, never capped
@@ -193,7 +197,8 @@ Plus: `originUuid → IntegrationSource` on every bridged model; `packages/db/sr
 ### Schema + primitives
 - [ ] The five models above, uuid-keyed, brand-scoped, typed columns only (no `value` text fallback)
 - [ ] `originUuid` on the first bridged model (FanUser/Contact equivalent) — the pattern every later model copies
-- [ ] `enrichmentValueColumns` registry + `differentiateEnrichmentValueTypeArgs`, called unconditionally from `paginate` and the rules compiler
+- [ ] `enrichmentValueColumns` registry + `differentiateEnrichmentValueTypeArgs`, called unconditionally from `paginate` and the rules compiler — and on json-rules ≥ 2.26, rules name the typed column themselves (the gate refuses an ordered comparison on a text column); decide whether the rules half of `differentiate…` survives once nothing writes `value` comparisons
+- [ ] Typed-column ↔ `valueType` check for every save gate that accepts enrichment rules (every comparison under the selector, nested included) — the lens can't see it
 - [ ] `ensureMap` (the only map creator) + contribution writer (typed column by declared type; exclusive-arc switch on `targetModel`) + `resolveIdentityCoordinate`
 - [ ] Vocabulary writer (`seen` flip on observation; seed-time `seen: false` rows from an integration's describe)
 
@@ -207,6 +212,7 @@ Plus: `originUuid → IntegrationSource` on every bridged model; `packages/db/sr
 - [ ] Typed hydration for the in-memory evaluator (`readEnrichmentValue` → JS number/Date, never strings)
 
 ### Lens / rules / search
+- [ ] Port `foldConditionTree` + `rewriteConditionLeaves` (with `LeafScope`) and the rule-surface `trees` / `mapTrees` registry — the only tree walkers rule migrations and validators use
 - [ ] `enrichments` narrowing on the anchor lens: brand bind + soft-delete wheres on the relation, `picks`, 3-level `sources` groupBy
 - [ ] Facets: per-source container, per-field cards, field selectors, presets with variables (INFRA-029) — the Zealot `segmentDecoration.ts` shape, minus its side-channel
 - [ ] Global search / paginate traverse `enrichments` with the relation wheres (visit-wheres fold)
@@ -241,4 +247,5 @@ Plus: `originUuid → IntegrationSource` on every bridged model; `packages/db/sr
 - **INFRA-028** / **INFRA-029** — prose + preset variables over the enrichment facets.
 - **FEAT-017** — audit lineage (enrichment values ride the generic rail); **FEAT-018** — transitions (materialized-value change as the driver); **FEAT-019** — actor attribution (`IntegrationSource` as actor).
 - **DB-001** — mutation lifecycle transaction identity (the contribution writer runs inside it).
+- Zealot ZLT-5178 / #2534 — json-rules 2.26 bump: typed-column rules, stamped-literal guards on every gate, `LeafScope` on `rewriteConditionLeaves`, `apps/api/src/scripts/migrateEnrichmentValueComparisonsToTypedColumns.ts`.
 - Zealot: `docs/plans/2026-02-18-custom-fields-api-design.md`, `2026-06-27-integration-bridge-and-enrichment-platform.md`; ZLT-2827, ZLT-3076, ZLT-3214, ZLT-3876, ZLT-4030, ZLT-4062, UE-4162, ZLT-4242, ZLT-4306, ZLT-4324, UE-4176, ZLT-4429; `packages/db/src/registries/enrichmentValueColumns.ts`, `apps/api/src/modules/enrichments/services/contributionWriter.ts`, `apps/api/src/modules/groups/lib/customerRefLens.ts`.

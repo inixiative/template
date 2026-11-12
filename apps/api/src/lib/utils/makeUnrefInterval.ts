@@ -1,8 +1,9 @@
 /**
  * @atlas
- * @kind utils
+ * @kind constructor, utils
  * @partOf primitive:lifecycle
  * @uses none
+ * @constructs interval
  */
 
 type UnrefInterval = {
@@ -19,7 +20,13 @@ type UnrefInterval = {
  * and `unref` so a pending tick can't hold a shutdown open — and each hand-rolled copy has to
  * remember all three. The tick body is the caller's; the bookkeeping lives here.
  */
-export const makeUnrefInterval = ({ intervalMs, tick }: { intervalMs: number; tick: () => void }): UnrefInterval => {
+export const makeUnrefInterval = ({
+  intervalMs,
+  tick,
+}: {
+  intervalMs: number;
+  tick: () => void;
+}): UnrefInterval => {
   let timer: ReturnType<typeof setInterval> | null = null;
 
   return {

@@ -62,11 +62,15 @@ export const App: React.FC = () => {
 
         {state === 'task' && (
           <>
-            {currentTask === 'cicd' && <CicdSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
+            {currentTask === 'cicd' && (
+              <CicdSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+            )}
             {currentTask === 'monitoring' && (
               <TelemetrySetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
-            {currentTask === 'settings' && <SettingsView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
+            {currentTask === 'settings' && (
+              <SettingsView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+            )}
             {currentTask === 'project-config' && (
               <ProjectConfigView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
@@ -80,16 +84,25 @@ export const App: React.FC = () => {
               <RailwaySetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
             {currentTask === 'railway-postgres' && (
-              <RailwayPostgresSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+              <RailwayPostgresSetupView
+                onComplete={handleTaskComplete}
+                onCancel={handleTaskCancel}
+              />
             )}
             {currentTask === 'railway-buckets' && (
-              <RailwayBucketsSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+              <RailwayBucketsSetupView
+                onComplete={handleTaskComplete}
+                onCancel={handleTaskCancel}
+              />
             )}
             {currentTask === 'vercel' && (
               <VercelSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
             {currentTask === 'cloudflare-pages' && (
-              <CloudflarePagesSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+              <CloudflarePagesSetupView
+                onComplete={handleTaskComplete}
+                onCancel={handleTaskCancel}
+              />
             )}
             {currentTask === 'resend' && (
               <ResendSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
@@ -97,7 +110,9 @@ export const App: React.FC = () => {
             {currentTask === 'bouncer' && (
               <BouncerSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
-            {currentTask === 'launch' && <LaunchView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
+            {currentTask === 'launch' && (
+              <LaunchView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+            )}
             {currentTask !== 'cicd' &&
               currentTask !== 'monitoring' &&
               currentTask !== 'settings' &&

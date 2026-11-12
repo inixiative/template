@@ -37,7 +37,11 @@ BreadcrumbItem.displayName = 'BreadcrumbItem';
 
 const BreadcrumbLink = React.forwardRef<HTMLAnchorElement, React.ComponentPropsWithoutRef<'a'>>(
   ({ className, ...props }, ref) => (
-    <a ref={ref} className={cn('transition-colors hover:text-foreground hover:underline', className)} {...props} />
+    <a
+      ref={ref}
+      className={cn('transition-colors hover:text-foreground hover:underline', className)}
+      {...props}
+    />
   ),
 );
 BreadcrumbLink.displayName = 'BreadcrumbLink';
@@ -46,8 +50,6 @@ const BreadcrumbPage = React.forwardRef<HTMLSpanElement, React.ComponentPropsWit
   ({ className, ...props }, ref) => (
     <span
       ref={ref}
-      role="link"
-      aria-disabled="true"
       aria-current="page"
       className={cn('font-medium text-foreground', className)}
       {...props}
@@ -57,7 +59,12 @@ const BreadcrumbPage = React.forwardRef<HTMLSpanElement, React.ComponentPropsWit
 BreadcrumbPage.displayName = 'BreadcrumbPage';
 
 const BreadcrumbSeparator = ({ children, className, ...props }: React.ComponentProps<'li'>) => (
-  <li role="presentation" aria-hidden="true" className={cn('[&>svg]:size-3.5', className)} {...props}>
+  <li
+    role="presentation"
+    aria-hidden="true"
+    className={cn('[&>svg]:size-3.5', className)}
+    {...props}
+  >
     {children ?? <Icon icon="lucide:chevron-right" />}
   </li>
 );

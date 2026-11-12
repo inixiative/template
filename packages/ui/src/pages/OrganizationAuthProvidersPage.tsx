@@ -54,8 +54,9 @@ export const OrganizationAuthProvidersPage = () => {
   });
 
   const createMutation = useOptimisticMutation({
-    mutationFn: apiMutation((requestOptions: Parameters<typeof organizationCreateAuthProvider>[0]) =>
-      organizationCreateAuthProvider(requestOptions),
+    mutationFn: apiMutation(
+      (requestOptions: Parameters<typeof organizationCreateAuthProvider>[0]) =>
+        organizationCreateAuthProvider(requestOptions),
     ),
     targets: [
       createOptimisticListTarget<AuthProvider, Omit<OrganizationCreateAuthProviderData, 'url'>>({
@@ -99,7 +100,9 @@ export const OrganizationAuthProvidersPage = () => {
     {
       key: 'type',
       label: 'Type',
-      render: (item: AuthProvider) => <span className="text-muted-foreground">{getTypeLabel(item.type)}</span>,
+      render: (item: AuthProvider) => (
+        <span className="text-muted-foreground">{getTypeLabel(item.type)}</span>
+      ),
     },
     {
       key: 'provider',
@@ -110,7 +113,9 @@ export const OrganizationAuthProvidersPage = () => {
       key: 'status',
       label: 'Status',
       render: (item: AuthProvider) => (
-        <Badge variant={item.enabled ? 'default' : 'secondary'}>{item.enabled ? 'Enabled' : 'Disabled'}</Badge>
+        <Badge variant={item.enabled ? 'default' : 'secondary'}>
+          {item.enabled ? 'Enabled' : 'Disabled'}
+        </Badge>
       ),
     },
     {
@@ -128,7 +133,11 @@ export const OrganizationAuthProvidersPage = () => {
           >
             <Icon icon="lucide:pencil" className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => deleteMutation.mutate({ path: { id: item.id } })}
+          >
             <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
           </Button>
         </div>

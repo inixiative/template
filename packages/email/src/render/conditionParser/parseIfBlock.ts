@@ -55,7 +55,12 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
       if (marker) {
         if (depth === 1) {
           closeCurrent(i);
-          current = { kind: 'elseIf', rule: marker.rule, ruleError: marker.ruleError, bodyStart: marker.next };
+          current = {
+            kind: 'elseIf',
+            rule: marker.rule,
+            ruleError: marker.ruleError,
+            bodyStart: marker.next,
+          };
         }
         i = marker.next;
         continue;

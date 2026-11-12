@@ -21,4 +21,5 @@ export const buildJobData = <TPayload>(
   traceContext: request.traceContext,
 });
 
-export const isSlowJobData = (data: { lane?: string } | undefined): boolean => data?.lane === JobLane.slow;
+export const isSlowJobData = (data: { lane?: string } | undefined): boolean =>
+  data?.lane === JobLane.slow;

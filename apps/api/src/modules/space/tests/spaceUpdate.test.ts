@@ -1,6 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+} from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -15,7 +21,7 @@ describe('PATCH /api/v1/space/:id', () => {
   let space: Space;
   let spaceUser: SpaceUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'owner' });
     orgUser = ou;
     user = context.user;
@@ -43,12 +49,14 @@ describe('PATCH /api/v1/space/:id', () => {
     testDb = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
   });
 
   it('updates the space name', async () => {
-    const response = await fetch(patch(`/api/v1/space/${space.id}`, { name: 'Updated Space Name' }));
+    const response = await fetch(
+      patch(`/api/v1/space/${space.id}`, { name: 'Updated Space Name' }),
+    );
     expect(response.status).toBe(200);
 
     const { data } = await json<Space>(response);

@@ -7,7 +7,12 @@
 
 import { ParseBlocksError } from '@template/email/errors/ParseBlocksError';
 import { serialize } from '@template/email/render/decompose';
-import { type ComponentNode, isOverrideSlot, type Node, type SlotNode } from '@template/email/render/nodes';
+import {
+  type ComponentNode,
+  isOverrideSlot,
+  type Node,
+  type SlotNode,
+} from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 
 export type ComponentRegion = {
@@ -19,7 +24,8 @@ export type ComponentRegion = {
   occurrenceIndex: number;
 };
 
-const overriddenNames = (nodes: Node[]): Set<string> => new Set(nodes.filter(isOverrideSlot).map((node) => node.name));
+const overriddenNames = (nodes: Node[]): Set<string> =>
+  new Set(nodes.filter(isOverrideSlot).map((node) => node.name));
 
 const forEachRenderedComponent = (
   nodes: Node[],
@@ -33,7 +39,8 @@ const forEachRenderedComponent = (
     const nodePath = [...path, index];
     if (node.type === 'component') {
       if (visit(node, nodePath, depth) === 'stop') return 'stop';
-      if (forEachRenderedComponent(node.children, visit, nodePath, depth + 1) === 'stop') return 'stop';
+      if (forEachRenderedComponent(node.children, visit, nodePath, depth + 1) === 'stop')
+        return 'stop';
     } else if (!(node.isDefault && overridden.has(node.name))) {
       if (forEachRenderedComponent(node.children, visit, nodePath, depth) === 'stop') return 'stop';
     }
@@ -65,7 +72,11 @@ export const collectComponentRegionsFromNodes = (roots: Node[]): ComponentRegion
 export const collectComponentRegions = (mjml: string): ComponentRegion[] =>
   collectComponentRegionsFromNodes(parseBlocks(mjml));
 
-const componentAtOccurrence = (roots: Node[], slug: string, occurrenceIndex: number): ComponentNode => {
+const componentAtOccurrence = (
+  roots: Node[],
+  slug: string,
+  occurrenceIndex: number,
+): ComponentNode => {
   let found: ComponentNode | undefined;
   let seen = -1;
 
@@ -102,7 +113,9 @@ export const collapseComponentBodies = (mjml: string, slug: string): string => {
 
   walk(roots);
   if (collapsed === 0) {
-    throw new Error(`No "${slug}" component ref left in the source — region handles are stale after any edit.`);
+    throw new Error(
+      `No "${slug}" component ref left in the source — region handles are stale after any edit.`,
+    );
   }
   return serialize(roots);
 };
@@ -114,7 +127,9 @@ export const removeSlotOverride = (
 ): string => {
   const roots = parseBlocks(mjml);
   const node = componentAtOccurrence(roots, region.slug, region.occurrenceIndex);
-  node.children = node.children.filter((child) => !(isOverrideSlot(child) && child.name === slotName));
+  node.children = node.children.filter(
+    (child) => !(isOverrideSlot(child) && child.name === slotName),
+  );
   return serialize(roots);
 };
 

@@ -3,8 +3,27 @@
  * @kind utils
  * @uses infrastructure:prisma
  */
-import { filterFields, getPolymorphismConfig, NOOP_FIELDS, redactSensitiveFields } from '@template/db';
+import {
+  filterFields,
+  getPolymorphismConfig,
+  NOOP_FIELDS,
+  Prisma,
+  redactSensitiveFields,
+} from '@template/db';
+import type { AuditActor } from '@template/db/lib/auditActorContext';
 import { isEqual } from 'lodash-es';
+
+export const auditActorColumns = (actor: AuditActor | null) => ({
+  actorUserId: actor?.actorUserId ?? null,
+  actorSpoofUserId: actor?.actorSpoofUserId ?? null,
+  actorTokenId: actor?.actorTokenId ?? null,
+  actorJobName: actor?.actorJobName ?? null,
+  actorIntegrationId: actor?.integrationId ?? null,
+  actor: (actor?.actor as Prisma.InputJsonValue | null) ?? Prisma.JsonNull,
+  ipAddress: actor?.ipAddress ?? null,
+  userAgent: actor?.userAgent ?? null,
+  sourceInquiryId: actor?.sourceInquiryId ?? null,
+});
 
 const getSubjectFieldValue = (model: string, field: string, record: Record<string, unknown>) => {
   switch (field) {
@@ -19,7 +38,10 @@ const getSubjectFieldValue = (model: string, field: string, record: Record<strin
   }
 };
 
-export const buildContextFkFields = (model: string, record: Record<string, unknown>): Record<string, unknown> => {
+export const buildContextFkFields = (
+  model: string,
+  record: Record<string, unknown>,
+): Record<string, unknown> => {
   if (model === 'Organization') {
     return { contextOrganizationId: record.id ?? null, contextSpaceId: null, contextUserId: null };
   }
@@ -39,8 +61,13 @@ export const buildContextFkFields = (model: string, record: Record<string, unkno
   };
 };
 
-export const buildSubjectFkFields = (model: string, record: Record<string, unknown>): Record<string, unknown> => {
-  const subjectAxis = getPolymorphismConfig('AuditLog')?.axes.find((axis) => axis.field === 'subjectModel');
+export const buildSubjectFkFields = (
+  model: string,
+  record: Record<string, unknown>,
+): Record<string, unknown> => {
+  const subjectAxis = getPolymorphismConfig('AuditLog')?.axes.find(
+    (axis) => axis.field === 'subjectModel',
+  );
   const fkFields = subjectAxis?.fkMap[model as keyof typeof subjectAxis.fkMap];
   if (!fkFields?.length) return {};
 
@@ -52,15 +79,15 @@ export const buildSubjectFkFields = (model: string, record: Record<string, unkno
   return subjectFields;
 };
 
-// Drops noop keys only — no redaction. buildAuditEntry diffs on this so a change touching only a
-// sensitive field is still detected; redacting first masks both sides to the same token and the
-// change vanishes under the empty-diff guard.
-export const filterForAudit = (model: string, data: Record<string, unknown>): Record<string, unknown> =>
-  filterFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
+export const filterForAudit = (
+  model: string,
+  data: Record<string, unknown>,
+): Record<string, unknown> => filterFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
 
-// Filtered + redacted snapshot (before/after JSON) — also used by the email-versioning hook.
-export const processAuditData = (model: string, data: Record<string, unknown>): Record<string, unknown> =>
-  redactSensitiveFields(model, filterForAudit(model, data));
+export const processAuditData = (
+  model: string,
+  data: Record<string, unknown>,
+): Record<string, unknown> => redactSensitiveFields(model, filterForAudit(model, data));
 
 export const computeDiff = (
   before: Record<string, unknown>,

@@ -42,7 +42,11 @@ export type ContextSelectorProps = {
   className?: string;
 };
 
-export const ContextSelector = ({ onManageOrganizations, locked = false, className }: ContextSelectorProps) => {
+export const ContextSelector = ({
+  onManageOrganizations,
+  locked = false,
+  className,
+}: ContextSelectorProps) => {
   // Read from Zustand store
   const tenant = useAppStore((state) => state.tenant);
   const auth = useAppStore((state) => state.auth);
@@ -56,7 +60,9 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
       .map((space) => ({ id: space.id, name: space.name })),
   }));
 
-  const [expandedOrgId, setExpandedOrgId] = useState<string | null>(current.organization?.id || null);
+  const [expandedOrgId, setExpandedOrgId] = useState<string | null>(
+    current.organization?.id || null,
+  );
 
   // Generate label from context
   const currentLabel =
@@ -100,7 +106,8 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
       <DropdownMenuContent className="w-[280px]" align="start">
         <div className="max-h-[60vh] overflow-y-auto">
           {organizations.map((org) => {
-            const isCurrentOrg = current.organization?.id === org.id && current.type === 'organization';
+            const isCurrentOrg =
+              current.organization?.id === org.id && current.type === 'organization';
             const isExpanded = expandedOrgId === org.id;
             const spaces = org.spaces || [];
 
@@ -110,7 +117,10 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                 <DropdownMenuItem
                   key={org.id}
                   onClick={() => tenant.setOrganization(org.id)}
-                  className={cn('cursor-pointer', isCurrentOrg && 'bg-accent text-accent-foreground')}
+                  className={cn(
+                    'cursor-pointer',
+                    isCurrentOrg && 'bg-accent text-accent-foreground',
+                  )}
                 >
                   <Icon icon="lucide:building-2" className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">{org.name}</span>
@@ -123,13 +133,18 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
             if (spaces.length === 1) {
               const space = spaces[0];
               const isCurrentSpace =
-                current.organization?.id === org.id && current.space?.id === space.id && current.type === 'space';
+                current.organization?.id === org.id &&
+                current.space?.id === space.id &&
+                current.type === 'space';
 
               return (
                 <DropdownMenuItem
                   key={org.id}
                   onClick={() => tenant.setSpace(space.id)}
-                  className={cn('cursor-pointer', isCurrentSpace && 'bg-accent text-accent-foreground')}
+                  className={cn(
+                    'cursor-pointer',
+                    isCurrentSpace && 'bg-accent text-accent-foreground',
+                  )}
                 >
                   <Icon icon="lucide:building-2" className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">{space.name}</span>
@@ -138,12 +153,13 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
               );
             }
 
-            // 2+ spaces: accordion — use plain div for toggle so dropdown stays open
+            // 2+ spaces: accordion — plain button, not a DropdownMenuItem, so the dropdown stays open
             return (
               <div key={org.id}>
-                <div
+                <button
+                  type="button"
                   onClick={() => toggleOrg(org.id)}
-                  className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer rounded-sm hover:bg-accent hover:text-accent-foreground"
+                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm cursor-pointer rounded-sm hover:bg-accent hover:text-accent-foreground"
                 >
                   <Icon icon="lucide:building-2" className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">
@@ -154,7 +170,7 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                   ) : (
                     <Icon icon="lucide:chevron-down" className="h-4 w-4" />
                   )}
-                </div>
+                </button>
 
                 {isExpanded && (
                   <div className="pl-6 py-1 space-y-1">
@@ -168,7 +184,10 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                         <DropdownMenuItem
                           key={space.id}
                           onClick={() => tenant.setSpace(space.id)}
-                          className={cn('cursor-pointer', isCurrentSpace && 'bg-accent text-accent-foreground')}
+                          className={cn(
+                            'cursor-pointer',
+                            isCurrentSpace && 'bg-accent text-accent-foreground',
+                          )}
                         >
                           <span className="flex-1 truncate">{space.name}</span>
                           {isCurrentSpace && <Icon icon="lucide:check" className="h-4 w-4 ml-2" />}
@@ -194,7 +213,10 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
 
         <DropdownMenuItem
           onClick={tenant.setUser}
-          className={cn('cursor-pointer', current.type === 'user' && 'bg-accent text-accent-foreground')}
+          className={cn(
+            'cursor-pointer',
+            current.type === 'user' && 'bg-accent text-accent-foreground',
+          )}
         >
           <Icon icon="lucide:user" className="h-4 w-4 mr-2" />
           <span className="flex-1">Personal</span>

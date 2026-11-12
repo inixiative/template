@@ -14,15 +14,16 @@
 // A hand-picked audience is a static segment whose rule is `id in [...]`.
 //
 // Nothing about a rule's health is stored here. The segments a rule names are
-// RuleReference edges (segmentId → referencedSegmentId); a rule whose named
+// RuleReference edges (sourceSegmentId → targetSegmentId); a rule whose named
 // segment is gone is degraded, read off those edges at evaluation and on the
 // owner's read, and a degraded rule does nothing new until its author fixes it.
 
 model Segment {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id                 String        @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements Entitlement[] @relation("EntitlementSource")
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?
 
   // Owner — false polymorphism, exactly one FK matches the discriminator.
   ownerModel     ProviderModel
@@ -43,10 +44,10 @@ model Segment {
   conditions       Json
   conditionsPrompt String?
 
-  members           SegmentMember[]
-  auditLogs         AuditLog[]
-  ruleReferences    RuleReference[] @relation("RuleReferenceOwnerSegment")
-  referencedByRules RuleReference[] @relation("RuleReferenceReferencedSegment")
+  members              SegmentMember[]
+  auditLogs            AuditLog[]
+  sourceRuleReferences RuleReference[] @relation("RuleReferenceSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -65,4 +66,3 @@ enum SegmentType {
   static
   dynamic
 }
-

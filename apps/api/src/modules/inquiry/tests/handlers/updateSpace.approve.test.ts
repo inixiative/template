@@ -1,6 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { Organization, Space } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  PlatformRole,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -21,7 +26,7 @@ describe('handler: updateSpace — approve', () => {
   let space: Space;
   let adminFetch: ReturnType<typeof createTestApp>['fetch'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
     const { entity: o } = await createOrganization();
     org = o;
@@ -34,7 +39,7 @@ describe('handler: updateSpace — approve', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -48,7 +53,12 @@ describe('handler: updateSpace — approve', () => {
       content: { slug: 'updated-slug' },
     });
 
-    const response = await adminFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }));
+    const response = await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
+    );
     expect(response.status).toBe(200);
 
     const updated = await db.space.findUniqueOrThrow({ where: { id: space.id } });
@@ -65,9 +75,14 @@ describe('handler: updateSpace — approve', () => {
       content: { slug: 'denied-slug' },
     });
 
-    await adminFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'denied' }));
+    await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+      }),
+    );
 
     const unchanged = await db.space.findUniqueOrThrow({ where: { id: space.id } });
-    expect(unchanged.slug).toBe('updated-slug');
+    expect(unchanged.slug).toBe('original-slug');
   });
 });

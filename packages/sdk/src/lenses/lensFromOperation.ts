@@ -43,7 +43,8 @@ export const lensFromOperation = (operationId: string): Lens => {
       );
       const data = response?.properties?.data;
       const item = data?.type === 'array' ? data.items : data;
-      if (!item) throw new Error(`lensFromOperation: '${operationId}' has no data envelope to lens`);
+      if (!item)
+        throw new Error(`lensFromOperation: '${operationId}' has no data envelope to lens`);
       const name = item.$ref?.split('/').pop() ?? operationId;
       return lensFromSchema(resolveRef(item) as SdkSchema, name);
     }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { filterFields, isNoOpUpdate, NOOP_FIELDS, unionRegistries, WEBHOOK_NOOP_FIELDS } from '@template/db/registries';
+import {
+  filterFields,
+  isNoOpUpdate,
+  NOOP_FIELDS,
+  unionRegistries,
+  WEBHOOK_NOOP_FIELDS,
+} from '@template/db/registries';
 
 describe('NOOP_FIELDS', () => {
   it('includes global updatedAt and high-frequency tracking columns', () => {
@@ -67,7 +73,12 @@ describe('isNoOpUpdate', () => {
       lastUsedAt: new Date('2024-01-01'),
       updatedAt: new Date('2024-01-01'),
     };
-    const current = { id: '123', name: 'Token', lastUsedAt: new Date('2024-01-02'), updatedAt: new Date('2024-01-02') };
+    const current = {
+      id: '123',
+      name: 'Token',
+      lastUsedAt: new Date('2024-01-02'),
+      updatedAt: new Date('2024-01-02'),
+    };
     expect(isNoOpUpdate('Token', current, previous, NOOP_FIELDS)).toBe(true);
   });
 

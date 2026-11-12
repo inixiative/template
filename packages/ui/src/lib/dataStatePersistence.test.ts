@@ -15,7 +15,10 @@ describe('readStateFromUrl — page/pageSize hardening', () => {
   });
 
   it('carries search and orderBy through', () => {
-    expect(readStateFromUrl('?search=hi&orderBy=name:asc')).toEqual({ search: 'hi', orderBy: ['name:asc'] });
+    expect(readStateFromUrl('?search=hi&orderBy=name:asc')).toEqual({
+      search: 'hi',
+      orderBy: ['name:asc'],
+    });
   });
 });
 

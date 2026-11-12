@@ -1,4 +1,5 @@
 export * from './contextQueries';
+export * from './inquiryCheckRecord';
 export * from './queryKeys';
 export * from './registry';
 

@@ -6,7 +6,8 @@
  * @uses primitive:shared, infrastructure:prisma
  */
 
-import { type AccessorName, db, type RuntimeDelegate } from '@template/db';
+import { type AccessorName, db } from '@template/db';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import { LogScope, log } from '@template/shared/logger';
 import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { isUuidV7 } from '@template/shared/utils/isUuidV7';
@@ -18,14 +19,22 @@ export type SeedFile<T = Record<string, unknown>> = {
   records: (Partial<T> & { id: string; prime?: boolean })[];
   createOnly?: boolean;
   updateOmitFields?: string[];
+  savedByApp?: true;
 };
+
+export type SeedRecord = Record<string, unknown> & { id: string };
+
+export type SeedSavers = Partial<Record<AccessorName, (record: SeedRecord) => Promise<unknown>>>;
 
 const args = process.argv.slice(2);
 const targetTable = args.find((arg) => !arg.startsWith('--'));
 const includePrime = args.includes('--prime');
 
 const checkUUIDUniqueness = () => {
-  const idDictionary: Record<string, Array<{ model: string; record: Record<string, unknown> }>> = {};
+  const idDictionary: Record<
+    string,
+    Array<{ model: string; record: Record<string, unknown> }>
+  > = {};
 
   for (const { model, records } of seeds) {
     for (const record of records) {
@@ -52,13 +61,13 @@ const checkUUIDUniqueness = () => {
   }
 };
 
-const seedTable = async (seedFile: SeedFile): Promise<void> => {
-  const delegate = db[seedFile.model] as unknown as RuntimeDelegate;
-
-  if (!delegate) {
-    log.error(`Model not found: ${seedFile.model}`, LogScope.seed);
-    return;
-  }
+export const seedTable = async (seedFile: SeedFile, savers: SeedSavers = {}): Promise<void> => {
+  const delegate = db.delegate(seedFile.model);
+  const save = savers[seedFile.model];
+  if (seedFile.savedByApp && !save)
+    throw new Error(
+      `${seedFile.model} seeds persist through the app's save path and its guards; run the api seed (apps/api/scripts/seed.ts)`,
+    );
 
   const eligibleRecords = seedFile.records.filter((record) => {
     // Skip prime data in production
@@ -77,6 +86,14 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
 
   log.info(`Seeding ${seedFile.model} (${eligibleRecords.length} records)...`, LogScope.seed);
 
+  if (seedFile.savedByApp && save) {
+    for (const { prime: _prime, ...record } of eligibleRecords) {
+      await save(record as SeedRecord);
+      log.success(`  - Saved: ${record.id}`, LogScope.seed);
+    }
+    return;
+  }
+
   const concurrency = getConcurrency([ConcurrencyType.db]) || 10;
 
   await resolveAll(
@@ -84,33 +101,41 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
       const { prime, ...data } = record;
       const id = data.id as string;
 
-      const updateData = seedFile.createOnly ? {} : omit(data, ['id', ...(seedFile.updateOmitFields ?? [])]);
+      const updateData = seedFile.createOnly
+        ? {}
+        : omit(data, ['id', ...(seedFile.updateOmitFields ?? [])]);
 
-      await delegate.upsert({ where: { id }, create: data, update: updateData });
+      await db.txn(async () => {
+        await db.findForUpdate(seedFile.model, { id }, { upserting: true });
+        await delegate.upsert({ where: { id }, create: data, update: updateData });
+      });
       log.success(`  - Upserted: ${id}`, LogScope.seed);
     }),
     concurrency,
   );
 };
 
-export const seed = async () => {
-  const isProduction = process.env.NODE_ENV === 'production';
+const SEED_ACTOR = { ...nullAuditActor, actorJobName: 'seed' };
 
-  log.info('Starting database seed...', LogScope.seed);
-  if (isProduction) log.warn('Running in PRODUCTION mode', LogScope.seed);
-  if (includePrime) log.info('Including PRIME development data', LogScope.seed);
-  if (targetTable) log.info(`Target table: ${targetTable}`, LogScope.seed);
+export const seed = (savers: SeedSavers = {}) =>
+  auditActorContext.scope(SEED_ACTOR, async () => {
+    const isProduction = process.env.NODE_ENV === 'production';
 
-  checkUUIDUniqueness();
+    log.info('Starting database seed...', LogScope.seed);
+    if (isProduction) log.warn('Running in PRODUCTION mode', LogScope.seed);
+    if (includePrime) log.info('Including PRIME development data', LogScope.seed);
+    if (targetTable) log.info(`Target table: ${targetTable}`, LogScope.seed);
 
-  for (const seedFile of seeds) {
-    if (targetTable && seedFile.model !== targetTable) continue;
+    checkUUIDUniqueness();
 
-    await seedTable(seedFile);
-  }
+    for (const seedFile of seeds) {
+      if (targetTable && seedFile.model !== targetTable) continue;
 
-  log.success('Seed completed!', LogScope.seed);
-};
+      await seedTable(seedFile, savers);
+    }
+
+    log.success('Seed completed!', LogScope.seed);
+  });
 
 if (import.meta.main) {
   seed()

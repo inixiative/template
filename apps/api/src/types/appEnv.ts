@@ -3,39 +3,37 @@
  * @kind type
  * @uses infrastructure:prisma, primitive:authz, feature:auth, feature:tenancy, feature:users
  */
-import type { RouteConfig } from '@hono/zod-openapi';
+import type { OpenAPIHono, RouteConfig } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
-import type { AccessorName, Db, Prisma } from '@template/db';
 import type {
-  Organization,
-  OrganizationUser,
-  Session,
-  Space,
-  SpaceUser,
-  User,
-} from '@template/db/generated/client/client';
+  AccessorName,
+  Db,
+  OrganizationUserWithEntitlements,
+  Prisma,
+  SpaceUserWithEntitlements,
+} from '@template/db';
+import type { Organization, Space, User } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions';
-import type { Hono } from 'hono';
 import type { TokenWithRelations } from '#/lib/context/types';
+import type { RouteArgs } from '#/lib/routeTemplates/types';
 import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 
 export type AppVars = {
-  app: Hono<AppEnv>;
+  app: OpenAPIHono<AppEnv>;
   db: Db;
   txn: Prisma.TransactionClient | undefined;
   user: User | null;
-  organizationUsers: OrganizationUser[] | null;
+  organizationUsers: OrganizationUserWithEntitlements[] | null;
   organizations: Organization[] | null;
-  spaceUsers: SpaceUser[] | null;
+  spaceUsers: SpaceUserWithEntitlements[] | null;
   spaces: Space[] | null;
-  session: Session | null;
   token: TokenWithRelations | null;
   spoofedBy: User | null;
   permix: Permix;
   requestId: string;
   resource: unknown;
   resourceType: AccessorName | null;
-  routeConfig: RouteConfig | null;
+  routeConfig: (RouteConfig & Pick<RouteArgs, 'model' | 'submodel'>) | null;
   filterLens: LensNarrowing | null;
   bracketQuery: BracketQueryRecord;
 };

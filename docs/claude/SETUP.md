@@ -65,7 +65,7 @@ gh --version
 | `bun run init` | Once per project lifecycle | Person forking the template |
 | `bun run setup` | Each new developer + periodically | Everyone |
 
-**Init**: Interactive setup that configures Infisical, generates secrets, and provisions services. See [INIT_SCRIPT.md](INIT_SCRIPT.md).
+**Init**: Interactive setup that configures Infisical, generates secrets, and provisions services. See [INIT_SCRIPT_PATTERNS.md](INIT_SCRIPT_PATTERNS.md).
 
 **Setup**: Installs deps, starts Docker, generates Prisma, seeds DB. Run by each developer and whenever the repo needs to be brought up to date.
 
@@ -135,6 +135,5 @@ When creating a new project from this template:
 
 1. Update package names from `@template/*` to `@yourproject/*`
 2. Add your app-specific models to `packages/db/prisma/schema/`
-3. Update typed model IDs in `packages/db/src/typedModelIds.ts`
-4. Update CLAUDE.md with project-specific context
-5. Update reference repos if you have similar production codebases
+3. Update CLAUDE.md with project-specific context
+4. Update reference repos if you have similar production codebases

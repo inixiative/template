@@ -6,12 +6,9 @@
  */
 import type { TokenIssue } from '@template/email/errors/TokenValidationError';
 import {
-  EACH,
-  IF,
-  parseEachBlock,
-  parseIfBlock,
   RESERVED_SCOPE_ROOTS,
   TOKEN_PATTERN,
+  visitTemplateBlocks,
 } from '@template/email/render/conditionParser';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 import { absoluteRule } from '@template/email/rules/absoluteRule';
@@ -42,10 +39,16 @@ const isGuarded = (path: string, optionalDepth: number, guarded: Set<string>): b
   return false;
 };
 
-const tokenProblem = (token: string, root: string, segments: string, walk: Walk): string | undefined => {
+const tokenProblem = (
+  token: string,
+  root: string,
+  segments: string,
+  walk: Walk,
+): string | undefined => {
   if (root === 'system' && !walk.options.lens) {
     const name = segments.slice(1);
-    if (!name.includes('.') && (SYSTEM_TOKEN_NAMES.has(name) || isRailProvidedSystemField(name))) return undefined;
+    if (!name.includes('.') && (SYSTEM_TOKEN_NAMES.has(name) || isRailProvidedSystemField(name)))
+      return undefined;
     return 'is not a system token the rail provides';
   }
 
@@ -70,7 +73,8 @@ const tokenProblem = (token: string, root: string, segments: string, walk: Walk)
         ? 'names the loop element, which is an object — pick a field'
         : `"${resolved}" is an object, not a value — pick a field`;
     case 'ok':
-      if (viaEach && !segments && !kind.scalarList) return 'names the loop element, which is an object — pick a field';
+      if (viaEach && !segments && !kind.scalarList)
+        return 'names the loop element, which is an object — pick a field';
       if (!viaEach && kind.scalarList) return `"${resolved}" is a list — iterate it with {{#each}}`;
       if (kind.optionalDepth > 0 && !isGuarded(resolved, kind.optionalDepth, walk.guarded)) {
         return `"${resolved}" may be empty — guard it with {{#if rule={"field":"${resolved}","operator":"exists"}}} … {{else}} … {{/if}}`;
@@ -90,56 +94,38 @@ const checkText = (text: string, walk: Walk): void => {
   }
 };
 
-const walkContent = (content: string, walk: Walk): void => {
-  let i = 0;
-  while (i < content.length) {
-    const ifIdx = content.indexOf(IF, i);
-    const eachIdx = content.indexOf(EACH, i);
-    if (ifIdx === -1 && eachIdx === -1) break;
-    const kind: 'if' | 'each' = eachIdx === -1 || (ifIdx !== -1 && ifIdx < eachIdx) ? 'if' : 'each';
-    const openIdx = kind === 'if' ? ifIdx : eachIdx;
-    checkText(content.slice(i, openIdx), walk);
-
-    if (kind === 'if') {
-      const block = parseIfBlock(content, openIdx);
-      if (!block) {
-        i = openIdx + IF.length;
-        continue;
-      }
-      for (const branch of block.branches) {
-        const guarded = new Set(walk.guarded);
-        if (branch.kind !== 'else' && branch.rule !== undefined) {
-          const judged = absoluteRule(branch.rule, walk.bindings);
+const walkContent = (content: string, walk: Omit<Walk, 'bindings'>): void =>
+  visitTemplateBlocks(
+    content,
+    {
+      text: (text, { bindings, state }) => checkText(text, { ...state, bindings }),
+      branch: ({ kind, rule }, _branchIndex, _position, { bindings, state }) => {
+        const guarded = new Set(state.guarded);
+        if (kind !== 'else' && rule !== undefined) {
+          const judged = absoluteRule(rule, bindings);
           if (judged) for (const guard of presenceGuards(judged)) guarded.add(guard);
         }
-        walkContent(branch.body, { ...walk, guarded });
-      }
-      i = block.end;
-      continue;
-    }
+        return { ...state, guarded };
+      },
+      loop: ({ as }, _loop, { openIdx }, { state }) => {
+        if (state.options.isSubject) {
+          state.issues.push({
+            path: `offset ${openIdx}`,
+            message: '{{#each}} is not allowed in the subject line',
+          });
+        }
+        const eachRoots = new Set(state.eachRoots);
+        if (as) eachRoots.add(as);
+        return { ...state, eachRoots };
+      },
+    },
+    { bindings: new Map(), state: walk },
+  );
 
-    const block = parseEachBlock(content, openIdx);
-    if (!block) {
-      i = openIdx + EACH.length;
-      continue;
-    }
-    if (walk.options.isSubject) {
-      walk.issues.push({ path: `offset ${openIdx}`, message: '{{#each}} is not allowed in the subject line' });
-    }
-    const bindings: BindingChain = new Map(walk.bindings);
-    const eachRoots = new Set(walk.eachRoots);
-    if (block.as) {
-      bindings.set(block.as, resolveBindingPath(block.path, walk.bindings));
-      eachRoots.add(block.as);
-    }
-    if (block.index) bindings.set(block.index, undefined);
-    walkContent(block.body, { ...walk, bindings, eachRoots });
-    i = block.end;
-  }
-  checkText(content.slice(i), walk);
-};
-
-export const validateTokens = (content: string, options: ValidateTokensOptions = {}): TokenIssue[] => {
+export const validateTokens = (
+  content: string,
+  options: ValidateTokensOptions = {},
+): TokenIssue[] => {
   const issues: TokenIssue[] = [];
   for (const offset of unknownMustaches(content)) {
     issues.push({
@@ -147,6 +133,11 @@ export const validateTokens = (content: string, options: ValidateTokensOptions =
       message: `"${content.slice(offset, offset + 24)}" is not a token or block the engine understands`,
     });
   }
-  walkContent(content, { bindings: new Map(), eachRoots: new Set(), guarded: new Set(), issues, options });
+  walkContent(content, {
+    eachRoots: new Set(),
+    guarded: new Set(),
+    issues,
+    options,
+  });
   return issues;
 };

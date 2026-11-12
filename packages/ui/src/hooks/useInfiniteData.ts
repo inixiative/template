@@ -7,7 +7,10 @@
 import type { QueryKey } from '@tanstack/react-query';
 import type { InfiniteScrollProps } from '@template/ui/components/primitives/Table';
 import { type DataFilters, useDataFilters } from '@template/ui/hooks/useDataFilters';
-import { type InfiniteDataPage, useInfiniteDataQuery } from '@template/ui/hooks/useInfiniteDataQuery';
+import {
+  type InfiniteDataPage,
+  useInfiniteDataQuery,
+} from '@template/ui/hooks/useInfiniteDataQuery';
 import { useScrollState } from '@template/ui/hooks/useScrollState';
 import type { DataConfig } from '@template/ui/lib/makeDataConfig';
 import * as React from 'react';
@@ -16,7 +19,10 @@ import { useRef } from 'react';
 export type UseInfiniteDataOptions<TItem> = {
   config: DataConfig;
   queryKey: QueryKey;
-  queryFn: (pageParam: number, filterQuery: Record<string, unknown>) => Promise<InfiniteDataPage<TItem>>;
+  queryFn: (
+    pageParam: number,
+    filterQuery: Record<string, unknown>,
+  ) => Promise<InfiniteDataPage<TItem>>;
   enabled?: boolean;
   sectionId?: string;
   scrollRestore?: boolean;
@@ -26,6 +32,7 @@ export type InfiniteDataResult<TItem> = DataFilters & {
   data: TItem[];
   pageCount: number;
   isLoading: boolean;
+  isError: boolean;
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
   fetchNextPage: () => void;
@@ -40,7 +47,9 @@ export type InfiniteDataResult<TItem> = DataFilters & {
   scrollRef: React.RefObject<HTMLDivElement | null>;
 };
 
-export function useInfiniteData<TItem>(options: UseInfiniteDataOptions<TItem>): InfiniteDataResult<TItem> {
+export function useInfiniteData<TItem>(
+  options: UseInfiniteDataOptions<TItem>,
+): InfiniteDataResult<TItem> {
   const { config, queryKey, queryFn, enabled = true, sectionId, scrollRestore } = options;
 
   const shouldRestoreScroll = scrollRestore ?? sectionId != null;
@@ -82,6 +91,7 @@ export function useInfiniteData<TItem>(options: UseInfiniteDataOptions<TItem>): 
     data: query.data,
     pageCount: query.pageCount,
     isLoading: query.isLoading,
+    isError: query.isError,
     isFetchingNextPage: query.isFetchingNextPage,
     hasNextPage: query.hasNextPage,
     fetchNextPage: query.fetchNextPage,

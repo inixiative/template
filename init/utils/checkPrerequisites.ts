@@ -146,7 +146,9 @@ export const checkGitHubSessionAsync = async (): Promise<InfisicalSession> => {
     };
   } catch (error) {
     const errorOutput =
-      error instanceof Error && 'stderr' in error ? String((error as { stderr: unknown }).stderr) : '';
+      error instanceof Error && 'stderr' in error
+        ? String((error as { stderr: unknown }).stderr)
+        : '';
 
     if (errorOutput.toLowerCase().includes('logged in')) {
       const userMatch = errorOutput.match(/Logged in to .+ as (.+?) \(/);
@@ -192,7 +194,8 @@ const INSTALL_COMMANDS: Record<string, string> = {
   docker: 'brew install --cask docker',
 };
 
-export const getInstallCommand = (cli: string): string => INSTALL_COMMANDS[cli] ?? `# install ${cli} manually`;
+export const getInstallCommand = (cli: string): string =>
+  INSTALL_COMMANDS[cli] ?? `# install ${cli} manually`;
 
 const SESSION_CHECKS: Record<string, () => Promise<InfisicalSession>> = {
   pscale: checkPlanetScaleSessionAsync,
