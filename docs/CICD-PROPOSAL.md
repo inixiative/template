@@ -1,0 +1,146 @@
+# CI/CD and infrastructure policy for Template
+
+Status: implementation in progress in a draft PR. The committed policy, init editor, pure delivery/approval planners, policy CI checks, shared staging configuration and safer database release are implemented. Privileged deployment workflows, remote merge enforcement, cloud reconciliation, preview provisioning/teardown and the DevOps dashboard remain planned. A policy decision is not evidence that a deployment or GitHub setting was applied.
+
+## Purpose
+
+Every Template copy should have a repeatable way to configure infrastructure, validate a revision, deploy it, inspect its health, and tear down temporary environments. Railway hosts the API, worker, PostgreSQL and Redis; Vercel hosts enabled frontend apps; Infisical owns secrets. Init gathers the choices and adopts or provisions resources. The same operational commands remain usable after init.
+
+## Agreed controls
+
+| Concern | Policy |
+| --- | --- |
+| Production on main | Automatic after passing CI when changes reach main |
+| PR preview deployment | `auto` or `manual` |
+| Draft PR deployment | Independent `auto` or `manual`; overrides ordinary PR behavior while draft |
+| Staging | On or off, with an explicit branch when enabled |
+| Merge approvals | Configurable nonnegative count, with bot approvals allowed or excluded |
+| Preview cleanup | Automatic when a PR merges or closes; manual teardown also available |
+| Validation | Pre-deployment checks and post-deployment checks |
+| Configuration | Committed `cicd.config.ts`, separate from init progress and resource IDs |
+
+Manual means an operator explicitly deploys a selected revision. Later pushes do not refresh a manual preview automatically. Marking a draft ready switches to the ordinary PR policy. Auto mode reacts to eligible PR updates; it must not deploy every unrelated branch push.
+
+Approval governs merging; previews can deploy before review. requiredApprovals accepts 0, 1, 2, 3 or another nonnegative integer. allowBotApprovals decides whether eligible bot reviews count toward the same total. Count distinct authorized reviewers, exclude self-review and stale approvals, and respect dismissals and outstanding change requests. The evaluator is implemented; enforcement still requires a trusted GitHub integration. Provider limits must never silently truncate the configured count: use a required check where native rules cannot express the policy, and verify that check is required.
+
+Forks do not receive privileged deployment credentials. Auto/manual deployment never bypasses required checks, caller authorization, or trusted-revision policy. PR-owned executable configuration must not control privileged workflow execution; deployment policy is loaded from the trusted default branch.
+
+## Proposed configuration
+
+```ts
+export const cicdConfig = {
+  version: 1,
+  production: {
+    branch: 'main',
+  },
+  staging: {
+    enabled: false,
+    branch: 'staging',
+  },
+  pullRequests: {
+    deploy: 'manual',
+    drafts: { deploy: 'manual' },
+    requiredApprovals: 1,
+    allowBotApprovals: false,
+    maxActive: 2,
+  },
+  database: {
+    strategy: 'schema-push',
+    seedOnRelease: true,
+  },
+};
+```
+
+These defaults are committed in cicd.config.ts. Staging retains its branch while disabled. Automatic production deploys, pre/post checks and close-event cleanup are invariants, not settings, so the file has no keys for them. The planner chooses an action but does not assert CI, authorization, resource limits or provider availability have been satisfied. Synthetic data and disabled external side effects remain the planned preview defaults.
+
+Init edits this file through its Delivery section. Both init and shell environment selection read staging from this file, falling back to the legacy field only when no delivery file exists. Resource IDs remain in the existing project configuration initially; secrets never enter either file. Generated workflow/provider settings must be deterministic and checked for drift. There must be exactly one owner of deployment triggers for each target.
+
+## Available in this increment
+
+```sh
+bun run init:agent -- --section=cicd --pr=auto --drafts=manual --staging=off --approvals=2 --bot-approvals=off
+bun run cicd validate
+bun run cicd plan /path/to/event.json
+bun run check:cicd
+```
+
+Example event file: `{"kind":"pull-request","number":123,"draft":false,"sameRepository":true,"closed":false}`. Plans explicitly report `execution: "plan-only"` and `authorization: "not-evaluated"`. They make no provider calls. The init editor saves local policy; it does not alter GitHub branch protection or cloud deployment triggers. Main-only Vercel autodeploy remains the current provider behavior until the coordinated workflows are installed.
+
+The database release entrypoint remains `scripts/db/release.sh`. It now reads the explicit strategy, refuses missing/conflicting migration history, omits `--accept-data-loss` and stops on schema or seed failure. Releases seed by default: the non-prime seeds carry system data (cron jobs, email components and templates) that production needs; `seedOnRelease: false` is the explicit opt-out. `database.strategy` is the single switch for schema behavior: release and `setup.sh` both read it, and launch (which requires a committed migration baseline) sets it to `migrations`. Repositories that already commit migrations must set `strategy: 'migrations'` when adopting this file, or release refuses to run. No database was migrated or baselined by this PR.
+
+## Planned commands and shared execution
+
+Proposed commands:
+
+```sh
+bun run infra:plan
+bun run infra:apply
+bun run infra:status
+bun run deploy -- --env=production --sha=<commit>
+bun run deploy -- --env=staging --sha=<commit>
+bun run deploy -- --pr=123 --sha=<commit>
+bun run teardown -- --pr=123
+```
+
+The deploy command resolves the revision, verifies its checks and authorization, plans affected services, and runs the same release procedure used by CI. Local execution should normally dispatch that workflow and follow its result, keeping privileged deployment execution in one place. Teardown produces an inventory of owned preview resources and removes only those bindings; production is not an accepted default teardown target.
+
+Infrastructure planning compares desired settings with observed remote state. Existing projects can be explicitly adopted by ID; a stale init completion flag never proves that a resource still exists or has the intended settings. Persist partial progress and distinguish a missing resource from an authorization or network failure. Concurrent apply/deploy/cleanup operations need an environment lock and revalidation before each mutation.
+
+## Release and preview lifecycle
+
+1. Resolve the exact commit and enabled apps; validate dependencies, configuration and provider access.
+2. Run prechecks, with isolated PostgreSQL, Redis and storage for tests. No tests use production data or secrets.
+3. Serialize production releases. Once migrations begin, a newer push cannot cancel the active release.
+4. Apply the environment's database policy once, then deploy API and worker at the selected revision.
+5. Verify readiness, deploy frontends with the correct API origin, and run application/auth smoke checks.
+6. Record commit, config digest, provider deployment IDs, database step, checks, URLs and outcome.
+
+Cross-provider deployment is not atomic. Require backward-compatible schema/API changes, preserve failed partial outcomes, and provide explicit recovery. Application rollback does not imply database rollback. Build provenance must identify the actual commit/artifact; a later branch head must not be substituted for the checked revision.
+
+A full-stack PR preview owns its API, worker, database, Redis/queues, storage scope, frontend deployments, auth origins and scoped secrets. Provision from preview-specific configuration rather than cloning production credentials. Frontends must wait for the preview API URL before building. Workers must not process another environment's queues. External email, webhooks and paid calls remain disabled unless separately configured for the preview.
+
+Cleanup runs on merge or close, including partially failed provisioning. It uses stored IDs and verified ownership, preserves persistent resources, reports failures, and can be rerun. A periodic reconciliation job catches missed close events and orphaned previews. A closed PR cannot be reprovisioned by a late in-flight deployment. Expiry and maximum active environments bound resource use; monetary alerts are not represented as hard spending caps unless the provider enforces them.
+
+## Database policy before migrations exist
+
+The repository currently has no migration SQL files. Switching immediately to `prisma migrate deploy` would not materialize the current schema, so the initial CI/CD release needs an explicit schema-push phase.
+
+- For disposable local/test/PR databases, allow schema push and an explicitly scoped rebuild/reseed operation.
+- For persistent staging/production databases during prototyping, use schema push without `--accept-data-loss`. If Prisma reports potentially destructive changes, stop and require a reviewed schema/data transition. This is a guard against detected data loss, not a guarantee that every schema change is operationally safe.
+- Remove `launched` as the authority for destructive database changes. Disposability belongs to the managed environment binding and must be checked against the actual target; a PR cannot label a production database disposable through its config.
+- Make required seed failures fail the release. Keep optional demo data out of persistent environments.
+
+When a project adopts migrations, generate and commit an initial baseline representing its schema. Verify it by creating an empty disposable database and comparing the result. For existing databases, back up and compare their actual schema before marking that baseline applied. Do not execute table-creation SQL over an existing database or mark a mismatched schema as migrated. Subsequent releases use reviewed migrations; CI verifies both creation from empty and upgrade from the previous baseline.
+
+Template copies can remain in schema-push mode while being developed. The migration transition is an explicit operation, not an automatic consequence of a launch flag.
+
+## Dashboard: ongoing operations, separate from init
+
+| Option | Benefit | Cost |
+| --- | --- | --- |
+| Init and CLI only | Smallest operational surface; usable during application outages | Status is split across commands and provider dashboards |
+| Optional DevOps page in superadmin | Reuses Template authentication and gives every copy a consistent operational view | The application being unhealthy can make its own page unavailable |
+| Separate ops application | Independent availability and a natural home for multiple projects | Another deployment, authentication boundary and service to maintain |
+
+Recommendation: ship an optional superadmin DevOps page with each Template copy, selectable in init, using the same commands/workflow contracts. Keep CLI and GitHub operational independently so the page is never necessary for recovery. Avoid making a new always-on ops service a prerequisite for every project.
+
+The first page should show environments, deployed revisions, checks, drift, active previews and resource links. Authorized actions can dispatch deploy, rerun checks and preview teardown through the same audited workflow. Do not put provider tokens in browser code or run arbitrary shell commands from the page. Changes to committed policy should be proposed through a PR, not saved as a competing dashboard-only configuration.
+
+## Implementation sequence and acceptance
+
+1. Fix current Vercel branch matching in all three apps. Explicitly deny all branches and allow main until managed workflow triggers replace native autodeployment.
+2. Add the typed policy, init controls and read-only plan/status. Test every PR/draft auto/manual combination and approval-count/bot/staging settings; report unsupported provider capabilities.
+3. Implement canonical CI, database-mode checks and manual production/staging deployment. Prove a failed precheck cannot deploy, exact revision provenance is retained, and concurrent production releases cannot overlap migrations.
+4. Implement PR deployment and teardown with isolation, partial-failure recovery and close-event reconciliation. Prove repeated cleanup is safe and late deployments cannot resurrect closed previews.
+5. Add automatic triggers using the same release path, then the optional DevOps page. Exercise failed postchecks, stale configuration, provider outages and rollback/recovery in disposable environments.
+
+Use Zealot's separation of validation, review deployments and visible cleanup failures as inspiration. Do not inherit temporary failure-tolerant CI gates, production deployment cancellation, or provider-specific assumptions from its Render/PlanetScale setup.
+
+## References
+
+- [Vercel branch matching](https://vercel.com/docs/project-configuration/git-configuration): unspecified branches default to enabled; a true matching rule wins over false matching rules.
+- [Railway GitHub autodeploys](https://docs.railway.com/deployments/github-autodeploys)
+- [Railway environments](https://docs.railway.com/environments)
+- [GitHub deployment controls](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments)
+- [Prisma schema prototyping](https://docs.prisma.io/docs/orm/v6/prisma-migrate/workflows/prototyping-your-schema)
+- [Prisma baselining](https://www.prisma.io/docs/orm/prisma-migrate/workflows/baselining)

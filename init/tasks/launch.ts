@@ -1,6 +1,8 @@
+import { resolve } from 'node:path';
 import { setLaunched } from '../utils/configHelpers';
 import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig';
 import { baselineDeployedDatabases } from './baselineDeployedDatabases';
+import { configureCicd } from './cicdSettings';
 
 export type PreflightCheck = {
   label: string;
@@ -83,7 +85,12 @@ export const runPreflightChecks = (
   return { checks, allPassed };
 };
 
+/**
+ * Execute the launch: the baseline migration is recorded on every deployed database, releases
+ * switch to migrations, then the launched flag flips.
+ */
 export const executeLaunch = async (): Promise<void> => {
   await baselineDeployedDatabases(await getProjectConfig());
+  await configureCicd(['--database=migrations'], resolve(import.meta.dir, '../..'));
   await setLaunched(true);
 };
