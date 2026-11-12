@@ -20,11 +20,11 @@ describe('inquiryPermission', () => {
     });
   });
 
-  it('walks to a related model when the level says via', () => {
+  it('uses a level written as a rule exactly as written', () => {
     expect(
       inquiryPartyRule(
         'source',
-        { model: 'Space', send: { via: 'organization', model: 'Organization', action: 'own' } },
+        { model: 'Space', send: { rel: 'sourceSpace.organization', action: 'own' } },
         'send',
       ),
     ).toEqual({

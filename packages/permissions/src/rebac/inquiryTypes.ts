@@ -19,16 +19,10 @@ type ResourceOf<M extends InquiryPartyModel> = Extract<`db:${Uncapitalize<M>}`, 
 // An action of the party model's own resource: the schema's vocabulary, checked at compile time.
 export type PartyAction<M extends InquiryPartyModel> = BaseActionOf<ResourceOf<M>>;
 
-// The level a party needs: one action; an action asked of a model the party relates to
-// (`{ via: 'organization', model: 'Organization', action: 'own' }` on a Space); or an action
-// chosen by a rule over the inquiry, first match winning in effect because the branches are ORed
-// and each states its own condition.
-export type PartyLevel<M extends InquiryPartyModel> =
-  | PartyAction<M>
-  | {
-      [V in InquiryPartyModel]: { via: string; model: V; action: PartyAction<V> };
-    }[InquiryPartyModel]
-  | readonly { when: ActionRule; action: PartyAction<M> }[];
+// The level a party needs: an action of the party's own resource, asked on its relation; or, for a
+// case one action cannot say, a plain rebac rule in the schema's own vocabulary (rel, any, all,
+// rule), used as written.
+export type PartyLevel<M extends InquiryPartyModel> = PartyAction<M> | Exclude<ActionRule, string>;
 
 export type InquiryParty =
   | {
@@ -61,13 +55,17 @@ export const INQUIRY_TYPES = {
     sources: [
       {
         model: 'Organization',
-        send: [
-          { when: role(Operator.in, highRoles), action: 'own' },
-          {
-            when: { any: [role(Operator.in, lowRoles), role(Operator.equals, null)] },
-            action: 'manage',
-          },
-        ],
+        send: {
+          any: [
+            { all: [role(Operator.in, highRoles), { rel: 'sourceOrganization', action: 'own' }] },
+            {
+              all: [
+                { any: [role(Operator.in, lowRoles), role(Operator.equals, null)] },
+                { rel: 'sourceOrganization', action: 'manage' },
+              ],
+            },
+          ],
+        },
       },
     ],
     targets: [{ model: 'User', resolve: 'manage' }],
@@ -81,9 +79,7 @@ export const INQUIRY_TYPES = {
     targets: [{ model: 'admin' }],
   },
   transferSpace: {
-    sources: [
-      { model: 'Space', send: { via: 'organization', model: 'Organization', action: 'own' } },
-    ],
+    sources: [{ model: 'Space', send: { rel: 'sourceSpace.organization', action: 'own' } }],
     targets: [{ model: 'Organization', resolve: 'own' }],
   },
 } as const satisfies Record<InquiryType, InquiryTypeParties>;

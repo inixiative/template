@@ -29,15 +29,9 @@ const isPartyModel = (side: InquirySide, model: InquiryPartyModel): ActionRule =
 });
 
 // The party's relation on the inquiry is named for its side and model: sourceOrganization,
-// targetUser, sourceSpaceUser.
-const levelRule = (rel: string, level: AnyLevel): ActionRule => {
-  if (typeof level === 'string') return { rel, action: level };
-  if (Array.isArray(level)) {
-    return { any: level.map(({ when, action }) => ({ all: [when, { rel, action }] })) };
-  }
-  const { via, action } = level as { via: string; action: string };
-  return { rel: `${rel}.${via}`, action };
-};
+// targetUser, sourceSpaceUser. An action is asked on it; a rule is used as written.
+const levelRule = (rel: string, level: AnyLevel): ActionRule =>
+  typeof level === 'string' ? { rel, action: level } : level;
 
 // The party's grant for one verb, gated on the inquiry naming that party model on that side.
 // `admin`, and a party that does not declare the verb, grant nothing: only a superadmin passes.

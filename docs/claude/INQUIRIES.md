@@ -320,9 +320,9 @@ No row keyed to the space keeps the old org's membership, so reviving a membersh
 | `inviteOrganizationUser` | Organization `own` for a high role (owner/admin), `manage` otherwise | User `manage` |
 | `createSpace` | Organization `own` | UserEvidence (superadmin) |
 | `updateSpace` | Space `own` (a space owner, or an org owner through `space.own → org.own`) | UserEvidence (superadmin) |
-| `transferSpace` | Space, via its `organization`: Organization `own` | Organization `own` |
+| `transferSpace` | Space: `own` on the space's organization (`{ rel: 'sourceSpace.organization', action: 'own' }`) | Organization `own` |
 
-`updateSpace` and `transferSpace` differ intentionally. `updateSpace` asks `own` on the space, which an org owner also holds. `transferSpace` declares `via: 'organization'`, so the check is `own` on the space's organization itself: a space owner alone cannot transfer it.
+`updateSpace` and `transferSpace` differ intentionally. `updateSpace` asks `own` on the space, which an org owner also holds. `transferSpace` is a rule with a dot-path `rel` to the space's organization, so the check is `own` on the organization itself: a space owner alone cannot transfer it.
 
 ## Response Schemas
 
@@ -356,7 +356,7 @@ Each mutation uses the include that matches what its caller needs:
 | `send` | The source party's declared `send` level for that type (table above) |
 | `resolve` | The target party's declared `resolve` level for that type; a UserEvidence (`admin`) target has no relation, so only a superadmin resolves it |
 
-`db:inquiry` is built by `inquiryPermission(INQUIRY_TYPES)`: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource, checked at compile time; `{ via, model, action }` asks a related model instead, and a list of `{ when, action }` picks the level by a rule over the inquiry.
+`db:inquiry` is built by `inquiryPermission(INQUIRY_TYPES)`: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource, checked at compile time, or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
 
 ## Adding a New Handler
 
