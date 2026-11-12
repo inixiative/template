@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { lensFor } from '@template/db/lens';
@@ -128,7 +128,7 @@ describe('lensWhere — root wheres (path "")', () => {
 });
 
 describe('lensWhere — query-plan execution (count operators)', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -162,11 +162,11 @@ describe('lensWhere — query-plan execution (count operators)', () => {
   it('counts only live related rows — a soft-deleted child does not satisfy the count', async () => {
     const { entity: onlyTombstoned } = await createUser();
     const { entity: hasLive } = await createUser();
-    const { entity: deadContact } = await createContact(
-      { ownerModel: 'User' },
-      { user: onlyTombstoned },
-    );
-    await db.contact.update({ where: { id: deadContact.id }, data: { deletedAt: new Date() } });
+    await createContact({ ownerModel: 'User' }, { user: onlyTombstoned });
+    await db.contact.updateManyAndReturn({
+      where: { userId: onlyTombstoned.id },
+      data: { deletedAt: new Date() },
+    });
     await createContact({ ownerModel: 'User' }, { user: hasLive });
 
     const lens: LensNarrowing = {

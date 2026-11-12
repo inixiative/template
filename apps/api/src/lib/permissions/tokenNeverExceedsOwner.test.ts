@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, Role, Space } from '@template/db/generated/client/client';
 import {
@@ -7,6 +7,7 @@ import {
   createOrganizationUser,
   createSpace,
 } from '@template/db/test';
+import { toEntitlementInput } from '@template/permissions';
 import { organizationRouter } from '#/modules/organization';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
@@ -24,11 +25,11 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   const onOrganization = (actions: Actions) =>
     actions
       ? [
-          {
+          toEntitlementInput({
             resource: 'db:organization',
             anchor: { resource: 'db:organization', id: organization.id },
             actions,
-          },
+          }),
         ]
       : undefined;
 
@@ -56,12 +57,12 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
     entitlements: Actions = null,
   ) => token('User', organizationUser, role, entitlements);
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

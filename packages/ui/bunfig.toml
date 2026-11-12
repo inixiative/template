@@ -1,2 +1,3 @@
 [test]
+randomize = true
 preload = "./src/test/setup.ts"

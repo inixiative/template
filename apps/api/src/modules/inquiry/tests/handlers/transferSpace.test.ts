@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { cache, cacheKey, checkCache, snapshotHookRegistry } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { cache, cacheKey, checkCache } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -20,16 +20,7 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
-import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
-import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
+import { memberSelfGrant, toEntitlementEntry } from '@template/permissions';
 import { inquiryRouter } from '#/modules/inquiry';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -43,21 +34,8 @@ describe('handler: transferSpace', () => {
   let targetOrg2: Organization;
   let ownerFetch: ReturnType<typeof createTestApp>['fetch'];
   let adminFetch: ReturnType<typeof createTestApp>['fetch'];
-  let restoreHooks: () => void;
 
-  beforeAll(async () => {
-    restoreHooks = snapshotHookRegistry();
-    registerDelegatedKeysHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerAuditLogHook();
-    registerClearCacheHook();
-    registerEmailVersioningHook();
-    registerEmailTemplateSlugReservationHook();
-    registerImmutableFieldsHook();
-    registerPreventHardDeleteHook();
-    registerSoftDeleteCascadeHook();
-
+  beforeEach(async () => {
     const { entity: owner } = await createUser();
     const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
     const { entity: o } = await createOrganization();
@@ -89,8 +67,7 @@ describe('handler: transferSpace', () => {
     }).fetch;
   });
 
-  afterAll(async () => {
-    restoreHooks();
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -207,7 +184,7 @@ describe('handler: transferSpace', () => {
     let spaceProjectId: string;
     let liveTargetMembersBefore: string[];
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       const { entity: s } = await createSpace({}, { organization: org });
       freshSpace = s;
       kept = await memberWithRows(freshSpace, targetOrg1);
@@ -300,6 +277,12 @@ describe('handler: transferSpace', () => {
       expect(await db.project.findUniqueOrThrow({ where: { id: kept.project.id } })).toMatchObject(
         live,
       );
+      const entitlements = await db.entitlement.findMany({
+        where: { targetModel: 'SpaceUser', targetId: kept.spaceUser.id },
+      });
+      expect(entitlements.length).toBeGreaterThan(0);
+      for (const row of entitlements)
+        expect(row).toMatchObject({ targetOrganizationId: targetOrg1.id, deletedAt: null });
     });
 
     it('tombstones every other member and everything downstream, keyed to the target org', async () => {
@@ -344,6 +327,28 @@ describe('handler: transferSpace', () => {
       expect(stampOf(dropped.user.id)).not.toBe(await spaceStampOf(dropped.spaceUser.id));
       expect(stampOf(leftOldOrg.user.id)).not.toBe(await spaceStampOf(leftOldOrg.spaceUser.id));
       expect(stampOf(removedEarlier.user.id)).not.toBe(removedEarlierAt.getTime());
+    });
+
+    it('writes each tombstoned target membership its self-grant, tombstoned with the same stamp', async () => {
+      const memberships = await withDeleted(() =>
+        db.organizationUser.findMany({
+          where: {
+            organizationId: targetOrg1.id,
+            userId: { in: [dropped.user.id, removedEarlier.user.id, leftOldOrg.user.id] },
+          },
+        }),
+      );
+      for (const membership of memberships) {
+        const rows = await withDeleted(() =>
+          db.entitlement.findMany({
+            where: { targetModel: 'OrganizationUser', targetId: membership.id },
+          }),
+        );
+        expect(rows.map(toEntitlementEntry)).toEqual([
+          memberSelfGrant('db:organizationUser', membership),
+        ]);
+        expect(rows.map((row) => row.deletedAt)).toEqual([membership.deletedAt]);
+      }
     });
 
     it('a member who had left the target org is removed at the transfer, and rehiring them leaves the space to a manual re-add', async () => {

@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import type { WithTargetEntitlements } from '@template/db/entitlements/targetEntitlements';
 import type {
   Organization,
   OrganizationUser,
@@ -11,25 +12,14 @@ import type {
   SpaceUser,
   User,
 } from '@template/db/generated/client/client';
-import {
-  OrganizationScalarSchema,
-  OrganizationUserScalarSchema,
-  SpaceScalarSchema,
-  SpaceUserScalarSchema,
-  UserScalarSchema,
-} from '@template/db/generated/zod/scalarSchemas.gen';
-import { z } from 'zod';
+
+export type OrganizationUserWithEntitlements = WithTargetEntitlements<OrganizationUser>;
+
+export type SpaceUserWithEntitlements = WithTargetEntitlements<SpaceUser>;
 
 export type UserWithRelations = User & {
-  organizationUsers: OrganizationUser[];
+  organizationUsers: OrganizationUserWithEntitlements[];
   organizations: Organization[];
-  spaceUsers: SpaceUser[];
+  spaceUsers: SpaceUserWithEntitlements[];
   spaces: Space[];
 };
-
-export const UserWithRelationsSchema = UserScalarSchema.extend({
-  organizationUsers: z.array(OrganizationUserScalarSchema),
-  organizations: z.array(OrganizationScalarSchema),
-  spaceUsers: z.array(SpaceUserScalarSchema),
-  spaces: z.array(SpaceScalarSchema),
-});

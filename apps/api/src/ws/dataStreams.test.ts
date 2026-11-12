@@ -1,5 +1,5 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
-import { db, getRedisClient, redisNamespace, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { db, getRedisClient, redisNamespace } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
@@ -15,7 +15,6 @@ import {
   WS_MAX_STREAM_NAME_LENGTH,
 } from '@template/shared/ws';
 import { app } from '#/app';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { streamAppendFrame } from '#/ws/dataFrame';
 import { sendToStreamLocal } from '#/ws/delivery';
 import { websocketHandler } from '#/ws/handler';
@@ -70,7 +69,7 @@ describe('data streams (real app)', () => {
   let memberBearer: string;
   let stream: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'member' });
     member = context.user;
     organization = context.organization;
@@ -84,7 +83,7 @@ describe('data streams (real app)', () => {
 
   afterEach(() => clearRegistry());
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -356,7 +355,7 @@ describe('data streams (real app)', () => {
   describe('sequence numbers', () => {
     // Its own member, so these reads do not spend the shared member's HTTP rate-limit budget.
     let bearer: string;
-    beforeAll(async () => {
+    beforeEach(async () => {
       await initWebSocketPubSub();
       const { context } = await createOrganizationUser({ role: 'member' }, { organization });
       bearer = (await createBearerToken(context.user)).authorization;
@@ -374,6 +373,8 @@ describe('data streams (real app)', () => {
     });
 
     it('an append landing during the snapshot read is delivered once, after the snapshot, one seq past it', async () => {
+      await appendToStream(stream, { type: 'remove', payload: { id: 'before' } });
+      await settle();
       const { socket, sent } = connect(bearer);
       let release = () => {};
       const gate = new Promise<void>((resolve) => {
@@ -547,13 +548,13 @@ describe('data streams (real app)', () => {
       revocable.sent.length = 0;
       staying.sent.length = 0;
 
-      registerClearCacheHook();
-      try {
-        await db.txn(() => db.organizationUser.delete({ where: { id: membership.id } }));
-        await settle();
-      } finally {
-        unregisterDbHook('clearCache');
-      }
+      await db.txn(() =>
+        db.organizationUser.update({
+          where: { id: membership.id },
+          data: { deletedAt: new Date() },
+        }),
+      );
+      await settle();
       await reauthorizeOpenStreams();
       const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'x' } });
       sendToStreamLocal(stream, () => JSON.stringify(append));
@@ -586,6 +587,21 @@ describe('data streams (real app)', () => {
       } finally {
         probe.mockRestore();
       }
+    });
+
+    it('evicts the connection when the recheck itself throws', async () => {
+      const { socket, closeInfo } = connect(memberBearer);
+      await websocketHandler.message(socket, openFrame(stream));
+      const run = spyOn(socket.data.queue, 'run').mockRejectedValue(new Error('recheck broke'));
+      try {
+        await reauthorizeOpenStreams();
+      } finally {
+        run.mockRestore();
+      }
+
+      expect(closeInfo()?.code).toBe(1011);
+      expect(byId.has(socket.data.connectionId)).toBe(false);
+      expect(byStream.has(stream)).toBe(false);
     });
   });
   describe('adversarial review', () => {

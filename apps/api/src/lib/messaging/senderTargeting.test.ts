@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import {
@@ -73,7 +73,7 @@ const targeted = async (sender: Sender, ids: string[], stored?: unknown) => {
   return users.map((user) => user.id).sort();
 };
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

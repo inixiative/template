@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { z } from '@hono/zod-openapi';
-import { db, type HydratedRecord, hydrate, unregisterDbHook } from '@template/db';
+import { db, type HydratedRecord, hydrate } from '@template/db';
 import type { Organization, Role, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -11,10 +11,10 @@ import {
   createSpaceUser,
   createUser,
 } from '@template/db/test';
+import { toEntitlementInput } from '@template/permissions';
 import { createPermissions } from '@template/permissions/client';
 import { check, placeUnder, rebacSchema, schemaMap } from '@template/permissions/rebac';
 import { app } from '#/app';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { readRoute } from '#/lib/routeTemplates';
 import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET } from '#/lib/utils/authProbe';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
@@ -22,9 +22,7 @@ import { Modules } from '#/modules/modules';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
-beforeAll(() => registerClearCacheHook());
-afterAll(async () => {
-  unregisterDbHook('clearCache');
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
@@ -65,7 +63,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
 
   const orgRoles = ['owner', 'admin', 'member', 'viewer'] as const;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
     for (const role of orgRoles) {
@@ -221,7 +219,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
     let callers: Record<string, Headers>;
     const memberTokenOutcome = { memberToken: 'unauthenticated' };
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       const { entity: organizationUser } = await createOrganizationUser(
         { role: 'owner' },
         { organization },
@@ -307,11 +305,11 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         {
           role: 'viewer',
           entitlements: [
-            {
+            toEntitlementInput({
               resource: 'db:organization',
               anchor: { resource: 'db:organization', id: other.id },
               actions: { manage: true },
-            },
+            }),
           ],
         },
         { organization: other },
@@ -326,11 +324,11 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
 
     it("an entitlement stored on one member and anchored at the user's other organization opens nothing there", async () => {
       const { entity: other } = await createOrganization();
-      const contactsHere = {
+      const contactsHere = toEntitlementInput({
         resource: 'db:contact',
         anchor: { resource: 'db:organization', id: organization.id, path: 'organization' },
         actions: { create: true },
-      };
+      });
       const { context } = await createOrganizationUser(
         { role: 'viewer', entitlements: [contactsHere] },
         { organization: other },
@@ -350,11 +348,11 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
           ownerModel: 'User',
           role: 'viewer',
           entitlements: [
-            {
+            toEntitlementInput({
               resource: 'db:contact',
               anchor: { resource: 'db:organization', id: other.id, path: 'organization' },
               actions: { create: true },
-            },
+            }),
           ],
         },
         { user: context.user },

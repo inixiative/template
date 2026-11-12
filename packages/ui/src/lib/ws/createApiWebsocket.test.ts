@@ -1,13 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import '@template/ui/store';
 import { QueryClient, QueryObserver, skipToken } from '@tanstack/react-query';
 import type { WSFrameErrorFrame, WSStreamAckFrame } from '@template/shared/ws';
 import {
+  type ApiWebsocket,
   type ApiWebsocketTiming,
   createApiWebsocket,
 } from '@template/ui/lib/ws/createApiWebsocket';
 import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
-import { useAppStore } from '@template/ui/store';
 
 let instances: FakeWebSocket[] = [];
 
@@ -54,6 +53,18 @@ const fastTiming: Partial<ApiWebsocketTiming> = {
 };
 const settled = () => wait(5);
 
+let queryClient: QueryClient | null = null;
+const clients: ApiWebsocket[] = [];
+const createClient = (
+  url: string,
+  onReconnect?: () => void,
+  timing?: Partial<ApiWebsocketTiming>,
+): ApiWebsocket => {
+  const client = createApiWebsocket(url, { getClient: () => queryClient, onReconnect }, timing);
+  clients.push(client);
+  return client;
+};
+
 describe('createApiWebsocket', () => {
   let wsSpy: ReturnType<typeof spyOn>;
   beforeEach(() => {
@@ -69,11 +80,47 @@ describe('createApiWebsocket', () => {
     });
   });
   afterEach(() => {
+    for (const client of clients.splice(0)) client.disconnect();
+    queryClient = null;
     wsSpy.mockRestore();
   });
 
+  it('disconnect closes the socket and stays closed until connect is called again', async () => {
+    const api = createClient('ws://x', undefined, {
+      ...fastTiming,
+      heartbeatMs: 2,
+      pongTimeoutMs: 4,
+    });
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    await wait(3);
+
+    api.disconnect();
+    expect(ws.readyState).toBe(FakeWebSocket.CLOSED);
+    await wait(20);
+    expect(instances).toHaveLength(1);
+
+    api.connect();
+    expect(instances).toHaveLength(2);
+  });
+
+  it('replays its subscriptions on the socket opened after a disconnect', () => {
+    const api = createClient('ws://x');
+    api.connect();
+    open(instances[0] as FakeWebSocket);
+    api.subscribe('ch1');
+
+    api.disconnect();
+    api.connect();
+    const second = instances[1] as FakeWebSocket;
+    open(second);
+
+    expect(sends(second)).toContainEqual({ action: 'subscribe', channel: 'ch1' });
+  });
+
   it('drops a subscription the server rejects so it is not replayed on reconnect', () => {
-    const api = createApiWebsocket('ws://x');
+    const api = createClient('ws://x');
     api.connect();
     const ws = instances[0] as FakeWebSocket;
     open(ws);
@@ -91,7 +138,7 @@ describe('createApiWebsocket', () => {
   });
 
   it('falls back to real identity when the server rejects a spoof', () => {
-    const api = createApiWebsocket('ws://x');
+    const api = createClient('ws://x');
     api.connect();
     const ws = instances[0] as FakeWebSocket;
     open(ws);
@@ -118,7 +165,7 @@ describe('createApiWebsocket', () => {
 
   it('defers onReconnect until replayed subscriptions are acked', () => {
     let reconnected = 0;
-    const api = createApiWebsocket('ws://x', () => {
+    const api = createClient('ws://x', () => {
       reconnected++;
     });
     api.connect();
@@ -135,7 +182,7 @@ describe('createApiWebsocket', () => {
   });
 
   it('re-sends a subscribe the server dropped for load', async () => {
-    const api = createApiWebsocket('ws://x', undefined, fastTiming);
+    const api = createClient('ws://x', undefined, fastTiming);
     api.connect();
     const ws = instances[0] as FakeWebSocket;
     open(ws);
@@ -154,7 +201,7 @@ describe('createApiWebsocket', () => {
   });
 
   it('re-sends an identity frame the server dropped for load, then replays grants under it', async () => {
-    const api = createApiWebsocket('ws://x', undefined, fastTiming);
+    const api = createClient('ws://x', undefined, fastTiming);
     api.connect();
     const ws = instances[0] as FakeWebSocket;
     open(ws);
@@ -176,16 +223,83 @@ describe('createApiWebsocket', () => {
     expect(sends(ws)).toContainEqual({ action: 'subscribe', channel: 'ch1' });
   });
 
+  it('leaves no frame-error retry pending after disconnect', () => {
+    const api = createClient('ws://x', undefined, fastTiming);
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    api.subscribe('ch1');
+
+    const live = new Set<unknown>();
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    const setSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((
+      callback: () => void,
+      ms?: number,
+    ) => {
+      const id = realSetTimeout(() => {
+        live.delete(id);
+        callback();
+      }, ms);
+      live.add(id);
+      return id;
+    }) as never);
+    const clearSpy = spyOn(globalThis, 'clearTimeout').mockImplementation(((
+      id: ReturnType<typeof setTimeout>,
+    ) => {
+      live.delete(id);
+      realClearTimeout(id);
+    }) as never);
+
+    try {
+      for (const frame of [
+        { action: 'authenticate' },
+        { action: 'subscribe', channel: 'ch1' },
+        { action: 'unsubscribe', channel: 'ch2' },
+        { action: 'close', stream: 'gone' },
+      ])
+        receive(ws, { type: 'error', retryable: true, ...frame });
+      expect(live.size).toBe(4);
+
+      api.disconnect();
+      expect(live.size).toBe(0);
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
+  });
+
+  it('does not report a reconnect when the socket closes before the replayed subscriptions are acked', async () => {
+    let reconnected = 0;
+    const api = createClient(
+      'ws://x',
+      () => {
+        reconnected++;
+      },
+      { reconnectAckTimeoutMs: 5 },
+    );
+    api.connect();
+    const ws = instances[0] as FakeWebSocket;
+    open(ws);
+    api.subscribe('ch1');
+    open(ws);
+
+    ws.close();
+    await wait(20);
+
+    expect(reconnected).toBe(0);
+  });
+
   describe('data streams', () => {
     const stream = 'organizationReadManyContacts:id:org-1';
     let client: QueryClient;
     beforeEach(() => {
       client = new QueryClient();
-      useAppStore.setState({ client });
+      queryClient = client;
     });
 
     const connected = (timing: Partial<ApiWebsocketTiming> = fastTiming) => {
-      const api = createApiWebsocket('ws://x', undefined, timing);
+      const api = createClient('ws://x', undefined, timing);
       api.connect();
       const ws = instances[0] as FakeWebSocket;
       open(ws);
@@ -412,7 +526,7 @@ describe('createApiWebsocket', () => {
     });
 
     it('never sends an open ahead of the identity frame on a connection that is not yet open', () => {
-      const api = createApiWebsocket('ws://x', undefined, fastTiming);
+      const api = createClient('ws://x', undefined, fastTiming);
       api.connect();
       const ws = instances[0] as FakeWebSocket;
       api.authenticate('tok');
@@ -748,10 +862,12 @@ describe('createApiWebsocket', () => {
 
   describe('adversarial review', () => {
     const stream = 'organizationReadManyContacts:id:org-1';
-    beforeEach(() => useAppStore.setState({ client: new QueryClient() }));
+    beforeEach(() => {
+      queryClient = new QueryClient();
+    });
 
     const connected = (timing: Partial<ApiWebsocketTiming> = fastTiming) => {
-      const api = createApiWebsocket('ws://x', undefined, timing);
+      const api = createClient('ws://x', undefined, timing);
       api.connect();
       const ws = instances[0] as FakeWebSocket;
       open(ws);

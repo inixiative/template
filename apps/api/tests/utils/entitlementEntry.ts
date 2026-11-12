@@ -1,18 +1,15 @@
-type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+import type { EntitlementInput } from '@template/db';
+import { toEntitlementInput } from '@template/permissions';
 
-export type Entry = {
-  resource: string;
-  anchor: { resource: string; id: string; path?: string };
-  actions: Record<string, boolean>;
-  where?: { [key: string]: Json };
-};
+export type Entry = EntitlementInput;
 
 export const entry = (
   resource: string,
   [anchorResource, id, path]: [string, string, string?],
   actions: string[],
-): Entry => ({
-  resource,
-  anchor: { resource: anchorResource, id, ...(path ? { path } : {}) },
-  actions: Object.fromEntries(actions.map((action) => [action, true])),
-});
+): Entry =>
+  toEntitlementInput({
+    resource,
+    anchor: { resource: anchorResource, id, ...(path ? { path } : {}) },
+    actions: Object.fromEntries(actions.map((action) => [action, true])),
+  });

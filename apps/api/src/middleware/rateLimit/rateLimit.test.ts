@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import { getRedisClient } from '@template/db';
 import { clientIp } from '#/lib/clientIp';
 import { type RateLimitRule, rateLimit } from '#/middleware/rateLimit/rateLimit';
@@ -25,11 +25,6 @@ const hit = (
 ) => fetchFromApp(new Request('http://t/rl', { headers: { 'x-forwarded-for': xff, ...extra } }));
 
 describe('rateLimit', () => {
-  beforeEach(async () => {
-    const keys = await getRedisClient().keys('limit:test:*');
-    if (keys.length) await getRedisClient().del(...keys);
-  });
-
   it('allows up to max, then 429s with Retry-After and the error envelope', async () => {
     const { fetch } = createTestApp({ mount: [mount([ipRule({ max: 2 })])] });
 

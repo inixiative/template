@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, Space } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
@@ -21,7 +21,7 @@ describe('GET /api/admin/space', () => {
   let space2: Space;
   let _space3: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
     const { entity: o1 } = await createOrganization();
     org1 = o1;
@@ -43,7 +43,7 @@ describe('GET /api/admin/space', () => {
     testDb = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
   });
 

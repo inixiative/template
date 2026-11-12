@@ -9,6 +9,7 @@
   - [Database](#database)
   - [Code Quality](#code-quality)
   - [Environment](#environment)
+  - [Shared Playwright MCP Server](#shared-playwright-mcp-server)
 - [Daily Workflow](#daily-workflow)
 - [Architectural Reviews](#architectural-reviews)
 - [Debugging](#debugging)
@@ -77,6 +78,25 @@ bun run test          # Run tests
 
 ```bash
 bun run sync-env      # Sync .env files
+```
+
+### Shared Playwright MCP Server
+
+The Playwright plugin starts its own MCP server in every Claude Code session. On macOS, `bun run setup` ends by replacing it with one server per machine that sessions in every repo share. It installs a login service on `localhost:8931`, registers it at user scope as `playwright`, and turns off the per-session plugin once the server responds.
+
+```bash
+bun run setup:playwright-mcp
+```
+
+The step is safe to re-run, and you should re-run it after changing your Node version. It replaces the `playwright@claude-plugins-official` plugin, so tool names change to `mcp__playwright__*` and Claude Code asks for permission again. Browser logins do not carry over between runs. Claude Code sessions already open keep their own servers until they restart. Any process on the machine can drive the server: it listens on localhost only and has no auth. On other systems, or without `claude`, `npx` or `node`, the step prints a message and skips. If another repo's setup already runs a Playwright MCP server on port 8931, the step registers that server and installs no service of its own.
+
+To undo it:
+
+```bash
+launchctl bootout gui/$(id -u)/com.inixiative.playwright-mcp
+rm ~/Library/LaunchAgents/com.inixiative.playwright-mcp.plist
+claude mcp remove -s user playwright
+claude plugin enable -s user playwright@claude-plugins-official
 ```
 
 ---

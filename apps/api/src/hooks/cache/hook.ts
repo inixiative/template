@@ -9,13 +9,26 @@ import {
   DbAction,
   HookTiming,
   isNoOpUpdate,
+  loadParentRows,
   NOOP_FIELDS,
   type Prisma,
   registerDbHook,
 } from '@template/db';
-import { keyBy } from 'lodash-es';
+import { groupBy, keyBy } from 'lodash-es';
 import { queueCacheClear } from '#/hooks/cache/queueCacheClear';
 import { isManyAction } from '#/hooks/shared/hookRows';
+
+const queueParentCacheClear = async (
+  model: Prisma.ModelName,
+  records: Record<string, unknown>[],
+) => {
+  const parents = (await loadParentRows(model, records)).filter((parent) => parent !== null);
+  for (const [parentModel, group] of Object.entries(groupBy(parents, 'model')))
+    await queueCacheClear(
+      parentModel as Prisma.ModelName,
+      group.map((parent) => parent.row),
+    );
+};
 
 const isUpdateAction = (action: DbAction): boolean =>
   action === DbAction.update || action === DbAction.updateManyAndReturn;
@@ -63,5 +76,6 @@ export const registerClearCacheHook = () => {
     }
 
     await queueCacheClear(model as Prisma.ModelName, records);
+    await queueParentCacheClear(model as Prisma.ModelName, records);
   });
 };

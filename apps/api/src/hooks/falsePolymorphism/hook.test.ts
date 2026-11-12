@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, snapshotHookRegistry, unregisterDbHook } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import {
   cleanupTouchedTables,
   createOrganization,
@@ -8,21 +8,10 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 
 // Polymorphism validation is now handled via rules (auto-injected from FalsePolymorphismRegistry)
 
-let restoreHooks: () => void;
-
-beforeAll(() => {
-  restoreHooks = snapshotHookRegistry();
-  registerMemberSelfGrantHook();
-  registerRulesHook();
-});
-
-afterAll(async () => {
-  restoreHooks();
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

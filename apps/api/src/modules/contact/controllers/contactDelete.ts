@@ -12,7 +12,10 @@ import { contactDeleteRoute } from '#/modules/contact/routes/contactDelete';
 export const contactDeleteController = makeController(contactDeleteRoute, async (c, respond) => {
   const db = c.get('db');
   const contact = getResource<'contact'>(c);
-  const deleted = await db.contact.delete({ where: { id: contact.id } });
+  const deleted = await db.contact.update({
+    where: { id: contact.id },
+    data: { deletedAt: new Date() },
+  });
   await emitAppEvent('contact.deleted', { contact: deleted });
   return respond.noContent();
 });

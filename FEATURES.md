@@ -173,7 +173,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Relationship-Based Control (ReBAC)** - Relation walks over your own rows through the schema (member row, organization, space), with no separate tuple store to sync
 
-- ✅ **Entitlements** - An owner hands on an action on a resource from an anchor, narrowed by a `where`. Every check asks the grantor again, so demoting anyone up the chain stops what they handed on at the next request
+- ✅ **Entitlements** - An owner hands on an action on a resource from an anchor, narrowed by a `where`. Every check asks the grantor again, so demoting anyone up the chain stops what they handed on at the next request. Each entitlement is a row of one `Entitlement` table (anchor as source, holder as target), so "who holds what on this record?" is a query and every grant and revocation is audited on its own
 
 - ✅ **Delegates** - Tokens and integrations act for their owner: `full` (the owner whole, in sync), a role (the owner capped at that role) or entitlements. Setting `full` takes the person-only `delegateFull` action on the owner
 
@@ -399,7 +399,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Password Hashing** - scrypt via BetterAuth (`node:crypto`). Passwords never stored or logged in plaintext
 - ✅ **Token Hashing** - API tokens stored as SHA-256 hashes. Raw token shown once at creation, never retrievable. Token comparison done on hash
 - ✅ **Rate Limiting** - Atomic Redis fixed windows, AND-checked per user / space / organization plus an IP window on `/api/auth/*`; 429 with `Retry-After`, fail-open on a Redis outage. Limits resolve through one seam (`rateLimitMax`) awaiting subscriptions / feature flags (INFRA-027)
-- ✅ **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 10 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. Retention job and admin API shipped (FEAT-005 Complete); explorer UI deferred to FEAT-017
+- ✅ **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 10 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. A child with no tenant of its own (an entitlement row) is filed under its parent's, and the admin read takes `historyModel` + `historyId` for one record's history with its children's events in the same stream (parent edge registry). Retention job and admin API shipped (FEAT-005 Complete); explorer UI deferred to FEAT-017
 
 ---
 

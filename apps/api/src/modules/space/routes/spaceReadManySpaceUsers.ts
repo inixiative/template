@@ -4,14 +4,15 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
-import { SpaceUserScalarSchema, UserScalarSchema } from '@template/db';
+import { UserScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
+import { spaceUserReadResponseSchema } from '#/modules/spaceUser/schemas/spaceUserSchemas';
 import { Tags } from '#/modules/tags';
 
-const responseSchema = SpaceUserScalarSchema.extend({
+const responseSchema = spaceUserReadResponseSchema.extend({
   user: UserScalarSchema,
 });
 

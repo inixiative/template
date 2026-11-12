@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, RuleReferenceError, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db, RuleReferenceError } from '@template/db';
 import type { Organization, Segment, Tag } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -8,9 +8,6 @@ import {
   createTag,
   createTagCategory,
 } from '@template/db/test';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { deadReferencesOf } from '#tests/utils/deadReferences';
 
@@ -56,10 +53,7 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
   let mySegment: Segment;
   let theirSegment: Segment;
 
-  beforeAll(async () => {
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerRuleReferenceHook();
+  beforeEach(async () => {
     mine = (await createOrganization()).entity;
     theirs = (await createOrganization()).entity;
     platformTag = (await createTag()).entity;
@@ -91,9 +85,8 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
       .entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it("platform tags and the owner's own tags and segments are admitted", async () => {

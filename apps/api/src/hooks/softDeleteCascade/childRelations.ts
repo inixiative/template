@@ -4,7 +4,14 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { hasDeletedAt, modelFields, modelNames } from '@template/db';
+import {
+  getPolymorphismConfig,
+  hasDeletedAt,
+  isArmColumns,
+  type ModelName,
+  modelFields,
+  modelNames,
+} from '@template/db';
 import { CASCADE_EXEMPT } from '#/hooks/softDeleteCascade/cascadeExempt';
 
 export type ChildRelation = {
@@ -12,6 +19,20 @@ export type ChildRelation = {
   hasDeletedAt: boolean;
   fromFields: readonly string[];
   toFields: readonly string[];
+  arm: Record<string, string>;
+};
+
+// why: a member arm's keys are a prefix of a deeper arm's (OrganizationUser of SpaceUser), so the relation alone over-reaches.
+const armOf = (
+  child: ModelName,
+  parent: string,
+  fromFields: readonly string[],
+): Record<string, string> => {
+  const axis = getPolymorphismConfig(child)?.axes.find(
+    (candidate) =>
+      parent in candidate.fkMap && isArmColumns(child, candidate.field, parent, fromFields),
+  );
+  return axis ? { [axis.field]: parent } : {};
 };
 
 const cache = new Map<string, ChildRelation[]>();
@@ -36,6 +57,7 @@ export const childRelations = (model: string): ChildRelation[] => {
           hasDeletedAt: hasDeletedAt(child),
           fromFields: def.fromFields,
           toFields: def.toFields,
+          arm: armOf(child, model, def.fromFields),
         },
       ];
     }),

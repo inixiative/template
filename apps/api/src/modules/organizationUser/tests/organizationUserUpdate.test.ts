@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type {
   Organization,
@@ -7,13 +7,15 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
+import { memberSelfGrant, toEntitlementInput } from '@template/permissions';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import type { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
-import { del, json, patch } from '#tests/utils/request';
+import { changeEntitlements, heldEntitlements } from '#tests/utils/entitlements';
+import { del, json, patch, post } from '#tests/utils/request';
 
 type UpdateOrgUserResponse = z.infer<typeof organizationUserUpdateRoute.responseSchema>;
 
@@ -24,7 +26,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   let org: Organization;
   let adminOrgUser: OrganizationUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     adminOrgUser = entity;
     user = context.user;
@@ -39,7 +41,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -75,27 +77,34 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       });
     };
 
+    const heldBy = (target: OrganizationUser): Promise<unknown[]> =>
+      heldEntitlements({ model: 'OrganizationUser', id: target.id });
+
+    const selfGrantOf = (member: OrganizationUser) =>
+      toEntitlementInput(memberSelfGrant('db:organizationUser', member));
+
     const grant = async (app: ReturnType<typeof createTestApp>, entitlements: unknown) => {
       const target = await newMember();
       const response = await app.fetch(
-        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: entitlements }),
+        post(`/api/v1/organizationUser/${target.id}/entitlements`, entitlements),
       );
-      const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
-      return { status: response.status, stored: stored.entitlements };
+      return { status: response.status, stored: await heldBy(target), self: selfGrantOf(target) };
     };
 
     it('an admin grants a member operate on the organization', async () => {
-      expect(await grant(await writer('admin'), onOrganization('operate'))).toEqual({
-        status: 200,
-        stored: onOrganization('operate'),
+      const { status, stored, self } = await grant(
+        await writer('admin'),
+        onOrganization('operate'),
+      );
+      expect({ status, stored }).toEqual({
+        status: 201,
+        stored: [self, ...onOrganization('operate')],
       });
     });
 
     it('an admin cannot grant a member own, and the member is unchanged', async () => {
-      expect(await grant(await writer('admin'), onOrganization('own'))).toEqual({
-        status: 403,
-        stored: null,
-      });
+      const { status, stored, self } = await grant(await writer('admin'), onOrganization('own'));
+      expect({ status, stored }).toEqual({ status: 403, stored: [self] });
     });
 
     it("an admin removes a member's entitlements", async () => {
@@ -103,14 +112,13 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         { role: 'member', entitlements: onOrganization('operate') },
         { organization: org },
       );
-      const response = await fetch(
-        patch(`/api/v1/organizationUser/${target.id}/entitlements`, {
-          remove: onOrganization('operate'),
-        }),
+      const response = await changeEntitlements(
+        { fetch },
+        { model: 'OrganizationUser', id: target.id },
+        { remove: onOrganization('operate') },
       );
-      expect(response.status).toBe(200);
-      const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
-      expect(stored.entitlements).toEqual([]);
+      expect(response.status).toBe(204);
+      expect(await heldBy(target)).toEqual([selfGrantOf(target)]);
     });
 
     const memberApp = (user: User, organizationUser: OrganizationUser) =>
@@ -120,17 +128,16 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
       });
 
-    const entitledMemberWith = async (granted: ReturnType<typeof entry>) => {
+    const entitledMemberWith = async (held: ReturnType<typeof entry>) => {
       const { entity, context } = await createOrganizationUser(
         { role: 'member' },
         { organization: org },
       );
       const response = await (await writer('owner')).fetch(
-        patch(`/api/v1/organizationUser/${entity.id}/entitlements`, { add: [granted] }),
+        post(`/api/v1/organizationUser/${entity.id}/entitlements`, [held]),
       );
-      expect(response.status).toBe(200);
-      const row = await db.organizationUser.findUniqueOrThrow({ where: { id: entity.id } });
-      return { row, user: context.user };
+      expect(response.status).toBe(201);
+      return { row: entity, user: context.user };
     };
 
     describe('you write a role you hold, with manage at the organization (Aron, 2026-10-26)', () => {
@@ -183,11 +190,11 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         const admin = await writer('admin');
         const grantOn = (action: string) =>
           admin.fetch(
-            patch(`/api/v1/organizationUser/${target.id}/entitlements`, {
-              add: [entry('db:organization', ['db:organization', org.id], [action])],
-            }),
+            post(`/api/v1/organizationUser/${target.id}/entitlements`, [
+              entry('db:organization', ['db:organization', org.id], [action]),
+            ]),
           );
-        expect((await grantOn('manage')).status).toBe(200);
+        expect((await grantOn('manage')).status).toBe(201);
         expect((await grantOn('own')).status).toBe(403);
       });
 
@@ -218,7 +225,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       const withWhere = (where: unknown) =>
         grant(app, [{ ...onOrganization('operate')[0], where }]);
       expect((await withWhere({ field: 'id', operator: 'equals', value: org.id })).status).toBe(
-        200,
+        201,
       );
       expect((await withWhere({ field: 'id', operator: 'nonsense' })).status).toBe(422);
       expect((await withWhere(null)).status).toBe(422);
@@ -258,9 +265,9 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       );
       const response = await tokenApp.fetch(
         new Request(`http://test/api/v1/organizationUser/${target.id}/entitlements`, {
-          method: 'PATCH',
+          method: 'POST',
           headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ add: entitlements }),
+          body: JSON.stringify(entitlements),
         }),
       );
       return response.status;
@@ -271,13 +278,13 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         name: 'an owner-role token on an owner member grants what the member could',
         memberRole: 'owner',
         tokenRole: 'owner',
-        statuses: { operate: 200, own: 200 },
+        statuses: { operate: 201, own: 201 },
       },
       {
         name: 'an owner-role token on an admin member grants no more than the admin',
         memberRole: 'admin',
         tokenRole: 'owner',
-        statuses: { operate: 200, own: 403 },
+        statuses: { operate: 201, own: 403 },
       },
       {
         name: 'a viewer-role token on an owner member grants nothing above read',

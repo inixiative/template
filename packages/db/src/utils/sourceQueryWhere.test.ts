@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import {
   type Bridge,
   type Condition,
@@ -34,7 +34,7 @@ const busyTags: LensNarrowing = {
   },
 };
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

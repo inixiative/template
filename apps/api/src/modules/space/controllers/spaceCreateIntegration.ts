@@ -4,16 +4,14 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
-import { validateIntegrationGrant } from '#/modules/integration/validations/validateIntegrationGrant';
+import { createIntegration } from '#/modules/integration/services/createIntegration';
 import { spaceCreateIntegrationRoute } from '#/modules/space/routes/spaceCreateIntegration';
 
 export const spaceCreateIntegrationController = makeController(
   spaceCreateIntegrationRoute,
   async (c, respond) => {
-    const db = c.get('db');
     const space = getResource<'space'>(c);
     const body = c.req.valid('json');
 
@@ -23,14 +21,7 @@ export const spaceCreateIntegrationController = makeController(
       organizationId: space.organizationId,
       spaceId: space.id,
     };
-    await validateIntegrationGrant(c.get('permix'), row);
-
-    const integration = await db.integration.create({
-      data: {
-        ...row,
-        entitlements: row.entitlements ?? Prisma.DbNull,
-      } as Prisma.IntegrationUncheckedCreateInput,
-    });
+    const integration = await createIntegration(c.get('permix'), row);
 
     return respond.created(integration);
   },

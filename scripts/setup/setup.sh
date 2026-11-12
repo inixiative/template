@@ -57,4 +57,6 @@ else
   bun run with local api bun run db:seed
 fi
 
+"$SCRIPT_DIR/playwright-mcp.sh"
+
 echo "Setup complete. Run: bun run local"

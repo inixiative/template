@@ -52,19 +52,6 @@ export type FlexibleRef = ModelName | FalsePolymorphismRef;
 export const isFalsePolymorphismRef = (ref: FlexibleRef): ref is FalsePolymorphismRef =>
   typeof ref === 'object' && 'model' in ref;
 
-// Resolve FalsePolymorphismRef to FK field using the registry
-export const resolveFalsePolymorphismRef = (ref: FalsePolymorphismRef): string | null => {
-  const config = getPolymorphismConfig(ref.model);
-  if (!config) return null;
-
-  const axis = config.axes.find((a) => a.field === ref.axis);
-  if (!axis) return null;
-
-  const fkFields = (axis.fkMap as Partial<Record<string, readonly string[]>>)[ref.value];
-  // Return the first FK field (usually there's just one per type)
-  return fkFields?.[0] ?? null;
-};
-
 export const PolymorphismRegistry = {
   Token: {
     axes: [
@@ -228,6 +215,7 @@ export const PolymorphismRegistry = {
           EmailTemplate: ['sourceEmailTemplateId'],
           EmailComponent: ['sourceEmailComponentId'],
           Segment: ['sourceSegmentId'],
+          Entitlement: ['sourceEntitlementId'],
         },
       },
       {
@@ -238,6 +226,54 @@ export const PolymorphismRegistry = {
           Organization: ['targetOrganizationId'],
           Space: ['targetSpaceId'],
           Segment: ['targetSegmentId'],
+          User: ['targetUserId'],
+          OrganizationUser: ['targetOrganizationUserId'],
+          SpaceUser: ['targetSpaceUserId'],
+          Integration: ['targetIntegrationId'],
+          Project: ['targetProjectId'],
+          Token: ['targetTokenId'],
+          Contact: ['targetContactId'],
+          SegmentMember: ['targetSegmentMemberId'],
+          Inquiry: ['targetInquiryId'],
+          Flow: ['targetFlowId'],
+          AuthProvider: ['targetAuthProviderId'],
+          WebhookSubscription: ['targetWebhookSubscriptionId'],
+        },
+      },
+    ],
+  },
+
+  Entitlement: {
+    axes: [
+      {
+        field: 'sourceModel',
+        materialized: 'sourceId',
+        fkMap: {
+          User: ['sourceUserId'],
+          Organization: ['sourceOrganizationId'],
+          OrganizationUser: ['sourceOrganizationId', 'sourceUserId'],
+          Space: ['sourceSpaceId'],
+          SpaceUser: ['sourceOrganizationId', 'sourceSpaceId', 'sourceUserId'],
+          Integration: ['sourceIntegrationId'],
+          Project: ['sourceProjectId'],
+          Token: ['sourceTokenId'],
+          Contact: ['sourceContactId'],
+          Segment: ['sourceSegmentId'],
+          SegmentMember: ['sourceSegmentMemberId'],
+          Inquiry: ['sourceInquiryId'],
+          Flow: ['sourceFlowId'],
+          AuthProvider: ['sourceAuthProviderId'],
+          WebhookSubscription: ['sourceWebhookSubscriptionId'],
+        },
+      },
+      {
+        field: 'targetModel',
+        materialized: 'targetId',
+        fkMap: {
+          Token: ['targetTokenId'],
+          Integration: ['targetIntegrationId'],
+          OrganizationUser: ['targetOrganizationId', 'targetUserId'],
+          SpaceUser: ['targetOrganizationId', 'targetSpaceId', 'targetUserId'],
         },
       },
     ],
@@ -330,6 +366,7 @@ export const PolymorphismRegistry = {
           CustomerRef: ['subjectCustomerRefId'],
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
+          Entitlement: ['subjectEntitlementId'],
         },
       },
     ],

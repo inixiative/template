@@ -14,8 +14,9 @@ export const authProviderDeleteController = makeController(
     const db = c.get('db');
     const authProvider = getResource<'authProvider'>(c);
 
-    await db.authProvider.delete({
+    await db.authProvider.update({
       where: { id: authProvider.id },
+      data: { deletedAt: new Date() },
     });
 
     return respond.noContent();

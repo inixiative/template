@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import {
   cleanupTouchedTables,
@@ -7,7 +7,6 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
-import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
@@ -44,11 +43,7 @@ const echo = async (key: string, headers: Record<string, string> = {}) =>
   ).json()) as Echo;
 
 describe('an integration acts through its token, and the audit names it (Aron, 2026-10-25)', () => {
-  beforeAll(() => registerDelegatedKeysHook());
-
-  afterAll(async () => {
-    unregisterDbHook('falsePolymorphism:delegatedKeys');
-    unregisterDbHook('falsePolymorphism:delegatedKeys:upsert');
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

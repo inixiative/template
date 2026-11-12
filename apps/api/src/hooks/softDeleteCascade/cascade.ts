@@ -19,9 +19,10 @@ const fkWhere = (child: ChildRelation, rows: Row[]): Record<string, unknown> | u
     const keys = uniq(
       rows.map((row) => row[child.toFields[0] ?? 'id']).filter((key) => key != null),
     );
-    return keys.length ? { [from]: { in: keys } } : undefined;
+    return keys.length ? { ...child.arm, [from]: { in: keys } } : undefined;
   }
   return {
+    ...child.arm,
     OR: rows.map((row) =>
       Object.fromEntries(child.fromFields.map((from, i) => [from, row[child.toFields[i] ?? 'id']])),
     ),
@@ -40,7 +41,7 @@ const hardDelete = async (model: string, where: Record<string, unknown>) => {
       if (!isHardDeletedOnTombstone(child.model)) continue;
       const [from] = child.fromFields;
       if (child.fromFields.length === 1 && from)
-        await hardDelete(child.model, { [from]: { in: ids } });
+        await hardDelete(child.model, { ...child.arm, [from]: { in: ids } });
     }
   }
   await db.delegate(model).deleteMany({ where });

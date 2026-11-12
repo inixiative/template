@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 
-import { type AccessorName, fetchOne, type HydratedRecord, hydrate } from '@template/db';
+import { type AccessorName, db, type HydratedRecord, hydrate } from '@template/db';
 import type { EntitlementEntry, Permix } from '@template/permissions';
 import {
   canGrantEntitlement,
@@ -19,7 +19,7 @@ const modelOf = (resource: string) => resource.slice('db:'.length) as AccessorNa
 
 const anchorRecord = async ({ resource, id }: EntitlementEntry['anchor']) => {
   const model = modelOf(resource);
-  const row = await fetchOne<{ id: string }>(model, id);
+  const row = (await db.delegate(model).findFirst({ where: { id } })) as HydratedRecord | null;
   return row ? hydrate(model, row) : null;
 };
 

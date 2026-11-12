@@ -1,33 +1,25 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   db,
   materializedIdConflicts,
-  snapshotHookRegistry,
   syncRuleReferenceEdges,
   withMaterializedIds,
 } from '@template/db';
 import type { EmailComponent, Tag } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createEmailComponent, createTag } from '@template/db/test';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 
 describe('materialized ids on a false-polymorphic axis', () => {
   let component: EmailComponent;
   let tag: Tag;
   let other: Tag;
-  let restoreHooks: () => void;
 
-  beforeAll(async () => {
-    restoreHooks = snapshotHookRegistry();
-    registerRulesHook();
-    registerImmutableFieldsHook();
+  beforeEach(async () => {
     component = (await createEmailComponent()).entity;
     tag = (await createTag()).entity;
     other = (await createTag()).entity;
   });
 
-  afterAll(async () => {
-    restoreHooks();
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -79,6 +71,22 @@ describe('materialized ids on a false-polymorphic axis', () => {
     });
     expect(restamped).toMatchObject({ targetId: tag.id, targetDeletedAt: stamp });
     await clearEdges();
+  });
+
+  it('a composite arm takes its materialized id as written, with every key it carries', () => {
+    const row = {
+      sourceModel: 'Organization',
+      sourceOrganizationId: 'o-1',
+      targetModel: 'OrganizationUser',
+      targetId: 'ou-1',
+      targetOrganizationId: 'o-1',
+      targetUserId: 'u-1',
+    };
+    expect(materializedIdConflicts('Entitlement', row)).toEqual([]);
+    expect(withMaterializedIds('Entitlement', row)).toMatchObject({ targetId: 'ou-1' });
+    expect(materializedIdConflicts('Entitlement', { ...row, targetUserId: null })).toEqual([
+      'Entitlement.targetId names a OrganizationUser; pass targetOrganizationId, targetUserId',
+    ]);
   });
 
   it('an axis without a materialized column is left as written', () => {

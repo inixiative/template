@@ -146,6 +146,33 @@ describe('createLock', () => {
       await waiter.release();
     });
 
+    it('takes over a briefly held lock well inside its slowest poll', async () => {
+      const id = newId();
+      const holder = createLock({
+        service: 's',
+        identifier: id,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
+      const waiter = createLock({
+        service: 's',
+        identifier: id,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
+      expect(await holder.acquire()).toBe(true);
+
+      const pollMs = 500;
+      const acquiring = waiter.acquire({ waitMs: 2_000, pollMs });
+      await sleep(5);
+      const releasedAt = Date.now();
+      await holder.release();
+
+      expect(await acquiring).toBe(true);
+      expect(Date.now() - releasedAt).toBeLessThan(pollMs / 2);
+      await waiter.release();
+    });
+
     it('with waitMs returns false once the wait runs out', async () => {
       const id = newId();
       const holder = createLock({

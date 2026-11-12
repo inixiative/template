@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 import { listBindings, projectLens, toLensSelect } from '@inixiative/json-rules';
-import { lensFor } from '@template/db/lens';
 import { emailLens } from '@template/email/rules';
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import { registry, slotRowsLens } from '#/lib/email/registry';

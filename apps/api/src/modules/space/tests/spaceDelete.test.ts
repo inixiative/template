@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type {
   Organization,
@@ -26,7 +26,7 @@ describe('DELETE /api/v1/space/:id', () => {
   let space: Space;
   let spaceUser: SpaceUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'owner' });
     orgUser = ou;
     user = context.user;
@@ -50,7 +50,7 @@ describe('DELETE /api/v1/space/:id', () => {
     testDb = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
   });
 

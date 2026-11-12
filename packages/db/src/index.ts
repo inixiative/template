@@ -1,6 +1,8 @@
 // Database client with scope/transaction methods
 export { db } from './client';
 export type { Db, FinallyFn, FindForUpdateOptions } from './clientTypes';
+// Entitlement rows and the entries they hold
+export * from './entitlements';
 // Mutation lifecycle hooks
 export {
   clearHookRegistry,
@@ -104,12 +106,14 @@ export {
 } from '@inixiative/prisma-map';
 export { equalsSuppliedBind } from './registries/equalsSuppliedBind';
 export {
+  isArmColumns,
   isOwnerKind,
   POLYMORPHIC_BINDS,
   type PolymorphicKind,
   polymorphicBindings,
   polymorphicIs,
   polymorphicKeyColumn,
+  polymorphicKeyColumns,
   polymorphicTarget,
 } from './registries/polymorphicIs';
 export { polymorphicSchema } from './registries/polymorphicSchema';
@@ -123,8 +127,11 @@ export type {
   PolymorphicTarget,
 } from './registries/polymorphicSchemaTypes';
 // User with relations type and schema
-export type { UserWithRelations } from './types/userWithRelations';
-export { UserWithRelationsSchema } from './types/userWithRelations';
+export type {
+  OrganizationUserWithEntitlements,
+  SpaceUserWithEntitlements,
+  UserWithRelations,
+} from './types/userWithRelations';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
 export { carryDelegatedKeys } from './utils/carryDelegatedKeys';
@@ -149,6 +156,7 @@ export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './ut
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
 // Rule references: the rows a stored rule names, as edges
+export { loadParentRows } from './utils/loadParentRows';
 export { lockedTargetStates, type TargetState } from './utils/lockedTargetStates';
 // Model name utilities
 export {
@@ -165,6 +173,7 @@ export {
   toModelName,
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
+export { polymorphicArmRelation } from './utils/polymorphicArmKeys';
 export { getModelRelations } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';

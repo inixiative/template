@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
+import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { betterAuth } from 'better-auth';
@@ -148,7 +148,7 @@ describe('oauthHandoffPlugins', () => {
 });
 
 describe('auth one-time token wiring', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

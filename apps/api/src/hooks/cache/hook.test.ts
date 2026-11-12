@@ -1,10 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { createHash } from 'node:crypto';
 import {
   cache,
   cacheKey,
   checkCache,
-  clearHookRegistry,
   clearKey,
   db,
   fetchOne,
@@ -19,8 +18,6 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { loadTokenContext } from '#/lib/context/loadTokenContext';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -42,12 +39,7 @@ const memberKeyOf = (member: { organizationId: string; userId: string }) =>
   cacheKey('organizationUser', { organizationId: member.organizationId, userId: member.userId });
 
 describe('a read through the cache inside a transaction', () => {
-  beforeAll(() => {
-    registerClearCacheHook();
-    registerSoftDeleteCascadeHook();
-  });
-  afterAll(async () => {
-    clearHookRegistry();
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

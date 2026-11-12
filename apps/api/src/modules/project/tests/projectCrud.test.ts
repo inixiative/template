@@ -1,5 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   Organization,
   OrganizationUser,
@@ -52,7 +51,7 @@ describe('Project', () => {
   let spaceUser: SpaceUser;
   let app: ReturnType<typeof createTestApp>;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const created = await createOrganizationUser({ role: Role.owner });
     organizationUser = created.entity;
     user = created.context.user;
@@ -64,9 +63,8 @@ describe('Project', () => {
     app = appFor(user, [organizationUser], [spaceUser]);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(app.db);
-    clearHookRegistry();
   });
 
   describe('each of the five owners creates and lists its own projects', () => {

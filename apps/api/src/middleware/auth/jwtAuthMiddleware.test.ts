@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -11,7 +11,6 @@ import {
 import { setEnvOverride } from '@template/shared/utils';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
 import { app } from '#/app';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { auth } from '#/lib/auth';
 import type { UserJwtHandoff } from '#/lib/auth/jwtHandoff';
 import { selfIssuer } from '#/lib/auth/userJwt';
@@ -19,10 +18,6 @@ import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 import { resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
-
-// Revocation and role changes reach the next request through the cache hooks the app registers.
-beforeAll(() => registerClearCacheHook());
-afterAll(() => unregisterDbHook('clearCache'));
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
@@ -51,13 +46,13 @@ describe('a user authenticates with a JWT, never a session', () => {
   let signIn: Response;
   let handoff: UserJwtHandoff & { user: { id: string } };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     verifiedUser = await signUpVerified();
     signIn = await signInOverHttp(verifiedUser.email, verifiedUser.password);
     handoff = (await signIn.clone().json()) as typeof handoff;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -188,11 +183,11 @@ describe('a user authenticates with a JWT, never a session', () => {
 describe('JWT verification', () => {
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: user } = await createUser());
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -252,7 +247,7 @@ describe('JWTs from a configured external issuer', () => {
   let signingKey: CryptoKey;
   let jwksServer: ReturnType<typeof Bun.serve>;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: user } = await createUser());
     const pair = await generateKeyPair('ES256', { extractable: true });
     signingKey = pair.privateKey;
@@ -260,7 +255,7 @@ describe('JWTs from a configured external issuer', () => {
     jwksServer = Bun.serve({ port: 0, fetch: () => Response.json({ keys: [publicJwk] }) });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     jwksServer.stop(true);
     await cleanupTouchedTables(db);
   });
@@ -299,12 +294,12 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
   let user: User;
   let superadmin: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: user } = await createUser());
     ({ entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin }));
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -395,7 +390,7 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
 });
 
 describe('account deletion revokes', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

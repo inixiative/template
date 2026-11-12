@@ -1,30 +1,18 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createCronJob } from '@template/db/test';
-import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import { JobLane, JobType } from '#/jobs/types';
-import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 
 describe('cron schedulers stamp the resolved lane and the row retry settings', () => {
-  let jobs: Awaited<ReturnType<typeof connectRealJobsQueue>>;
+  const jobs = useRealJobsQueue();
 
   const templateOf = async (jobId: string) =>
-    (await jobs.realQueue.getJobScheduler(jobId))?.template;
-
-  beforeAll(async () => {
-    registerCronJobSyncHook();
-    jobs = await connectRealJobsQueue();
-  });
+    (await jobs().realQueue.getJobScheduler(jobId))?.template;
 
   afterEach(async () => {
-    await jobs.realQueue.obliterate({ force: true });
     await cleanupTouchedTables(db);
-  });
-
-  afterAll(async () => {
-    clearHookRegistry();
-    await jobs.close();
   });
 
   it('the cronJobSync hook builds the same envelope as enqueue, lane included', async () => {
@@ -44,7 +32,7 @@ describe('cron schedulers stamp the resolved lane and the row retry settings', (
 
   it('registerCronJobs builds the same envelope', async () => {
     const { entity } = await createCronJob({ handler: 'sweepSegments' });
-    await jobs.realQueue.removeJobScheduler(entity.jobId);
+    await jobs().realQueue.removeJobScheduler(entity.jobId);
 
     await registerCronJobs();
 

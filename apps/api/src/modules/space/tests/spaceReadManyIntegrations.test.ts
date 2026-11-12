@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   Integration,
   Organization,
@@ -30,7 +30,7 @@ describe('GET /api/v1/space/:id/integrations', () => {
   let spaceUser: SpaceUser;
   let names: [string, string, string];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'member' });
     orgUser = ou;
     user = context.user;
@@ -89,7 +89,7 @@ describe('GET /api/v1/space/:id/integrations', () => {
     await db.integration.update({ where: { id: removed.id }, data: { deletedAt: new Date() } });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

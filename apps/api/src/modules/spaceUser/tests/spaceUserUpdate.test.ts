@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, Role, Space, SpaceUser } from '@template/db/generated/client/client';
 import {
@@ -7,23 +7,25 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
+import { isMemberSelfGrant, toEntitlementEntry } from '@template/permissions';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
 import { entry } from '#tests/utils/entitlementEntry';
-import { json, patch } from '#tests/utils/request';
+import { heldEntitlements } from '#tests/utils/entitlements';
+import { json, patch, post } from '#tests/utils/request';
 
 describe('PATCH /api/v1/spaceUser/:id', () => {
   let org: Organization;
   let space: Space;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     ({ entity: org } = await createOrganizationUser({ role: 'owner' }).then(({ context }) => ({
       entity: context.organization,
     })));
     ({ entity: space } = await createSpace({}, { organization: org }));
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -47,7 +49,7 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
   const write = async (by: Role, target: SpaceUser, body: object) =>
     (await writer(by))(patch(`/api/v1/spaceUser/${target.id}`, body));
   const grantTo = async (by: Role, target: SpaceUser, add: unknown) =>
-    (await writer(by))(patch(`/api/v1/spaceUser/${target.id}/entitlements`, { add }));
+    (await writer(by))(post(`/api/v1/spaceUser/${target.id}/entitlements`, add));
 
   it('updates the role', async () => {
     const { entity: target } = await spaceMember('member');
@@ -58,9 +60,12 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
 
   it("a space admin grants a space member's entitlements it could take itself", async () => {
     const { entity: target } = await spaceMember('member');
-    expect((await grantTo('admin', target, onSpace('operate'))).status).toBe(200);
-    const stored = await db.spaceUser.findUniqueOrThrow({ where: { id: target.id } });
-    expect(stored.entitlements).toEqual(onSpace('operate'));
+    expect((await grantTo('admin', target, onSpace('operate'))).status).toBe(201);
+    expect(
+      (await heldEntitlements({ model: 'SpaceUser', id: target.id })).filter(
+        (held) => !isMemberSelfGrant('db:spaceUser', target)(toEntitlementEntry(held)),
+      ) as unknown,
+    ).toEqual(onSpace('operate'));
   });
 
   it('a space admin cannot grant own', async () => {
@@ -71,7 +76,7 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
   it("a space admin cannot change a space owner's entitlements; another space owner can", async () => {
     const { entity: target } = await spaceMember('owner');
     expect((await grantTo('admin', target, onSpace('operate'))).status).toBe(403);
-    expect((await grantTo('owner', target, onSpace('operate'))).status).toBe(200);
+    expect((await grantTo('owner', target, onSpace('operate'))).status).toBe(201);
   });
 
   it('a flat map of actions is not an entitlement', async () => {

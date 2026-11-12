@@ -1,0 +1,139 @@
+// ============================================================================
+// ENTITLEMENT - one row per entitlement a delegate or member holds
+// ============================================================================
+// A directed edge: the source is the anchor the entitlement acts from (reached from the entitled
+// record along `sourcePath`), the target is the holder. The grantor is never a column: it is the
+// target's owner, re-walked live by the permissions library.
+//
+// Rows are immutable. A change is a soft delete plus a create, both written by the one writer
+// (apps/api/src/lib/permissions/changeEntitlements.ts) and audited per row. A row tombstones with
+// its target and revives with it; a target that never revives (Token) keeps its rows dead.
+//
+// The source side mirrors RuleReference's target side: a soft-deleted source lands in
+// `sourceDeletedAt` (ruleReference:target), a purge nulls the typed FK and leaves `sourceId`.
+//
+// A member arm keys on the member's whole owner chain, as Inquiry's do, so the row carries its tenant
+// and a space transfer re-keys it by ON UPDATE CASCADE. Its `sourceId` / `targetId` is the member's id.
+
+model Entitlement {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  resource EntitlementResourceModel
+  actions  String[]
+  where    Json?
+  lens     Json?
+
+  sourceModel                 EntitlementResourceModel
+  // True poly beside the false, materialized from the typed FK on create by the polymorphism registry.
+  sourceId                    String                   @db.VarChar(36)
+  sourcePath                  String?
+  sourceDeletedAt             DateTime?
+  sourceUserId                String?                  @db.VarChar(36)
+  sourceOrganizationId        String?                  @db.VarChar(36)
+  sourceSpaceId               String?                  @db.VarChar(36)
+  sourceIntegrationId         String?                  @db.VarChar(36)
+  sourceProjectId             String?                  @db.VarChar(36)
+  sourceTokenId               String?                  @db.VarChar(36)
+  sourceContactId             String?                  @db.VarChar(36)
+  sourceSegmentId             String?                  @db.VarChar(36)
+  sourceSegmentMemberId       String?                  @db.VarChar(36)
+  sourceInquiryId             String?                  @db.VarChar(36)
+  sourceFlowId                String?                  @db.VarChar(36)
+  sourceAuthProviderId        String?                  @db.VarChar(36)
+  sourceWebhookSubscriptionId String?                  @db.VarChar(36)
+
+  targetModel              EntitlementTargetModel
+  targetId                 String                 @db.VarChar(36)
+  targetTokenId            String?                @db.VarChar(36)
+  targetIntegrationId      String?                @db.VarChar(36)
+  targetOrganizationId     String?                @db.VarChar(36)
+  targetSpaceId            String?                @db.VarChar(36)
+  targetUserId             String?                @db.VarChar(36)
+
+  // SetNull: purging an anchor leaves the row standing with `sourceId` naming what went.
+  sourceUser                User?                @relation("EntitlementSource", fields: [sourceUserId], references: [id], onDelete: SetNull)
+  sourceOrganization        Organization?        @relation("EntitlementSource", fields: [sourceOrganizationId], references: [id], onDelete: SetNull)
+  sourceOrganizationUser    OrganizationUser?    @relation("EntitlementSource", fields: [sourceOrganizationId, sourceUserId], references: [organizationId, userId], onDelete: SetNull)
+  sourceSpace               Space?               @relation("EntitlementSource", fields: [sourceSpaceId], references: [id], onDelete: SetNull)
+  sourceSpaceUser           SpaceUser?           @relation("EntitlementSource", fields: [sourceOrganizationId, sourceSpaceId, sourceUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
+  sourceIntegration         Integration?         @relation("EntitlementSource", fields: [sourceIntegrationId], references: [id], onDelete: SetNull)
+  sourceProject             Project?             @relation("EntitlementSource", fields: [sourceProjectId], references: [id], onDelete: SetNull)
+  sourceToken               Token?               @relation("EntitlementSource", fields: [sourceTokenId], references: [id], onDelete: SetNull)
+  sourceContact             Contact?             @relation("EntitlementSource", fields: [sourceContactId], references: [id], onDelete: SetNull)
+  sourceSegment             Segment?             @relation("EntitlementSource", fields: [sourceSegmentId], references: [id], onDelete: SetNull)
+  sourceSegmentMember       SegmentMember?       @relation("EntitlementSource", fields: [sourceSegmentMemberId], references: [id], onDelete: SetNull)
+  sourceInquiry             Inquiry?             @relation("EntitlementSource", fields: [sourceInquiryId], references: [id], onDelete: SetNull)
+  sourceFlow                Flow?                @relation("EntitlementSource", fields: [sourceFlowId], references: [id], onDelete: SetNull)
+  sourceAuthProvider        AuthProvider?        @relation("EntitlementSource", fields: [sourceAuthProviderId], references: [id], onDelete: SetNull)
+  sourceWebhookSubscription WebhookSubscription? @relation("EntitlementSource", fields: [sourceWebhookSubscriptionId], references: [id], onDelete: SetNull)
+
+  targetToken            Token?            @relation("EntitlementTarget", fields: [targetTokenId], references: [id], onDelete: Cascade)
+  targetIntegration      Integration?      @relation("EntitlementTarget", fields: [targetIntegrationId], references: [id], onDelete: Cascade)
+  targetOrganizationUser OrganizationUser? @relation("EntitlementTarget", fields: [targetOrganizationId, targetUserId], references: [organizationId, userId], onDelete: Cascade)
+  targetSpaceUser        SpaceUser?        @relation("EntitlementTarget", fields: [targetOrganizationId, targetSpaceId, targetUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+
+  sourceRuleReferences RuleReference[] @relation("RuleReferenceSource")
+  auditLogsAsSubject   AuditLog[]      @relation("AuditLogSubjectEntitlement")
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  // why: full, not live-only: the audit history read joins a target's tombstoned rows too.
+  @@index([targetModel, targetId])
+  @@index([sourceModel, sourceId], where: raw("\"deletedAt\" IS NULL"), map: "Entitlement_live_source_idx")
+  @@index([resource], where: raw("\"deletedAt\" IS NULL"), map: "Entitlement_live_resource_idx")
+  @@index([actions(ops: ArrayOps)], type: Gin)
+  @@index([sourceUserId])
+  @@index([sourceOrganizationId])
+  @@index([sourceSpaceId])
+  @@index([sourceIntegrationId])
+  @@index([sourceProjectId])
+  @@index([sourceTokenId])
+  @@index([sourceContactId])
+  @@index([sourceSegmentId])
+  @@index([sourceSegmentMemberId])
+  @@index([sourceInquiryId])
+  @@index([sourceFlowId])
+  @@index([sourceAuthProviderId])
+  @@index([sourceWebhookSubscriptionId])
+  @@index([targetTokenId])
+  @@index([targetIntegrationId])
+  @@index([targetOrganizationId, targetUserId, targetSpaceId])
+}
+
+// The rebac resources: what an entitlement's actions apply to, and what it may anchor at.
+enum EntitlementResourceModel {
+  User
+  Organization
+  OrganizationUser
+  Space
+  SpaceUser
+  Integration
+  Project
+  Token
+  Contact
+  Segment
+  SegmentMember
+  Inquiry
+  Flow
+  AuthProvider
+  WebhookSubscription
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific rebac resources below
+  // ==========================================================================
+}
+
+enum EntitlementTargetModel {
+  Token
+  Integration
+  OrganizationUser
+  SpaceUser
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific holders below
+  // ==========================================================================
+}

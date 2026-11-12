@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -17,9 +17,6 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -108,22 +105,18 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
   ) =>
     as(writer.user, [writer.organizationUser])(
       entitlements
-        ? patch(`/api/v1/integration/${integration.id}/entitlements`, { add: entitlements })
+        ? post(`/api/v1/integration/${integration.id}/entitlements`, entitlements)
         : patch(`/api/v1/integration/${integration.id}`, permissions),
     );
 
-  beforeAll(async () => {
-    registerClearCacheHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
     owner = await member('owner');
     admin = await member('admin');
   });
 
-  afterAll(async () => {
-    unregisterDbHook('clearCache');
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -175,9 +168,9 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
       expect(minted.status).toBe(422);
     });
 
-    it('an integration that goes from a role to none must keep something: entitlements, or it is a 422 (R114)', async () => {
+    it('an integration that goes from a role to none is not refused: with no entitlements it holds nothing', async () => {
       expect((await update(owner, await orgIntegration('viewer'), { role: null })).status).toBe(
-        422,
+        200,
       );
       const entitled = await orgIntegration('viewer', [
         entry('db:space', ['db:space', space.id], ['read']),

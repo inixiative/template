@@ -65,7 +65,7 @@ jobs/
 ├── outbox/             # Durable overflow buffer (see Overflow Buffer)
 │   ├── drain/          # Per-worker drain loop + pass
 │   ├── accumulator.ts  # Batched outbox writes (spillToOutbox/flushOutbox)
-│   ├── config.ts       # Caps, linger, TTLs (from the env schema)
+│   ├── config.ts       # Caps, TTLs (from the env schema)
 │   ├── flag.ts         # Redis overflow flag (set-once + TTL/heartbeat)
 │   ├── mutex.ts        # Serialized queue shared by flush + drain
 │   ├── queueDepth.ts   # Cached waiting+active depth probe
@@ -501,7 +501,7 @@ A durable buffer in front of BullMQ. When queue depth crosses a cap, an overflow
 
 ### Spill Routing
 
-`shouldSpill(type, bypass, overflowing)` is a pure predicate: spill only when `type === 'adhoc' && !bypass && overflowing`. A flow child (an enqueue carrying `parent`, added by a staged job's `enqueueChildJob`) never counts as overflowing and always goes direct: the drain's re-add would lose its parent link. Cron and cronTrigger jobs always go direct — only `adhoc` jobs are ever buffered. On a direct `adhoc` add, `recordAddAndTripIfFull()` counts it into a rough per-process depth estimate (last probe + adds since, re-probed every `DEPTH_PROBE_MS` = 2s); reaching a cap forces a fresh probe and the flag trips on what it reads, so a 20k or 100k wave turns spilling on part-way through. The drain tick also trips the flag from the depths it reads (`tripFromDepths`). If Redis refuses an add as out of memory (`noeviction`), the job spills instead of failing; flow children and `bypass`/cron jobs still throw.
+`shouldSpill(type, bypass, overflowing)` is a pure predicate: spill only when `type === 'adhoc' && !bypass && overflowing`. A flow child (an enqueue carrying `parent`, added by a staged job's `enqueueChildJob`) never counts as overflowing and always goes direct: the drain's re-add would lose its parent link. Cron and cronTrigger jobs always go direct — only `adhoc` jobs are ever buffered. On a direct `adhoc` add, `recordAddAndTripIfFull()` counts it into a rough per-process depth estimate (last probe + adds since, re-probed every `DEPTH_PROBE_MS` = 2s); reaching a cap forces a fresh probe and the flag trips on what it reads, so a 20k or 100k wave turns spilling on part-way through. A fast add forces that probe only at the total cap, a slow add at either cap, so a full slow lane does not put a probe on every fast enqueue. The drain tick also trips the flag from the depths it reads (`tripFromDepths`). If Redis refuses an add as out of memory (`noeviction`), the job spills instead of failing; flow children and `bypass`/cron jobs still throw.
 
 ### Accumulator
 
@@ -563,7 +563,7 @@ Stored in DB, scheduled as BullMQ job schedulers keyed by the row's `jobId` (`qu
 
 **Worker start.** `registerCronJobs` reconciles under the same lock (longer wait). An enabled row that fails `validateCronJob` is turned off — the one caller that catches the validator — in a single `updateManyAndReturn` (`enabled: false`, which the `cronJobSync` hook does not fire on) with an error log: fix it and re-enable it. It then upserts every remaining row's scheduler and removes every scheduler whose key is not a live row's `jobId` — schedulers left by deleted, disabled or renamed rows, and the md5-keyed repeatables older code registered. A failed upsert or a lost lease throws out of the pass before the sweep, so the sweep never removes a working legacy schedule whose replacement was never written, and the throw fails `initializeWorker`. Rolling back past the scheduler change double-fires every cron (md5 and `jobId` keys do not dedupe) until a worker on the newer code boots and sweeps.
 
-The scheduler tests (`apps/api/src/jobs/tests/cronJobSchedulers.test.ts`, `apps/api/src/modules/admin/cronJob/tests/cronJobSchedulers.test.ts`) need a real Redis at `REDIS_BULLMQ_URL` (BullMQ's Lua cannot run on the in-memory mock); `connectRealJobsQueue` points the `queue` singleton's scheduler methods at a randomly named queue there, and throws rather than skips when the URL is missing.
+The scheduler tests (`apps/api/src/jobs/tests/cronJobSchedulers.test.ts`, `apps/api/src/modules/admin/cronJob/tests/cronJobSchedulers.test.ts`) need a real Redis at `REDIS_BULLMQ_URL` (BullMQ's Lua cannot run on the in-memory mock); `useRealJobsQueue()` (`apps/api/tests/utils/realJobsQueue.ts`) points the `queue` singleton's scheduler methods at a randomly named queue there for each test, obliterates and closes it after the test, and throws rather than skips when the URL is missing.
 
 ### System Cron Jobs (seeded)
 

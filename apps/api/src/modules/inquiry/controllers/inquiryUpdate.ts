@@ -40,7 +40,7 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
     const saved = await db.inquiry.update({
       where: { id: inquiry.id },
       data: {
-        content: content as Prisma.InputJsonValue | undefined,
+        content: content === undefined ? undefined : (effectiveContent as Prisma.InputJsonValue),
         ...(status === InquiryStatus.draft && { status, expiresAt: null }),
       },
       include: includeInquirySent,

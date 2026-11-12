@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db, unregisterDbHook } from '@template/db';
 import { AuditAction } from '@template/db/generated/client/enums';
 import {
   auditActorContext,
@@ -16,22 +16,21 @@ import {
   createUser,
 } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { createTestApp } from '#tests/createTestApp';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 
-registerAuditLogHook();
+useRealJobsQueue();
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 describe('auditLog hook', () => {
   let userId: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: user } = await createUser();
     userId = user.id;
   });
@@ -187,6 +186,7 @@ describe('auditLog hook', () => {
     const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
+      targetEntitlements: [],
       user: tokenOwner,
       organization: null,
       organizationUser: null,
@@ -238,6 +238,7 @@ describe('auditLog hook', () => {
     const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
+      targetEntitlements: [],
       user: tokenOwner,
       organization: null,
       organizationUser: null,
@@ -265,14 +266,14 @@ describe('auditLog hook', () => {
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
     const { id } = (await res.json()) as { id: string };
 
-    await db.token.delete({ where: { id: token.id } });
+    await db.token.update({ where: { id: token.id }, data: { deletedAt: new Date() } });
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
       orderBy: { id: 'desc' },
     });
 
-    expect(log?.actorTokenId).toBeNull();
+    expect(log?.actorTokenId).toBe(token.id);
     expect(log?.actor).toMatchObject({
       model: 'Token',
       record: { id: token.id, name: token.name, keyPrefix: token.keyPrefix },
@@ -374,6 +375,7 @@ describe('auditLog hook', () => {
   });
 
   it('creates a delete audit log on hard-delete and preserves the deleted row in before', async () => {
+    unregisterDbHook('preventHardDelete');
     const ts = Date.now();
     const slug = `harddel-${ts}`;
 
@@ -413,6 +415,7 @@ describe('auditLog hook', () => {
   });
 
   it('keeps org context but clears space context on hard-delete for spaces', async () => {
+    unregisterDbHook('preventHardDelete');
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
 

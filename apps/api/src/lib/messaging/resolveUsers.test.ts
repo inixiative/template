@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { ArrayOperator, Operator } from '@inixiative/json-rules';
 import type { User } from '@template/db/generated/client/client';
 import { TagResource } from '@template/db/generated/client/enums';
@@ -21,7 +21,7 @@ describe('resolveUsers', () => {
   let foundersTag: { id: string };
   let testDb: ReturnType<typeof createTestApp>['db'];
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const harness = createTestApp({});
     testDb = harness.db;
 
@@ -32,7 +32,7 @@ describe('resolveUsers', () => {
     const c = await createUser();
     carol = c.entity;
 
-    // Each user gets one whatsapp contact (so messageUser can fan out later).
+    // Each user gets a whatsapp contact beside the email contact its creation writes.
     await createContact(
       { ownerModel: 'User', type: 'whatsapp', value: { jid: '111' } },
       { user: a.entity },
@@ -62,7 +62,7 @@ describe('resolveUsers', () => {
     );
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(testDb);
   });
 
@@ -90,8 +90,7 @@ describe('resolveUsers', () => {
       operator: Operator.equals,
       value: alice.id,
     });
-    expect(users[0].contacts.length).toBeGreaterThan(0);
-    expect(users[0].contacts[0].type).toBe('whatsapp');
+    expect(users[0].contacts.map((contact) => contact.type).sort()).toEqual(['email', 'whatsapp']);
   });
 
   it('matches users via tag attachment rule', async () => {

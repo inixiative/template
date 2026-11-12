@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, TokenScalarSchema, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db, TokenScalarSchema } from '@template/db';
 import type { Organization, TokenOwnerModel, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -8,7 +8,6 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
-import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
@@ -55,16 +54,13 @@ describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () =>
   let user: User;
   let organization: Organization;
 
-  beforeAll(async () => {
-    registerDelegatedKeysHook();
+  beforeEach(async () => {
     ({ entity: user } = await createUser());
     ({ entity: organization } = await createOrganization());
     await createOrganizationUser({ role: 'owner' }, { user, organization });
   });
 
-  afterAll(async () => {
-    unregisterDbHook('falsePolymorphism:delegatedKeys');
-    unregisterDbHook('falsePolymorphism:delegatedKeys:upsert');
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

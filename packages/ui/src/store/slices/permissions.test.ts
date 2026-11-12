@@ -55,7 +55,7 @@ describe('permissions slice', () => {
         ({
           id: 'user-1',
           organizationUsers: [
-            { id: 'orgUser-1', role, organizationId: 'org-1', entitlements: null },
+            { id: 'orgUser-1', role, organizationId: 'org-1', targetEntitlements: [] },
           ],
           spaceUsers: [],
         }) as unknown as UserWithRelations;
@@ -81,7 +81,7 @@ describe('permissions slice', () => {
           {
             role: 'owner',
             organizationId: 'org-1',
-            entitlements: null,
+            targetEntitlements: [],
           },
         ],
         spaceUsers: [],
@@ -121,14 +121,14 @@ describe('permissions slice', () => {
           {
             role: 'owner',
             organizationId: 'org-1',
-            entitlements: null,
+            targetEntitlements: [],
           },
         ],
         spaceUsers: [
           {
             role: 'member',
             spaceId: 'space-1',
-            entitlements: null,
+            targetEntitlements: [],
           },
         ],
       } as unknown as UserWithRelations;

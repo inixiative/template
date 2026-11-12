@@ -39,11 +39,18 @@ export const renewOverflow = (lane: JobLane = JobLane.fast): Promise<unknown> =>
 export const clearOverflow = (lane: JobLane = JobLane.fast): Promise<unknown> =>
   queue.redis.del(flagKey(lane));
 
-const isAtCap = (depths: QueueDepths): boolean =>
-  LANES.some((lane) => laneDepth(depths, lane) >= laneDepthCap(lane));
+const isLaneAtCap = (depths: QueueDepths, lane: JobLane): boolean =>
+  laneDepth(depths, lane) >= laneDepthCap(lane);
+
+// Whether the add just recorded has reached a cap it counts against. Every add counts against the whole
+// budget; only a slow add counts against the slow share. So a fast add does not force a probe because the
+// slow lane is full — slow work sitting at its cap would otherwise put a probe back on every fast enqueue.
+// The slow flag is still set by the periodic probe and by the drain tick.
+const hasReachedCap = (depths: QueueDepths, isSlow: boolean): boolean =>
+  isLaneAtCap(depths, JobLane.fast) || (isSlow && isLaneAtCap(depths, JobLane.slow));
 
 // Trip each lane's flag whose depth has reached its cap, from depths the caller already holds: the
-// enqueue-side estimate, or the drain pass's per-tick read (so the flag turns itself on within a tick
+// enqueue-side probe, or the drain pass's per-tick read (so the flag turns itself on within a tick
 // even when no single process saw the wave).
 export const tripFromDepths = async (depths: QueueDepths): Promise<void> => {
   for (const lane of LANES)
@@ -56,8 +63,9 @@ export const tripIfFull = async (): Promise<void> => tripFromDepths(await queueD
 
 // A rough, per-process queue depth: the last probe plus every add this process made since. An add that
 // finds the probe older than `probeMs` re-probes (one shared in-flight probe) and the add count resets.
-// The estimate only decides when to look: reaching a cap forces a fresh probe, and the flag trips on what
-// that probe reads, so stale counts never trip it falsely. A wave of 20k or 100k adds therefore turns
+// The estimate only decides when to look: reaching a cap forces a fresh probe, and the flag trips on the
+// depths that probe returned, never on the estimate, so neither stale counts nor adds recorded around the
+// probe trip it falsely. A wave of 20k or 100k adds therefore turns
 // spilling on part-way through instead of overfilling Redis. Deliberately approximate — it sees only this
 // process's adds, and adds made during a probe are dropped by the reset. It guards against catastrophic
 // overfill, not exact admission: the drain tick trips from the real depth, and the cap sits well below
@@ -68,13 +76,14 @@ export const createDepthEstimator = (
 ) => {
   let probed: { at: number; depths: QueueDepths } | null = null;
   let added = { total: 0, slow: 0 };
-  let probing: Promise<void> | null = null;
+  let probing: Promise<QueueDepths> | null = null;
 
-  const probe = (): Promise<void> => {
+  const probe = (): Promise<QueueDepths> => {
     probing ??= probeDepths()
       .then((depths) => {
         probed = { at: Date.now(), depths };
         added = { total: 0, slow: 0 };
+        return depths;
       })
       .finally(() => {
         probing = null;
@@ -93,10 +102,9 @@ export const createDepthEstimator = (
     added.total++;
     if (isSlow) added.slow++;
     const rough = estimate();
-    const isStale = !probed || Date.now() - probed.at >= probeMs;
-    if (isStale || !rough || isAtCap(rough)) await probe();
-    const confirmed = estimate();
-    if (confirmed) await tripFromDepths(confirmed);
+    const isFresh = probed !== null && Date.now() - probed.at < probeMs;
+    if (isFresh && rough && !hasReachedCap(rough, isSlow)) return;
+    await tripFromDepths(await probe());
   };
 
   return { recordAdd };

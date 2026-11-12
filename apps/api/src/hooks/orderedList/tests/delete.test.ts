@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { db, unregisterDbHook } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
 import {
@@ -112,6 +112,8 @@ describe('bulk soft delete', () => {
 });
 
 describe('hard delete', () => {
+  beforeEach(() => unregisterDbHook('preventHardDelete'));
+
   it('compacts via Prisma delete', async () => {
     const { entity: u } = await createUser();
     const a = await phone(u.id); // 1
@@ -164,7 +166,7 @@ describe('multi-scope isolation — bulk soft-delete', () => {
     const pa = await phone(u.id);
     await phone(u.id); // phone: [1,2]
     const ea = await mkEmail(u.id);
-    await mkEmail(u.id); // email: [1,2]
+    await mkEmail(u.id); // email: [1,2,3] with the user's own
 
     await db.contact.updateManyAndReturn({
       where: { id: { in: [pa.id, ea.id] } },
@@ -172,11 +174,13 @@ describe('multi-scope isolation — bulk soft-delete', () => {
     });
 
     expect(positions(await liveOrders(u.id, ContactType.phone))).toEqual([1]);
-    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1]);
+    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2]);
   });
 });
 
 describe('multi-scope isolation — deleteMany', () => {
+  beforeEach(() => unregisterDbHook('preventHardDelete'));
+
   it('deleting across two owners compacts each list independently', async () => {
     const { entity: u1 } = await createUser();
     const { entity: u2 } = await createUser();
@@ -205,6 +209,6 @@ describe('multi-scope isolation — deleteMany', () => {
     await db.contact.deleteMany({ where: { id: { in: [pb.id, eb.id] } } });
 
     expect(positions(await liveOrders(u.id, ContactType.phone))).toEqual([1, 2]);
-    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2]);
+    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2, 3]);
   });
 });

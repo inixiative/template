@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { CronJobScalarSchema, OrganizationScalarSchema } from '@template/db';
 import type { CronJob, Organization, User } from '@template/db/generated/client/client';
 import {
@@ -13,7 +13,10 @@ import { makeController } from '#/lib/utils/makeController';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 import { Modules } from '#/modules/modules';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
+import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 import { get, json, patch } from '#tests/utils/request';
+
+useRealJobsQueue();
 
 // Drives resourceContextMiddleware via the real readRoute template (which
 // auto-attaches the middleware via prepareMiddleware) so the test surface
@@ -92,7 +95,7 @@ describe('resourceContextMiddleware', () => {
   let deletedOrg: Organization;
   let cronJob: CronJob;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
@@ -124,7 +127,7 @@ describe('resourceContextMiddleware', () => {
     });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

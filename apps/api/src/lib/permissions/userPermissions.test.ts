@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, hydrate, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db, hydrate } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -12,7 +12,6 @@ import {
 } from '@template/db/test';
 import type { Permix } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { userPermissions } from '#/lib/permissions/userPermissions';
 import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
@@ -65,8 +64,7 @@ describe("a user's permissions, built for a user who is not the requester", () =
   let superadmin: User;
   let situations: Situation[];
 
-  beforeAll(async () => {
-    registerClearCacheHook();
+  beforeEach(async () => {
     ({ entity: organization } = await createOrganization());
     ({ entity: otherOrganization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
@@ -84,8 +82,7 @@ describe("a user's permissions, built for a user who is not the requester", () =
     ]);
   });
 
-  afterAll(async () => {
-    unregisterDbHook('clearCache');
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

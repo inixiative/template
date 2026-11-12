@@ -48,7 +48,12 @@
 - [False Polymorphism](#false-polymorphism)
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
   - [Delegated Keys](#delegated-keys)
+  - [Back-Relations Over Shared Key Columns](#back-relations-over-shared-key-columns)
+- [Entitlement](#entitlement)
+  - [Tokens](#tokens)
+  - [Inquiries and rule references](#inquiries-and-rule-references)
 - [Registries](#registries)
+  - [Parent Edges](#parent-edges)
 - [Schema Reference](#schema-reference)
 
 <!-- toc:end -->
@@ -490,7 +495,7 @@ db.scope(id, fn)        // Create AsyncLocalStorage context
 db.txn(fn)              // Start transaction
 db.onCommit(fns)        // Queue callbacks for after commit
 db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or rollback
-db.findForUpdate(model, where, opts?) // SELECT ... FOR UPDATE; { upserting: true } fences a missing row
+db.findForUpdate(model, where, opts?) // SELECT ... FOR NO KEY UPDATE; { upserting: true } fences a missing row
 db.withLockUntilSettled(lockOptions, fn, acquireOptions?) // Redis lock held until the txn ends
 db.cacheOverlay()       // The open transaction's cache overlay, or null outside one
 db.getScopeId()         // Get current scope ID
@@ -593,7 +598,7 @@ turns it locally false.
 
 ### Row Locks and Create-If-Missing
 
-`db.findForUpdate(model, where)` runs `SELECT * ... FOR UPDATE` inside `db.txn()`. A row that does
+`db.findForUpdate(model, where)` runs `SELECT * ... FOR NO KEY UPDATE` inside `db.txn()` (`changesKey: true` takes `FOR UPDATE`; see [CONCURRENCY.md § Row Locks](./CONCURRENCY.md#row-locks-dbfindforupdate)). A row that does
 not exist yet locks nothing, so find-then-create races: two callers both see nothing and both
 insert. Do not answer that with a bare `upsert` or a caught unique violation — fence the key:
 
@@ -646,9 +651,10 @@ const users = await db.user.findMany({ where });
 **What it does:**
 1. Applies `search` across all `searchableFields` (case-insensitive `contains`, OR logic)
 2. Applies `searchFields` to individual fields (case-sensitive; a bare String value is `contains`; pass `mode: 'insensitive'` to opt in), AND logic with search
-3. Escapes LIKE metacharacters (`%`, `_`, `\`) in `contains` / `startsWith` / `endsWith`, an insensitive `equals` / `not`, Json `string_*`, and the `search` term, so a value matches only itself
-4. Merges with `filters` object
-5. Returns combined `where` clause
+3. Rejects an enum value the lens doesn't allow (an `enumOmits`/`enumPicks` value, or one outside the enum) with a 400 naming the valid values, for a bare value and for every operator value
+4. Escapes LIKE metacharacters (`%`, `_`, `\`) in `contains` / `startsWith` / `endsWith`, an insensitive `equals` / `not`, Json `string_*`, and the `search` term, so a value matches only itself
+5. Merges with `filters` object
+6. Returns combined `where` clause
 
 **Security:** Uses `validatePathNotation()` to prevent injection attacks on nested field paths.
 
@@ -782,9 +788,58 @@ enum EmailOwnerModel {
 
 An axis value can name a parent in `delegates`: the row carries the parent's own owner keys beside its own. A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:delegatedKeys` hook copies them from the parent on create and upsert through `carryDelegatedKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
 
+### Back-Relations Over Shared Key Columns
+
+Arms of one axis share columns: an `OrganizationUser` arm's keys (`organizationId`, `userId`) are a prefix of a `SpaceUser` arm's, and the `Organization`, `Space` and `User` arms reuse the same columns alone. A back-relation is defined by its columns, not by the discriminator, so it also takes in the rows of every deeper arm that carries those keys:
+
+- `OrganizationUser.targetEntitlements` holds the member's `SpaceUser` rows too.
+- `Organization.sourceEntitlements`, `User.sourceEntitlements` and `Space.sourceEntitlements` hold member-anchored rows.
+- `OrganizationUser.auditLogsAsSubject` holds `SpaceUser` subjects.
+- Owner axes behave the same way: `OrganizationUser.tokens` holds the member's `SpaceUser` tokens.
+
+A read, filter or cascade through such a back-relation must carry the arm's discriminator (`targetModel: 'OrganizationUser'`, `subjectModel: …`). The primitives do this for you: `includeTargetEntitlements(model)` for holder reads, `childRelations`' `arm` for the soft-delete cascade, `auditHistoryWhere` for audit history. Use them rather than the bare relation. Nothing enforces this yet. A CI rule has been proposed (a relation filter or include over a shared-column back-relation without its discriminator), pending Aron's decision.
+
 See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
 
 ---
+
+## Entitlement
+
+`packages/db/prisma/schema/entitlement.prisma`. One row per entitlement a member or delegate holds. The rules for granting and reading them are in [PERMISSIONS.md](PERMISSIONS.md#entitlements); this is the storage.
+
+A row is a directed edge in the standard names ([NAMING.md](NAMING.md)):
+
+| Column | Holds |
+|---|---|
+| `sourceModel`, `sourceId`, `sourcePath` | the **anchor**: the record the entitlement acts from, reached from the entitled record along `sourcePath`. `sourceModel` is any of the 15 rebac resources (`EntitlementResourceModel`), each with a typed FK (`sourceUserId`, `sourceOrganizationId`, …, `sourceWebhookSubscriptionId`); a member anchor keys on its owner chain (`OrganizationUser` → `sourceOrganizationId` + `sourceUserId`, `SpaceUser` → `sourceOrganizationId` + `sourceSpaceId` + `sourceUserId`). |
+| `sourceDeletedAt` | a copy of the anchor's `deletedAt`, stamped by `ruleReference:target` |
+| `targetModel`, `targetId` | the **holder**: `Token`, `Integration`, `OrganizationUser` or `SpaceUser` (`EntitlementTargetModel`). A delegate by its id (`targetTokenId`, `targetIntegrationId`); a member by its owner chain (`targetOrganizationId` + `targetUserId`, plus `targetSpaceId` for a `SpaceUser`) |
+| `resource` | the model the actions apply to (`EntitlementResourceModel`) |
+| `actions` | `String[]`, the actions held, GIN-indexed |
+| `where` | `Json?`, a positive json-rules condition over the entitled record |
+| `lens` | `Json?`, a lens narrowing; kept abstract, unused so far |
+| `deletedAt` | the row's tombstone |
+
+- **No grantor column.** The grantor is the target's owner, re-walked live by the permissions library.
+- **Both ends are false-polymorphic with a materialized id** (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names, and the API reads and writes the rows as stored: a writer gives `EntitlementInput` (`resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`) and `toEntitlementCreateData(inputs, holder, anchors)` (`packages/db/src/entitlements`) fills in each arm's keys off rows the writer already holds: the holder as read, and the anchors from `loadEntitlementAnchors` (one read per anchor model, tombstones included). It copies each anchor's `deletedAt` into `sourceDeletedAt`, so a row written on a tombstoned anchor (a factory, a hook; the grant check refuses one on the route) is born stamped. The writer refuses an anchor that does not exist with a 422 (`missingAnchors`). Arm keys come from `polymorphicArmKeys` (`packages/db/src/utils/polymorphicArmKeys.ts`). The library's entry shape (`resource: 'db:integration'`, `anchor: { resource, id, path? }`, actions as a map) exists only at the permissions boundary: `toEntitlementEntry`, `toEntitlementInput` and `entitlementsOf` in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`).
+- **A member arm carries the member's whole owner chain** (Aron, 2026-11-11), as `Inquiry`'s and the owner axes' do. Why: the row then carries its tenant, so tenant filters and the audit hook read it, and a space transfer re-keys a moved member's rows by `ON UPDATE CASCADE` with the member ([Foreign Keys](#foreign-keys), the `spaceKeyColumns` test). A composite arm holds no single id, so its `sourceId` / `targetId` is the member's id as the writer gives it, and `materializedIdConflicts` requires every key beside it. The keys of an `OrganizationUser` arm are a prefix of a `SpaceUser` arm's, so the relation `OrganizationUser.targetEntitlements` also reaches the member's `SpaceUser` rows: a holder read names its model (`includeTargetEntitlements(model)`), and the soft-delete cascade keeps each relation to its own arm (`childRelations`, the `arm` discriminator).
+- **The target owns the row.** Target FKs cascade at the database; `softDeleteCascade` tombstones a target's rows with it and revives them with it. A target that never revives (a `Token`, `SKIP_REVIVE`) keeps its rows dead.
+- **The source only names the row.** Source FKs are `onDelete: SetNull`, and every source relation is in `CASCADE_EXEMPT`: an anchor's tombstone lands in `sourceDeletedAt`, and a hard-deleted anchor (a `SegmentMember`, `Flow` or `WebhookSubscription`, which have no `deletedAt`) nulls the typed FK and leaves `sourceId` naming what went. The polymorphism rule on a materialized axis accepts that state (FK null, plain id set), so the row can still be tombstoned with its target; a create must set the FK, never the plain id alone (`materializedIdConflicts`).
+- **Audited and soft-deleted** (`AUDIT_ENABLED_MODELS`): every created and every removed row is its own audit entry. Rows are immutable (`immutableFields` refuses a change to any column but the tombstones); a change is a removal plus a create.
+- **Indexes.** (target) is a full index: live reads filter `deletedAt` on it, and the audit history read joins a target's tombstoned rows through it. One full index costs less than a live one plus a full one. The alternative was filtering the history through each arm's own key column, but a member arm would then need its owner chain read first. (source) and (resource) are partial on live rows (`deletedAt IS NULL`). Tombstones are kept, never purged.
+- **Its `where` is a rule surface.** `Entitlement` is a `RuleReference` source (the `ruleReference` hook, [HOOKS.md](HOOKS.md#application-hooks)), so the rows a `where` names by id get edges.
+
+- **A set-null arm keeps a plain id (CI rule `set-null-polymorphism-materialized`).** Any relation on a false-polymorphic axis with `onDelete: SetNull` requires that axis to be registered with a `materialized` plain id column in `packages/db/src/registries/falsePolymorphism.ts` (as Entitlement's `sourceId`); `Cascade` arms are exempt, since their row goes with the target. Why: when the target is hard-deleted, SetNull nulls the typed key, and without a plain id the row no longer says what it pointed at; the required-FK rule (`requiredForeignKey`, `apps/api/src/hooks/falsePolymorphism/toRules.ts`) accepts that plain id in the key's place, so the row stays valid and can still be tombstoned with its target.
+
+Why a table and not the JSON column the holders had: "who holds what on this record?" becomes a query, and each grant and revocation is audited on its own.
+
+### Tokens
+
+A `Token` is soft-deleted and audited, and never revived (`SKIP_REVIVE`; it is no longer in `HARD_DELETE_ON_TOMBSTONE`). Revoking (`DELETE /token/:id`) and `redactUser` tombstone it; a tombstoned token is not found at sign-in. It tombstones with its owner (user, member, tenant or integration) and stays dead when the owner is revived, and so do its entitlement rows. Why: once a token's grants are audited rows, they should stay explainable after it dies, and a revived token would re-grant access nobody decided on now.
+
+### Inquiries and rule references
+
+Every `Inquiry` party relation (source and target, each kind) is in `CASCADE_EXEMPT`: an inquiry never tombstones because a party did, and shows that party as deleted. `RuleReference` gained `Entitlement` as a source and 12 more target models (`User`, `OrganizationUser`, `SpaceUser`, `Integration`, `Project`, `Token`, `Contact`, `SegmentMember`, `Inquiry`, `Flow`, `AuthProvider`, `WebhookSubscription`), so an entitlement's `where` naming any rebac resource by id has a target column. The email lens declares an id source for every referenceable model (`emailLens.ts`, labelled by `name` where the model has one), so the widening reaches email rules too: an email rule naming a recipient by id (`recipient.id equals …`) is now a `User` reference, gets an edge, and must name a live row when saved.
 
 ## Registries
 
@@ -798,10 +853,11 @@ Schema-level configuration in `packages/db/src/registries/`:
 |---|---|
 | `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
 | `delegatedKeys(axis, value)` / `carryDelegatedKeys(model, row)` | The parent keys a delegating value carries; copy them from the parent row (the hook and the test factory both call it) |
-| `polymorphicKeyColumn` / `polymorphicTarget` | The key column for a value; the `{ kind, id }` a row points at |
+| `polymorphicKeyColumns` / `polymorphicKeyColumn` / `polymorphicTarget` / `isArmColumns` | Every key column for a value (a member arm has two or three); the one column of a single-key arm (throws on a composite arm); the `{ kind, id }` a row points at (throws likewise); whether a relation's columns are exactly an arm's |
+| `polymorphicArmRelation` / `polymorphicArmKeys` | The relation an arm's key columns form (matched by `isArmColumns`, as `childRelations` matches); the columns an arm sets to point at a row (its id, or a composite arm's owner chain off the row) |
 | `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
 | `polymorphicBindings(ownerModel, ownerId)` | The bind map `polymorphicIs` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`POLYMORPHIC_BINDS`, `isOwnerKind`) |
-| `isFalsePolymorphismRef(ref)` / `resolveFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart, and resolve returns that value's FK column (null on an unknown model, axis or value) |
+| `isFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart (its column is `polymorphicKeyColumn(ref.model, ref.axis, ref.value)`) |
 | `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |
 
 ```typescript
@@ -812,6 +868,18 @@ const config = getPolymorphismConfig('Token');
 ```
 
 See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.
+
+### Parent Edges
+
+`ParentEdgeRegistry` (`packages/db/src/registries/parentEdges.ts`, Aron, 2026-11-11): a child model names its path to its parent once, either a false-polymorphic axis (`Entitlement: { axis: 'targetModel' }`, the parent read off the axis's materialized id) or one foreign key (`{ parent, foreignKey }`). Three consumers read it:
+
+| Consumer | Reads |
+|---|---|
+| Cache hook (`apps/api/src/hooks/cache/hook.ts`) | `loadParentRows`: a child's write clears its parent's keys ([HOOKS.md](HOOKS.md#parent-edges)) |
+| Audit hook (`contextRows`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
+| Audit history read (`auditHistoryWhere`) | `childrenOf(record)`: a record's entries and its children's in one stream ([HOOKS.md](HOOKS.md#reading-the-log)) |
+
+Why one registry: the cache traversal, the audit tenancy and the history read are the same fact ("this row's change is a change to that row"), and stating it once keeps them from drifting. Register a child only when a consumer would otherwise special-case it; a model with its own tenant columns and its own cache keys needs no edge.
 
 ---
 
@@ -829,7 +897,8 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `organizationUser.prisma` - Organization memberships and roles
 - `space.prisma` - Flexible containers within organizations
 - `spaceUser.prisma` - Space memberships (requires organization membership)
-- `token.prisma` - API tokens (user/org/space scoped)
+- `token.prisma` - API tokens (user/org/space/member/integration scoped); soft-deleted, never revived ([Tokens](#tokens))
+- `entitlement.prisma` - one row per entitlement a member or delegate holds ([Entitlement](#entitlement))
 - `webhookSubscription.prisma` - Webhook configurations
 - `project.prisma` - `Project`: a unit of work an owner organizes things around (name, optional description). False-polymorphic over all five owners (User, OrganizationUser, Organization, Space, SpaceUser); names are unique per owner among live rows, so one repo can be a project in several tenants. Taggable (`TagResource.Project`). Routes: `/me/projects` and `/{organization,organizationUser,space,spaceUser}/:id/projects` to create and list, `/project/:id` to read, update and delete
 - `inquiry.prisma` - False polymorphic inquiry system

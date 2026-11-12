@@ -42,7 +42,7 @@ export const createRoute = <const T extends RouteArgs>(args: T) => {
     ...routeArgs,
     model,
     submodel,
-    operationId: buildOperationId({ action: 'create', model, submodel, admin, internal }),
+    operationId: buildOperationId({ action: 'create', model, submodel, many, admin, internal }),
     method: 'post',
     path: routePath,
     tags: routeTags,

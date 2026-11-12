@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
+import { db } from '@template/db';
 import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import {
@@ -11,17 +11,10 @@ import {
   createUser,
   createWebhookSubscription,
 } from '@template/db/test';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-import { registerWebhookHook } from '#/hooks/webhooks/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 import { processJob } from '#/jobs/processJob';
 import { JobType } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
-
-registerPreventHardDeleteHook();
-registerSoftDeleteCascadeHook();
-registerWebhookHook();
 
 type Enqueued = {
   subscriptionId: string;
@@ -32,21 +25,16 @@ type Enqueued = {
 
 let enqueueSpy: Mock<typeof enqueueModule.enqueueJob>;
 
-beforeAll(() => {
+beforeEach(() => {
   enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({
     jobId: 'mock',
     name: 'sendWebhook',
   });
 });
 
-beforeEach(() => {
-  enqueueSpy.mockClear();
-});
-
-afterAll(async () => {
+afterEach(async () => {
   enqueueSpy.mockRestore();
   await cleanupTouchedTables(db);
-  clearHookRegistry();
 });
 
 const enqueued = () => enqueueSpy.mock.calls.map(([, payload]) => payload as Enqueued);
@@ -90,7 +78,7 @@ describe('webhook hook — tenancy', () => {
   let inactiveCustomerSub: { id: string };
   let inactiveCustomerId: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: customer } = await createUser();
     const { entity: other } = await createUser();
     const { entity: providerOrganization } = await createOrganization();
@@ -451,7 +439,7 @@ describe('webhook hook — origin suppression', () => {
   let hsSub: { id: string };
   let plainSub: { id: string };
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: user, context } = await createUser();
     const { entity: customer } = await createUser();
 
@@ -483,6 +471,7 @@ describe('webhook hook — origin suppression', () => {
       providerUserId: user.id,
     });
     customerRefId = ref.id;
+    enqueueSpy.mockClear();
   });
 
   const touchRef = (kinds: ('platform' | 'activity' | 'marketing')[]) =>

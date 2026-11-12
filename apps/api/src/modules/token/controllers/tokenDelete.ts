@@ -12,7 +12,7 @@ export const tokenDeleteController = makeController(tokenDeleteRoute, async (c, 
   const db = c.get('db');
   const token = getResource<'token'>(c);
 
-  await db.token.delete({ where: { id: token.id } });
+  await db.token.update({ where: { id: token.id }, data: { deletedAt: new Date() } });
 
   return respond.noContent();
 });

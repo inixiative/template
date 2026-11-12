@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db/client';
 import { ContactOwnerModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
@@ -20,9 +20,9 @@ const tombstone = (model: 'user' | 'organization' | 'contact' | 'organizationUse
   db.delegate(model).update({ where: { id }, data: { deletedAt: new Date() } });
 
 describe('softDeleteScope extension', () => {
-  beforeAll(() => {});
+  beforeEach(() => {});
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

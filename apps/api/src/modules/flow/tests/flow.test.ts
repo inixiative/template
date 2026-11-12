@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -59,12 +59,12 @@ describe('flows', () => {
   let owner: User;
   let harness: Harness;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     owner = (await createUser()).entity;
     harness = harnessFor(owner, []);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(harness.db);
   });
 
@@ -173,7 +173,7 @@ describe('flows', () => {
     expect(advanced.currentStep).toBe(2);
     expect(advanced.stepStates).toEqual(['done', 'done', 'pending']);
 
-    await harness.db.token.delete({ where: { id: ciToken.id } });
+    await harness.db.token.update({ where: { id: ciToken.id }, data: { deletedAt: new Date() } });
     const back = await readIn(app, flow.id);
     expect(back.currentStep).toBe(1);
     expect(back.stepStates).toEqual(['done', 'pending', 'pending']);

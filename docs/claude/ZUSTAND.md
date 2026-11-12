@@ -227,7 +227,7 @@ await logout();
 Called by `fetchAndHydrateMe`. Sets the Permix user id; a superadmin gets
 `setSuperadmin(true)` and stops there. Otherwise it applies `getUserPermissions`, then
 `getOrgPermissions` per `organizationUsers` row and `getSpacePermissions` per
-`spaceUsers` row (role + entitlements), mirroring the backend setup.
+`spaceUsers` row (role + entitlements, the `/me` response's entries built from each member's Entitlement rows), mirroring the backend setup.
 
 #### check(model, record, action)
 
@@ -334,7 +334,9 @@ removing the observer closes or unsubscribes.
 
 `createClientSlice` derives the `ws(s)://` URL from `VITE_API_URL`, builds the
 `ApiWebsocket` (`createApiWebsocket`), and on reconnect invalidates live queries to recover
-invalidations missed while disconnected. Live-query registration lives in
+invalidations missed while disconnected. The slice hands the websocket the query client it writes
+to (`getClient`); nothing under `lib/ws` imports the store, so the store and the websocket do not
+import each other. Live-query registration lives in
 `@template/shared/ws` (`LIVE_QUERIES`, `channelKey`); the connect is driven by
 `useApiWebsocket` (see [WEBSOCKETS.md](WEBSOCKETS.md)).
 

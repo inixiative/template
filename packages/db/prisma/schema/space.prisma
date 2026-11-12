@@ -7,10 +7,11 @@
 // - Marketplace: a storefront or seller account
 
 model Space {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id                 String        @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements Entitlement[] @relation("EntitlementSource")
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?
 
   name String
   slug String

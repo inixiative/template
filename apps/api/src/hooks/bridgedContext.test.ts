@@ -1,6 +1,6 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { clearHookRegistry, DbAction, db, HookTiming, registerDbHook } from '@template/db';
+import { DbAction, db, HookTiming, registerDbHook, unregisterDbHook } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
 
@@ -47,32 +47,35 @@ const observe = (hook: string, model: string) => {
 
 // Declared across two hooks with an overlapping subset: beta is named twice, and the stores are a
 // single union applied to every hook, so hookA observes gamma even though hookB declared it.
-registerDbHook(
-  'probeMatrixA',
-  '*',
-  HookTiming.after,
-  [DbAction.create],
-  async ({ model }) => {
-    observe('probeMatrixA', model);
-    const alpha = probeAlpha.getStore();
-    if (alpha) alpha.touchedByHook = true;
-  },
-  [probeAlpha, probeBeta],
-);
+beforeEach(() => {
+  registerDbHook(
+    'probeMatrixA',
+    '*',
+    HookTiming.after,
+    [DbAction.create],
+    async ({ model }) => {
+      observe('probeMatrixA', model);
+      const alpha = probeAlpha.getStore();
+      if (alpha) alpha.touchedByHook = true;
+    },
+    [probeAlpha, probeBeta],
+  );
 
-registerDbHook(
-  'probeMatrixB',
-  '*',
-  HookTiming.after,
-  [DbAction.create],
-  async ({ model }) => {
-    observe('probeMatrixB', model);
-  },
-  [probeBeta, probeGamma, probeDelta],
-);
+  registerDbHook(
+    'probeMatrixB',
+    '*',
+    HookTiming.after,
+    [DbAction.create],
+    async ({ model }) => {
+      observe('probeMatrixB', model);
+    },
+    [probeBeta, probeGamma, probeDelta],
+  );
+});
 
-afterAll(async () => {
-  clearHookRegistry();
+afterEach(async () => {
+  unregisterDbHook('probeMatrixA');
+  unregisterDbHook('probeMatrixB');
   await cleanupTouchedTables(db);
 });
 

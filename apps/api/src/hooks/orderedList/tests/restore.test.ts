@@ -99,9 +99,9 @@ describe('multi-scope isolation — bulk restore', () => {
     const pa = await phone(u.id);
     await phone(u.id); // phone: [1,2]
     const ea = await mkEmail(u.id);
-    await mkEmail(u.id); // email: [1,2]
+    await mkEmail(u.id); // email: [1,2,3] with the user's own
     await softDelete(pa.id); // phone: [1]
-    await softDelete(ea.id); // email: [1]
+    await softDelete(ea.id); // email: [1,2]
 
     await db.withDeleted(() =>
       db.contact.updateManyAndReturn({
@@ -111,6 +111,6 @@ describe('multi-scope isolation — bulk restore', () => {
     );
 
     expect(positions(await liveOrders(u.id, ContactType.phone))).toEqual([1, 2]);
-    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2]);
+    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2, 3]);
   });
 });

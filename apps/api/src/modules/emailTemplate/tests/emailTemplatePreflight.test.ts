@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -124,7 +124,7 @@ describe('POST /api/admin/emailTemplate/preflight', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let superadmin: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     superadmin = (await createUser({ platformRole: PlatformRole.superadmin })).entity;
     const harness = createTestApp({
       mockUser: superadmin,
@@ -134,7 +134,7 @@ describe('POST /api/admin/emailTemplate/preflight', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

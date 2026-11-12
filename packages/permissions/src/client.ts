@@ -15,6 +15,7 @@ import {
 } from '@inixiative/permissions';
 
 export {
+  coversEntitlement,
   delegate,
   installPermissions,
   permixOf,

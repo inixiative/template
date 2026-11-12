@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
@@ -12,7 +12,7 @@ describe('admin/job', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: u } = await createUser();
     user = u;
 
@@ -24,7 +24,7 @@ describe('admin/job', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

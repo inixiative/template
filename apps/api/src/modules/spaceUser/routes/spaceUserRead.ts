@@ -4,13 +4,13 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
-import { SpaceUserScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
+import { spaceUserReadResponseSchema } from '#/modules/spaceUser/schemas/spaceUserSchemas';
 
 export const spaceUserReadRoute = readRoute({
   model: Modules.spaceUser,
-  responseSchema: SpaceUserScalarSchema,
+  responseSchema: spaceUserReadResponseSchema,
   middleware: [validatePermission('read')],
 });

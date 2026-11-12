@@ -1,4 +1,4 @@
-import type { HookOptions, ManyAction, SingleAction } from '@template/db';
+import type { HookOptions } from '@template/db';
 import {
   AUDIT_ENABLED_MODELS,
   DbAction,
@@ -11,7 +11,8 @@ import {
 } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
-import { keyBy } from 'lodash-es';
+import { castArray, keyBy } from 'lodash-es';
+import { type ContextRow, contextRows } from '#/hooks/auditLog/contextRows';
 import {
   auditActorColumns,
   buildContextFkFields,
@@ -19,7 +20,6 @@ import {
   computeDiff,
   filterForAudit,
 } from '#/hooks/auditLog/utils';
-import { isManyAction } from '#/hooks/shared/hookRows';
 import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
 
 const dbActionToAuditAction = (
@@ -43,23 +43,23 @@ const dbActionToAuditAction = (
 const isDeleteAction = (action: DbAction): action is DbAction.delete | DbAction.deleteMany =>
   action === DbAction.delete || action === DbAction.deleteMany;
 
-const buildDeleteContextFkFields = (model: AuditSubjectModel, record: Record<string, unknown>) => {
+const buildDeleteContextFkFields = (model: AuditSubjectModel, context: ContextRow) => {
   if (model === 'Organization') return {};
   if (model === 'Space') {
     return {
-      contextOrganizationId: record.organizationId ?? null,
+      contextOrganizationId: context.row.organizationId ?? null,
       contextSpaceId: null,
     };
   }
-  return buildContextFkFields(model, record);
+  return buildContextFkFields(context.model, context.row);
 };
 
 const buildAuditEntry = (
   model: AuditSubjectModel,
   action: AuditAction,
   record: Record<string, unknown>,
-  previous?: Record<string, unknown>,
-  withContextFkFields = true,
+  previous: Record<string, unknown> | undefined,
+  contextFkFields: Record<string, unknown>,
   withSubjectFkFields = true,
 ): Prisma.AuditLogCreateManyInput | null => {
   const actor = auditActorContext.getScope();
@@ -87,12 +87,12 @@ const buildAuditEntry = (
     after: (processedAfter as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     changes: (processedChanges as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     ...auditActorColumns(actor),
-    ...(withContextFkFields ? buildContextFkFields(model, record) : {}),
+    ...contextFkFields,
     ...(withSubjectFkFields ? buildSubjectFkFields(model, record) : {}),
   };
 };
 
-const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
+const buildEntries = async (model: AuditSubjectModel, options: HookOptions) => {
   const { action: dbAction } = options;
   const entries: NonNullable<ReturnType<typeof buildAuditEntry>>[] = [];
 
@@ -100,55 +100,39 @@ const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
   // Keep tenant context for child deletes, clear org context for Organization deletes,
   // and clear only the space context for Space deletes.
   if (isDeleteAction(dbAction)) {
-    if (isManyAction(dbAction)) {
-      const records = (options.result ?? []) as Record<string, unknown>[];
-      for (const record of records) {
-        const entry = buildAuditEntry(model, AuditAction.delete, record, record, false, false);
-        if (entry) {
-          Object.assign(entry, buildDeleteContextFkFields(model, record));
-          entries.push(entry);
-        }
-      }
-    } else {
-      const record = (options as HookOptions & { action: SingleAction }).result as
-        | Record<string, unknown>
-        | undefined;
-      if (!record) return entries;
-      const entry = buildAuditEntry(model, AuditAction.delete, record, record, false, false);
-      if (entry) {
-        Object.assign(entry, buildDeleteContextFkFields(model, record));
-        entries.push(entry);
-      }
-    }
-    return entries;
-  }
-
-  if (isManyAction(dbAction)) {
-    const { result, previous } = options as HookOptions & { action: ManyAction };
-    const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-    const previousById = keyBy(previous, 'id');
-
-    for (const record of results) {
-      const prev = previousById[record.id];
+    const records = castArray(options.result ?? []) as Record<string, unknown>[];
+    const contexts = await contextRows(model, records);
+    records.forEach((record, index) => {
       const entry = buildAuditEntry(
         model,
-        dbActionToAuditAction(dbAction, record, prev),
+        AuditAction.delete,
         record,
-        prev,
+        record,
+        buildDeleteContextFkFields(model, contexts[index]!),
+        false,
       );
       if (entry) entries.push(entry);
-    }
-
+    });
     return entries;
   }
 
-  const { result, previous } = options as HookOptions & { action: SingleAction };
-  const record = result as (Record<string, unknown> & { id: string }) | undefined;
-  if (!record) return entries;
+  const { result, previous } = options;
+  const records = castArray(result ?? []) as (Record<string, unknown> & { id: string })[];
+  const previousById = keyBy(castArray(previous ?? []) as Record<string, unknown>[], 'id');
+  const contexts = await contextRows(model, records);
 
-  const prev = previous as Record<string, unknown> | undefined;
-  const entry = buildAuditEntry(model, dbActionToAuditAction(dbAction, record, prev), record, prev);
-  if (entry) entries.push(entry);
+  records.forEach((record, index) => {
+    const prev = previousById[record.id];
+    const context = contexts[index]!;
+    const entry = buildAuditEntry(
+      model,
+      dbActionToAuditAction(dbAction, record, prev),
+      record,
+      prev,
+      buildContextFkFields(context.model, context.row),
+    );
+    if (entry) entries.push(entry);
+  });
 
   return entries;
 };
@@ -170,7 +154,7 @@ export const registerAuditLogHook = () => {
     HookTiming.after,
     actions,
     async (options: HookOptions) => {
-      const entries = buildEntries(options.model as AuditSubjectModel, options);
+      const entries = await buildEntries(options.model as AuditSubjectModel, options);
       if (entries.length === 0) return;
 
       await db.auditLog.createManyAndReturn({ data: entries });

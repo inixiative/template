@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, Prisma, unregisterDbHook } from '@template/db';
+import { db, Prisma } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -9,10 +9,6 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
@@ -22,20 +18,15 @@ describe('segmentConditions hook', () => {
   let organization: Organization;
   let user: User;
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerRuleReferenceHook();
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     user = context.user;
     organization = context.organization;
     space = (await createSpace({}, { organization })).entity;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('refuses a segment without conditions, whatever its type', async () => {

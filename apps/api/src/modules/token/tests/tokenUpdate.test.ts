@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -12,9 +12,6 @@ import {
   createOrganization,
   createOrganizationUser,
 } from '@template/db/test';
-import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
@@ -23,26 +20,11 @@ import { patch } from '#tests/utils/request';
 
 let organization: Organization;
 
-const hooks = [
-  'fullDelegate',
-  'fullDelegate:upsert',
-  'memberSelfGrant',
-  'rules:create',
-  'rules:upsert',
-  'rules:update',
-  'rules:updateManyAndReturn',
-];
-
-beforeAll(async () => {
-  for (const name of hooks) unregisterDbHook(name);
-  registerFullDelegateHook();
-  registerMemberSelfGrantHook();
-  registerRulesHook();
+beforeEach(async () => {
   ({ entity: organization } = await createOrganization());
 });
 
-afterAll(async () => {
-  for (const name of hooks) unregisterDbHook(name);
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

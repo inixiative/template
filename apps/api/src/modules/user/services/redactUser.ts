@@ -42,8 +42,13 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
     for (const space of spaces) await emitAppEvent('space.deleted', { space });
   }
 
+  // Tokens keep their audit trail: tombstoned, never revived.
+  await db.token.updateManyAndReturn({
+    where: { userId, deletedAt: null },
+    data: { deletedAt: now },
+  });
+
   // Ephemeral auth state — hard delete.
-  await db.token.deleteMany({ where: { userId } });
   await db.account.deleteMany({ where: { userId } });
   await db.webhookSubscription.deleteMany({ where: { userId, ownerModel: 'User' } });
 

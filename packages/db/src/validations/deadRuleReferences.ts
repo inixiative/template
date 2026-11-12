@@ -15,12 +15,16 @@ export type ReferenceScope = { lens: RuleLens; references: RuleReference[] };
 
 export type DeadRuleReference = RuleReference & { state: 'deleted' | 'missing' };
 
-const ownerScopeIds = async (lens: RuleLens, model: string): Promise<Set<string>> => {
+const ownerScopeIds = async (
+  lens: RuleLens,
+  model: string,
+  ids: string[],
+): Promise<Set<string>> => {
   const source = toSourceQueries(lens).find(
     (query) => query.model === model && query.field === 'id',
   );
   if (!source) return new Set();
-  const { options } = await sourceQueryValues(source, { lens });
+  const { options } = await sourceQueryValues(source, { lens, among: ids });
   return new Set(options.map((option) => String(option.value)));
 };
 
@@ -47,7 +51,7 @@ export const deadRuleReferences = async (
   for (const { lens, references: scopeReferences } of scopes)
     for (const [model, group] of Object.entries(groupBy(scopeReferences, 'model'))) {
       const ids = [...new Set(map(group, 'id'))];
-      const inScope = await ownerScopeIds(lens, model);
+      const inScope = await ownerScopeIds(lens, model, ids);
       const deletedAt = await deletedAtById(model, ids);
       for (const id of ids) {
         const state = deletedAt.get(id) ? 'deleted' : inScope.has(id) ? null : 'missing';

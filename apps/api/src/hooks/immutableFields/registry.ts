@@ -18,6 +18,26 @@ type ImmutableFieldsOverride = {
 export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
   ...polymorphismImmutableFields,
   Space: { exclude: ['organizationId'] },
+  // A changed entitlement is a removed row and a new one; only its tombstones move.
+  Entitlement: {
+    include: polymorphismImmutableFields.Entitlement?.include,
+    refuse: [
+      ...(polymorphismImmutableFields.Entitlement?.refuse ?? []),
+      'resource',
+      'actions',
+      'where',
+      'lens',
+      'sourcePath',
+    ],
+  },
+  Tag: {
+    ...polymorphismImmutableFields.Tag,
+    refuse: [...(polymorphismImmutableFields.Tag?.refuse ?? []), 'tagCategoryId'],
+  },
+  CommunicationLog: {
+    ...polymorphismImmutableFields.CommunicationLog,
+    exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],
+  },
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {

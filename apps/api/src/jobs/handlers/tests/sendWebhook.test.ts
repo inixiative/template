@@ -1,14 +1,4 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  mock,
-  spyOn,
-} from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import crypto from 'node:crypto';
 import type { User } from '@template/db/generated/client/client';
 import {
@@ -41,10 +31,10 @@ describe('sendWebhook handler', () => {
   let user: User;
   let testCounter = 0;
 
-  const getUniqueUrl = (suffix = '') => `http://test-webhook.local/${++testCounter}${suffix}`;
+  const getUniqueUrl = (suffix = '') => `https://test-webhook.local/${++testCounter}${suffix}`;
   const worker = createTestWorker();
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser();
     user = entity;
 
@@ -74,7 +64,7 @@ describe('sendWebhook handler', () => {
     mock.restore();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

@@ -69,25 +69,17 @@ describe('recomposeFromSnapshots', () => {
   });
 });
 
-import { afterAll, afterEach, beforeAll } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach } from 'bun:test';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createCommunicationLog } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { recomposeCommunication } from '#/lib/email/recompose';
 
 const documentMjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
 
 describe('recomposeCommunication (DB-backed)', () => {
-  beforeAll(() => {
-    registerAuditLogHook();
-    registerEmailVersioningHook();
-  });
-
-  afterAll(async () => {
-    clearHookRegistry();
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

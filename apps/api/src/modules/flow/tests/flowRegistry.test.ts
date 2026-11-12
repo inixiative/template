@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import type { FlowKey } from '@template/db/generated/client/enums';
 import {
@@ -47,7 +47,7 @@ const callerFor: Record<
 describe('flow registry', () => {
   let db: Harness['db'] | undefined;
 
-  afterAll(async () => {
+  afterEach(async () => {
     if (db) await cleanupTouchedTables(db);
   });
 

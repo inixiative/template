@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, unregisterDbHook } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type { Integration, Organization, Role } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -9,13 +9,12 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
-import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
-import { patch } from '#tests/utils/request';
+import { patch, post } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
 
@@ -25,8 +24,7 @@ const kinds: Kind[] = ['Organization', 'Space', 'OrganizationUser', 'SpaceUser']
 let organization: Organization;
 const integrations = {} as Record<Kind, Integration>;
 
-beforeAll(async () => {
-  registerClearCacheHook();
+beforeEach(async () => {
   ({ entity: organization } = await createOrganization());
   const { entity: space } = await createSpace({}, { organization });
   const { entity: member, context } = await createOrganizationUser(
@@ -54,8 +52,7 @@ beforeAll(async () => {
   ).entity;
 });
 
-afterAll(async () => {
-  unregisterDbHook('clearCache');
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
@@ -81,11 +78,8 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
       mockOrganizationUsers: [member],
       mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
     });
-    return (
-      await app.fetch(
-        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [granted] }),
-      )
-    ).status;
+    return (await app.fetch(post(`/api/v1/organizationUser/${target.id}/entitlements`, [granted])))
+      .status;
   };
 
   const underOrganization = (where?: Entry['where']) => ({
@@ -96,12 +90,12 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
     underOrganization({ field: 'ownerModel', operator: 'equals', value: 'Organization' });
 
   it('unfiltered, it reaches all four kinds: the owner grants it, an admin does not', async () => {
-    expect(await grant('owner', underOrganization())).toBe(200);
+    expect(await grant('owner', underOrganization())).toBe(201);
     expect(await grant('admin', underOrganization())).toBe(403);
   });
 
   it("where ownerModel = Organization: an admin grants deleting the organization's own integrations", async () => {
-    expect(await grant('admin', theOrganizations())).toBe(200);
+    expect(await grant('admin', theOrganizations())).toBe(201);
   });
 
   it('the holder of the unfiltered grant deletes all four kinds', async () => {
@@ -124,7 +118,7 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
       ['read'],
     );
     expect(await grant('admin', owning)).toBe(403);
-    expect(await grant('admin', owning, [owning])).toBe(200);
+    expect(await grant('admin', owning, [owning])).toBe(201);
   });
 
   it("an admin entitled to read the organization's own integrations grants that, not every kind", async () => {
@@ -137,7 +131,7 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
       operator: 'equals',
       value: 'Organization',
     });
-    expect(await grant('admin', theOrganizationsOwn, [theOrganizationsOwn])).toBe(200);
+    expect(await grant('admin', theOrganizationsOwn, [theOrganizationsOwn])).toBe(201);
     expect(await grant('admin', owning(), [theOrganizationsOwn])).toBe(403);
   });
 
@@ -145,9 +139,9 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
     underOrganization({ field: 'ownerModel', operator: 'in', value: values });
 
   it('where ownerModel in [...]: an admin grants the kinds it holds, not one more (R88)', async () => {
-    expect(await grant('admin', kindsIn('Organization'))).toBe(200);
+    expect(await grant('admin', kindsIn('Organization'))).toBe(201);
     expect(await grant('admin', kindsIn('Organization', 'OrganizationUser'))).toBe(403);
-    expect(await grant('owner', kindsIn('Organization', 'OrganizationUser'))).toBe(200);
+    expect(await grant('owner', kindsIn('Organization', 'OrganizationUser'))).toBe(201);
   });
 
   it('every leaf of a root `all` narrows; a nested rule narrows nothing (R88)', async () => {
@@ -157,7 +151,7 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
         { field: 'ownerModel', operator: 'in', value: ['Organization', 'Space'] },
       ],
     });
-    expect(await grant('admin', both)).toBe(200);
+    expect(await grant('admin', both)).toBe(201);
     const nested = underOrganization({
       all: [{ all: [{ field: 'ownerModel', operator: 'equals', value: 'Organization' }] }],
     });
@@ -185,11 +179,8 @@ describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one
       mockOrganizationUsers: [member],
       mount: [(hono) => hono.route('/api/v1/organizationUser', organizationUserRouter)],
     });
-    return (
-      await app.fetch(
-        patch(`/api/v1/organizationUser/${target.id}/entitlements`, { add: [granted] }),
-      )
-    ).status;
+    return (await app.fetch(post(`/api/v1/organizationUser/${target.id}/entitlements`, [granted])))
+      .status;
   };
   const staticSegments = (where: Entry['where']) => ({
     ...entry('db:segment', ['db:organization', organization.id, 'organization'], ['own']),
@@ -199,13 +190,13 @@ describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one
 
   it('an exact copy and a narrowed copy pass; the same without its where does not', async () => {
     const held = staticSegments(isStatic);
-    expect(await grant(held, [held])).toBe(200);
+    expect(await grant(held, [held])).toBe(201);
     expect(
       await grant(
         staticSegments({ all: [isStatic, { field: 'name', operator: 'equals', value: 'x' }] }),
         [held],
       ),
-    ).toBe(200);
+    ).toBe(201);
     expect(
       await grant(
         entry('db:segment', ['db:organization', organization.id, 'organization'], ['own']),

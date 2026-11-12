@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
@@ -18,7 +18,7 @@ describe('GET /api/admin/organization', () => {
   let _orgB: Organization;
   let _orgC: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity: sa } = await createUser({ platformRole: PlatformRole.superadmin });
     superadmin = sa;
 
@@ -39,7 +39,7 @@ describe('GET /api/admin/organization', () => {
     db = harness.db;
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

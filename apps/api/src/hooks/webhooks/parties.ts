@@ -10,8 +10,8 @@ import {
   isFalsePolymorphismRef,
   isOwnerKind,
   type PolymorphicKind,
+  polymorphicKeyColumn,
   polymorphicTarget,
-  resolveFalsePolymorphismRef,
   webhookEnabledModels,
   webhookRelatedModels,
 } from '@template/db';
@@ -51,7 +51,7 @@ export const relatedCounterparties = async (
   ref: FalsePolymorphismRef,
   rows: WebhookRow[],
 ): Promise<Record<string, Party[]>> => {
-  const column = resolveFalsePolymorphismRef(ref);
+  const column = polymorphicKeyColumn(ref.model, ref.axis, ref.value);
   if (!column) return {};
   const tombstones = rows.flatMap(({ deletedAt }) =>
     deletedAt instanceof Date ? [deletedAt] : [],

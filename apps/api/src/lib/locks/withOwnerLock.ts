@@ -9,9 +9,10 @@ import { makeError } from '#/lib/errors';
 
 // One scope per owner-wide invariant that row locks cannot protect. `rules` is the first: an
 // owner's rule graph, where segment A may name segment B and B may name A, and a save of either
-// validates against the graph and then writes into it. A new owner-wide, cross-row invariant adds
-// a scope here rather than a second lock helper.
-export type OwnerLockScope = 'rules';
+// validates against the graph and then writes into it. `entitlements` is a holder's set of
+// entitlement rows, which must keep holding something when two removals race. A new owner-wide,
+// cross-row invariant adds a scope here rather than a second lock helper.
+export type OwnerLockScope = 'rules' | 'entitlements';
 
 type Owner = { ownerModel: string; ownerId: string };
 

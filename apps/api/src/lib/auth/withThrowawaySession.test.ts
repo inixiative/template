@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { log } from '@template/shared/logger';
@@ -7,7 +7,7 @@ import { auth } from '#/lib/auth';
 import { withThrowawaySession } from '#/lib/auth/withThrowawaySession';
 import { AppError } from '#/lib/errors';
 
-afterAll(async () => {
+afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 

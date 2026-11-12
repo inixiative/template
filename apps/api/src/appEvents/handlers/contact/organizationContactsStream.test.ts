@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, User } from '@template/db/generated/client/client';
 import {
@@ -34,7 +34,7 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 3000): Promise<void
 };
 
 describe('organization contacts stream producers', () => {
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
@@ -110,7 +110,7 @@ describe('organization contacts stream (app event → redis → open socket)', (
   let member: User;
   let organization: Organization;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     await initWebSocketPubSub();
     const { context } = await createOrganizationUser({ role: 'member' });
     member = context.user;
@@ -119,7 +119,7 @@ describe('organization contacts stream (app event → redis → open socket)', (
 
   afterEach(() => clearRegistry());
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

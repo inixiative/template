@@ -9,6 +9,23 @@ import {
   toModelName,
 } from '@template/db';
 
+// why: a hard-deleted source (SegmentMember, Flow, WebhookSubscription) nulls its SetNull FK; the plain id still names it.
+const requiredForeignKey = (
+  model: ModelName,
+  axis: PolymorphicAxis,
+  typeValue: PolymorphicValue,
+  fk: string,
+): Condition => {
+  const error = `${model} with ${axis.field}=${typeValue} requires ${fk}`;
+  const present: Condition = { field: fk, operator: Operator.notEmpty, value: true };
+  return axis.materialized
+    ? {
+        any: [present, { field: axis.materialized, operator: Operator.notEmpty, value: true }],
+        error,
+      }
+    : { ...present, error };
+};
+
 const buildAxisRule = (model: ModelName, axis: PolymorphicAxis): Condition => {
   const allFks = [...new Set(Object.values(axis.fkMap).flat())];
   const typeValues = Object.keys(axis.fkMap) as PolymorphicValue[];
@@ -20,12 +37,7 @@ const buildAxisRule = (model: ModelName, axis: PolymorphicAxis): Condition => {
 
     const conditions: Condition[] = [
       { field: axis.field, operator: Operator.equals, value: typeValue },
-      ...requiredFks.map((fk) => ({
-        field: fk,
-        operator: Operator.notEmpty,
-        value: true,
-        error: `${model} with ${axis.field}=${typeValue} requires ${fk}`,
-      })),
+      ...requiredFks.map((fk) => requiredForeignKey(model, axis, typeValue, fk)),
       ...forbiddenFks.map((fk) => ({
         field: fk,
         operator: Operator.isEmpty,

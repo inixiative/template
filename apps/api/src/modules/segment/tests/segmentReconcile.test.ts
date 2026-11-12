@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, type Prisma, unregisterDbHook } from '@template/db';
+import { db, type Prisma } from '@template/db';
 import type {
   CustomerRef,
   Organization,
@@ -31,11 +31,6 @@ import {
   getNextSeq,
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { enqueueJob } from '#/jobs/enqueue';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import {
@@ -87,13 +82,7 @@ describe('segment reconcile', () => {
       })
     ).entity;
 
-  beforeAll(async () => {
-    registerSegmentConditionsHook();
-    registerSegmentMemberOwnerHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerRuleReferenceHook();
-
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     organization = context.organization;
     space = (await createSpace({}, { organization })).entity;
@@ -103,9 +92,8 @@ describe('segment reconcile', () => {
     otherRef = await customerOf(other);
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('a saved segment is not reconciled until its created event fires', async () => {
@@ -304,7 +292,10 @@ describe('segment reconcile', () => {
     await emitAppEvent('contact.created', { contact });
     expect(await memberIds(segment.id)).toEqual([otherRef.id]);
 
-    const deleted = await db.contact.delete({ where: { id: contact.id } });
+    const deleted = await db.contact.update({
+      where: { id: contact.id },
+      data: { deletedAt: new Date() },
+    });
     await emitAppEvent('contact.deleted', { contact: deleted });
     expect(await memberIds(segment.id)).toEqual([]);
   });

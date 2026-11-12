@@ -6,12 +6,9 @@
  */
 import type { TokenIssue } from '@template/email/errors/TokenValidationError';
 import {
-  EACH,
-  IF,
-  parseEachBlock,
-  parseIfBlock,
   RESERVED_SCOPE_ROOTS,
   TOKEN_PATTERN,
+  visitTemplateBlocks,
 } from '@template/email/render/conditionParser';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 import { absoluteRule } from '@template/email/rules/absoluteRule';
@@ -97,57 +94,33 @@ const checkText = (text: string, walk: Walk): void => {
   }
 };
 
-const walkContent = (content: string, walk: Walk): void => {
-  let i = 0;
-  while (i < content.length) {
-    const ifIdx = content.indexOf(IF, i);
-    const eachIdx = content.indexOf(EACH, i);
-    if (ifIdx === -1 && eachIdx === -1) break;
-    const kind: 'if' | 'each' = eachIdx === -1 || (ifIdx !== -1 && ifIdx < eachIdx) ? 'if' : 'each';
-    const openIdx = kind === 'if' ? ifIdx : eachIdx;
-    checkText(content.slice(i, openIdx), walk);
-
-    if (kind === 'if') {
-      const block = parseIfBlock(content, openIdx);
-      if (!block) {
-        i = openIdx + IF.length;
-        continue;
-      }
-      for (const branch of block.branches) {
-        const guarded = new Set(walk.guarded);
-        if (branch.kind !== 'else' && branch.rule !== undefined) {
-          const judged = absoluteRule(branch.rule, walk.bindings);
+const walkContent = (content: string, walk: Omit<Walk, 'bindings'>): void =>
+  visitTemplateBlocks(
+    content,
+    {
+      text: (text, { bindings, state }) => checkText(text, { ...state, bindings }),
+      branch: ({ kind, rule }, _branchIndex, _position, { bindings, state }) => {
+        const guarded = new Set(state.guarded);
+        if (kind !== 'else' && rule !== undefined) {
+          const judged = absoluteRule(rule, bindings);
           if (judged) for (const guard of presenceGuards(judged)) guarded.add(guard);
         }
-        walkContent(branch.body, { ...walk, guarded });
-      }
-      i = block.end;
-      continue;
-    }
-
-    const block = parseEachBlock(content, openIdx);
-    if (!block) {
-      i = openIdx + EACH.length;
-      continue;
-    }
-    if (walk.options.isSubject) {
-      walk.issues.push({
-        path: `offset ${openIdx}`,
-        message: '{{#each}} is not allowed in the subject line',
-      });
-    }
-    const bindings: BindingChain = new Map(walk.bindings);
-    const eachRoots = new Set(walk.eachRoots);
-    if (block.as) {
-      bindings.set(block.as, resolveBindingPath(block.path, walk.bindings));
-      eachRoots.add(block.as);
-    }
-    if (block.index) bindings.set(block.index, undefined);
-    walkContent(block.body, { ...walk, bindings, eachRoots });
-    i = block.end;
-  }
-  checkText(content.slice(i), walk);
-};
+        return { ...state, guarded };
+      },
+      loop: ({ as }, _loop, { openIdx }, { state }) => {
+        if (state.options.isSubject) {
+          state.issues.push({
+            path: `offset ${openIdx}`,
+            message: '{{#each}} is not allowed in the subject line',
+          });
+        }
+        const eachRoots = new Set(state.eachRoots);
+        if (as) eachRoots.add(as);
+        return { ...state, eachRoots };
+      },
+    },
+    { bindings: new Map(), state: walk },
+  );
 
 export const validateTokens = (
   content: string,
@@ -161,7 +134,6 @@ export const validateTokens = (
     });
   }
   walkContent(content, {
-    bindings: new Map(),
     eachRoots: new Set(),
     guarded: new Set(),
     issues,

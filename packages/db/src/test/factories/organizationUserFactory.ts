@@ -5,6 +5,10 @@
  * @uses none
  */
 import { Role } from '@template/db/generated/client/enums';
+import {
+  type EntitlementsOverride,
+  storeEntitlements,
+} from '@template/db/test/factories/entitlementFactory';
 import { createFactory } from '@template/db/test/factory';
 import type { BuildContext, CreateInputOf, TypedBuildResult } from '@template/db/test/factoryTypes';
 
@@ -21,7 +25,14 @@ export const buildOrganizationUser = (
   context?: BuildContext,
 ): Promise<Result> => organizationUserFactory.build(overrides, context) as Promise<Result>;
 
-export const createOrganizationUser = (
-  overrides?: Partial<CreateInputOf<'OrganizationUser'>>,
+export const createOrganizationUser = async (
+  {
+    entitlements,
+    ...overrides
+  }: Partial<CreateInputOf<'OrganizationUser'>> & EntitlementsOverride = {},
   context?: BuildContext,
-): Promise<Result> => organizationUserFactory.create(overrides, context) as Promise<Result>;
+): Promise<Result> => {
+  const result = (await organizationUserFactory.create(overrides, context)) as Result;
+  await storeEntitlements({ model: 'OrganizationUser', row: result.entity }, entitlements ?? []);
+  return result;
+};

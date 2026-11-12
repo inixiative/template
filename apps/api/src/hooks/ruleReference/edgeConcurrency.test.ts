@@ -1,12 +1,6 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { type Condition, Operator } from '@inixiative/json-rules';
-import {
-  clearHookRegistry,
-  db,
-  ruleReferences,
-  syncRuleReferenceEdges,
-  unregisterDbHook,
-} from '@template/db';
+import { db, ruleReferences, syncRuleReferenceEdges } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -15,13 +9,6 @@ import {
   createSpace,
 } from '@template/db/test';
 import { gate } from '@template/db/test/gate';
-import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
-import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
-import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
-import { registerRulesHook } from '#/hooks/rules/hook';
-import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
@@ -35,11 +22,11 @@ const membersOf = (segmentId: string) => ({
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-// The contender's blocked FOR UPDATE is observed in pg_stat_activity before the holder mutates, so
-// the contender has provably finished its unlocked reads against the live row; a fixed delay would
-// only guess at that and make the race flaky in both directions.
+// The contender's blocked FOR NO KEY UPDATE is observed in pg_stat_activity before the holder
+// mutates, so the contender has provably finished its unlocked reads against the live row; a fixed
+// delay would only guess at that and make the race flaky in both directions.
 const waitForBlockedLockOn = async (table: string): Promise<void> => {
-  const pattern = `%"${table}"%FOR UPDATE%`;
+  const pattern = `%"${table}"%FOR NO KEY UPDATE%`;
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const rows = await db.$queryRaw<{ n: bigint | number }[]>`
@@ -70,24 +57,13 @@ describe('ruleReference — edges under concurrency and repair', () => {
   let space: Space;
   let owner: { ownerModel: string; ownerId: string };
 
-  beforeAll(async () => {
-    registerPreventHardDeleteHook();
-    registerMemberSelfGrantHook();
-    registerRulesHook();
-    registerSegmentConditionsHook();
-    registerRuleReferenceHook();
-    registerRuleReferenceTargetHook();
-    registerSoftDeleteCascadeHook();
-  });
-
   beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
     owner = { ownerModel: 'Space', ownerId: space.id };
   });
 
-  afterAll(async () => {
-    clearHookRegistry();
+  afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 

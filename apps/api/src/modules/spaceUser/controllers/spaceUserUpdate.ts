@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import { db, hydrate, Prisma } from '@template/db';
+import { db, hydrate, includeTargetEntitlements, Prisma } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { memberRoleWrite } from '@template/permissions/rebac/schemaHelpers';
 import { getResource } from '#/lib/context/getResource';
@@ -29,6 +29,7 @@ export const spaceUserUpdateController = makeController(
 
     const updated = await db.spaceUser.update({
       where: { id: spaceUser.id },
+      include: includeTargetEntitlements('SpaceUser'),
       data: body,
     });
 

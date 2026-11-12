@@ -4,6 +4,11 @@
  * @partOf feature:integrations
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:auth
  */
+import {
+  type IncludeTargetEntitlements,
+  includeTargetEntitlements,
+  type Prisma,
+} from '@template/db';
 import { paginate } from '#/lib/prisma/paginate';
 import { submodelOwnerWhere } from '#/lib/prisma/submodelOwnerWhere';
 import { makeController } from '#/lib/utils/makeController';
@@ -13,7 +18,11 @@ export const integrationReadManyTokensController = makeController(
   integrationReadManyTokensRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const { data, pagination } = await paginate(c, db.token, {
+    const { data, pagination } = await paginate<
+      typeof db.token,
+      Prisma.TokenGetPayload<{ include: IncludeTargetEntitlements; omit: { keyHash: true } }>
+    >(c, db.token, {
+      include: includeTargetEntitlements('Token'),
       where: submodelOwnerWhere(c),
       omit: { keyHash: true },
     });

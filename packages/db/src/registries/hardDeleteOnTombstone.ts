@@ -10,7 +10,6 @@
 // parent nobody thought to list.
 export const HARD_DELETE_ON_TOMBSTONE = [
   'Session',
-  'Token',
   'WebhookSubscription',
   'WebhookEvent',
   'RuleReference',
