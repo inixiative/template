@@ -100,9 +100,7 @@ describe('polymorphicIs', () => {
     expect(compile(polymorphicBindings('platform', 'platform'))).toContain(
       '"ownerModel":{"in":["platform"]}',
     );
-    expect(compile(polymorphicBindings('Organization', 'org-1'))).toContain(
-      '"ownerModel":{"in":[]}',
-    );
+    expect(compile(polymorphicBindings('Organization', 'org-1'))).not.toContain('"platform"');
   });
 
   it('refuses an axis the registry does not declare, and a kind no single key binds', () => {

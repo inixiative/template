@@ -81,7 +81,7 @@ describe('hydrate', () => {
     );
   });
 
-  it('walks only the edges the permission check names: a variant reaches its flag, never its audience', async () => {
+  it('skips edges tagged @permissions(hydrate: false): a variant reaches its flag, never its audience', async () => {
     const { entity: flag } = await createFeatureFlag({ ownerModel: 'platform' });
     const { entity: audience } = await createSegment({ ownerModel: 'platform' });
     const { entity: variant } = await createFeatureFlagVariant(
@@ -100,9 +100,11 @@ describe('hydrate', () => {
 
   it('a segment member reaches its segment and owner, never the customer reference', async () => {
     const { entity: segment } = await createSegment({ ownerModel: 'platform' });
+    const { entity: customer } = await createUser();
     const { entity: customerRef } = await createCustomerRef({
       customerModel: 'User',
       providerModel: 'platform',
+      customerUserId: customer.id,
     });
     const { entity: member } = await createSegmentMember({}, { segment, customerRef });
 
