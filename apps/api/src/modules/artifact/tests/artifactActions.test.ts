@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type {
   Artifact,
   Organization,
@@ -12,7 +12,6 @@ import {
   InquiryType,
 } from '@template/db/generated/client/enums';
 import {
-  cleanupTouchedTables,
   createArtifact,
   createArtifactPermission,
   createArtifactPlacement,
@@ -23,10 +22,6 @@ import {
   createResourceBinding,
   createUser,
 } from '@template/db/test';
-import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerOrganizationUserFolderHook } from '#/hooks/organizationUserFolder/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { artifactRouter } from '#/modules/artifact';
 import { findOrganizationUserFolder } from '#/modules/artifact/services/ensureOrganizationUserFolder';
@@ -60,7 +55,6 @@ describe('artifact actions', () => {
   let adminFetch: Fetch;
   let memberFetch: Fetch;
   let strangerFetch: Fetch;
-  let testDb: ReturnType<typeof createTestApp>['db'];
 
   const orgFolder = async (extra: Record<string, unknown> = {}) =>
     (
@@ -77,11 +71,7 @@ describe('artifact actions', () => {
 
   const ids = (artifacts: Artifact[]) => artifacts.map((artifact) => artifact.id);
 
-  beforeAll(async () => {
-    registerArtifactAccessHook();
-    registerImmutableFieldsHook();
-    registerSoftDeleteCascadeHook();
-    registerOrganizationUserFolderHook();
+  beforeEach(async () => {
     const seat = await createOrganizationUser({ role: 'admin' });
     organization = seat.context.organization;
     admin = seat.context.user;
@@ -93,18 +83,12 @@ describe('artifact actions', () => {
 
     const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminSeat], mount });
     adminFetch = harness.fetch;
-    testDb = harness.db;
     memberFetch = createTestApp({
       mockUser: member,
       mockOrganizationUsers: [memberSeat],
       mount,
     }).fetch;
     strangerFetch = createTestApp({ mockUser: stranger, mount }).fetch;
-  });
-
-  afterAll(async () => {
-    await cleanupTouchedTables(testDb);
-    clearHookRegistry();
   });
 
   it('every artifact is a container or an object, set from its kind and fixed', async () => {
@@ -272,7 +256,10 @@ describe('artifact actions', () => {
       await createArtifactPlacement({ artifactId: file.id, containerArtifactId: own.id });
       const inquiry = await transferTo(file, stranger, true);
       const resolved = await adminFetch(
-        post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+        post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+          status: 'approved',
+          expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        }),
       );
       expect(resolved.status).toBe(200);
       const after = await db.artifact.findUniqueOrThrow({ where: { id: file.id } });
@@ -296,7 +283,11 @@ describe('artifact actions', () => {
       const file = await userFile(stranger);
       const inquiry = await transferTo(file, stranger, true);
       await adminFetch(
-        post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved', allowTracking: false }),
+        post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+          status: 'approved',
+          allowTracking: false,
+          expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        }),
       );
       expect(await db.resourceBinding.count({ where: { artifactId: file.id } })).toBe(0);
       const copies = await db.artifact.findMany({
@@ -314,7 +305,7 @@ describe('artifact actions', () => {
           organizationId: organization.id,
         })
       ).entity;
-      await createArtifactPlacement({ artifactId: note.id, containerArtifactId: memberFolder!.id });
+      await createArtifactPlacement({ artifactId: note.id, containerArtifactId: memberFolder?.id });
       const response = await adminFetch(
         post(`/api/v1/organization/${organization.id}/inquiries`, {
           type: InquiryType.transferArtifact,
@@ -385,7 +376,7 @@ describe('artifact actions', () => {
       const { context } = await createOrganizationUser({ role: 'member' }, { organization });
       const folder = await findOrganizationUserFolder(organization.id, context.user.id);
       expect(folder?.kind).toBe('organizationUserFolder');
-      const grants = await db.artifactPermission.findMany({ where: { artifactId: folder!.id } });
+      const grants = await db.artifactPermission.findMany({ where: { artifactId: folder?.id } });
       expect(grants.map((grant) => grant.granteeModel)).toEqual(['OrganizationUser']);
     });
 
@@ -395,7 +386,7 @@ describe('artifact actions', () => {
         .user;
       const theirs = await findOrganizationUserFolder(organization.id, someone.id);
       await createArtifactPermission({
-        artifactId: theirs!.id,
+        artifactId: theirs?.id,
         granteeModel: 'User',
         granteeUserId: joiner.id,
         role: 'owner',
@@ -403,7 +394,7 @@ describe('artifact actions', () => {
       await createOrganizationUser({ role: 'member' }, { organization, user: joiner });
       const own = await findOrganizationUserFolder(organization.id, joiner.id);
       expect(own).not.toBeNull();
-      expect(own!.id).not.toBe(theirs!.id);
+      expect(own?.id).not.toBe(theirs?.id);
     });
 
     it('an invite creates it early with no grant; accepting grants the membership', async () => {
@@ -420,14 +411,21 @@ describe('artifact actions', () => {
       expect(response.status).toBe(201);
       const early = await findOrganizationUserFolder(organization.id, invitee.id);
       expect(early).not.toBeNull();
-      expect(await db.artifactPermission.count({ where: { artifactId: early!.id } })).toBe(0);
-      const { id: inquiryId } = (await json<{ id: string }>(response)).data;
+      expect(await db.artifactPermission.count({ where: { artifactId: early?.id } })).toBe(0);
+      const { id: inquiryId, updatedAt } = (await json<{ id: string; updatedAt: string }>(response))
+        .data;
       const inviteeFetch = createTestApp({ mockUser: invitee, mount }).fetch;
       expect(
-        (await inviteeFetch(post(`/api/v1/inquiry/${inquiryId}/resolve`, { status: 'approved' })))
-          .status,
+        (
+          await inviteeFetch(
+            post(`/api/v1/inquiry/${inquiryId}/resolve`, {
+              status: 'approved',
+              expectedUpdatedAt: updatedAt,
+            }),
+          )
+        ).status,
       ).toBe(200);
-      const grants = await db.artifactPermission.findMany({ where: { artifactId: early!.id } });
+      const grants = await db.artifactPermission.findMany({ where: { artifactId: early?.id } });
       expect(grants.map((grant) => grant.granteeModel)).toEqual(['OrganizationUser']);
     });
   });

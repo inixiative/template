@@ -169,14 +169,15 @@ export const PolymorphismRegistry = {
         field: 'model',
         fkMap: {
           CustomerRef: [],
+          Artifact: [],
         },
       },
     ],
-    // All owner types can subscribe to CustomerRef
+    // All owner types can subscribe to CustomerRef and Artifact
     allowedCombinations: {
-      User: ['CustomerRef'],
-      Organization: ['CustomerRef'],
-      Space: ['CustomerRef'],
+      User: ['CustomerRef', 'Artifact'],
+      Organization: ['CustomerRef', 'Artifact'],
+      Space: ['CustomerRef', 'Artifact'],
     },
   },
 

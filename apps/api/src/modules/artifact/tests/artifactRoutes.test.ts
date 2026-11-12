@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type {
   Artifact,
   ArtifactPlacement,
@@ -8,14 +8,12 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import {
-  cleanupTouchedTables,
   createOrganizationUser,
   createSpace,
   createSpaceUser,
   createToken,
   createUser,
 } from '@template/db/test';
-import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { artifactRouter } from '#/modules/artifact';
 import { artifactPermissionRouter } from '#/modules/artifactPermission';
@@ -46,10 +44,8 @@ describe('artifact routes', () => {
   let adminFetch: Fetch;
   let memberFetch: Fetch;
   let outsiderFetch: Fetch;
-  let testDb: ReturnType<typeof createTestApp>['db'];
   let shared: Artifact;
   let drafts: Artifact;
-  let edge: ArtifactPlacement;
 
   const createFolder = async (fetch: Fetch, path: string, body: Record<string, unknown> = {}) => {
     const response = await fetch(post(path, { kind: 'folder', name: 'folder', ...body }));
@@ -64,8 +60,13 @@ describe('artifact routes', () => {
       }),
     );
 
-  beforeAll(async () => {
-    registerArtifactAccessHook();
+  const placeDraftsInShared = async () => {
+    const response = await place(memberFetch, drafts, shared);
+    expect(response.status).toBe(201);
+    return (await json<ArtifactPlacement>(response)).data;
+  };
+
+  beforeEach(async () => {
     const adminSeat = await createOrganizationUser({ role: 'admin' });
     organization = adminSeat.context.organization;
     admin = adminSeat.context.user;
@@ -79,7 +80,6 @@ describe('artifact routes', () => {
       mount,
     });
     adminFetch = harness.fetch;
-    testDb = harness.db;
     memberFetch = createTestApp({
       mockUser: member,
       mockOrganizationUsers: [memberMembership],
@@ -97,18 +97,17 @@ describe('artifact routes', () => {
       }),
     );
     expect(grant.status).toBe(201);
-  });
-
-  afterAll(async () => {
-    await cleanupTouchedTables(testDb);
-    clearHookRegistry();
+    drafts = await createFolder(memberFetch, `/api/v1/organization/${organization.id}/artifacts`);
   });
 
   it('creates at the kind default and gives the creating member an owner grant', async () => {
-    drafts = await createFolder(memberFetch, `/api/v1/organization/${organization.id}/artifacts`);
-    expect(drafts.ownerModel).toBe('Organization');
-    expect(drafts.access).toBe('private');
-    const access = await memberFetch(get(`/api/v1/artifact/${drafts.id}/access`));
+    const created = await createFolder(
+      memberFetch,
+      `/api/v1/organization/${organization.id}/artifacts`,
+    );
+    expect(created.ownerModel).toBe('Organization');
+    expect(created.access).toBe('private');
+    const access = await memberFetch(get(`/api/v1/artifact/${created.id}/access`));
     expect((await json<{ role: string }>(access)).data.role).toBe('owner');
   });
 
@@ -124,9 +123,7 @@ describe('artifact routes', () => {
   });
 
   it('an edge needs manage on the artifact and operate on the container', async () => {
-    const response = await place(memberFetch, drafts, shared);
-    expect(response.status).toBe(201);
-    edge = (await json<ArtifactPlacement>(response)).data;
+    await placeDraftsInShared();
     const placed = await db.artifact.findUniqueOrThrow({ where: { id: drafts.id } });
     expect(placed.access).toBe('inherit');
   });
@@ -232,6 +229,7 @@ describe('artifact routes', () => {
   });
 
   it('refuses a loop', async () => {
+    await placeDraftsInShared();
     const response = await place(adminFetch, shared, drafts);
     expect(response.status).toBe(422);
   });
@@ -243,6 +241,7 @@ describe('artifact routes', () => {
   });
 
   it('lists only the members the caller can read', async () => {
+    await placeDraftsInShared();
     const hidden = await createFolder(
       adminFetch,
       `/api/v1/organization/${organization.id}/artifacts`,
@@ -295,6 +294,7 @@ describe('artifact routes', () => {
   it('removing its last folder needs both sides; it then shows at its owner root', async () => {
     const stranger = (await createUser()).entity;
     const strangerFetch = createTestApp({ mockUser: stranger, mount }).fetch;
+    const edge = await placeDraftsInShared();
     expect((await strangerFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(404);
     expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(204);
     const roots = await json<Artifact[]>(

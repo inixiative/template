@@ -1,19 +1,8 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  spyOn,
-} from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
+import { db } from '@template/db';
 import type { Artifact, Organization, Space, User } from '@template/db/generated/client/client';
 import { WebhookModel } from '@template/db/generated/client/enums';
 import {
-  cleanupTouchedTables,
   createArtifact,
   createArtifactPermission,
   createArtifactPlacement,
@@ -22,9 +11,6 @@ import {
   createUser,
   createWebhookSubscription,
 } from '@template/db/test';
-import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-import { registerWebhookHook } from '#/hooks/webhooks/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 
 type Enqueued = { subscriptionId: string; action: string; resourceId: string };
@@ -67,10 +53,7 @@ describe('webhook hook: Artifact audience', () => {
       })
     ).entity;
 
-  beforeAll(async () => {
-    registerArtifactAccessHook();
-    registerSoftDeleteCascadeHook();
-    registerWebhookHook();
+  beforeEach(async () => {
     organization = (await createOrganization()).entity;
     outsiderOrganization = (await createOrganization()).entity;
     space = (await createSpace({}, { organization })).entity;
@@ -87,11 +70,6 @@ describe('webhook hook: Artifact audience', () => {
     });
     granteeSub = await subscribe({ ownerModel: 'User', userId: grantee.id });
     spaceSub = await subscribe({ ownerModel: 'Space', spaceId: space.id });
-  });
-
-  afterAll(async () => {
-    await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('a grant fires an Artifact event to the owner and the grantee, never to an unrelated party', async () => {

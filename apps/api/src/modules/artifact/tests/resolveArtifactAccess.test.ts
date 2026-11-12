@@ -1,8 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type { Artifact, Organization, Space, User } from '@template/db/generated/client/client';
 import {
-  cleanupTouchedTables,
   createArtifact,
   createArtifactPermission,
   createArtifactPlacement,
@@ -10,7 +9,6 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
-import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
 import { principalKey } from '#/modules/artifact/lib/artifactPrincipal';
 import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
 
@@ -40,16 +38,10 @@ describe('resolveArtifactAccess', () => {
   let space: Space;
   let reader: User;
 
-  beforeAll(async () => {
-    registerArtifactAccessHook();
+  beforeEach(async () => {
     organization = (await createOrganization()).entity;
     space = (await createSpace({}, { organization })).entity;
     reader = (await createUser()).entity;
-  });
-
-  afterAll(async () => {
-    await cleanupTouchedTables(db);
-    clearHookRegistry();
   });
 
   it('an inherit artifact takes the union of its containers: any public container makes it public', async () => {

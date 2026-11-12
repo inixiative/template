@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type {
   Artifact,
   Organization,
@@ -7,17 +7,11 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import {
-  cleanupTouchedTables,
   createArtifact,
   createArtifactPermission,
   createArtifactPlacement,
-  createOrganization,
   createOrganizationUser,
-  createResourceBinding,
 } from '@template/db/test';
-import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
-import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { artifactRouter } from '#/modules/artifact';
 import { artifactPermissionRouter } from '#/modules/artifactPermission';
 import { artifactPlacementRouter } from '#/modules/artifactPlacement';
@@ -25,7 +19,7 @@ import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { del, get, json, patch, post } from '#tests/utils/request';
+import { del, get, json, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [
   (app) => {
@@ -49,7 +43,6 @@ describe('artifact lifecycle', () => {
   let ownerFetch: Fetch;
   let adminFetch: Fetch;
   let memberFetch: Fetch;
-  let testDb: ReturnType<typeof createTestApp>['db'];
 
   const seat = async (role: 'owner' | 'admin' | 'member') => {
     const { entity, context } = await createOrganizationUser({ role }, { organization });
@@ -74,10 +67,7 @@ describe('artifact lifecycle', () => {
   const status = async (fetch: Fetch, artifact: Artifact) =>
     (await fetch(get(`/api/v1/artifact/${artifact.id}/access`))).status;
 
-  beforeAll(async () => {
-    registerArtifactAccessHook();
-    registerSoftDeleteCascadeHook();
-    registerAuditLogHook();
+  beforeEach(async () => {
     const first = await createOrganizationUser({ role: 'owner' });
     organization = first.context.organization;
     owner = first.context.user;
@@ -93,7 +83,6 @@ describe('artifact lifecycle', () => {
       mount,
     });
     ownerFetch = harness.fetch;
-    testDb = harness.db;
     adminFetch = createTestApp({
       mockUser: admin,
       mockOrganizationUsers: [adminSeat.entity],
@@ -106,16 +95,11 @@ describe('artifact lifecycle', () => {
     }).fetch;
   });
 
-  afterAll(async () => {
-    await cleanupTouchedTables(testDb);
-    clearHookRegistry();
-  });
-
   describe("a member's org-user content", () => {
     let memberFolder: Artifact;
     let note: Artifact;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       memberFolder = await orgArtifact('organizationUserFolder', { system: true });
       await createArtifactPermission({
         artifactId: memberFolder.id,
@@ -162,7 +146,7 @@ describe('artifact lifecycle', () => {
       const [edge] = await db.artifactPlacement.findMany({
         where: { artifactId: draft.id, containerArtifactId: memberFolder.id },
       });
-      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge!.id}`))).status).toBe(422);
+      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge?.id}`))).status).toBe(422);
 
       const team = await orgArtifact('folder');
       await createArtifactPermission({
@@ -177,7 +161,7 @@ describe('artifact lifecycle', () => {
       );
       expect(placed.status).toBe(201);
       expect(await listedFor(adminFetch, team)).toContain(draft.id);
-      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge!.id}`))).status).toBe(204);
+      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge?.id}`))).status).toBe(204);
     });
 
     it('a team artifact a member also files into their folder stays visible to admins', async () => {
@@ -223,7 +207,7 @@ describe('artifact lifecycle', () => {
       edges: { artifactId: string; containerArtifactId: string }[];
     };
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       root = await orgArtifact('folder', { name: 'root' });
       legal = await orgArtifact('folder', { name: 'legal' });
       operations = await orgArtifact('folder', { name: 'operations' });
@@ -292,7 +276,7 @@ describe('artifact lifecycle', () => {
     let shared: Artifact;
     let other: Artifact;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       shared = await orgArtifact('folder');
       other = await orgArtifact('folder');
     });
@@ -338,7 +322,7 @@ describe('artifact lifecycle', () => {
       const [edge] = await db.artifactPlacement.findMany({
         where: { artifactId: item.id, containerArtifactId: shelf.id },
       });
-      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge!.id}`))).status).toBe(204);
+      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge?.id}`))).status).toBe(204);
     });
 
     it('deleting a container keeps its contents; contents only there are listed and deleted through batch', async () => {
