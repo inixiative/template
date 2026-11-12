@@ -1,5 +1,4 @@
 import { db } from '@template/db';
-import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import {
   baseResolutionInputSchema,
   type CreateSpaceResolution,
@@ -20,8 +19,6 @@ const validate = (inquiry: Partial<Inquiry>, content: CreateSpaceContent): Promi
   });
 
 export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceResolution> = {
-  sources: [{ sourceModel: InquiryResourceModel.Organization }],
-  targets: [{ targetModel: InquiryResourceModel.admin }],
   contentSchema: spaceContentSchema,
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema: createSpaceResolutionSchema,

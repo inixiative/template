@@ -641,6 +641,16 @@ Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'o
 
 In the inquiry schema, `updateSpace` uses single-hop and `transferSpace` uses the dot-path.
 
+### Inquiry permissions
+
+`db:inquiry` is an extension of the schema, built by `inquiryPermission(INQUIRY_TYPES)` (`packages/permissions/src/rebac/inquiryPermission.ts`). Each inquiry type declares, in `INQUIRY_TYPES` (`inquiryTypes.ts`), the party models that may stand on each side and the level each needs: `send` for a source, `resolve` for a target. A level is an action of that party model's own resource (`BaseActionOf`), so a typo or an action the model lacks fails to compile. `{ via, model, action }` asks a related model instead (`transferSpace` asks `own` on the space's organization), and a list of `{ when, action }` picks the level by a rule over the inquiry (an invite's role).
+
+- **`read`** is party-wide, whatever the type: the user on either side (`read`), or `manage` on the organization or space on either side (`INQUIRY_READ_LEVELS`).
+- **`send`** and **`resolve`** are one branch per type, each gated on the type and on the party model, asking the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`).
+- A UserEvidence (`admin`) party has no relation, so only a superadmin acts for it.
+
+The API reads the same declarations to check that a create's parties are ones the type accepts (`validateInquiryHandler`).
+
 ---
 
 ## Owner-Polymorphic Models

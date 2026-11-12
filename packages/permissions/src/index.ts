@@ -19,6 +19,7 @@ export {
 } from './client';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
+export { INQUIRY_TYPES, type InquiryParty, type InquiryTypeParties } from './rebac/inquiryTypes';
 export { rebacSchema } from './rebac/schema';
 export type { ActionRule } from './rebac/types';
 export type { DelegatePermissions } from './roles/delegatePermissions';

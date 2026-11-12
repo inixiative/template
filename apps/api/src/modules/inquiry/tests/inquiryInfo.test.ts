@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { Role } from '@template/db/generated/client/enums';
+import { type InquiryType, Role } from '@template/db/generated/client/enums';
+import { INQUIRY_TYPES } from '@template/permissions';
 import { inquiryRouter } from '#/modules/inquiry';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { createTestApp } from '#tests/createTestApp';
@@ -31,11 +32,12 @@ describe('GET /api/v1/inquiry/info', () => {
     expect(Object.keys(types).sort()).toEqual(Object.keys(inquiryHandlers).sort());
   });
 
-  it('reports each handler’s source and target models and its rules', async () => {
+  it('reports each type’s declared source and target models and its handler rules', async () => {
     const types = await loadInfo();
     for (const [type, handler] of Object.entries(inquiryHandlers)) {
-      expect(types[type]!.sources).toEqual(handler.sources.map(({ sourceModel }) => sourceModel));
-      expect(types[type]!.targets).toEqual(handler.targets.map(({ targetModel }) => targetModel));
+      const { sources, targets } = INQUIRY_TYPES[type as InquiryType];
+      expect(types[type]!.sources).toEqual(sources.map(({ model }) => model));
+      expect(types[type]!.targets).toEqual(targets.map(({ model }) => model));
       expect(types[type]!.unique).toBe(handler.unique ?? null);
       expect(types[type]!.defaultExpirationDays).toBe(handler.defaultExpirationDays ?? null);
     }

@@ -1,5 +1,4 @@
 import { db, revive } from '@template/db';
-import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   baseResolutionInputSchema,
   type InviteOrganizationUserContent,
@@ -10,8 +9,6 @@ import { inviteOrganizationUserAppEvents } from '#/modules/inquiry/handlers/invi
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
 
 export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUserContent> = {
-  sources: [{ sourceModel: InquiryResourceModel.Organization }],
-  targets: [{ targetModel: InquiryResourceModel.User }],
   contentSchema: inviteOrganizationUserContentSchema,
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,

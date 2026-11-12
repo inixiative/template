@@ -38,7 +38,7 @@ export const createInquiry = async (
 
   const handler = inquiryHandlers[body.type];
   const content = handler.contentSchema.parse(body.content);
-  validateInquiryHandler(handler, source.sourceModel, body.targetModel);
+  validateInquiryHandler(body.type, source.sourceModel, body.targetModel);
   const target = await resolveInquiryTarget(c);
 
   const partial = await hydrate('inquiry', {

@@ -198,7 +198,7 @@ POST /api/admin/inquiry          → sourceModel: admin (no FK)
 
 No create route sources an `OrganizationUser`, `SpaceUser`, `Integration` or `Token` inquiry; those sources are set by the service that already holds the party.
 
-The handler's `sources` config is checked by `validateInquiryHandler` to confirm the resolved source is valid for this inquiry type.
+The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/rebac/inquiryTypes.ts`) are checked by `validateInquiryHandler` to confirm the resolved source is valid for this inquiry type.
 
 ### Target
 
@@ -220,8 +220,6 @@ Every inquiry type maps to a handler registered in `handlers/index.ts`.
 
 ```typescript
 type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
-  sources: { sourceModel: InquiryResourceModel }[];
-  targets: { targetModel: InquiryResourceModel }[];
   contentSchema: z.ZodType<TContent>;            // parsed on create/update; stored in inquiry.content
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
   resolutionSchema: z.ZodType<TResolution>;      // full stored shape (includes computed fields from handleApprove)
@@ -234,7 +232,7 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
 };
 ```
 
-`createInquiry` checks the resolved source and target against `sources` / `targets` (`validateInquiryHandler`, 422 on mismatch). `sendInquiry` flips the status to `sent`, sets `sentAt` (first send only) and `expiresAt`, then calls `autoApprove`; on `true` it runs `resolveInquiry(..., approved)` — and with it `handleApprove` — before emitting `inquiry.sent`.
+A type's parties are not on the handler: they are declared once, with their permission levels, in `INQUIRY_TYPES` (`packages/permissions/src/rebac/inquiryTypes.ts`). `createInquiry` checks the resolved source and target against them (`validateInquiryHandler`, 422 on mismatch). `sendInquiry` flips the status to `sent`, sets `sentAt` (first send only) and `expiresAt`, then calls `autoApprove`; on `true` it runs `resolveInquiry(..., approved)` — and with it `handleApprove` — before emitting `inquiry.sent`.
 
 All three type params default to `BaseResolution` (`{ explanation?: string }`), so simple handlers need no generics:
 
@@ -315,17 +313,16 @@ Approving a transfer moves the space, its members and everything downstream into
 
 No row keyed to the space keeps the old org's membership, so reviving a membership in the old org revives nothing in the moved space. Audit rows record their context (`contextOrganizationId`) as it was when written, so the space's earlier history stays filed under the old org.
 
-**Send permissions by type:**
+**Who may send and resolve, by type** (declared in `INQUIRY_TYPES`):
 
-| Type | Role required | How |
-|------|--------------|-----|
-| `inviteOrganizationUser` (low role: member/viewer) | org `manage` | Admin+ can invite |
-| `inviteOrganizationUser` (high role: owner/admin) | org `own` | Owner only can invite |
-| `createSpace` | org `own` | Owner only |
-| `updateSpace` | space `own` | Space owner or org owner (via `space.own → org.own` delegation) |
-| `transferSpace` | org `own` (explicit 2-hop) | Org owner only — space owner alone is not enough |
+| Type | Send (source) | Resolve (target) |
+|------|---------------|------------------|
+| `inviteOrganizationUser` | Organization `own` for a high role (owner/admin), `manage` otherwise | User `manage` |
+| `createSpace` | Organization `own` | UserEvidence (superadmin) |
+| `updateSpace` | Space `own` (a space owner, or an org owner through `space.own → org.own`) | UserEvidence (superadmin) |
+| `transferSpace` | Space, via its `organization`: Organization `own` | Organization `own` |
 
-`updateSpace` and `transferSpace` differ intentionally: `updateSpace` uses `{ rel: 'sourceSpace', action: 'own' }` which delegates through to org.own, so both direct space owners and org owners can update. `transferSpace` uses `{ rel: 'sourceSpace.organization', action: 'own' }` — dot-path traversal that explicitly resolves to the owning organization, bypassing any direct space.own check, ensuring only org owners can initiate a transfer.
+`updateSpace` and `transferSpace` differ intentionally. `updateSpace` asks `own` on the space, which an org owner also holds. `transferSpace` declares `via: 'organization'`, so the check is `own` on the space's organization itself: a space owner alone cannot transfer it.
 
 ## Response Schemas
 
@@ -355,13 +352,16 @@ Each mutation uses the include that matches what its caller needs:
 
 | Action | Who can perform it |
 |--------|--------------------|
-| `read` | Source user/manage-on-source-org-or-space OR target user/manage-on-target-org-or-space |
-| `send` | Source-side permission (see handler table above). For user-sourced inquiry types, `{ rel: 'sourceUser', action: 'operate' }` is also checked — add the type to that rule's `value: []` list in `schema.ts` when creating a user-sourced handler. |
-| `resolve` | Target user (`rel: 'targetUser'`); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
+| `read` | Party-wide, whatever the type: the user on either side (`read`), or `manage` on the organization or space on either side (`INQUIRY_READ_LEVELS`) |
+| `send` | The source party's declared `send` level for that type (table above) |
+| `resolve` | The target party's declared `resolve` level for that type; a UserEvidence (`admin`) target has no relation, so only a superadmin resolves it |
+
+`db:inquiry` is built by `inquiryPermission(INQUIRY_TYPES)`: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource, checked at compile time; `{ via, model, action }` asks a related model instead, and a list of `{ when, action }` picks the level by a rule over the inquiry.
 
 ## Adding a New Handler
 
-1. Create `handlers/<type>/index.ts` implementing `InquiryHandler<TContent, TResolution>`
+1. Declare the type's parties and their `send` / `resolve` levels in `INQUIRY_TYPES` (`packages/permissions/src/rebac/inquiryTypes.ts`); the record is keyed by `InquiryType`, so a new type does not compile until it does
+2. Create `handlers/<type>/index.ts` implementing `InquiryHandler<TContent, TResolution>`
 2. Define `contentSchema` (stored on create) and `resolutionInputSchema` / `resolutionSchema` (validated on resolve) in `packages/shared/src/inquiry/<type>.ts`, so web/admin type `inquiry.content` with the same schema the API parses; `baseResolutionInputSchema` lives there too
    - `resolutionInputSchema` — what the resolver submits; fields here (except `explanation`) can override content
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
