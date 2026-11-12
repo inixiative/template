@@ -318,8 +318,8 @@ No row keyed to the space keeps the old org's membership, so reviving a membersh
 | Type | Send (source) | Resolve (target) |
 |------|---------------|------------------|
 | `inviteOrganizationUser` | Organization `own` for a high role (owner/admin), `manage` otherwise | User `manage` |
-| `createSpace` | Organization `own` | UserEvidence (superadmin) |
-| `updateSpace` | Space `own` (a space owner, or an org owner through `space.own → org.own`) | UserEvidence (superadmin) |
+| `createSpace` | Organization `own` | The platform (superadmin) |
+| `updateSpace` | Space `own` (a space owner, or an org owner through `space.own → org.own`) | The platform (superadmin) |
 | `transferSpace` | Space: `own` on the space's organization (`{ rel: 'sourceSpace.organization', action: 'own' }`) | Organization `own` |
 
 `updateSpace` and `transferSpace` differ intentionally. `updateSpace` asks `own` on the space, which an org owner also holds. `transferSpace` is a rule with a dot-path `rel` to the space's organization, so the check is `own` on the organization itself: a space owner alone cannot transfer it.
@@ -354,7 +354,7 @@ Each mutation uses the include that matches what its caller needs:
 |--------|--------------------|
 | `read` | Party-wide, whatever the type: the user on either side (`read`), or `manage` on the organization or space on either side (`INQUIRY_READ_LEVELS`) |
 | `send` | The source party's declared `send` level for that type (table above) |
-| `resolve` | The target party's declared `resolve` level for that type; a UserEvidence (`admin`) target has no relation, so only a superadmin resolves it |
+| `resolve` | The target party's declared `resolve` level for that type; a platform (`admin`) target has no relation, so only a superadmin resolves it |
 
 `db:inquiry` is the `inquiry` object built by `inquiryPermission(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
 
@@ -439,7 +439,7 @@ Each handler that resolves in a list (e.g. `transferSpace` received by an org) m
 ```typescript
 // packages/ui/src/hooks/useInquiryPermission.ts
 useInquiryPermission(
-  inquiry: InquirySentItem | InquiryReceivedItem,
+  inquiry: CheckableInquiry, // { type, sourceModel, targetModel, content? }: a stored inquiry, or a draft
   action: ActionRule,
   side: 'source' | 'target',
 ): boolean
@@ -447,10 +447,12 @@ useInquiryPermission(
 
 Side-aware permission check. `side` determines which side of the inquiry the current tenant context fills:
 
-- `'source'` — fills `sourceOrganization` / `sourceSpace` from tenant context (used in sent-list views)
-- `'target'` — fills `targetOrganization` / `targetSpace` from tenant context (used in received-list views)
+- `'source'` — fills `sourceUser` / `sourceOrganization` / `sourceSpace` from tenant context (used in sent-list views and send forms)
+- `'target'` — fills `targetUser` / `targetOrganization` / `targetSpace` from tenant context (used in received-list views)
 
 The inquiry object carries the other side's FK data. This is needed because inquiries only partially hydrate relations in list responses (sent = targets only, received = sources only).
+
+`db:inquiry` gates every send and resolve branch on `sourceModel` / `targetModel`, so a check needs both models and the type. A form that offers sending an inquiry not yet created passes a draft (`{ type: 'transferSpace', sourceModel: 'Space', targetModel: 'Organization' }`). Where the parties come from a prop or the check runs per option (the invite form checks each role), build the record with `inquiryCheckRecord(inquiry, side, parties)` (`packages/ui/src/lib/inquiries/inquiryCheckRecord.ts`), the builder the hook uses, and pass it to `checkPermission`. Never hand-roll the record.
 
 ### UI Components
 

@@ -109,3 +109,32 @@ describe('OrganizationUsersPage: removing a member', () => {
     expect(screen.queryByLabelText('Remove member')).toBeNull();
   });
 });
+
+describe('OrganizationUsersPage: inviting a member', () => {
+  const offeredRoles = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: /Invite member/ }));
+    const select = (await screen.findByLabelText('Role')) as HTMLSelectElement;
+    return Array.from(select.options).map((option) => option.value);
+  };
+
+  it('an owner invites with every role', async () => {
+    await signInAs('owner');
+    renderPage();
+    await screen.findByText('Mallory Member');
+    expect(await offeredRoles()).toEqual(['owner', 'admin', 'member', 'viewer']);
+  });
+
+  it('an admin invites with the low roles only', async () => {
+    await signInAs('admin');
+    renderPage();
+    await screen.findByText('Mallory Member');
+    expect(await offeredRoles()).toEqual(['member', 'viewer']);
+  });
+
+  it('a member is not offered the invite', async () => {
+    await signInAs('member');
+    renderPage();
+    await screen.findByText('Mallory Member');
+    expect(screen.queryByRole('button', { name: /Invite member/ })).toBeNull();
+  });
+});
