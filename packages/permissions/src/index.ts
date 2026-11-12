@@ -18,7 +18,12 @@ export {
   UserAction,
   wellFormedEntitlements,
 } from './client';
-export { entitlementsOf, toEntitlementEntry, toEntitlementInput } from './entitlementRows';
+export {
+  entitlementsOf,
+  sameEntitlement,
+  toEntitlementEntry,
+  toEntitlementInput,
+} from './entitlementRows';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { INQUIRY_TYPES, type InquiryParty, type InquiryTypeParties } from './rebac/inquiryTypes';

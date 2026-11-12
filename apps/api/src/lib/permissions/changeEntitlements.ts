@@ -19,6 +19,7 @@ import {
   coversEntitlement,
   entitlementsOf,
   type Permix,
+  sameEntitlement,
   toEntitlementEntry,
   toEntitlementInput,
 } from '@template/permissions';
@@ -52,15 +53,14 @@ type Granted = Pick<
 
 const sameLens = (left: Granted, right: Granted) => isEqual(left.lens ?? null, right.lens ?? null);
 
-const sameGrant = (left: Granted, right: Granted) =>
-  isEqual(toEntitlementEntry(left), toEntitlementEntry(right));
-
 const covers = (holding: Granted, input: Granted) =>
   sameLens(holding, input) &&
   coversEntitlement(toEntitlementEntry(holding), toEntitlementEntry(input));
 
 const lastOfEqual = (add: EntitlementInput[]): EntitlementInput[] =>
-  add.filter((input, index) => !add.slice(index + 1).some((later) => sameGrant(later, input)));
+  add.filter(
+    (input, index) => !add.slice(index + 1).some((later) => sameEntitlement(later, input)),
+  );
 
 // why: rows are immutable, so a held row a new entry covers stays; only the new entries are filtered.
 const uncovered = (held: Granted[], added: EntitlementInput[]): EntitlementInput[] =>
@@ -102,7 +102,7 @@ export const changeEntitlements = (
             !removedIds.includes(row.id) &&
             entitlementsOf({ targetEntitlements: [row] }).length > 0,
         ),
-        (row) => written.some((input) => sameGrant(row, input) && !sameLens(row, input)),
+        (row) => written.some((input) => sameEntitlement(row, input) && !sameLens(row, input)),
       );
       const tombstonedIds = [...removedIds, ...replaced.map((row) => row.id)];
       const removed = holder.targetEntitlements.filter((row) => tombstonedIds.includes(row.id));
