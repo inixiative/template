@@ -239,6 +239,8 @@ export const PolymorphismRegistry = {
           Flow: ['targetFlowId'],
           AuthProvider: ['targetAuthProviderId'],
           WebhookSubscription: ['targetWebhookSubscriptionId'],
+          FeatureFlag: ['targetFeatureFlagId'],
+          FeatureFlagVariant: ['targetFeatureFlagVariantId'],
         },
       },
     ],

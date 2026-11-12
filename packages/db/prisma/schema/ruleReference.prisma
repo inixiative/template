@@ -54,6 +54,8 @@ model RuleReference {
   targetFlowId                String?                  @db.VarChar(36)
   targetAuthProviderId        String?                  @db.VarChar(36)
   targetWebhookSubscriptionId String?                  @db.VarChar(36)
+  targetFeatureFlagId         String?                  @db.VarChar(36)
+  targetFeatureFlagVariantId  String?                  @db.VarChar(36)
 
   // Snapshot of the target row's deletedAt, maintained by ruleReference:target. One scalar
   // copied across one hop, so a reader answers "is this rule degraded" from the edge alone rather
@@ -82,6 +84,8 @@ model RuleReference {
   targetFlow                Flow?                @relation("RuleReferenceTarget", fields: [targetFlowId], references: [id])
   targetAuthProvider        AuthProvider?        @relation("RuleReferenceTarget", fields: [targetAuthProviderId], references: [id])
   targetWebhookSubscription WebhookSubscription? @relation("RuleReferenceTarget", fields: [targetWebhookSubscriptionId], references: [id])
+  targetFeatureFlag         FeatureFlag?         @relation("RuleReferenceTarget", fields: [targetFeatureFlagId], references: [id])
+  targetFeatureFlagVariant  FeatureFlagVariant?  @relation("RuleReferenceTarget", fields: [targetFeatureFlagVariantId], references: [id])
 
   // Edge identity, on the plain columns: one unique whatever the source model, so a new source
   // model needs no new constraint.
@@ -107,6 +111,8 @@ model RuleReference {
   @@index([targetFlowId])
   @@index([targetAuthProviderId])
   @@index([targetWebhookSubscriptionId])
+  @@index([targetFeatureFlagId])
+  @@index([targetFeatureFlagVariantId])
 }
 
 enum RuleReferenceSourceModel {
@@ -137,6 +143,8 @@ enum RuleReferenceTargetModel {
   Flow
   AuthProvider
   WebhookSubscription
+  FeatureFlag
+  FeatureFlagVariant
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific referenceable models below
