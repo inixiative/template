@@ -57,7 +57,8 @@ function RecordingIntersectionObserver(callback: IntersectionObserverCallback) {
 }
 
 const scrollToEnd = (container: HTMLElement) => {
-  const sentinel = container.querySelector('[aria-hidden="true"]:last-of-type');
+  // why: an icon's svg is aria-hidden too once its set has loaded, so only the direct child is the sentinel.
+  const sentinel = container.querySelector(':scope > div[aria-hidden="true"]');
   for (const { callback, targets } of observers) {
     if (!sentinel || !targets.has(sentinel)) continue;
     act(() =>
