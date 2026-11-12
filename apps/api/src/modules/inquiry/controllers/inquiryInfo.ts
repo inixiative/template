@@ -4,6 +4,7 @@
  * @partOf feature:inquiry
  * @uses primitive:routeTemplates
  */
+import { INQUIRY_TYPES } from '@template/permissions';
 import { mapValues } from 'lodash-es';
 import { schemaGuide } from '#/lib/jsonSchema/schemaGuide';
 import { toJsonSchema } from '#/lib/jsonSchema/toJsonSchema';
@@ -17,9 +18,9 @@ const guide = schemaGuide(inquiryInfoResponseSchema);
 export const inquiryInfoController = makeController(inquiryInfoRoute, async (_c, respond) => {
   return respond.ok({
     guide,
-    types: mapValues(inquiryHandlers, (handler) => ({
-      sources: handler.sources.map(({ sourceModel }) => sourceModel),
-      targets: handler.targets.map(({ targetModel }) => targetModel),
+    types: mapValues(inquiryHandlers, (handler, type: keyof typeof INQUIRY_TYPES) => ({
+      sources: INQUIRY_TYPES[type].sources.map(({ model }) => model),
+      targets: INQUIRY_TYPES[type].targets.map(({ model }) => model),
       unique: handler.unique ?? null,
       defaultExpirationDays: handler.defaultExpirationDays ?? null,
       content: toJsonSchema(handler.contentSchema, 'input'),

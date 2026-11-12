@@ -4,32 +4,38 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { HydratedRecord } from '@template/db';
+import type { InquirySide } from '@template/permissions/rebac/inquiryPermission';
 import type { ActionRule } from '@template/permissions/rebac/types';
-import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
 import { checkPermission } from '@template/ui/hooks/usePermission';
+import {
+  type CheckableInquiry,
+  type InquiryPartyContext,
+  inquiryCheckRecord,
+} from '@template/ui/lib/inquiries/inquiryCheckRecord';
 import { useAppStore } from '@template/ui/store';
 
-export const useInquiryPermission = (
-  inquiry: InquirySentItem | InquiryReceivedItem,
-  action: ActionRule,
-  side: 'source' | 'target',
-): boolean => {
-  const permissions = useAppStore((state) => state.permissions);
+const useInquiryPartyContext = (): InquiryPartyContext => {
   const context = useAppStore((state) => state.tenant.context);
   const user = useAppStore((state) => state.auth.user);
+  const organization = context.organization ? { id: context.organization.id } : undefined;
+  return {
+    user: user ? { id: user.id } : undefined,
+    organization,
+    space: context.space ? { id: context.space.id, organization } : undefined,
+  };
+};
 
-  const me = user ? { id: user.id } : undefined;
-  const org = context.organization ? { id: context.organization.id } : undefined;
-  const space = context.space ? { id: context.space.id, organization: org } : undefined;
-
-  // Fill only the side the current context occupies; the inquiry carries the other side's data.
-  const contextFill =
-    side === 'source'
-      ? { sourceUser: me, sourceOrganization: org, sourceSpace: space }
-      : { targetUser: me, targetOrganization: org, targetSpace: space };
-
-  const hydrated = { ...contextFill, ...inquiry };
-
-  return checkPermission(permissions, 'inquiry', hydrated as unknown as HydratedRecord, action);
+export const useInquiryPermission = (
+  inquiry: CheckableInquiry,
+  action: ActionRule,
+  side: InquirySide,
+): boolean => {
+  const permissions = useAppStore((state) => state.permissions);
+  const parties = useInquiryPartyContext();
+  return checkPermission(
+    permissions,
+    'inquiry',
+    inquiryCheckRecord(inquiry, side, parties),
+    action,
+  );
 };

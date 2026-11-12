@@ -29,6 +29,7 @@ import { useCreateInquiryMutation } from '@template/ui/hooks/inquiry/useCreateIn
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
+import { inquiryCheckRecord } from '@template/ui/lib/inquiries/inquiryCheckRecord';
 import { useAppStore } from '@template/ui/store';
 
 type OrganizationUser = OrganizationReadManyUsersResponse['data'][number];
@@ -47,15 +48,16 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     checkPermission(
       permissions,
       'inquiry',
-      {
-        id: '',
-        type: 'inviteOrganizationUser',
-        content: { role },
-        sourceOrganization: { id: organizationId } as HydratedRecord,
-        sourceOrganizationId: organizationId,
-        sourceSpaceId: '',
-        targetOrganizationId: '',
-      } as unknown as HydratedRecord,
+      inquiryCheckRecord(
+        {
+          type: 'inviteOrganizationUser',
+          sourceModel: 'Organization',
+          targetModel: 'User',
+          content: { role },
+        },
+        'source',
+        { organization: { id: organizationId } },
+      ),
       'send',
     ),
   );

@@ -36,8 +36,6 @@ export type InquiryHandler<
   TResolution extends Record<string, unknown> = BaseResolution,
   TResolutionInput extends Record<string, unknown> = BaseResolution,
 > = {
-  sources: { sourceModel: InquiryResourceModel }[];
-  targets: { targetModel: InquiryResourceModel }[];
   contentSchema: z.ZodType<TContent>;
   resolutionInputSchema: z.ZodType<TResolutionInput>;
   resolutionSchema: z.ZodType<TResolution>;

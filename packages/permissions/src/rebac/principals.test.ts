@@ -39,6 +39,8 @@ const tokenOf = (id: string, user: { id: string }) => ({ id, userId: user.id, us
 const inquiryTo = (target: { id: string }, source: { id: string }) => ({
   id: 'q1',
   type: 'inviteOrganizationUser',
+  sourceModel: 'Organization',
+  targetModel: 'User',
   content: { role: 'member' },
   sourceUserId: source.id,
   sourceUser: source,

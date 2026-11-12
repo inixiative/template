@@ -1,5 +1,5 @@
 import { db } from '@template/db';
-import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
+import { InquiryType } from '@template/db/generated/client/enums';
 import {
   baseResolutionInputSchema,
   type UpdateSpaceContent,
@@ -37,8 +37,6 @@ const validate = async (inquiry: Partial<Inquiry>, content: UpdateSpaceContent):
 };
 
 export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
-  sources: [{ sourceModel: InquiryResourceModel.Space }],
-  targets: [{ targetModel: InquiryResourceModel.admin }],
   contentSchema: updateSpaceContentSchema,
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,

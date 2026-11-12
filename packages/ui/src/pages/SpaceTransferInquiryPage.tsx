@@ -4,7 +4,6 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { HydratedRecord } from '@template/db';
 import {
   spaceCreateInquiry,
   spaceSentManyInquiries,
@@ -20,8 +19,7 @@ import {
   Page,
 } from '@template/ui/components';
 import { InquirySourceControls } from '@template/ui/components/inquiries';
-import { useCreateInquiryMutation, useQuery } from '@template/ui/hooks';
-import { checkPermission } from '@template/ui/hooks/usePermission';
+import { useCreateInquiryMutation, useInquiryPermission, useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { INQUIRY_STATUS_COLORS, isTerminalInquiry } from '@template/ui/lib/inquiries/queryKeys';
 import { useAppStore } from '@template/ui/store';
@@ -30,7 +28,6 @@ import { useState } from 'react';
 
 export const SpaceTransferInquiryPage = () => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
-  const permissions = useAppStore((state) => state.permissions);
   const spaceId = context.space!.id;
   const organizationId = context.organization?.id ?? '';
 
@@ -48,21 +45,10 @@ export const SpaceTransferInquiryPage = () => {
 
   const createMutation = useCreateInquiryMutation();
 
-  const canRequestTransfer = checkPermission(
-    permissions,
-    'inquiry',
-    {
-      id: '',
-      type: 'transferSpace',
-      sourceSpaceId: spaceId,
-      sourceOrganizationId: organizationId,
-      targetOrganizationId: '',
-      sourceSpace: {
-        id: spaceId,
-        organization: { id: organizationId } as HydratedRecord,
-      } as HydratedRecord,
-    } as unknown as HydratedRecord,
+  const canRequestTransfer = useInquiryPermission(
+    { type: 'transferSpace', sourceModel: 'Space', targetModel: 'Organization' },
     'send',
+    'source',
   );
 
   const handleSubmit = () => {

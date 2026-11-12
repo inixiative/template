@@ -1,6 +1,6 @@
 import { db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
-import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
+import { Role } from '@template/db/generated/client/enums';
 import {
   baseResolutionInputSchema,
   type TransferSpaceContent,
@@ -13,8 +13,6 @@ import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
 import { validateSpaceSlugFree } from '#/modules/inquiry/validations/validateSpaceSlugFree';
 
 export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
-  sources: [{ sourceModel: InquiryResourceModel.Space }],
-  targets: [{ targetModel: InquiryResourceModel.Organization }],
   contentSchema: transferSpaceContentSchema,
   resolutionInputSchema: transferSpaceResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
