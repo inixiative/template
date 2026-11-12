@@ -124,7 +124,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     expect(stored.status).toBe(InquiryStatus.sent);
     expect(stored.sentAt).not.toBeNull();
     expect(stored.expiresAt).not.toBeNull();
-    expect(stored.content).toEqual({ organizationId: org.id, role: 'admin' });
+    expect(stored.content).toEqual({ role: 'admin' });
   });
 
   it('unsends a sent inquiry back to draft', async () => {

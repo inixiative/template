@@ -35,10 +35,10 @@ export const resolveInquiry = async (
       const fresh = await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt);
       validateInquiryIsResolvable(fresh);
 
+      const handler = inquiryHandlers[fresh.type];
       let approvalOutput: Record<string, unknown> = {};
 
       if (status === InquiryStatus.approved) {
-        const handler = inquiryHandlers[fresh.type];
         const content = handler.contentSchema.parse(fresh.content);
         const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
         approvalOutput = (await handler.handleApprove(fresh, merged)) ?? {};
@@ -51,7 +51,10 @@ export const resolveInquiry = async (
         where: { id: fresh.id },
         data: {
           status,
-          resolution: { ...resolutionData, ...approvalOutput } as Prisma.InputJsonValue,
+          resolution: handler.resolutionSchema.parse({
+            ...resolutionData,
+            ...approvalOutput,
+          }) as Prisma.InputJsonValue,
           expiresAt,
         },
         include: includeInquiryReceived,

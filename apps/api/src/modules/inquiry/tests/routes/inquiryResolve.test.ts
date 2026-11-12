@@ -90,6 +90,33 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
     expect(data.targetUser).toBeUndefined();
   });
 
+  it('stores the resolution through its schema, dropping keys it does not define', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { role: 'member' },
+    });
+
+    const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
+    const response = await targetFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+        explanation: 'Not now',
+        role: 'owner',
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(stored.resolution).toEqual({ explanation: 'Not now' });
+  });
+
   it('sets status to denied', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
