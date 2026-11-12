@@ -47,13 +47,13 @@ done <<< "$test_files"
 exit_code=0
 
 if [[ "${#never_cleared[@]}" -gt 0 ]]; then
-  echo "Test files register db hooks but never clear them (clearHookRegistry in afterEach/afterAll):"
+  echo "Test files register db hooks but never remove them (unregisterDbHook by name in the test that registered it; clearHookRegistry in afterEach in packages/db tests; docs/claude/TESTING.md, Hooks in tests):"
   printf '  %s\n' "${never_cleared[@]}"
   exit_code=1
 fi
 
 if [[ "${#at_import[@]}" -gt 0 ]]; then
-  echo "Test files register db hooks at import time; register in beforeEach/beforeAll instead:"
+  echo "Test files register db hooks at import time, where the per-test restore removes them (register a test-only hook in the test that needs it, or in beforeEach, never beforeAll; docs/claude/TESTING.md, Hooks in tests):"
   printf '  %s\n' "${at_import[@]}"
   exit_code=1
 fi
