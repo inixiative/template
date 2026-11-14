@@ -47,11 +47,18 @@ const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
 };
 
 // why: rows are immutable, so a held row a new entry covers stays; only the new entries are filtered.
-const uncovered = (held: EntitlementEntry[], added: EntitlementEntry[]): EntitlementEntry[] =>
+const uncovered = (held: EntitlementEntry[], added: EntitlementInput[]): EntitlementInput[] =>
   added.filter(
-    (entry, index) =>
-      ![...held, ...added.slice(0, index)].some((holding) => coversEntitlement(holding, entry)),
+    (input, index) =>
+      ![...held, ...added.slice(0, index).map(toEntitlementEntry)].some((holding) =>
+        coversEntitlement(holding, toEntitlementEntry(input)),
+      ),
   );
+
+const asStored = (input: EntitlementInput): EntitlementInput => ({
+  ...toEntitlementInput(toEntitlementEntry(input)),
+  ...(input.lens != null ? { lens: input.lens } : {}),
+});
 
 /**
  * The one writer of a target's entitlements: every added entry and every removed row passes the
@@ -96,7 +103,7 @@ export const changeEntitlements = (
       const kept = entitlementsOf({
         targetEntitlements: holder.targetEntitlements.filter((row) => !removedIds.includes(row.id)),
       });
-      const added = uncovered(kept, addedEntries);
+      const added = uncovered(kept, add);
 
       if (removed.length)
         await db.entitlement.updateManyAndReturn({
@@ -106,7 +113,7 @@ export const changeEntitlements = (
       if (added.length)
         await db.entitlement.createManyAndReturn({
           data: toEntitlementCreateData(
-            added.map(toEntitlementInput),
+            added.map(asStored),
             { model: target.model, row: holder },
             anchors,
           ),
