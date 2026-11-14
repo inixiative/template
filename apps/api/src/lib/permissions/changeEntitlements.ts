@@ -17,13 +17,13 @@ import {
 import type { Entitlement } from '@template/db/generated/client/client';
 import {
   coversEntitlement,
-  type EntitlementEntry,
   entitlementsOf,
   type Permix,
+  sameEntitlement,
   toEntitlementEntry,
   toEntitlementInput,
 } from '@template/permissions';
-import { partition, uniq } from 'lodash-es';
+import { isEqual, partition, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
@@ -46,17 +46,41 @@ const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
   return holder;
 };
 
-// why: rows are immutable, so a held row a new entry covers stays; only the new entries are filtered.
-const uncovered = (held: EntitlementEntry[], added: EntitlementEntry[]): EntitlementEntry[] =>
-  added.filter(
-    (entry, index) =>
-      ![...held, ...added.slice(0, index)].some((holding) => coversEntitlement(holding, entry)),
+type Granted = Pick<
+  EntitlementInput,
+  'resource' | 'actions' | 'where' | 'sourceModel' | 'sourceId' | 'sourcePath' | 'lens'
+>;
+
+const sameLens = (left: Granted, right: Granted): boolean =>
+  isEqual(left.lens ?? null, right.lens ?? null);
+
+// why: no lens is the full surface, so a held row without one covers whatever lens the entry has.
+const covers = (holding: Granted, input: Granted) =>
+  (holding.lens == null || sameLens(holding, input)) &&
+  coversEntitlement(toEntitlementEntry(holding), toEntitlementEntry(input));
+
+const lastOfEqual = (add: EntitlementInput[]): EntitlementInput[] =>
+  add.filter(
+    (input, index) => !add.slice(index + 1).some((later) => sameEntitlement(later, input)),
   );
+
+// why: rows are immutable, so a held row a new entry covers stays; only the new entries are filtered.
+const uncovered = (held: Granted[], added: EntitlementInput[]): EntitlementInput[] =>
+  added.filter(
+    (input, index) =>
+      ![...held, ...added.slice(0, index)].some((holding) => covers(holding, input)),
+  );
+
+const asStored = (input: EntitlementInput): EntitlementInput => ({
+  ...toEntitlementInput(toEntitlementEntry(input)),
+  ...(input.lens != null ? { lens: input.lens } : {}),
+});
 
 /**
  * The one writer of a target's entitlements: every added entry and every removed row passes the
- * grant check, and entries already covered are skipped. A target left with no rows holds nothing.
- * Rows never change; a removal is a soft delete, so each row's audit entry is its own.
+ * grant check, and entries a held row covers (with no lens, or the same lens) are skipped. A held row equal to an
+ * added entry but for its lens is replaced: one grant holds one lens. A target left with no rows
+ * holds nothing. Rows never change; a removal is a soft delete, so each row's audit entry is its own.
  */
 export const changeEntitlements = (
   writer: Permix,
@@ -67,46 +91,56 @@ export const changeEntitlements = (
     withOwnerLock({ ownerModel: target.model, ownerId: target.id }, 'entitlements', async () => {
       const holder = await liveRows(target);
       const removedIds = uniq(remove);
-      const removed = holder.targetEntitlements.filter((row) => removedIds.includes(row.id));
-      if (removed.length !== removedIds.length)
+      if (
+        holder.targetEntitlements.filter((row) => removedIds.includes(row.id)).length !==
+        removedIds.length
+      )
         throw makeError({ status: 404, message: 'Entitlement not found on this holder' });
+
+      const written = lastOfEqual(add);
+      const [replaced, kept] = partition(
+        holder.targetEntitlements.filter(
+          (row) =>
+            !removedIds.includes(row.id) &&
+            entitlementsOf({ targetEntitlements: [row] }).length > 0,
+        ),
+        (row) => written.some((input) => sameEntitlement(row, input) && !sameLens(row, input)),
+      );
+      const tombstonedIds = [...removedIds, ...replaced.map((row) => row.id)];
+      const removed = holder.targetEntitlements.filter((row) => tombstonedIds.includes(row.id));
 
       const checked = removed.filter((row) => !anchorIsHardDeleted(row));
       const [anchoredLive, anchoredDeleted] = partition(
         checked,
         (row) => row.sourceDeletedAt == null,
       );
-      const anchors = await loadEntitlementAnchors(add);
-      const [missing] = missingAnchors(add, anchors);
+      const anchors = await loadEntitlementAnchors(written);
+      const [missing] = missingAnchors(written, anchors);
       if (missing)
         throw makeError({
           status: 422,
           message: `${missing.sourceModel} ${missing.sourceId} not found`,
         });
 
-      const addedEntries = add.map(toEntitlementEntry);
       await validateEntitlementGrants(writer, [
-        ...addedEntries,
+        ...written.map(toEntitlementEntry),
         ...anchoredLive.map(toEntitlementEntry),
       ]);
       await db.withDeleted(() =>
         validateEntitlementGrants(writer, anchoredDeleted.map(toEntitlementEntry)),
       );
 
-      const kept = entitlementsOf({
-        targetEntitlements: holder.targetEntitlements.filter((row) => !removedIds.includes(row.id)),
-      });
-      const added = uncovered(kept, addedEntries);
+      const added = uncovered(kept, written);
 
       if (removed.length)
         await db.entitlement.updateManyAndReturn({
-          where: { id: { in: removedIds }, deletedAt: null },
+          where: { id: { in: tombstonedIds }, deletedAt: null },
           data: { deletedAt: new Date() },
         });
       if (added.length)
         await db.entitlement.createManyAndReturn({
           data: toEntitlementCreateData(
-            added.map(toEntitlementInput),
+            added.map(asStored),
             { model: target.model, row: holder },
             anchors,
           ),

@@ -41,7 +41,7 @@ export const resolveInquiry = async (
       if (status === InquiryStatus.approved) {
         const content = handler.contentSchema.parse(fresh.content);
         const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
-        approvalOutput = (await handler.handleApprove(fresh, merged)) ?? {};
+        approvalOutput = (await handler.handleApprove(fresh, merged, c.get('permix'))) ?? {};
       }
 
       const expiresAt =

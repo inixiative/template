@@ -8,7 +8,11 @@ import type { Condition } from '@inixiative/json-rules';
 import type { EntitlementInput } from '@template/db/entitlements/entitlementRow';
 import type { Prisma } from '@template/db/generated/client/client';
 import type { EntitlementResourceModel } from '@template/db/generated/client/enums';
-import { type EntitlementEntry, wellFormedEntitlements } from '@template/permissions/client';
+import {
+  coversEntitlement,
+  type EntitlementEntry,
+  wellFormedEntitlements,
+} from '@template/permissions/client';
 import { lowerFirst, upperFirst } from 'lodash-es';
 
 /** A row as stored, written, or serialized to a client: what the transformer reads. */
@@ -37,6 +41,12 @@ export const toEntitlementEntry = (row: EntitlementFields): EntitlementEntry => 
   ...(row.where != null ? { where: row.where as Condition } : {}),
   actions: Object.fromEntries(row.actions.map((action) => [action, true])),
 });
+
+/** Two rows grant the same thing: same resource, anchor and path, `where` and actions. A lens is not part of it. */
+export const sameEntitlement = (left: EntitlementFields, right: EntitlementFields): boolean => {
+  const [one, other] = [toEntitlementEntry(left), toEntitlementEntry(right)];
+  return coversEntitlement(one, other) && coversEntitlement(other, one);
+};
 
 /** An entry the library hands back (a self-grant), as the row a writer stores: held actions only. */
 export const toEntitlementInput = (entry: EntitlementEntry): EntitlementInput => ({
