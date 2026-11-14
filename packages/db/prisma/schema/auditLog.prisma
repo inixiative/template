@@ -77,6 +77,12 @@ model AuditLog {
   subjectSegment          Segment?          @relation(fields: [subjectSegmentId], references: [id], onDelete: SetNull)
   subjectEntitlementId    String?           @db.VarChar(36)
   subjectEntitlement      Entitlement?      @relation("AuditLogSubjectEntitlement", fields: [subjectEntitlementId], references: [id], onDelete: SetNull)
+  subjectArtifactId       String?           @db.VarChar(36)
+  subjectArtifact         Artifact?         @relation(fields: [subjectArtifactId], references: [id], onDelete: SetNull)
+  subjectArtifactPlacementId  String?            @db.VarChar(36)
+  subjectArtifactPlacement    ArtifactPlacement? @relation(fields: [subjectArtifactPlacementId], references: [id], onDelete: SetNull)
+  subjectArtifactPermissionId String?            @db.VarChar(36)
+  subjectArtifactPermission   ArtifactPermission? @relation(fields: [subjectArtifactPermissionId], references: [id], onDelete: SetNull)
   // Composite FKs
   subjectOrganizationUser OrganizationUser? @relation("AuditLogSubjectOrganizationUser", fields: [subjectOrganizationId, subjectUserId], references: [organizationId, userId], onDelete: SetNull)
   subjectSpaceUser        SpaceUser?        @relation("AuditLogSubjectSpaceUser", fields: [subjectOrganizationId, subjectSpaceId, subjectUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
@@ -116,6 +122,9 @@ model AuditLog {
   @@index([subjectIntegrationId])
   @@index([subjectSegmentId])
   @@index([subjectEntitlementId])
+  @@index([subjectArtifactId])
+  @@index([subjectArtifactPlacementId])
+  @@index([subjectArtifactPermissionId])
 }
 
 enum AuditAction {
@@ -143,4 +152,7 @@ enum AuditSubjectModel {
   Integration
   Segment
   Entitlement
+  Artifact
+  ArtifactPlacement
+  ArtifactPermission
 }

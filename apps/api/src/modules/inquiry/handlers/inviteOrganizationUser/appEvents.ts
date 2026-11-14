@@ -6,6 +6,7 @@
  */
 import { WS_CHANNELS, type WSQueryEvent } from '@template/shared/ws';
 import type { WSHandoff } from '#/appEvents/types';
+import { ensureOrganizationUserFolder } from '#/modules/artifact/services/ensureOrganizationUserFolder';
 import type { InquiryAppEvents } from '#/modules/inquiry/handlers/types';
 
 // Refetch the inquiry's read query on every subscribed client. The channel comes from the
@@ -33,6 +34,13 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
       ];
     },
     websocket: (inquiry) => [refetchInquiry(inquiry.id)],
+    cb: [
+      async (inquiry) => {
+        if (inquiry.sourceOrganizationId && inquiry.targetUserId) {
+          await ensureOrganizationUserFolder(inquiry.sourceOrganizationId, inquiry.targetUserId);
+        }
+      },
+    ],
   },
   resolved: {
     websocket: (inquiry) => [refetchInquiry(inquiry.id)],

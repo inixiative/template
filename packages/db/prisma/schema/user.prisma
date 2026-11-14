@@ -58,6 +58,10 @@ model User {
 
   emailTemplates  EmailTemplate[]
   emailComponents EmailComponent[]
+
+  ownedArtifacts   Artifact[]           @relation("ArtifactOwnerUser")
+  artifactGrants   ArtifactPermission[] @relation("ArtifactPermissionGranteeUser")
+  resourceBindings ResourceBinding[] @relation("ResourceBindingUser")
 }
 
 enum PlatformRole {

@@ -1,3 +1,4 @@
+import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
@@ -9,6 +10,7 @@ import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerMemberSelfGrantHook } from '#/hooks/memberSelfGrant/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
+import { registerOrganizationUserFolderHook } from '#/hooks/organizationUserFolder/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
@@ -27,6 +29,7 @@ export const registerHooks = () => {
   registerFullDelegateHook();
   registerMemberSelfGrantHook();
   registerRulesHook();
+  registerArtifactAccessHook();
   registerAuditLogHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();
@@ -35,6 +38,7 @@ export const registerHooks = () => {
   registerCronJobSyncHook();
   registerImmutableFieldsHook();
   registerOrderedListHook();
+  registerOrganizationUserFolderHook();
   registerPreventHardDeleteHook();
   registerRuleReferenceHook();
   registerRuleReferenceTargetHook();

@@ -72,6 +72,18 @@ export const INQUIRY_TYPES = {
     sources: [{ model: 'Space', send: 'own' }],
     targets: [{ model: 'admin' }],
   },
+  transferArtifact: {
+    sources: [
+      { model: 'User', send: 'manage' },
+      { model: 'Organization', send: 'manage' },
+      { model: 'Space', send: 'manage' },
+    ],
+    targets: [
+      { model: 'User', resolve: 'manage' },
+      { model: 'Organization', resolve: 'manage' },
+      { model: 'Space', resolve: 'manage' },
+    ],
+  },
   transferSpace: {
     sources: [{ model: 'Space', send: { rel: 'sourceSpace.organization', action: 'own' } }],
     targets: [{ model: 'Organization', resolve: 'own' }],

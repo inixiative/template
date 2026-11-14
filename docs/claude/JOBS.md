@@ -38,6 +38,7 @@
   - [Queue Depth Probe](#queue-depth-probe)
   - [Overflow Configuration](#overflow-configuration)
 - [Cron Jobs](#cron-jobs)
+  - [System Cron Jobs (seeded)](#system-cron-jobs-seeded)
   - [Cron Patterns (UTC)](#cron-patterns-utc)
   - [CronJob Model](#cronjob-model)
   - [Admin Routes](#admin-routes)

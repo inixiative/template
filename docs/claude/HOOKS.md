@@ -119,6 +119,8 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 
 | Hook | Purpose |
 |------|---------|
+| `artifactAccess` | An Artifact's `type` is set from its kind and its `access` at creation is its kind's default when it is `inherit` or unset; refuses a kind the catalog does not know ([ARTIFACTS.md](ARTIFACTS.md)) |
+| `organizationUserFolder` | Creates a member's `organizationUserFolder` when an OrganizationUser is created (`ensureOrganizationUserFolder`; the invite `sent` callback creates it earlier) |
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
 | `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
@@ -238,13 +240,14 @@ Automatic webhook delivery on database mutations.
 // packages/db/src/registries/webhook/enabledModels.ts
 export const webhookEnabledModels: WebhookModel[] = [
   WebhookModel.CustomerRef,
+  WebhookModel.Artifact,
 ];
 ```
 
 ### How It Works
 
-1. A mutation runs the `webhookDelivery` hook (after the write; jobs are scheduled with `db.onCommit`). It acts when the model is webhook-enabled, or when `webhookRelatedModels` lists it as a party of one
-2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRef's parties are its customer and its provider. A related row (a User, Organization or Space) takes the counterparty of every live CustomerRef it sits on, on either axis
+1. A mutation runs the `webhookDelivery` hook (after the write; jobs are scheduled with `db.onCommit`). It acts when the model is webhook-enabled, or when `webhookRelatedModels` lists it as a party of one or as a child of one
+2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRef's parties are its customer and its provider. A related row (a User, Organization or Space) takes the counterparty of every live CustomerRef it sits on, on either axis. A model listed in `webhookGrantedAudiences` (`apps/api/src/hooks/webhooks/audiences.ts`) takes its parties from that resolver instead of its axes: an Artifact reaches its owner and its grantees, through its containers, and owners-only org-user content reaches no org-level subscription
 3. It loads only the active subscriptions owned by those parties, and enqueues one `sendWebhook` job per (subscription, changed row), skipping the write's origin integration and no-op updates
 4. The job signs the payload with RSA-SHA256 and delivers it
 
@@ -326,7 +329,7 @@ Use cases:
 
 ### Related Models
 
-A party's own row changes reach its counterparties on its CustomerRefs. Each party model is registered on both axes:
+A party's own row changes reach its counterparties on its CustomerRefs, and a child row's change fires its parent's webhook. Party models are registered on both axes; a child names its parent model:
 
 ```typescript
 // packages/db/src/registries/webhook/relatedModels.ts
@@ -335,10 +338,16 @@ export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
     { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
     { model: 'CustomerRef', axis: 'providerModel', value: 'User' },
   ],
+  ArtifactPermission: ['Artifact'],
+  ArtifactPlacement: ['Artifact'],
 };
 ```
 
 Private fields of a party stay off the row (a settings or config table that is not related), or are dropped from webhooks in `WEBHOOK_NOOP_FIELDS` (`User.platformRole`). A change that touches only dropped fields emits nothing.
+
+- A **direct model ref** (`'Artifact'`) is a child → parent edge. The hook follows the child's foreign keys to that model (an `ArtifactPlacement` has two, so both ends fire), loads the parents and delivers an `update` of each parent to the parent's audience: the event is the **parent** record, not the child row.
+- `webhookRelatedRowAudiences` adds the parties a child row names that the parent's audience may no longer hold: a deleted `ArtifactPermission`'s grantee still hears its revocation.
+- The event names the node that changed. A receiver that needs a container's members fans out itself.
 
 ---
 
