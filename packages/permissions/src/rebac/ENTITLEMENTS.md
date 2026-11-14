@@ -18,7 +18,15 @@ The examples use one cast: user U1, organization O1, space S1 under O1, M1 U1's 
 - **`resource`** is the model the action is checked on. The action is always checked on that record, never asked of the anchor.
 - **`anchor`** is the record the entitlement acts from. `path` names the relations from the entitled record up to the anchor, following the Prisma relation names (`'organization'`, `'space.organization'`, `'user'`). A record anchored at itself has no `path`. Only the anchor's id is fixed: a record that moves inside the anchor stays reached, one that moves out stops.
 - **`where`** is a positive json-rules condition over the record: no negation, `isEmpty`, `notExists`, `if`/`then`/`else`, array or aggregate rule. "No value" is `equals null`. A single row is `where: { field: 'id', … }`, never an `id` beside the anchor.
-- **`actions`** are booleans; a row stores the names of the ones held. Readers prune entries to the well-formed ones, and an entry another one already covers is dropped; the writer skips adding an entry one the holder holds already covers.
+- **`actions`** are booleans; a row stores the names of the ones held. Readers prune entries to the well-formed ones, and an entry another one already covers is dropped; the writer skips adding an entry a held row with no lens, or the same lens, already covers.
+
+## The lens
+
+A stored row may also carry a `lens` (`Entitlement.lens`, a json-rules lens narrowing). It is not part of the entry above and the library never reads it: the check decides what the grant reaches, and the lens shapes what the holder gets from what it reaches. It is one narrowing and one surface at once: it limits the records the holder sees (root `where` filters) and the shape they come back in (picks and omits, to drop sensitive keys). No lens means the resource's full surface.
+
+**One grant holds one lens** (Aron, 2026-11-12). Two rows that are equal but for their lens (same holder, `resource`, anchor and path, `where` and `actions`) never coexist: writing one with a new lens replaces the held row, a soft delete of the old one plus a create, in the same write (the create is skipped when another held row with the new lens covers it). No lens and a lens are different lenses, so either replaces the other. Why: two lenses on one grant have no defined meaning; neither their union nor the broader one is right. A held row covers a new entry (and the new entry is skipped) when it has no lens or the same lens: no lens is the full surface, so it reaches whatever a lensed entry would.
+
+**A lens is never copied down a delegation** (Aron, 2026-11-14). Lenses narrow monotonically: a delegate's row stores only its own narrowing, and what the delegate gets is its lens composed over every lens above it in the chain. Copying the lens above would be redundant at best, and a stale copy when the one above changes. Nothing in template reads `Entitlement.lens` yet; the reader that does must compose up the chain, or a delegate escapes the narrowing above it, since the grant check never reads the lens.
 
 ## Writing one
 
@@ -64,7 +72,7 @@ Every entitlement is installed with an owner, and holds an action on a record on
 
 ## Granting one
 
-Entitlements are read on their holder (`targetEntitlements`, the rows as stored) and change only through its sub-resource: `POST …/:id/entitlements` with an array of rows grants them, `DELETE …/:id/entitlements` with an array of row ids removes them, both through the one writer (`changeEntitlements`). Each row becomes the library's entry at this boundary (`toEntitlementEntry`, `packages/permissions/src/entitlementRows.ts`). Every added entry, and every removed row, is one check: `placeEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action, or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
+Entitlements are read on their holder (`targetEntitlements`, the rows as stored) and change only through its sub-resource: `POST …/:id/entitlements` with an array of rows grants them, `DELETE …/:id/entitlements` with an array of row ids removes them, both through the one writer (`changeEntitlements`). Each row becomes the library's entry at this boundary (`toEntitlementEntry`, `packages/permissions/src/entitlementRows.ts`). Every added entry, and every removed row, is one check: `placeEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action, or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Narrowed has one form: the entry's `where` is an `all` holding every conjunct of the held `where` plus more (held `C`, granted `all: [A, B, C]`; held `all: [C1, C2]`, granted `all: [A, C1, C2]`). Anything else is refused. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
 
 ## The standard chain
 
@@ -85,7 +93,7 @@ A rule that only walks to the owner for the same action (`{ rel: 'organization',
 - **Reading.** An entitlement answers every action its held action implies through the chain, while whoever backs it can still do that action: a `manage` entitlement whose backer is down to `read` still reads. Every side of a cross-tenant chain is asked the same action.
 - **Lowering.** Whoever holds an entitlement can pass on a copy with lower actions: each granted action must reach a held one through the chain.
 - **Capping.** A delegate holds its owner's role entries capped at its own role (`capAtRole`), never its owner's entitlements: those it holds only when given them, or when it is `full`.
-- **Copying.** A copy, or a copy with a narrower `where`, is checked against what the holder holds through the same chain.
+- **Copying.** An exact copy, or a copy whose `where` is `all` of the held `where`'s conjuncts and more, is checked against what the holder holds through the same chain. The lens is never part of the copy ([the lens](#the-lens)).
 
 ## Models that are not standard
 

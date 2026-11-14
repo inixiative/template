@@ -3,6 +3,7 @@ import { Operator } from '@inixiative/json-rules';
 import type { EntitlementEntry } from '@template/permissions/client';
 import {
   entitlementsOf,
+  sameEntitlement,
   toEntitlementEntry,
   toEntitlementInput,
 } from '@template/permissions/entitlementRows';
@@ -60,5 +61,17 @@ describe('a row is the entry it stores, exactly (Aron, 2026-11-10)', () => {
     ]);
     expect(entitlementsOf({})).toEqual([]);
     expect(entitlementsOf({ targetEntitlements: null })).toEqual([]);
+  });
+});
+
+describe('one grant, one lens (Aron, 2026-11-12)', () => {
+  it('rows are the same grant when resource, anchor, path, where and actions match, whatever their lens or action order', () => {
+    const row = toEntitlementInput(pathAndWhere);
+    const lensed = { ...row, actions: [...row.actions].reverse(), lens: { fields: ['id'] } };
+    expect(sameEntitlement(row, lensed)).toBe(true);
+    expect(sameEntitlement(row, { ...row, sourcePath: null })).toBe(false);
+    expect(sameEntitlement(row, { ...row, where: null })).toBe(false);
+    expect(sameEntitlement(row, { ...row, actions: ['read'] })).toBe(false);
+    expect(sameEntitlement(row, { ...row, sourceId: 'other' })).toBe(false);
   });
 });
