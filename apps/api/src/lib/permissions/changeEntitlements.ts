@@ -20,11 +20,10 @@ import {
   entitlementsOf,
   type Permix,
   sameEntitlement,
-  sameLens,
   toEntitlementEntry,
   toEntitlementInput,
 } from '@template/permissions';
-import { partition, uniq } from 'lodash-es';
+import { isEqual, partition, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
@@ -52,8 +51,12 @@ type Granted = Pick<
   'resource' | 'actions' | 'where' | 'sourceModel' | 'sourceId' | 'sourcePath' | 'lens'
 >;
 
+const sameLens = (left: Granted, right: Granted): boolean =>
+  isEqual(left.lens ?? null, right.lens ?? null);
+
+// why: no lens is the full surface, so a held row without one covers whatever lens the entry has.
 const covers = (holding: Granted, input: Granted) =>
-  sameLens(holding, input) &&
+  (holding.lens == null || sameLens(holding, input)) &&
   coversEntitlement(toEntitlementEntry(holding), toEntitlementEntry(input));
 
 const lastOfEqual = (add: EntitlementInput[]): EntitlementInput[] =>
@@ -75,7 +78,7 @@ const asStored = (input: EntitlementInput): EntitlementInput => ({
 
 /**
  * The one writer of a target's entitlements: every added entry and every removed row passes the
- * grant check, and entries a held row with the same lens covers are skipped. A held row equal to an
+ * grant check, and entries a held row covers (with no lens, or the same lens) are skipped. A held row equal to an
  * added entry but for its lens is replaced: one grant holds one lens. A target left with no rows
  * holds nothing. Rows never change; a removal is a soft delete, so each row's audit entry is its own.
  */

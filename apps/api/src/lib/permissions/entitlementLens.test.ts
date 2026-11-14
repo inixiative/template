@@ -91,7 +91,7 @@ describe('one lens per entitlement: an equal entitlement with a new lens replace
     expect(await rows()).toEqual([{ actions: ['read'], lens: { fields: ['slug'] }, live: true }]);
   });
 
-  it('different actions or a different where are not equal: coverage applies, and only with the same lens', async () => {
+  it('different actions or a different where are not equal: coverage applies only from no lens or the same lens', async () => {
     const { onOrganization, write, live } = await scene();
     const name = { fields: ['name'] };
     const named = { field: 'name', operator: 'equals', value: 'Acme' };
@@ -130,6 +130,23 @@ describe('one lens per entitlement: an equal entitlement with a new lens replace
     expect(await rows()).toEqual([
       { actions: ['read'], lens: { fields: ['name'] }, live: false },
       { actions: ['operate', 'read'], lens: { fields: ['slug'] }, live: true },
+    ]);
+  });
+
+  it('a held row with no lens covers a narrower entry with a lens: no lens is the full surface', async () => {
+    const { onOrganization, write, live } = await scene();
+    await write(onOrganization({ actions: ['operate', 'read'] }));
+    await write(onOrganization({ lens: { fields: ['name'] } }));
+    expect(await live()).toEqual([{ actions: ['operate', 'read'], lens: null, live: true }]);
+  });
+
+  it('a held row with a lens does not cover a narrower entry with no lens', async () => {
+    const { onOrganization, write, live } = await scene();
+    await write(onOrganization({ actions: ['operate', 'read'], lens: { fields: ['name'] } }));
+    await write(onOrganization());
+    expect(await live()).toEqual([
+      { actions: ['operate', 'read'], lens: { fields: ['name'] }, live: true },
+      { actions: ['read'], lens: null, live: true },
     ]);
   });
 

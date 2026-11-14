@@ -21,7 +21,6 @@ export {
 export {
   entitlementsOf,
   sameEntitlement,
-  sameLens,
   toEntitlementEntry,
   toEntitlementInput,
 } from './entitlementRows';

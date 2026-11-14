@@ -4,7 +4,6 @@ import type { EntitlementEntry } from '@template/permissions/client';
 import {
   entitlementsOf,
   sameEntitlement,
-  sameLens,
   toEntitlementEntry,
   toEntitlementInput,
 } from '@template/permissions/entitlementRows';
@@ -74,11 +73,5 @@ describe('one grant, one lens (Aron, 2026-11-12)', () => {
     expect(sameEntitlement(row, { ...row, where: null })).toBe(false);
     expect(sameEntitlement(row, { ...row, actions: ['read'] })).toBe(false);
     expect(sameEntitlement(row, { ...row, sourceId: 'other' })).toBe(false);
-  });
-
-  it('no lens is a lens of its own, and key order does not make a lens different', () => {
-    expect(sameLens({}, { lens: null })).toBe(true);
-    expect(sameLens({}, { lens: { fields: ['id'] } })).toBe(false);
-    expect(sameLens({ lens: { a: 1, b: 2 } }, { lens: { b: 2, a: 1 } })).toBe(true);
   });
 });
