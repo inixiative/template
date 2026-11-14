@@ -7,7 +7,12 @@ import { cacheKey } from '@template/db/redis/cache/cacheKey';
 import { getRedisClient } from '@template/db/redis/client';
 import {
   cleanupTouchedTables,
+  createCustomerRef,
+  createFeatureFlag,
+  createFeatureFlagVariant,
   createOrganizationUser,
+  createSegment,
+  createSegmentMember,
   createSession,
   createToken,
   createUser,
@@ -74,6 +79,43 @@ describe('hydrate', () => {
     expect((result.organizationUser as { organization: { id: string } }).organization.id).toBe(
       organizationId,
     );
+  });
+
+  it('skips edges tagged @permissions(hydrate: false): a variant reaches its flag, never its audience', async () => {
+    const { entity: flag } = await createFeatureFlag({ ownerModel: 'platform' });
+    const { entity: audience } = await createSegment({ ownerModel: 'platform' });
+    const { entity: variant } = await createFeatureFlagVariant(
+      { segmentId: audience.id },
+      { featureFlag: flag },
+    );
+
+    const hydratedVariant = await hydrate('featureFlagVariant', {
+      id: variant.id,
+      featureFlagId: flag.id,
+      segmentId: audience.id,
+    });
+    expect((hydratedVariant.featureFlag as { id: string }).id).toBe(flag.id);
+    expect(hydratedVariant.segment).toBeUndefined();
+  });
+
+  it('a segment member reaches its segment and owner, never the customer reference', async () => {
+    const { entity: segment } = await createSegment({ ownerModel: 'platform' });
+    const { entity: customer } = await createUser();
+    const { entity: customerRef } = await createCustomerRef({
+      customerModel: 'User',
+      providerModel: 'platform',
+      customerUserId: customer.id,
+    });
+    const { entity: member } = await createSegmentMember({}, { segment, customerRef });
+
+    const result = await hydrate('segmentMember', {
+      id: member.id,
+      segmentId: member.segmentId,
+      customerRefId: member.customerRefId,
+    });
+
+    expect((result.segment as { id: string }).id).toBe(segment.id);
+    expect(result.customerRef).toBeUndefined();
   });
 
   it('handles null FK gracefully', async () => {

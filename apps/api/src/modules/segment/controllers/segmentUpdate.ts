@@ -12,10 +12,12 @@ import { makeController } from '#/lib/utils/makeController';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentUpdateRoute } from '#/modules/segment/routes/segmentUpdate';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { assertNotInternalSegment } from '#/modules/segment/validations/assertNotInternalSegment';
 
 export const segmentUpdateController = makeController(segmentUpdateRoute, async (c, respond) => {
   const db = c.get('db');
   const segment = getResource<'segment'>(c);
+  assertNotInternalSegment(segment);
   const body = c.req.valid('json');
 
   const save = () =>

@@ -6,7 +6,7 @@
 import {
   db,
   POLYMORPHIC_BINDS,
-  type PolymorphicKind,
+  type PolymorphicFkKind,
   polymorphicKeyColumn,
   polymorphicTarget,
 } from '@template/db';
@@ -14,7 +14,7 @@ import type { WebhookModel, WebhookSubscription } from '@template/db/generated/c
 import { uniq } from 'lodash-es';
 import type { Party } from '#/hooks/webhooks/parties';
 
-const ownerKinds = Object.keys(POLYMORPHIC_BINDS) as PolymorphicKind[];
+const ownerKinds = Object.keys(POLYMORPHIC_BINDS) as PolymorphicFkKind[];
 
 export const findPartySubscriptions = (model: WebhookModel, parties: Party[]) =>
   db.webhookSubscription.findMany({

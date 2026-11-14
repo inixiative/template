@@ -18,6 +18,10 @@ const tagOwned = platformOrBound('Tag', 'ownerModel');
 
 const segmentOwned = boundAndLive('Segment', 'ownerModel');
 
+const segmentNameable: Condition = {
+  all: [segmentOwned, { field: 'featureFlagInternal', operator: Operator.equals, value: false }],
+};
+
 const contacts: ModelNarrowing = {
   picks: [
     'type',
@@ -55,7 +59,10 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
     prisma: {
       models: {
         Tag: { where: tagOwned, sources: { id: { label: 'name', where: tagOwned } } },
-        Segment: { where: segmentOwned, sources: { id: { label: 'name', where: segmentOwned } } },
+        Segment: {
+          where: segmentOwned,
+          sources: { id: { label: 'name', where: segmentNameable } },
+        },
       },
     },
   },

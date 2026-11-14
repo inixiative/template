@@ -38,6 +38,21 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
     ...polymorphismImmutableFields.CommunicationLog,
     exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],
   },
+  FeatureFlag: {
+    ...polymorphismImmutableFields.FeatureFlag,
+    include: [
+      ...(polymorphismImmutableFields.FeatureFlag?.include ?? []),
+      'slug',
+      'subjectModel',
+      'valueType',
+    ],
+    exclude: ['segmentId'],
+  },
+  FeatureFlagVariant: { ...polymorphismImmutableFields.FeatureFlagVariant, exclude: ['segmentId'] },
+  Segment: {
+    ...polymorphismImmutableFields.Segment,
+    include: [...(polymorphismImmutableFields.Segment?.include ?? []), 'featureFlagInternal'],
+  },
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {

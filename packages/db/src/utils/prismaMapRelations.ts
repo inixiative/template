@@ -3,7 +3,12 @@
  * @kind utils
  * @partOf infrastructure:prisma
  */
-import { getRelations, type Identifier, type PrismaMap } from '@inixiative/prisma-map';
+import {
+  type Annotations,
+  getRelations,
+  type Identifier,
+  type PrismaMap,
+} from '@inixiative/prisma-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import {
   type AccessorName,
@@ -14,8 +19,6 @@ import {
 
 export type { Identifier } from '@inixiative/prisma-map';
 
-// The generated map is declared `as const` (readonly literal arrays); the lib's
-// helpers want the structural PrismaMap shape. Cast once at this boundary.
 const models = prismaMap.models as unknown as PrismaMap;
 
 export type RelationInfo = {

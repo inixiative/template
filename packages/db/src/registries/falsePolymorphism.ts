@@ -15,7 +15,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 // - Immutable fields (type fields are immutable)
 
 // Special non-model values for ownership
-type SpecialOwner = 'default' | 'admin' | 'platform';
+export type SpecialOwner = 'default' | 'admin' | 'platform';
 
 // Valid type values in polymorphic fields (strongly typed)
 export type PolymorphicValue = ModelName | SpecialOwner;
@@ -193,6 +193,7 @@ export const PolymorphismRegistry = {
       {
         field: 'providerModel',
         fkMap: {
+          platform: [],
           User: ['providerUserId'],
           Organization: ['providerOrganizationId'],
           Space: ['providerSpaceId'],
@@ -200,9 +201,9 @@ export const PolymorphismRegistry = {
       },
     ],
     allowedCombinations: {
-      User: ['User', 'Organization', 'Space'],
-      Organization: ['User', 'Organization', 'Space'],
-      Space: ['User', 'Organization', 'Space'],
+      User: ['platform', 'User', 'Organization', 'Space'],
+      Organization: ['platform', 'User', 'Organization', 'Space'],
+      Space: ['platform', 'User', 'Organization', 'Space'],
     },
   },
 
@@ -238,6 +239,8 @@ export const PolymorphismRegistry = {
           Flow: ['targetFlowId'],
           AuthProvider: ['targetAuthProviderId'],
           WebhookSubscription: ['targetWebhookSubscriptionId'],
+          FeatureFlag: ['targetFeatureFlagId'],
+          FeatureFlagVariant: ['targetFeatureFlagVariantId'],
         },
       },
     ],
@@ -264,6 +267,8 @@ export const PolymorphismRegistry = {
           Flow: ['sourceFlowId'],
           AuthProvider: ['sourceAuthProviderId'],
           WebhookSubscription: ['sourceWebhookSubscriptionId'],
+          FeatureFlag: ['sourceFeatureFlagId'],
+          FeatureFlagVariant: ['sourceFeatureFlagVariantId'],
         },
       },
       {
@@ -367,6 +372,8 @@ export const PolymorphismRegistry = {
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
           Entitlement: ['subjectEntitlementId'],
+          FeatureFlag: ['subjectFeatureFlagId'],
+          FeatureFlagVariant: ['subjectFeatureFlagVariantId'],
         },
       },
     ],
@@ -377,6 +384,21 @@ export const PolymorphismRegistry = {
       {
         field: 'ownerModel',
         fkMap: {
+          platform: [],
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  FeatureFlag: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          platform: [],
           User: ['userId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],

@@ -43,14 +43,16 @@ model Entitlement {
   sourceFlowId                String?                  @db.VarChar(36)
   sourceAuthProviderId        String?                  @db.VarChar(36)
   sourceWebhookSubscriptionId String?                  @db.VarChar(36)
+  sourceFeatureFlagId         String?                  @db.VarChar(36)
+  sourceFeatureFlagVariantId  String?                  @db.VarChar(36)
 
-  targetModel              EntitlementTargetModel
-  targetId                 String                 @db.VarChar(36)
-  targetTokenId            String?                @db.VarChar(36)
-  targetIntegrationId      String?                @db.VarChar(36)
-  targetOrganizationId     String?                @db.VarChar(36)
-  targetSpaceId            String?                @db.VarChar(36)
-  targetUserId             String?                @db.VarChar(36)
+  targetModel          EntitlementTargetModel
+  targetId             String                 @db.VarChar(36)
+  targetTokenId        String?                @db.VarChar(36)
+  targetIntegrationId  String?                @db.VarChar(36)
+  targetOrganizationId String?                @db.VarChar(36)
+  targetSpaceId        String?                @db.VarChar(36)
+  targetUserId         String?                @db.VarChar(36)
 
   // SetNull: purging an anchor leaves the row standing with `sourceId` naming what went.
   sourceUser                User?                @relation("EntitlementSource", fields: [sourceUserId], references: [id], onDelete: SetNull)
@@ -68,6 +70,8 @@ model Entitlement {
   sourceFlow                Flow?                @relation("EntitlementSource", fields: [sourceFlowId], references: [id], onDelete: SetNull)
   sourceAuthProvider        AuthProvider?        @relation("EntitlementSource", fields: [sourceAuthProviderId], references: [id], onDelete: SetNull)
   sourceWebhookSubscription WebhookSubscription? @relation("EntitlementSource", fields: [sourceWebhookSubscriptionId], references: [id], onDelete: SetNull)
+  sourceFeatureFlag         FeatureFlag?         @relation("EntitlementSource", fields: [sourceFeatureFlagId], references: [id], onDelete: SetNull)
+  sourceFeatureFlagVariant  FeatureFlagVariant?  @relation("EntitlementSource", fields: [sourceFeatureFlagVariantId], references: [id], onDelete: SetNull)
 
   targetToken            Token?            @relation("EntitlementTarget", fields: [targetTokenId], references: [id], onDelete: Cascade)
   targetIntegration      Integration?      @relation("EntitlementTarget", fields: [targetIntegrationId], references: [id], onDelete: Cascade)
@@ -99,6 +103,8 @@ model Entitlement {
   @@index([sourceFlowId])
   @@index([sourceAuthProviderId])
   @@index([sourceWebhookSubscriptionId])
+  @@index([sourceFeatureFlagId])
+  @@index([sourceFeatureFlagVariantId])
   @@index([targetTokenId])
   @@index([targetIntegrationId])
   @@index([targetOrganizationId, targetUserId, targetSpaceId])
@@ -121,6 +127,8 @@ enum EntitlementResourceModel {
   Flow
   AuthProvider
   WebhookSubscription
+  FeatureFlag
+  FeatureFlagVariant
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific rebac resources below

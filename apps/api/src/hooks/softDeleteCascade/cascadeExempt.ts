@@ -27,4 +27,6 @@ export const CASCADE_EXEMPT: Record<string, readonly string[]> = {
   // A rule names these rows; it does not own them. Tombstoning one stamps the edges that name it
   // (ruleReference:target) — deleting them would erase the record that a rule is degraded.
   RuleReference: axisRelations('RuleReference', 'target'),
+  FeatureFlag: ['segment'],
+  FeatureFlagVariant: ['segment'],
 };

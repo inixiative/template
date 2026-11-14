@@ -5,6 +5,8 @@ import type { Organization, Space, User } from '@template/db/generated/client/cl
 import { ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
+  createFeatureFlag,
+  createFeatureFlagVariant,
   createOrganizationUser,
   createSegment,
   createSpace,
@@ -51,6 +53,53 @@ describe('segmentConditions hook', () => {
         { space },
       ),
     ).rejects.toThrow('Invalid segment conditions');
+  });
+
+  it('a platform segment may name only platform segments', async () => {
+    const { entity: theirs } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
+    const naming = (id: string) => ({
+      field: 'segmentMembers',
+      arrayOperator: 'any',
+      condition: { field: 'segment.id', operator: Operator.equals, value: id },
+    });
+    expect(
+      await deadReferencesOf(
+        createSegment({ ownerModel: ProviderModel.platform, conditions: naming(theirs.id) }, {}),
+      ),
+    ).toEqual([{ model: 'Segment', id: theirs.id, state: 'missing' }]);
+
+    const { entity: ours } = await createSegment(
+      { ownerModel: ProviderModel.platform, conditions: acmeRule },
+      {},
+    );
+    const { entity } = await createSegment(
+      { ownerModel: ProviderModel.platform, conditions: naming(ours.id) },
+      {},
+    );
+    expect(entity.ownerModel).toBe('platform');
+  });
+
+  it('a rule may not name an internal segment, even the owner’s own', async () => {
+    const { entity: flag } = await createFeatureFlag(
+      { slug: 'custom:x', ownerModel: ProviderModel.Space },
+      { space },
+    );
+    const { entity: internal } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule, featureFlagInternal: true },
+      { space },
+    );
+    await createFeatureFlagVariant({}, { segment: internal, featureFlag: flag });
+    const naming = {
+      field: 'segmentMembers',
+      arrayOperator: 'any',
+      condition: { field: 'segment.id', operator: Operator.equals, value: internal.id },
+    };
+    expect(
+      await deadReferencesOf(createSegment({ ownerModel: 'Space', conditions: naming }, { space })),
+    ).toEqual([{ model: 'Segment', id: internal.id, state: 'missing' }]);
   });
 
   it('accepts a valid rule and writes the normalized tree back', async () => {

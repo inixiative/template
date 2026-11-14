@@ -10,7 +10,7 @@ import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { RuleDegradedError, RuleEvaluationError, withRule } from '@template/shared/rules';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
-import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { providerWhere, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentRuleState } from '#/modules/segment/services/segmentRuleHealth';
 
 const isInfrastructureFault = (error: unknown): boolean =>
@@ -27,7 +27,7 @@ export const compileSegmentWhere = async (
     now: new Date(),
   });
   const where = await executePrismaPlan(plan, db as never);
-  return andWhere([where, { [customerRefProviderFk(ownerModel)]: ownerId }]);
+  return andWhere([where, providerWhere(ownerModel, ownerId)]);
 };
 
 const segmentWhere = async (segment: Segment): Promise<Record<string, unknown>> => {

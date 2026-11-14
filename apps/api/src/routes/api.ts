@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind route
- * @uses feature:auth, feature:contact, feature:inquiry, feature:segment, feature:tenancy, feature:users, feature:webhooks, primitive:batch, primitive:flows
+ * @uses feature:auth, feature:contact, feature:featureFlag, feature:inquiry, feature:segment, feature:tenancy, feature:users, feature:webhooks, primitive:batch, primitive:flows
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
@@ -16,6 +16,8 @@ import { authRateLimit } from '#/middleware/rateLimit/authRateLimit';
 import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
 import { contactRouter } from '#/modules/contact';
+import { featureFlagRouter } from '#/modules/featureFlag';
+import { featureFlagVariantRouter } from '#/modules/featureFlagVariant';
 import { flowRouter } from '#/modules/flow';
 import { identifyRouter } from '#/modules/identify';
 import { inquiryRouter } from '#/modules/inquiry';
@@ -70,6 +72,8 @@ apiRouter.route('/admin', adminRouter);
 apiRouter.route('/v1/authProvider', authProviderRouter);
 apiRouter.route('/v1/batch', batchRouter);
 apiRouter.route('/v1/contact', contactRouter);
+apiRouter.route('/v1/featureFlag', featureFlagRouter);
+apiRouter.route('/v1/featureFlagVariant', featureFlagVariantRouter);
 apiRouter.route('/v1/flow', flowRouter);
 apiRouter.route('/v1/identify', identifyRouter);
 apiRouter.route('/v1/integration', integrationRouter);

@@ -18,7 +18,7 @@ export const spaceReadManySegmentsController = makeController(
     const space = getResource<'space'>(c);
 
     const { data, pagination } = await paginate(c, db.segment, {
-      where: { ownerModel: 'Space', spaceId: space.id },
+      where: { ownerModel: 'Space', spaceId: space.id, featureFlagInternal: false },
       include: includeSegmentRuleReferences,
     });
 

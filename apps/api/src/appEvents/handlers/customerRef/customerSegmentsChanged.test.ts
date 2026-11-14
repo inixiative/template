@@ -4,13 +4,24 @@ import { customerSegmentsChanged } from '#/appEvents/handlers/customerRef/custom
 import { meChannel } from '#/ws/meChannel';
 
 describe("a customer's segments changed: refetch on the customer's own channel", () => {
-  it("a User customer: the user's /me channel", () => {
+  it("a User customer: the user's /me channel, and the shared flag-values channel", () => {
     const _id = 'meReadManySegmentMemberships';
     expect(customerSegmentsChanged({ customerModel: 'User', customerId: 'u1' })).toEqual([
       {
         kind: 'channels',
         target: { channels: [meChannel(WS_CHANNELS[_id].name(), 'u1')] },
         message: { data: { category: 'query', action: 'refetch', key: { _id } } },
+      },
+      {
+        kind: 'channels',
+        target: { channels: [WS_CHANNELS.meReadManyFeatureFlagValues.name()] },
+        message: {
+          data: {
+            category: 'query',
+            action: 'refetch',
+            key: { _id: 'meReadManyFeatureFlagValues' },
+          },
+        },
       },
     ]);
   });

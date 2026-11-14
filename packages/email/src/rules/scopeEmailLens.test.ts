@@ -57,12 +57,14 @@ describe('scopeEmailLens — static scopes, bound per row', () => {
     expect(tokens(TENANT_EMAIL_SCOPE, false)).toEqual([
       'organizationId',
       'ownerOrganizationId',
+      'platform',
       'senderOrganizationId',
       'spaceId',
       'userId',
     ]);
     expect(tokens(PLATFORM_OWNER_EMAIL_SCOPE, false)).toEqual([
       'organizationId',
+      'platform',
       'senderOrganizationId',
       'spaceId',
       'userId',
@@ -70,10 +72,16 @@ describe('scopeEmailLens — static scopes, bound per row', () => {
     expect(tokens(OWNER_EMAIL_SCOPE, false)).toEqual([
       'organizationId',
       'ownerOrganizationId',
+      'platform',
       'spaceId',
       'userId',
     ]);
-    expect(tokens(PLATFORM_EMAIL_SCOPE, false)).toEqual(['organizationId', 'spaceId', 'userId']);
+    expect(tokens(PLATFORM_EMAIL_SCOPE, false)).toEqual([
+      'organizationId',
+      'platform',
+      'spaceId',
+      'userId',
+    ]);
     for (const scope of [
       TENANT_EMAIL_SCOPE,
       OWNER_EMAIL_SCOPE,

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import {
   cleanupTouchedTables,
+  createCustomerRef,
   createOrganization,
   createOrganizationUser,
   createToken,
@@ -157,5 +158,32 @@ describe('falsePolymorphism hook', () => {
       expect(updated.name).toBe('updated');
       expect(updated.ownerModel).toBe('User');
     });
+  });
+
+  it('pass: platform provider on a CustomerRef carries no provider key', async () => {
+    const { entity: user } = await createUser();
+
+    const ref = await db.customerRef.findFirstOrThrow({
+      where: { customerUserId: user.id, providerModel: 'platform' },
+    });
+
+    expect(ref.providerModel).toBe('platform');
+    expect(ref.providerUserId).toBeNull();
+    expect(ref.providerOrganizationId).toBeNull();
+    expect(ref.providerSpaceId).toBeNull();
+  });
+
+  it('fail: platform provider on a CustomerRef with a provider key', async () => {
+    const { entity: user } = await createUser();
+    const { entity: org } = await createOrganization();
+
+    await expect(
+      createCustomerRef({
+        customerModel: 'User',
+        providerModel: 'platform',
+        providerOrganizationId: org.id,
+        customerUserId: user.id,
+      }),
+    ).rejects.toThrow('CustomerRef providerModel=platform cannot have providerOrganizationId');
   });
 });

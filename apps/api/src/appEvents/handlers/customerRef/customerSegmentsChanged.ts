@@ -30,4 +30,15 @@ const channelOf = ({ customerModel, customerId }: Customer): WSHandoff => {
   };
 };
 
-export const customerSegmentsChanged = (customer: Customer): WSHandoff[] => [channelOf(customer)];
+// Flag values are read per actor on one shared channel (featureFlag.changed), so a member's change
+// asks every subscriber to refetch.
+const flagValuesChanged: WSHandoff = {
+  kind: 'channels',
+  target: { channels: [WS_CHANNELS.meReadManyFeatureFlagValues.name()] },
+  message: { data: refetch({ _id: 'meReadManyFeatureFlagValues' }) },
+};
+
+export const customerSegmentsChanged = (customer: Customer): WSHandoff[] =>
+  customer.customerModel === 'User'
+    ? [channelOf(customer), flagValuesChanged]
+    : [channelOf(customer)];

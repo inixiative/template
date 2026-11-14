@@ -17,6 +17,7 @@ import type { Permix } from '@template/permissions';
 import type { TokenWithRelations } from '#/lib/context/types';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
+import type { ResolvedFlags } from '#/modules/featureFlag/services/resolveFlags';
 
 export type AppVars = {
   app: OpenAPIHono<AppEnv>;
@@ -36,6 +37,7 @@ export type AppVars = {
   routeConfig: (RouteConfig & Pick<RouteArgs, 'model' | 'submodel'>) | null;
   filterLens: LensNarrowing | null;
   bracketQuery: BracketQueryRecord;
+  featureFlags: ResolvedFlags | null;
 };
 
 export type AppEnv = {

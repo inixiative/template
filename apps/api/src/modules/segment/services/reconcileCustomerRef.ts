@@ -5,12 +5,12 @@
  * @uses infrastructure:prisma
  */
 import { check, narrowRule } from '@inixiative/json-rules';
-import { db, polymorphicTarget } from '@template/db';
-import type { CustomerRef, Segment } from '@template/db/generated/client/client';
+import { db } from '@template/db';
+import type { Segment } from '@template/db/generated/client/client';
 import { type ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
-import { ownedSegments } from '#/modules/customerRef/lib/ownedSegments';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
+import { providerOf, segmentsOf } from '#/modules/segment/lib/segmentOwner';
 import {
   applyMembershipDiff,
   type MembershipDiff,
@@ -28,20 +28,8 @@ import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth'
 
 export type CustomerRefReconciliation = { segmentId: string; diff: MembershipDiff }[];
 
-const providerOf = (
-  customerRef: CustomerRef,
-): { ownerModel: ProviderModel; ownerId: string } | null => {
-  const target = polymorphicTarget(customerRef, 'CustomerRef', 'providerModel');
-  return target ? { ownerModel: target.kind as ProviderModel, ownerId: target.id } : null;
-};
-
-export const dynamicSegmentsOf = async (
-  ownerModel: ProviderModel,
-  ownerId: string,
-): Promise<Segment[]> =>
-  (await ownedSegments(ownerModel, ownerId)).filter(
-    (segment) => segment.type === SegmentType.dynamic,
-  );
+export const dynamicSegmentsOf = (ownerModel: ProviderModel, ownerId: string): Promise<Segment[]> =>
+  segmentsOf(ownerModel, ownerId, { type: SegmentType.dynamic });
 
 const recordDecision = (row: HydratedCustomerRef, segment: Segment, matches: boolean): void => {
   const index = row.segmentMembers.findIndex((member) => member.segment?.id === segment.id);
@@ -55,7 +43,6 @@ export const reconcileCustomerRef = async (
   const customerRef = await db.customerRef.findUnique({ where: { id: customerRefId } });
   if (!customerRef) return [];
   const provider = providerOf(customerRef);
-  if (!provider) return [];
 
   const segments = (await dynamicSegmentsOf(provider.ownerModel, provider.ownerId)).filter(
     isContinuous,

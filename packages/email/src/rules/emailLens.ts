@@ -122,6 +122,7 @@ const RECIPIENT_NARROWING_BY_SENDER: Record<ProviderModel, ModelNarrowing> = {
     },
   }),
   User: withMemberships({}),
+  platform: withMemberships({}),
 };
 
 export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowing | undefined =>

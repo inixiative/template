@@ -27,6 +27,10 @@ import {
   customerRefSegmentsRemoved,
 } from '#/appEvents/handlers/customerRef/customerRefSegmentsRemoved';
 import {
+  type FeatureFlagChangedPayload,
+  featureFlagChanged,
+} from '#/appEvents/handlers/featureFlag/featureFlagChanged';
+import {
   type InquiryResolvedPayload,
   inquiryResolved,
 } from '#/appEvents/handlers/inquiry/inquiryResolved';
@@ -95,6 +99,7 @@ export type AppEventPayloads = {
   'customerRef.created': CustomerRefCreatedPayload;
   'customerRef.segmentsAdded': CustomerRefSegmentsAddedPayload;
   'customerRef.segmentsRemoved': CustomerRefSegmentsRemovedPayload;
+  'featureFlag.changed': FeatureFlagChangedPayload;
   'inquiry.sent': InquirySentPayload;
   'inquiry.resolved': InquiryResolvedPayload;
   'organization.updated': OrganizationUpdatedPayload;
@@ -125,6 +130,7 @@ export const AppEventName = {
   customerRefCreated: 'customerRef.created',
   customerRefSegmentsAdded: 'customerRef.segmentsAdded',
   customerRefSegmentsRemoved: 'customerRef.segmentsRemoved',
+  featureFlagChanged: 'featureFlag.changed',
   inquirySent: 'inquiry.sent',
   inquiryResolved: 'inquiry.resolved',
   organizationUpdated: 'organization.updated',
@@ -157,6 +163,7 @@ export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
   'customerRef.created': customerRefCreated,
   'customerRef.segmentsAdded': customerRefSegmentsAdded,
   'customerRef.segmentsRemoved': customerRefSegmentsRemoved,
+  'featureFlag.changed': featureFlagChanged,
   'inquiry.sent': inquirySent,
   'inquiry.resolved': inquiryResolved,
   'organization.updated': organizationUpdated,

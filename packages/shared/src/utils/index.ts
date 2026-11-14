@@ -18,4 +18,14 @@ export { resolveAll } from './resolveAll';
 export { type RetryOptions, withRetry } from './retry';
 export { createSerializedQueue, type SerializedQueue } from './serializedQueue';
 export { settleWithin } from './settleWithin';
+export {
+  CUSTOM_FLAG_PREFIX,
+  featureFlagSlugSchema,
+  isCustomFlagSlug,
+  isFeatureFlagSlug,
+  isSlug,
+  keepSlugCharacters,
+  slugSchema,
+  toSlug,
+} from './slug';
 export { stableHash } from './stableHash';

@@ -17,6 +17,9 @@ export const orderedListRegistry: OrderedListRegistry = {
   Contact: {
     position: [...contactOwnerFields, 'type'],
   },
+  FeatureFlagVariant: {
+    position: ['featureFlagId'],
+  },
 };
 
 export const getOrderedListFieldsByModel = (): Record<string, string[]> => {

@@ -15,6 +15,7 @@ export const Modules = {
   customer: 'customer',
   batch: 'batch',
   segmentMembership: 'segmentMembership',
+  featureFlagValue: 'featureFlagValue',
 } as const;
 
 export type Module = (typeof Modules)[keyof typeof Modules];

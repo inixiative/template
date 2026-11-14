@@ -109,6 +109,7 @@ export {
   isArmColumns,
   isOwnerKind,
   POLYMORPHIC_BINDS,
+  type PolymorphicFkKind,
   type PolymorphicKind,
   polymorphicBindings,
   polymorphicIs,
