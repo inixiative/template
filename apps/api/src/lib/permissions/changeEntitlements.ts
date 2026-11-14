@@ -27,6 +27,7 @@ import { partition, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
+import { validateEntitlementLens } from '#/lib/permissions/validateEntitlementLens';
 
 export type EntitlementChanges = { add?: EntitlementInput[]; remove?: string[] };
 
@@ -65,6 +66,7 @@ export const changeEntitlements = (
 ): Promise<Entitlement[]> =>
   db.txn(() =>
     withOwnerLock({ ownerModel: target.model, ownerId: target.id }, 'entitlements', async () => {
+      for (const input of add) validateEntitlementLens(input);
       const holder = await liveRows(target);
       const removedIds = uniq(remove);
       const removed = holder.targetEntitlements.filter((row) => removedIds.includes(row.id));

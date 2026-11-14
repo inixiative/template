@@ -48,6 +48,7 @@
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
   - [Changing Entitlements](#changing-entitlements)
   - [The Path Names the Anchor and the Axis; the Where Narrows](#the-path-names-the-anchor-and-the-axis-the-where-narrows)
+  - [Lenses Keep `id`; Paths Merge by `id`](#lenses-keep-id-paths-merge-by-id)
 - [Adding a Model](#adding-a-model)
 - [Permix](#permix)
 - [REBAC](#rebac)
@@ -55,6 +56,7 @@
   - [ActionRule Types](#actionrule-types)
   - [How It Works](#how-it-works)
   - [Dot-path vs. Single-hop Delegation](#dot-path-vs-single-hop-delegation)
+  - [Inquiry permissions](#inquiry-permissions)
 - [Owner-Polymorphic Models](#owner-polymorphic-models)
 - [Row-Level Overrides](#row-level-overrides)
   - [Schema](#schema)
@@ -568,6 +570,14 @@ A polymorphic record carries the ids of everything above it: S1's integration ha
 | `user` | the user's, and the user's members' (narrow with `where ownerModel = User`) |
 
 Sides are separate axes: `targetOrganization` reaches what O1 (or its members) received, never what it sent. A self anchor (the entitled record itself) has no path. Only the anchor's id is fixed: a record that moves within the anchor stays reached, one that moves out stops.
+
+### Lenses Keep `id`; Paths Merge by `id`
+
+A holder can be admitted along several delegation paths, each with its own lens (a `where` on the rows, picks and omits on their shape). The holder gets the union of what every path gives, the chimera (Aron, 2026-11-14): each object comes back through every path whose filter admits it, and the projections are merged object by object. Why: extra access from a second grantor has to reach the holder; taking one path's lens, or the intersection, drops what the second grantor gave.
+
+- **A lens never removes `id`.** `changeEntitlements` refuses (422) an added entry whose lens has a narrowing that omits `id` or picks without it: the root, every nested `relations` narrowing, and every `mapDefaults` model, on any model whose field map has an `id` (`validateEntitlementLens`, `apps/api/src/lib/permissions/validateEntitlementLens.ts`, over `narrowingsDroppingId` in `packages/permissions/src/lens`). It refuses rather than adding `id`, so a stored lens always says what it shows. The rule is template's (and Kingdom's), not json-rules': the `id` convention is ours. Why: with `id` always present, every projection can be matched object by object.
+- **`mergeProjections(lens, projections)`** (`packages/permissions/src/lens/mergeProjections.ts`) takes each path's `projectRows` output over the same source rows, tagged with the path's key. Objects with one `id` become one object holding every key any path kept; a to-one is merged recursively, and every to-many list is merged by its items' `id`, recursively, never by position. A relation present in one projection beats one missing or `null` in another (`projectRows` turns a to-one its filter hides into `null`), so the result does not depend on path order. Scalars and Json kept by two paths must be equal, and an object without `id` in a model that has one throws. Why: a plain deep merge pairs list items by index and invents rows (one item's field glued onto another's `id`), and lets a hidden `null` overwrite a shown to-one depending on order.
+- **Attribution, not billing.** `attribution` names every path that admitted at least one object in the result. Each is noted as used; none is budget-checked or charged (only the routed path is), so there is no superset or subset calculation. Why: a contributor's budget must not change what the holder sees.
 
 ---
 

@@ -98,3 +98,12 @@ Not every model has all four, and not every model chains all of them. Each is de
 ## Non-standard actions
 
 `create`, `delete`, `leave`, `delegateFull`, `send`, `resolve`, `user.redact` and the like are not part of the chain. They delegate only where their rule says so (`delete: { any: ['manage', …] }`). To give one to a holder, grant it explicitly.
+
+## Lenses across paths
+
+A row's `lens` shapes what the holder gets from what the grant reaches. Two rules let the holder get the union of every path that admits them (Aron, 2026-11-14); the full statement is in [PERMISSIONS.md](../../../../docs/claude/PERMISSIONS.md#lenses-keep-id-paths-merge-by-id).
+
+- **A lens never removes `id`.** No narrowing in it (root, nested relation, `mapDefaults` model) omits `id` or picks without it, on a model that has one. The writer refuses such a lens; it never adds `id` itself. `narrowingsDroppingId(base, lens)` (`src/lens/narrowingsDroppingId.ts`) names the narrowings that break it.
+- **Projections merge by `id`.** `mergeProjections(lens, [{ path, rows }, …])` (`src/lens/mergeProjections.ts`) joins each path's `projectRows` output: one object per `id`, every list merged by its items' `id` at every level, a shown relation beating a hidden `null`, equal scalars or a throw. `attribution` is the paths that admitted at least one object: noted as used, never charged.
+
+Why: a merge by position glues one row's fields onto another's `id`; with `id` always kept, projections from different grants always line up object by object.

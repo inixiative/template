@@ -23,6 +23,7 @@ export type EntitlementInput = {
   sourceModel: EntitlementResourceModel;
   sourceId: string;
   sourcePath?: string | null;
+  lens?: Prisma.InputJsonValue | null;
 };
 
 export type StoredEntitlement = Pick<
@@ -46,12 +47,13 @@ export const toEntitlementCreateData = (
   anchors: EntitlementAnchors,
 ): Prisma.EntitlementUncheckedCreateInput[] => {
   const targetKeys = polymorphicArmKeys('Entitlement', 'targetModel', holder.model, holder.row);
-  return inputs.map(({ where, sourcePath, ...input }) => {
+  return inputs.map(({ where, sourcePath, lens, ...input }) => {
     const anchor = anchors[anchorKey(input)];
     if (!anchor) throw new Error(`${input.sourceModel} ${input.sourceId} not found`);
     return {
       ...input,
       ...(where != null ? { where } : {}),
+      ...(lens != null ? { lens } : {}),
       sourcePath: sourcePath ?? null,
       ...polymorphicArmKeys('Entitlement', 'sourceModel', input.sourceModel, anchor),
       sourceDeletedAt: (anchor.deletedAt as Date | null | undefined) ?? null,
