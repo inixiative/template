@@ -4,115 +4,147 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { getLensRoot, type Lens, type LensNarrowing, type Row } from '@inixiative/json-rules';
-import {
-  fieldOf,
-  hasIdField,
-  type LensModel,
-  relationTargetOf,
-  rootModelOf,
-} from '@template/permissions/lens/lensModels';
-import { isEqual, isPlainObject, uniq } from 'lodash-es';
+import { type Lens, type LensNarrowing, lensVisit, type Row } from '@inixiative/json-rules';
+import { modelHasId } from '@template/permissions/lens/modelHasId';
+import { cloneDeep, isEqual, isPlainObject, uniq } from 'lodash-es';
 
-/** One path's `projectRows` output over the shared source rows, tagged with the path's key. */
-export type LensProjection<PathKey extends string = string> = { path: PathKey; rows: Row[] };
+/** One path's `projectRows(lens, sourceRows)`, with the lens it went through, tagged with the path's key. */
+export type LensProjection<PathKey extends string = string> = {
+  path: PathKey;
+  lens: Lens | LensNarrowing;
+  rows: Row[];
+};
 
 export type MergedProjections<PathKey extends string = string> = {
   rows: Row[];
   attribution: PathKey[];
 };
 
-const isRow = (value: unknown): value is Row => isPlainObject(value);
+type Piece = { lens: Lens | LensNarrowing; rows: Row[] };
+type Part = { lens: Lens | LensNarrowing; row: Row };
 
-const idOf = (at: LensModel, row: Row, label: string): unknown => {
+const childPath = (relationPath: string, field: string) =>
+  relationPath ? `${relationPath}.${field}` : field;
+
+const visitOf = (lens: Lens | LensNarrowing, relationPath: string, label: string) => {
+  const visit = lensVisit(lens, relationPath);
+  if (!visit)
+    throw new Error(`${label}: a projection carries ${relationPath}, which its lens hides`);
+  return visit;
+};
+
+const idOf = (row: Row, model: string, label: string): unknown => {
   if (row.id === undefined || row.id === null)
-    throw new Error(`${label}: a ${at.modelName} came back without its id`);
+    throw new Error(`${label}: a ${model} came back without its id`);
   return row.id;
 };
 
-const mergeById = (base: Lens, at: LensModel, lists: Row[][], label: string): Row[] => {
-  const carrying = lists.filter((list) => list.length > 0);
-  if (!hasIdField(base, at)) {
+const mergeList = (
+  source: unknown,
+  pieces: Piece[],
+  relationPath: string,
+  label: string,
+): Row[] => {
+  const carrying = pieces.filter((piece) => piece.rows.length > 0);
+  const [first] = carrying;
+  if (!first) return [];
+  const visit = visitOf(first.lens, relationPath, label);
+  if (!modelHasId(first.lens, visit)) {
     if (carrying.length > 1)
-      throw new Error(`${label}: ${at.modelName} has no id, so its projections can't be merged`);
-    return carrying[0] ?? [];
+      throw new Error(`${label}: ${visit.model} has no id, so its projections can't be merged`);
+    return cloneDeep(first.rows);
   }
-  const byId = new Map<unknown, Row>();
-  for (const list of carrying)
-    for (const row of list) {
-      const id = idOf(at, row, label);
-      const held = byId.get(id);
-      byId.set(id, held ? mergeRows(base, at, held, row, `${label}[${String(id)}]`) : row);
-    }
-  return [...byId.values()];
+  if (!Array.isArray(source)) throw new Error(`${label}: the source rows carry no list here`);
+
+  const byId = carrying.map(
+    ({ lens, rows }) =>
+      new Map(rows.map((row) => [idOf(row, visit.model, label), { lens, row }] as const)),
+  );
+  const merged: Row[] = [];
+  let matched = 0;
+  for (const sourceRow of source as Row[]) {
+    const id = idOf(sourceRow, visit.model, label);
+    const parts = byId.flatMap((rows) => rows.get(id) ?? []);
+    matched += parts.length;
+    if (parts.length)
+      merged.push(mergeObject(sourceRow, parts, relationPath, `${label}[${String(id)}]`));
+  }
+  if (matched !== byId.reduce((total, rows) => total + rows.size, 0))
+    throw new Error(`${label}: a projection carries a ${visit.model} the source rows do not`);
+  return merged;
 };
 
 const mergeRelation = (
-  base: Lens,
-  target: LensModel,
+  source: unknown,
+  holders: Part[],
+  key: string,
   isList: boolean,
-  held: unknown,
-  value: unknown,
+  relationPath: string,
   label: string,
 ): unknown => {
-  if (value === null || value === undefined) return held;
-  if (held === null || held === undefined) return value;
-  if (isList && Array.isArray(held) && Array.isArray(value))
-    return mergeById(base, target, [held as Row[], value as Row[]], label);
-  if (!isList && isRow(held) && isRow(value)) {
-    if (hasIdField(base, target) && idOf(target, held, label) !== idOf(target, value, label))
-      throw new Error(`${label}: projections disagree on which ${target.modelName} it is`);
-    return mergeRows(base, target, held, value, label);
-  }
-  throw new Error(`${label}: projections disagree on the shape of ${target.modelName}`);
+  const shown = holders.filter(({ row }) => row[key] !== null && row[key] !== undefined);
+  if (!shown.length) return holders[0]?.row[key] ?? null;
+  const child = childPath(relationPath, key);
+  if (isList)
+    return mergeList(
+      (source as Row | undefined)?.[key],
+      shown.map(({ lens, row }) => ({ lens, rows: row[key] as Row[] })),
+      child,
+      label,
+    );
+  const sourceRow = (source as Row | undefined)?.[key];
+  if (!isPlainObject(sourceRow)) throw new Error(`${label}: the source rows carry no ${key}`);
+  return mergeObject(
+    sourceRow as Row,
+    shown.map(({ lens, row }) => ({ lens, row: row[key] as Row })),
+    child,
+    label,
+  );
 };
 
-const mergeRows = (base: Lens, at: LensModel, left: Row, right: Row, label: string): Row => {
-  const merged: Row = { ...left };
-  for (const [key, value] of Object.entries(right)) {
-    if (!Object.hasOwn(merged, key)) {
-      merged[key] = value;
-      continue;
-    }
-    const entry = fieldOf(base, at, key);
-    const target = entry ? relationTargetOf(entry, at.mapName) : null;
-    if (entry && target)
+const mergeObject = (source: Row, parts: Part[], relationPath: string, label: string): Row => {
+  const shownFields = new Map(
+    parts.map(({ lens }) => [lens, visitOf(lens, relationPath, label).fields] as const),
+  );
+  const merged: Row = {};
+  for (const key of uniq(parts.flatMap(({ row }) => Object.keys(row)))) {
+    const holders = parts.filter(({ row }) => Object.hasOwn(row, key));
+    const [first] = holders;
+    if (!first) continue;
+    const entry = shownFields.get(first.lens)?.[key];
+    if (entry?.kind === 'object' || entry?.kind === 'bridge') {
       merged[key] = mergeRelation(
-        base,
-        target,
+        source,
+        holders,
+        key,
         entry.isList === true,
-        merged[key],
-        value,
+        relationPath,
         `${label}.${key}`,
       );
-    else if (!isEqual(merged[key], value))
+      continue;
+    }
+    if (holders.some(({ row }) => !isEqual(row[key], first.row[key])))
       throw new Error(`${label}.${key}: projections of one source disagree on its value`);
+    merged[key] = cloneDeep(first.row[key]);
   }
   return merged;
 };
 
 /**
- * The chimera of several paths' projections: objects with one `id` are one object holding every
- * key any projection kept, to-one relations merged recursively, every to-many list merged by its
- * items' `id` (never by position), and a present relation beating a missing or null one. Scalars
- * and Json kept by two projections must be equal. Rows come in order of first appearance, and
- * `attribution` names every path that admitted at least one object.
+ * The chimera of several paths' projections of the same source rows: objects with one `id` are
+ * one object holding every key any projection kept, to-one relations merged recursively, every
+ * to-many list merged by its items' `id` (never by position), and a shown relation beating a
+ * hidden (`null`) one. Scalars and Json kept by two projections must be equal. Every list,
+ * the root included, comes back in the source rows' order, whatever order the paths are given in,
+ * and the result shares no object with its inputs. `attribution` names every path that admitted
+ * at least one object.
  */
 export const mergeProjections = <PathKey extends string>(
-  lens: Lens | LensNarrowing,
+  sourceRows: readonly Row[],
   projections: readonly LensProjection<PathKey>[],
-): MergedProjections<PathKey> => {
-  const base = getLensRoot(lens);
-  const root = rootModelOf(base);
-  return {
-    rows: mergeById(
-      base,
-      root,
-      projections.map((projection) => projection.rows),
-      root.modelName,
-    ),
-    attribution: uniq(
-      projections.filter((projection) => projection.rows.length > 0).map(({ path }) => path),
-    ),
-  };
-};
+): MergedProjections<PathKey> => ({
+  rows: mergeList(sourceRows, [...projections], '', 'root'),
+  attribution: uniq(
+    projections.filter((projection) => projection.rows.length > 0).map(({ path }) => path),
+  ),
+});

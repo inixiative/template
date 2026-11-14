@@ -27,7 +27,6 @@ import { partition, uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
-import { validateEntitlementLens } from '#/lib/permissions/validateEntitlementLens';
 
 export type EntitlementChanges = { add?: EntitlementInput[]; remove?: string[] };
 
@@ -48,11 +47,18 @@ const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
 };
 
 // why: rows are immutable, so a held row a new entry covers stays; only the new entries are filtered.
-const uncovered = (held: EntitlementEntry[], added: EntitlementEntry[]): EntitlementEntry[] =>
+const uncovered = (held: EntitlementEntry[], added: EntitlementInput[]): EntitlementInput[] =>
   added.filter(
-    (entry, index) =>
-      ![...held, ...added.slice(0, index)].some((holding) => coversEntitlement(holding, entry)),
+    (input, index) =>
+      ![...held, ...added.slice(0, index).map(toEntitlementEntry)].some((holding) =>
+        coversEntitlement(holding, toEntitlementEntry(input)),
+      ),
   );
+
+const asStored = (input: EntitlementInput): EntitlementInput => ({
+  ...toEntitlementInput(toEntitlementEntry(input)),
+  ...(input.lens != null ? { lens: input.lens } : {}),
+});
 
 /**
  * The one writer of a target's entitlements: every added entry and every removed row passes the
@@ -66,7 +72,6 @@ export const changeEntitlements = (
 ): Promise<Entitlement[]> =>
   db.txn(() =>
     withOwnerLock({ ownerModel: target.model, ownerId: target.id }, 'entitlements', async () => {
-      for (const input of add) validateEntitlementLens(input);
       const holder = await liveRows(target);
       const removedIds = uniq(remove);
       const removed = holder.targetEntitlements.filter((row) => removedIds.includes(row.id));
@@ -98,7 +103,7 @@ export const changeEntitlements = (
       const kept = entitlementsOf({
         targetEntitlements: holder.targetEntitlements.filter((row) => !removedIds.includes(row.id)),
       });
-      const added = uncovered(kept, addedEntries);
+      const added = uncovered(kept, add);
 
       if (removed.length)
         await db.entitlement.updateManyAndReturn({
@@ -108,7 +113,7 @@ export const changeEntitlements = (
       if (added.length)
         await db.entitlement.createManyAndReturn({
           data: toEntitlementCreateData(
-            added.map(toEntitlementInput),
+            added.map(asStored),
             { model: target.model, row: holder },
             anchors,
           ),

@@ -101,9 +101,9 @@ Not every model has all four, and not every model chains all of them. Each is de
 
 ## Lenses across paths
 
-A row's `lens` shapes what the holder gets from what the grant reaches. Two rules let the holder get the union of every path that admits them (Aron, 2026-11-14); the full statement is in [PERMISSIONS.md](../../../../docs/claude/PERMISSIONS.md#lenses-keep-id-paths-merge-by-id).
+A holder admitted along several paths gets the union of what each path's lens shows (Aron, 2026-11-14). Two things make that union well defined; the full statement is in [PERMISSIONS.md](../../../../docs/claude/PERMISSIONS.md#lenses-keep-id-paths-merge-by-id).
 
-- **A lens never removes `id`.** No narrowing in it (root, nested relation, `mapDefaults` model) omits `id` or picks without it, on a model that has one. The writer refuses such a lens; it never adds `id` itself. `narrowingsDroppingId(base, lens)` (`src/lens/narrowingsDroppingId.ts`) names the narrowings that break it.
-- **Projections merge by `id`.** `mergeProjections(lens, [{ path, rows }, …])` (`src/lens/mergeProjections.ts`) joins each path's `projectRows` output: one object per `id`, every list merged by its items' `id` at every level, a shown relation beating a hidden `null`, equal scalars or a throw. `attribution` is the paths that admitted at least one object: noted as used, never charged.
+- **A stored lens never removes `id`.** Every `Entitlement` create, whoever writes it, is refused (422) when its lens is not a valid narrowing or hides `id` at any visit, or in any `mapDefaults` model, of a model that has one (the `entitlementLens` hook, over `visitsDroppingId` in `src/lens`). `id` is never added for the writer.
+- **Projections merge by `id`.** `mergeProjections(sourceRows, [{ path, lens, rows }, …])` (`src/lens/mergeProjections.ts`) gives one object per `id`, every list merged by its items' `id` at every level and kept in source order, a shown relation beating a hidden `null`. `attribution` is the paths that admitted at least one object: noted as used, never charged.
 
-Why: a merge by position glues one row's fields onto another's `id`; with `id` always kept, projections from different grants always line up object by object.
+Why: a merge by position glues one row's fields onto another's `id`; with `id` always kept, projections from different grants line up object by object.

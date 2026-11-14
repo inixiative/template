@@ -12,7 +12,8 @@
     "./client": "./src/client.ts",
     "./actorOf": "./src/actorOf.ts",
     "./entitlementRows": "./src/entitlementRows.ts",
-    "./lens/*": "./src/lens/*",
+    "./lens/mergeProjections": "./src/lens/mergeProjections.ts",
+    "./lens/visitsDroppingId": "./src/lens/visitsDroppingId.ts",
     "./types": "./src/types.ts",
     "./rebac/*": "./src/rebac/*",
     "./roles/*": "./src/roles/*"
