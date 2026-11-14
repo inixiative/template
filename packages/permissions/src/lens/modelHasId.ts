@@ -6,7 +6,6 @@
  */
 import { getLensRoot, type Lens, type LensNarrowing } from '@inixiative/json-rules';
 
-/** Whether a visited model's field map has an `id` column: the models whose objects merge by `id`. */
 export const modelHasId = (
   lens: Lens | LensNarrowing,
   { mapName, model }: { mapName: string; model: string },

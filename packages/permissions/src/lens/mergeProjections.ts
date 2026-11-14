@@ -8,7 +8,6 @@ import { type Lens, type LensNarrowing, lensVisit, type Row } from '@inixiative/
 import { modelHasId } from '@template/permissions/lens/modelHasId';
 import { cloneDeep, isEqual, isPlainObject, uniq } from 'lodash-es';
 
-/** One path's `projectRows(lens, sourceRows)`, with the lens it went through, tagged with the path's key. */
 export type LensProjection<PathKey extends string = string> = {
   path: PathKey;
   lens: Lens | LensNarrowing;
@@ -130,15 +129,6 @@ const mergeObject = (source: Row, parts: Part[], relationPath: string, label: st
   return merged;
 };
 
-/**
- * The chimera of several paths' projections of the same source rows: objects with one `id` are
- * one object holding every key any projection kept, to-one relations merged recursively, every
- * to-many list merged by its items' `id` (never by position), and a shown relation beating a
- * hidden (`null`) one. Scalars and Json kept by two projections must be equal. Every list,
- * the root included, comes back in the source rows' order, whatever order the paths are given in,
- * and the result shares no object with its inputs. `attribution` names every path that admitted
- * at least one object.
- */
 export const mergeProjections = <PathKey extends string>(
   sourceRows: readonly Row[],
   projections: readonly LensProjection<PathKey>[],

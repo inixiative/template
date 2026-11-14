@@ -33,12 +33,6 @@ const defaultsDroppingId = (narrowing: LensNarrowing): string[] => {
   );
 };
 
-/**
- * The visits of a valid narrowing (`validateNarrowing` passed) that do not show `id` on a model
- * whose field map has one: every path the narrowing shows, by `projectLens`, and every model its
- * `mapDefaults` narrow, wherever that model is visited. Empty when the lens keeps `id` everywhere,
- * which is what lets projections through different lenses be merged by `id`.
- */
 export const visitsDroppingId = (narrowing: LensNarrowing): string[] => [
   ...droppingId(narrowing, projectLens(narrowing)),
   ...defaultsDroppingId(narrowing),

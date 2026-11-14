@@ -27,10 +27,6 @@ const validated = (narrowing: LensNarrowing): ValidationResult => {
   }
 };
 
-/**
- * A stored lens is one json-rules narrowing over the resource's base lens, and it never removes
- * `id`, so the projections of every path a holder is admitted along can be merged by `id`.
- */
 export const validateEntitlementLens = ({
   resource,
   lens,
