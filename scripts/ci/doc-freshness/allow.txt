@@ -4,6 +4,8 @@
 
 # libraries and tools
 docs/claude/PERMISSIONS.md	capAtRole
+docs/claude/PERMISSIONS.md	loadMany
+docs/claude/PERMISSIONS.md	validateSchema
 ZodEffects
 c.json
 dangerouslySetInnerHTML
