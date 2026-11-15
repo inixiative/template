@@ -79,7 +79,7 @@ Other parts of the system (use them, don't parallel them):
 - `RulesRegistry` json-rules write rules, enforced by the rules hook — a row's own columns only (`full` takes no role; where `full` may be set). Nothing in a rules object reads an entitlement or its anchor. A non-full delegate with no role and no entitlements is not refused; it holds nothing. Don't call `validateRules` from controllers;
 - hydration / the lens — relations come from hydrating, never from copying keys;
 - the one `full` skip at install (`delegatedPermissions`);
-- the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement row, written after the member is created, backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `permissionsOfUser` routes it to the user and everything else to the tenant.
+- the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement row anchored at itself with no `where`, written after the member is created, backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `permissionsOfUser` routes it to the user and everything else to the tenant. Unlensed and unconditional, it grants below the member row: a `full` delegate of M1 grants over M1's own integrations (`entitlementsOf` marks every row with no `where` and no lens `grantsBelow`; PERMISSIONS.md § Granting below a held row).
 
 ## 3. Pseudo records
 

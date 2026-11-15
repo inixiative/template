@@ -28,7 +28,7 @@ export type EntitlementInput = {
 
 export type StoredEntitlement = Pick<
   Entitlement,
-  'resource' | 'actions' | 'where' | 'sourceModel' | 'sourceId' | 'sourcePath'
+  'resource' | 'actions' | 'where' | 'lens' | 'sourceModel' | 'sourceId' | 'sourcePath'
 >;
 
 /** The holder a row is stored on, as read: a member arm takes its owner chain off it. */

@@ -58,7 +58,7 @@ Writing a member's role: manage at the tenant and hold there the role being set.
 Gives db:organizationUser and db:spaceUser their actions; manage and own do not imply operate.
 
 **memberSelfGrant**  
-The entitlement every member row carries to operate on itself, anchored on and backed by its user.
+The entitlement every member row carries to operate on itself, anchored at the row with no `where` (so it grants below the row) and backed by its user.
 
 **memberSelfGrantRules**  
 Rule refusing any stored member row without its self-grant (422).
@@ -157,20 +157,18 @@ So the owner of O1 owns M1 and still does not operate it: removing M1 is the own
 `operate` on M1 comes from U1 by the schema walk. A delegate holding M1's permissions has no U1 in its table, so M1 carries its own `operate` as a stored entitlement, the member self-grant (`packages/permissions/src/roles/memberSelfGrant.ts`):
 
 ```typescript
-memberSelfGrant('db:organizationUser', { id: M1.id, userId: U1.id })
+memberSelfGrant('db:organizationUser', { id: M1.id })
 // {
 //   resource: 'db:organizationUser',
-//   anchor: { resource: 'db:user', id: U1.id, path: 'user' },
-//   where: { field: 'id', operator: 'equals', value: M1.id },
+//   anchor: { resource: 'db:organizationUser', id: M1.id },
 //   actions: { operate: true },
 // }
 ```
 
-- **Anchored on the member's user, along `user`, pinned to the row's id.** The anchor is U1 because U1 is what makes M1 operable; the `where` pins it to M1, so it never reaches U1's other member rows (U1's member row in another organization, or SM1).
+- **Anchored at the member row itself, with no `where`** (Aron, 2026-11-14). A self anchor reaches M1 and nothing else, so it never reaches U1's other member rows (U1's member row in another organization, or SM1). Why this shape: an unconditional entitlement with no lens counts in the grant check's first pass like a role on its record ([Granting below a held row](#granting-below-a-held-row)), so a `full` delegate of M1 can grant over M1's own integrations. The old shape (anchored at U1 along `user`, `where id = M1`) had a `where`, so it never counted there and a member-owned grant over the member's own integration was refused.
 - **Backed by the member's user.** A member's stored entitlements are installed with an owner that must still allow each action on each record. Every other entitlement on M1 is backed by O1's owner grant; the self-grant is backed by U1 (`getUserPermissions(U1)`), because O1's owner does not hold `operate` on M1 and would back nothing. At read time U1 still operates M1 through the normal walk, so the self-grant holds exactly as long as M1 is U1's.
-- **Only that exact entry is backed by the user.** `permissionsOfUser` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry whose resource, anchor and `where` equal the self-grant of that very row goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
-- **The `memberSelfGrant` hook writes it; a rule keeps it.** The hook (`apps/api/src/hooks/memberSelfGrant/hook.ts`, before `create`, `createManyAndReturn` and `upsert` on `OrganizationUser` and `SpaceUser`) appends the self-grant on create. The rule `memberSelfGrantRules` (`apps/api/src/hooks/rules/memberSelfGrantRules.ts`, in `RulesRegistry`) requires every stored member row to hold it: the rules hook checks the row as it will be stored on create, update and `updateManyAndReturn`, so a write that removes it, weakens it, swaps in another member's, or clears entitlements in bulk is refused with 422 (`apps/api/src/hooks/memberSelfGrant/hook.test.ts`).
-- **Its id is generated before insert.** The self-grant names the row's own id, and the database would only assign that id on insert, so the hook sets `row.id ??= Bun.randomUUIDv7()` first and builds the self-grant from it.
+- **Only that exact entry is backed by the user.** `permissionsOfUser` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry equal to the self-grant of that very row (resource, anchor, no `where`, `operate` alone; a lens is not part of the entry) goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
+- **The `memberSelfGrant` hook writes it; a guard keeps it.** The hook (`apps/api/src/hooks/memberSelfGrant/hook.ts`, after `create`, `createManyAndReturn` and an `upsert` that creates, on `OrganizationUser` and `SpaceUser`) writes the self-grant as an `Entitlement` row targeted at the new member, once the member has its id. A member created tombstoned (a transferred space's dropped people, `transferSpace`) gets its self-grant tombstoned with the member's own `deletedAt`, so reviving the member revives the grant. The guard `memberSelfGrant:kept` (same file, after updates on `Entitlement`) refuses with 422 any write that tombstones a live member's self-grant, by id or in bulk; only the cascade from the member's own tombstone takes it. Rows are immutable, so the grant can't be weakened in place either (`apps/api/src/hooks/memberSelfGrant/hook.test.ts`).
 
 Who holds `operate` on M1, then: U1 through the walk; a `full` delegate of M1 (or of U1), through the self-grant installed with M1's permissions; and a role delegate only when it is given `operate` on M1 by hand.
 
@@ -307,7 +305,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 #### Class `permissions-members`
 - **delegate** `packages/permissions/src/client.ts#delegate` [primitive] resolve a token's or integration's permissions from its owner's, capped at a ceiling Use: delegate(ownerPermissions, ceiling)
 - **delegatePermissionRules** `apps/api/src/hooks/rules/delegatePermissionRules.ts#delegatePermissionRules` [primitive] constrain where `full` and roles may sit on integration, token and member rows Use: Edit apps/api/src/hooks/rules/delegatePermissionRules.ts; enforced via RulesRegistry
-- **memberSelfGrant** `packages/permissions/src/roles/memberSelfGrant.ts#memberSelfGrant` [primitive] build the self-grant entitlement every org/space member row must hold Use: memberSelfGrant('organizationUser', { id, userId })
+- **memberSelfGrant** `packages/permissions/src/roles/memberSelfGrant.ts#memberSelfGrant` [primitive] build the self-grant entitlement every org/space member row must hold Use: memberSelfGrant('db:organizationUser', { id })
 - **validateIntegrationGrant** `apps/api/src/modules/integration/validations/validateIntegrationGrant.ts#validateIntegrationGrant` [primitive] check the writer may grant the access an integration create body requests Use: await validateIntegrationGrant(writer, body)
 - **validateIntegrationRole** `apps/api/src/modules/integration/validations/validateIntegrationGrant.ts#validateIntegrationRole` [primitive] check the writer may set an integration's role, returning the hydrated pseudo integration Use: const hydrated = await validateIntegrationRole(writer, body)
 - **validateTokenWrite** `apps/api/src/modules/token/validations/validateTokenWrite.ts#validateTokenWrite` [primitive] check the writer may create the token before and after a change, including full grants Use: await validateTokenWrite(writer, token)

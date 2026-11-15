@@ -36,6 +36,7 @@ const leafNames = (rule: ActionRule): string[] => {
   if (typeof rule === 'string') return [`:${rule}`];
   if ('any' in rule) return rule.any.flatMap(leafNames);
   if ('all' in rule) return rule.all.flatMap(leafNames);
+  if ('arrayOperator' in rule) return [`${rule.rel}[]`];
   if ('rel' in rule) return [`${rule.rel}:${rule.action}`];
   return [(rule.rule as { field: string }).field];
 };

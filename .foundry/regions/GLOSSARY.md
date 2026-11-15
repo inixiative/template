@@ -2384,7 +2384,7 @@ Writing a member's role: manage at the tenant and hold there the role being set.
 Gives db:organizationUser and db:spaceUser their actions; manage and own do not imply operate. *Region:* [Member rows and delegates](permissions-members/knowledge.md)
 
 **memberSelfGrant**  
-The entitlement every member row carries to operate on itself, anchored on and backed by its user. *Region:* [Member rows and delegates](permissions-members/knowledge.md)
+The entitlement every member row carries to operate on itself, anchored at the row with no `where` (so it grants below the row) and backed by its user. *Region:* [Member rows and delegates](permissions-members/knowledge.md)
 
 **memberSelfGrantRules**  
 Rule refusing any stored member row without its self-grant (422). *Region:* [Member rows and delegates](permissions-members/knowledge.md)

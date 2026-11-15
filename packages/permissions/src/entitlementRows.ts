@@ -20,6 +20,7 @@ export type EntitlementFields = {
   resource: string;
   actions: string[];
   where?: unknown;
+  lens?: unknown;
   sourceModel: string;
   sourceId: string;
   sourcePath?: string | null;
@@ -60,8 +61,15 @@ export const toEntitlementInput = (entry: EntitlementEntry): EntitlementInput =>
   ...(entry.anchor.path ? { sourcePath: entry.anchor.path } : {}),
 });
 
-/** The well-formed entries a holder's live rows grant, for the library's checks. */
+const grantsBelow = (row: EntitlementFields): boolean => row.where == null && row.lens == null;
+
+/** The well-formed entries a holder's live rows grant, for the library's checks; a row nothing narrows grants below its record. */
 export const entitlementsOf = (holder: {
   targetEntitlements?: EntitlementFields[] | null;
 }): EntitlementEntry[] =>
-  wellFormedEntitlements((holder.targetEntitlements ?? []).map(toEntitlementEntry));
+  wellFormedEntitlements(
+    (holder.targetEntitlements ?? []).map((row) => ({
+      ...toEntitlementEntry(row),
+      ...(grantsBelow(row) ? { grantsBelow: true as const } : {}),
+    })),
+  );

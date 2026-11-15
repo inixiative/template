@@ -44,6 +44,7 @@
   - [Integrations Are Delegates](#integrations-are-delegates)
   - [An Integration's Role](#an-integrations-role)
   - [Granting an Entitlement](#granting-an-entitlement)
+    - [Granting below a held row](#granting-below-a-held-row)
 - [Entitlements](#entitlements)
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
   - [Changing Entitlements](#changing-entitlements)
@@ -55,7 +56,10 @@
   - [Schema](#schema)
   - [ActionRule Types](#actionrule-types)
   - [How It Works](#how-it-works)
+  - [Crossing a List (`down`)](#crossing-a-list-down)
+  - [Placing a Field on a Stand-In (`place`)](#placing-a-field-on-a-stand-in-place)
   - [Dot-path vs. Single-hop Delegation](#dot-path-vs-single-hop-delegation)
+  - [Inquiry permissions](#inquiry-permissions)
 - [Owner-Polymorphic Models](#owner-polymorphic-models)
 - [Row-Level Overrides](#row-level-overrides)
   - [Schema](#schema)
@@ -253,18 +257,17 @@ So the owner of O1 owns M1 and still does not operate it: removing M1 is the own
 `operate` on M1 comes from U1 by the schema walk. A delegate holding M1's permissions has no U1 in its table, so M1 carries its own `operate` as a stored entitlement, the member self-grant (`packages/permissions/src/roles/memberSelfGrant.ts`):
 
 ```typescript
-memberSelfGrant('db:organizationUser', { id: M1.id, userId: U1.id })
+memberSelfGrant('db:organizationUser', { id: M1.id })
 // {
 //   resource: 'db:organizationUser',
-//   anchor: { resource: 'db:user', id: U1.id, path: 'user' },
-//   where: { field: 'id', operator: 'equals', value: M1.id },
+//   anchor: { resource: 'db:organizationUser', id: M1.id },
 //   actions: { operate: true },
 // }
 ```
 
-- **Anchored on the member's user, along `user`, pinned to the row's id.** The anchor is U1 because U1 is what makes M1 operable; the `where` pins it to M1, so it never reaches U1's other member rows (U1's member row in another organization, or SM1).
+- **Anchored at the member row itself, with no `where`** (Aron, 2026-11-14). A self anchor reaches M1 and nothing else, so it never reaches U1's other member rows (U1's member row in another organization, or SM1). Why this shape: an unconditional entitlement with no lens counts in the grant check's first pass like a role on its record ([Granting below a held row](#granting-below-a-held-row)), so a `full` delegate of M1 can grant over M1's own integrations. The old shape (anchored at U1 along `user`, `where id = M1`) had a `where`, so it never counted there and a member-owned grant over the member's own integration was refused.
 - **Backed by the member's user.** A member's stored entitlements are installed with an owner that must still allow each action on each record. Every other entitlement on M1 is backed by O1's owner grant; the self-grant is backed by U1 (`getUserPermissions(U1)`), because O1's owner does not hold `operate` on M1 and would back nothing. At read time U1 still operates M1 through the normal walk, so the self-grant holds exactly as long as M1 is U1's.
-- **Only that exact entry is backed by the user.** `permissionsOfUser` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry whose resource, anchor and `where` equal the self-grant of that very row goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
+- **Only that exact entry is backed by the user.** `permissionsOfUser` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry equal to the self-grant of that very row (resource, anchor, no `where`, `operate` alone; a lens is not part of the entry) goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
 - **The `memberSelfGrant` hook writes it; a guard keeps it.** The hook (`apps/api/src/hooks/memberSelfGrant/hook.ts`, after `create`, `createManyAndReturn` and an `upsert` that creates, on `OrganizationUser` and `SpaceUser`) writes the self-grant as an `Entitlement` row targeted at the new member, once the member has its id. A member created tombstoned (a transferred space's dropped people, `transferSpace`) gets its self-grant tombstoned with the member's own `deletedAt`, so reviving the member revives the grant. The guard `memberSelfGrant:kept` (same file, after updates on `Entitlement`) refuses with 422 any write that tombstones a live member's self-grant, by id or in bulk; only the cascade from the member's own tombstone takes it. Rows are immutable, so the grant can't be weakened in place either (`apps/api/src/hooks/memberSelfGrant/hook.test.ts`).
 
 Who holds `operate` on M1, then: U1 through the walk; a `full` delegate of M1 (or of U1), through the self-grant installed with M1's permissions; and a role delegate only when it is given `operate` on M1 by hand.
@@ -403,7 +406,7 @@ A delegate that is not `full` and has no role and no entitlements is not refused
 
 ### Hydration
 
-`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchOne` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load goes through `cache()`, which computes inside `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchOne` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its live entitlement rows (`includeTargetEntitlements(model)`, ordered by `createdAt`, `id`) and caches it with those rows as stored, so a hydrated holder carries `targetEntitlements: Entitlement[]` and the cache holds one shape. `findUserWithRelations` and `loadTokenContext` read the same way. The rows turn into the library's entries at check time, where a holder is handed to the library (`entitlementsOf` in `@template/permissions`, which also prunes them with `wellFormedEntitlements`). A write to an `Entitlement` row clears its target's cache keys (its parent edge, [HOOKS.md](HOOKS.md#parent-edges)), so a revoked row is gone on the very next request.
+`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchOne` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. It owns those relations: a value the caller put under a to-one relation is dropped unless the hydrator loaded it, so attach a hand-made relation after hydrating. A list is left as given unless it is declared `down` ([Crossing a List](#crossing-a-list-down)). A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load goes through `cache()`, which computes inside `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchOne` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its live entitlement rows (`includeTargetEntitlements(model)`, ordered by `createdAt`, `id`) and caches it with those rows as stored, so a hydrated holder carries `targetEntitlements: Entitlement[]` and the cache holds one shape. `findUserWithRelations` and `loadTokenContext` read the same way. The rows turn into the library's entries at check time, where a holder is handed to the library (`entitlementsOf` in `@template/permissions`, which also prunes them with `wellFormedEntitlements`). A write to an `Entitlement` row clears its target's cache keys (its parent edge, [HOOKS.md](HOOKS.md#parent-edges)), so a revoked row is gone on the very next request.
 
 ### installPermissions
 
@@ -509,8 +512,19 @@ Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on t
 
 A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
 
-1. **The writer's role table.** The writer's table alone (no entitlements, no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable.
+1. **The writer's role table, and what it holds outright above the record.** The writer's table (no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable. An entitlement the writer holds counts here too, like a role on its record, when it is marked `grantsBelow` and sits on a real row above the pseudo record ([Granting below a held row](#granting-below-a-held-row)).
 2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed (an `all` holding every conjunct of the held `where` plus more: held `C`, granted `all: [A, B, C]`), and its granter still backing each action. The lens is never copied: lenses compose down the chain ([the lens](../../packages/permissions/src/rebac/ENTITLEMENTS.md#the-lens)). Held entitlements never combine: to pass on two, grant two.
+
+#### Granting below a held row
+
+An entitlement held with no `where` and no lens grants below its record, as a role there would (Aron, 2026-11-14). `entitlementsOf` marks every such row `grantsBelow: true` as it turns rows into entries for a table; the library counts a marked entry in the first pass only on a hydrated row above the granted record (the entry's anchor row when the entry sits under it by a path, or a row the anchor holds under its own foreign keys), never on the granted record itself or a pseudo record, and asks the same of whoever backs it at every depth. So M1's self-grant lets a `full` delegate of M1 give `manage` on I1, M1's integration, to another of M1's delegates; a holder of `manage` on S1 (no `where`, no lens) grants `manage` on S1's integrations instead of only a copy of itself.
+
+- **Why no `where`.** A held `where` would be read on today's anchor row and left out of the grant, so the new row would outlive the condition. A row with a `where` is handed on only by the second pass, which keeps every held condition.
+- **Why no lens.** The library never sees a lens; the mark is the app's statement that nothing narrows the row. A lensed row is handed on by the second pass, where its lens composes down the chain at read. Aron: "we shouldn't pass lensed grants… That way, it's just maximally open."
+- **Why derived, not stored.** The mark is a fact about the row's `where` and `lens` columns, so a column would only restate them and could disagree. It is set in `entitlementsOf` alone, not in `toEntitlementEntry`: that one also compares rows (`sameEntitlement`, the writer's coverage), where the lens is deliberately not part of the grant and a mark would make a lensed row and its unlensed twin unequal.
+- **A capped delegate is unchanged.** A role-capped token drops its owner's entitlements (the library's `delegate` keeps only the owner's unowned groups when capping), the self-grant included, so it is still not the member and grants nothing below M1.
+
+Situations: `apps/api/src/lib/permissions/memberGrantsBelowItself.test.ts`.
 
 Every entry goes through this check, whoever writes it and whatever delegate it lands on, and so does every row being removed: you remove only what you could grant. A malformed entry or an anchor that does not exist is 422; a refusal is 403.
 
@@ -586,7 +600,7 @@ A holder can be admitted along several delegation paths, each with its own lens 
 2. **Every action is on the record.** Name what a caller does to this model (`create`, `delete`, `send`), never what the model does elsewhere. A create rule goes on the created model and is checked on a pseudo record.
 3. **Person-only acts** add `actorIsUser` to their rule. Never use the actor to decide relationships.
 4. **Declare deviations.** If the model does not chain all four standard actions, list exactly which links it misses in `notStandard` in `standardActionsChain.test.ts`.
-5. **Hydration.** The check walks hydrated to-one relations only. `hydrate` (`packages/db/src/hydrate/hydrate.ts`) loads every foreign-key relation of the model, recursively and live rows only, so a new relation is reachable once the Prisma schema has it.
+5. **Hydration.** The check walks hydrated to-one relations, and a list only where it is declared ([Crossing a List](#crossing-a-list-down)). `hydrate` (`packages/db/src/hydrate/hydrate.ts`) loads every foreign-key relation of the model, recursively and live rows only, so a new relation is reachable once the Prisma schema has it.
 6. **Routes.** A route on the record names its action with `validatePermission(action)`; a create or collection under an owner uses `validateSubmodelPermission(action)`. Checks that need the body run in the controller with the same `check`.
 7. **Tests first**, in the situations' own sentences, including attempts to get around the rule (another member's row, a token actor, a lower role, another tenant). Factories only.
 
@@ -632,6 +646,7 @@ The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed
 | `string` | another action on the same record | `manage: 'own'` |
 | `{ rel, action }` | the action on a related record (dot-paths walk further) | `{ rel: 'organization', action: 'own' }` |
 | `{ rule: Condition }` | a json-rules condition over the record and `__actor` | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
+| `{ rel, arrayOperator: 'any', condition }` | some item of a declared list passes `condition`, judged on the item ([Crossing a List](#crossing-a-list-down)) | `{ rel: 'participants', arrayOperator: 'any', condition: { rel: 'user', action: 'operate' } }` |
 | `{ any: ActionRule[] }` | at least one passes | `{ any: [{ rel: 'user', action: 'read' }, 'read'] }` |
 | `{ all: ActionRule[] }` | all pass | `{ all: [actorIsUser, 'own'] }` |
 | `null` | only a held grant passes | `own: null` |
@@ -645,6 +660,47 @@ Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'o
 3. **Dot-path traversal**: `{ rel: 'sourceSpace.organization', action: 'own' }` walks `inquiry.sourceSpace` and then its `organization`, and asks `own` only there.
 4. **Entitlements**: consulted at a record only after the table and the schema rule miss.
 5. **Cycle detection** stops a rule that comes back to itself.
+
+### Crossing a List (`down`)
+
+A `{ rel, action }` walk goes up: from a record to a parent it holds the key of. Some rules turn on a child row instead, and the record holds no key to it:
+
+- **Membership.** You may post in a conversation when you are one of its participants.
+- **A junction table.** A resource is attached to many projects, and whoever reads one of those projects reads the resource. The role or entitlement stays on the project.
+
+The list arm says "some item passes": `{ rel: '<list field>', arrayOperator: 'any', condition }`, where `condition` is an ActionRule judged on each item as the item's own resource. `any` is the only operator; the others hold on an empty list or count rows, and the library refuses them.
+
+The list is declared on the Prisma field, and the declaration is the load plan:
+
+```prisma
+model Resource {
+  /// @permissions(down: [project.organization])
+  projects ProjectResource[]
+}
+```
+
+```ts
+'db:resource': {
+  actions: {
+    read: { rel: 'projects', arrayOperator: 'any', condition: { rel: 'project', action: 'read' } },
+  },
+},
+```
+
+- **`down` is a list of dotted to-one paths from an item**, each leaf by its full path (`[a.b, a.c]`). `down: []` loads the items alone.
+- **What loads.** Wherever the model is hydrated, the hydrator makes one `loadMany` read of the items, then loads only the declared paths under each. Nothing else loads from an item, so hydration goes one jump down and never back up into the record it came from. Any other to-one relation on an item ends empty.
+- **The declaration carries what the rule walks.** Every relation the `condition` walks, followed through the actions it lands on, must be inside a declared path. Above, `project.read` walks on to the organization, so the path is `project.organization`. A shorter declaration is a `validateSchema` error and the check refuses the schema on first use.
+- **One jump.** A list arm under an item denies. A list that is not declared is never crossed.
+- **Never on a stand-in.** A record that does not exist yet has no list, so a grant that rests on a list is anchored where a real list is (the record itself, or one below it), not above.
+- **Wiring.** `createHydrator` needs `loadMany` once any list is declared and refuses to build without it. Add it beside `load` in `packages/db/src/hydrate/hydrate.ts`, reading live rows through the same cache layer. Template declares no list today.
+
+When the record holds the key itself, use a plain `rel`. The library README (`@inixiative/permissions`, "Crossing a list") has the full rules.
+
+### Placing a Field on a Stand-In (`place`)
+
+A grant is checked on a stand-in record before the real one exists. A rule that reads a type field one level down (`resource.kind`) finds it unknown there. Mark the scalar `/// @permissions(place: true)` and a grant whose `where` states `<path>.<field> equals <literal>` builds the stand-in with that value. The condition stays on the row, so it is still judged on the real record at read. Allowed on String, Int, Boolean and enum fields; never on an id, a relation key, a discriminator or a relation. Use it instead of copying the field onto the root model.
+
+`@permissions(...)` takes three keys (`hydrate: false`, `down`, `place`) and is read strictly: a typo throws on first use of the map.
 
 ### Dot-path vs. Single-hop Delegation
 

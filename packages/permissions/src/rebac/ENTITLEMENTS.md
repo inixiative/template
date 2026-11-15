@@ -54,12 +54,7 @@ Examples:
 }
 
 // the member self-grant on M1: written by the memberSelfGrant hook, never by hand
-{
-  resource: 'db:organizationUser',
-  anchor: { resource: 'db:user', id: U1, path: 'user' },
-  where: { field: 'id', operator: 'equals', value: M1 },
-  actions: { operate: true },
-}
+{ resource: 'db:organizationUser', anchor: { resource: 'db:organizationUser', id: M1 }, actions: { operate: true } }
 ```
 
 ## Who backs it
@@ -68,11 +63,11 @@ Every entitlement is installed with an owner, and holds an action on a record on
 
 - on a token or an integration, the owner is the delegate's owner table;
 - on a member row, the owner is the tenant's owner grant (`own` on O1 for M1);
-- the member self-grant alone is backed by the member's user, and only the exact entry for that row.
+- the member self-grant alone is backed by the member's user, and only the exact entry for that row: `operate` on M1 is `manage` on U1, which only U1's own table takes.
 
 ## Granting one
 
-Entitlements are read on their holder (`targetEntitlements`, the rows as stored) and change only through its sub-resource: `POST …/:id/entitlements` with an array of rows grants them, `DELETE …/:id/entitlements` with an array of row ids removes them, both through the one writer (`changeEntitlements`). Each row becomes the library's entry at this boundary (`toEntitlementEntry`, `packages/permissions/src/entitlementRows.ts`). Every added entry, and every removed row, is one check: `placeEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action, or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Narrowed has one form: the entry's `where` is an `all` holding every conjunct of the held `where` plus more (held `C`, granted `all: [A, B, C]`; held `all: [C1, C2]`, granted `all: [A, C1, C2]`). Anything else is refused. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
+Entitlements are read on their holder (`targetEntitlements`, the rows as stored) and change only through its sub-resource: `POST …/:id/entitlements` with an array of rows grants them, `DELETE …/:id/entitlements` with an array of row ids removes them, both through the one writer (`changeEntitlements`). Each row becomes the library's entry at this boundary (`toEntitlementEntry`, `packages/permissions/src/entitlementRows.ts`). Every added entry, and every removed row, is one check: `placeEntitlement` builds a pseudo record per kind the entry reaches, and `canGrantEntitlement` asks, on each, whether the writer's role table takes every action (counting, like a role on its record, an entitlement the writer holds with no `where` and no lens on a row above the granted one: [granting below a held row](../../../../docs/claude/PERMISSIONS.md#granting-below-a-held-row)), or else whether the entry is a copy of one entitlement the writer holds, with actions lowered through the chain and its `where` copied or narrowed. Narrowed has one form: the entry's `where` is an `all` holding every conjunct of the held `where` plus more (held `C`, granted `all: [A, B, C]`; held `all: [C1, C2]`, granted `all: [A, C1, C2]`). Anything else is refused. Held entitlements never combine. A person-only action (`create` on a token, `delegateFull`) is never grantable: the grant check runs with no actor.
 
 ## The standard chain
 
