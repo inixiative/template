@@ -5,6 +5,7 @@
  * @uses none
  */
 import {
+  type Lens,
   type LensNarrowing,
   type ValidationResult,
   validateNarrowing,
@@ -27,18 +28,23 @@ const validated = (narrowing: LensNarrowing): ValidationResult => {
   }
 };
 
-export const validateEntitlementLens = ({
-  resource,
-  lens,
-}: {
-  resource: EntitlementResourceModel;
-  lens?: unknown;
-}): void => {
+export const validateEntitlementLens = (
+  {
+    resource,
+    lens,
+  }: {
+    resource: EntitlementResourceModel;
+    lens?: unknown;
+  },
+  baseLensOf: (resource: EntitlementResourceModel) => Lens | null = lensFor,
+): void => {
   if (isCleared(lens)) return;
   if (!isPlainObject(lens)) throw malformed('it is not an object');
+  const base = baseLensOf(resource);
+  if (!base) throw malformed(`${resource} takes no lens`);
   const { root, mapDefaults } = lens as Pick<LensNarrowing, 'root' | 'mapDefaults'>;
   const narrowing: LensNarrowing = {
-    parent: lensFor(resource),
+    parent: base,
     ...(root !== undefined ? { root } : {}),
     ...(mapDefaults !== undefined ? { mapDefaults } : {}),
   };
