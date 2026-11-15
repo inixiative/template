@@ -44,6 +44,7 @@
   - [Integrations Are Delegates](#integrations-are-delegates)
   - [An Integration's Role](#an-integrations-role)
   - [Granting an Entitlement](#granting-an-entitlement)
+    - [Granting below a held row](#granting-below-a-held-row)
 - [Entitlements](#entitlements)
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
   - [Changing Entitlements](#changing-entitlements)
@@ -56,6 +57,7 @@
   - [ActionRule Types](#actionrule-types)
   - [How It Works](#how-it-works)
   - [Dot-path vs. Single-hop Delegation](#dot-path-vs-single-hop-delegation)
+  - [Inquiry permissions](#inquiry-permissions)
 - [Owner-Polymorphic Models](#owner-polymorphic-models)
 - [Row-Level Overrides](#row-level-overrides)
   - [Schema](#schema)
@@ -253,18 +255,17 @@ So the owner of O1 owns M1 and still does not operate it: removing M1 is the own
 `operate` on M1 comes from U1 by the schema walk. A delegate holding M1's permissions has no U1 in its table, so M1 carries its own `operate` as a stored entitlement, the member self-grant (`packages/permissions/src/roles/memberSelfGrant.ts`):
 
 ```typescript
-memberSelfGrant('db:organizationUser', { id: M1.id, userId: U1.id })
+memberSelfGrant('db:organizationUser', { id: M1.id })
 // {
 //   resource: 'db:organizationUser',
-//   anchor: { resource: 'db:user', id: U1.id, path: 'user' },
-//   where: { field: 'id', operator: 'equals', value: M1.id },
+//   anchor: { resource: 'db:organizationUser', id: M1.id },
 //   actions: { operate: true },
 // }
 ```
 
-- **Anchored on the member's user, along `user`, pinned to the row's id.** The anchor is U1 because U1 is what makes M1 operable; the `where` pins it to M1, so it never reaches U1's other member rows (U1's member row in another organization, or SM1).
+- **Anchored at the member row itself, with no `where`** (Aron, 2026-11-14). A self anchor reaches M1 and nothing else, so it never reaches U1's other member rows (U1's member row in another organization, or SM1). Why this shape: an unconditional entitlement with no lens counts in the grant check's first pass like a role on its record ([Granting below a held row](#granting-below-a-held-row)), so a `full` delegate of M1 can grant over M1's own integrations. The old shape (anchored at U1 along `user`, `where id = M1`) had a `where`, so it never counted there and a member-owned grant over the member's own integration was refused.
 - **Backed by the member's user.** A member's stored entitlements are installed with an owner that must still allow each action on each record. Every other entitlement on M1 is backed by O1's owner grant; the self-grant is backed by U1 (`getUserPermissions(U1)`), because O1's owner does not hold `operate` on M1 and would back nothing. At read time U1 still operates M1 through the normal walk, so the self-grant holds exactly as long as M1 is U1's.
-- **Only that exact entry is backed by the user.** `permissionsOfUser` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry whose resource, anchor and `where` equal the self-grant of that very row goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
+- **Only that exact entry is backed by the user.** `permissionsOfUser` splits a member's entitlements with `isMemberSelfGrant(resource, member)`: an entry equal to the self-grant of that very row (resource, anchor, no `where`, `operate` alone; a lens is not part of the entry) goes to U1; everything else, including a wider entry anchored on U1 or M1's self-grant copied onto M2, goes to the tenant. Backing a wider entry by the user would let whoever writes member entitlements spend the user's authority (`apps/api/src/lib/permissions/memberSelfGrant.test.ts`).
 - **The `memberSelfGrant` hook writes it; a guard keeps it.** The hook (`apps/api/src/hooks/memberSelfGrant/hook.ts`, after `create`, `createManyAndReturn` and an `upsert` that creates, on `OrganizationUser` and `SpaceUser`) writes the self-grant as an `Entitlement` row targeted at the new member, once the member has its id. A member created tombstoned (a transferred space's dropped people, `transferSpace`) gets its self-grant tombstoned with the member's own `deletedAt`, so reviving the member revives the grant. The guard `memberSelfGrant:kept` (same file, after updates on `Entitlement`) refuses with 422 any write that tombstones a live member's self-grant, by id or in bulk; only the cascade from the member's own tombstone takes it. Rows are immutable, so the grant can't be weakened in place either (`apps/api/src/hooks/memberSelfGrant/hook.test.ts`).
 
 Who holds `operate` on M1, then: U1 through the walk; a `full` delegate of M1 (or of U1), through the self-grant installed with M1's permissions; and a role delegate only when it is given `operate` on M1 by hand.
@@ -509,8 +510,19 @@ Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on t
 
 A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
 
-1. **The writer's role table.** The writer's table alone (no entitlements, no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable.
+1. **The writer's role table, and what it holds outright above the record.** The writer's table (no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable. An entitlement the writer holds counts here too, like a role on its record, when it is marked `grantsBelow` and sits on a real row above the pseudo record ([Granting below a held row](#granting-below-a-held-row)).
 2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed (an `all` holding every conjunct of the held `where` plus more: held `C`, granted `all: [A, B, C]`), and its granter still backing each action. The lens is never copied: lenses compose down the chain ([the lens](../../packages/permissions/src/rebac/ENTITLEMENTS.md#the-lens)). Held entitlements never combine: to pass on two, grant two.
+
+#### Granting below a held row
+
+An entitlement held with no `where` and no lens grants below its record, as a role there would (Aron, 2026-11-14). `entitlementsOf` marks every such row `grantsBelow: true` as it turns rows into entries for a table; the library counts a marked entry in the first pass only on a hydrated row above the granted record (the entry's anchor row when the entry sits under it by a path, or a row the anchor holds under its own foreign keys), never on the granted record itself or a pseudo record, and asks the same of whoever backs it at every depth. So M1's self-grant lets a `full` delegate of M1 give `manage` on I1, M1's integration, to another of M1's delegates; a holder of `manage` on S1 (no `where`, no lens) grants `manage` on S1's integrations instead of only a copy of itself.
+
+- **Why no `where`.** A held `where` would be read on today's anchor row and left out of the grant, so the new row would outlive the condition. A row with a `where` is handed on only by the second pass, which keeps every held condition.
+- **Why no lens.** The library never sees a lens; the mark is the app's statement that nothing narrows the row. A lensed row is handed on by the second pass, where its lens composes down the chain at read. Aron: "we shouldn't pass lensed grants… That way, it's just maximally open."
+- **Why derived, not stored.** The mark is a fact about the row's `where` and `lens` columns, so a column would only restate them and could disagree. It is set in `entitlementsOf` alone, not in `toEntitlementEntry`: that one also compares rows (`sameEntitlement`, the writer's coverage), where the lens is deliberately not part of the grant and a mark would make a lensed row and its unlensed twin unequal.
+- **A capped delegate is unchanged.** A role-capped token drops its owner's entitlements (the library's `delegate` keeps only the owner's unowned groups when capping), the self-grant included, so it is still not the member and grants nothing below M1.
+
+Situations: `apps/api/src/lib/permissions/memberGrantsBelowItself.test.ts`.
 
 Every entry goes through this check, whoever writes it and whatever delegate it lands on, and so does every row being removed: you remove only what you could grant. A malformed entry or an anchor that does not exist is 422; a refusal is 403.
 

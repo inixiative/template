@@ -355,20 +355,40 @@ describe('edges of the lifecycle the review found (2026-11-03)', () => {
 });
 
 describe("an entitlement's where names rows as rule-reference edges", () => {
-  const selfGrantEdges = (memberId: string) =>
+  const edgesTo = (spaceId: string) =>
     db.ruleReference.findMany({
-      where: { sourceModel: 'Entitlement', targetModel: 'OrganizationUser', targetId: memberId },
+      where: { sourceModel: 'Entitlement', targetModel: 'Space', targetId: spaceId },
     });
 
-  it('a self-grant names its member; the edge goes with the row and comes back with it', async () => {
-    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
-    expect(await selfGrantEdges(member.id)).toHaveLength(1);
+  it("a row's where names the space it pins; the edge goes with the row and comes back with it", async () => {
+    const { entity: space } = await createSpace({}, { organization });
+    const pinned = {
+      ...entry('db:space', ['db:organization', organization.id, 'organization'], ['read']),
+      where: { field: 'id', operator: 'equals', value: space.id },
+    };
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member', entitlements: [pinned] },
+      { organization },
+    );
+    expect(await edgesTo(space.id)).toHaveLength(1);
 
     await db.organizationUser.update({ where: { id: member.id }, data: { deletedAt: new Date() } });
-    expect(await selfGrantEdges(member.id)).toHaveLength(0);
+    expect(await edgesTo(space.id)).toHaveLength(0);
 
     await revive(db.organizationUser, { id: member.id });
-    expect(await selfGrantEdges(member.id)).toHaveLength(1);
+    expect(await edgesTo(space.id)).toHaveLength(1);
+  });
+
+  it('the self-grant has no where, so it names no row: its anchor is the member itself', async () => {
+    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
+    expect(
+      await db.ruleReference.findMany({
+        where: { sourceModel: 'Entitlement', targetModel: 'OrganizationUser', targetId: member.id },
+      }),
+    ).toEqual([]);
+    expect(await rowsOf('OrganizationUser', member.id)).toMatchObject([
+      { sourceModel: 'OrganizationUser', sourceId: member.id, sourcePath: null, where: null },
+    ]);
   });
 });
 
