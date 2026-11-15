@@ -56,6 +56,8 @@
   - [Schema](#schema)
   - [ActionRule Types](#actionrule-types)
   - [How It Works](#how-it-works)
+  - [Crossing a List (`down`)](#crossing-a-list-down)
+  - [Placing a Field on a Stand-In (`place`)](#placing-a-field-on-a-stand-in-place)
   - [Dot-path vs. Single-hop Delegation](#dot-path-vs-single-hop-delegation)
   - [Inquiry permissions](#inquiry-permissions)
 - [Owner-Polymorphic Models](#owner-polymorphic-models)
@@ -404,7 +406,7 @@ A delegate that is not `full` and has no role and no entitlements is not refused
 
 ### Hydration
 
-`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchOne` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load goes through `cache()`, which computes inside `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchOne` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its live entitlement rows (`includeTargetEntitlements(model)`, ordered by `createdAt`, `id`) and caches it with those rows as stored, so a hydrated holder carries `targetEntitlements: Entitlement[]` and the cache holds one shape. `findUserWithRelations` and `loadTokenContext` read the same way. The rows turn into the library's entries at check time, where a holder is handed to the library (`entitlementsOf` in `@template/permissions`, which also prunes them with `wellFormedEntitlements`). A write to an `Entitlement` row clears its target's cache keys (its parent edge, [HOOKS.md](HOOKS.md#parent-edges)), so a revoked row is gone on the very next request.
+`hydrate(accessor, record)` (`packages/db/src/hydrate/hydrate.ts`) is the library's `createHydrator` over `schemaMap` (`packages/db/src/schemaMap.ts`, the same map the checks walk), loading each parent with `fetchOne` under its own cache key. It follows every to-one relation that owns its foreign key, by every column of a composite key, and on a polymorphic record every relation whose columns are set. It owns those relations: a value the caller put under a to-one relation is dropped unless the hydrator loaded it, so attach a hand-made relation after hydrating. A list is left as given unless it is declared `down` ([Crossing a List](#crossing-a-list-down)). A relation tagged `/// @permissions(hydrate: false)` in the Prisma schema is not followed, and an edge back to a record already on the path is cut. Every load goes through `cache()`, which computes inside `db.withoutDeleted`, so a check run inside a `db.withDeleted` block never sees a tombstoned member, organization or integration. `fetchOne` loads a `Token`, `Integration`, `OrganizationUser` or `SpaceUser` with its live entitlement rows (`includeTargetEntitlements(model)`, ordered by `createdAt`, `id`) and caches it with those rows as stored, so a hydrated holder carries `targetEntitlements: Entitlement[]` and the cache holds one shape. `findUserWithRelations` and `loadTokenContext` read the same way. The rows turn into the library's entries at check time, where a holder is handed to the library (`entitlementsOf` in `@template/permissions`, which also prunes them with `wellFormedEntitlements`). A write to an `Entitlement` row clears its target's cache keys (its parent edge, [HOOKS.md](HOOKS.md#parent-edges)), so a revoked row is gone on the very next request.
 
 ### installPermissions
 
@@ -598,7 +600,7 @@ A holder can be admitted along several delegation paths, each with its own lens 
 2. **Every action is on the record.** Name what a caller does to this model (`create`, `delete`, `send`), never what the model does elsewhere. A create rule goes on the created model and is checked on a pseudo record.
 3. **Person-only acts** add `actorIsUser` to their rule. Never use the actor to decide relationships.
 4. **Declare deviations.** If the model does not chain all four standard actions, list exactly which links it misses in `notStandard` in `standardActionsChain.test.ts`.
-5. **Hydration.** The check walks hydrated to-one relations only. `hydrate` (`packages/db/src/hydrate/hydrate.ts`) loads every foreign-key relation of the model, recursively and live rows only, so a new relation is reachable once the Prisma schema has it.
+5. **Hydration.** The check walks hydrated to-one relations, and a list only where it is declared ([Crossing a List](#crossing-a-list-down)). `hydrate` (`packages/db/src/hydrate/hydrate.ts`) loads every foreign-key relation of the model, recursively and live rows only, so a new relation is reachable once the Prisma schema has it.
 6. **Routes.** A route on the record names its action with `validatePermission(action)`; a create or collection under an owner uses `validateSubmodelPermission(action)`. Checks that need the body run in the controller with the same `check`.
 7. **Tests first**, in the situations' own sentences, including attempts to get around the rule (another member's row, a token actor, a lower role, another tenant). Factories only.
 
@@ -644,6 +646,7 @@ The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed
 | `string` | another action on the same record | `manage: 'own'` |
 | `{ rel, action }` | the action on a related record (dot-paths walk further) | `{ rel: 'organization', action: 'own' }` |
 | `{ rule: Condition }` | a json-rules condition over the record and `__actor` | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
+| `{ rel, arrayOperator: 'any', condition }` | some item of a declared list passes `condition`, judged on the item ([Crossing a List](#crossing-a-list-down)) | `{ rel: 'participants', arrayOperator: 'any', condition: { rel: 'user', action: 'operate' } }` |
 | `{ any: ActionRule[] }` | at least one passes | `{ any: [{ rel: 'user', action: 'read' }, 'read'] }` |
 | `{ all: ActionRule[] }` | all pass | `{ all: [actorIsUser, 'own'] }` |
 | `null` | only a held grant passes | `own: null` |
@@ -657,6 +660,47 @@ Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'o
 3. **Dot-path traversal**: `{ rel: 'sourceSpace.organization', action: 'own' }` walks `inquiry.sourceSpace` and then its `organization`, and asks `own` only there.
 4. **Entitlements**: consulted at a record only after the table and the schema rule miss.
 5. **Cycle detection** stops a rule that comes back to itself.
+
+### Crossing a List (`down`)
+
+A `{ rel, action }` walk goes up: from a record to a parent it holds the key of. Some rules turn on a child row instead, and the record holds no key to it:
+
+- **Membership.** You may post in a conversation when you are one of its participants.
+- **A junction table.** A resource is attached to many projects, and whoever reads one of those projects reads the resource. The role or entitlement stays on the project.
+
+The list arm says "some item passes": `{ rel: '<list field>', arrayOperator: 'any', condition }`, where `condition` is an ActionRule judged on each item as the item's own resource. `any` is the only operator; the others hold on an empty list or count rows, and the library refuses them.
+
+The list is declared on the Prisma field, and the declaration is the load plan:
+
+```prisma
+model Resource {
+  /// @permissions(down: [project.organization])
+  projects ProjectResource[]
+}
+```
+
+```ts
+'db:resource': {
+  actions: {
+    read: { rel: 'projects', arrayOperator: 'any', condition: { rel: 'project', action: 'read' } },
+  },
+},
+```
+
+- **`down` is a list of dotted to-one paths from an item**, each leaf by its full path (`[a.b, a.c]`). `down: []` loads the items alone.
+- **What loads.** Wherever the model is hydrated, the hydrator makes one `loadMany` read of the items, then loads only the declared paths under each. Nothing else loads from an item, so hydration goes one jump down and never back up into the record it came from. Any other to-one relation on an item ends empty.
+- **The declaration carries what the rule walks.** Every relation the `condition` walks, followed through the actions it lands on, must be inside a declared path. Above, `project.read` walks on to the organization, so the path is `project.organization`. A shorter declaration is a `validateSchema` error and the check refuses the schema on first use.
+- **One jump.** A list arm under an item denies. A list that is not declared is never crossed.
+- **Never on a stand-in.** A record that does not exist yet has no list, so a grant that rests on a list is anchored where a real list is (the record itself, or one below it), not above.
+- **Wiring.** `createHydrator` needs `loadMany` once any list is declared and refuses to build without it. Add it beside `load` in `packages/db/src/hydrate/hydrate.ts`, reading live rows through the same cache layer. Template declares no list today.
+
+When the record holds the key itself, use a plain `rel`. The library README (`@inixiative/permissions`, "Crossing a list") has the full rules.
+
+### Placing a Field on a Stand-In (`place`)
+
+A grant is checked on a stand-in record before the real one exists. A rule that reads a type field one level down (`resource.kind`) finds it unknown there. Mark the scalar `/// @permissions(place: true)` and a grant whose `where` states `<path>.<field> equals <literal>` builds the stand-in with that value. The condition stays on the row, so it is still judged on the real record at read. Allowed on String, Int, Boolean and enum fields; never on an id, a relation key, a discriminator or a relation. Use it instead of copying the field onto the root model.
+
+`@permissions(...)` takes three keys (`hydrate: false`, `down`, `place`) and is read strictly: a typo throws on first use of the map.
 
 ### Dot-path vs. Single-hop Delegation
 
