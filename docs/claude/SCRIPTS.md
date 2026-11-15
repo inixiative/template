@@ -56,6 +56,7 @@ scripts/
 │   ├── minio-init.sh       # MinIO container entrypoint (creates the four base buckets)
 │   ├── minio-provision.sh  # Ensure buckets exist (setup + worktree:create)
 │   ├── minio-remove.sh     # Remove buckets, reporting each (worktree:destroy)
+│   ├── s3.sh               # Signed S3 calls with curl --aws-sigv4, sourced by both
 │   ├── wait-postgres.sh    # Wait for postgres ready
 │   └── wait-redis.sh       # Wait for redis ready
 ├── deployment/

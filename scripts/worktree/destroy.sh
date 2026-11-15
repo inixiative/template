@@ -132,7 +132,7 @@ else
 
     info "Removing MinIO buckets for slot ${SLOT}..."
     storage_env_from "$ROOT_DIR/.env.local"
-    PATH="$(dirname "$DOCKER"):$PATH" bash "$SCRIPT_DIR/../db/minio-remove.sh" \
+    bash "$SCRIPT_DIR/../db/minio-remove.sh" \
       "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
       "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST" \
       || warn "Warning: bucket removal did not complete."

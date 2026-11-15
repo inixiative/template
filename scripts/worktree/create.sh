@@ -316,9 +316,10 @@ Run 'bun run worktree:destroy $(basename "$CLAIMANT")' if that worktree is finis
   MINIO_PROVISION="$WORKTREE_DIR/scripts/db/minio-provision.sh"
   [ -f "$MINIO_PROVISION" ] || MINIO_PROVISION="$ROOT_DIR/scripts/db/minio-provision.sh"
   storage_env_from "$MAIN_ENV"
-  PATH="$(dirname "$DOCKER"):$PATH" bash "$MINIO_PROVISION" \
+  bash "$MINIO_PROVISION" \
     "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
-    "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"
+    "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST" \
+    || die "Error: provisioning MinIO buckets for slot ${SLOT} failed (see above)."
 fi
 
 info "Installing dependencies (bun install --force --ignore-scripts)..."

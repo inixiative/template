@@ -213,6 +213,8 @@ storage_env_from() {
   STORAGE_ENDPOINT="$(env_value "$file" STORAGE_ENDPOINT)"
   STORAGE_ACCESS_KEY_ID="$(env_value "$file" STORAGE_ACCESS_KEY_ID)"
   STORAGE_SECRET_ACCESS_KEY="$(env_value "$file" STORAGE_SECRET_ACCESS_KEY)"
+  STORAGE_REGION="$(env_value "$file" STORAGE_REGION)"
+  export STORAGE_REGION="${STORAGE_REGION:-us-east-1}"
   export STORAGE_ENDPOINT="${STORAGE_ENDPOINT:-http://localhost:9000}"
   export STORAGE_ACCESS_KEY_ID="${STORAGE_ACCESS_KEY_ID:-minioadmin}"
   export STORAGE_SECRET_ACCESS_KEY="${STORAGE_SECRET_ACCESS_KEY:-minioadmin}"
