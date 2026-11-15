@@ -52,7 +52,7 @@ export const resolveInquiry = async (
         data: {
           status,
           resolution: handler.resolutionSchema.parse({
-            ...resolutionData,
+            ...handler.resolutionInputSchema.parse(resolutionData),
             ...approvalOutput,
           }) as Prisma.InputJsonValue,
           expiresAt,
