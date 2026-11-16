@@ -131,7 +131,7 @@ describe('inquiryPermission', () => {
     });
     expect(inquiryPermission(INQUIRY_TYPES).actions.read).toEqual({
       any: (['source', 'target'] as const).flatMap((side) => [
-        { rel: `${side}User`, action: 'read' },
+        { rel: `${side}User`, action: 'operate' },
         channel(side, 'Organization', ['SpaceId', 'UserId']),
         channel(side, 'Space', ['UserId']),
       ]),

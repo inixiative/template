@@ -335,7 +335,7 @@ All three (`inquiryResponseSchema`, `inquirySentResponseSchema`, `inquiryReceive
 
 | Action | Who can perform it |
 |--------|--------------------|
-| `read` | Party-wide, whatever the type, each party on its own channel (`INQUIRY_READ_LEVELS`): a person reads the sides that name them (`read`); `manage` on an organization reads the sides on the organization alone (no space, no person); `manage` on a space reads the sides on the space with no person |
+| `read` | Party-wide, whatever the type, each party on its own channel (`INQUIRY_READ_LEVELS`): a person reads the sides that name them by operating as that user (`operate`): what belongs to a member, or chains through one, is the member's and never the organization's; `manage` on an organization reads the sides on the organization alone (no space, no person); `manage` on a space reads the sides on the space with no person |
 | `send` | The source party's declared `send` level for that type (table above) |
 | `resolve` | The target party's declared `resolve` level for that type; a platform (`admin`) target has no relation, so only a superadmin resolves it |
 
