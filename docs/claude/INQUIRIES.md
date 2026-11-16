@@ -224,7 +224,7 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
   resolutionSchema: z.ZodType<TResolution>;      // full stored shape: the parsed input plus handleApprove's output, nothing else from the body
   validate?(inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
-  handleApprove(inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
+  handleApprove(inquiry, resolvedContent: TContent, c): Promise<Partial<TResolution> | undefined | void>; // c is the resolve request's context: the approver acts from it, as on any route
   autoApprove(inquiry): Promise<boolean>;    // called after send; return true to skip human review
   unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
   defaultExpirationDays?: number;     // drives computeExpiresAt on send and changesRequested; undefined = no expiry

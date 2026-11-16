@@ -6,11 +6,12 @@
  */
 import type { Prisma, PrismaBaseArgs } from '@template/db';
 import type { InquiryResourceModel } from '@template/db/generated/client/enums';
-import type { Permix } from '@template/permissions';
 import type { BaseResolution } from '@template/shared/inquiry';
+import type { Context } from 'hono';
 import type { z } from 'zod';
 import type { AppEventHandlerDefinition } from '#/appEvents/types';
 import type { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
+import type { AppEnv } from '#/types/appEnv';
 
 export type Inquiry = Prisma.InquiryGetPayload<PrismaBaseArgs>;
 
@@ -43,7 +44,7 @@ export type InquiryHandler<
   handleApprove(
     inquiry: Inquiry,
     resolvedContent: TContent,
-    approver: Permix,
+    c: Context<AppEnv>,
   ): Promise<Partial<TResolution> | undefined | void>;
   validate?(inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
   autoApprove(inquiry: Inquiry): Promise<boolean>;
