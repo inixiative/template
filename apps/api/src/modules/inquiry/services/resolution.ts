@@ -15,7 +15,6 @@ import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryInclude
 import type { InquiryResolutionStatus } from '#/modules/inquiry/schemas/inquiryResolutionStatusSchema';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
-import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 import { validateInquiryIsResolvable } from '#/modules/inquiry/validations/validateInquiryStatus';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -36,12 +35,17 @@ export const resolveInquiry = async (
       validateInquiryIsResolvable(fresh);
 
       const handler = inquiryHandlers[fresh.type];
+      const response = handler.resolutionInputSchema.parse(resolutionData);
       let approvalOutput: Record<string, unknown> = {};
 
       if (status === InquiryStatus.approved) {
-        const content = handler.contentSchema.parse(fresh.content);
-        const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
-        approvalOutput = (await handler.handleApprove(c, fresh, merged)) ?? {};
+        approvalOutput =
+          (await handler.handleApprove(
+            c,
+            fresh,
+            handler.contentSchema.parse(fresh.content),
+            response,
+          )) ?? {};
       }
 
       const expiresAt =
@@ -52,7 +56,7 @@ export const resolveInquiry = async (
         data: {
           status,
           resolution: handler.resolutionSchema.parse({
-            ...handler.resolutionInputSchema.parse(resolutionData),
+            ...response,
             ...approvalOutput,
           }) as Prisma.InputJsonValue,
           expiresAt,

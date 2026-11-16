@@ -44,7 +44,8 @@ export type InquiryHandler<
   handleApprove(
     c: Context<AppEnv>,
     inquiry: Inquiry,
-    resolvedContent: TContent,
+    content: TContent,
+    response: TResolutionInput,
   ): Promise<Partial<TResolution> | undefined | void>;
   validate?(inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
   autoApprove(inquiry: Inquiry): Promise<boolean>;

@@ -18,7 +18,7 @@
 - [Handler Architecture](#handler-architecture)
   - [`unique` enforcement](#unique-enforcement)
   - [`validate` — pre-create and pre-update checks](#validate--pre-create-and-pre-update-checks)
-  - [`resolvedContent` and the Override Pattern](#resolvedcontent-and-the-override-pattern)
+  - [The request and the response](#the-request-and-the-response)
   - [Current Handlers](#current-handlers)
 - [Response Schemas](#response-schemas)
   - [Standardized includes](#standardized-includes)
@@ -224,7 +224,7 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
   resolutionSchema: z.ZodType<TResolution>;      // full stored shape: the parsed input plus handleApprove's output, nothing else from the body
   validate?(inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
-  handleApprove(c, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>; // c is the resolve request's context, first as on every service that takes one: the approver acts from it. Approval runs only inside a request (resolve, or auto-approval on send), never in a job
+  handleApprove(c, inquiry, content: TContent, response: TResolutionInput): Promise<Partial<TResolution> | undefined | void>; // c is the resolve request's context, first as on every service that takes one: the approver acts from it. Approval runs only inside a request (resolve, or auto-approval on send), never in a job
   autoApprove(inquiry): Promise<boolean>;    // called after send; return true to skip human review
   unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
   defaultExpirationDays?: number;     // drives computeExpiresAt on send and changesRequested; undefined = no expiry
@@ -271,24 +271,23 @@ const validate = async (inquiry, content: SpaceContent) => {
 };
 ```
 
-### `resolvedContent` and the Override Pattern
+### The request and the response
 
-On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution body. `resolveContent` (`services/resolveContent.ts`) parses the resolution against `resolutionInputSchema` first and merges the **parsed** values, so defaults and transforms inside an override apply and a refined schema works the same as a plain object. Only keys the resolver actually sent that the schema keeps can flow into `resolvedContent`; a key the schema defaults but the resolver didn't send never overrides content. `explanation` is always excluded (resolution-only metadata), so it never overrides content fields.
+An inquiry keeps both sides apart: what was asked is `inquiry.content`, and what the resolver answered is the resolve body. `handleApprove(c, inquiry, content, response)` gets them as two arguments, `content` parsed by `contentSchema` and `response` parsed by `resolutionInputSchema`. Nothing is merged or computed from one onto the other; a handler reads each value from the side it belongs to, and says so in its own code.
 
-**Opt-in to allow resolver overrides** by declaring the field in `resolutionInputSchema`:
+**A field the resolver may set** is declared in `resolutionInputSchema` and read from `response`:
 ```typescript
-// createSpace — admin can rename the space at approval time
-const resolutionInputSchema = baseResolutionInputSchema.extend({
-  name: z.string().optional(), // ← declared → flows into resolvedContent
-});
+// transferSpace: the approving org may give the space another slug
+const slug = response.slug ?? content.slug ?? space.slug;
 ```
 
-**Opt-out to lock the field** by omitting it from `resolutionInputSchema`:
+**A field the resolver may not set** is left out of `resolutionInputSchema`, so it is never in `response`:
 ```typescript
-// inviteOrganizationUser — role is locked; resolver cannot change it
-// 'role' is NOT in resolutionInputSchema, so it never reaches resolvedContent
-const { role } = resolvedContent; // always from original inquiry.content
+// inviteOrganizationUser: the role is the inviter's
+const { role } = content;
 ```
+
+Why: an approval is the approver's own answer, kept beside the request, never a patch applied to it (Aron, 2026-11-15: "no merge logic and nothing computed against the request"). A shared overlay made every handler's input a mix of the two with nothing saying which side a value came from.
 
 ### Current Handlers
 
@@ -305,7 +304,7 @@ All four handlers return `autoApprove: async () => false` — no type currently 
 
 Approving a transfer moves the space, its members and everything downstream into the target org, in the resolution transaction. A member who already belongs to the target org keeps their membership. Every other member is removed; their space membership and its rows move to the target org as tombstones, and hiring them there later does not bring the space back. Nobody becomes a live member of an org they didn't join.
 
-1. The space is locked (`db.findForUpdate`). Its slug in the target org is the resolution's `slug` when the approver gives one (a rename, merged into content by `resolveContent`), else its current slug. A slug the target org already holds, or an open `createSpace` request for it, refuses the transfer with a 409 (`validateSpaceSlugFree`, shared with `createSpace` and `updateSpace`). The target org's Review dialog offers the rename.
+1. The space is locked (`db.findForUpdate`). Its slug in the target org is the resolution's `slug` when the approver gives one (a rename, read from the response), else its current slug. A slug the target org already holds, or an open `createSpace` request for it, refuses the transfer with a 409 (`validateSpaceSlugFree`, shared with `createSpace` and `updateSpace`). The target org's Review dialog offers the rename.
 2. One update tombstones every live `SpaceUser` whose user is not a live member of the target org, stamped with the transfer time; `softDeleteCascade` tombstones what they owned and deletes their tokens.
 3. Every space member, live or tombstoned, gets a tombstoned `member` row in the target org unless they already have one (`skipDuplicates`): the `SpaceUser` → `OrganizationUser` key needs it once step 4 re-keys their space membership. Its stamp is one no space membership carries, so hiring the person revives only their org membership. Putting them back in the space is a manual re-add; the transfer revives nothing.
 4. `Space.organizationId` is set. Every row keyed to the space or a space member carries the org in a composite key (`SpaceUser`; Integration, Token, EmailTemplate and EmailComponent; Inquiry and AuditLog rows keyed to a space member), so one statement re-keys them all by `ON UPDATE CASCADE`; Postgres runs every cascade of a statement before it checks the keys. `spaceKeys.test.ts` (`packages/db/src/registries`) fails when a Space- or SpaceUser-owned model carries an org column outside such a key.
@@ -366,7 +365,7 @@ Each mutation uses the include that matches what its caller needs:
    - `resolutionInputSchema` — what the resolver submits; fields here (except `explanation`) can override content
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
    - If no computed fields, both can be the same schema
-3. Implement `handleApprove(c, inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
+3. Implement `handleApprove(c, inquiry, content: TContent, response: TResolutionInput)` — runs side effects; return partial resolution output (merged into stored `resolution`)
 4. Implement `autoApprove(inquiry)` — required; called immediately after send; return `true` to resolve as approved without human review, `async () => false` otherwise. Future: organizations may configure this via JSON rules stored on the organization record.
 5. Add `validate(inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
 6. Set `defaultExpirationDays` if the inquiry should auto-expire (e.g. `30` for invitations). Drives `computeExpiresAt` on send and changesRequested. Omit for no expiry.

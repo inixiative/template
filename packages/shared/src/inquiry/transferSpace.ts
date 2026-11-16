@@ -15,3 +15,4 @@ export const transferSpaceResolutionInputSchema = baseResolutionInputSchema.exte
 );
 
 export type TransferSpaceContent = z.infer<typeof transferSpaceContentSchema>;
+export type TransferSpaceResolutionInput = z.infer<typeof transferSpaceResolutionInputSchema>;

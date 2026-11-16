@@ -12,9 +12,7 @@ import { inquiryReceivedResponseSchema } from '#/modules/inquiry/schemas/inquiry
 import { inquiryVersionSchema } from '#/modules/inquiry/schemas/inquiryVersionSchema';
 import { Modules } from '#/modules/modules';
 
-// Per-handler resolution fields get validated downstream against
-// `handler.resolutionInputSchema` and filtered in `resolveContent`. Pass them
-// through here instead of stripping them.
+// why: a type's own response fields are parsed downstream by its handler's `resolutionInputSchema`
 const bodySchema = inquiryVersionSchema
   .extend({
     status: inquiryResolutionStatusSchema,
