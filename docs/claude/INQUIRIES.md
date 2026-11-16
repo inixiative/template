@@ -222,7 +222,7 @@ Every inquiry type maps to a handler registered in `handlers/index.ts`.
 type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   contentSchema: z.ZodType<TContent>;            // parsed on create/update; stored in inquiry.content
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
-  resolutionSchema: z.ZodType<TResolution>;      // full stored shape (includes computed fields from handleApprove)
+  resolutionSchema: z.ZodType<TResolution>;      // full stored shape: the parsed input plus handleApprove's output, nothing else from the body
   validate?(inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
   handleApprove(inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
   autoApprove(inquiry): Promise<boolean>;    // called after send; return true to skip human review

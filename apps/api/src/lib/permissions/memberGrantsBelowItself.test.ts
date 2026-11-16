@@ -94,7 +94,7 @@ describe("a member's operate on itself grants below it: its own integrations (Ar
     );
     expect(response.status).toBe(403);
     expect(((await response.json()) as { message: string }).message).toBe(
-      'A delegate holds your permissions or less',
+      `A delegate holds your permissions or less: you cannot give manage on db:integration at db:integration ${theirs.id}`,
     );
   });
 
