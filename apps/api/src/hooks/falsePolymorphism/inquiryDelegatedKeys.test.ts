@@ -179,6 +179,26 @@ describe('an inquiry carries the owner keys of the delegate on each side (Aron, 
     });
   }
 
+  it("a caller's own keys never stand: they are the delegate's, deleted or not", async () => {
+    const { organization, organizationIntegration, organizationToken, member } = await world();
+    const { entity: elsewhere } = await createOrganization();
+    const forged = { organizationId: elsewhere.id, userId: member.userId };
+    const owned = {
+      targetTokenId: organizationToken.id,
+      targetIntegrationId: organizationIntegration.id,
+      targetOrganizationId: organization.id,
+      targetUserId: null,
+      targetSpaceId: null,
+    };
+    expect(
+      await inquiryOn('target', { model: 'Token', tokenId: organizationToken.id, ...forged }),
+    ).toMatchObject(owned);
+    await db.token.update({ where: { id: organizationToken.id }, data: { deletedAt: new Date() } });
+    expect(
+      await inquiryOn('target', { model: 'Token', tokenId: organizationToken.id, ...forged }),
+    ).toMatchObject(owned);
+  });
+
   it("a space's move re-keys the inquiries addressed to it and to what it holds", async () => {
     const { space, spaceToken } = await world();
     const { entity: destination } = await createOrganization();

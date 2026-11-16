@@ -22,12 +22,14 @@ export const carryDelegatedKeys = async (model: ModelName, row: Row): Promise<vo
     if (!parent) continue;
     const [parentKey] = axis.fkMap[value] ?? [];
     const parentId = parentKey ? row[parentKey] : null;
+    // why: a deleted parent still owns its row's keys; a caller's own values never stand
     const parentRow = parentId
-      ? ((await db.delegate(parent).findUnique({ where: { id: parentId } })) as Row | null)
+      ? ((await db.withDeleted(() =>
+          db.delegate(parent).findUnique({ where: { id: parentId } }),
+        )) as Row | null)
       : null;
-    if (!parentRow) continue;
-    const held = ownerKeysHeld(parent, parentRow.ownerModel as PolymorphicValue);
+    const held = parentRow ? ownerKeysHeld(parent, parentRow.ownerModel as PolymorphicValue) : [];
     for (const { column, parentKey: key } of delegatedKeyPairs(axis, value))
-      row[column] = held.includes(key) ? parentRow[key] : null;
+      row[column] = parentRow && held.includes(key) ? parentRow[key] : null;
   }
 };

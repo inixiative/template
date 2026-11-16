@@ -5,6 +5,7 @@
  * @uses none
  */
 import type { ModelName } from '@template/db/utils/modelNames';
+import { lowerFirst, upperFirst } from 'lodash-es';
 
 // ============================================================================
 // POLYMORPHISM REGISTRY - Single source of truth for false polymorphism
@@ -433,9 +434,6 @@ export const polymorphicAxis = (model: ModelName, axisField: string): Polymorphi
 };
 
 const ownerAxisField = 'ownerModel';
-
-const lowerFirst = (name: string) => name.charAt(0).toLowerCase() + name.slice(1);
-const upperFirst = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
 /** What a delegating axis puts before its parent's names: `targetTokenId` names Token with `target`, `integrationId` names Integration with nothing. */
 export const delegatePrefix = (axis: PolymorphicAxis, value: PolymorphicValue): string => {
