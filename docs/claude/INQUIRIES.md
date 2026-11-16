@@ -21,7 +21,6 @@
   - [The request and the response](#the-request-and-the-response)
   - [Current Handlers](#current-handlers)
 - [Response Schemas](#response-schemas)
-  - [Standardized includes](#standardized-includes)
 - [Permissions (ReBAC)](#permissions-rebac)
 - [Adding a New Handler](#adding-a-new-handler)
   - [Status utilities (`validations/validateInquiryStatus.ts`)](#status-utilities-validationsvalidateinquirystatusts)
@@ -173,9 +172,12 @@ Each context exposes two list endpoints. Requires `manage` on the parent resourc
 | `GET` | `/api/v1/space/:id/inquiries/sent` | Inquiries sent by this space |
 | `GET` | `/api/v1/space/:id/inquiries/received` | Non-draft inquiries received by this space |
 
-- **Sent** endpoints include `targetUser`, `targetOrganization`, `targetSpace`
-- **Received** endpoints include `sourceUser`, `sourceOrganization`, `sourceSpace`
+- Every list loads both sides in full: the user, organization, space, integration, token and project on the source and on the target, so a row says who it acts on and through what
 - Draft inquiries are always hidden from received lists
+
+**What a list holds.** Each owner's list holds what is addressed to it and to what it holds beneath it: an organization's holds the inquiries on the organization, its integrations, their tokens and its projects. It does not hold a space's or a member's; those are in the space's list and the member's own. The filter is `whereAxisIsOwnerOrItsDelegate('Inquiry', '<side>Model', owner)` (`packages/db/src/registries/delegatedOwnerWhere.ts`), built from the `delegates` registry with one arm per delegate model, each read through the delegate's own row. The owner is given by its standard key columns (`OwnerKeys`) with null for "holds none": `{ organizationId, spaceId: null, userId: null }` is the organization alone.
+
+**Carried keys.** An inquiry whose side names an Integration, Token or Project also carries that record's owner keys on the same side (`targetTokenId` plus `targetIntegrationId` and `targetOrganizationId`), written by the delegated-keys hook ([DATABASE.md](DATABASE.md#delegated-keys)). So the row itself says whose it is, for attribution, audit and events. `whereAxisCarriesOwnerKeys` is the flat filter on those columns; `inquiryDelegatedKeys.test.ts` runs both filters over the same rows and fails when they differ. A space's inquiries carry its organization in a composite key, so a transfer re-keys them and the ones addressed to what the space holds.
 
 ### Admin
 
@@ -191,12 +193,12 @@ Each context exposes two list endpoints. Requires `manage` on the parent resourc
 
 ```
 POST /organization/:id/inquiries → sourceModel: Organization, sourceOrganizationId: org.id
-POST /space/:id/inquiries        → sourceModel: Space, sourceSpaceId: space.id
+POST /space/:id/inquiries        → sourceModel: Space, sourceOrganizationId: space.organizationId, sourceSpaceId: space.id
 POST /me/inquiries               → sourceModel: User, sourceUserId: user.id
 POST /api/admin/inquiry          → sourceModel: admin (no FK)
 ```
 
-No create route sources an `OrganizationUser`, `SpaceUser`, `Integration` or `Token` inquiry; those sources are set by the service that already holds the party.
+No create route sources an `OrganizationUser`, `SpaceUser`, `Integration`, `Token` or `Project` inquiry; those sources are set by the service that already holds the party.
 
 The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/rebac/inquiryTypes.ts`) are checked by `validateInquiryHandler` to confirm the resolved source is valid for this inquiry type.
 
@@ -206,11 +208,11 @@ The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/reba
 
 - `targetModel: User` → `targetUserId` OR `targetEmail`: `findUserOrCreateGuest` (`apps/api/src/modules/user/services/findOrCreateGuest.ts`) returns the user with that normalized email or creates an unverified guest and emits `user.created` with `isGuest: true`
 - `targetModel: Organization` → `targetOrganizationId` OR `targetOrganizationSlug`
-- `targetModel: Space` → `targetSpaceId` OR `targetOrganizationSlug` + `targetSpaceSlug` (space slugs are org-scoped)
+- `targetModel: Space` → `targetSpaceId` OR `targetOrganizationSlug` + `targetSpaceSlug` (space slugs are org-scoped); its organization fills `targetOrganizationId`
 - `targetModel: OrganizationUser` → `targetOrganizationId` + `targetUserId` (the membership must exist)
 - `targetModel: SpaceUser` → `targetSpaceId` + `targetUserId` (the membership must exist; its organization fills `targetOrganizationId`)
 - `targetModel: admin` → no FK, just sets the model
-- `targetModel: Integration` / `Token` → 422; a request body cannot name them, only a service that holds the party
+- `targetModel: Integration` / `Token` / `Project` → 422; a request body cannot name them, only a service that holds the party
 
 Slug-based lookups are useful when callers know human-readable identifiers rather than UUIDs.
 
@@ -273,7 +275,7 @@ const validate = async (inquiry, content: SpaceContent) => {
 
 ### The request and the response
 
-An inquiry keeps both sides apart: what was asked is `inquiry.content`, and what the resolver answered is the resolve body. `handleApprove(c, inquiry, content, response)` gets them as two arguments, `content` parsed by `contentSchema` and `response` parsed by `resolutionInputSchema`. Nothing is merged or computed from one onto the other; a handler reads each value from the side it belongs to, and says so in its own code.
+An inquiry keeps both sides apart: what was asked is `inquiry.content`, and what the resolver answered is the resolve body. `handleApprove(c, inquiry, content, response)` gets them as two arguments, `content` parsed by `contentSchema` and `response` parsed by `resolutionInputSchema`. Nothing is merged or computed from one onto the other; a handler reads each value from the side it belongs to, and says so in its own code. Auto-approval sends the request back as the response, so a handler always gets the thing it approves (Aron, 2026-11-16).
 
 **A field the resolver may set** is declared in `resolutionInputSchema` and read from `response`:
 ```typescript
@@ -327,33 +329,17 @@ No row keyed to the space keeps the old org's membership, so reviving a membersh
 
 Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
 
-| Schema | Relations included | Used on |
-|--------|--------------------|---------|
-| `inquiryResponseSchema` | All 6 (sources + targets) + `auditLogsAsSubject` | Single read (`GET /inquiry/:id`), admin list |
-| `inquirySentResponseSchema` | Targets only + `auditLogsAsSubject` | Sent lists, create response, update, send |
-| `inquiryReceivedResponseSchema` | Sources only + `auditLogsAsSubject` | Received lists, resolve |
-
-The schemas are chosen to return only the relations the current side needs — source-side mutations (update, send) include target data; target-side mutations (resolve) include source data; admin/read endpoints include all 6.
-
-### Standardized includes
-
-Each mutation uses the include that matches what its caller needs:
-
-| Endpoint | Prisma include | Why |
-|----------|---------------|-----|
-| `PATCH /inquiry/:id` | `includeInquirySent` | Source is editing; only targets relevant |
-| `POST /inquiry/:id/send` | `includeInquirySent` | Source is sending; only targets relevant |
-| `POST /inquiry/:id/resolve` | `includeInquiryReceived` | Target is resolving; only sources relevant |
-| `GET /inquiry/:id` | `includeInquiryResponse` | Preloaded by resource context middleware — no extra DB call |
-| Admin list | `includeInquiryResponse` | All relations for full audit view |
+All three (`inquiryResponseSchema`, `inquirySentResponseSchema`, `inquiryReceivedResponseSchema`) carry both sides in full (user, organization, space, integration, token, project) and `auditLogsAsSubject`, and the three Prisma includes in `queries/inquiryIncludes.ts` are one. A token is returned without its `keyHash`. Why: a row addressed to a token or an integration is only readable in a list when the row shows that record and its owners, whichever side the reader is on (Aron, 2026-11-16).
 
 ## Permissions (ReBAC)
 
 | Action | Who can perform it |
 |--------|--------------------|
-| `read` | Party-wide, whatever the type: the user on either side (`read`), or `manage` on the organization or space on either side (`INQUIRY_READ_LEVELS`) |
+| `read` | Party-wide, whatever the type, each party on its own channel (`INQUIRY_READ_LEVELS`): a person reads the sides that name them (`read`); `manage` on an organization reads the sides on the organization alone (no space, no person); `manage` on a space reads the sides on the space with no person |
 | `send` | The source party's declared `send` level for that type (table above) |
 | `resolve` | The target party's declared `resolve` level for that type; a platform (`admin`) target has no relation, so only a superadmin resolves it |
+
+Reading is by ownership channel because carried keys put the organization on every row beneath it. An organization's managers see what is the organization's, including its own integrations and tokens; a member's own integration is the member's, and a space's inquiries are the space's (Aron, 2026-11-16). Seeing is not resolving: `resolve` stays the per-type level. An inquiry entitlement by a tenant path (`targetOrganization`) admits every kind that carries the key, so a grant kept to the tenant's own channel says so in its `where` (`targetSpaceId` and `targetUserId` equal null); without it the granter must be able to read every kind the path reaches.
 
 `db:inquiry` is the `inquiry` object built by `inquiryPermission(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
 

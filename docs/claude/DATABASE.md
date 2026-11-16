@@ -788,6 +788,8 @@ enum EmailOwnerModel {
 
 An axis value can name a parent in `delegates`: the row carries the parent's own owner keys beside its own. A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:delegatedKeys` hook copies them from the parent on create and upsert through `carryDelegatedKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
 
+The parent's keys come from its `ownerModel` axis, and the chain needs no config: the parent row already holds what its own delegate carried, so one copy brings the whole chain (a token gives an inquiry its integration and that integration's owner). An axis with a prefix keeps it: the prefix is whatever the delegating key puts before the parent's name (`targetTokenId` names Token with `target`), so Inquiry's `sourceModel` and `targetModel` carry `source*` and `target*` columns. `whereAxisIsOwnerOrItsDelegate` and `whereAxisCarriesOwnerKeys` (`registries/delegatedOwnerWhere.ts`) build "this owner's rows, and those of what it holds" from the same registry.
+
 ### Back-Relations Over Shared Key Columns
 
 Arms of one axis share columns: an `OrganizationUser` arm's keys (`organizationId`, `userId`) are a prefix of a `SpaceUser` arm's, and the `Organization`, `Space` and `User` arms reuse the same columns alone. A back-relation is defined by its columns, not by the discriminator, so it also takes in the rows of every deeper arm that carries those keys:
