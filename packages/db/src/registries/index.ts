@@ -1,7 +1,10 @@
 export * from './auditEnabledModels';
+export * from './delegatedOwnerWhere';
 export * from './discriminatorDefaults';
 export {
+  delegatedKeyPairs,
   delegatedKeys,
+  delegatePrefix,
   type FalsePolymorphismRef,
   type FlexibleRef,
   getPolymorphismConfig,

@@ -27,15 +27,17 @@ export type InquiryTypeParties = {
   targets: readonly InquiryParty[];
 };
 
-// Reading an inquiry is party-wide, whatever its type: the person on a side reads it, and an
-// organization or space reads what it sent and received with manage (the entitlement rulings,
-// R74/R76). Sending and resolving are per type, below.
-// Open: lower-level types may want an operator to read, possibly per type and side. Left
-// party-wide because the received/sent lists filter by party in the query.
-export const INQUIRY_READ_LEVELS: Partial<Record<InquiryPartyModel, string>> = {
-  User: 'read',
-  Organization: 'manage',
-  Space: 'manage',
+// Reading an inquiry is party-wide, whatever its type, and each party reads its own ownership
+// channel only: a person reads the sides that name them (their own, their memberships', and what
+// those hold); an organization reads, with manage, the sides on the organization alone (no space,
+// no person); a space the sides on the space with no person (Aron, 2026-11-16). `clear` lists the
+// side keys that must be empty. Sending and resolving are per type, below.
+export const INQUIRY_READ_LEVELS: Partial<
+  Record<InquiryPartyModel, { action: string; clear: readonly string[] }>
+> = {
+  User: { action: 'read', clear: [] },
+  Organization: { action: 'manage', clear: ['SpaceId', 'UserId'] },
+  Space: { action: 'manage', clear: ['UserId'] },
 };
 
 const role = (operator: Operator, value: string[] | null): ActionRule => ({

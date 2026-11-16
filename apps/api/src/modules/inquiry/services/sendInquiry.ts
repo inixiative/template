@@ -49,7 +49,13 @@ export const sendInquiry = async (
     const autoApproved = await handler.autoApprove(sent);
 
     if (autoApproved) {
-      await resolveInquiry(c, sent, InquiryStatus.approved, {}, sent.updatedAt);
+      await resolveInquiry(
+        c,
+        sent,
+        InquiryStatus.approved,
+        sent.content as Record<string, unknown>,
+        sent.updatedAt,
+      );
 
       const approved = await db.inquiry.findUniqueOrThrow({
         where: { id: sent.id },

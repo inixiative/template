@@ -6,10 +6,10 @@
  */
 import { db } from '@template/db/client';
 import {
-  delegatedKeys,
+  delegatedKeyPairs,
   getPolymorphismConfig,
+  ownerKeysHeld,
   type PolymorphicValue,
-  polymorphicAxis,
 } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 
@@ -26,10 +26,8 @@ export const carryDelegatedKeys = async (model: ModelName, row: Row): Promise<vo
       ? ((await db.delegate(parent).findUnique({ where: { id: parentId } })) as Row | null)
       : null;
     if (!parentRow) continue;
-    const parentAxis = polymorphicAxis(parent, axis.field);
-    const carried: readonly string[] =
-      parentAxis.fkMap[parentRow[parentAxis.field] as PolymorphicValue] ?? [];
-    for (const key of delegatedKeys(axis, value))
-      row[key] = carried.includes(key) ? parentRow[key] : null;
+    const held = ownerKeysHeld(parent, parentRow.ownerModel as PolymorphicValue);
+    for (const { column, parentKey: key } of delegatedKeyPairs(axis, value))
+      row[column] = held.includes(key) ? parentRow[key] : null;
   }
 };

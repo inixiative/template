@@ -288,11 +288,13 @@ export const PolymorphismRegistry = {
           User: ['sourceUserId'],
           OrganizationUser: ['sourceOrganizationId', 'sourceUserId'],
           Organization: ['sourceOrganizationId'],
-          Space: ['sourceSpaceId'],
+          Space: ['sourceOrganizationId', 'sourceSpaceId'],
           SpaceUser: ['sourceOrganizationId', 'sourceSpaceId', 'sourceUserId'],
           Integration: ['sourceIntegrationId'],
           Token: ['sourceTokenId'],
+          Project: ['sourceProjectId'],
         },
+        delegates: { Integration: 'Integration', Token: 'Token', Project: 'Project' },
       },
       {
         field: 'targetModel',
@@ -301,11 +303,13 @@ export const PolymorphismRegistry = {
           User: ['targetUserId'],
           OrganizationUser: ['targetOrganizationId', 'targetUserId'],
           Organization: ['targetOrganizationId'],
-          Space: ['targetSpaceId'],
+          Space: ['targetOrganizationId', 'targetSpaceId'],
           SpaceUser: ['targetOrganizationId', 'targetSpaceId', 'targetUserId'],
           Integration: ['targetIntegrationId'],
           Token: ['targetTokenId'],
+          Project: ['targetProjectId'],
         },
+        delegates: { Integration: 'Integration', Token: 'Token', Project: 'Project' },
       },
     ],
   },
@@ -428,9 +432,59 @@ export const polymorphicAxis = (model: ModelName, axisField: string): Polymorphi
   return axis;
 };
 
-export const delegatedKeys = (axis: PolymorphicAxis, value: unknown): string[] => {
+const ownerAxisField = 'ownerModel';
+
+const lowerFirst = (name: string) => name.charAt(0).toLowerCase() + name.slice(1);
+const upperFirst = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
+
+/** What a delegating axis puts before its parent's names: `targetTokenId` names Token with `target`, `integrationId` names Integration with nothing. */
+export const delegatePrefix = (axis: PolymorphicAxis, value: PolymorphicValue): string => {
+  const parent = axis.delegates?.[value];
+  const [key, ...rest] = axis.fkMap[value] ?? [];
+  const suffix = `${parent}Id`;
+  if (!parent || !key || rest.length)
+    throw new Error(`${axis.field}=${value} delegates through one key naming its parent`);
+  if (key === lowerFirst(suffix)) return '';
+  if (!key.endsWith(suffix))
+    throw new Error(`${axis.field}=${value} key ${key} does not name ${parent}`);
+  return key.slice(0, -suffix.length);
+};
+
+export const prefixedName = (prefix: string, name: string) =>
+  prefix ? `${prefix}${upperFirst(name)}` : lowerFirst(name);
+
+/** Every owner key a row of `model` can hold: its own arms' keys and the ones its delegates carry. */
+export const ownerKeysOf = (model: ModelName): string[] => {
+  const axis = polymorphicAxis(model, ownerAxisField);
+  return [
+    ...new Set([
+      ...(Object.values(axis.fkMap).flat() as string[]),
+      ...(Object.keys(axis.delegates ?? {}) as PolymorphicValue[]).flatMap((value) =>
+        delegatedKeys(axis, value),
+      ),
+    ]),
+  ];
+};
+
+/** The owner keys a row of `model` holds when its owner axis says `value`. */
+export const ownerKeysHeld = (model: ModelName, value: PolymorphicValue): string[] => {
+  const axis = polymorphicAxis(model, ownerAxisField);
+  return [...(axis.fkMap[value] ?? []), ...delegatedKeys(axis, value)];
+};
+
+/** The parent's owner keys a delegating value carries, each paired with the column that holds it on this axis. */
+export const delegatedKeyPairs = (
+  axis: PolymorphicAxis,
+  value: unknown,
+): { column: string; parentKey: string }[] => {
   const parent = axis.delegates?.[value as PolymorphicValue];
   if (!parent) return [];
-  const parentAxis = polymorphicAxis(parent, axis.field);
-  return [...new Set(Object.values(parentAxis.fkMap).flat())] as string[];
+  const prefix = delegatePrefix(axis, value as PolymorphicValue);
+  return ownerKeysOf(parent).map((parentKey) => ({
+    column: prefixedName(prefix, parentKey),
+    parentKey,
+  }));
 };
+
+export const delegatedKeys = (axis: PolymorphicAxis, value: unknown): string[] =>
+  delegatedKeyPairs(axis, value).map(({ column }) => column);

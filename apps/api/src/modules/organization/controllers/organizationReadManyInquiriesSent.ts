@@ -3,7 +3,7 @@
  * @kind controller
  * @partOf feature:tenancy
  */
-import { InquiryResourceModel } from '@template/db/generated/client/enums';
+import { whereAxisIsOwnerOrItsDelegate } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
@@ -16,8 +16,11 @@ export const organizationReadManyInquiriesSentController = makeController(
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        sourceModel: InquiryResourceModel.Organization,
-        sourceOrganizationId: getResource<'organization'>(c).id,
+        ...whereAxisIsOwnerOrItsDelegate('Inquiry', 'sourceModel', {
+          organizationId: getResource<'organization'>(c).id,
+          spaceId: null,
+          userId: null,
+        }),
       },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },

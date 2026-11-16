@@ -15,6 +15,7 @@ const nullTargetFields = {
   targetSpaceId: null,
   targetIntegrationId: null,
   targetTokenId: null,
+  targetProjectId: null,
 };
 export type InquiryTargetBody = {
   targetModel: InquiryResourceModel;
@@ -32,7 +33,11 @@ export type InquiryTargetFields =
       targetModel: (typeof InquiryResourceModel)['Organization'];
       targetOrganizationId: string;
     }
-  | { targetModel: (typeof InquiryResourceModel)['Space']; targetSpaceId: string }
+  | {
+      targetModel: (typeof InquiryResourceModel)['Space'];
+      targetOrganizationId: string;
+      targetSpaceId: string;
+    }
   | {
       targetModel: (typeof InquiryResourceModel)['OrganizationUser'];
       targetOrganizationId: string;
@@ -91,7 +96,12 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
     if (body.targetSpaceId) {
       const space = await db.space.findUnique({ where: { id: body.targetSpaceId } });
       if (!space) throw makeError({ status: 404, message: 'Target space not found' });
-      return { ...nullTargetFields, targetModel, targetSpaceId: space.id };
+      return {
+        ...nullTargetFields,
+        targetModel,
+        targetOrganizationId: space.organizationId,
+        targetSpaceId: space.id,
+      };
     }
     if (body.targetOrganizationSlug && body.targetSpaceSlug) {
       const space = await db.space.findFirst({
@@ -101,7 +111,12 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
         },
       });
       if (!space) throw makeError({ status: 404, message: 'Target space not found' });
-      return { ...nullTargetFields, targetModel, targetSpaceId: space.id };
+      return {
+        ...nullTargetFields,
+        targetModel,
+        targetOrganizationId: space.organizationId,
+        targetSpaceId: space.id,
+      };
     }
     throw makeError({
       status: 422,
@@ -149,8 +164,7 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
     };
   }
 
-  // Integration and Token name a row no request body can resolve: they are set by the
-  // service that already holds the party, never from a slug or an email.
+  // why: Integration, Token and Project name a row only the service holding the party can set
   if (targetModel !== InquiryResourceModel.admin)
     throw makeError({
       status: 422,

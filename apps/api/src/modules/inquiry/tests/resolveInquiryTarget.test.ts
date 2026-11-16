@@ -47,6 +47,7 @@ describe('resolveInquiryTarget', () => {
       targetSpaceId: null,
       targetIntegrationId: null,
       targetTokenId: null,
+      targetProjectId: null,
     });
   });
 
@@ -84,6 +85,7 @@ describe('resolveInquiryTarget', () => {
       targetUserId: membership.userId,
       targetIntegrationId: null,
       targetTokenId: null,
+      targetProjectId: null,
     });
   });
 
