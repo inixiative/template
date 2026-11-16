@@ -15,7 +15,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 // - Immutable fields (type fields are immutable)
 
 // Special non-model values for ownership
-type SpecialOwner = 'default' | 'admin' | 'platform';
+type SpecialOwner = 'default' | 'admin' | 'platform' | 'url';
 
 // Valid type values in polymorphic fields (strongly typed)
 export type PolymorphicValue = ModelName | SpecialOwner;
@@ -169,14 +169,15 @@ export const PolymorphismRegistry = {
         field: 'model',
         fkMap: {
           CustomerRef: [],
+          Artifact: [],
         },
       },
     ],
-    // All owner types can subscribe to CustomerRef
+    // All owner types can subscribe to CustomerRef and Artifact
     allowedCombinations: {
-      User: ['CustomerRef'],
-      Organization: ['CustomerRef'],
-      Space: ['CustomerRef'],
+      User: ['CustomerRef', 'Artifact'],
+      Organization: ['CustomerRef', 'Artifact'],
+      Space: ['CustomerRef', 'Artifact'],
     },
   },
 
@@ -367,6 +368,9 @@ export const PolymorphismRegistry = {
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
           Entitlement: ['subjectEntitlementId'],
+          Artifact: ['subjectArtifactId'],
+          ArtifactPlacement: ['subjectArtifactPlacementId'],
+          ArtifactPermission: ['subjectArtifactPermissionId'],
         },
       },
     ],
@@ -385,12 +389,54 @@ export const PolymorphismRegistry = {
     ],
   },
 
+  Artifact: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: { User: ['userId'], Organization: ['organizationId'], Space: ['spaceId'] },
+      },
+    ],
+  },
+
+  ArtifactPermission: {
+    axes: [
+      {
+        field: 'granteeModel',
+        fkMap: {
+          User: ['granteeUserId'],
+          Organization: ['granteeOrganizationId'],
+          Space: ['granteeSpaceId'],
+          OrganizationUser: ['granteeOrganizationId', 'granteeUserId'],
+          SpaceUser: ['granteeOrganizationId', 'granteeSpaceId', 'granteeUserId'],
+          CustomerRef: ['granteeCustomerRefId'],
+          Integration: ['granteeIntegrationId'],
+        },
+      },
+    ],
+  },
+
+  ResourceBinding: {
+    axes: [
+      { field: 'sourceModel', fkMap: { Artifact: ['artifactId'], url: [] } },
+      {
+        field: 'resourceModel',
+        fkMap: {
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+          User: ['userId'],
+          CustomerRef: ['customerRefId'],
+        },
+      },
+    ],
+  },
+
   IntegrationRecord: {
     axes: [
       {
         field: 'model',
         fkMap: {
           CustomerRef: ['customerRefId'],
+          Artifact: ['artifactId'],
         },
       },
     ],

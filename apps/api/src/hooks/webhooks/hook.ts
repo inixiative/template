@@ -14,7 +14,7 @@ import { ConcurrencyType } from '@template/shared/utils';
 import { keyBy } from 'lodash-es';
 import { isManyAction } from '#/hooks/shared/hookRows';
 import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
-import { recordAudiences, type WebhookRow } from '#/hooks/webhooks/parties';
+import { parentDeliveries, recordAudiences, type WebhookRow } from '#/hooks/webhooks/parties';
 import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -150,6 +150,27 @@ export const registerWebhookHook = () => {
             previousData,
           );
           allCallbacks = allCallbacks.concat(callbacks);
+        }
+      }
+
+      for (const { webhookModel, parents, partiesByRowId } of await parentDeliveries(
+        model,
+        records.map(({ resultData }) => resultData),
+      )) {
+        const subscriptions = await findPartySubscriptions(
+          webhookModel,
+          Object.values(partiesByRowId).flat(),
+        );
+        for (const parent of parents) {
+          allCallbacks = allCallbacks.concat(
+            processSingleRecord(
+              subscriptions.filter((sub) => isPartyTo(sub, partiesByRowId[parent.id] ?? [])),
+              webhookModel,
+              webhookModel,
+              WebhookAction.update,
+              parent,
+            ),
+          );
         }
       }
 
