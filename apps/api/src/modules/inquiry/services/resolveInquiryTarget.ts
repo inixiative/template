@@ -22,6 +22,8 @@ export type InquiryTargetBody = {
   targetUserId?: string;
   targetOrganizationId?: string;
   targetSpaceId?: string;
+  targetTokenId?: string | null;
+  targetIntegrationId?: string | null;
   targetEmail?: string;
   targetOrganizationSlug?: string;
   targetSpaceSlug?: string;
@@ -49,6 +51,8 @@ export type InquiryTargetFields =
       targetSpaceId: string;
       targetUserId: string;
     }
+  | { targetModel: (typeof InquiryResourceModel)['Token']; targetTokenId: string }
+  | { targetModel: (typeof InquiryResourceModel)['Integration']; targetIntegrationId: string }
   | { targetModel: (typeof InquiryResourceModel)['admin'] };
 
 export const resolveInquiryTarget = async <C extends ValidatedContext<'json', InquiryTargetBody>>(
@@ -164,7 +168,23 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
     };
   }
 
-  // why: Integration, Token and Project name a row only the service holding the party can set
+  if (targetModel === InquiryResourceModel.Token) {
+    const token = body.targetTokenId
+      ? await db.token.findUnique({ where: { id: body.targetTokenId } })
+      : null;
+    if (!token) throw makeError({ status: 404, message: 'Target token not found' });
+    return { ...nullTargetFields, targetModel, targetTokenId: token.id };
+  }
+
+  if (targetModel === InquiryResourceModel.Integration) {
+    const integration = body.targetIntegrationId
+      ? await db.integration.findUnique({ where: { id: body.targetIntegrationId } })
+      : null;
+    if (!integration) throw makeError({ status: 404, message: 'Target integration not found' });
+    return { ...nullTargetFields, targetModel, targetIntegrationId: integration.id };
+  }
+
+  // why: a Project is named only by the service that holds the party
   if (targetModel !== InquiryResourceModel.admin)
     throw makeError({
       status: 422,

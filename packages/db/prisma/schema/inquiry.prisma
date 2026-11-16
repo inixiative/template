@@ -83,6 +83,7 @@ enum InquiryType {
   createSpace
   updateSpace
   transferSpace
+  changeEntitlements
 }
 
 enum InquiryStatus {

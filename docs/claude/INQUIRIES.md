@@ -20,6 +20,7 @@
   - [`validate` — pre-create and pre-update checks](#validate--pre-create-and-pre-update-checks)
   - [The request and the response](#the-request-and-the-response)
   - [Current Handlers](#current-handlers)
+  - [Asking to change a record's entitlements](#asking-to-change-a-records-entitlements)
 - [Response Schemas](#response-schemas)
 - [Permissions (ReBAC)](#permissions-rebac)
 - [Adding a New Handler](#adding-a-new-handler)
@@ -212,7 +213,8 @@ The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/reba
 - `targetModel: OrganizationUser` → `targetOrganizationId` + `targetUserId` (the membership must exist)
 - `targetModel: SpaceUser` → `targetSpaceId` + `targetUserId` (the membership must exist; its organization fills `targetOrganizationId`)
 - `targetModel: admin` → no FK, just sets the model
-- `targetModel: Integration` / `Token` / `Project` → 422; a request body cannot name them, only a service that holds the party
+- `targetModel: Token` → `targetTokenId`; `targetModel: Integration` → `targetIntegrationId` (the row must exist; its owner keys are carried, never taken from the body)
+- `targetModel: Project` → 422; a request body cannot name it, only a service that holds the party
 
 Slug-based lookups are useful when callers know human-readable identifiers rather than UUIDs.
 
@@ -299,8 +301,18 @@ Why: an approval is the approver's own answer, kept beside the request, never a 
 | `createSpace` | Organization | admin | — | 90 days | Creates `Space` under source org |
 | `updateSpace` | Space | admin | `untargeted` | 90 days | Updates `Space` with content fields |
 | `transferSpace` | Space | Organization | `untargeted` | 30 days | Moves the space and everything keyed to it into the target org; see *Transferring a space* |
+| `changeEntitlements` | User | Token, Integration | — | 30 days | Adds and removes the target's entitlements through `changeEntitlements`; see *Asking to change a record's entitlements* |
 
-All four handlers return `autoApprove: async () => false` — no type currently auto-approves.
+All five handlers return `autoApprove: async () => false` — no type currently auto-approves.
+
+### Asking to change a record's entitlements
+
+`changeEntitlements` is addressed to the record whose entitlements change (a Token or an Integration), never to its owner: whoever administers the record answers it, and it shows in that record's owner's list through the carried keys. Anyone asks from their own inbox (`POST /api/v1/me/inquiries` with `targetModel` and `targetTokenId` or `targetIntegrationId`).
+
+- **The request** is `{ add, remove }`: `add` is entitlement entries in the shape the direct add route takes, `remove` is row ids.
+- **The response** is the approver's own `{ add, remove }`, narrower or wider than asked. An approval with neither is refused (422): to give nothing, deny.
+- **Approving is issuing.** `handleApprove` runs the checks the record's own add and remove routes run (`validateTokenWrite` and `validateDelegateRole`, or `validateIntegrationRole`) and then the one writer, `changeEntitlements`, with the approver as writer. An approver who could not grant an entry directly gets the writer's 403; the resolve transaction rolls back, nothing is written and the inquiry stays open (Aron, 2026-11-16: "The grantor and the person who approves the inquiry need to have access to approve that level… Otherwise, it should error and stay open").
+- Member rows also hold entitlements but are not targets yet: an inquiry addressed to a member is the member's to read, and a member does not administer their own row, so nobody who could answer would see it.
 
 ### Transferring a space
 
