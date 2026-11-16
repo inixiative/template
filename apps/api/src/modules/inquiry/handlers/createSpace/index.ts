@@ -26,7 +26,7 @@ export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceR
   validate,
   autoApprove: async () => false,
 
-  handleApprove: async (inquiry, content) => {
+  handleApprove: async (_c, inquiry, content) => {
     const space = await db.space.create({
       data: { ...content, organizationId: inquiry.sourceOrganizationId! },
     });

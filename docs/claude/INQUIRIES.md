@@ -224,7 +224,7 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
   resolutionSchema: z.ZodType<TResolution>;      // full stored shape: the parsed input plus handleApprove's output, nothing else from the body
   validate?(inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
-  handleApprove(inquiry, resolvedContent: TContent, c): Promise<Partial<TResolution> | undefined | void>; // c is the resolve request's context: the approver acts from it, as on any route
+  handleApprove(c, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>; // c is the resolve request's context, first as on every service that takes one: the approver acts from it. Approval runs only inside a request (resolve, or auto-approval on send), never in a job
   autoApprove(inquiry): Promise<boolean>;    // called after send; return true to skip human review
   unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
   defaultExpirationDays?: number;     // drives computeExpiresAt on send and changesRequested; undefined = no expiry
@@ -366,7 +366,7 @@ Each mutation uses the include that matches what its caller needs:
    - `resolutionInputSchema` — what the resolver submits; fields here (except `explanation`) can override content
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
    - If no computed fields, both can be the same schema
-3. Implement `handleApprove(inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
+3. Implement `handleApprove(c, inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
 4. Implement `autoApprove(inquiry)` — required; called immediately after send; return `true` to resolve as approved without human review, `async () => false` otherwise. Future: organizations may configure this via JSON rules stored on the organization record.
 5. Add `validate(inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
 6. Set `defaultExpirationDays` if the inquiry should auto-expire (e.g. `30` for invitations). Drives `computeExpiresAt` on send and changesRequested. Omit for no expiry.

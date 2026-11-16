@@ -20,7 +20,7 @@ export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
   defaultExpirationDays: 30,
   autoApprove: async () => false,
 
-  handleApprove: async (inquiry, content) => {
+  handleApprove: async (_c, inquiry, content) => {
     const spaceId = inquiry.sourceSpaceId!;
     const organizationId = inquiry.targetOrganizationId!;
 

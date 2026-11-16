@@ -29,7 +29,7 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
 
   autoApprove: async () => false,
 
-  handleApprove: async (inquiry: Inquiry, resolvedContent: InviteOrganizationUserContent) => {
+  handleApprove: async (_c, inquiry: Inquiry, resolvedContent: InviteOrganizationUserContent) => {
     const organizationId = inquiry.sourceOrganizationId!;
     const userId = inquiry.targetUserId!;
     const [revived] = await revive(db.organizationUser, { organizationId, userId });

@@ -42,9 +42,9 @@ export type InquiryHandler<
   resolutionInputSchema: z.ZodType<TResolutionInput>;
   resolutionSchema: z.ZodType<TResolution>;
   handleApprove(
+    c: Context<AppEnv>,
     inquiry: Inquiry,
     resolvedContent: TContent,
-    c: Context<AppEnv>,
   ): Promise<Partial<TResolution> | undefined | void>;
   validate?(inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
   autoApprove(inquiry: Inquiry): Promise<boolean>;

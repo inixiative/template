@@ -44,7 +44,7 @@ export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
   validate,
   autoApprove: async () => false,
 
-  handleApprove: async (inquiry, content) => {
+  handleApprove: async (_c, inquiry, content) => {
     const space = await db.space.update({
       where: { id: inquiry.sourceSpaceId! },
       data: content,
