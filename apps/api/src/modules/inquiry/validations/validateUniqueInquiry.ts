@@ -4,7 +4,13 @@
  * @partOf feature:inquiry
  * @uses infrastructure:prisma
  */
-import { db, getPolymorphismConfig, type PolymorphicValue, type Prisma } from '@template/db';
+import {
+  db,
+  getPolymorphismConfig,
+  type PolymorphicValue,
+  type Prisma,
+  polymorphicKeyColumns,
+} from '@template/db';
 import type { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
@@ -31,7 +37,7 @@ export const validateUniqueInquiry = async (
     const axis = config.axes.find((a) => a.field === axisField);
     if (!axis) return [];
     const value = (inquiry as Record<string, unknown>)[axisField] as PolymorphicValue | undefined;
-    return value ? (axis.fkMap[value] ?? []) : [];
+    return value ? polymorphicKeyColumns('Inquiry', axisField, value) : [];
   };
 
   const pickValues = (fields: readonly string[]): Record<string, unknown> =>

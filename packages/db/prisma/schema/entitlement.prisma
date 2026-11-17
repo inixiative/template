@@ -26,7 +26,7 @@ model Entitlement {
   lens     Json?
 
   sourceModel                 EntitlementResourceModel
-  // True poly beside the false, materialized from the typed FK on create by the polymorphism registry.
+  // dual polymorphism id, set from the typed FK on create by the polymorphism registry.
   sourceId                    String                   @db.VarChar(36)
   sourcePath                  String?
   sourceDeletedAt             DateTime?

@@ -92,7 +92,7 @@ template level with it.
   outside its scope's owner scope, as `{ model, id, state }`.
 - `validations/assertRuleReferencesExist(scopes, references?)`: throws a `RuleReferenceError` with
   those as `details`, which the API answers with a 422.
-- `materializedIdConflicts`, `withMaterializedIds`, `materializedColumns`: the polymorphism
+- `dualPolymorphismIdConflicts`, `withDualPolymorphismIds`, `dualPolymorphismIdColumns`: the polymorphism
   registry's materialized-id step, applied by the rules hook and the factories.
 - `snapshotHookRegistry()`: for tests; restores the hook registry to the snapshot.
 

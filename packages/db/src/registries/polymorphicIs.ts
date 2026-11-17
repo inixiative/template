@@ -5,8 +5,9 @@
  * @uses none
  */
 import { type Condition, Operator } from '@inixiative/json-rules';
-import { polymorphicAxis } from '@template/db/registries/falsePolymorphism';
+import { type PolymorphicAxis, polymorphicAxis } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
+import { polymorphicArmColumns } from '@template/db/utils/polymorphicArmKeys';
 
 export const POLYMORPHIC_BINDS = {
   User: 'userId',
@@ -38,19 +39,32 @@ export const isArmColumns = (
   return keys.length === columns.length && keys.every((key) => columns.includes(key));
 };
 
-/** The key column a false-polymorphic axis uses for a value, or null when the value carries no key (platform, admin). */
+/**
+ * The column holding the id of the `value` row an axis points at, or null when the value carries no
+ * key (platform, admin). A composite arm answers through its relation (`Inquiry.targetSpace` on
+ * `targetOrganizationId` + `targetSpaceId` → `targetSpaceId`); a member arm has no single id column.
+ */
 export const polymorphicKeyColumn = (
   model: ModelName,
   axisField: string,
   value: string,
 ): string | null => {
   const columns = polymorphicKeyColumns(model, axisField, value);
-  if (columns.length > 1)
+  if (columns.length <= 1) return columns[0] ?? null;
+  const idColumn = polymorphicArmColumns(model, axisField, value).id;
+  if (!idColumn)
     throw new Error(
-      `${model}.${axisField} value ${value} keys on ${columns.join('+')}; ask for polymorphicKeyColumns instead`,
+      `${model}.${axisField} value ${value} keys on ${columns.join('+')} and no single id; ask for polymorphicKeyColumns, or give the axis a dualPolymorphismId`,
     );
-  return columns[0] ?? null;
+  return idColumn;
 };
+
+/** The column naming the row an axis points at: its dual polymorphism id when it has one, else the arm's id column. */
+export const axisTargetIdColumn = (
+  model: ModelName,
+  axis: PolymorphicAxis,
+  value: string,
+): string | null => axis.dualPolymorphismId ?? polymorphicKeyColumn(model, axis.field, value);
 
 /**
  * The row a false-polymorphic axis points at — its kind and id — or null when it points at nobody.
@@ -63,7 +77,7 @@ export const polymorphicTarget = (
 ): { kind: string; id: string } | null => {
   const kind = row[axisField];
   if (typeof kind !== 'string') return null;
-  const column = polymorphicKeyColumn(model, axisField, kind);
+  const column = axisTargetIdColumn(model, polymorphicAxis(model, axisField), kind);
   const id = column ? row[column] : null;
   return typeof id === 'string' ? { kind, id } : null;
 };

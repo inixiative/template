@@ -5,7 +5,7 @@
  * @uses none
  */
 
-import { carriedOwnerKeyColumns } from '@template/db/registries/carriedOwnerKeys';
+import { keysHeldOnAxis } from '@template/db/registries/carriedOwnerKeys';
 import {
   discriminatorDefault,
   discriminatorRequiresValue,
@@ -51,7 +51,7 @@ export const assertSelectedForeignKeys = (
       throw new Error(
         `${modelName} ${axis.field}=${String(value)} needs ${missing.join(', ')} — pass the ${String(value)}`,
       );
-    const carried = [...selected, ...carriedOwnerKeyColumns(modelName, axis, value)];
+    const carried = keysHeldOnAxis(modelName, axis, value);
     const stray = [...new Set(Object.values(foreignKeysByValue).flat())].filter(
       (foreignKey) => foreignKey && !carried.includes(foreignKey) && fields[foreignKey] != null,
     );

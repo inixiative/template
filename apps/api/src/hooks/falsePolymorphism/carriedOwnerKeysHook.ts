@@ -11,14 +11,14 @@ import { castArray } from 'lodash-es';
 
 type Row = Record<string, unknown>;
 
-const delegatingModels: ModelName[] = Object.entries(PolymorphismRegistry)
+const modelsCarryingOwnerKeys: ModelName[] = Object.entries(PolymorphismRegistry)
   .filter(([, config]) => config.axes.some((axis) => 'carriesOwnerKeysOf' in axis))
   .map(([model]) => toModelName(model));
 
 export const registerCarriedOwnerKeysHook = () => {
   registerDbHook(
     'falsePolymorphism:carriedOwnerKeys',
-    delegatingModels,
+    modelsCarryingOwnerKeys,
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ model, args }) => {
@@ -29,7 +29,7 @@ export const registerCarriedOwnerKeysHook = () => {
 
   registerDbHook(
     'falsePolymorphism:carriedOwnerKeys:upsert',
-    delegatingModels,
+    modelsCarryingOwnerKeys,
     HookTiming.before,
     [DbAction.upsert],
     async ({ model, args }) => {

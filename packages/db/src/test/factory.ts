@@ -8,8 +8,8 @@
 import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { withDiscriminatorDefaults } from '@template/db/registries/discriminatorDefaults';
+import { withDualPolymorphismIds } from '@template/db/registries/dualPolymorphismIds';
 import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
-import { withMaterializedIds } from '@template/db/registries/materializedIds';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import {
   assertDiscriminatorsChosen,
@@ -217,7 +217,7 @@ export const createFactory = <K extends ModelName>(
     await carryOwnerKeys(modelName, merged);
 
     assertSelectedForeignKeys(modelName, merged);
-    Object.assign(merged, withMaterializedIds(modelName, merged));
+    Object.assign(merged, withDualPolymorphismIds(modelName, merged));
 
     const delegate = db.delegate(modelName);
     const entity: ModelOf<K> = persist

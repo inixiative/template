@@ -7,7 +7,7 @@ import {
 } from '@template/db/registries/parentEdges';
 
 describe('parent edges', () => {
-  it('an entitlement names its target as its parent, by the materialized id', () => {
+  it('an entitlement names its target as its parent, by its dual polymorphism id', () => {
     expect(
       parentOf('Entitlement', {
         targetModel: 'SpaceUser',
@@ -42,9 +42,9 @@ describe('parent edges', () => {
     expect(childWhereAlong('OrganizationUser', edge, { model: 'Space', id: 's-1' })).toBeNull();
   });
 
-  it('a composite arm with no materialized id has no single parent id', () => {
+  it('a composite arm with no dual polymorphism id has no single parent id', () => {
     expect(() =>
       parentAlong('Inquiry', { axis: 'targetModel' }, { targetModel: 'SpaceUser' }),
-    ).toThrow('materialize its id');
+    ).toThrow('give the axis a dualPolymorphismId');
   });
 });

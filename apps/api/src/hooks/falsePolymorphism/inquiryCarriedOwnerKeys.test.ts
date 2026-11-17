@@ -15,7 +15,7 @@ import {
 const sides = ['source', 'target'] as const;
 const other = { source: 'target', target: 'source' } as const;
 
-describe('an inquiry carries the owner keys of the delegate on each side (Aron, 2026-11-16)', () => {
+describe('an inquiry carries the owner keys of the record each side names (Aron, 2026-11-16)', () => {
   afterEach(async () => {
     await cleanupTouchedTables(db);
   });
@@ -170,7 +170,7 @@ describe('an inquiry carries the owner keys of the delegate on each side (Aron, 
     });
   }
 
-  it("a caller's own keys never stand: they are the delegate's, deleted or not", async () => {
+  it("a caller's own keys never stand: they are the named record's, deleted or not", async () => {
     const { organization, organizationIntegration, organizationToken, member } = await world();
     const { entity: elsewhere } = await createOrganization();
     const forged = { organizationId: elsewhere.id, userId: member.userId };

@@ -23,8 +23,8 @@ export type PolymorphicValue = ModelName | SpecialOwner;
 export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
   fkMap: Partial<Record<PolymorphicValue, readonly string[]>>; // typeValue → required FK fields
-  materialized?: string; // the plain column holding the one id the set typed FK points at
-  carriesOwnerKeysOf?: readonly PolymorphicValue[];
+  dualPolymorphismId?: string; // the plain column holding the one id the set typed FK points at
+  carriesOwnerKeysOf?: readonly ModelName[];
 };
 
 export type PolymorphicConfig = {
@@ -210,7 +210,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'sourceModel',
-        materialized: 'sourceId',
+        dualPolymorphismId: 'sourceId',
         fkMap: {
           EmailTemplate: ['sourceEmailTemplateId'],
           EmailComponent: ['sourceEmailComponentId'],
@@ -220,7 +220,7 @@ export const PolymorphismRegistry = {
       },
       {
         field: 'targetModel',
-        materialized: 'targetId',
+        dualPolymorphismId: 'targetId',
         fkMap: {
           Tag: ['targetTagId'],
           Organization: ['targetOrganizationId'],
@@ -247,7 +247,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'sourceModel',
-        materialized: 'sourceId',
+        dualPolymorphismId: 'sourceId',
         fkMap: {
           User: ['sourceUserId'],
           Organization: ['sourceOrganizationId'],
@@ -268,7 +268,7 @@ export const PolymorphismRegistry = {
       },
       {
         field: 'targetModel',
-        materialized: 'targetId',
+        dualPolymorphismId: 'targetId',
         fkMap: {
           Token: ['targetTokenId'],
           Integration: ['targetIntegrationId'],

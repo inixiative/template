@@ -1,7 +1,7 @@
 import type { Condition } from '@inixiative/json-rules';
 import { Operator } from '@inixiative/json-rules';
 import {
-  carriedOwnerKeyColumns,
+  keysHeldOnAxis,
   type ModelName,
   type PolymorphicAxis,
   type PolymorphicValue,
@@ -18,9 +18,12 @@ const requiredForeignKey = (
 ): Condition => {
   const error = `${model} with ${axis.field}=${typeValue} requires ${fk}`;
   const present: Condition = { field: fk, operator: Operator.notEmpty, value: true };
-  return axis.materialized
+  return axis.dualPolymorphismId
     ? {
-        any: [present, { field: axis.materialized, operator: Operator.notEmpty, value: true }],
+        any: [
+          present,
+          { field: axis.dualPolymorphismId, operator: Operator.notEmpty, value: true },
+        ],
         error,
       }
     : { ...present, error };
@@ -32,7 +35,7 @@ const buildAxisRule = (model: ModelName, axis: PolymorphicAxis): Condition => {
 
   const branches = typeValues.map((typeValue) => {
     const requiredFks = axis.fkMap[typeValue] ?? [];
-    const carriedFks = [...requiredFks, ...carriedOwnerKeyColumns(model, axis, typeValue)];
+    const carriedFks = keysHeldOnAxis(model, axis, typeValue);
     const forbiddenFks = allFks.filter((fk: string) => !carriedFks.includes(fk));
 
     const conditions: Condition[] = [

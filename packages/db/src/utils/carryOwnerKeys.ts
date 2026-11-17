@@ -7,13 +7,15 @@
 import { db } from '@template/db/client';
 import {
   carriedOwnerKeyPairs,
-  ownerKeysCarriedFrom,
-  ownerKeysHeld,
+  keysHeldOnAxis,
+  modelWhoseOwnerKeysAreCarried,
 } from '@template/db/registries/carriedOwnerKeys';
 import {
   getPolymorphismConfig,
   type PolymorphicValue,
+  polymorphicAxis,
 } from '@template/db/registries/falsePolymorphism';
+import { polymorphicKeyColumn } from '@template/db/registries/polymorphicIs';
 import type { ModelName } from '@template/db/utils/modelNames';
 
 type Row = Record<string, unknown>;
@@ -21,18 +23,24 @@ type Row = Record<string, unknown>;
 export const carryOwnerKeys = async (model: ModelName, row: Row): Promise<void> => {
   for (const axis of getPolymorphismConfig(model)?.axes ?? []) {
     const value = row[axis.field] as PolymorphicValue;
-    const parent = ownerKeysCarriedFrom(axis, value);
-    if (!parent) continue;
-    const [parentKey] = axis.fkMap[value] ?? [];
-    const parentId = parentKey ? row[parentKey] : null;
-    // why: a deleted parent still owns its row's keys; a caller's own values never stand
-    const parentRow = parentId
+    const carriedFrom = modelWhoseOwnerKeysAreCarried(axis, value);
+    if (!carriedFrom) continue;
+    const idColumn = polymorphicKeyColumn(model, axis.field, value);
+    const carriedFromId = idColumn ? row[idColumn] : null;
+    // why: a deleted record still owns its row's keys; a caller's own values never stand
+    const carriedFromRow = carriedFromId
       ? ((await db.withDeleted(() =>
-          db.delegate(parent).findUnique({ where: { id: parentId } }),
+          db.delegate(carriedFrom).findUnique({ where: { id: carriedFromId } }),
         )) as Row | null)
       : null;
-    const held = parentRow ? ownerKeysHeld(parent, parentRow.ownerModel as PolymorphicValue) : [];
-    for (const { column, parentKey: key } of carriedOwnerKeyPairs(model, axis, value))
-      row[column] = parentRow && held.includes(key) ? parentRow[key] : null;
+    const held = carriedFromRow
+      ? keysHeldOnAxis(
+          carriedFrom,
+          polymorphicAxis(carriedFrom, 'ownerModel'),
+          carriedFromRow.ownerModel,
+        )
+      : [];
+    for (const { column, carriedKey } of carriedOwnerKeyPairs(model, axis, value))
+      row[column] = carriedFromRow && held.includes(carriedKey) ? carriedFromRow[carriedKey] : null;
   }
 };

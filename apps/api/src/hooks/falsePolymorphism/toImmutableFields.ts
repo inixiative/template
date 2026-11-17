@@ -1,6 +1,6 @@
 import {
+  dualPolymorphismIdColumns,
   type ModelName,
-  materializedColumns,
   PolymorphismRegistry,
   toModelName,
 } from '@template/db';
@@ -17,12 +17,12 @@ for (const [model, config] of Object.entries(PolymorphismRegistry)) {
   if (!config) continue;
   const modelName = toModelName(model);
   const typeFields = config.axes.map((axis) => axis.field);
-  const materialized = materializedColumns(modelName);
-  const refuse = materialized.length
+  const dualPolymorphismIds = dualPolymorphismIdColumns(modelName);
+  const refuse = dualPolymorphismIds.length
     ? [
         ...new Set([
           ...config.axes.flatMap((axis) => Object.values(axis.fkMap).flat() as string[]),
-          ...materialized,
+          ...dualPolymorphismIds,
         ]),
       ]
     : [];

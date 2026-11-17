@@ -5,11 +5,11 @@
  * @uses infrastructure:prisma
  */
 import {
-  axisColumnFor,
   DbAction,
   db,
   type HookOptions,
   HookTiming,
+  polymorphicKeyColumn,
   registerDbHook,
 } from '@template/db';
 import type { Entitlement, Prisma } from '@template/db/generated/client/client';
@@ -58,7 +58,7 @@ export const registerEntitlementChangeRequestsHook = () => {
             type: InquiryType.changeEntitlements,
             status: { notIn: inquiryTerminalStatuses },
             targetModel: model,
-            [axisColumnFor('Inquiry', 'targetModel', model)]: targetId,
+            [polymorphicKeyColumn('Inquiry', 'targetModel', model) as string]: targetId,
             ...(resolving ? { id: { not: resolving } } : {}),
           },
         });
