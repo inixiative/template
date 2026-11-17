@@ -5,7 +5,6 @@
  * @uses none
  */
 import type { ModelName } from '@template/db/utils/modelNames';
-import { lowerFirst, upperFirst } from 'lodash-es';
 
 // ============================================================================
 // POLYMORPHISM REGISTRY - Single source of truth for false polymorphism
@@ -432,57 +431,3 @@ export const polymorphicAxis = (model: ModelName, axisField: string): Polymorphi
   if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
   return axis;
 };
-
-const ownerAxisField = 'ownerModel';
-
-/** What a delegating axis puts before its parent's names: `targetTokenId` names Token with `target`, `integrationId` names Integration with nothing. */
-export const delegatePrefix = (axis: PolymorphicAxis, value: PolymorphicValue): string => {
-  const parent = axis.delegates?.[value];
-  const [key, ...rest] = axis.fkMap[value] ?? [];
-  const suffix = `${parent}Id`;
-  if (!parent || !key || rest.length)
-    throw new Error(`${axis.field}=${value} delegates through one key naming its parent`);
-  if (key === lowerFirst(suffix)) return '';
-  if (!key.endsWith(suffix))
-    throw new Error(`${axis.field}=${value} key ${key} does not name ${parent}`);
-  return key.slice(0, -suffix.length);
-};
-
-export const prefixedName = (prefix: string, name: string) =>
-  prefix ? `${prefix}${upperFirst(name)}` : lowerFirst(name);
-
-/** Every owner key a row of `model` can hold: its own arms' keys and the ones its delegates carry. */
-export const ownerKeysOf = (model: ModelName): string[] => {
-  const axis = polymorphicAxis(model, ownerAxisField);
-  return [
-    ...new Set([
-      ...(Object.values(axis.fkMap).flat() as string[]),
-      ...(Object.keys(axis.delegates ?? {}) as PolymorphicValue[]).flatMap((value) =>
-        delegatedKeys(axis, value),
-      ),
-    ]),
-  ];
-};
-
-/** The owner keys a row of `model` holds when its owner axis says `value`. */
-export const ownerKeysHeld = (model: ModelName, value: PolymorphicValue): string[] => {
-  const axis = polymorphicAxis(model, ownerAxisField);
-  return [...(axis.fkMap[value] ?? []), ...delegatedKeys(axis, value)];
-};
-
-/** The parent's owner keys a delegating value carries, each paired with the column that holds it on this axis. */
-export const delegatedKeyPairs = (
-  axis: PolymorphicAxis,
-  value: unknown,
-): { column: string; parentKey: string }[] => {
-  const parent = axis.delegates?.[value as PolymorphicValue];
-  if (!parent) return [];
-  const prefix = delegatePrefix(axis, value as PolymorphicValue);
-  return ownerKeysOf(parent).map((parentKey) => ({
-    column: prefixedName(prefix, parentKey),
-    parentKey,
-  }));
-};
-
-export const delegatedKeys = (axis: PolymorphicAxis, value: unknown): string[] =>
-  delegatedKeyPairs(axis, value).map(({ column }) => column);

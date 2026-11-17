@@ -119,6 +119,21 @@ describe('changeEntitlements: a request addressed to the record whose entitlemen
     expect((await ask(requester, target)).status).toBe(409);
   });
 
+  it('a request carries positive rules only: a negated where is refused when asked, as on the direct route', async () => {
+    const negated = {
+      ...onOrganization(['read']),
+      where: { field: 'name', operator: 'notEquals', value: 'x' },
+    };
+    const response = await ask(requester, {
+      targetModel: 'Token',
+      targetTokenId: token.id,
+      content: { add: [negated] },
+    });
+    expect(response.status).toBe(422);
+    expect(JSON.stringify(await response.json())).toContain('add.0.where');
+    expect(await db.inquiry.count({ where: { targetTokenId: token.id } })).toBe(0);
+  });
+
   it('a stranger cannot address a record they cannot read, and is shown nothing of it', async () => {
     const { entity: stranger } = await createUser();
     const response = await ask(

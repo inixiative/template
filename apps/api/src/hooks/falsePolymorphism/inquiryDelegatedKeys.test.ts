@@ -133,23 +133,23 @@ describe('an inquiry carries the owner keys of the delegate on each side (Aron, 
       const organizationId = w.organization.id;
       const views: Record<string, { owner: OwnerKeys; holds: string[] }> = {
         organization: {
-          owner: { organizationId, spaceId: null, userId: null },
+          owner: { Organization: organizationId, Space: null, User: null },
           holds: ['organization', 'organizationIntegration', 'organizationToken', 'project'],
         },
         member: {
-          owner: { organizationId, userId: w.member.userId, spaceId: null },
+          owner: { Organization: organizationId, User: w.member.userId, Space: null },
           holds: ['member', 'memberIntegration', 'memberToken'],
         },
         user: {
-          owner: { userId: w.member.userId },
+          owner: { User: w.member.userId },
           holds: ['member', 'memberIntegration', 'memberToken'],
         },
         space: {
-          owner: { organizationId, spaceId: w.space.id, userId: null },
+          owner: { Organization: organizationId, Space: w.space.id, User: null },
           holds: ['space', 'spaceIntegration', 'spaceToken'],
         },
         integration: {
-          owner: { integrationId: w.organizationIntegration.id },
+          owner: { Integration: w.organizationIntegration.id },
           holds: ['organizationIntegration', 'organizationToken'],
         },
       };

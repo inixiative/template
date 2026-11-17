@@ -19,9 +19,9 @@ export const spaceReadManyInquiriesReceivedController = makeController(
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
         ...whereAxisCarriesOwnerKeys('Inquiry', 'targetModel', {
-          organizationId: space.organizationId,
-          spaceId: space.id,
-          userId: null,
+          Organization: space.organizationId,
+          Space: space.id,
+          User: null,
         }),
         status: { notIn: [InquiryStatus.draft, InquiryStatus.canceled] },
       },

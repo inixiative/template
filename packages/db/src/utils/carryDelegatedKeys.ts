@@ -5,10 +5,9 @@
  * @uses none
  */
 import { db } from '@template/db/client';
+import { delegatedKeyPairs, ownerKeysHeld } from '@template/db/registries/delegatedColumns';
 import {
-  delegatedKeyPairs,
   getPolymorphismConfig,
-  ownerKeysHeld,
   type PolymorphicValue,
 } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
@@ -29,7 +28,7 @@ export const carryDelegatedKeys = async (model: ModelName, row: Row): Promise<vo
         )) as Row | null)
       : null;
     const held = parentRow ? ownerKeysHeld(parent, parentRow.ownerModel as PolymorphicValue) : [];
-    for (const { column, parentKey: key } of delegatedKeyPairs(axis, value))
+    for (const { column, parentKey: key } of delegatedKeyPairs(model, axis, value))
       row[column] = parentRow && held.includes(key) ? parentRow[key] : null;
   }
 };

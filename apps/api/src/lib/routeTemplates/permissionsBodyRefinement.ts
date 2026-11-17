@@ -31,6 +31,10 @@ const reportWheres = (ctx: z.RefinementCtx, path: (string | number)[], entries: 
 const isEntitlement = (body: unknown): body is { sourceModel: unknown; where?: unknown } =>
   typeof body === 'object' && body !== null && 'sourceModel' in body;
 
+/** A list of entitlement entries carries positive rules only: the refinement for any field that holds them. */
+export const entitlementEntriesRefinement = (entries: unknown, ctx: z.RefinementCtx): void =>
+  reportWheres(ctx, [], entries);
+
 /** Entitlements carry positive rules only: one row of a many body, or a delegate's `entitlements`. */
 export const permissionsBodyRefinement = (body: unknown, ctx: z.RefinementCtx): void => {
   if (isEntitlement(body)) {

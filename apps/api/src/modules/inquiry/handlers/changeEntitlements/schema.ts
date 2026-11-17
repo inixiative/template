@@ -7,9 +7,10 @@
 import { entitlementInputsSchema } from '@template/permissions/rebac';
 import { baseResolutionInputSchema } from '@template/shared/inquiry';
 import { z } from 'zod';
+import { entitlementEntriesRefinement } from '#/lib/routeTemplates/permissionsBodyRefinement';
 
 const changes = {
-  add: entitlementInputsSchema.default([]),
+  add: entitlementInputsSchema.superRefine(entitlementEntriesRefinement).default([]),
   remove: z.array(z.string().min(1)).default([]),
 };
 

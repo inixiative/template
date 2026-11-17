@@ -41,7 +41,7 @@ describe('polymorphicSchema matches the write rule', () => {
             rule: false,
           });
         }
-        const carried = delegatedKeys(axis, value);
+        const carried = delegatedKeys(modelName, axis, value);
         for (const fk of columns.filter((column) => !required.includes(column))) {
           expect({ value, fk, ...verdicts({ ...row, [fk]: id }) }).toEqual({
             value,

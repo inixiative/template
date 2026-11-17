@@ -18,9 +18,9 @@ export const spaceReadManyInquiriesSentController = makeController(
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
         ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', {
-          organizationId: space.organizationId,
-          spaceId: space.id,
-          userId: null,
+          Organization: space.organizationId,
+          Space: space.id,
+          User: null,
         }),
       },
       orNullFields: ['expiresAt'],

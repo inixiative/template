@@ -16,7 +16,7 @@ export const meReadManyInquiriesSentController = makeController(
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', { userId: me(c)!.id }),
+        ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', { User: me(c)!.id }),
       },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },

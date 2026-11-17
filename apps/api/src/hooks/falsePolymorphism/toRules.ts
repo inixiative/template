@@ -32,7 +32,7 @@ const buildAxisRule = (model: ModelName, axis: PolymorphicAxis): Condition => {
 
   const branches = typeValues.map((typeValue) => {
     const requiredFks = axis.fkMap[typeValue] ?? [];
-    const carriedFks = [...requiredFks, ...delegatedKeys(axis, typeValue)];
+    const carriedFks = [...requiredFks, ...delegatedKeys(model, axis, typeValue)];
     const forbiddenFks = allFks.filter((fk: string) => !carriedFks.includes(fk));
 
     const conditions: Condition[] = [
