@@ -8,6 +8,7 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
+import { waitFor } from '@template/shared/utils/waitFor';
 import {
   STREAM_DEFINITIONS,
   WS_CHANNELS,
@@ -37,14 +38,6 @@ const until = async (predicate: () => boolean, attempts = 10_000): Promise<void>
 };
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
-
-const waitFor = async (predicate: () => boolean, timeoutMs = 3000): Promise<void> => {
-  const start = Date.now();
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) throw new Error('waitFor timed out');
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-};
 
 const withStreamRouteStatus = async (
   status: number,

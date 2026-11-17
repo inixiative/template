@@ -7,6 +7,7 @@ import {
   createContact,
   createOrganizationUser,
 } from '@template/db/test';
+import { waitFor } from '@template/shared/utils/waitFor';
 import { defineStream, STREAM_DEFINITIONS, type StreamDefinition } from '@template/shared/ws';
 import { z } from 'zod';
 import { emitAppEvent } from '#/appEvents/emit';
@@ -24,14 +25,6 @@ import { createTestSocket } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 
 const organizationContactsStream = STREAM_DEFINITIONS.organizationReadManyContacts;
-
-const waitFor = async (predicate: () => boolean, timeoutMs = 3000): Promise<void> => {
-  const start = Date.now();
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) throw new Error('waitFor timed out');
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-};
 
 describe('organization contacts stream producers', () => {
   afterEach(async () => {

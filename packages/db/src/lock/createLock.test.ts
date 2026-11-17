@@ -5,22 +5,12 @@ import { maxSafeHeartbeatMs } from '@template/db/lock/maxSafeHeartbeatMs';
 import type { LockRedis } from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
+import { waitFor } from '@template/shared/utils/waitFor';
 
 const newId = () => `test-${Bun.randomUUIDv7()}`;
 const keyFor = (id: string) => `${redisNamespace.lock}:s:${id}`;
 const fastOpts = { ttlMs: 100, heartbeatMs: 30 };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-const waitFor = async (
-  condition: () => boolean | Promise<boolean>,
-  timeoutMs = 500,
-): Promise<void> => {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await condition()) return;
-    await sleep(5);
-  }
-  throw new Error('Timed out waiting for condition');
-};
 
 // A refresh eval carries 5 args (script, numkeys, key, token, ttl); a delete eval carries 4.
 const isRefresh = (args: unknown[]) => args.length === 5;

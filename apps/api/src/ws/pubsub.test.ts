@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { getRedisPub, getRedisSub } from '@template/db';
-
+import { waitFor } from '@template/shared/utils/waitFor';
 import { appendToStream, initWebSocketPubSub, isPubSubEnabled, sendToChannel } from '#/ws/pubsub';
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
 import { addConnection, clearRegistry } from '#/ws/registry';
@@ -9,14 +9,6 @@ import { streamSeqKey } from '#/ws/streamSeq';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket } from '#tests/createTestSocket';
-
-const waitFor = async (predicate: () => boolean, timeoutMs = 3000): Promise<void> => {
-  const start = Date.now();
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) throw new Error('waitFor timed out');
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-};
 
 describe('ws pubsub (redis round trip)', () => {
   beforeEach(async () => {
