@@ -11,6 +11,11 @@ const WS_CLOSED = 3;
 
 let seq = 0;
 
+export type SentFrame = Record<string, unknown>;
+
+export const sentFrames = <Frame extends SentFrame = SentFrame>(sent: readonly string[]): Frame[] =>
+  sent.map((message) => JSON.parse(message) as Frame);
+
 export type TestSocketHandle = {
   socket: WSSocket;
   sent: string[];

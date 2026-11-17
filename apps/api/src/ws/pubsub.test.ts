@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { getRedisPub, getRedisSub } from '@template/db';
-
+import { waitFor } from '@template/shared/test/waitFor';
 import { appendToStream, initWebSocketPubSub, isPubSubEnabled, sendToChannel } from '#/ws/pubsub';
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
 import { addConnection, clearRegistry } from '#/ws/registry';
@@ -8,15 +8,7 @@ import { pendingStreamQueues } from '#/ws/streamPublishOrder';
 import { streamSeqKey } from '#/ws/streamSeq';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
-import { createTestSocket } from '#tests/createTestSocket';
-
-const waitFor = async (predicate: () => boolean, timeoutMs = 3000): Promise<void> => {
-  const start = Date.now();
-  while (!predicate()) {
-    if (Date.now() - start > timeoutMs) throw new Error('waitFor timed out');
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-};
+import { createTestSocket, type SentFrame, sentFrames } from '#tests/createTestSocket';
 
 describe('ws pubsub (redis round trip)', () => {
   beforeEach(async () => {
@@ -35,7 +27,7 @@ describe('ws pubsub (redis round trip)', () => {
     await sendToChannel('pubsub:round-trip', { type: 'query.refetch', queryKey: ['pubsub'] });
 
     await waitFor(() => handle.sent.length > 0);
-    expect(JSON.parse(handle.sent[0]!)).toEqual({ type: 'query.refetch', queryKey: ['pubsub'] });
+    expect(sentFrames(handle.sent)[0]).toEqual({ type: 'query.refetch', queryKey: ['pubsub'] });
   });
 
   it('does not deliver to sockets subscribed to other channels', async () => {
@@ -57,7 +49,7 @@ describe('ws pubsub (redis round trip)', () => {
     await appendToStream('pubsub:stream', { type: 'upsert', payload: { id: 'x' } });
 
     await waitFor(() => handle.sent.length > 0);
-    expect(JSON.parse(handle.sent[0]!)).toEqual({
+    expect(sentFrames(handle.sent)[0]).toEqual({
       category: 'data',
       action: 'append',
       stream: 'pubsub:stream',
@@ -77,7 +69,7 @@ describe('ws pubsub (redis round trip)', () => {
     );
     await waitFor(() => handle.sent.length === 3);
 
-    const frames = handle.sent.map((message) => JSON.parse(message));
+    const frames = sentFrames<SentFrame & { seq: number; payload: { n: number } }>(handle.sent);
     expect(frames.map((frame) => frame.payload.n)).toEqual([1, 2, 3]);
     expect(frames.map((frame) => frame.seq - frames[0].seq)).toEqual([0, 1, 2]);
     expect(pendingStreamQueues()).toBe(0);
@@ -100,7 +92,7 @@ describe('ws pubsub (redis round trip)', () => {
     await Promise.all([1, 2, 3, 4, 5].flatMap((n) => [a(n), b(n)]));
     await waitFor(() => handle.sent.length === 10);
 
-    const seqs = handle.sent.map((message) => JSON.parse(message).seq as number);
+    const seqs = sentFrames(handle.sent).map((frame) => frame.seq as number);
     expect(seqs.map((seq) => seq - (seqs[0] as number))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
@@ -118,9 +110,7 @@ describe('ws pubsub (redis round trip)', () => {
       spy.mockRestore();
     }
 
-    expect(handle.sent.map((message) => JSON.parse(message))).toEqual([
-      { type: 'resync', stream: 'pubsub:down' },
-    ]);
+    expect(sentFrames(handle.sent)).toEqual([{ type: 'resync', stream: 'pubsub:down' }]);
     expect(handle.socket.data.streams.has('pubsub:down')).toBe(false);
     expect(pendingStreamQueues()).toBe(0);
   });
@@ -150,7 +140,7 @@ describe('ws pubsub (redis round trip)', () => {
       publishSpy.mockRestore();
     }
 
-    expect(published.map((message) => JSON.parse(message))).toEqual([
+    expect(sentFrames(published)).toEqual([
       { type: 'streamResync', target: 'pubsub:remote', origin: expect.any(String) },
     ]);
   });
@@ -184,7 +174,7 @@ describe('ws pubsub (redis round trip)', () => {
       publishSpy.mockRestore();
     }
 
-    expect(published.map((message) => JSON.parse(message).target)).toEqual([
+    expect(sentFrames(published).map((frame) => frame.target)).toEqual([
       'pubsub:resync-first',
       'pubsub:resync-second',
     ]);
@@ -201,9 +191,7 @@ describe('ws pubsub (redis round trip)', () => {
     );
     await waitFor(() => handle.sent.length > 0);
 
-    expect(handle.sent.map((message) => JSON.parse(message))).toEqual([
-      { type: 'resync', stream: 'pubsub:foreign' },
-    ]);
+    expect(sentFrames(handle.sent)).toEqual([{ type: 'resync', stream: 'pubsub:foreign' }]);
   });
 
   it('a subscriber reconnect resubscribes, then resyncs every locally held stream', async () => {
@@ -224,10 +212,8 @@ describe('ws pubsub (redis round trip)', () => {
       resubscribe.mockRestore();
     }
 
-    expect(quiet.sent.map((message) => JSON.parse(message))).toEqual([
-      { type: 'resync', stream: 'pubsub:reconnect-quiet' },
-    ]);
-    expect(new Set(busy.sent.map((message) => JSON.parse(message).stream))).toEqual(
+    expect(sentFrames(quiet.sent)).toEqual([{ type: 'resync', stream: 'pubsub:reconnect-quiet' }]);
+    expect(new Set(sentFrames(busy.sent).map((frame) => frame.stream))).toEqual(
       new Set(['pubsub:reconnect-busy', 'pubsub:reconnect-quiet']),
     );
     expect(busy.socket.data.streams.size).toBe(0);
@@ -267,7 +253,7 @@ describe('ws pubsub (redis round trip)', () => {
     ]);
     await waitFor(() => alice.sent.length === 3 && bob.sent.length === 2);
 
-    const seqs = (sent: string[]) => sent.map((message) => JSON.parse(message).seq as number);
+    const seqs = (sent: string[]) => sentFrames(sent).map((frame) => frame.seq as number);
     const consecutive = (numbers: number[]) => numbers.map((seq) => seq - (numbers[0] as number));
     expect(consecutive(seqs(alice.sent))).toEqual([0, 1, 2]);
     expect(consecutive(seqs(bob.sent))).toEqual([0, 1]);

@@ -9,6 +9,7 @@ import {
   createSpace,
 } from '@template/db/test';
 import { gate } from '@template/db/test/gate';
+import { waitFor } from '@template/shared/test/waitFor';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
@@ -25,17 +26,14 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 // The contender's blocked FOR NO KEY UPDATE is observed in pg_stat_activity before the holder
 // mutates, so the contender has provably finished its unlocked reads against the live row; a fixed
 // delay would only guess at that and make the race flaky in both directions.
-const waitForBlockedLockOn = async (table: string): Promise<void> => {
+const waitForBlockedLockOn = (table: string): Promise<void> => {
   const pattern = `%"${table}"%FOR NO KEY UPDATE%`;
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
+  return waitFor(async () => {
     const rows = await db.$queryRaw<{ n: bigint | number }[]>`
       SELECT COUNT(*) AS n FROM pg_stat_activity
       WHERE pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query ILIKE ${pattern}`;
-    if (Number(rows[0]?.n ?? 0) > 0) return;
-    await sleep(25);
-  }
-  throw new Error(`no contender blocked on ${table}`);
+    return Number(rows[0]?.n ?? 0) > 0;
+  }, 10_000);
 };
 
 const settles = (promise: Promise<unknown>, withinMs: number) =>

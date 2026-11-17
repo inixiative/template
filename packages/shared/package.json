@@ -14,6 +14,7 @@
     ".": "./src/index.ts",
     "./utils": "./src/utils/index.ts",
     "./utils/*": "./src/utils/*.ts",
+    "./test/*": "./src/test/*.ts",
     "./bracketQuery": "./src/lib/bracketQuery/index.ts",
     "./bracketQuery/*": "./src/lib/bracketQuery/*.ts",
     "./errors": "./src/errors/index.ts",

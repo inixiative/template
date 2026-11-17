@@ -2,7 +2,7 @@ import { getRedisPub, getRedisSub } from '@template/db';
 import { appendToStream, initWebSocketPubSub } from '#/ws/pubsub';
 import { addConnection } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
-import { createTestSocket, type TestSocketHandle } from '#tests/createTestSocket';
+import { createTestSocket, sentFrames, type TestSocketHandle } from '#tests/createTestSocket';
 import {
   WS_INSTANCE_REPLY,
   type WSInstanceCommand,
@@ -54,7 +54,7 @@ const run = async (command: WSInstanceCommand): Promise<unknown> => {
     case 'append':
       return append(command);
     case 'frames':
-      return (sockets.get(command.connectionId)?.sent ?? []).map((frame) => JSON.parse(frame));
+      return sentFrames(sockets.get(command.connectionId)?.sent ?? []);
     case 'dropSubscriber':
       return dropSubscriber(command.downMs);
     case 'awaitSubscriber':
