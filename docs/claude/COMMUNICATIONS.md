@@ -794,7 +794,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   referenced row is copied onto every edge naming it by `ruleReference:target` (one
   `updateManyAndReturn`, matched on `(targetModel, targetId)`, cleared on undelete); a
   purge `SET NULL`s the typed FK and leaves `targetId` naming the row that went. The referenced
-  axis therefore carries true polymorphism beside the false — the FK is the relation and may go
+  axis is dual-polymorphic ([DATABASE.md](DATABASE.md#false-polymorphism)): the FK is the relation and may go
   null, `targetId` is the name and never changes. The false-polymorphism rules hook writes `sourceId`
   and `targetId` from the set typed FK on create (`materialized` on the registry axis), refuses a
   row where they disagree, and the immutable-fields hook refuses any update to an edge's typed FKs

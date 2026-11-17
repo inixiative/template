@@ -47,7 +47,7 @@
   - [Path Notation Utilities](#path-notation-utilities)
 - [False Polymorphism](#false-polymorphism)
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
-  - [Delegated Keys](#delegated-keys)
+  - [Carried Owner Keys](#carried-owner-keys)
   - [Back-Relations Over Shared Key Columns](#back-relations-over-shared-key-columns)
 - [Entitlement](#entitlement)
   - [Tokens](#tokens)
@@ -740,7 +740,16 @@ const where = buildWhereClause({
 
 ## False Polymorphism
 
-Instead of true polymorphism (type + id), use type enum + optional FKs:
+A row that points at one of several models uses one of two shapes, never a third.
+
+| Kind | Columns | Use when |
+|---|---|---|
+| **False polymorphism** (the default) | an enum naming the model + one typed, optional FK per arm | the target always outlives the row, or the row goes with it (`onDelete: Cascade`) |
+| **Dual polymorphism** | the same, + one plain id column the typed FK fills on create (`materialized` on the registry axis) | the row must keep naming its target after the typed FK goes null: an arm is `onDelete: SetNull` (CI rule `set-null-polymorphism-materialized`), or the target can be hard-deleted. `Entitlement` (`sourceId`, `targetId`) and `RuleReference` |
+
+**Never Rails-style polymorphism:** an enum plus a bare id with no FKs. Why: no FK constraint, no typed include, no cascade, and nothing stops the id naming a row that is gone. A hard-deletable target that a row must keep naming takes dual polymorphism instead (Aron, 2026-11-17: "If we need a hard delete, then you probably should move to dual polymorphism").
+
+False polymorphism, the type enum + optional FKs:
 
 ```prisma
 ownerModel         WebhookOwnerModel
@@ -784,11 +793,11 @@ enum EmailOwnerModel {
 2. Admin override (if super admin has customized)
 3. Default (seeded baseline)
 
-### Delegated Keys
+### Carried Owner Keys
 
-An axis value can name a parent in `delegates`: the row carries the parent's own owner keys beside its own. A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:delegatedKeys` hook copies them from the parent on create and upsert through `carryDelegatedKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
+An axis can list values in `carriesOwnerKeysOf`: a row whose axis names one of those records carries that record's own owner keys beside its own. This is about where a row is filed, not about authority: Project is listed though it is no permission delegate (those are `DELEGATE_MODELS`, PERMISSIONS.md). A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:carriedOwnerKeys` hook copies them from that record on create and upsert through `carryOwnerKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
 
-The parent's keys come from its `ownerModel` axis, and the chain needs no config: the parent row already holds what its own delegate carried, so one copy brings the whole chain (a token gives an inquiry its integration and that integration's owner). Which column holds which parent key is read from the Prisma relations, never from column names (`registries/delegatedColumns.ts`): for each owner kind both axes point at, the arm relations name the same field of that kind's row (`Token.space` on `organizationId` + `spaceId`, `Inquiry.targetSpace` on `targetOrganizationId` + `targetSpaceId`), so those columns pair. `whereAxisCarriesOwnerKeys` (`registries/delegatedOwnerWhere.ts`) is "this owner's rows, and those of what it holds" as one flat filter on those columns, the owner given by kind (`{ Organization: id, Space: null, User: null }`).
+The parent's keys come from its `ownerModel` axis, and the chain needs no config: the record already holds what its own axis carried, so one copy brings the whole chain (a token gives an inquiry its integration and that integration's owner). Which column holds which parent key is read from the Prisma relations, never from column names (`registries/carriedOwnerKeys.ts`, through `polymorphicArmColumns` in `utils/polymorphicArmKeys.ts`): for each owner kind both axes point at, the arm relations name the same field of that kind's row (`Token.space` on `organizationId` + `spaceId`, `Inquiry.targetSpace` on `targetOrganizationId` + `targetSpaceId`), so those columns pair. `whereAxisCarriesOwnerKeys` (`registries/ownerWhere.ts`) is "this owner's rows, and those of what it holds" as one flat filter on those columns, the owner given by kind (`{ Organization: id, Space: null, User: null }`); the inquiry lists use it, since an inquiry is not a submodel and has no permission placement. A submodel's list under an owner uses `submodelOwnerWhere` instead, the same placement its permission check made, so the list and the check can't drift (PERMISSIONS.md § Lists under an owner).
 
 ### Back-Relations Over Shared Key Columns
 
@@ -854,7 +863,7 @@ Schema-level configuration in `packages/db/src/registries/`:
 | Helper (`@template/db`) | Derives |
 |---|---|
 | `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
-| `delegatedKeys(model, axis, value)` / `delegatedKeyPairs` / `ownerKeysHeld` / `carryDelegatedKeys(model, row)` | The columns a delegating value carries, paired with the parent's keys through the arm relations; the keys a row holds for its owner value; copy them from the parent row (the hook and the test factory both call it) |
+| `ownerKeysCarriedFrom(axis, value)` / `carriedOwnerKeyColumns(model, axis, value)` / `carriedOwnerKeyPairs` / `ownerKeysHeld` / `carryOwnerKeys(model, row)` | The record a value carries owner keys from; the columns it carries, paired with that record's keys through the arm relations; the keys a row holds for its owner value; copy them from that record (the hook and the test factory both call it) |
 | `axisColumnFor(model, axisField, kind)` / `whereAxisCarriesOwnerKeys(model, axisField, owner)` | The column on an axis that holds a kind's id, from its arm relation; an owner's rows and those of what it holds, as one flat filter |
 | `polymorphicKeyColumns` / `polymorphicKeyColumn` / `polymorphicTarget` / `isArmColumns` | Every key column for a value (a member arm has two or three); the one column of a single-key arm (throws on a composite arm); the `{ kind, id }` a row points at (throws likewise); whether a relation's columns are exactly an arm's |
 | `polymorphicArmRelation` / `polymorphicArmKeys` | The relation an arm's key columns form (matched by `isArmColumns`, as `childRelations` matches); the columns an arm sets to point at a row (its id, or a composite arm's owner chain off the row) |

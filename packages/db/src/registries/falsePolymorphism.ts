@@ -24,7 +24,7 @@ export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
   fkMap: Partial<Record<PolymorphicValue, readonly string[]>>; // typeValue → required FK fields
   materialized?: string; // the plain column holding the one id the set typed FK points at
-  delegates?: Partial<Record<PolymorphicValue, ModelName>>;
+  carriesOwnerKeysOf?: readonly PolymorphicValue[];
 };
 
 export type PolymorphicConfig = {
@@ -65,7 +65,7 @@ export const PolymorphismRegistry = {
           SpaceUser: ['organizationId', 'spaceId', 'userId'],
           Integration: ['integrationId'],
         },
-        delegates: { Integration: 'Integration' },
+        carriesOwnerKeysOf: ['Integration'],
       },
     ],
   },
@@ -294,7 +294,7 @@ export const PolymorphismRegistry = {
           Token: ['sourceTokenId'],
           Project: ['sourceProjectId'],
         },
-        delegates: { Integration: 'Integration', Token: 'Token', Project: 'Project' },
+        carriesOwnerKeysOf: ['Integration', 'Token', 'Project'],
       },
       {
         field: 'targetModel',
@@ -309,7 +309,7 @@ export const PolymorphismRegistry = {
           Token: ['targetTokenId'],
           Project: ['targetProjectId'],
         },
-        delegates: { Integration: 'Integration', Token: 'Token', Project: 'Project' },
+        carriesOwnerKeysOf: ['Integration', 'Token', 'Project'],
       },
     ],
   },

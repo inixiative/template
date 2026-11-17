@@ -107,7 +107,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | reject invalid type values, missing FKs and changed type fields on writes | **Registry-generated polymorphic write validation** · pattern docs/claude/HOOKS.md > Auto-Generated Validation — Instead of hand-written hooks or immutable-field config for polymorphic type fields. | part 4 | — |
 | compute membership once on change (static) or continuously (dynamic) | **Segment static vs dynamic** · pattern segment.prisma; docs/claude/SEGMENTS.md — static for hand-picked or rarely changing audiences; dynamic when membership tracks live data. | part 4 | — |
 | a default owner that isn't a real row; a seeded base readable by everyone, writable by super admins; an admin-only owner value; owner values that have no foreign key | **Special owner values without FK** · pattern docs/claude/DATABASE.md § False Polymorphism › Special Owner Values (No FK) — default for tenant-wide readable baselines; admin for super-admin-only internals; Organization for tenant customizations. | code `User`, `Organization`, `Token`, `Integration` | — |
-| copy a parent's owner keys onto the row on create and upsert | **falsePolymorphism:delegatedKeys** · primitive docs/claude/DATABASE.md § False Polymorphism › Delegated Keys — copy a parent's owner keys onto the row on create and upsert | code `User`, `Organization`, `Token`, `Integration` | — |
+| copy a parent's owner keys onto the row on create and upsert | **falsePolymorphism:carriedOwnerKeys** · primitive docs/claude/DATABASE.md § False Polymorphism › Delegated Keys — copy a parent's owner keys onto the row on create and upsert | code `User`, `Organization`, `Token`, `Integration` | — |
 | skip the webhook for a record that keeps failing; mark a record as poisoned for this integration; stop delivering for this one record | **integrationRecord.poisonedAt** · primitive packages/db/prisma/schema/integrationRecord.prisma — make sendWebhook skip a record poisoned in its integration | part 4 | — |
 | type the only/omit/extend options checked against the registry | **PolymorphicSchemaOptions** · primitive packages/db/src/registries/polymorphicSchemaTypes.ts — Rarely named; inference usually suffices. Sibling helpers: PolymorphicTarget, PolymorphicAxisValue, PolymorphicFkColumn. | part 4 | — |
 | verify polymorphicSchema matches the write rule for single-axis models | **toRules.test.ts** · primitive toRules.test.ts — verify polymorphicSchema matches the write rule for single-axis models | part 4 | — |
@@ -124,7 +124,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | just add a field to this table; store the URL on the existing model; merge these two things into one table; split it into its own model because it lives differently | **Separate concerns by lifecycle and ownership** · rule CLAUDE.md §0.2 Decomposition by Default — When tempted to 'just add a field', store a URL, or merge into one table. | part 4 | — |
 | what id type for the new model; use a random uuid for the primary key; ids that sort by creation time | **UUID v7 IDs** · rule FEATURES.md > Database & ORM > UUID v7 IDs — Every model primary key. | part 4 | — |
 
-- *Also here, by name:* TagOwnerModel (`packages/db/prisma/schema/tag.prisma`); TagResource (`packages/db/prisma/schema/tagAttachment.prisma`); delegatedKeys (`packages/db/src/registries/falsePolymorphism.ts`); isFalsePolymorphismRef (`packages/db/src/registries/falsePolymorphism.ts`); isOwnerKind (`packages/db/src/registries/polymorphicIs.ts`); withMaterializedIds (`packages/db/src/registries/materializedIds.ts`)
+- *Also here, by name:* TagOwnerModel (`packages/db/prisma/schema/tag.prisma`); TagResource (`packages/db/prisma/schema/tagAttachment.prisma`); carriedOwnerKeyColumns (`packages/db/src/registries/falsePolymorphism.ts`); isFalsePolymorphismRef (`packages/db/src/registries/falsePolymorphism.ts`); isOwnerKind (`packages/db/src/registries/polymorphicIs.ts`); withMaterializedIds (`packages/db/src/registries/materializedIds.ts`)
 
 ### Class `reference-data`: Static reference data: countries, currencies, languages, timezones + zod schemas
 
@@ -274,7 +274,16 @@ enum InquiryType {
 
 #### False Polymorphism
 
-Instead of true polymorphism (type + id), use type enum + optional FKs:
+A row that points at one of several models uses one of two shapes, never a third.
+
+| Kind | Columns | Use when |
+|---|---|---|
+| **False polymorphism** (the default) | an enum naming the model + one typed, optional FK per arm | the target always outlives the row, or the row goes with it (`onDelete: Cascade`) |
+| **Dual polymorphism** | the same, + one plain id column the typed FK fills on create (`materialized` on the registry axis) | the row must keep naming its target after the typed FK goes null: an arm is `onDelete: SetNull` (CI rule `set-null-polymorphism-materialized`), or the target can be hard-deleted. `Entitlement` (`sourceId`, `targetId`) and `RuleReference` |
+
+**Never Rails-style polymorphism:** an enum plus a bare id with no FKs. Why: no FK constraint, no typed include, no cascade, and nothing stops the id naming a row that is gone. A hard-deletable target that a row must keep naming takes dual polymorphism instead (Aron, 2026-11-17: "If we need a hard delete, then you probably should move to dual polymorphism").
+
+False polymorphism, the type enum + optional FKs:
 
 ```prisma
 ownerModel         WebhookOwnerModel
@@ -318,11 +327,11 @@ enum EmailOwnerModel {
 2. Admin override (if super admin has customized)
 3. Default (seeded baseline)
 
-##### Delegated Keys
+##### Carried Owner Keys
 
-An axis value can name a parent in `delegates`: the row carries the parent's own owner keys beside its own. A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:delegatedKeys` hook copies them from the parent on create and upsert through `carryDelegatedKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
+An axis can list values in `carriesOwnerKeysOf`: a row whose axis names one of those records carries that record's own owner keys beside its own. This is about where a row is filed, not about authority: Project is listed though it is no permission delegate (those are `DELEGATE_MODELS`, PERMISSIONS.md). A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:carriedOwnerKeys` hook copies them from that record on create and upsert through `carryOwnerKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
 
-The parent's keys come from its `ownerModel` axis, and the chain needs no config: the parent row already holds what its own delegate carried, so one copy brings the whole chain (a token gives an inquiry its integration and that integration's owner). Which column holds which parent key is read from the Prisma relations, never from column names (`registries/delegatedColumns.ts`): for each owner kind both axes point at, the arm relations name the same field of that kind's row (`Token.space` on `organizationId` + `spaceId`, `Inquiry.targetSpace` on `targetOrganizationId` + `targetSpaceId`), so those columns pair. `whereAxisCarriesOwnerKeys` (`registries/delegatedOwnerWhere.ts`) is "this owner's rows, and those of what it holds" as one flat filter on those columns, the owner given by kind (`{ Organization: id, Space: null, User: null }`).
+The parent's keys come from its `ownerModel` axis, and the chain needs no config: the record already holds what its own axis carried, so one copy brings the whole chain (a token gives an inquiry its integration and that integration's owner). Which column holds which parent key is read from the Prisma relations, never from column names (`registries/carriedOwnerKeys.ts`, through `polymorphicArmColumns` in `utils/polymorphicArmKeys.ts`): for each owner kind both axes point at, the arm relations name the same field of that kind's row (`Token.space` on `organizationId` + `spaceId`, `Inquiry.targetSpace` on `targetOrganizationId` + `targetSpaceId`), so those columns pair. `whereAxisCarriesOwnerKeys` (`registries/ownerWhere.ts`) is "this owner's rows, and those of what it holds" as one flat filter on those columns, the owner given by kind (`{ Organization: id, Space: null, User: null }`); the inquiry lists use it, since an inquiry is not a submodel and has no permission placement. A submodel's list under an owner uses `submodelOwnerWhere` instead, the same placement its permission check made, so the list and the check can't drift (PERMISSIONS.md § Lists under an owner).
 
 ##### Back-Relations Over Shared Key Columns
 
@@ -354,7 +363,7 @@ Schema-level configuration in `packages/db/src/registries/`:
 | Helper (`@template/db`) | Derives |
 |---|---|
 | `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
-| `delegatedKeys(model, axis, value)` / `delegatedKeyPairs` / `ownerKeysHeld` / `carryDelegatedKeys(model, row)` | The columns a delegating value carries, paired with the parent's keys through the arm relations; the keys a row holds for its owner value; copy them from the parent row (the hook and the test factory both call it) |
+| `ownerKeysCarriedFrom(axis, value)` / `carriedOwnerKeyColumns(model, axis, value)` / `carriedOwnerKeyPairs` / `ownerKeysHeld` / `carryOwnerKeys(model, row)` | The record a value carries owner keys from; the columns it carries, paired with that record's keys through the arm relations; the keys a row holds for its owner value; copy them from that record (the hook and the test factory both call it) |
 | `axisColumnFor(model, axisField, kind)` / `whereAxisCarriesOwnerKeys(model, axisField, owner)` | The column on an axis that holds a kind's id, from its arm relation; an owner's rows and those of what it holds, as one flat filter |
 | `polymorphicKeyColumns` / `polymorphicKeyColumn` / `polymorphicTarget` / `isArmColumns` | Every key column for a value (a member arm has two or three); the one column of a single-key arm (throws on a composite arm); the `{ kind, id }` a row points at (throws likewise); whether a relation's columns are exactly an arm's |
 | `polymorphicArmRelation` / `polymorphicArmKeys` | The relation an arm's key columns form (matched by `isArmColumns`, as `childRelations` matches); the columns an arm sets to point at a row (its id, or a composite arm's owner chain off the row) |

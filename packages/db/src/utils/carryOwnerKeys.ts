@@ -5,7 +5,11 @@
  * @uses none
  */
 import { db } from '@template/db/client';
-import { delegatedKeyPairs, ownerKeysHeld } from '@template/db/registries/delegatedColumns';
+import {
+  carriedOwnerKeyPairs,
+  ownerKeysCarriedFrom,
+  ownerKeysHeld,
+} from '@template/db/registries/carriedOwnerKeys';
 import {
   getPolymorphismConfig,
   type PolymorphicValue,
@@ -14,10 +18,10 @@ import type { ModelName } from '@template/db/utils/modelNames';
 
 type Row = Record<string, unknown>;
 
-export const carryDelegatedKeys = async (model: ModelName, row: Row): Promise<void> => {
+export const carryOwnerKeys = async (model: ModelName, row: Row): Promise<void> => {
   for (const axis of getPolymorphismConfig(model)?.axes ?? []) {
     const value = row[axis.field] as PolymorphicValue;
-    const parent = axis.delegates?.[value];
+    const parent = ownerKeysCarriedFrom(axis, value);
     if (!parent) continue;
     const [parentKey] = axis.fkMap[value] ?? [];
     const parentId = parentKey ? row[parentKey] : null;
@@ -28,7 +32,7 @@ export const carryDelegatedKeys = async (model: ModelName, row: Row): Promise<vo
         )) as Row | null)
       : null;
     const held = parentRow ? ownerKeysHeld(parent, parentRow.ownerModel as PolymorphicValue) : [];
-    for (const { column, parentKey: key } of delegatedKeyPairs(model, axis, value))
+    for (const { column, parentKey: key } of carriedOwnerKeyPairs(model, axis, value))
       row[column] = parentRow && held.includes(key) ? parentRow[key] : null;
   }
 };
