@@ -15,7 +15,7 @@ model SegmentMember {
   segmentId String  @db.VarChar(36)
   segment   Segment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
 
-  customerRelationshipId String      @db.VarChar(36)
+  customerRelationshipId String               @db.VarChar(36)
   customerRelationship   CustomerRelationship @relation(fields: [customerRelationshipId], references: [id], onDelete: Cascade)
 
   // ==========================================================================

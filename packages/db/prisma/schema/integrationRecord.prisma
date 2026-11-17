@@ -17,7 +17,7 @@ model IntegrationRecord {
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   // Record — false polymorphism, exactly one FK matches the discriminator.
-  model         WebhookModel
+  model                  WebhookModel
   customerRelationshipId String?      @db.VarChar(36)
 
   customerRelationship CustomerRelationship? @relation(fields: [customerRelationshipId], references: [id], onDelete: Cascade)
