@@ -1,0 +1,1 @@
+apps/api/src/hooks/selfGrant/hook.ts:entitlement.createManyAndReturn	Written from the schema with its member.
