@@ -570,6 +570,7 @@ Entitlements are read on their holder (every read of a token, integration or mem
 - Rows are immutable (`immutableFields` refuses a change to any column but the tombstones): a change is a removal plus a grant. A removal is a soft delete, audited per row, as is every created row.
 - A member's self-grant can't be removed ([The Member Self-Grant](#the-member-self-grant)); a `full` holder takes none. A holder left with no rows holds nothing ([The Backstop Rules](#the-backstop-rules)).
 - The create body of a token or an integration may carry `entitlements`; they are written by the same writer in the same transaction as the row.
+- The `entitlement-writer-only` CI rule holds the one-writer line above: a write outside `changeEntitlements` fails, nested writes and `delegate('Entitlement')` included ([SCRIPTS.md § CI Rule Scripts](./SCRIPTS.md#ci-rule-scripts)). A gap in the check is fixed inside the writer, never beside it.
 
 ### The Path Names the Anchor and the Axis; the Where Narrows
 
