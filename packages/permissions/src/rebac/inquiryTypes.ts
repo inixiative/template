@@ -78,11 +78,27 @@ export const INQUIRY_TYPES = {
     sources: [{ model: 'Space', send: { rel: 'sourceSpace.organization', action: 'own' } }],
     targets: [{ model: 'Organization', resolve: 'own' }],
   },
-  // Addressed to the record whose entitlements change. Whoever administers it may answer (a token
+  // Addressed to the record whose entitlements change. Only someone who can read that record asks,
+  // so a stranger cannot probe ids or have its owner shown to them. Whoever administers it may answer (a token
   // has no manage; delete is its administering action); the handler then runs the direct routes'
   // own checks, so an approver who could not grant it gets the refusal and the inquiry stays open.
   changeEntitlements: {
-    sources: [{ model: 'User', send: 'operate' }],
+    sources: [
+      {
+        model: 'User',
+        send: {
+          all: [
+            { rel: 'sourceUser', action: 'operate' },
+            {
+              any: [
+                { rel: 'targetToken', action: 'read' },
+                { rel: 'targetIntegration', action: 'read' },
+              ],
+            },
+          ],
+        },
+      },
+    ],
     targets: [
       { model: 'Token', resolve: 'delete' },
       { model: 'Integration', resolve: 'manage' },

@@ -60,9 +60,15 @@ export const changeEntitlementsHandler: InquiryHandler<
   resolutionInputSchema: changeEntitlementsResolutionInputSchema,
   resolutionSchema: changeEntitlementsResolutionInputSchema,
   defaultExpirationDays: 30,
+  unique: 'targeted',
   autoApprove: async () => false,
 
   handleApprove: async (c, inquiry, _content, response) => {
+    if (!response.add.length && !response.remove.length)
+      throw makeError({
+        status: 422,
+        message: 'An approval sends back what it approves; to give nothing, deny',
+      });
     const writer = c.get('permix');
     const { validateWriter, ...holder } = await holderOf(inquiry);
     await validateWriter(writer);
