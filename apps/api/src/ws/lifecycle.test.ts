@@ -8,7 +8,7 @@ import {
 import { addConnection, byId, clearRegistry } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
-import { createTestSocket } from '#tests/createTestSocket';
+import { createTestSocket, sentFrames } from '#tests/createTestSocket';
 
 afterEach(() => clearRegistry());
 
@@ -51,7 +51,7 @@ describe('lifecycle', () => {
 
     drainConnections();
 
-    expect(JSON.parse(a.sent[0])).toEqual({ type: 'reconnect', reason: 'server_shutdown' });
+    expect(sentFrames(a.sent)[0]).toEqual({ type: 'reconnect', reason: 'server_shutdown' });
     expect(a.closeInfo()?.reason).toBe('Server shutting down');
     expect(getConnectionStats().connections).toBe(0);
   });

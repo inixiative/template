@@ -23,19 +23,39 @@ const fastTiming: Partial<ApiWebsocketTiming> = {
   openAckTimeoutMs: 10_000,
   streamSettleMs: 1,
 };
-const opensSent = (ws: FakeBrowserWebSocket, count: number) =>
+const waitForOpensSent = (ws: FakeBrowserWebSocket, count: number) =>
   waitFor(() => opensOf(ws).length === count);
-const recordTimerDelays = () => {
+const recordTimers = () => {
   const delays: number[] = [];
+  const pending = new Set<ReturnType<typeof setTimeout>>();
   const realSetTimeout = globalThis.setTimeout;
-  const spy = spyOn(globalThis, 'setTimeout').mockImplementation(((
+  const realClearTimeout = globalThis.clearTimeout;
+  const setSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((
     callback: () => void,
     ms?: number,
   ) => {
     delays.push(ms ?? 0);
-    return realSetTimeout(callback, ms);
+    const id = realSetTimeout(() => {
+      pending.delete(id);
+      callback();
+    }, ms);
+    pending.add(id);
+    return id;
   }) as never);
-  return { delays, restore: () => spy.mockRestore() };
+  const clearSpy = spyOn(globalThis, 'clearTimeout').mockImplementation(((
+    id: ReturnType<typeof setTimeout>,
+  ) => {
+    pending.delete(id);
+    realClearTimeout(id);
+  }) as never);
+  return {
+    delays,
+    pending,
+    restore: () => {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    },
+  };
 };
 
 let queryClient: QueryClient | null = null;
@@ -210,27 +230,7 @@ describe('createApiWebsocket', () => {
     ws.open();
     api.subscribe('ch1');
 
-    const live = new Set<unknown>();
-    const realSetTimeout = globalThis.setTimeout;
-    const realClearTimeout = globalThis.clearTimeout;
-    const setSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((
-      callback: () => void,
-      ms?: number,
-    ) => {
-      const id = realSetTimeout(() => {
-        live.delete(id);
-        callback();
-      }, ms);
-      live.add(id);
-      return id;
-    }) as never);
-    const clearSpy = spyOn(globalThis, 'clearTimeout').mockImplementation(((
-      id: ReturnType<typeof setTimeout>,
-    ) => {
-      live.delete(id);
-      realClearTimeout(id);
-    }) as never);
-
+    const timers = recordTimers();
     try {
       for (const frame of [
         { action: 'authenticate' },
@@ -239,13 +239,12 @@ describe('createApiWebsocket', () => {
         { action: 'close', stream: 'gone' },
       ])
         ws.receive({ type: 'error', retryable: true, ...frame });
-      expect(live.size).toBe(4);
+      expect(timers.pending.size).toBe(4);
 
       api.disconnect();
-      expect(live.size).toBe(0);
+      expect(timers.pending.size).toBe(0);
     } finally {
-      setSpy.mockRestore();
-      clearSpy.mockRestore();
+      timers.restore();
     }
   });
 
@@ -305,7 +304,7 @@ describe('createApiWebsocket', () => {
       api.open(stream);
       api.open(stream);
       api.close(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
       expect(ws.sentFrames().some((frame) => frame.action === 'close')).toBe(false);
 
@@ -334,17 +333,17 @@ describe('createApiWebsocket', () => {
     it('re-opens a stream re-held inside the settle window after the server rejected its open', async () => {
       const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       api.close(stream);
       ws.receive({ type: 'openRejected', stream } satisfies WSStreamAckFrame);
       api.open(stream);
-      await opensSent(ws, 2);
+      await waitForOpensSent(ws, 2);
     });
 
     it('re-opens a stream re-held inside the settle window after a retryable open error', async () => {
       const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       api.close(stream);
       ws.receive({
         type: 'error',
@@ -353,7 +352,7 @@ describe('createApiWebsocket', () => {
         retryable: true,
       } satisfies WSFrameErrorFrame);
       api.open(stream);
-      await opensSent(ws, 2);
+      await waitForOpensSent(ws, 2);
     });
 
     it('keeps a pending retry through a release and re-hold inside the settle window', async () => {
@@ -365,7 +364,7 @@ describe('createApiWebsocket', () => {
         openAckTimeoutMs: 10_000,
       });
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       ws.receive({ type: 'opened', stream });
       ws.receive({
         type: 'error',
@@ -375,8 +374,8 @@ describe('createApiWebsocket', () => {
       } satisfies WSFrameErrorFrame);
       api.close(stream);
       api.open(stream);
-      await opensSent(ws, 2);
-      await wait(20);
+      await waitForOpensSent(ws, 2);
+      await wait(60);
 
       expect(opensOf(ws)).toHaveLength(2);
     });
@@ -401,7 +400,7 @@ describe('createApiWebsocket', () => {
     it('keeps a stream open across a release and re-hold within the settle window', async () => {
       const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       ws.receive({ type: 'opened', stream });
       api.close(stream);
       api.open(stream);
@@ -454,7 +453,7 @@ describe('createApiWebsocket', () => {
       const unobserve = observe();
       const { api, ws } = connected();
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       ws.receive({ type: 'opened', stream } satisfies WSStreamAckFrame);
       ws.receive(snapshotFrame);
 
@@ -499,7 +498,7 @@ describe('createApiWebsocket', () => {
     it('routes a held stream snapshot into its query', async () => {
       const { api, ws } = connected();
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
 
       ws.receive(snapshotFrame);
 
@@ -523,7 +522,7 @@ describe('createApiWebsocket', () => {
       const unobserve = observe();
       const { api, ws } = connected();
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       api.authenticate('tok');
 
       ws.receive({ type: 'openRejected', stream });
@@ -538,12 +537,12 @@ describe('createApiWebsocket', () => {
       const { api, ws } = connected();
       api.open(stream);
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       ws.receive({ type: 'openRejected', stream });
 
       api.open(stream);
       api.close(stream);
-      await opensSent(ws, 2);
+      await waitForOpensSent(ws, 2);
       await wait(10);
 
       expect(opensOf(ws)).toHaveLength(2);
@@ -554,7 +553,7 @@ describe('createApiWebsocket', () => {
       const unobserve = observe();
       const { api, ws } = connected();
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       ws.receive({ type: 'opened', stream });
       ws.receive(snapshotFrame);
       ws.sent.length = 0;
@@ -569,14 +568,20 @@ describe('createApiWebsocket', () => {
       expect(state?.status).toBe('error');
       expect(state?.data).toEqual({ data: [] });
 
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
       unobserve();
     });
 
-    it('doubles the retry delay on each consecutive retryable failure and resets once opened', async () => {
-      const random = spyOn(Math, 'random').mockReturnValue(1);
-      const timers = recordTimerDelays();
+    it.each([
+      { jitter: 1, delays: [20, 40, 20] },
+      { jitter: 0, delays: [10, 20, 10] },
+    ])('doubles the retry delay on each consecutive retryable failure and resets once opened (jitter $jitter)', async ({
+      jitter,
+      delays,
+    }) => {
+      const random = spyOn(Math, 'random').mockReturnValue(jitter);
+      const timers = recordTimers();
       try {
         const { api, ws } = connected({
           ...fastTiming,
@@ -585,18 +590,18 @@ describe('createApiWebsocket', () => {
           openAckTimeoutMs: 10_000,
         });
         api.open(stream);
-        await opensSent(ws, 1);
+        await waitForOpensSent(ws, 1);
         const fail = () => ws.receive({ type: 'error', action: 'open', stream, retryable: true });
 
         fail();
-        await opensSent(ws, 2);
+        await waitForOpensSent(ws, 2);
         fail();
-        await opensSent(ws, 3);
+        await waitForOpensSent(ws, 3);
         ws.receive({ type: 'opened', stream });
         fail();
-        await opensSent(ws, 4);
+        await waitForOpensSent(ws, 4);
 
-        expect(timers.delays.filter((ms) => ms >= 20 && ms <= 1_000)).toEqual([20, 40, 20]);
+        expect(timers.delays.filter((ms) => ms >= 10 && ms <= 1_000)).toEqual([...delays]);
       } finally {
         timers.restore();
         random.mockRestore();
@@ -617,7 +622,7 @@ describe('createApiWebsocket', () => {
       const unobserve = observe();
       const { api, ws } = connected();
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       ws.receive({ type: 'opened', stream });
       ws.receive(snapshotFrame);
 
@@ -646,7 +651,7 @@ describe('createApiWebsocket', () => {
     it('resync re-opens a live stream once, and never a rejected one', async () => {
       const { api, ws } = connected();
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       ws.receive({ type: 'opened', stream });
       ws.sent.length = 0;
 
@@ -702,7 +707,7 @@ describe('createApiWebsocket', () => {
       const opened = async () => {
         const { api, ws } = connected();
         api.open(stream);
-        await opensSent(ws, 1);
+        await waitForOpensSent(ws, 1);
         ws.receive({ type: 'opened', stream });
         ws.sent.length = 0;
         return { api, ws };
@@ -775,7 +780,7 @@ describe('createApiWebsocket', () => {
         api.close(stream);
         ws.receive(upsert(12, 'gap'));
         api.open(stream);
-        await opensSent(ws, 1);
+        await waitForOpensSent(ws, 1);
 
         expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
         ws.receive({ type: 'opened', stream });
@@ -854,7 +859,7 @@ describe('createApiWebsocket', () => {
     it('re-sends a close the server dropped for load while the stream stays released', async () => {
       const { api, ws } = connected();
       api.open(stream);
-      await opensSent(ws, 1);
+      await waitForOpensSent(ws, 1);
       ws.receive({ type: 'opened', stream });
       api.close(stream);
       await waitFor(() => ws.sentFrames().at(-1)?.action === 'close');
@@ -891,7 +896,7 @@ describe('createApiWebsocket', () => {
 
     it('backs off identity re-sends after repeated load drops', async () => {
       const random = spyOn(Math, 'random').mockReturnValue(1);
-      const timers = recordTimerDelays();
+      const timers = recordTimers();
       try {
         const { api, ws } = connected({ ...fastTiming, retryBaseMs: 20, retryMaxMs: 1_000 });
         api.authenticate('tok');

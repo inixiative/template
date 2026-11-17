@@ -174,7 +174,7 @@ describe('ws pubsub (redis round trip)', () => {
       publishSpy.mockRestore();
     }
 
-    expect(published.map((message) => JSON.parse(message).target)).toEqual([
+    expect(sentFrames(published).map((frame) => frame.target)).toEqual([
       'pubsub:resync-first',
       'pubsub:resync-second',
     ]);
@@ -213,7 +213,7 @@ describe('ws pubsub (redis round trip)', () => {
     }
 
     expect(sentFrames(quiet.sent)).toEqual([{ type: 'resync', stream: 'pubsub:reconnect-quiet' }]);
-    expect(new Set(busy.sent.map((message) => JSON.parse(message).stream))).toEqual(
+    expect(new Set(sentFrames(busy.sent).map((frame) => frame.stream))).toEqual(
       new Set(['pubsub:reconnect-busy', 'pubsub:reconnect-quiet']),
     );
     expect(busy.socket.data.streams.size).toBe(0);
@@ -253,7 +253,7 @@ describe('ws pubsub (redis round trip)', () => {
     ]);
     await waitFor(() => alice.sent.length === 3 && bob.sent.length === 2);
 
-    const seqs = (sent: string[]) => sent.map((message) => JSON.parse(message).seq as number);
+    const seqs = (sent: string[]) => sentFrames(sent).map((frame) => frame.seq as number);
     const consecutive = (numbers: number[]) => numbers.map((seq) => seq - (numbers[0] as number));
     expect(consecutive(seqs(alice.sent))).toEqual([0, 1, 2]);
     expect(consecutive(seqs(bob.sent))).toEqual([0, 1]);

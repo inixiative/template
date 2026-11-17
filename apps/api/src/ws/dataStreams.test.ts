@@ -28,9 +28,9 @@ import { createTestSocket, type SentFrame, sentFrames } from '#tests/createTestS
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
-const until = async (predicate: () => boolean, attempts = 10_000): Promise<void> => {
+const waitWithinMicrotasks = async (predicate: () => boolean, attempts = 10_000): Promise<void> => {
   for (let i = 0; !predicate(); i++) {
-    if (i >= attempts) throw new Error('until: predicate never held');
+    if (i >= attempts) throw new Error('waitWithinMicrotasks: predicate never held');
     await Promise.resolve();
   }
 };
@@ -250,7 +250,7 @@ describe('data streams (real app)', () => {
   it('holds appends published while the snapshot is in flight and sends them after it', async () => {
     const { socket, sent } = connect(memberBearer);
     const pending = websocketHandler.message(socket, openFrame(stream));
-    await until(() => byStream.has(stream));
+    await waitWithinMicrotasks(() => byStream.has(stream));
 
     const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'in-flight' } });
     sendToStreamLocal(stream, () => JSON.stringify(append));
@@ -345,7 +345,7 @@ describe('data streams (real app)', () => {
   it('an open resolving after the socket closed neither indexes nor sends', async () => {
     const { socket, sent } = connect(memberBearer);
     const pending = websocketHandler.message(socket, openFrame(stream));
-    await until(() => byStream.has(stream));
+    await waitWithinMicrotasks(() => byStream.has(stream));
     websocketHandler.close(socket);
     await pending;
 
