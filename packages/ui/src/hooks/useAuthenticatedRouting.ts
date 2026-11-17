@@ -15,8 +15,8 @@ import {
   syncStoreFromSearchParams,
 } from '@template/ui/hooks/useAuthenticatedRouting/querySync';
 import {
+  applySearchParamUpdates,
   buildSearchParamUpdates,
-  replaceUrlSearchParams,
 } from '@template/ui/hooks/useAuthenticatedRouting/urlSync';
 import { checkContextPermission } from '@template/ui/lib/checkContextPermission';
 import { findRoute } from '@template/ui/lib/findRoute';
@@ -27,7 +27,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const { pathname, search } = useLocation();
+  const { pathname, search, hash } = useLocation();
   const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
   const navConfig = useAppStore((state) => state.navigation.navConfig);
   const setCurrentRouteMatch = useAppStore((state) => state.navigation.setCurrentRouteMatch);
@@ -38,18 +38,18 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
   const flow = useActiveFlow();
   const urlFlowId = parseRoutingSearchParams(search).flowId;
 
-  // Handle context from query params (async for spoof)
   useEffect(() => {
     (async () => {
       const searchParams = parseRoutingSearchParams(search);
-      syncStoreFromSearchParams({ searchParams, tenant, auth });
+      const { tenant: currentTenant, auth: currentAuth } = useAppStore.getState();
+      syncStoreFromSearchParams({ searchParams, tenant: currentTenant, auth: currentAuth });
 
-      if (searchParams.spoofEmail !== auth.spoofUserEmail) {
+      if (searchParams.spoofEmail !== currentAuth.spoofUserEmail) {
         useAppStore.getState().navigation.setFlowId(null);
-        await auth.setSpoof(searchParams.spoofEmail);
+        await currentAuth.setSpoof(searchParams.spoofEmail);
       }
     })();
-  }, [search, auth, tenant]);
+  }, [search, auth.organizations, auth.spaces, auth.spoofUserEmail]);
 
   useEffect(() => {
     const { navigation } = useAppStore.getState();
@@ -64,9 +64,18 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
       context: tenant.context,
       spoofUserEmail: auth.spoofUserEmail,
       flowId,
+      isKnownOrganization: (organizationId) => Boolean(auth.organizations?.[organizationId]),
+      isKnownSpace: (spaceId) => Boolean(auth.spaces?.[spaceId]),
     });
 
-    if (updates) replaceUrlSearchParams(updates);
+    const navigate = useAppStore.getState().navigation.navigate;
+    if (!updates || !navigate) return;
+    navigate({
+      to: pathname,
+      search: applySearchParamUpdates(search, updates),
+      hash,
+      replace: true,
+    });
   }, [
     tenant.context.type,
     tenant.context.organization?.id,
@@ -74,6 +83,10 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
     auth.spoofUserEmail,
     flowId,
     search,
+    pathname,
+    hash,
+    auth.organizations,
+    auth.spaces,
     tenant.context,
   ]);
 

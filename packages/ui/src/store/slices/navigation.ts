@@ -74,8 +74,13 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
       set((state) => ({
         navigation: {
           ...state.navigation,
-          navigate: ({ to, search, hash }) => {
-            fn({ to, ...(search && { search }), ...(hash && { hash }) });
+          navigate: ({ to, search, hash, replace }) => {
+            fn({
+              to,
+              ...(search && { search }),
+              ...(hash && { hash }),
+              ...(replace && { replace }),
+            });
           },
         },
       })),
