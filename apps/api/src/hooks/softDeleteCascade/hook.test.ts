@@ -113,7 +113,7 @@ describe('softDeleteCascade hook', () => {
     expect((await spaceById(space.id))?.deletedAt).toBeNull();
   });
 
-  it("a party's tombstone cancels its open inquiries and leaves its closed ones as the record (Aron, 2026-11-16)", async () => {
+  it("a party's tombstone cancels its open inquiries without burying them, and leaves its closed ones (Aron, 2026-11-16)", async () => {
     const { entity: sender } = await createOrganization();
     const { entity: target } = await createUser();
     const parties = {
@@ -129,8 +129,11 @@ describe('softDeleteCascade hook', () => {
 
     const read = (id: string) =>
       db.withDeleted(() => db.inquiry.findUniqueOrThrow({ where: { id } }));
-    expect(await read(open.id)).toMatchObject({ status: InquiryStatus.canceled, expiresAt: null });
-    expect((await read(open.id)).deletedAt).not.toBeNull();
+    expect(await read(open.id)).toMatchObject({
+      status: InquiryStatus.canceled,
+      expiresAt: null,
+      deletedAt: null,
+    });
     expect(await read(decided.id)).toMatchObject({ status: InquiryStatus.denied, deletedAt: null });
   });
 

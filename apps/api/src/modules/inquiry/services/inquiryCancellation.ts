@@ -6,5 +6,5 @@
  */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 
-/** What canceling writes besides the tombstone: no longer open, never expires. */
+/** What canceling writes: no longer open, never expires. */
 export const inquiryCancellation = { status: InquiryStatus.canceled, expiresAt: null } as const;

@@ -7,8 +7,11 @@
 import { db, isHardDeletedOnTombstone, isSkippedOnRevive } from '@template/db';
 import { uniq } from 'lodash-es';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
+import {
+  CLOSE_ON_PARENT_DELETE,
+  isClosedOnParentDelete,
+} from '#/hooks/softDeleteCascade/closeOnParentDelete';
 import { REGENERATE_ON_REVIVE } from '#/hooks/softDeleteCascade/regenerateOnRevive';
-import { TOMBSTONE_CLOSES } from '#/hooks/softDeleteCascade/tombstoneCloses';
 
 type Row = Record<string, unknown>;
 
@@ -53,13 +56,18 @@ export const tombstoneChildren = async (model: string, rows: Row[], deletedAt: u
   for (const child of childRelations(model)) {
     const where = fkWhere(child, rows);
     if (!where) continue;
-    if (isHardDeletedOnTombstone(child.model)) {
+    const closes = CLOSE_ON_PARENT_DELETE[child.model];
+    if (closes) {
+      await db.delegate(child.model).updateManyAndReturn({
+        where: { ...where, ...closes.open },
+        data: closes.closed,
+      });
+    } else if (isHardDeletedOnTombstone(child.model)) {
       await hardDelete(child.model, where);
     } else if (child.hasDeletedAt) {
-      const closes = TOMBSTONE_CLOSES[child.model];
       await db.delegate(child.model).updateManyAndReturn({
-        where: { ...where, deletedAt: null, ...closes?.open },
-        data: { deletedAt, ...closes?.closed },
+        where: { ...where, deletedAt: null },
+        data: { deletedAt },
       });
     }
   }
@@ -71,7 +79,7 @@ export const reviveChildren = async (model: string, rows: Row[], priorDeletedAt:
       await REGENERATE_ON_REVIVE[child.model]?.(model, rows);
       continue;
     }
-    if (isSkippedOnRevive(child.model)) continue;
+    if (isSkippedOnRevive(child.model) || isClosedOnParentDelete(child.model)) continue;
     const where = fkWhere(child, rows);
     if (!child.hasDeletedAt || !where) continue;
     await db.delegate(child.model).updateManyAndReturn({

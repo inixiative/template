@@ -10,10 +10,12 @@ import {
   isHardDeletedOnTombstone,
   isModelName,
   modelFields,
+  modelNames,
   SKIP_REVIVE,
   SOFT_DELETE_MODEL_SET,
 } from '@template/db';
 import { childRelations } from '#/hooks/softDeleteCascade/childRelations';
+import { CLOSE_ON_PARENT_DELETE } from '#/hooks/softDeleteCascade/closeOnParentDelete';
 
 const optionalForeignKey = (model: string, fromFields: readonly string[]): boolean => {
   const fields = modelFields(model);
@@ -71,8 +73,31 @@ export const skipReviveViolations = (models: readonly string[] = SKIP_REVIVE): s
     return [];
   });
 
+export const closeOnParentDeleteViolations = (
+  models: readonly string[] = Object.keys(CLOSE_ON_PARENT_DELETE),
+): string[] =>
+  models.flatMap((model) => {
+    if (!isModelName(model))
+      return [`${model} is listed in CLOSE_ON_PARENT_DELETE but is not a model in the schema.`];
+    if ('deletedAt' in (CLOSE_ON_PARENT_DELETE[model]?.closed ?? {}))
+      return [
+        `${model} is closed on its parent's delete and kept as the record, but its close writes deletedAt.`,
+      ];
+    return modelNames
+      .filter((parent) => childRelations(parent).some((child) => child.model === model))
+      .filter((parent) => !SOFT_DELETE_MODEL_SET.has(parent))
+      .map(
+        (parent) =>
+          `${model} is closed on its parent's delete and kept as the record, but its parent ${parent} can be hard-deleted and would take it along. Make ${parent} soft-delete, or point at it with a true-polymorphic pair (model + id, as RuleReference does) instead of a foreign key.`,
+      );
+  });
+
 export const validateDeleteBehavior = () => {
-  const violations = [...deleteBehaviorViolations(), ...skipReviveViolations()];
+  const violations = [
+    ...deleteBehaviorViolations(),
+    ...skipReviveViolations(),
+    ...closeOnParentDeleteViolations(),
+  ];
   if (violations.length)
     throw new Error(
       `[softDeleteCascade] delete behavior is inconsistent:\n  ${violations.join('\n  ')}`,

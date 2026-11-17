@@ -78,8 +78,11 @@ describe('a removed row leaves the open requests that would remove it (Aron, 202
     const [read] = await rowsOf();
     const inquiry = await request({ add: [], remove: [read!] });
     await removeRows([read!]);
-    expect(await stored(inquiry)).toMatchObject({ status: 'canceled', expiresAt: null });
-    expect((await stored(inquiry)).deletedAt).not.toBeNull();
+    expect(await stored(inquiry)).toMatchObject({
+      status: 'canceled',
+      expiresAt: null,
+      deletedAt: null,
+    });
   });
 
   it('a closed request is the record of what was asked and is left as it is', async () => {
@@ -95,12 +98,15 @@ describe('a removed row leaves the open requests that would remove it (Aron, 202
 });
 
 describe('an open inquiry whose party is deleted is canceled; a closed one stays (Aron, 2026-11-16)', () => {
-  it('deleting the token cancels the open request to it and keeps the approved one', async () => {
+  it('deleting the token cancels the open request to it, still listed, and keeps the approved one', async () => {
     const open = await request({ add: [onOrganization(['manage'])], remove: [] });
     const decided = await request({ add: [onOrganization(['manage'])], remove: [] }, 'approved');
     await db.token.update({ where: { id: token.id }, data: { deletedAt: new Date() } });
-    expect(await stored(open)).toMatchObject({ status: 'canceled', expiresAt: null });
-    expect((await stored(open)).deletedAt).not.toBeNull();
+    expect(await db.inquiry.findUnique({ where: { id: open.id } })).toMatchObject({
+      status: 'canceled',
+      expiresAt: null,
+      deletedAt: null,
+    });
     expect(await stored(decided)).toMatchObject({ status: 'approved', deletedAt: null });
   });
 
@@ -129,7 +135,6 @@ describe('an open inquiry whose party is deleted is canceled; a closed one stays
     await db.withDeleted(() =>
       db.integration.update({ where: { id: integration.id }, data: { deletedAt: null } }),
     );
-    expect(await stored(open)).toMatchObject({ status: 'canceled' });
-    expect((await stored(open)).deletedAt).not.toBeNull();
+    expect(await stored(open)).toMatchObject({ status: 'canceled', deletedAt: null });
   });
 });

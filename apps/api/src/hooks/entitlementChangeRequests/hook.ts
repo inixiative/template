@@ -71,7 +71,7 @@ export const registerEntitlementChangeRequestsHook = () => {
             data:
               remove.length || content.add?.length
                 ? { content: { ...content, remove } as Prisma.InputJsonValue }
-                : { ...inquiryCancellation, deletedAt: new Date() },
+                : inquiryCancellation,
           });
         }
       }

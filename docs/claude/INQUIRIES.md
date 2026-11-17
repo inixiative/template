@@ -81,7 +81,7 @@ enum InquiryResourceModel {
 }
 ```
 
-Both ends carry a real relation per party: `sourceUser`, `sourceOrganization`, `sourceSpace`, `sourceIntegration`, `sourceToken`, plus the membership relations `sourceOrganizationUser` (on `[sourceOrganizationId, sourceUserId]`) and `sourceSpaceUser` (on `[sourceOrganizationId, sourceSpaceId, sourceUserId]`); the target side mirrors them. A membership party has no column of its own: it fills the user + organization (+ space) columns. `admin` has no FK. All relations cascade on delete.
+Both ends carry a real relation per party: `sourceUser`, `sourceOrganization`, `sourceSpace`, `sourceIntegration`, `sourceToken`, plus the membership relations `sourceOrganizationUser` (on `[sourceOrganizationId, sourceUserId]`) and `sourceSpaceUser` (on `[sourceOrganizationId, sourceSpaceId, sourceUserId]`); the target side mirrors them. A membership party has no column of its own: it fills the user + organization (+ space) columns. `admin` has no FK. The relations cascade on delete in the database, but no party can be hard-deleted (every party model is soft-delete); a soft-deleted party cancels its open inquiries and keeps every inquiry live (see *Data Model*).
 
 ### Status Flow
 
