@@ -11,7 +11,7 @@ import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
-import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import type { InquiryResolutionStatus } from '#/modules/inquiry/schemas/inquiryResolutionStatusSchema';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
@@ -61,7 +61,7 @@ export const resolveInquiry = async (
           }) as Prisma.InputJsonValue,
           expiresAt,
         },
-        include: includeInquiryReceived,
+        include: includeInquiryResponse,
       });
 
       await emitAppEvent('inquiry.resolved', updated);

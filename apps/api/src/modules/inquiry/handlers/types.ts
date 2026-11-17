@@ -18,8 +18,8 @@ export type Inquiry = Prisma.InquiryGetPayload<PrismaBaseArgs>;
 // InquiryWithIncludes is the contract app-event handlers see. Different routes
 // load different subsets — sent routes hydrate target* relations only, received
 // routes hydrate source* only — so the shape must accept either. We mark each
-// relation Partial<> so a value loaded with includeInquirySent OR
-// includeInquiryReceived OR includeInquiryResponse is assignable. Handlers
+// relation Partial<> so a value loaded with includeInquiryResponse OR
+// includeInquiryResponse OR includeInquiryResponse is assignable. Handlers
 // that read a relation must check for undefined.
 type InquiryAllRelations = Prisma.InquiryGetPayload<{ include: typeof includeInquiryResponse }>;
 type InquiryRelationsOnly = Omit<InquiryAllRelations, keyof Inquiry>;

@@ -3,12 +3,12 @@
  * @kind controller
  * @partOf feature:tenancy
  */
-import { whereAxisIsOwnerOrItsDelegate } from '@template/db';
+import { whereAxisCarriesOwnerKeys } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { spaceReadManyInquiriesReceivedRoute } from '#/modules/space/routes/spaceReadManyInquiriesReceived';
 
 export const spaceReadManyInquiriesReceivedController = makeController(
@@ -18,7 +18,7 @@ export const spaceReadManyInquiriesReceivedController = makeController(
     const space = getResource<'space'>(c);
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        ...whereAxisIsOwnerOrItsDelegate('Inquiry', 'targetModel', {
+        ...whereAxisCarriesOwnerKeys('Inquiry', 'targetModel', {
           organizationId: space.organizationId,
           spaceId: space.id,
           userId: null,
@@ -27,7 +27,7 @@ export const spaceReadManyInquiriesReceivedController = makeController(
       },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },
-      include: includeInquiryReceived,
+      include: includeInquiryResponse,
     });
     return respond.ok(data, { pagination });
   },

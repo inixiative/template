@@ -7,22 +7,21 @@
 
 import { getResource } from '#/lib/context/getResource';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
+import { validateEntitlementWriter } from '#/lib/permissions/validateEntitlementWriter';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationCreateManyEntitlementsRoute } from '#/modules/integration/routes/integrationCreateManyEntitlements';
-import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
 
 export const integrationCreateManyEntitlementsController = makeController(
   integrationCreateManyEntitlementsRoute,
   async (c, respond) => {
     const permix = c.get('permix');
     const integration = getResource<'integration'>(c);
-    await validateIntegrationRole(permix, integration);
+    const changes = { add: c.req.valid('json') };
+    await validateEntitlementWriter(permix, 'Integration', integration, changes);
     const entitlements = await changeEntitlements(
       permix,
       { model: 'Integration', id: integration.id },
-      {
-        add: c.req.valid('json'),
-      },
+      changes,
     );
     return respond.created(entitlements);
   },

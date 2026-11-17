@@ -6,7 +6,7 @@
  */
 import { Operator } from '@inixiative/json-rules';
 import type { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
-import { highRoles, lowRoles } from '@template/permissions/rebac/schemaHelpers';
+import { actorIsUser, highRoles, lowRoles } from '@template/permissions/rebac/schemaHelpers';
 import type { ActionRule } from '@template/permissions/rebac/types';
 
 // A party that can stand on a side of an inquiry. `admin` is the platform (superadmin): it has no
@@ -81,7 +81,8 @@ export const INQUIRY_TYPES = {
   // Addressed to the record whose entitlements change. Only someone who can read that record asks,
   // so a stranger cannot probe ids or have its owner shown to them. Whoever administers it may answer (a token
   // has no manage; delete is its administering action); the handler then runs the direct routes'
-  // own checks, so an approver who could not grant it gets the refusal and the inquiry stays open.
+  // own checks, so an approver who could not grant it gets the refusal and the inquiry stays open. A person
+  // answers, never a token: a token may approve one day, for now it neither approves nor denies.
   changeEntitlements: {
     sources: [
       {
@@ -100,8 +101,11 @@ export const INQUIRY_TYPES = {
       },
     ],
     targets: [
-      { model: 'Token', resolve: 'delete' },
-      { model: 'Integration', resolve: 'manage' },
+      { model: 'Token', resolve: { all: [actorIsUser, { rel: 'targetToken', action: 'delete' }] } },
+      {
+        model: 'Integration',
+        resolve: { all: [actorIsUser, { rel: 'targetIntegration', action: 'manage' }] },
+      },
     ],
   },
 } as const satisfies Record<InquiryType, InquiryTypeParties>;

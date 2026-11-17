@@ -34,7 +34,3 @@ export const includeInquiryResponse = {
   ...includeBothSides,
   auditLogsAsSubject: includeAuditLogNested,
 } as const satisfies Prisma.InquiryInclude;
-
-export const includeInquirySent = includeInquiryResponse;
-
-export const includeInquiryReceived = includeInquiryResponse;

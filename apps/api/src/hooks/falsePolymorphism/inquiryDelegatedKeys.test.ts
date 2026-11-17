@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import {
-  db,
-  type OwnerKeys,
-  whereAxisCarriesOwnerKeys,
-  whereAxisIsOwnerOrItsDelegate,
-} from '@template/db';
+import { db, type OwnerKeys, whereAxisCarriesOwnerKeys } from '@template/db';
 import type { Prisma } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -169,12 +164,8 @@ describe('an inquiry carries the owner keys of the delegate on each side (Aron, 
           .sort();
 
       for (const [view, { owner, holds }] of Object.entries(views)) {
-        const throughDelegates = await listed(
-          whereAxisIsOwnerOrItsDelegate('Inquiry', `${side}Model`, owner),
-        );
         const carried = await listed(whereAxisCarriesOwnerKeys('Inquiry', `${side}Model`, owner));
-        expect({ view, throughDelegates }).toEqual({ view, throughDelegates: [...holds].sort() });
-        expect({ view, carried }).toEqual({ view, carried: throughDelegates });
+        expect({ view, carried }).toEqual({ view, carried: [...holds].sort() });
       }
     });
   }

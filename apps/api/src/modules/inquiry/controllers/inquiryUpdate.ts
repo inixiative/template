@@ -12,7 +12,7 @@ import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
 import { sendInquiry } from '#/modules/inquiry/services/sendInquiry';
@@ -43,7 +43,7 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
         content: content === undefined ? undefined : (effectiveContent as Prisma.InputJsonValue),
         ...(status === InquiryStatus.draft && { status, expiresAt: null }),
       },
-      include: includeInquirySent,
+      include: includeInquiryResponse,
     });
     return status === InquiryStatus.sent ? sendInquiry(c, saved, saved.updatedAt) : saved;
   });

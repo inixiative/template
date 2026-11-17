@@ -836,7 +836,7 @@ readRoute({
   action: 'sent',
   many: true,
   paginate: true,
-  responseSchema: inquirySentResponseSchema,
+  responseSchema: inquiryResponseSchema,
   filterLens: {
     parent: lensFor('Inquiry'),
     root: { picks: inquiryPicks },

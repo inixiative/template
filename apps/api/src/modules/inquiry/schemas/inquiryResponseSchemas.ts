@@ -35,9 +35,3 @@ const bothSides = {
 };
 
 export const inquiryResponseSchema = InquiryScalarSchema.extend(bothSides).openapi('InquiryItem');
-
-export const inquirySentResponseSchema =
-  InquiryScalarSchema.extend(bothSides).openapi('InquirySentItem');
-
-export const inquiryReceivedResponseSchema =
-  InquiryScalarSchema.extend(bothSides).openapi('InquiryReceivedItem');

@@ -135,7 +135,7 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 }
 ```
 
-**Response:** `inquirySentResponseSchema` — includes `targetUser`, `targetOrganization`, `targetSpace`.
+**Response:** `inquiryResponseSchema` — includes `targetUser`, `targetOrganization`, `targetSpace`.
 
 **Which `targetModel` and `content` a type takes:** `GET /api/v1/inquiry/info` (public) lists, for every registered handler, its `sources`, `targets`, the JSON Schema of `content`, of the extra resolve-body fields (`resolutionInput`) and of the stored `resolution`, plus `unique` and `defaultExpirationDays`. It is generated from `inquiryHandlers`, so a new handler appears there without route changes. A `targetModel` outside `targets` answers 422 (`validateInquiryHandler`); content that fails `contentSchema` answers 422 too.
 
@@ -176,9 +176,9 @@ Each context exposes two list endpoints. Requires `manage` on the parent resourc
 - Every list loads both sides in full: the user, organization, space, integration, token and project on the source and on the target, so a row says who it acts on and through what
 - Draft inquiries are always hidden from received lists
 
-**What a list holds.** Each owner's list holds what is addressed to it and to what it holds beneath it: an organization's holds the inquiries on the organization, its integrations, their tokens and its projects. It does not hold a space's or a member's; those are in the space's list and the member's own. The filter is `whereAxisIsOwnerOrItsDelegate('Inquiry', '<side>Model', owner)` (`packages/db/src/registries/delegatedOwnerWhere.ts`), built from the `delegates` registry with one arm per delegate model, each read through the delegate's own row. The owner is given by its standard key columns (`OwnerKeys`) with null for "holds none": `{ organizationId, spaceId: null, userId: null }` is the organization alone.
+**What a list holds.** Each owner's list holds what is addressed to it and to what it holds beneath it: an organization's holds the inquiries on the organization, its integrations, their tokens and its projects. It does not hold a space's or a member's; those are in the space's list and the member's own. The filter is `whereAxisCarriesOwnerKeys('Inquiry', '<side>Model', owner)` (`packages/db/src/registries/delegatedOwnerWhere.ts`): one flat filter on the side's own columns, because each row carries its delegate's owner keys. The owner is given by its standard key columns (`OwnerKeys`) with null for "holds none": `{ organizationId, spaceId: null, userId: null }` is the organization alone.
 
-**Carried keys.** An inquiry whose side names an Integration, Token or Project also carries that record's owner keys on the same side (`targetTokenId` plus `targetIntegrationId` and `targetOrganizationId`), written by the delegated-keys hook ([DATABASE.md](DATABASE.md#delegated-keys)). So the row itself says whose it is, for attribution, audit and events. `whereAxisCarriesOwnerKeys` is the flat filter on those columns; `inquiryDelegatedKeys.test.ts` runs both filters over the same rows and fails when they differ. A space's inquiries carry its organization in a composite key, so a transfer re-keys them and the ones addressed to what the space holds.
+**Carried keys.** An inquiry whose side names an Integration, Token or Project also carries that record's owner keys on the same side (`targetTokenId` plus `targetIntegrationId` and `targetOrganizationId`), written by the delegated-keys hook ([DATABASE.md](DATABASE.md#delegated-keys)). So the row itself says whose it is, for attribution, audit and events. `inquiryDelegatedKeys.test.ts` checks each owner's list holds its own and what it holds beneath it, and nothing a member or space holds. A space's inquiries carry its organization in a composite key, so a transfer re-keys them and the ones addressed to what the space holds.
 
 ### Admin
 
@@ -307,7 +307,7 @@ All five handlers return `autoApprove: async () => false` — no type currently 
 
 ### Asking to change a record's entitlements
 
-`changeEntitlements` is addressed to the record whose entitlements change (a Token or an Integration), never to its owner: whoever administers the record answers it, and it shows in that record's owner's list through the carried keys. Someone who can read the record asks from their own inbox (`POST /api/v1/me/inquiries` with `targetModel` and `targetTokenId` or `targetIntegrationId`); a stranger is refused, so nobody probes ids or is shown another tenant's token and its owner. One open request per asker and record (`unique: 'targeted'`).
+`changeEntitlements` is addressed to the record whose entitlements change (a Token or an Integration), never to its owner: whoever administers the record answers it (a person, never a token), and it shows in that record's owner's list through the carried keys. Someone who can read the record asks from their own inbox (`POST /api/v1/me/inquiries` with `targetModel` and `targetTokenId` or `targetIntegrationId`); a stranger is refused, so nobody probes ids or is shown another tenant's token and its owner. One open request per asker and record (`unique: 'targeted'`).
 
 - **The request** is `{ add, remove }`: `add` is entitlement entries in the shape the direct add route takes, `remove` is row ids.
 - **The response** is the approver's own `{ add, remove }`, narrower or wider than asked. An approval with neither is refused (422, in `handleApprove`): to give nothing, deny. A denial needs neither.
@@ -339,9 +339,7 @@ No row keyed to the space keeps the old org's membership, so reviving a membersh
 
 ## Response Schemas
 
-Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
-
-All three (`inquiryResponseSchema`, `inquirySentResponseSchema`, `inquiryReceivedResponseSchema`) carry both sides in full (user, organization, space, integration, token, project) and `auditLogsAsSubject`, and the three Prisma includes in `queries/inquiryIncludes.ts` are one. A token is returned without its `keyHash`. Why: a row addressed to a token or an integration is only readable in a list when the row shows that record and its owners, whichever side the reader is on (Aron, 2026-11-16).
+There is one response, `inquiryResponseSchema` (`InquiryItem`, `modules/inquiry/schemas/inquiryResponseSchemas.ts`), with one Prisma include, `includeInquiryResponse` (`queries/inquiryIncludes.ts`): both sides in full (user, organization, space, integration, token, project) and `auditLogsAsSubject`. Every read, list and mutation returns it. A token is returned without its `keyHash`. Why: a row addressed to a token or an integration is only readable in a list when the row shows that record and its owners, whichever side the reader is on (Aron, 2026-11-16: "We should make everything a full response").
 
 ## Permissions (ReBAC)
 
@@ -457,7 +455,7 @@ The inquiry object carries the other side's FK data. This is needed because inqu
 
 ```typescript
 // packages/ui/src/components/inquiries/InquirySourceControls.tsx
-<InquirySourceControls inquiry={InquirySentItem} size? />
+<InquirySourceControls inquiry={InquiryItem} size? />
 ```
 
 Renders Edit / Send / Cancel buttons for the source side. Buttons are conditionally shown based on `isTerminalInquiry` and status:
@@ -471,7 +469,7 @@ All buttons are disabled when `useInquiryPermission(inquiry, 'send', 'source')` 
 
 ```typescript
 // packages/ui/src/components/inquiries/InquiryTargetControls.tsx
-<InquiryTargetControls inquiry={InquiryReceivedItem} size? />
+<InquiryTargetControls inquiry={InquiryItem} size? />
 ```
 
 Renders Approve / Decline buttons, plus Review when the type registers a `target.review` component. Visible when not terminal and status is `sent` or `changesRequested`. Disabled when `useInquiryPermission(inquiry, 'resolve', 'target')` is false.

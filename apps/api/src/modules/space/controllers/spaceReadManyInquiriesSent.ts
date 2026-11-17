@@ -3,11 +3,11 @@
  * @kind controller
  * @partOf feature:tenancy
  */
-import { whereAxisIsOwnerOrItsDelegate } from '@template/db';
+import { whereAxisCarriesOwnerKeys } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { spaceReadManyInquiriesSentRoute } from '#/modules/space/routes/spaceReadManyInquiriesSent';
 
 export const spaceReadManyInquiriesSentController = makeController(
@@ -17,7 +17,7 @@ export const spaceReadManyInquiriesSentController = makeController(
     const space = getResource<'space'>(c);
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        ...whereAxisIsOwnerOrItsDelegate('Inquiry', 'sourceModel', {
+        ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', {
           organizationId: space.organizationId,
           spaceId: space.id,
           userId: null,
@@ -25,7 +25,7 @@ export const spaceReadManyInquiriesSentController = makeController(
       },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },
-      include: includeInquirySent,
+      include: includeInquiryResponse,
     });
     return respond.ok(data, { pagination });
   },

@@ -64,7 +64,7 @@ const buildModel = (schema: SdkSchema, modelName: string, models: FieldMap['mode
  * Build a json-rules lens from an SDK response schema. The response schema IS the
  * filter vocabulary — anything the endpoint returns is in memory and filterable,
  * including computed fields the server can't `WHERE`. `name` is the endpoint view's
- * identity (the spec component name, e.g. `InquiryReceivedItem`), NOT a Prisma model:
+ * identity (the spec component name, e.g. `InquiryItem`), NOT a Prisma model:
  * two endpoints share a vocabulary iff they share a response component. Prefer
  * `lensFromOperation(operationId)`, which resolves schema + name from the spec.
  * Field kinds drive the builder surface (operators, options, coercion stamping);

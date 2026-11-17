@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
+import type { InquiryItem } from '@template/sdk';
 import { Badge, Page, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
@@ -24,17 +24,17 @@ import { getInquiryInterface } from '@template/ui/lib/inquiries/registry';
 import { useAppStore } from '@template/ui/store';
 import { useMemo, useState } from 'react';
 
-type Row = InquirySentItem | InquiryReceivedItem;
+type Row = InquiryItem;
 
 const getEntityLabel = (inq: Row, direction: 'sent' | 'received'): string => {
   if (direction === 'received') {
-    const r = inq as InquiryReceivedItem;
+    const r = inq as InquiryItem;
     if (r.sourceUser) return r.sourceUser.name || r.sourceUser.email;
     if (r.sourceOrganization) return r.sourceOrganization.name;
     if (r.sourceSpace) return r.sourceSpace.name;
     return r.sourceModel;
   }
-  const s = inq as InquirySentItem;
+  const s = inq as InquiryItem;
   if (s.targetUser) return s.targetUser.name || s.targetUser.email;
   if (s.targetOrganization) return s.targetOrganization.name;
   if (s.targetSpace) return s.targetSpace.name;
@@ -93,11 +93,11 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
         if (direction === 'sent') {
           const entry = getInquiryInterface(inq.type);
           const Summary = entry?.source?.summary;
-          if (Summary) return <Summary inquiry={inq as InquirySentItem} />;
+          if (Summary) return <Summary inquiry={inq as InquiryItem} />;
         } else {
           const entry = getInquiryInterface(inq.type);
           const Summary = entry?.target?.summary;
-          if (Summary) return <Summary inquiry={inq as InquiryReceivedItem} />;
+          if (Summary) return <Summary inquiry={inq as InquiryItem} />;
         }
         return getEntityLabel(inq, direction);
       },
@@ -141,9 +141,9 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
       label: '',
       render: (inq: Row) =>
         direction === 'sent' ? (
-          <InquirySourceControls inquiry={inq as InquirySentItem} />
+          <InquirySourceControls inquiry={inq as InquiryItem} />
         ) : (
-          <InquiryTargetControls inquiry={inq as InquiryReceivedItem} />
+          <InquiryTargetControls inquiry={inq as InquiryItem} />
         ),
     },
   ];

@@ -4,20 +4,20 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
+import type { InquiryItem } from '@template/sdk';
 import type { InquiryType } from '@template/ui/lib/inquiries/queryKeys';
 import type { ComponentType } from 'react';
 
 export type InquirySourceInterface = {
-  summary: ComponentType<{ inquiry: InquirySentItem }>;
-  detail?: ComponentType<{ inquiry: InquirySentItem; onClose: () => void }>;
-  compose?: ComponentType<{ inquiry?: InquirySentItem; onClose: () => void }>;
+  summary: ComponentType<{ inquiry: InquiryItem }>;
+  detail?: ComponentType<{ inquiry: InquiryItem; onClose: () => void }>;
+  compose?: ComponentType<{ inquiry?: InquiryItem; onClose: () => void }>;
 };
 
 export type InquiryTargetInterface = {
-  summary: ComponentType<{ inquiry: InquiryReceivedItem }>;
-  detail?: ComponentType<{ inquiry: InquiryReceivedItem; onClose: () => void }>;
-  review?: ComponentType<{ inquiry: InquiryReceivedItem; onClose: () => void }>;
+  summary: ComponentType<{ inquiry: InquiryItem }>;
+  detail?: ComponentType<{ inquiry: InquiryItem; onClose: () => void }>;
+  review?: ComponentType<{ inquiry: InquiryItem; onClose: () => void }>;
 };
 
 export type InquiryInterfaceEntry = {

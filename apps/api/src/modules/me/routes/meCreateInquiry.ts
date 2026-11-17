@@ -10,7 +10,7 @@ import {
   inquiryCreateBodySchema,
   inquiryCreateSanitizeKeys,
 } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
-import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
+import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
@@ -20,7 +20,7 @@ export const meCreateInquiryRoute = createRoute({
   submodel: Modules.inquiry,
   skipId: true,
   bodySchema: inquiryCreateBodySchema,
-  responseSchema: inquirySentResponseSchema,
+  responseSchema: inquiryResponseSchema,
   sanitizeKeys: inquiryCreateSanitizeKeys,
   tags: [Tags.me, Tags.inquiry],
 });

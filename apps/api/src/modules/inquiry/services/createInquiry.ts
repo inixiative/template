@@ -12,7 +12,7 @@ import { check, rebacSchema } from '@template/permissions/rebac';
 import type { ValidatedContext } from '#/lib/context/getValidatedData';
 import { makeError } from '#/lib/errors';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import type {
   inquiryCreateBodySchema,
   inquiryCreateSanitizeKeys,
@@ -62,7 +62,7 @@ export const createInquiry = async (
         ...target,
         status: InquiryStatus.draft,
       },
-      include: includeInquirySent,
+      include: includeInquiryResponse,
     });
 
     if (status === InquiryStatus.sent) return sendInquiry(c, draft);

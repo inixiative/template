@@ -43,6 +43,8 @@ const leafNames = (rule: ActionRule): string[] => {
 };
 
 const isKnown = (name: string) => {
+  // why: `__actor` is the credential the check runs for, not a column of the inquiry
+  if (name.startsWith('__actor.')) return true;
   if (!name.includes(':')) return name.split('.')[0] in fieldsOf('Inquiry');
   const [rel, action] = name.split(':');
   const model = rel ? modelAt(rel) : 'Inquiry';

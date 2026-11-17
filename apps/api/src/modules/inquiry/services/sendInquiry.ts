@@ -10,7 +10,7 @@ import { emitAppEvent } from '#/appEvents/emit';
 import { makeError } from '#/lib/errors';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
-import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
 import { resolveInquiry } from '#/modules/inquiry/services/resolution';
@@ -28,7 +28,10 @@ export const sendInquiry = async (
     const fresh = await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt);
 
     if (fresh.status === InquiryStatus.sent)
-      return db.inquiry.findUniqueOrThrow({ where: { id: fresh.id }, include: includeInquirySent });
+      return db.inquiry.findUniqueOrThrow({
+        where: { id: fresh.id },
+        include: includeInquiryResponse,
+      });
 
     validateInquiryIsSendable(fresh);
 
@@ -42,7 +45,7 @@ export const sendInquiry = async (
         sentAt: fresh.sentAt ?? new Date(),
         expiresAt: computeExpiresAt(fresh.type),
       },
-      include: includeInquirySent,
+      include: includeInquiryResponse,
     });
 
     const handler = inquiryHandlers[fresh.type];
@@ -59,7 +62,7 @@ export const sendInquiry = async (
 
       const approved = await db.inquiry.findUniqueOrThrow({
         where: { id: sent.id },
-        include: includeInquirySent,
+        include: includeInquiryResponse,
       });
 
       await emitAppEvent('inquiry.sent', approved);
