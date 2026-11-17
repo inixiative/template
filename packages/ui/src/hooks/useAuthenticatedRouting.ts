@@ -41,15 +41,14 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
   useEffect(() => {
     (async () => {
       const searchParams = parseRoutingSearchParams(search);
-      const { tenant: currentTenant, auth: currentAuth } = useAppStore.getState();
-      syncStoreFromSearchParams({ searchParams, tenant: currentTenant, auth: currentAuth });
+      syncStoreFromSearchParams({ searchParams, tenant: useAppStore.getState().tenant, auth });
 
-      if (searchParams.spoofEmail !== currentAuth.spoofUserEmail) {
+      if (searchParams.spoofEmail !== auth.spoofUserEmail) {
         useAppStore.getState().navigation.setFlowId(null);
-        await currentAuth.setSpoof(searchParams.spoofEmail);
+        await auth.setSpoof(searchParams.spoofEmail);
       }
     })();
-  }, [search, auth.organizations, auth.spaces, auth.spoofUserEmail]);
+  }, [search, auth]);
 
   useEffect(() => {
     const { navigation } = useAppStore.getState();
