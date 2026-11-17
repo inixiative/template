@@ -25,6 +25,8 @@ const fastTiming: Partial<ApiWebsocketTiming> = {
 };
 const waitForOpensSent = (ws: FakeBrowserWebSocket, count: number) =>
   waitFor(() => opensOf(ws).length === count);
+const scheduledByTheClient = () =>
+  new Error().stack?.includes('lib/ws/createApiWebsocket.ts:') ?? false;
 const recordTimers = () => {
   const delays: number[] = [];
   const pending = new Set<ReturnType<typeof setTimeout>>();
@@ -34,6 +36,7 @@ const recordTimers = () => {
     callback: () => void,
     ms?: number,
   ) => {
+    if (!scheduledByTheClient()) return realSetTimeout(callback, ms);
     delays.push(ms ?? 0);
     const id = realSetTimeout(() => {
       pending.delete(id);
