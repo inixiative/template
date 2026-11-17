@@ -100,15 +100,15 @@ describe("a member's entitlements change only through its entitlement rows: crea
     expect(await stored(target)).toEqual([]);
   });
 
-  it('removing needs the ability to grant it: an admin cannot strip what only an owner gives', async () => {
+  it('removing takes administering the holder, not the right to grant: an admin strips what only an owner gives, and cannot give it back (Aron, 2026-11-16)', async () => {
     const target = await member([spaceIntegrations(['delete'])]);
     expect(
       (await change('admin', target, { remove: [spaceIntegrations(['delete'])] })).status,
-    ).toBe(403);
-    expect(
-      (await change('owner', target, { remove: [spaceIntegrations(['delete'])] })).status,
     ).toBe(204);
     expect(await stored(target)).toEqual([]);
+    expect((await change('admin', target, { add: [spaceIntegrations(['delete'])] })).status).toBe(
+      403,
+    );
   });
 
   it('an admin removes one row and grants another it could grant, in a delete-many then a create-many', async () => {

@@ -11,7 +11,6 @@ import {
   includeTargetEntitlements,
   loadEntitlementAnchors,
   missingAnchors,
-  polymorphicKeyColumns,
   toEntitlementCreateData,
 } from '@template/db';
 import type { Entitlement } from '@template/db/generated/client/client';
@@ -31,11 +30,6 @@ import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlement
 export type EntitlementChanges = { add?: EntitlementInput[]; remove?: string[] };
 
 type Holder = Record<string, unknown> & { id: string; targetEntitlements: Entitlement[] };
-
-const anchorIsHardDeleted = (row: Entitlement): boolean =>
-  polymorphicKeyColumns('Entitlement', 'sourceModel', row.sourceModel).some(
-    (column) => row[column as keyof Entitlement] == null,
-  );
 
 const liveRows = async (target: EntitlementTarget): Promise<Holder> => {
   const holder = (await db.delegate(target.model).findUnique({
@@ -77,10 +71,12 @@ const asStored = (input: EntitlementInput): EntitlementInput => ({
 });
 
 /**
- * The one writer of a target's entitlements: every added entry and every removed row passes the
- * grant check, and entries a held row covers (with no lens, or the same lens) are skipped. A held row equal to an
- * added entry but for its lens is replaced: one grant holds one lens. A target left with no rows
- * holds nothing. Rows never change; a removal is a soft delete, so each row's audit entry is its own.
+ * The one writer of a target's entitlements. Every added entry passes the grant check, and entries
+ * a held row covers (with no lens, or the same lens) are skipped. A held row equal to an added
+ * entry but for its lens is replaced: one grant holds one lens. A removal needs only what the
+ * caller's route already checked, that the writer administers the holder: taking away never hands
+ * on authority. A target left with no rows holds nothing. Rows never change; a removal is a soft
+ * delete, so each row's audit entry is its own.
  */
 export const changeEntitlements = (
   writer: Permix,
@@ -109,11 +105,6 @@ export const changeEntitlements = (
       const tombstonedIds = [...removedIds, ...replaced.map((row) => row.id)];
       const removed = holder.targetEntitlements.filter((row) => tombstonedIds.includes(row.id));
 
-      const checked = removed.filter((row) => !anchorIsHardDeleted(row));
-      const [anchoredLive, anchoredDeleted] = partition(
-        checked,
-        (row) => row.sourceDeletedAt == null,
-      );
       const anchors = await loadEntitlementAnchors(written);
       const [missing] = missingAnchors(written, anchors);
       if (missing)
@@ -122,13 +113,7 @@ export const changeEntitlements = (
           message: `${missing.sourceModel} ${missing.sourceId} not found`,
         });
 
-      await validateEntitlementGrants(writer, [
-        ...written.map(toEntitlementEntry),
-        ...anchoredLive.map(toEntitlementEntry),
-      ]);
-      await db.withDeleted(() =>
-        validateEntitlementGrants(writer, anchoredDeleted.map(toEntitlementEntry)),
-      );
+      await validateEntitlementGrants(writer, written.map(toEntitlementEntry));
 
       const added = uncovered(kept, written);
 
