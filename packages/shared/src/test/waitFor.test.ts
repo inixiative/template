@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { waitFor } from '@template/shared/utils/waitFor';
+import { waitFor } from '@template/shared/test/waitFor';
 
 describe('waitFor', () => {
   test('returns as soon as the condition holds', async () => {

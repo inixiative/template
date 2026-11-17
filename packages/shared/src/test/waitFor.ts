@@ -1,10 +1,3 @@
-/**
- * @atlas
- * @kind utils
- * @partOf primitive:shared
- * @uses none
- */
-
 const POLL_MS = 5;
 
 export const waitFor = async (

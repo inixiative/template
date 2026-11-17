@@ -3,11 +3,9 @@ import { broadcastLocal, sendToChannelLocal, sendToStreamLocal } from '#/ws/deli
 import { addConnection, byId, clearRegistry } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
-import { createTestSocket } from '#tests/createTestSocket';
+import { createTestSocket, sentFrames } from '#tests/createTestSocket';
 
 afterEach(() => clearRegistry());
-
-const parse = (sent: string[]) => sent.map((m) => JSON.parse(m));
 
 describe('delivery', () => {
   it('sendToChannelLocal delivers only to subscribers of that channel', () => {
@@ -19,7 +17,7 @@ describe('delivery', () => {
 
     sendToChannelLocal('ch1', { type: 'query.refetch', queryKey: ['x'] });
 
-    expect(parse(a.sent)).toEqual([{ type: 'query.refetch', queryKey: ['x'] }]);
+    expect(sentFrames(a.sent)).toEqual([{ type: 'query.refetch', queryKey: ['x'] }]);
     expect(b.sent).toEqual([]);
   });
 
@@ -68,7 +66,7 @@ describe('delivery', () => {
       }),
     );
 
-    expect(parse(a.sent)).toEqual([
+    expect(sentFrames(a.sent)).toEqual([
       { category: 'data', action: 'append', stream: 'st1', type: 'upsert', payload: 1 },
     ]);
     expect(b.sent).toEqual([]);
@@ -87,7 +85,7 @@ describe('delivery', () => {
       ws.data.userId === 'u-alice' ? JSON.stringify({ n: 1 }) : null,
     );
 
-    expect(parse(alice.sent)).toEqual([{ n: 1 }]);
+    expect(sentFrames(alice.sent)).toEqual([{ n: 1 }]);
     expect(bob.sent).toEqual([]);
     expect(anonymous.sent).toEqual([]);
   });
@@ -105,6 +103,6 @@ describe('delivery', () => {
 
     expect(priming.sent).toEqual([]);
     expect(priming.socket.data.heldAppends.get('st1')).toEqual([JSON.stringify({ n: 1 })]);
-    expect(parse(open.sent)).toEqual([{ n: 1 }]);
+    expect(sentFrames(open.sent)).toEqual([{ n: 1 }]);
   });
 });

@@ -5,7 +5,7 @@ import { maxSafeHeartbeatMs } from '@template/db/lock/maxSafeHeartbeatMs';
 import type { LockRedis } from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
-import { waitFor } from '@template/shared/utils/waitFor';
+import { waitFor } from '@template/shared/test/waitFor';
 
 const newId = () => `test-${Bun.randomUUIDv7()}`;
 const keyFor = (id: string) => `${redisNamespace.lock}:s:${id}`;

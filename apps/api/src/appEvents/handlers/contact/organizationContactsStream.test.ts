@@ -7,7 +7,7 @@ import {
   createContact,
   createOrganizationUser,
 } from '@template/db/test';
-import { waitFor } from '@template/shared/utils/waitFor';
+import { waitFor } from '@template/shared/test/waitFor';
 import { defineStream, STREAM_DEFINITIONS, type StreamDefinition } from '@template/shared/ws';
 import { z } from 'zod';
 import { emitAppEvent } from '#/appEvents/emit';
@@ -21,7 +21,7 @@ import { organizationReadManyContactsRoute } from '#/modules/organization/routes
 import { websocketHandler } from '#/ws/handler';
 import { initWebSocketPubSub } from '#/ws/pubsub';
 import { clearRegistry } from '#/ws/registry';
-import { createTestSocket } from '#tests/createTestSocket';
+import { createTestSocket, type SentFrame, sentFrames } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 
 const organizationContactsStream = STREAM_DEFINITIONS.organizationReadManyContacts;
@@ -123,20 +123,20 @@ describe('organization contacts stream (app event → redis → open socket)', (
     });
     websocketHandler.open(handle.socket);
     await websocketHandler.message(handle.socket, JSON.stringify({ action: 'open', stream }));
-    const snapshot = handle.sent
-      .map((message) => JSON.parse(message))
-      .find((frame) => frame.action === 'snapshot');
+    const snapshot = sentFrames<
+      SentFrame & { seq: number; payload: { data: Array<{ id: string }> } }
+    >(handle.sent).find((frame) => frame.action === 'snapshot');
+    if (!snapshot) throw new Error('no snapshot frame was sent');
     handle.sent.length = 0;
     return {
       ...handle,
       stream,
-      snapshotSeq: snapshot.seq as number,
-      snapshotRows: snapshot.payload.data as Array<{ id: string }>,
+      snapshotSeq: snapshot.seq,
+      snapshotRows: snapshot.payload.data,
     };
   };
 
-  const appends = (sent: string[]) =>
-    sent.map((message) => JSON.parse(message)).filter((frame) => frame.action === 'append');
+  const appends = (sent: string[]) => sentFrames(sent).filter((frame) => frame.action === 'append');
 
   it('pushes contact changes as appends whose rows match what the route snapshot serves', async () => {
     const { entity: contact } = await createContact(

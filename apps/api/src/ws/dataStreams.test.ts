@@ -8,7 +8,7 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
-import { waitFor } from '@template/shared/utils/waitFor';
+import { waitFor } from '@template/shared/test/waitFor';
 import {
   STREAM_DEFINITIONS,
   WS_CHANNELS,
@@ -24,11 +24,9 @@ import { readStreamSeq } from '#/ws/queries/readStreamSeq';
 import { byId, byStream, clearRegistry } from '#/ws/registry';
 import { reauthorizeOpenStreams } from '#/ws/streamReauthorizeSweep';
 import { streamSeqKey } from '#/ws/streamSeq';
-import { createTestSocket } from '#tests/createTestSocket';
+import { createTestSocket, type SentFrame, sentFrames } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
-
-const frames = (sent: string[]) => sent.map((message) => JSON.parse(message));
 
 const until = async (predicate: () => boolean, attempts = 10_000): Promise<void> => {
   for (let i = 0; !predicate(); i++) {
@@ -53,6 +51,11 @@ const withStreamRouteStatus = async (
   } finally {
     spy.mockRestore();
   }
+};
+
+type SnapshotFrame = SentFrame & {
+  seq: number;
+  payload: { data: Array<{ id: string }>; pagination: { total: number } };
 };
 
 describe('data streams (real app)', () => {
@@ -93,7 +96,8 @@ describe('data streams (real app)', () => {
     const { socket, sent } = connect(memberBearer);
     await websocketHandler.message(socket, openFrame(stream));
 
-    const [opened, snapshot] = frames(sent);
+    const [opened] = sentFrames(sent);
+    const snapshot = sentFrames<SnapshotFrame>(sent)[1];
     expect(opened).toEqual({ type: 'opened', stream });
     expect(snapshot).toMatchObject({ category: 'data', action: 'snapshot', stream });
     expect(snapshot.seq).toBeNumber();
@@ -106,7 +110,7 @@ describe('data streams (real app)', () => {
     const { socket, sent } = connect();
     await websocketHandler.message(socket, openFrame(stream));
 
-    expect(frames(sent)).toEqual([{ type: 'openRejected', stream }]);
+    expect(sentFrames(sent)).toEqual([{ type: 'openRejected', stream }]);
     expect(byStream.has(stream)).toBe(false);
     expect(socket.data.streams.size).toBe(0);
   });
@@ -116,7 +120,7 @@ describe('data streams (real app)', () => {
     const { socket, sent } = connect((await createBearerToken(outsider)).authorization);
     await websocketHandler.message(socket, openFrame(stream));
 
-    expect(frames(sent)).toEqual([{ type: 'openRejected', stream }]);
+    expect(sentFrames(sent)).toEqual([{ type: 'openRejected', stream }]);
     expect(byStream.has(stream)).toBe(false);
   });
 
@@ -127,7 +131,9 @@ describe('data streams (real app)', () => {
         websocketHandler.message(socket, openFrame(stream)),
       );
 
-      expect(frames(sent)).toEqual([{ type: 'error', action: 'open', stream, retryable: true }]);
+      expect(sentFrames(sent)).toEqual([
+        { type: 'error', action: 'open', stream, retryable: true },
+      ]);
       expect(byStream.has(stream)).toBe(false);
       clearRegistry();
     }
@@ -138,7 +144,7 @@ describe('data streams (real app)', () => {
     const junk = [`${stream}:junk`, `organizationReadManyContacts:id:nope:id:${organization.id}`];
     for (const name of junk) await websocketHandler.message(socket, openFrame(name));
 
-    expect(frames(sent)).toEqual(junk.map((name) => ({ type: 'openRejected', stream: name })));
+    expect(sentFrames(sent)).toEqual(junk.map((name) => ({ type: 'openRejected', stream: name })));
     expect(byStream.size).toBe(0);
   });
 
@@ -147,7 +153,9 @@ describe('data streams (real app)', () => {
     const dotted = ['organizationReadManyContacts:id:..', 'organizationReadManyContacts:id:.'];
     for (const name of dotted) await websocketHandler.message(socket, openFrame(name));
 
-    expect(frames(sent)).toEqual(dotted.map((name) => ({ type: 'openRejected', stream: name })));
+    expect(sentFrames(sent)).toEqual(
+      dotted.map((name) => ({ type: 'openRejected', stream: name })),
+    );
     expect(byStream.size).toBe(0);
   });
 
@@ -159,7 +167,7 @@ describe('data streams (real app)', () => {
     );
     await Promise.all(names.map((name) => websocketHandler.message(socket, openFrame(name))));
 
-    const answered = frames(sent);
+    const answered = sentFrames(sent);
     expect(answered).toHaveLength(names.length);
     expect(new Set(answered.map((frame) => frame.stream))).toEqual(new Set(names));
     for (const name of names.slice(WS_MAX_PENDING_FRAMES)) {
@@ -186,7 +194,7 @@ describe('data streams (real app)', () => {
       probe.mockRestore();
     }
 
-    const answered = frames(sent);
+    const answered = sentFrames(sent);
     expect(answered.filter((frame) => frame.type === 'opened')).toHaveLength(6);
     expect(answered.filter((frame) => frame.action === 'snapshot')).toHaveLength(1);
     expect(answered.at(-1)).toMatchObject({ action: 'snapshot', stream });
@@ -206,7 +214,7 @@ describe('data streams (real app)', () => {
       probe.mockRestore();
     }
 
-    expect(frames(sent)).toEqual([
+    expect(sentFrames(sent)).toEqual([
       { type: 'opened', stream },
       { type: 'closed', stream },
     ]);
@@ -231,7 +239,7 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, openFrame(queryChannel));
     await websocketHandler.message(socket, openFrame('organizationReadManyContacts'));
 
-    expect(frames(sent)).toEqual([
+    expect(sentFrames(sent)).toEqual([
       { type: 'openRejected', stream: 'nope:id:x' },
       { type: 'openRejected', stream: queryChannel },
       { type: 'openRejected', stream: 'organizationReadManyContacts' },
@@ -250,9 +258,9 @@ describe('data streams (real app)', () => {
     await pending;
 
     expect(
-      frames(sent).map((frame) => (frame.type === 'opened' ? 'opened' : frame.action)),
+      sentFrames(sent).map((frame) => (frame.type === 'opened' ? 'opened' : frame.action)),
     ).toEqual(['opened', 'snapshot', 'append']);
-    expect(frames(sent)[2]).toEqual(append);
+    expect(sentFrames(sent)[2]).toEqual(append);
   });
 
   it('delivers appends directly once the stream is open', async () => {
@@ -263,7 +271,7 @@ describe('data streams (real app)', () => {
     const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'x' } });
     sendToStreamLocal(stream, () => JSON.stringify(append));
 
-    expect(frames(sent)).toEqual([append]);
+    expect(sentFrames(sent)).toEqual([append]);
   });
 
   it('close stops delivery and confirms', async () => {
@@ -271,7 +279,7 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, openFrame(stream));
     await websocketHandler.message(socket, JSON.stringify({ action: 'close', stream }));
 
-    expect(frames(sent).at(-1)).toEqual({ type: 'closed', stream });
+    expect(sentFrames(sent).at(-1)).toEqual({ type: 'closed', stream });
     expect(byStream.has(stream)).toBe(false);
     expect(socket.data.streams.has(stream)).toBe(false);
   });
@@ -317,7 +325,7 @@ describe('data streams (real app)', () => {
 
     sent.length = 0;
     await websocketHandler.message(socket, openFrame(stream));
-    expect(frames(sent)).toEqual([{ type: 'openRejected', stream }]);
+    expect(sentFrames(sent)).toEqual([{ type: 'openRejected', stream }]);
   });
 
   it('re-sending the same credential keeps open streams', async () => {
@@ -354,7 +362,8 @@ describe('data streams (real app)', () => {
       bearer = (await createBearerToken(context.user)).authorization;
     });
 
-    const appendsOf = (sent: string[]) => frames(sent).filter((frame) => frame.action === 'append');
+    const appendsOf = (sent: string[]) =>
+      sentFrames<SnapshotFrame>(sent).filter((frame) => frame.action === 'append');
 
     it('stamps the snapshot with the seq of the last append before its read', async () => {
       await appendToStream(stream, { type: 'remove', payload: { id: 'before' } });
@@ -362,7 +371,7 @@ describe('data streams (real app)', () => {
       const { socket, sent } = connect(bearer);
       await websocketHandler.message(socket, openFrame(stream));
 
-      expect(frames(sent)[1]).toMatchObject({ action: 'snapshot', seq: counter });
+      expect(sentFrames(sent)[1]).toMatchObject({ action: 'snapshot', seq: counter });
     });
 
     it('an append landing during the snapshot read is delivered once, after the snapshot, one seq past it', async () => {
@@ -395,7 +404,8 @@ describe('data streams (real app)', () => {
         spy.mockRestore();
       }
 
-      const [opened, snapshot, ...rest] = frames(sent);
+      const [opened, , ...rest] = sentFrames(sent);
+      const snapshot = sentFrames<SnapshotFrame>(sent)[1];
       expect(opened).toEqual({ type: 'opened', stream });
       expect(rest).toEqual([
         streamAppendFrame(stream, snapshot.seq + 1, { type: 'remove', payload: { id: 'during' } }),
@@ -420,7 +430,7 @@ describe('data streams (real app)', () => {
 
       const reconnected = connect(bearer);
       await websocketHandler.message(reconnected.socket, openFrame(stream));
-      const snapshot = frames(reconnected.sent)[1];
+      const snapshot = sentFrames<SnapshotFrame>(reconnected.sent)[1];
       expect(snapshot.seq).toBe((await readStreamSeq(getRedisClient(), streamSeqKey(stream))).seq);
       expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toContain(created.id);
 
@@ -459,7 +469,7 @@ describe('data streams (real app)', () => {
         evals.mockRestore();
       }
 
-      const answers = frames(sent).map((frame) => frame.type);
+      const answers = sentFrames(sent).map((frame) => frame.type);
       expect(answers.slice(0, 2)).toEqual(['openRejected', 'openRejected']);
       expect(answers).toHaveLength(7);
       expect(await redis.exists(streamSeqKey(knownFamily))).toBe(0);
@@ -473,7 +483,7 @@ describe('data streams (real app)', () => {
       const { socket, sent } = connect(fresh.authorization);
       await websocketHandler.message(socket, openFrame(fresh.name));
 
-      const snapshot = frames(sent)[1];
+      const snapshot = sentFrames<SnapshotFrame>(sent)[1];
       expect(await getRedisClient().get(streamSeqKey(fresh.name))).toBe(String(snapshot.seq));
       await appendToStream(fresh.name, { type: 'remove', payload: { id: 'next' } });
       await waitFor(() => appendsOf(sent).length === 1);
@@ -500,7 +510,8 @@ describe('data streams (real app)', () => {
         spy.mockRestore();
       }
 
-      const [opened, snapshot, ...rest] = frames(sent);
+      const [opened, , ...rest] = sentFrames(sent);
+      const snapshot = sentFrames<SnapshotFrame>(sent)[1];
       expect(reads).toBe(2);
       expect(opened).toEqual({ type: 'opened', stream: fresh.name });
       expect(snapshot.seq).toBe(Number(await getRedisClient().get(streamSeqKey(fresh.name))));
@@ -552,9 +563,9 @@ describe('data streams (real app)', () => {
       const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'x' } });
       sendToStreamLocal(stream, () => JSON.stringify(append));
 
-      expect(frames(revocable.sent)).toEqual([{ type: 'openRejected', stream }]);
+      expect(sentFrames(revocable.sent)).toEqual([{ type: 'openRejected', stream }]);
       expect(revocable.socket.data.streams.has(stream)).toBe(false);
-      expect(frames(staying.sent).map((frame) => frame.action)).toEqual(['append']);
+      expect(sentFrames(staying.sent).map((frame) => frame.action)).toEqual(['append']);
     });
 
     it('closes a stream with a retryable error when the recheck hits a 5xx', async () => {
@@ -564,7 +575,9 @@ describe('data streams (real app)', () => {
 
       await withStreamRouteStatus(503, () => reauthorizeOpenStreams());
 
-      expect(frames(sent)).toEqual([{ type: 'error', action: 'open', stream, retryable: true }]);
+      expect(sentFrames(sent)).toEqual([
+        { type: 'error', action: 'open', stream, retryable: true },
+      ]);
       expect(byStream.has(stream)).toBe(false);
     });
 
@@ -630,7 +643,9 @@ describe('data streams (real app)', () => {
 
       await withIdentifyStatus(429, authenticate);
 
-      expect(frames(sent)).toEqual([{ type: 'error', action: 'authenticate', retryable: true }]);
+      expect(sentFrames(sent)).toEqual([
+        { type: 'error', action: 'authenticate', retryable: true },
+      ]);
       expect(socket.data.headers.authorization).toBe(authorization);
       expect(byStream.has(stream)).toBe(true);
     });
@@ -648,7 +663,9 @@ describe('data streams (real app)', () => {
           }),
         ),
       );
-      expect(frames(sent)).toEqual([{ type: 'error', action: 'authenticate', retryable: true }]);
+      expect(sentFrames(sent)).toEqual([
+        { type: 'error', action: 'authenticate', retryable: true },
+      ]);
     });
 
     it('a probe that throws closes that stream as retryable and still rechecks the rest', async () => {
@@ -673,7 +690,7 @@ describe('data streams (real app)', () => {
         spy.mockRestore();
       }
 
-      expect(frames(sent)).toEqual([
+      expect(sentFrames(sent)).toEqual([
         { type: 'error', action: 'open', stream: otherStream, retryable: true },
         { type: 'openRejected', stream },
       ]);

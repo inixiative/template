@@ -19,4 +19,3 @@ export { type RetryOptions, withRetry } from './retry';
 export { createSerializedQueue, type SerializedQueue } from './serializedQueue';
 export { settleWithin } from './settleWithin';
 export { stableHash } from './stableHash';
-export { waitFor } from './waitFor';
