@@ -264,6 +264,7 @@ never cross the API. The grantor has no name on the row: it is the target's owne
 
 TODO: Document ID format
 - UUIDv7 for sortability
+- **Ids and keys that share a space carry a namespace from one registry, never a bare name.** Redis keys take theirs from `redisNamespace` ([REDIS.md](REDIS.md#namespaces)). A new family of keys or ids that can share a space gets a registry of the same shape: a `const` object of namespaces, one builder that joins `<namespace>:<name>` and one reader; nothing writes a prefix by hand, and a written value may not take a namespace only generated ones carry. Why: bare names in a shared space collide silently (Foundry, 2026-11-16: a region named `feedback` took a built-in role's id and the daemon could not boot for five hours).
 
 ---
 
