@@ -10,6 +10,7 @@ import { prismaMap } from '@template/db/generated/prismaMap';
 import { withDiscriminatorDefaults } from '@template/db/registries/discriminatorDefaults';
 import { withDualPolymorphismIds } from '@template/db/registries/dualPolymorphismIds';
 import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { polymorphicKeyColumns } from '@template/db/registries/polymorphicIs';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import {
   assertDiscriminatorsChosen,
@@ -197,7 +198,7 @@ export const createFactory = <K extends ModelName>(
           if (!axis) return true;
           const discriminator = merged[axis.field] as string | undefined;
           if (!discriminator) return true;
-          return (axis.fkMap[discriminator as keyof typeof axis.fkMap] ?? []).includes(fkField);
+          return polymorphicKeyColumns(modelName, axis.field, discriminator).includes(fkField);
         };
 
         if (typeof dep.foreignKey === 'string') {

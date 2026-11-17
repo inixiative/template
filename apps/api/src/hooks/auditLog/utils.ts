@@ -5,9 +5,9 @@
  */
 import {
   filterFields,
-  getPolymorphismConfig,
   NOOP_FIELDS,
   Prisma,
+  polymorphicKeyColumns,
   redactSensitiveFields,
 } from '@template/db';
 import type { AuditActor } from '@template/db/lib/auditActorContext';
@@ -65,11 +65,8 @@ export const buildSubjectFkFields = (
   model: string,
   record: Record<string, unknown>,
 ): Record<string, unknown> => {
-  const subjectAxis = getPolymorphismConfig('AuditLog')?.axes.find(
-    (axis) => axis.field === 'subjectModel',
-  );
-  const fkFields = subjectAxis?.fkMap[model as keyof typeof subjectAxis.fkMap];
-  if (!fkFields?.length) return {};
+  const fkFields = polymorphicKeyColumns('AuditLog', 'subjectModel', model);
+  if (!fkFields.length) return {};
 
   const subjectFields: Record<string, unknown> = {};
   for (const field of fkFields) {

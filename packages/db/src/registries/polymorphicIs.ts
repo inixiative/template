@@ -67,8 +67,8 @@ export const axisTargetIdColumn = (
 ): string | null => axis.dualPolymorphismId ?? polymorphicKeyColumn(model, axis.field, value);
 
 /**
- * The row a false-polymorphic axis points at — its kind and id — or null when it points at nobody.
- * A composite kind has no single id, so asking for one is a bug.
+ * The row a false-polymorphic axis points at, its kind and id, or null when it points at nobody.
+ * A dual axis names it by its dual polymorphism id, and by the typed FK until that id is written.
  */
 export const polymorphicTarget = (
   row: Record<string, unknown>,
@@ -77,8 +77,10 @@ export const polymorphicTarget = (
 ): { kind: string; id: string } | null => {
   const kind = row[axisField];
   if (typeof kind !== 'string') return null;
-  const column = axisTargetIdColumn(model, polymorphicAxis(model, axisField), kind);
-  const id = column ? row[column] : null;
+  const { dualPolymorphismId } = polymorphicAxis(model, axisField);
+  const dualId = dualPolymorphismId ? row[dualPolymorphismId] : null;
+  const keyColumn = dualId == null ? polymorphicKeyColumn(model, axisField, kind) : null;
+  const id = dualId ?? (keyColumn ? row[keyColumn] : null);
   return typeof id === 'string' ? { kind, id } : null;
 };
 

@@ -587,6 +587,7 @@ For `updateManyAndReturn`, rules run **after** the mutation (in the same transac
 By design, immutable field violations are silently fixed, not rejected. If you need to reject attempts to change a field, use a rule instead.
 
 <!-- unit doc:docs/claude/HOOKS.md#immutable-fields -->
+
 **Source:** `docs/claude/HOOKS.md` § Immutable Fields (in "Hooks")
 
 #### Immutable Fields
@@ -611,6 +612,9 @@ export const ImmutableFieldsOverrides = {
   // updatable for the transferSpace inquiry handler
   Space: { exclude: ['organizationId'] },
 
+  // A tag never moves between categories: naming another one is a 422.
+  Tag: { ...polymorphismImmutableFields.Tag, refuse: ['tagCategoryId'] },
+
   // Other examples:
   // SomeModel: { exclude: ['categoryId'] },  // Allow this FK to change
   // SomeModel: { include: ['status'] },      // Make this non-FK immutable
@@ -619,7 +623,11 @@ export const ImmutableFieldsOverrides = {
 
 **Important:** When a new inquiry handler needs to update a FK field (e.g. moving a resource between owners), add an `exclude` override here. The silent-strip behavior would otherwise make the `handleApprove` update a no-op with a 200 response, with no error.
 
-Supports dot notation for JSON paths: `'entitlements.canInvite'`
+Supports dot notation for JSON paths: `'payload.canInvite'` on a `CronJob` locks one key of the JSON column.
+
+`Entitlement` rows are immutable: an update naming `resource`, `actions`, `where`, `lens`, `sourcePath` or either axis is a 422; only `deletedAt` and `sourceDeletedAt` move.
+
+`getImmutableFields(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with dual polymorphism ids, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`getRefusedFields`).
 
 ##### Why Strip Instead of Throw?
 
@@ -630,7 +638,7 @@ Immutable fields are **silently stripped** rather than throwing errors because:
 3. **API stability** - Adding immutable fields doesn't break existing clients
 4. **Idempotency** - Sending the same value back is harmless, not an error
 
-If you need strict validation (throw on attempt to change), use the Rules Registry instead.
+If you need strict validation (throw on attempt to change), add the field to the override's `refuse` list (a 422), or use the Rules Registry for a conditional rule.
 
 ---
 
