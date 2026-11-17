@@ -36,7 +36,11 @@ const testLens: EmailLens = { recipient };
 
 describe('collectJsonOpacityWarnings', () => {
   it('confirms the hole: validateRuleInLens does NOT catch a typo under a Json field', () => {
-    const rule = { field: 'enrichments.valueMeta.tYpo', operator: 'notEmpty' } as const;
+    const rule = {
+      field: 'enrichments',
+      arrayOperator: 'any',
+      condition: { field: 'valueMeta.tYpo', operator: 'notEmpty' },
+    } as const;
     expect(validateRuleInLens(rule, recipient).ok).toBe(true);
   });
 

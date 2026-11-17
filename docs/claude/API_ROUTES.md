@@ -155,7 +155,7 @@ readRoute({ model: 'user', many: true, admin: true, responseSchema })
 
 A lens narrowing can declare a `where` in three places, and they assert three different things.
 
-**Root where** (`root.where`, plus any parent layer's) — a predicate on the root rows themselves: through this lens, the only rows that exist are the ones matching. Its rule may traverse relations (`tokens.isActive`-style fields), but the traversal qualifies *roots*: "give me Users such that…". It answers **which rows are in the result set**.
+**Root where** (`root.where`, plus any parent layer's) — a predicate on the root rows themselves: through this lens, the only rows that exist are the ones matching. Its rule may traverse relations (a to-one by path, `organization.name`; a to-many under an array rule, `{ field: 'tokens', arrayOperator: 'any', condition: { field: 'isActive', … } }`), but the traversal qualifies *roots*: "give me Users such that…". It answers **which rows are in the result set**.
 
 **Relation-node where** (`root.relations.<rel>.where`) — a standing condition on that edge: whenever a query traverses this relation, the related rows are scoped by this condition. It says nothing about which roots qualify — a User with zero matching tokens is still in the set. It answers **what the related collection looks like when you traverse to it**. Declared per *path*, not per model: two edges reaching the same model can carry different wheres.
 
@@ -836,7 +836,7 @@ readRoute({
   action: 'sent',
   many: true,
   paginate: true,
-  responseSchema: inquirySentResponseSchema,
+  responseSchema: inquiryResponseSchema,
   filterLens: {
     parent: lensFor('Inquiry'),
     root: { picks: inquiryPicks },

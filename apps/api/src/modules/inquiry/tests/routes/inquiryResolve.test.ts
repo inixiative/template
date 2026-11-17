@@ -64,7 +64,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
     expect(data.status).toBe(InquiryStatus.approved);
   });
 
-  it('returns source relations but not target relations in response', async () => {
+  it('returns both sides in the response', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -87,7 +87,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
 
     expect(response.status).toBe(200);
     expect(data.sourceOrganization).toBeDefined();
-    expect(data.targetUser).toBeUndefined();
+    expect(data.targetUser).toMatchObject({ id: invitee.id });
   });
 
   it('stores the resolution through its schema, dropping keys it does not define', async () => {

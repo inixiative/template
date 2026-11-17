@@ -204,7 +204,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | the approve handler moves a space to another org; the handler's FK update returned 200 but changed nothing; escape to raw to change the owner FK | **Inquiry handlers changing FKs need exclude override** · rule docs/claude/HOOKS.md § FK fields are automatically immutable — Inquiry handleApprove moving resources between owners. | part 4 | an inquiry handleApprove that updates an owner FK (e.g. Space.organizationId) and silently does nothing with a 200, or that escapes to db.raw, instead of an `exclude` in ImmutableFieldsOverrides (docs/claude/HOOKS.md § Immutable Fields › FK fields are automatically immutable) |
 | delete the id and FKs from the payload in the controller; throw when a locked field is in the update; silently drop locked fields instead of erroring | **Strip immutable fields, don't throw** · rule docs/claude/HOOKS.md § Immutable Fields › Why Strip Instead of Throw? — Need an error on change attempt: Rules Registry instead of immutable fields hook. | code `registry`, `Space`, `ImmutableFieldsOverrides` | controller code deleting `id`/`createdAt`/FK keys from a payload before update, or a new guard that throws on them (docs/claude/HOOKS.md § Immutable Fields › Why Strip Instead of Throw?) |
 
-- *Also here, by name:* clearImmutableFieldsCache (`apps/api/src/hooks/immutableFields/registry.ts`); materializedColumns (`packages/db/src/registries/materializedIds.ts`); materializedIdConflicts (`packages/db/src/registries/materializedIds.ts`); setImmutableFieldsCache (`apps/api/src/hooks/immutableFields/registry.ts`)
+- *Also here, by name:* clearImmutableFieldsCache (`apps/api/src/hooks/immutableFields/registry.ts`); dualPolymorphismIdColumns (`packages/db/src/registries/dualPolymorphismIds.ts`); dualPolymorphismIdConflicts (`packages/db/src/registries/dualPolymorphismIds.ts`); setImmutableFieldsCache (`apps/api/src/hooks/immutableFields/registry.ts`)
 
 ### Class `ordered-lists`: Dense position columns maintained by the orderedList hook
 
@@ -421,6 +421,7 @@ registerDbHook(
 ---
 
 <!-- unit doc:docs/claude/HOOKS.md#application-hooks -->
+
 **Source:** `docs/claude/HOOKS.md` § Application Hooks (in "Hooks")
 
 #### Application Hooks
@@ -430,16 +431,21 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | Hook | Purpose |
 |------|---------|
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
-| `cache` | Cache invalidation on mutations (post-commit) |
+| `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
+| `entitlementLens` | On `Entitlement` (`create`, `createManyAndReturn`, `upsert`'s create): a `lens` must be a valid json-rules narrowing over the resource's base lens that never hides `id` (422 otherwise), whoever writes it ([PERMISSIONS.md](PERMISSIONS.md#lenses-keep-id-paths-merge-by-id)) |
+| `fullDelegate` | On `Token` and `Integration`: a row written `full` gets `role: null` before the write, and its live entitlement rows are tombstoned after it. On `Entitlement`, a create whose target is a `full` delegate is refused (422 `full takes no entitlements`), whoever writes it |
 | `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
+| `memberSelfGrant` | After an `OrganizationUser` or `SpaceUser` is created (`create`, `createManyAndReturn`, an `upsert` that creates), writes its self-grant as an `Entitlement` row, tombstoned with the member's own `deletedAt` when the member is created tombstoned. `memberSelfGrant:kept` refuses (422) tombstoning a live member's self-grant; only the member's own tombstone takes it ([PERMISSIONS.md](PERMISSIONS.md#the-member-self-grant)) |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
+| `ruleReference` | Keeps `RuleReference` edges in step with each rule-bearing column (`RULE_REFERENCE_SURFACES`, `apps/api/src/hooks/ruleReference/surfaces.ts`: email templates and components, segment `conditions`, `Entitlement.where` read through `entitlementWhereLens`, which names the entitled record by id) |
+| `ruleReference:target` | Copies a named row's `deletedAt` onto the edges that name it, for every edge in `NAMING_EDGES` (`targetHook.ts`): `RuleReference.targetDeletedAt` and `Entitlement.sourceDeletedAt`. A purged row is left to the null FK |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
-| `segmentConditions` | Segment `conditions` required, validated against `segmentLensFor(owner)` + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
+| `segmentConditions` | Segment `conditions` required, validated by `validateSegmentConditions` (against `customerRefLens`, compiled with `resolvedCustomerRefLens(ownerModel, …)`) + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
 | `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
-| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). `HARD_DELETE_ON_TOMBSTONE` hard-deletes ephemeral grants that must not survive a revive — `Session`, `Token`, `WebhookSubscription` |
-| `tagOwnerCategory` | Tag.ownerModel + FK must match its TagCategory's owner |
+| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). Each delete behavior has its own registry, keyed by the child model: `HARD_DELETE_ON_TOMBSTONE` (`@template/db` registries) hard-deletes ephemeral rows that must not survive a revive — `Session`, `WebhookSubscription`, `WebhookEvent`, `RuleReference`, `Flow`; `REGENERATE_ON_REVIVE` rebuilds the derived ones (`RuleReference`) when the parent is revived; `SKIP_REVIVE` (`@template/db` registries: `Token`) tombstones a row with its parent and never revives it (a grant has to be issued again), and the cascade never reaches its children (a token's entitlement rows stay dead); `CLOSE_ON_PARENT_DELETE` closes a child instead of burying it: its open rows get the close written and nothing is tombstoned, so every row stays as the record (an `Inquiry` whose party is tombstoned is canceled unless already decided), and every parent of such a model must be soft-delete; `CASCADE_EXEMPT` lists the reference relations that never cascade (every `Entitlement` source, every `RuleReference` target); `validateDeleteBehavior` refuses an inconsistent registry at boot |
+| `tagOwnerCategory` | A created Tag's ownerModel + FK must match its TagCategory's owner. A tag never moves: `tagCategoryId` is refused on update (422) and the owner fields are stripped |
 | `webhooks` | Webhook delivery on mutations (post-commit) |
 
 `apps/api/src/hooks/falsePolymorphism/` lives under `hooks/` but is **not** a runtime hook — it's a pair of transformers (`toRules.ts`, `toImmutableFields.ts`) that inject polymorphism constraints into the rules and immutableFields registries at module load time.
@@ -581,6 +587,7 @@ For `updateManyAndReturn`, rules run **after** the mutation (in the same transac
 By design, immutable field violations are silently fixed, not rejected. If you need to reject attempts to change a field, use a rule instead.
 
 <!-- unit doc:docs/claude/HOOKS.md#immutable-fields -->
+
 **Source:** `docs/claude/HOOKS.md` § Immutable Fields (in "Hooks")
 
 #### Immutable Fields
@@ -605,6 +612,9 @@ export const ImmutableFieldsOverrides = {
   // updatable for the transferSpace inquiry handler
   Space: { exclude: ['organizationId'] },
 
+  // A tag never moves between categories: naming another one is a 422.
+  Tag: { ...polymorphismImmutableFields.Tag, refuse: ['tagCategoryId'] },
+
   // Other examples:
   // SomeModel: { exclude: ['categoryId'] },  // Allow this FK to change
   // SomeModel: { include: ['status'] },      // Make this non-FK immutable
@@ -613,7 +623,11 @@ export const ImmutableFieldsOverrides = {
 
 **Important:** When a new inquiry handler needs to update a FK field (e.g. moving a resource between owners), add an `exclude` override here. The silent-strip behavior would otherwise make the `handleApprove` update a no-op with a 200 response, with no error.
 
-Supports dot notation for JSON paths: `'entitlements.canInvite'`
+Supports dot notation for JSON paths: `'payload.canInvite'` on a `CronJob` locks one key of the JSON column.
+
+`Entitlement` rows are immutable: an update naming `resource`, `actions`, `where`, `lens`, `sourcePath` or either axis is a 422; only `deletedAt` and `sourceDeletedAt` move.
+
+`getImmutableFields(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with dual polymorphism ids, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`getRefusedFields`).
 
 ##### Why Strip Instead of Throw?
 
@@ -624,7 +638,7 @@ Immutable fields are **silently stripped** rather than throwing errors because:
 3. **API stability** - Adding immutable fields doesn't break existing clients
 4. **Idempotency** - Sending the same value back is harmless, not an error
 
-If you need strict validation (throw on attempt to change), use the Rules Registry instead.
+If you need strict validation (throw on attempt to change), add the field to the override's `refuse` list (a 422), or use the Rules Registry for a conditional rule.
 
 ---
 

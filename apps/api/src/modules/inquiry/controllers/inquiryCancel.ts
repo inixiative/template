@@ -4,10 +4,10 @@
  * @partOf feature:inquiry
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryCancelRoute } from '#/modules/inquiry/routes/inquiryCancel';
+import { inquiryCancellation } from '#/modules/inquiry/services/inquiryCancellation';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
 import { validateInquiryIsCancelable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
@@ -20,7 +20,7 @@ export const inquiryCancelController = makeController(inquiryCancelRoute, async 
     validateInquiryIsCancelable(await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt));
     await db.inquiry.update({
       where: { id: inquiry.id },
-      data: { status: InquiryStatus.canceled, expiresAt: null, deletedAt: new Date() },
+      data: inquiryCancellation,
     });
   });
 

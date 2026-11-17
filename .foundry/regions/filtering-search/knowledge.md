@@ -554,6 +554,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 ---
 
 <!-- unit doc:docs/claude/API_ROUTES.md#frontend-metadata -->
+
 **Source:** `docs/claude/API_ROUTES.md` § Frontend Metadata (in "API Routes")
 
 #### Frontend Metadata
@@ -574,7 +575,7 @@ readRoute({
   action: 'sent',
   many: true,
   paginate: true,
-  responseSchema: inquirySentResponseSchema,
+  responseSchema: inquiryResponseSchema,
   filterLens: {
     parent: lensFor('Inquiry'),
     root: { picks: inquiryPicks },

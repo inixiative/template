@@ -27,7 +27,7 @@ const inquiryFactory = createFactory('Inquiry', {
     },
     sourceSpace: {
       modelName: 'Space',
-      foreignKey: { id: 'sourceSpaceId' },
+      foreignKey: { organizationId: 'sourceOrganizationId', id: 'sourceSpaceId' },
       required: false,
     },
     targetUser: {
@@ -42,7 +42,7 @@ const inquiryFactory = createFactory('Inquiry', {
     },
     targetSpace: {
       modelName: 'Space',
-      foreignKey: { id: 'targetSpaceId' },
+      foreignKey: { organizationId: 'targetOrganizationId', id: 'targetSpaceId' },
       required: false,
     },
   },

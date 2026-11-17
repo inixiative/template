@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Detector for the set-null-polymorphism-materialized CI rule. Run from the repo (or fixture) root:
- *   bun scripts/ci/rules/lib/setNullPolymorphismMaterialized.ts
+ * Detector for the set-null-arm-requires-dual-polymorphism-id CI rule. Run from the repo (or fixture) root:
+ *   bun scripts/ci/rules/lib/setNullArmRequiresDualPolymorphismId.ts
  *
  * A relation on a false-polymorphic axis whose typed foreign key is `onDelete: SetNull` must sit on an
- * axis registered with a `materialized` plain id column (packages/db/src/registries/falsePolymorphism.ts),
+ * axis registered with a `dualPolymorphismId` plain id column (packages/db/src/registries/falsePolymorphism.ts),
  * as Entitlement's `sourceId` is. Why: when the row it points at is hard-deleted, SetNull nulls the
  * typed key, and without a plain id the row no longer says what it pointed at; the required-FK rule
  * (apps/api/src/hooks/falsePolymorphism/toRules.ts) accepts that plain id in the key's place.
@@ -16,7 +16,7 @@ import { finishFence, lineAt, listFiles, readSource, type Violation } from './fe
 const REGISTRY = 'packages/db/src/registries/falsePolymorphism.ts';
 const MODEL = /^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm;
 
-type Axis = { field: string; materialized: boolean; foreignKeys: string[] };
+type Axis = { field: string; hasDualPolymorphismId: boolean; foreignKeys: string[] };
 
 const propertyOf = (node: ts.ObjectLiteralExpression, name: string) =>
   node.properties.find(
@@ -59,7 +59,7 @@ const registeredAxes = (): Map<string, Axis[]> => {
             const fkMap = propertyOf(axis, 'fkMap');
             return {
               field: field && ts.isStringLiteral(field) ? field.text : '',
-              materialized: propertyOf(axis, 'materialized') !== undefined,
+              hasDualPolymorphismId: propertyOf(axis, 'dualPolymorphismId') !== undefined,
               foreignKeys: fkMap ? stringsIn(fkMap) : [],
             };
           }),
@@ -92,25 +92,25 @@ for (const file of listFiles(['packages'], /\.prisma$/)) {
           .split(',')
           .map((c) => c.trim()) ?? [];
       const axis = axes.find((a) => columns.some((column) => a.foreignKeys.includes(column)));
-      if (!axis || axis.materialized) continue;
+      if (!axis || axis.hasDualPolymorphismId) continue;
       violations.push({
         file,
         line: lineAt(source, bodyOffset + (relation.index ?? 0)),
         key: `${model}.${name}`,
-        detail: `${model}.${name} sets null on a ${axis.field} arm; register ${axis.field} with a materialized plain id, or cascade`,
+        detail: `${model}.${name} sets null on a ${axis.field} arm; register ${axis.field} with a dualPolymorphismId plain id, or cascade`,
       });
     }
   }
 }
 
 finishFence({
-  rule: 'set-null-polymorphism-materialized',
+  rule: 'set-null-arm-requires-dual-polymorphism-id',
   violations,
   explain: [
     'Relations on a false-polymorphic axis that set null when their target is deleted, on an axis',
-    'with no materialized plain id: the row would lose what it pointed at. Register the axis with',
-    '`materialized` (as Entitlement.sourceId) in packages/db/src/registries/falsePolymorphism.ts,',
+    'with no dual polymorphism id: the row would lose what it pointed at. Register the axis with',
+    '`dualPolymorphismId` (as Entitlement.sourceId) in packages/db/src/registries/falsePolymorphism.ts,',
     'or make the relation onDelete: Cascade.',
   ],
-  clean: 'Every set-null arm of a false-polymorphic axis keeps a materialized plain id.',
+  clean: 'Every set-null arm of a false-polymorphic axis keeps a dual polymorphism id.',
 });

@@ -23,8 +23,8 @@ export type PolymorphicValue = ModelName | SpecialOwner;
 export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
   fkMap: Partial<Record<PolymorphicValue, readonly string[]>>; // typeValue → required FK fields
-  materialized?: string; // the plain column holding the one id the set typed FK points at
-  delegates?: Partial<Record<PolymorphicValue, ModelName>>;
+  dualPolymorphismId?: string; // the plain column holding the one id the set typed FK points at
+  carriesOwnerKeysOf?: readonly ModelName[];
 };
 
 export type PolymorphicConfig = {
@@ -65,7 +65,7 @@ export const PolymorphismRegistry = {
           SpaceUser: ['organizationId', 'spaceId', 'userId'],
           Integration: ['integrationId'],
         },
-        delegates: { Integration: 'Integration' },
+        carriesOwnerKeysOf: ['Integration'],
       },
     ],
   },
@@ -210,7 +210,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'sourceModel',
-        materialized: 'sourceId',
+        dualPolymorphismId: 'sourceId',
         fkMap: {
           EmailTemplate: ['sourceEmailTemplateId'],
           EmailComponent: ['sourceEmailComponentId'],
@@ -220,7 +220,7 @@ export const PolymorphismRegistry = {
       },
       {
         field: 'targetModel',
-        materialized: 'targetId',
+        dualPolymorphismId: 'targetId',
         fkMap: {
           Tag: ['targetTagId'],
           Organization: ['targetOrganizationId'],
@@ -247,7 +247,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'sourceModel',
-        materialized: 'sourceId',
+        dualPolymorphismId: 'sourceId',
         fkMap: {
           User: ['sourceUserId'],
           Organization: ['sourceOrganizationId'],
@@ -268,7 +268,7 @@ export const PolymorphismRegistry = {
       },
       {
         field: 'targetModel',
-        materialized: 'targetId',
+        dualPolymorphismId: 'targetId',
         fkMap: {
           Token: ['targetTokenId'],
           Integration: ['targetIntegrationId'],
@@ -288,11 +288,13 @@ export const PolymorphismRegistry = {
           User: ['sourceUserId'],
           OrganizationUser: ['sourceOrganizationId', 'sourceUserId'],
           Organization: ['sourceOrganizationId'],
-          Space: ['sourceSpaceId'],
+          Space: ['sourceOrganizationId', 'sourceSpaceId'],
           SpaceUser: ['sourceOrganizationId', 'sourceSpaceId', 'sourceUserId'],
           Integration: ['sourceIntegrationId'],
           Token: ['sourceTokenId'],
+          Project: ['sourceProjectId'],
         },
+        carriesOwnerKeysOf: ['Integration', 'Token', 'Project'],
       },
       {
         field: 'targetModel',
@@ -301,11 +303,13 @@ export const PolymorphismRegistry = {
           User: ['targetUserId'],
           OrganizationUser: ['targetOrganizationId', 'targetUserId'],
           Organization: ['targetOrganizationId'],
-          Space: ['targetSpaceId'],
+          Space: ['targetOrganizationId', 'targetSpaceId'],
           SpaceUser: ['targetOrganizationId', 'targetSpaceId', 'targetUserId'],
           Integration: ['targetIntegrationId'],
           Token: ['targetTokenId'],
+          Project: ['targetProjectId'],
         },
+        carriesOwnerKeysOf: ['Integration', 'Token', 'Project'],
       },
     ],
   },
@@ -426,11 +430,4 @@ export const polymorphicAxis = (model: ModelName, axisField: string): Polymorphi
   );
   if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
   return axis;
-};
-
-export const delegatedKeys = (axis: PolymorphicAxis, value: unknown): string[] => {
-  const parent = axis.delegates?.[value as PolymorphicValue];
-  if (!parent) return [];
-  const parentAxis = polymorphicAxis(parent, axis.field);
-  return [...new Set(Object.values(parentAxis.fkMap).flat())] as string[];
 };

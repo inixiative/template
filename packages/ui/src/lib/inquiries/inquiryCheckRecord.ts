@@ -6,9 +6,9 @@
  */
 import type { HydratedRecord } from '@template/db';
 import type { InquirySide } from '@template/permissions/rebac/inquiryPermission';
-import type { InquirySentItem } from '@template/sdk';
+import type { InquiryItem } from '@template/sdk';
 
-export type CheckableInquiry = Pick<InquirySentItem, 'type' | 'sourceModel' | 'targetModel'> & {
+export type CheckableInquiry = Pick<InquiryItem, 'type' | 'sourceModel' | 'targetModel'> & {
   content?: unknown;
 };
 

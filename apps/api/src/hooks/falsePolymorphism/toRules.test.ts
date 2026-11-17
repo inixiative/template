@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { check } from '@inixiative/json-rules';
 import {
-  delegatedKeys,
+  carriedOwnerKeyColumns,
   type ModelName,
   PolymorphismRegistry,
   polymorphicSchema,
@@ -41,7 +41,7 @@ describe('polymorphicSchema matches the write rule', () => {
             rule: false,
           });
         }
-        const carried = delegatedKeys(axis, value);
+        const carried = carriedOwnerKeyColumns(modelName, axis, value);
         for (const fk of columns.filter((column) => !required.includes(column))) {
           expect({ value, fk, ...verdicts({ ...row, [fk]: id }) }).toEqual({
             value,

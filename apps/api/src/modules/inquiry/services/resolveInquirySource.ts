@@ -16,6 +16,7 @@ const nullSourceFields = {
   sourceSpaceId: null,
   sourceIntegrationId: null,
   sourceTokenId: null,
+  sourceProjectId: null,
 };
 
 export type InquirySourceFields =
@@ -24,7 +25,11 @@ export type InquirySourceFields =
       sourceModel: (typeof InquiryResourceModel)['Organization'];
       sourceOrganizationId: string;
     }
-  | { sourceModel: (typeof InquiryResourceModel)['Space']; sourceSpaceId: string }
+  | {
+      sourceModel: (typeof InquiryResourceModel)['Space'];
+      sourceOrganizationId: string;
+      sourceSpaceId: string;
+    }
   | { sourceModel: (typeof InquiryResourceModel)['admin'] };
 
 export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields => {
@@ -44,6 +49,7 @@ export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields =>
     return {
       ...nullSourceFields,
       sourceModel: InquiryResourceModel.Space,
+      sourceOrganizationId: space.organizationId,
       sourceSpaceId: space.id,
     };
   }

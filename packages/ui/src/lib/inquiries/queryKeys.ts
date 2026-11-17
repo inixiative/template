@@ -8,6 +8,7 @@ import type { QueryKey } from '@tanstack/react-query';
 import type { InquiryItem, InquiryResolveData } from '@template/sdk';
 import {
   meReceivedManyInquiriesQueryKey,
+  meSentManyInquiriesQueryKey,
   organizationReceivedManyInquiriesQueryKey,
   organizationSentManyInquiriesQueryKey,
   spaceSentManyInquiriesQueryKey,
@@ -22,6 +23,7 @@ export const INQUIRY_TYPE_LABELS: Record<InquiryType, string> = {
   createSpace: 'Space Request',
   updateSpace: 'Space Update',
   transferSpace: 'Space Transfer',
+  changeEntitlements: 'Permission Request',
 };
 
 export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string> = {
@@ -124,6 +126,7 @@ export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   ],
   updateSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
   transferSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
+  changeEntitlements: (_inq) => [meSentManyInquiriesQueryKey()],
 };
 
 // Query keys affected when the TARGET side mutates (resolve/approve/deny)
@@ -134,4 +137,8 @@ export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   transferSpace: (inq) => [
     organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId! } }),
   ],
+  changeEntitlements: (inq) =>
+    inq.targetOrganizationId
+      ? [organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } })]
+      : [meReceivedManyInquiriesQueryKey()],
 };

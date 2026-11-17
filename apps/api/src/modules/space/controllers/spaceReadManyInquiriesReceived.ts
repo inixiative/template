@@ -3,26 +3,31 @@
  * @kind controller
  * @partOf feature:tenancy
  */
-import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';
+import { whereAxisCarriesOwnerKeys } from '@template/db';
+import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { spaceReadManyInquiriesReceivedRoute } from '#/modules/space/routes/spaceReadManyInquiriesReceived';
 
 export const spaceReadManyInquiriesReceivedController = makeController(
   spaceReadManyInquiriesReceivedRoute,
   async (c, respond) => {
     const db = c.get('db');
+    const space = getResource<'space'>(c);
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        targetModel: InquiryResourceModel.Space,
-        targetSpaceId: getResource<'space'>(c).id,
+        ...whereAxisCarriesOwnerKeys('Inquiry', 'targetModel', {
+          Organization: space.organizationId,
+          Space: space.id,
+          User: null,
+        }),
         status: { notIn: [InquiryStatus.draft, InquiryStatus.canceled] },
       },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },
-      include: includeInquiryReceived,
+      include: includeInquiryResponse,
     });
     return respond.ok(data, { pagination });
   },

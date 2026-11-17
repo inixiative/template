@@ -15,12 +15,15 @@ const nullTargetFields = {
   targetSpaceId: null,
   targetIntegrationId: null,
   targetTokenId: null,
+  targetProjectId: null,
 };
 export type InquiryTargetBody = {
   targetModel: InquiryResourceModel;
   targetUserId?: string;
   targetOrganizationId?: string;
   targetSpaceId?: string;
+  targetTokenId?: string | null;
+  targetIntegrationId?: string | null;
   targetEmail?: string;
   targetOrganizationSlug?: string;
   targetSpaceSlug?: string;
@@ -32,7 +35,11 @@ export type InquiryTargetFields =
       targetModel: (typeof InquiryResourceModel)['Organization'];
       targetOrganizationId: string;
     }
-  | { targetModel: (typeof InquiryResourceModel)['Space']; targetSpaceId: string }
+  | {
+      targetModel: (typeof InquiryResourceModel)['Space'];
+      targetOrganizationId: string;
+      targetSpaceId: string;
+    }
   | {
       targetModel: (typeof InquiryResourceModel)['OrganizationUser'];
       targetOrganizationId: string;
@@ -44,6 +51,8 @@ export type InquiryTargetFields =
       targetSpaceId: string;
       targetUserId: string;
     }
+  | { targetModel: (typeof InquiryResourceModel)['Token']; targetTokenId: string }
+  | { targetModel: (typeof InquiryResourceModel)['Integration']; targetIntegrationId: string }
   | { targetModel: (typeof InquiryResourceModel)['admin'] };
 
 export const resolveInquiryTarget = async <C extends ValidatedContext<'json', InquiryTargetBody>>(
@@ -91,7 +100,12 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
     if (body.targetSpaceId) {
       const space = await db.space.findUnique({ where: { id: body.targetSpaceId } });
       if (!space) throw makeError({ status: 404, message: 'Target space not found' });
-      return { ...nullTargetFields, targetModel, targetSpaceId: space.id };
+      return {
+        ...nullTargetFields,
+        targetModel,
+        targetOrganizationId: space.organizationId,
+        targetSpaceId: space.id,
+      };
     }
     if (body.targetOrganizationSlug && body.targetSpaceSlug) {
       const space = await db.space.findFirst({
@@ -101,7 +115,12 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
         },
       });
       if (!space) throw makeError({ status: 404, message: 'Target space not found' });
-      return { ...nullTargetFields, targetModel, targetSpaceId: space.id };
+      return {
+        ...nullTargetFields,
+        targetModel,
+        targetOrganizationId: space.organizationId,
+        targetSpaceId: space.id,
+      };
     }
     throw makeError({
       status: 422,
@@ -149,8 +168,23 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
     };
   }
 
-  // Integration and Token name a row no request body can resolve: they are set by the
-  // service that already holds the party, never from a slug or an email.
+  if (targetModel === InquiryResourceModel.Token) {
+    const token = body.targetTokenId
+      ? await db.token.findUnique({ where: { id: body.targetTokenId } })
+      : null;
+    if (!token) throw makeError({ status: 404, message: 'Target token not found' });
+    return { ...nullTargetFields, targetModel, targetTokenId: token.id };
+  }
+
+  if (targetModel === InquiryResourceModel.Integration) {
+    const integration = body.targetIntegrationId
+      ? await db.integration.findUnique({ where: { id: body.targetIntegrationId } })
+      : null;
+    if (!integration) throw makeError({ status: 404, message: 'Target integration not found' });
+    return { ...nullTargetFields, targetModel, targetIntegrationId: integration.id };
+  }
+
+  // why: a Project is named only by the service that holds the party
   if (targetModel !== InquiryResourceModel.admin)
     throw makeError({
       status: 422,

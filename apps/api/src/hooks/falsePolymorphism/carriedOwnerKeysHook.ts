@@ -1,5 +1,5 @@
 import {
-  carryDelegatedKeys,
+  carryOwnerKeys,
   DbAction,
   HookTiming,
   type ModelName,
@@ -11,30 +11,30 @@ import { castArray } from 'lodash-es';
 
 type Row = Record<string, unknown>;
 
-const delegatingModels: ModelName[] = Object.entries(PolymorphismRegistry)
-  .filter(([, config]) => config.axes.some((axis) => 'delegates' in axis))
+const modelsCarryingOwnerKeys: ModelName[] = Object.entries(PolymorphismRegistry)
+  .filter(([, config]) => config.axes.some((axis) => 'carriesOwnerKeysOf' in axis))
   .map(([model]) => toModelName(model));
 
-export const registerDelegatedKeysHook = () => {
+export const registerCarriedOwnerKeysHook = () => {
   registerDbHook(
-    'falsePolymorphism:delegatedKeys',
-    delegatingModels,
+    'falsePolymorphism:carriedOwnerKeys',
+    modelsCarryingOwnerKeys,
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ model, args }) => {
       for (const row of castArray((args as { data: Row | Row[] }).data) as Row[])
-        await carryDelegatedKeys(model, row);
+        await carryOwnerKeys(model, row);
     },
   );
 
   registerDbHook(
-    'falsePolymorphism:delegatedKeys:upsert',
-    delegatingModels,
+    'falsePolymorphism:carriedOwnerKeys:upsert',
+    modelsCarryingOwnerKeys,
     HookTiming.before,
     [DbAction.upsert],
     async ({ model, args }) => {
       const { create } = args as { create?: Row };
-      if (create) await carryDelegatedKeys(model, create);
+      if (create) await carryOwnerKeys(model, create);
     },
   );
 };

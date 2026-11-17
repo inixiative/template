@@ -107,7 +107,7 @@ An action on something that does not exist yet, or on a collection, is checked o
 | deciding who is related to what by comparing `__actor` ids | an action on the record: acting as a member is `operate` on the member row; actor rules only gate person-only actions |
 | a role token acting as its member by default | `operate` on the member row: held by `full`, or given by hand as an entitlement |
 | write-time "ceiling" with a trim in `validateDelegateGrant` | `roleHeldAtOwner` + `memberRoleWrite`/`integrationRoleWrite` + `canGrantEntitlement` |
-| copying delegated keys onto a pseudo record | hydrate the relation and read it |
+| copying carried owner keys onto a pseudo record | hydrate the relation and read it |
 | explicit `validateRules` in controllers | the rules hook |
 | a library clause special-casing "conditional" actions | removed in 0.8: the owner walk already re-runs the rule's conditions |
 | `greaterRole` folded into one role check | two checks: the role-write rule on the row as it is and as it will be |

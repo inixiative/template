@@ -4,8 +4,8 @@ import { lensFromOperation } from '@template/sdk/lenses/lensFromOperation';
 describe('lensFromOperation', () => {
   it('resolves a readMany operation to its response component lens', () => {
     const lens = lensFromOperation('meReceivedManyInquiries');
-    expect(lens.model).toBe('InquiryReceivedItem');
-    const fields = lens.maps.sdk.models.InquiryReceivedItem.fields;
+    expect(lens.model).toBe('InquiryItem');
+    const fields = lens.maps.sdk.models.InquiryItem.fields;
     expect(fields.createdAt).toEqual({ kind: 'scalar', type: 'DateTime' });
     expect(fields.status.kind).toBe('enum');
   });
@@ -15,7 +15,7 @@ describe('lensFromOperation', () => {
     const alsoReceived = lensFromOperation('organizationReceivedManyInquiries');
     expect(alsoReceived.model).toBe(received.model);
     const sent = lensFromOperation('meSentManyInquiries');
-    expect(sent.model).toBe('InquirySentItem');
+    expect(sent.model).toBe('InquiryItem');
     expect(sent.model).not.toBe(received.model);
   });
 

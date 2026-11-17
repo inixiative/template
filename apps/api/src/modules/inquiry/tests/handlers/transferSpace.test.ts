@@ -110,6 +110,7 @@ describe('handler: transferSpace', () => {
         type: InquiryType.transferSpace,
         status: InquiryStatus.sent,
         sourceModel: InquiryResourceModel.Space,
+        sourceOrganizationId: sourceSpace.organizationId,
         sourceSpaceId: sourceSpace.id,
         targetModel: InquiryResourceModel.Organization,
         targetOrganizationId: target.id,

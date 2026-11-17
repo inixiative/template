@@ -134,7 +134,7 @@ export type {
 } from './types/userWithRelations';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
-export { carryDelegatedKeys } from './utils/carryDelegatedKeys';
+export { carryOwnerKeys } from './utils/carryOwnerKeys';
 // Type-safe delegate helpers (pass-the-delegate pattern)
 export {
   type AnyCrudDelegate,

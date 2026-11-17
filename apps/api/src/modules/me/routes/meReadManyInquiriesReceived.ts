@@ -8,7 +8,7 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { inquiryPicks } from '#/modules/inquiry/schemas/inquiryPicks';
-import { inquiryReceivedResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
+import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
 
 export const meReadManyInquiriesReceivedRoute = readRoute({
@@ -26,5 +26,5 @@ export const meReadManyInquiriesReceivedRoute = readRoute({
       enumOmits: { status: [InquiryStatus.draft, InquiryStatus.canceled] },
     },
   },
-  responseSchema: inquiryReceivedResponseSchema,
+  responseSchema: inquiryResponseSchema,
 });

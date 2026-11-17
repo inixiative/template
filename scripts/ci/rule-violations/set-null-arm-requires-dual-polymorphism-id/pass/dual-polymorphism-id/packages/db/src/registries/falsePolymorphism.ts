@@ -3,7 +3,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'subjectModel',
-        materialized: 'subjectId',
+        dualPolymorphismId: 'subjectId',
         fkMap: {
           User: ['subjectUserId'],
           Flow: ['subjectFlowId'],

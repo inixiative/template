@@ -7,7 +7,7 @@
 
 import { getResource } from '#/lib/context/getResource';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
-import { validateMemberGrant } from '#/lib/permissions/validateMemberGrant';
+import { validateEntitlementWriter } from '#/lib/permissions/validateEntitlementWriter';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceUserDeleteManyEntitlementsRoute } from '#/modules/spaceUser/routes/spaceUserDeleteManyEntitlements';
 
@@ -16,14 +16,9 @@ export const spaceUserDeleteManyEntitlementsController = makeController(
   async (c, respond) => {
     const permix = c.get('permix');
     const spaceUser = getResource<'spaceUser'>(c);
-    await validateMemberGrant(permix, 'spaceUser', spaceUser);
-    await changeEntitlements(
-      permix,
-      { model: 'SpaceUser', id: spaceUser.id },
-      {
-        remove: c.req.valid('json'),
-      },
-    );
+    const changes = { remove: c.req.valid('json') };
+    await validateEntitlementWriter(permix, 'SpaceUser', spaceUser, changes);
+    await changeEntitlements(permix, { model: 'SpaceUser', id: spaceUser.id }, changes);
     return respond.noContent();
   },
 );
