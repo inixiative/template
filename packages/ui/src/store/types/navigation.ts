@@ -11,7 +11,12 @@ import type { RouteMatch } from '@template/ui/lib/findRoute';
 export type NavigationSlice = {
   navigation: {
     navigate:
-      | ((options: { to: string; search?: Record<string, string>; hash?: string }) => void)
+      | ((options: {
+          to: string;
+          search?: Record<string, string>;
+          hash?: string;
+          replace?: boolean;
+        }) => void)
       | null;
     navConfig: NavConfig | null;
     currentRouteMatch: RouteMatch | null;
