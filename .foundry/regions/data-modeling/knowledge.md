@@ -269,6 +269,7 @@ enum InquiryType {
 ---
 
 <!-- unit doc:docs/claude/DATABASE.md#false-polymorphism -->
+
 **Source:** `docs/claude/DATABASE.md` § False Polymorphism (in "Database")
 
 #### False Polymorphism
@@ -321,11 +322,25 @@ enum EmailOwnerModel {
 
 An axis value can name a parent in `delegates`: the row carries the parent's own owner keys beside its own. A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:delegatedKeys` hook copies them from the parent on create and upsert through `carryDelegatedKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
 
+The parent's keys come from its `ownerModel` axis, and the chain needs no config: the parent row already holds what its own delegate carried, so one copy brings the whole chain (a token gives an inquiry its integration and that integration's owner). Which column holds which parent key is read from the Prisma relations, never from column names (`registries/delegatedColumns.ts`): for each owner kind both axes point at, the arm relations name the same field of that kind's row (`Token.space` on `organizationId` + `spaceId`, `Inquiry.targetSpace` on `targetOrganizationId` + `targetSpaceId`), so those columns pair. `whereAxisCarriesOwnerKeys` (`registries/delegatedOwnerWhere.ts`) is "this owner's rows, and those of what it holds" as one flat filter on those columns, the owner given by kind (`{ Organization: id, Space: null, User: null }`).
+
+##### Back-Relations Over Shared Key Columns
+
+Arms of one axis share columns: an `OrganizationUser` arm's keys (`organizationId`, `userId`) are a prefix of a `SpaceUser` arm's, and the `Organization`, `Space` and `User` arms reuse the same columns alone. A back-relation is defined by its columns, not by the discriminator, so it also takes in the rows of every deeper arm that carries those keys:
+
+- `OrganizationUser.targetEntitlements` holds the member's `SpaceUser` rows too.
+- `Organization.sourceEntitlements`, `User.sourceEntitlements` and `Space.sourceEntitlements` hold member-anchored rows.
+- `OrganizationUser.auditLogsAsSubject` holds `SpaceUser` subjects.
+- Owner axes behave the same way: `OrganizationUser.tokens` holds the member's `SpaceUser` tokens.
+
+A read, filter or cascade through such a back-relation must carry the arm's discriminator (`targetModel: 'OrganizationUser'`, `subjectModel: …`). The primitives do this for you: `includeTargetEntitlements(model)` for holder reads, `childRelations`' `arm` for the soft-delete cascade, `auditHistoryWhere` for audit history. Use them rather than the bare relation. Nothing enforces this yet. A CI rule has been proposed (a relation filter or include over a shared-column back-relation without its discriminator), pending Aron's decision.
+
 See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
 
 ---
 
 <!-- unit doc:docs/claude/DATABASE.md#registries -->
+
 **Source:** `docs/claude/DATABASE.md` § Registries (in "Database")
 
 #### Registries
@@ -339,9 +354,13 @@ Schema-level configuration in `packages/db/src/registries/`:
 | Helper (`@template/db`) | Derives |
 |---|---|
 | `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
-| `delegatedKeys(axis, value)` / `carryDelegatedKeys(model, row)` | The parent keys a delegating value carries; copy them from the parent row (the hook and the test factory both call it) |
-| `polymorphicKeyColumn` / `polymorphicTarget` | The key column for a value; the `{ kind, id }` a row points at |
+| `delegatedKeys(model, axis, value)` / `delegatedKeyPairs` / `ownerKeysHeld` / `carryDelegatedKeys(model, row)` | The columns a delegating value carries, paired with the parent's keys through the arm relations; the keys a row holds for its owner value; copy them from the parent row (the hook and the test factory both call it) |
+| `axisColumnFor(model, axisField, kind)` / `whereAxisCarriesOwnerKeys(model, axisField, owner)` | The column on an axis that holds a kind's id, from its arm relation; an owner's rows and those of what it holds, as one flat filter |
+| `polymorphicKeyColumns` / `polymorphicKeyColumn` / `polymorphicTarget` / `isArmColumns` | Every key column for a value (a member arm has two or three); the one column of a single-key arm (throws on a composite arm); the `{ kind, id }` a row points at (throws likewise); whether a relation's columns are exactly an arm's |
+| `polymorphicArmRelation` / `polymorphicArmKeys` | The relation an arm's key columns form (matched by `isArmColumns`, as `childRelations` matches); the columns an arm sets to point at a row (its id, or a composite arm's owner chain off the row) |
 | `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
+| `polymorphicBindings(ownerModel, ownerId)` | The bind map `polymorphicIs` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`POLYMORPHIC_BINDS`, `isOwnerKind`) |
+| `isFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart (its column is `polymorphicKeyColumn(ref.model, ref.axis, ref.value)`) |
 | `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |
 
 ```typescript
@@ -352,6 +371,18 @@ const config = getPolymorphismConfig('Token');
 ```
 
 See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.
+
+##### Parent Edges
+
+`ParentEdgeRegistry` (`packages/db/src/registries/parentEdges.ts`, Aron, 2026-11-11): a child model names its path to its parent once, either a false-polymorphic axis (`Entitlement: { axis: 'targetModel' }`, the parent read off the axis's materialized id) or one foreign key (`{ parent, foreignKey }`). Three consumers read it:
+
+| Consumer | Reads |
+|---|---|
+| Cache hook (`apps/api/src/hooks/cache/hook.ts`) | `loadParentRows`: a child's write clears its parent's keys ([HOOKS.md](HOOKS.md#parent-edges)) |
+| Audit hook (`contextRows`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
+| Audit history read (`auditHistoryWhere`) | `childrenOf(record)`: a record's entries and its children's in one stream ([HOOKS.md](HOOKS.md#reading-the-log)) |
+
+Why one registry: the cache traversal, the audit tenancy and the history read are the same fact ("this row's change is a change to that row"), and stating it once keeps them from drifting. Register a child only when a consumer would otherwise special-case it; a model with its own tenant columns and its own cache keys needs no edge.
 
 ---
 

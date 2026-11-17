@@ -360,7 +360,7 @@ Reading is by ownership channel because carried keys put the organization on eve
 1. Declare the type's parties and their `send` / `resolve` levels in `INQUIRY_TYPES` (`packages/permissions/src/rebac/inquiryTypes.ts`); the record is keyed by `InquiryType`, so a new type does not compile until it does
 2. Create `handlers/<type>/index.ts` implementing `InquiryHandler<TContent, TResolution>`
 2. Define `contentSchema` (stored on create) and `resolutionInputSchema` / `resolutionSchema` (validated on resolve) in `packages/shared/src/inquiry/<type>.ts`, so web/admin type `inquiry.content` with the same schema the API parses; `baseResolutionInputSchema` lives there too
-   - `resolutionInputSchema` — what the resolver submits; fields here (except `explanation`) can override content
+   - `resolutionInputSchema` — the copy the resolver sends back, parsed and passed to `handleApprove` as `response`; nothing in it is merged into `content`
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
    - If no computed fields, both can be the same schema
 3. Implement `handleApprove(c, inquiry, content: TContent, response: TResolutionInput)` — runs side effects; return partial resolution output (merged into stored `resolution`)

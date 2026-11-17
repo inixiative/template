@@ -421,6 +421,7 @@ registerDbHook(
 ---
 
 <!-- unit doc:docs/claude/HOOKS.md#application-hooks -->
+
 **Source:** `docs/claude/HOOKS.md` § Application Hooks (in "Hooks")
 
 #### Application Hooks
@@ -430,16 +431,21 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | Hook | Purpose |
 |------|---------|
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
-| `cache` | Cache invalidation on mutations (post-commit) |
+| `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
+| `entitlementLens` | On `Entitlement` (`create`, `createManyAndReturn`, `upsert`'s create): a `lens` must be a valid json-rules narrowing over the resource's base lens that never hides `id` (422 otherwise), whoever writes it ([PERMISSIONS.md](PERMISSIONS.md#lenses-keep-id-paths-merge-by-id)) |
+| `fullDelegate` | On `Token` and `Integration`: a row written `full` gets `role: null` before the write, and its live entitlement rows are tombstoned after it. On `Entitlement`, a create whose target is a `full` delegate is refused (422 `full takes no entitlements`), whoever writes it |
 | `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
+| `memberSelfGrant` | After an `OrganizationUser` or `SpaceUser` is created (`create`, `createManyAndReturn`, an `upsert` that creates), writes its self-grant as an `Entitlement` row, tombstoned with the member's own `deletedAt` when the member is created tombstoned. `memberSelfGrant:kept` refuses (422) tombstoning a live member's self-grant; only the member's own tombstone takes it ([PERMISSIONS.md](PERMISSIONS.md#the-member-self-grant)) |
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
+| `ruleReference` | Keeps `RuleReference` edges in step with each rule-bearing column (`RULE_REFERENCE_SURFACES`, `apps/api/src/hooks/ruleReference/surfaces.ts`: email templates and components, segment `conditions`, `Entitlement.where` read through `entitlementWhereLens`, which names the entitled record by id) |
+| `ruleReference:target` | Copies a named row's `deletedAt` onto the edges that name it, for every edge in `NAMING_EDGES` (`targetHook.ts`): `RuleReference.targetDeletedAt` and `Entitlement.sourceDeletedAt`. A purged row is left to the null FK |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
-| `segmentConditions` | Segment `conditions` required, validated against `segmentLensFor(owner)` + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
+| `segmentConditions` | Segment `conditions` required, validated by `validateSegmentConditions` (against `customerRefLens`, compiled with `resolvedCustomerRefLens(ownerModel, …)`) + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
 | `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
-| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). `HARD_DELETE_ON_TOMBSTONE` hard-deletes ephemeral grants that must not survive a revive — `Session`, `Token`, `WebhookSubscription` |
-| `tagOwnerCategory` | Tag.ownerModel + FK must match its TagCategory's owner |
+| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). Each delete behavior has its own registry, keyed by the child model: `HARD_DELETE_ON_TOMBSTONE` (`@template/db` registries) hard-deletes ephemeral rows that must not survive a revive — `Session`, `WebhookSubscription`, `WebhookEvent`, `RuleReference`, `Flow`; `REGENERATE_ON_REVIVE` rebuilds the derived ones (`RuleReference`) when the parent is revived; `SKIP_REVIVE` (`@template/db` registries: `Token`) tombstones a row with its parent and never revives it (a grant has to be issued again), and the cascade never reaches its children (a token's entitlement rows stay dead); `CLOSE_ON_PARENT_DELETE` closes a child instead of burying it: its open rows get the close written and nothing is tombstoned, so every row stays as the record (an `Inquiry` whose party is tombstoned is canceled unless already decided), and every parent of such a model must be soft-delete; `CASCADE_EXEMPT` lists the reference relations that never cascade (every `Entitlement` source, every `RuleReference` target); `validateDeleteBehavior` refuses an inconsistent registry at boot |
+| `tagOwnerCategory` | A created Tag's ownerModel + FK must match its TagCategory's owner. A tag never moves: `tagCategoryId` is refused on update (422) and the owner fields are stripped |
 | `webhooks` | Webhook delivery on mutations (post-commit) |
 
 `apps/api/src/hooks/falsePolymorphism/` lives under `hooks/` but is **not** a runtime hook — it's a pair of transformers (`toRules.ts`, `toImmutableFields.ts`) that inject polymorphism constraints into the rules and immutableFields registries at module load time.
