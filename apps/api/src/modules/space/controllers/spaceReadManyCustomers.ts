@@ -15,7 +15,7 @@ export const spaceReadManyCustomersController = makeController(
     const db = c.get('db');
     const space = getResource<'space'>(c);
 
-    const { data, pagination } = await paginate(c, db.customerRef, {
+    const { data, pagination } = await paginate(c, db.customerRelationship, {
       where: { providerSpaceId: space.id },
       include: {
         customerUser: true,

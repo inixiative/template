@@ -13,7 +13,7 @@ export type SpaceUpdatedPayload = { space: Space };
 export const spaceUpdated = makeAppEvent<SpaceUpdatedPayload>({
   cb: [
     async ({ space }) => {
-      await enqueueJob('reconcileCustomerRefSegments', {
+      await enqueueJob('reconcileCustomerRelationshipSegments', {
         customerModel: 'Space',
         customerId: space.id,
       });

@@ -55,7 +55,7 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
   };
 
   const webhook = () => ({
-    model: 'CustomerRef',
+    model: 'CustomerRelationship',
     url: `https://example.com/${Bun.randomUUIDv7()}`,
   });
 

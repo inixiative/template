@@ -14,7 +14,7 @@ import type { RULE_REFERENCE_SURFACES } from '#/hooks/ruleReference/surfaces';
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import { registry } from '#/lib/email/registry';
 import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
-import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
+import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 
 type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
 
@@ -36,7 +36,7 @@ const emailLenses = (slugs: (string | undefined)[]): RuleLens[] =>
 const AUTHORED_UNDER = {
   EmailTemplate: emailLenses(Object.keys(registry)),
   EmailComponent: emailLenses([undefined]),
-  Segment: [customerRefLens],
+  Segment: [customerRelationshipLens],
   Entitlement: Object.values(EntitlementResourceModel).map(entitlementWhereLens),
 } satisfies Record<keyof typeof RULE_REFERENCE_SURFACES, RuleLens[]>;
 

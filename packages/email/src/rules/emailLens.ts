@@ -83,7 +83,7 @@ export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
     tagAttachments: { picks: [], where: live, relations: { tag: referenced } },
     spaceUsers: { picks: ['role'], relations: { space: referenced } },
     organizationUsers: { picks: ['role'], relations: { organization: referenced } },
-    providerRefs: {
+    customerRelationshipsAsCustomer: {
       picks: [],
       relations: { segmentMembers: { picks: [], relations: { segment: referenced } } },
     },

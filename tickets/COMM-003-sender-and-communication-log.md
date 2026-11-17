@@ -49,17 +49,17 @@ type RecipientTargets = {
   users?: string[];          // user ids
   organizations?: string[];  // → members
   spaces?: string[];         // → members
-  customerRefs?: string[];   // → contacts
+  customerRelationships?: string[];   // → contacts
   raw?: string[];            // literal addresses
 };
 ```
 
 `sendEmail` resolution:
-1. Expand `organizations`/`spaces` → members, `customerRefs` → contacts; `users` direct.
+1. Expand `organizations`/`spaces` → members, `customerRelationships` → contacts; `users` direct.
 2. Resolve each candidate down to its email `Contact` (where `acceptedKinds`/`verifiedAt` live); the `to` is that contact's value.
-3. **Keep the resolution trace** (the org/space/customerRef + membership it came through) on each recipient → feeds `{{...}}` interpolation. A recipient is `{ final user/contact + trace }`, never a bare email.
+3. **Keep the resolution trace** (the org/space/customerRelationship + membership it came through) on each recipient → feeds `{{...}}` interpolation. A recipient is `{ final user/contact + trace }`, never a bare email.
 4. **Gate ① targeting** — rebac read-check on the entity (`check`, @template/permissions): drop candidates who can't read it. **SEAM** for now (pass-through); real per-candidate-permix filtering deferred (needs `setupUser/Org/SpacePermissions` made context-free + N permission builds/send).
-5. **Gate ② settings** — `canDeliver(template.kind, contact, customerRef)` (existing): respect opt-outs; `system` always delivers.
+5. **Gate ② settings** — `canDeliver(template.kind, contact, customerRelationship)` (existing): respect opt-outs; `system` always delivers.
 6. Dedupe; fan out one `deliverEmail` per surviving to-recipient, carrying cc/bcc.
 
 - `kind` = `EmailTemplate.kind` (`CommunicationKind`, now unified — `CommunicationCategory` dropped).
@@ -80,7 +80,7 @@ A user-actor owns templates along the **user** chain (personal overrides at spac
 
 **Denormalization — DECIDED: standardize on it.** Every space-bearing owner row carries its parent `organizationId` (a `SpaceUser` carries `organizationId`+`spaceId`+`userId`) so each chain walks up via one cheap indexed read, no join. `fkMap` mirrors `Token`:
 `User:[userId]  OrganizationUser:[organizationId,userId]  SpaceUser:[organizationId,spaceId,userId]  Organization:[organizationId]  Space:[organizationId,spaceId]`.
-Email + `Token` already comply; the FP models that store `spaceId` only (Contact, Tag, TagCategory, TagAttachment, WebhookSubscription, CustomerRef, Inquiry, CommunicationLog) are the inconsistency → app-wide standardization tracked in **COMM-007**.
+Email + `Token` already comply; the FP models that store `spaceId` only (Contact, Tag, TagCategory, TagAttachment, WebhookSubscription, CustomerRelationship, Inquiry, CommunicationLog) are the inconsistency → app-wide standardization tracked in **COMM-007**.
 
 **Cross-chain opt-in** (a Space/user electing a *different* tier's template): explicit target on **manual** sends; **best-effort most-specific** on automatic sends (walk the sender's chain down to the shared `default` floor).
 

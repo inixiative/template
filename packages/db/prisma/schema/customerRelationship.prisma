@@ -1,9 +1,9 @@
 // ============================================================================
-// CUSTOMER REF - Polymorphic customer relationship (false polymorphism)
+// CUSTOMER RELATIONSHIP - A customer and a provider, polymorphic on both sides (false polymorphism)
 // ============================================================================
 // Links a customer (User, Org, or Space) to a provider (Space, etc.)
 
-model CustomerRef {
+model CustomerRelationship {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -15,9 +15,9 @@ model CustomerRef {
   customerOrganizationId String?       @db.VarChar(36)
   customerSpaceId        String?       @db.VarChar(36)
 
-  customerUser         User?         @relation("providerRefs", fields: [customerUserId], references: [id], onDelete: Cascade)
-  customerOrganization Organization? @relation("providerRefs", fields: [customerOrganizationId], references: [id], onDelete: Cascade)
-  customerSpace        Space?        @relation("providerRefs", fields: [customerSpaceId], references: [id], onDelete: Cascade)
+  customerUser         User?         @relation("CustomerRelationshipAsCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  customerOrganization Organization? @relation("CustomerRelationshipAsCustomer", fields: [customerOrganizationId], references: [id], onDelete: Cascade)
+  customerSpace        Space?        @relation("CustomerRelationshipAsCustomer", fields: [customerSpaceId], references: [id], onDelete: Cascade)
 
   // Provider (false polymorphism: Space, etc.)
   providerModel          ProviderModel
@@ -25,9 +25,9 @@ model CustomerRef {
   providerOrganizationId String?       @db.VarChar(36)
   providerSpaceId        String?       @db.VarChar(36)
 
-  providerUser         User?         @relation("customerRefs", fields: [providerUserId], references: [id], onDelete: Cascade)
-  providerOrganization Organization? @relation("customerRefs", fields: [providerOrganizationId], references: [id], onDelete: Cascade)
-  providerSpace        Space?        @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
+  providerUser         User?         @relation("CustomerRelationshipAsProvider", fields: [providerUserId], references: [id], onDelete: Cascade)
+  providerOrganization Organization? @relation("CustomerRelationshipAsProvider", fields: [providerOrganizationId], references: [id], onDelete: Cascade)
+  providerSpace        Space?        @relation("CustomerRelationshipAsProvider", fields: [providerSpaceId], references: [id], onDelete: Cascade)
 
   auditLogs          AuditLog[]
   segmentMembers     SegmentMember[]

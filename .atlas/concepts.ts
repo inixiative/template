@@ -9,7 +9,7 @@ export const CONCEPTS: ConceptRegistry = {
   'feature:users': { module: ['user', 'me'] },
   'feature:inquiry': { module: ['inquiry'], docs: ['INQUIRIES.md'] },
   'feature:contact': { module: ['contact'] },
-  'feature:customer': { module: ['customerRef'] },
+  'feature:customer': { module: ['customerRelationship'] },
   'feature:segment': { module: ['segment'] },
   'feature:auditLogs': { module: ['auditLog'], docs: ['HOOKS.md'] }, // lives under modules/admin/, but is its own feature
   'feature:cronJob': { module: ['cronJob'] }, // admin/cronJob — scheduled job management (own model + CRUD)

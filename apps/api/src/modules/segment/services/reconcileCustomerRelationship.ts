@@ -6,19 +6,19 @@
  */
 import { check, narrowRule } from '@inixiative/json-rules';
 import { db, polymorphicTarget } from '@template/db';
-import type { CustomerRef, Segment } from '@template/db/generated/client/client';
+import type { CustomerRelationship, Segment } from '@template/db/generated/client/client';
 import { type ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
-import { ownedSegments } from '#/modules/customerRef/lib/ownedSegments';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
+import { ownedSegments } from '#/modules/customerRelationship/lib/ownedSegments';
+import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
 import {
   applyMembershipDiff,
   type MembershipDiff,
 } from '#/modules/segment/services/applyMembershipDiff';
 import {
-  type HydratedCustomerRef,
-  hydrateCustomerRefs,
-} from '#/modules/segment/services/hydrateCustomerRefs';
+  type HydratedCustomerRelationship,
+  hydrateCustomerRelationships,
+} from '#/modules/segment/services/hydrateCustomerRelationships';
 import { isContinuous } from '#/modules/segment/services/reconcileSegment';
 import {
   buildReferenceMap,
@@ -26,12 +26,12 @@ import {
 } from '#/modules/segment/services/segmentReferenceGraph';
 import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth';
 
-export type CustomerRefReconciliation = { segmentId: string; diff: MembershipDiff }[];
+export type CustomerRelationshipReconciliation = { segmentId: string; diff: MembershipDiff }[];
 
 const providerOf = (
-  customerRef: CustomerRef,
+  customerRelationship: CustomerRelationship,
 ): { ownerModel: ProviderModel; ownerId: string } | null => {
-  const target = polymorphicTarget(customerRef, 'CustomerRef', 'providerModel');
+  const target = polymorphicTarget(customerRelationship, 'CustomerRelationship', 'providerModel');
   return target ? { ownerModel: target.kind as ProviderModel, ownerId: target.id } : null;
 };
 
@@ -43,18 +43,24 @@ export const dynamicSegmentsOf = async (
     (segment) => segment.type === SegmentType.dynamic,
   );
 
-const recordDecision = (row: HydratedCustomerRef, segment: Segment, matches: boolean): void => {
+const recordDecision = (
+  row: HydratedCustomerRelationship,
+  segment: Segment,
+  matches: boolean,
+): void => {
   const index = row.segmentMembers.findIndex((member) => member.segment?.id === segment.id);
   if (matches && index === -1) row.segmentMembers.push({ segment });
   if (!matches && index !== -1) row.segmentMembers.splice(index, 1);
 };
 
-export const reconcileCustomerRef = async (
-  customerRefId: string,
-): Promise<CustomerRefReconciliation> => {
-  const customerRef = await db.customerRef.findUnique({ where: { id: customerRefId } });
-  if (!customerRef) return [];
-  const provider = providerOf(customerRef);
+export const reconcileCustomerRelationship = async (
+  customerRelationshipId: string,
+): Promise<CustomerRelationshipReconciliation> => {
+  const customerRelationship = await db.customerRelationship.findUnique({
+    where: { id: customerRelationshipId },
+  });
+  if (!customerRelationship) return [];
+  const provider = providerOf(customerRelationship);
   if (!provider) return [];
 
   const segments = (await dynamicSegmentsOf(provider.ownerModel, provider.ownerId)).filter(
@@ -62,12 +68,14 @@ export const reconcileCustomerRef = async (
   );
   if (!segments.length) return [];
 
-  const lens = resolvedCustomerRefLens(provider.ownerModel, provider.ownerId);
+  const lens = resolvedCustomerRelationshipLens(provider.ownerModel, provider.ownerId);
   const ordered = sortByDependency(segments, buildReferenceMap(segments));
   const states = await segmentRuleStates(ordered);
-  const [row] = await hydrateCustomerRefs(provider.ownerModel, provider.ownerId, [customerRefId]);
+  const [row] = await hydrateCustomerRelationships(provider.ownerModel, provider.ownerId, [
+    customerRelationshipId,
+  ]);
 
-  const results: CustomerRefReconciliation = [];
+  const results: CustomerRelationshipReconciliation = [];
   for (const segment of ordered) {
     const matches = withRule(states.get(segment.id)!.health, {
       degraded: () => null,
@@ -77,8 +85,8 @@ export const reconcileCustomerRef = async (
     if (row) recordDecision(row, segment, matches);
     const diff = await applyMembershipDiff({
       segmentId: segment.id,
-      matching: matches ? [customerRefId] : [],
-      within: [customerRefId],
+      matching: matches ? [customerRelationshipId] : [],
+      within: [customerRelationshipId],
     });
     if (diff.added.length || diff.removed.length) results.push({ segmentId: segment.id, diff });
   }

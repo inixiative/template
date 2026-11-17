@@ -19,7 +19,7 @@ export const contactUpdated = makeAppEvent<ContactUpdatedPayload>({
       const fk = polymorphicKeyColumn('Contact', 'ownerModel', contact.ownerModel)!;
       const customerId = (contact as unknown as Record<string, string | null>)[fk];
       if (!customerId) return;
-      await enqueueJob('reconcileCustomerRefSegments', {
+      await enqueueJob('reconcileCustomerRelationshipSegments', {
         customerModel: contact.ownerModel,
         customerId,
       });

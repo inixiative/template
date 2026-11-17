@@ -11,7 +11,7 @@ import { enqueueJob } from '#/jobs/enqueue';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { publishMembershipChanges } from '#/modules/segment/services/publishMembershipChanges';
-import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRef';
+import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRelationship';
 import {
   isReconcilable,
   reconcileSegment as reconcile,

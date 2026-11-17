@@ -3,7 +3,7 @@ import type { z } from '@hono/zod-openapi';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
-  createCustomerRef,
+  createCustomerRelationship,
   createOrganizationUser,
   createSpace,
   createUser,
@@ -54,7 +54,7 @@ describe('GET /me/providers', () => {
   });
 
   it('returns providers where user is customer', async () => {
-    await createCustomerRef({
+    await createCustomerRelationship({
       customerModel: 'User',
       providerModel: 'Space',
       customerUserId: user.id,
@@ -92,7 +92,7 @@ describe('GET /me/providers', () => {
       {},
       { organization: otherContext.organization },
     );
-    await createCustomerRef({
+    await createCustomerRelationship({
       customerModel: 'User',
       providerModel: 'Space',
       customerUserId: otherUser.id,

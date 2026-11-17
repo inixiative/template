@@ -11,7 +11,7 @@ import {
 import { gate } from '@template/db/test/gate';
 import { waitFor } from '@template/shared/test/waitFor';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
-import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
+import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 
@@ -120,7 +120,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
       db.txn(() =>
         syncRuleReferenceEdges(
           { model: 'Segment', id: segment.id },
-          ruleReferences(customerRefLens, segment.conditions as Condition),
+          ruleReferences(customerRelationshipLens, segment.conditions as Condition),
         ),
       );
 

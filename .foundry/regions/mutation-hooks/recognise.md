@@ -89,7 +89,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - what can a segment condition refer to
 - validate segment conditions against the owner's lens
 - which lens validates this segment's conditions
-- the customer ref must belong to the segment's owner
+- the customer relationship must belong to the segment's owner
 - validate against what the row will look like after the update
 - what happens to position when a row is deleted
 - deleting the parent should tombstone the children

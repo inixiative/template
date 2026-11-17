@@ -69,8 +69,8 @@ model AuditLog {
   subjectEmailTemplate    EmailTemplate?    @relation(fields: [subjectEmailTemplateId], references: [id], onDelete: SetNull)
   subjectEmailComponentId String?           @db.VarChar(36)
   subjectEmailComponent   EmailComponent?   @relation(fields: [subjectEmailComponentId], references: [id], onDelete: SetNull)
-  subjectCustomerRefId    String?           @db.VarChar(36)
-  subjectCustomerRef      CustomerRef?      @relation(fields: [subjectCustomerRefId], references: [id], onDelete: SetNull)
+  subjectCustomerRelationshipId    String?           @db.VarChar(36)
+  subjectCustomerRelationship      CustomerRelationship?      @relation(fields: [subjectCustomerRelationshipId], references: [id], onDelete: SetNull)
   subjectIntegrationId    String?           @db.VarChar(36)
   subjectIntegration      Integration?      @relation("AuditLogSubjectIntegration", fields: [subjectIntegrationId], references: [id], onDelete: SetNull)
   subjectSegmentId        String?           @db.VarChar(36)
@@ -111,7 +111,7 @@ model AuditLog {
   @@index([subjectCronJobId])
   @@index([subjectEmailTemplateId])
   @@index([subjectEmailComponentId])
-  @@index([subjectCustomerRefId])
+  @@index([subjectCustomerRelationshipId])
   @@index([actorIntegrationId])
   @@index([subjectIntegrationId])
   @@index([subjectSegmentId])
@@ -139,7 +139,7 @@ enum AuditSubjectModel {
   CronJob
   EmailTemplate
   EmailComponent
-  CustomerRef
+  CustomerRelationship
   Integration
   Segment
   Entitlement

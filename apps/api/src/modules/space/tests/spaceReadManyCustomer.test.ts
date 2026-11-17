@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type {
-  CustomerRef,
+  CustomerRelationship,
   Organization,
   OrganizationUser,
   Space,
@@ -63,13 +63,13 @@ describe('GET /api/v1/space/:id/customers', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<CustomerRef[]>(response);
+    const { data } = await json<CustomerRelationship[]>(response);
     expect(data.length).toBe(0);
   });
 
   it('returns user customers', async () => {
     const { entity: customerUser } = await createUser();
-    await db.customerRef.create({
+    await db.customerRelationship.create({
       data: {
         customerModel: 'User',
         customerUserId: customerUser.id,
@@ -81,14 +81,14 @@ describe('GET /api/v1/space/:id/customers', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<CustomerRef[]>(response);
+    const { data } = await json<CustomerRelationship[]>(response);
     expect(data.length).toBeGreaterThanOrEqual(1);
     expect(data.some((c) => c.customerUserId === customerUser.id)).toBe(true);
   });
 
   it('returns organization customers', async () => {
     const { entity: customerOrg } = await createOrganizationUser({ role: 'owner' });
-    await db.customerRef.create({
+    await db.customerRelationship.create({
       data: {
         customerModel: 'Organization',
         customerOrganizationId: customerOrg.organizationId,
@@ -100,7 +100,7 @@ describe('GET /api/v1/space/:id/customers', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<CustomerRef[]>(response);
+    const { data } = await json<CustomerRelationship[]>(response);
     expect(data.some((c) => c.customerOrganizationId === customerOrg.organizationId)).toBe(true);
   });
 });

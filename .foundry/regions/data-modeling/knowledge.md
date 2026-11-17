@@ -416,8 +416,8 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `webhookSubscription.prisma` - Webhook configurations
 - `inquiry.prisma` - False polymorphic inquiry system
 - `integrationRecord.prisma` - One record's standing in one integration (false-polymorphic over `WebhookModel`); `poisonedAt` makes sendWebhook skip the record
-- `customerRef.prisma` - Customer references (false-polymorphic customer User/Organization/Space → provider)
-- `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic over `ProviderModel`) named set of its customer references. Every segment has json-rules `conditions` over the segment lens; `static` is computed when created or its conditions change, `dynamic` is recomputed continuously by the reconcile jobs. A hand-picked audience is a static segment whose rule is `id in [...]`. Members are written only by reconcile. See [SEGMENTS.md](SEGMENTS.md) for rules, reconciliation, API routes and the Owned/Memberships pages
+- `customerRelationship.prisma` - Customer relationships (false-polymorphic customer User/Organization/Space → provider)
+- `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic over `ProviderModel`) named set of its customer relationships. Every segment has json-rules `conditions` over the segment lens; `static` is computed when created or its conditions change, `dynamic` is recomputed continuously by the reconcile jobs. A hand-picked audience is a static segment whose rule is `id in [...]`. Members are written only by reconcile. See [SEGMENTS.md](SEGMENTS.md) for rules, reconciliation, API routes and the Owned/Memberships pages
 - `flow.prisma` - `Flow`: one user's short-lived walk through a registered flow (`flowKey`, resolved `steps`, optional `returnUrl`); deleted after 15 idle minutes. See [FLOWS.md](FLOWS.md)
 - `contact.prisma` - Unified contact-info entries (phone/email/social handles), false-polymorphic owner (User/Organization/Space), per-type validation registry, per-owner uniqueness on `(ownerModel, …, type, valueKey)`, optional row-level `permissionRules` for sharing
 
@@ -620,7 +620,7 @@ await db.token.create({
 
 - ✅ **Post-Transaction Queue** - Jobs enqueued during transaction but only executed after successful commit. Ensures webhooks and external notifications don't fire for rolled-back changes. Critical for maintaining consistency between database state and external systems
 
-- ✅ **Robust False Polymorphism** - Pattern for polymorphic relationships without database-level polymorphism. Models like Token (user/organization/space scoped) and CustomerRef (references different customer types) use explicit foreign keys with validation. More type-safe and performant than traditional polymorphic associations. [Learn more: DATABASE.md](docs/claude/DATABASE.md)
+- ✅ **Robust False Polymorphism** - Pattern for polymorphic relationships without database-level polymorphism. Models like Token (user/organization/space scoped) and CustomerRelationship (references different customer types) use explicit foreign keys with validation. More type-safe and performant than traditional polymorphic associations. [Learn more: DATABASE.md](docs/claude/DATABASE.md)
 
 - ✅ **Split Schema Architecture** - One Prisma file per model in `packages/db/prisma/schema/` for better organization and merge conflict reduction. Schema files dynamically combined during generation. Makes large schemas manageable
 
@@ -634,7 +634,7 @@ await db.token.create({
 
 - ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories). The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
-- ✅ **24 Database Models** - user, account, session, verification, jwks, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
+- ✅ **24 Database Models** - user, account, session, verification, jwks, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRelationship, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -646,7 +646,7 @@ await db.token.create({
 
 - ✅ **Advanced Constraints** - Helper functions for PostgreSQL features Prisma doesn't support natively: partial unique indexes (`addUniqueWhereNotNull`), CHECK constraints (`addCheckConstraint`), and GIST indexes (`addGistIndex`) for advanced queries
 
-- ✅ **False Polymorphism Registry** - Centralized configuration (`PolymorphismRegistry`) defining polymorphic patterns across models. Single source of truth for constraints, validation hooks, and FK resolution. Supports multi-axis polymorphism (Token owner + model, CustomerRef customer + provider)
+- ✅ **False Polymorphism Registry** - Centralized configuration (`PolymorphismRegistry`) defining polymorphic patterns across models. Single source of truth for constraints, validation hooks, and FK resolution. Supports multi-axis polymorphism (Token owner + model, CustomerRelationship customer + provider)
 
 - ✅ **Model Name Utilities** - Type-safe conversion between model names (`User`) and accessor names (`user`). Guards like `isModelName()` and `isAccessorName()` prevent runtime errors from invalid model references
 

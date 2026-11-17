@@ -110,11 +110,11 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
 
     expect(fieldsOf(data, 'Email')).toEqual(['data', 'recipient', 'sender', 'system']);
     expect(fieldsOf(data, 'User')).toEqual([
+      'customerRelationshipsAsCustomer',
       'email',
       'id',
       'name',
       'organizationUsers',
-      'providerRefs',
       'spaceUsers',
       'tagAttachments',
     ]);

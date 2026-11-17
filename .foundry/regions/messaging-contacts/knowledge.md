@@ -25,7 +25,7 @@
 CommunicationKind[] on Contact: the kinds this contact accepts.
 
 **canDeliver**  
-Shared gate: system always delivers; otherwise the kind must be in contact.acceptedKinds (and customerRef.acceptedKinds when given).
+Shared gate: system always delivers; otherwise the kind must be in contact.acceptedKinds (and customerRelationship.acceptedKinds when given).
 
 **Contact**  
 One false-polymorphic table (User / Organization / Space owner) for phone, email, website and social handles, ordered by position.
@@ -106,7 +106,7 @@ Messaging is a separate lane from email for direct per-`ContactType` channels (S
 
 `Contact` is one false-polymorphic table (`ownerModel` + nullable `userId` / `organizationId` / `spaceId`) for email, phone, website and 19 social or messaging handles. Never add address columns to User, Organization or Space. `User.email` is login identity only. Each type is a `ContactTypeDef` in `ContactRegistry`: a loose `inputSchema`, a `parseInput` normalizer, a strict `valueSchema`, a `toValueKey` projection (E.164, `classifier:handle`), subtype and uniqueness rules, and display. The `contactRules` before-mutation hook runs the registry on every Contact write, shadow-merging partial updates with `previous`. Per-owner uniqueness is three partial uniques on `valueKey`. Adding a type means a def file, a `ContactType` enum value, and a registry entry, with no controller, route or hook change. URL parsing reuses `canonicalUrl`, `splitUrl` and `parseSimpleHandleUrl`, and bare email checks use `emailAddressSchema`. The contact routes are owner-scoped create/list under `/me`, `/organization/:id` and `/space/:id`, plus by-id read/update/delete and an admin list. A Contact also carries what delivery reads: `acceptedKinds`, gated by `canDeliver`, and `deliverability`, distinct from `verifiedAt`.
 
-Related regions: templated email (planner, deliverEmail, CommunicationLog, unsubscribe and the `canDeliver` preference semantics) is `email-delivery`. Recipient rendering and the recipient lens (`renderForRecipient`, `emailLensFor`, `targetedBySender`) are shared with `email-templates` and `email-lens`. The broadcast-registry adapter pattern is `app-events-webhooks / adapters-integrations`, which also owns outbound webhooks. The `position` column is the orderedList hook in `mutation-hooks`. Row-level `permissionRules` and `ownerActions` are `permissions-roles / permissions-rebac`. Route templates and `sanitizeKeys` are `api-routes / api-schemas-openapi`. `CustomerRef` and segments are `customers-segments`.
+Related regions: templated email (planner, deliverEmail, CommunicationLog, unsubscribe and the `canDeliver` preference semantics) is `email-delivery`. Recipient rendering and the recipient lens (`renderForRecipient`, `emailLensFor`, `targetedBySender`) are shared with `email-templates` and `email-lens`. The broadcast-registry adapter pattern is `app-events-webhooks / adapters-integrations`, which also owns outbound webhooks. The `position` column is the orderedList hook in `mutation-hooks`. Row-level `permissionRules` and `ownerActions` are `permissions-roles / permissions-rebac`. Route templates and `sanitizeKeys` are `api-routes / api-schemas-openapi`. `CustomerRelationship` and segments are `customers-segments`.
 
 ## 3. Everything that exists here, by class
 
@@ -277,9 +277,9 @@ projection (scope-root tokens through json-rules `readLensValue`), rules judge t
 `deliverEmail` and `messageUser` both call it, so the same recipient and content render the same in
 either lane.
 
-`canDeliver(kind, contact, customerRef?)` (`apps/api/src/lib/messaging/canDeliver.ts`) is the shared
+`canDeliver(kind, contact, customerRelationship?)` (`apps/api/src/lib/messaging/canDeliver.ts`) is the shared
 gate for both lanes: `system` always delivers; otherwise the kind must be in `contact.acceptedKinds`
-(and, when given, `customerRef.acceptedKinds`).
+(and, when given, `customerRelationship.acceptedKinds`).
 
 > **Status:** the lane is built and unit-tested but **not yet registered** in `jobHandlers`
 > (`apps/api/src/jobs/handlers/index.ts`) and has no adapters or callers wired — it is the seam SMS/push

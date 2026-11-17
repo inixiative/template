@@ -18,9 +18,9 @@ model IntegrationRecord {
 
   // Record — false polymorphism, exactly one FK matches the discriminator.
   model         WebhookModel
-  customerRefId String?      @db.VarChar(36)
+  customerRelationshipId String?      @db.VarChar(36)
 
-  customerRef CustomerRef? @relation(fields: [customerRefId], references: [id], onDelete: Cascade)
+  customerRelationship CustomerRelationship? @relation(fields: [customerRelationshipId], references: [id], onDelete: Cascade)
 
   poisonedAt     DateTime?
   poisonedReason String?
@@ -31,7 +31,7 @@ model IntegrationRecord {
 
   // Per-record uniqueness — partial uniques (see Contact for rationale). Each
   // partial doubles as the lookup index for that record column.
-  @@unique([integrationId, customerRefId], where: { customerRefId: { not: null } })
+  @@unique([integrationId, customerRelationshipId], where: { customerRelationshipId: { not: null } })
   @@index([integrationId])
-  @@index([customerRefId])
+  @@index([customerRelationshipId])
 }

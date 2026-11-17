@@ -237,6 +237,10 @@ The typed FKs and relations carry the side too, so both ends read the same way: 
 back-relations do the same, side plus the full model name: `sourceRuleReferences` on a source model,
 `targetRuleReferences` on a target model, both on a model that is both (`Segment`).
 
+Where side plus model would read ambiguously, the back-relation states the side outright:
+`customerRelationshipsAsCustomer` / `customerRelationshipsAsProvider` on User, Organization and Space. Why: like
+`User.sourceEntitlements`, it means "rows where I am that side", and `As<Side>` cannot be read as "my providers".
+
 ### Entitlement: source, target and the library's anchor
 
 An `Entitlement` row is a directed edge, so it uses `source` / `target` like `RuleReference`. The

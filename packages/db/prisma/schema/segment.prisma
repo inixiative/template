@@ -1,14 +1,14 @@
 // ============================================================================
-// SEGMENT - A named set of a provider's customer references
+// SEGMENT - A named set of a provider's customer relationships
 // ============================================================================
 // Owner is false-polymorphic over ProviderModel (User | Organization | Space,
 // one FK populated to match `ownerModel`, enforced by the falsePolymorphism
 // hook + registry entry). The owner is the PROVIDER whose customers are
-// segmented: a member is a CustomerRef whose provider is this owner, so the
-// owner enum IS CustomerRef.providerModel.
+// segmented: a member is a CustomerRelationship whose provider is this owner, so the
+// owner enum IS CustomerRelationship.providerModel.
 //
 // Every segment carries `conditions`, a json-rules tree over the segment lens
-// rooted at CustomerRef. `type` says when it is evaluated: a `static` segment
+// rooted at CustomerRelationship. `type` says when it is evaluated: a `static` segment
 // is computed once when it is created or its conditions change; a `dynamic`
 // segment is recomputed continuously as the rows its rule reads are written.
 // A hand-picked audience is a static segment whose rule is `id in [...]`.

@@ -12,8 +12,8 @@ import {
   validateRuleForLens,
 } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
+import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
+import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
 
 const PROBE_OWNER_ID = '00000000-0000-7000-8000-000000000000';
 
@@ -24,11 +24,14 @@ export const validateSegmentConditions = (
   ownerModel: ProviderModel,
   options: { selfId?: string } = {},
 ): ConditionsValidation => {
-  const validation = validateRuleForLens(rawConditions, customerRefLens, {
-    compileWith: resolvedCustomerRefLens(ownerModel, PROBE_OWNER_ID),
+  const validation = validateRuleForLens(rawConditions, customerRelationshipLens, {
+    compileWith: resolvedCustomerRelationshipLens(ownerModel, PROBE_OWNER_ID),
   });
   if (!validation.valid) return validation;
-  const dynamic = dynamicRuleReferences(customerRefLens, validation.normalized as Condition);
+  const dynamic = dynamicRuleReferences(
+    customerRelationshipLens,
+    validation.normalized as Condition,
+  );
   if (dynamic.length)
     return {
       valid: false,
@@ -38,7 +41,7 @@ export const validateSegmentConditions = (
       ),
       normalized: validation.normalized,
     };
-  const self = ruleReferences(customerRefLens, validation.normalized as Condition).some(
+  const self = ruleReferences(customerRelationshipLens, validation.normalized as Condition).some(
     (reference) => reference.model === 'Segment' && reference.id === options.selfId,
   );
   return self

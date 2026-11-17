@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import type { User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
-  createCustomerRef,
+  createCustomerRelationship,
   createIntegration,
   createIntegrationRecord,
   createUser,
@@ -75,7 +75,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -98,7 +98,7 @@ describe('sendWebhook handler', () => {
       expect(receivedWebhooks[0].url).toBe(testUrl);
       // timestamp is carried through from the hook unchanged (passthrough, not re-stamped)
       expect(receivedWebhooks[0].body).toEqual({
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         action: 'create',
         payload: { id: user.id, name: user.name },
         timestamp: eventTimestamp,
@@ -113,7 +113,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -154,7 +154,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -188,7 +188,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -219,7 +219,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -244,7 +244,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         isActive: false,
       });
 
@@ -299,7 +299,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: getUniqueUrl('/retries'),
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
       });
       return sub;
     };
@@ -439,7 +439,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         isActive: true,
       });
 
@@ -479,7 +479,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         isActive: true,
       });
 
@@ -527,7 +527,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         isActive: true,
       });
 
@@ -570,7 +570,7 @@ describe('sendWebhook handler', () => {
 
     const createRecordSubscription = async ({ withIntegration = true } = {}) => {
       const { entity: customer } = await createUser();
-      const { entity: customerRef } = await createCustomerRef({
+      const { entity: customerRelationship } = await createCustomerRelationship({
         customerModel: 'User',
         providerModel: 'User',
         customerUserId: customer.id,
@@ -584,11 +584,11 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: getUniqueUrl('/integration'),
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         integrationId: withIntegration ? integration.id : null,
       });
       receivedWebhooks.length = 0;
-      return { sub, context, integration, customerRef };
+      return { sub, context, integration, customerRelationship };
     };
 
     const deliver = (subscriptionId: string, resourceId: string) =>
@@ -600,8 +600,8 @@ describe('sendWebhook handler', () => {
         timestamp: eventTimestamp,
       });
 
-    const findRecord = (integrationId: string, customerRefId: string) =>
-      db.integrationRecord.findFirst({ where: { integrationId, customerRefId } });
+    const findRecord = (integrationId: string, customerRelationshipId: string) =>
+      db.integrationRecord.findFirst({ where: { integrationId, customerRelationshipId } });
 
     const at = (ms: number) => new Date(Date.UTC(2026, 0, 1) + ms);
     // The delivery's id comes from Postgres uuidv7(); a host uuidv7 from "now" can sort either side of it.
@@ -611,90 +611,95 @@ describe('sendWebhook handler', () => {
     });
 
     it('poisons the record on the second touch once another record delivered since its first rejection', async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(2) }, context);
       await createWebhookEvent(
         { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3) },
         context,
       );
       rejectDeliveries();
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
-      const record = await findRecord(integration.id, customerRef.id);
-      expect(record?.model).toBe('CustomerRef');
+      const record = await findRecord(integration.id, customerRelationship.id);
+      expect(record?.model).toBe('CustomerRelationship');
       expect(record?.poisonedAt).toBeInstanceOf(Date);
       expect(record?.poisonedReason).toBe('HTTP 400: Bad Request');
       const latest = await db.webhookEvent.findFirst({
-        where: { webhookSubscriptionId: sub.id, resourceId: customerRef.id },
+        where: { webhookSubscriptionId: sub.id, resourceId: customerRelationship.id },
         orderBy: { id: 'desc' },
       });
       expect(latest?.httpStatus).toBe(400);
     });
 
     it('never counts a rate-limited (429) delivery toward the streak', async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ ...rejection(customerRef.id, 429), ...past(1) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id, 429), ...past(2) }, context);
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRelationship.id, 429), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id, 429), ...past(2) }, context);
       await createWebhookEvent(
         { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3) },
         context,
       );
       rejectDeliveries();
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
-      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+      expect(await findRecord(integration.id, customerRelationship.id)).toBeNull();
     });
 
     it('does not poison on a rate-limited (429) touch, even after enough rejections', async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(3) }, context);
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(2) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(3) }, context);
       await createWebhookEvent(
         { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(4) },
         context,
       );
       respondWith(429, 'Too Many Requests');
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
-      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+      expect(await findRecord(integration.id, customerRelationship.id)).toBeNull();
     });
 
     it('does not poison when the other record delivered before the streak began', async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
       await createWebhookEvent(
         { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(1) },
         context,
       );
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(3) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(2) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(3) }, context);
       rejectDeliveries();
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
-      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+      expect(await findRecord(integration.id, customerRelationship.id)).toBeNull();
     });
 
     it('does not poison when nothing else delivered — that is the subscription circuit, not a dead record', async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(2) }, context);
       rejectDeliveries();
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
-      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+      expect(await findRecord(integration.id, customerRelationship.id)).toBeNull();
     });
 
     it('never counts unreachable events, and an unreachable blip mid-streak does not reset it', async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(1) }, context);
       await createWebhookEvent(
-        { status: 'unreachable', resourceId: customerRef.id, error: 'HTTP 503', ...past(2) },
+        {
+          status: 'unreachable',
+          resourceId: customerRelationship.id,
+          error: 'HTTP 503',
+          ...past(2),
+        },
         context,
       );
       await createWebhookEvent(
@@ -703,19 +708,21 @@ describe('sendWebhook handler', () => {
       );
       rejectDeliveries();
 
-      await deliver(sub.id, customerRef.id);
-      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+      await deliver(sub.id, customerRelationship.id);
+      expect(await findRecord(integration.id, customerRelationship.id)).toBeNull();
 
-      await deliver(sub.id, customerRef.id);
-      expect((await findRecord(integration.id, customerRef.id))?.poisonedAt).toBeInstanceOf(Date);
+      await deliver(sub.id, customerRelationship.id);
+      expect(
+        (await findRecord(integration.id, customerRelationship.id))?.poisonedAt,
+      ).toBeInstanceOf(Date);
     });
 
     it("resets the streak on the record's own success", async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(2) }, context);
       await createWebhookEvent(
-        { status: 'success', resourceId: customerRef.id, ...past(3) },
+        { status: 'success', resourceId: customerRelationship.id, ...past(3) },
         context,
       );
       await createWebhookEvent(
@@ -724,57 +731,66 @@ describe('sendWebhook handler', () => {
       );
       rejectDeliveries();
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
-      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+      expect(await findRecord(integration.id, customerRelationship.id)).toBeNull();
     });
 
     it("orders by id: a rejection in the same millisecond but before the record's success does not count", async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1_000) }, context);
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(1_000) }, context);
       await createWebhookEvent(
-        { status: 'success', resourceId: customerRef.id, ...past(1_000, 1_001) },
+        { status: 'success', resourceId: customerRelationship.id, ...past(1_000, 1_001) },
         context,
       );
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2_000) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(2_000) }, context);
       await createWebhookEvent(
         { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3_000) },
         context,
       );
       rejectDeliveries();
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
-      expect(await findRecord(integration.id, customerRef.id)).toBeNull();
+      expect(await findRecord(integration.id, customerRelationship.id)).toBeNull();
     });
 
     it("orders by id: a rejection in the same millisecond but after the record's success counts", async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
       await createWebhookEvent(
-        { status: 'success', resourceId: customerRef.id, ...past(1_000) },
+        { status: 'success', resourceId: customerRelationship.id, ...past(1_000) },
         context,
       );
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1_000, 1_001) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2_000) }, context);
+      await createWebhookEvent(
+        { ...rejection(customerRelationship.id), ...past(1_000, 1_001) },
+        context,
+      );
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(2_000) }, context);
       await createWebhookEvent(
         { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3_000) },
         context,
       );
       rejectDeliveries();
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
-      expect((await findRecord(integration.id, customerRef.id))?.poisonedAt).toBeInstanceOf(Date);
+      expect(
+        (await findRecord(integration.id, customerRelationship.id))?.poisonedAt,
+      ).toBeInstanceOf(Date);
     });
 
     it('skips a poisoned record: no event, no request, while other records still deliver', async () => {
-      const { sub, integration, customerRef } = await createRecordSubscription();
+      const { sub, integration, customerRelationship } = await createRecordSubscription();
       await createIntegrationRecord(
-        { model: 'CustomerRef', poisonedAt: new Date(), poisonedReason: 'HTTP 400: Bad Request' },
-        { integration, customerRef },
+        {
+          model: 'CustomerRelationship',
+          poisonedAt: new Date(),
+          poisonedReason: 'HTTP 400: Bad Request',
+        },
+        { integration, customerRelationship },
       );
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
       expect(await db.webhookEvent.count({ where: { webhookSubscriptionId: sub.id } })).toBe(0);
       expect(receivedWebhooks.length).toBe(0);
@@ -792,39 +808,43 @@ describe('sendWebhook handler', () => {
     });
 
     it('never poisons on a subscription without an integration', async () => {
-      const { sub, context, customerRef } = await createRecordSubscription({
+      const { sub, context, customerRelationship } = await createRecordSubscription({
         withIntegration: false,
       });
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(2) }, context);
       await createWebhookEvent(
         { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(3) },
         context,
       );
       rejectDeliveries();
 
-      await deliver(sub.id, customerRef.id);
+      await deliver(sub.id, customerRelationship.id);
 
-      expect(await db.integrationRecord.count({ where: { customerRefId: customerRef.id } })).toBe(
-        0,
-      );
+      expect(
+        await db.integrationRecord.count({
+          where: { customerRelationshipId: customerRelationship.id },
+        }),
+      ).toBe(0);
     });
 
     it('a record rejected five times in a row no longer disables a subscription that delivers other records', async () => {
-      const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      const { sub, context, integration, customerRelationship } = await createRecordSubscription();
+      await createWebhookEvent({ ...rejection(customerRelationship.id), ...past(1) }, context);
       await createWebhookEvent(
         { status: 'success', resourceId: Bun.randomUUIDv7(), ...past(2) },
         context,
       );
       rejectDeliveries();
 
-      for (let i = 0; i < 5; i++) await deliver(sub.id, customerRef.id);
+      for (let i = 0; i < 5; i++) await deliver(sub.id, customerRelationship.id);
 
-      expect((await findRecord(integration.id, customerRef.id))?.poisonedAt).toBeInstanceOf(Date);
+      expect(
+        (await findRecord(integration.id, customerRelationship.id))?.poisonedAt,
+      ).toBeInstanceOf(Date);
       expect(
         await db.webhookEvent.count({
-          where: { webhookSubscriptionId: sub.id, resourceId: customerRef.id },
+          where: { webhookSubscriptionId: sub.id, resourceId: customerRelationship.id },
         }),
       ).toBe(3);
       const updated = await db.webhookSubscription.findUnique({ where: { id: sub.id } });

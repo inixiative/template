@@ -145,7 +145,7 @@ describe('rebac check', () => {
         'db:space': {
           actions: { own: null, manage: 'own', read: 'manage' },
         },
-        'db:customerRef': {
+        'db:customerRelationship': {
           actions: {
             read: {
               any: [
@@ -169,7 +169,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
     });
 
     it('grants access when second condition matches', async () => {
@@ -179,7 +179,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
     });
 
     it('denies access when no conditions match', async () => {
@@ -189,7 +189,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(false);
     });
   });
 
@@ -202,7 +202,7 @@ describe('rebac check', () => {
         'db:space': {
           actions: { own: null },
         },
-        'db:customerRef': {
+        'db:customerRelationship': {
           actions: {
             admin: {
               all: [
@@ -225,7 +225,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'admin')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'admin')).toBe(true);
     });
 
     it('denies access when only first condition matches', async () => {
@@ -239,7 +239,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'admin')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'admin')).toBe(false);
     });
 
     it('denies access when only second condition matches', async () => {
@@ -249,7 +249,7 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space' },
       };
-      expect(check(permix, schema, 'customerRef', record, 'admin')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'admin')).toBe(false);
     });
   });
 
@@ -377,8 +377,8 @@ describe('rebac check', () => {
     });
   });
 
-  describe('polymorphic CustomerRef - full example', () => {
-    // CustomerRef has customer side (user/org/space) and provider side (space)
+  describe('polymorphic CustomerRelationship - full example', () => {
+    // CustomerRelationship has customer side (user/org/space) and provider side (space)
     // Customer can read their refs, provider can manage them
     const schema: RebacSchema = {
       permissions: {
@@ -401,7 +401,7 @@ describe('rebac check', () => {
             read: 'operate',
           },
         },
-        'db:customerRef': {
+        'db:customerRelationship': {
           actions: {
             // Provider owns the ref
             own: { rel: 'providerSpace', action: 'own' },
@@ -420,7 +420,7 @@ describe('rebac check', () => {
       },
     };
 
-    it('provider org owner can manage customerRef', async () => {
+    it('provider org owner can manage customerRelationship', async () => {
       await permix.setup({
         resource: 'db:organization',
         id: 'provider-org',
@@ -431,12 +431,12 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space', organization: { id: 'provider-org' } },
       };
-      expect(check(permix, schema, 'customerRef', record, 'own')).toBe(true);
-      expect(check(permix, schema, 'customerRef', record, 'manage')).toBe(true);
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'own')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'manage')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
     });
 
-    it('customer org member can read but not manage customerRef', async () => {
+    it('customer org member can read but not manage customerRelationship', async () => {
       await permix.setup({
         resource: 'db:organization',
         id: 'customer-org',
@@ -447,19 +447,19 @@ describe('rebac check', () => {
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space', organization: { id: 'provider-org' } },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
-      expect(check(permix, schema, 'customerRef', record, 'manage')).toBe(false);
-      expect(check(permix, schema, 'customerRef', record, 'own')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'manage')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'own')).toBe(false);
     });
 
-    it('unrelated user cannot access customerRef', async () => {
+    it('unrelated user cannot access customerRelationship', async () => {
       await permix.setup({ resource: 'db:organization', id: 'other-org', actions: { own: true } });
       const record = {
         id: 'ref-1',
         customerOrganization: { id: 'customer-org' },
         providerSpace: { id: 'provider-space', organization: { id: 'provider-org' } },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(false);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(false);
     });
 
     it('customer user can read their own ref', async () => {
@@ -469,7 +469,7 @@ describe('rebac check', () => {
         customerUser: { id: 'user-1' },
         providerSpace: { id: 'provider-space', organization: { id: 'provider-org' } },
       };
-      expect(check(permix, schema, 'customerRef', record, 'read')).toBe(true);
+      expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(true);
     });
   });
 

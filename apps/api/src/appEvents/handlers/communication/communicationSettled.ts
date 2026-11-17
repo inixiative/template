@@ -14,7 +14,7 @@ export const communicationSettled = makeAppEvent<CommunicationSettledPayload>({
   cb: [
     async ({ communicationLog }) => {
       if (!communicationLog.recipientUserId) return;
-      await enqueueJob('reconcileCustomerRefSegments', {
+      await enqueueJob('reconcileCustomerRelationshipSegments', {
         customerModel: 'User',
         customerId: communicationLog.recipientUserId,
       });

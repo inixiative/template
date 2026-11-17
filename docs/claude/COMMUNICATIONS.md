@@ -354,9 +354,9 @@ row — or on the slug's default-tier row when the row carries none. A stored sl
 layer**: it shows exactly what it names and can never turn on what the declared surface does not
 (a stored recipient lens naming `sessions` or `accounts` is refused). The lens is scoped to the
 owner of the row being saved, edited or rendered (`scopeEmailLens`): tags are platform-owned or the
-owner's, segments are the owner's (via `recipient.providerRefs.segmentMembers.segment`), platform
+owner's, segments are the owner's (via `recipient.customerRelationshipsAsCustomer.segmentMembers.segment`), platform
 tiers see platform tags and no segments; the link rows are bound the same way — a tag attachment or
-segment membership by its far side, a customer ref by its provider.
+segment membership by its far side, a customer relationship by its provider.
 `OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The scope
 is one of four static declarations in `packages/email/src/rules/scopes/` (tenant owner and sender,
 owner only, platform owner with a tenant sender, platform), chosen by `emailScopeFor(owner, sender)`
@@ -756,7 +756,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `name`) as a `mapDefaults` entry for each of `RULE_REFERENCEABLE_MODELS`, so the id answers on
   every path to the model. The default
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
-  and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
+  and `customerRelationshipsAsCustomer.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
   builder gets `emailSurface` of it (which strips clamps and sources), while save and settle keep the lens
   itself (`defaultEmailLens` when none is threaded) — extraction never runs on the exposed
@@ -775,7 +775,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
 - **Edges are written by one hook over one declaration table.** `RULE_REFERENCE_SURFACES`
   (`apps/api/src/hooks/ruleReference/surfaces.ts`) declares each rule-bearing model: its rule
   columns, a label, the lens a row's rules are read under (`emailLensFor` for email rows, the
-  owner-bound customer-ref lens for segments) and the storage wrapper that reads rules out of the
+  owner-bound customer-relationship lens for segments) and the storage wrapper that reads rules out of the
   stored value (MJML and subject for email, a condition tree for segments). The `ruleReference`
   after-hook runs on every write to those models. When a row's rule columns differ from the
   pre-image, it first checks the changed columns: `deadRuleReferences` (`packages/db`) reads the
@@ -871,9 +871,9 @@ projection (scope-root tokens through json-rules `readLensValue`), rules judge t
 `deliverEmail` and `messageUser` both call it, so the same recipient and content render the same in
 either lane.
 
-`canDeliver(kind, contact, customerRef?)` (`apps/api/src/lib/messaging/canDeliver.ts`) is the shared
+`canDeliver(kind, contact, customerRelationship?)` (`apps/api/src/lib/messaging/canDeliver.ts`) is the shared
 gate for both lanes: `system` always delivers; otherwise the kind must be in `contact.acceptedKinds`
-(and, when given, `customerRef.acceptedKinds`).
+(and, when given, `customerRelationship.acceptedKinds`).
 
 > **Status:** the lane is built and unit-tested but **not yet registered** in `jobHandlers`
 > (`apps/api/src/jobs/handlers/index.ts`) and has no adapters or callers wired — it is the seam SMS/push

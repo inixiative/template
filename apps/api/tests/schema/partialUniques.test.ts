@@ -10,7 +10,7 @@ import {
 import {
   cleanupTouchedTables,
   createContact,
-  createCustomerRef,
+  createCustomerRelationship,
   createEmailComponent,
   createEmailTemplate,
   createIntegration,
@@ -141,20 +141,20 @@ describe('partial unique constraints', () => {
     });
   });
 
-  describe('CustomerRef: per-(customer, provider)', () => {
+  describe('CustomerRelationship: per-(customer, provider)', () => {
     it('blocks two refs linking the same user customer to the same space provider', async () => {
       const { entity: customer } = await createUser();
       const { entity: org } = await createOrganization();
       const { entity: providerSpace } = await createSpace({}, { organization: org });
       // Context is keyed by model accessor, so it can't disambiguate customerSpace from providerSpace; pass FKs.
-      await createCustomerRef({
+      await createCustomerRelationship({
         customerModel: 'User',
         providerModel: 'Space',
         customerUserId: customer.id,
         providerSpaceId: providerSpace.id,
       });
       const dupe = async () =>
-        createCustomerRef({
+        createCustomerRelationship({
           customerModel: 'User',
           providerModel: 'Space',
           customerUserId: customer.id,
@@ -169,12 +169,12 @@ describe('partial unique constraints', () => {
       const { entity: user } = await createUser();
       const url = `https://example.com/${seq('hook')}`;
       await createWebhookSubscription(
-        { ownerModel: WebhookOwnerModel.User, model: WebhookModel.CustomerRef, url },
+        { ownerModel: WebhookOwnerModel.User, model: WebhookModel.CustomerRelationship, url },
         { user },
       );
       const dupe = async () =>
         createWebhookSubscription(
-          { ownerModel: WebhookOwnerModel.User, model: WebhookModel.CustomerRef, url },
+          { ownerModel: WebhookOwnerModel.User, model: WebhookModel.CustomerRelationship, url },
           { user },
         );
       await expect(dupe()).rejects.toThrow();

@@ -17,7 +17,7 @@ export const reconcileCustomerOf = async (
 ): Promise<void> => {
   const target = polymorphicTarget(row, model, axis);
   if (!target) return;
-  await enqueueJob('reconcileCustomerRefSegments', {
+  await enqueueJob('reconcileCustomerRelationshipSegments', {
     customerModel: target.kind as CustomerModel,
     customerId: target.id,
   });

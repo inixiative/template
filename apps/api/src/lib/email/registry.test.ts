@@ -10,7 +10,7 @@ describe('slotRowsLens', () => {
     const lens = slotRowsLens(emailLens().recipient, where);
     const paths = Object.keys(projectLens(lens));
     expect(paths).toContain('User.tagAttachments.tag');
-    expect(paths).toContain('User.providerRefs.segmentMembers.segment');
+    expect(paths).toContain('User.customerRelationshipsAsCustomer.segmentMembers.segment');
     expect(projectLens(lens).User?.whereClauses).toEqual([where]);
   });
 

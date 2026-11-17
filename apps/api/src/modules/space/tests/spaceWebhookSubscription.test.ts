@@ -80,7 +80,7 @@ describe('space/webhookSubscriptions', () => {
       const seq = getNextSeq();
       const response = await fetch(
         post(`/api/v1/space/${space.id}/webhookSubscriptions`, {
-          model: 'CustomerRef',
+          model: 'CustomerRelationship',
           url: `https://example.com/space-webhook-${seq}`,
         }),
       );
@@ -116,7 +116,7 @@ describe('space/webhookSubscriptions', () => {
       const seq = getNextSeq();
       const response = await memberHarness.fetch(
         post(`/api/v1/space/${space.id}/webhookSubscriptions`, {
-          model: 'CustomerRef',
+          model: 'CustomerRelationship',
           url: `https://example.com/space-member-webhook-${seq}`,
         }),
       );
@@ -133,7 +133,7 @@ describe('space/webhookSubscriptions', () => {
     it('returns space webhooks', async () => {
       const seq = getNextSeq();
       await createWebhookSubscription({
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         ownerModel: 'Space',
         spaceId: space.id,
         url: `https://example.com/space-list-${seq}`,
@@ -152,7 +152,7 @@ describe('space/webhookSubscriptions', () => {
       const { entity: otherSpace } = await createSpace({}, { organization: org });
       const seq = getNextSeq();
       await createWebhookSubscription({
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         ownerModel: 'Space',
         spaceId: otherSpace.id,
         url: `https://example.com/other-space-${seq}`,

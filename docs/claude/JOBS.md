@@ -9,7 +9,7 @@
   - [Job IDs](#job-ids)
 - [Built-in Handlers](#built-in-handlers)
   - [sendWebhook](#sendwebhook)
-  - [reconcileSegment / reconcileCustomerRefSegments / sweepSegments](#reconcilesegment--reconcilecustomerrefsegments--sweepsegments)
+  - [reconcileSegment / reconcileCustomerRelationshipSegments / sweepSegments](#reconcilesegment--reconcilecustomerrelationshipsegments--sweepsegments)
   - [rotateEncryptionKeys](#rotateencryptionkeys)
 - [Creating Handlers](#creating-handlers)
   - [1. Define Handler](#1-define-handler)
@@ -144,12 +144,12 @@ await enqueueJob('sendWebhook', {
 | Poisoned records | Integration-owned subscriptions skip a record after 3 rejections (HTTP 400/422) while other records deliver |
 | Logging | Creates a `WebhookEvent` per attempt: `retrying` for an attempt that will be retried, the settled status for the last |
 
-### reconcileSegment / reconcileCustomerRefSegments / sweepSegments
+### reconcileSegment / reconcileCustomerRelationshipSegments / sweepSegments
 
-Segment membership. `reconcileSegment` (superseding by segment id) recomputes one segment set-wise via `toPrisma` — static or dynamic, it runs when `segment.created` / `segment.updated` says the rule changed — and fans out to the dynamic segments that reference it. `reconcileCustomerRefSegments` (payload `{ customerModel, customerId }`, superseding by that pair and resolving it to the customer's references) hydrates each customer reference through `fetchLens` and runs `check()` per dynamic segment in dependency order; static segments are never on this rail. It is enqueued by the business events on the rows the segment lens reads (`contact.*`, `organization.*`, `space.*`, `user.redacted`, `communication.settled`), never by a DB hook. `sweepSegments` (cron, seeded at 04:00 UTC) enqueues every sound dynamic segment in dependency order (`sweepableSegments`) and is the backstop for writes that bypass a service; a degraded segment never reaches the queue, from the sweep or from a recomputed segment's dependents fan-out. Both reconcile paths publish the junction diff as four events: `segment.membersAdded` / `segment.membersRemoved` (owner side) and `customerRef.segmentsAdded` / `customerRef.segmentsRemoved` (member side).
+Segment membership. `reconcileSegment` (superseding by segment id) recomputes one segment set-wise via `toPrisma` — static or dynamic, it runs when `segment.created` / `segment.updated` says the rule changed — and fans out to the dynamic segments that reference it. `reconcileCustomerRelationshipSegments` (payload `{ customerModel, customerId }`, superseding by that pair and resolving it to the customer's references) hydrates each customer relationship through `fetchLens` and runs `check()` per dynamic segment in dependency order; static segments are never on this rail. It is enqueued by the business events on the rows the segment lens reads (`contact.*`, `organization.*`, `space.*`, `user.redacted`, `communication.settled`), never by a DB hook. `sweepSegments` (cron, seeded at 04:00 UTC) enqueues every sound dynamic segment in dependency order (`sweepableSegments`) and is the backstop for writes that bypass a service; a degraded segment never reaches the queue, from the sweep or from a recomputed segment's dependents fan-out. Both reconcile paths publish the junction diff as four events: `segment.membersAdded` / `segment.membersRemoved` (owner side) and `customerRelationship.segmentsAdded` / `customerRelationship.segmentsRemoved` (member side).
 
 `RECONCILE_TRIGGERS` records coverage of the lens's reached models. The added handlers for
-`customerRef.created`, `user.updated`, `tag.deleted`, `tagAttachment.created` and
+`customerRelationship.created`, `user.updated`, `tag.deleted`, `tagAttachment.created` and
 `tagAttachment.deleted` still lack production emitters; the sweep remains the backstop.
 See [SEGMENTS.md](SEGMENTS.md) for current behavior and the remaining work.
 

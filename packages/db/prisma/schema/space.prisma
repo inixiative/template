@@ -37,8 +37,8 @@ model Space {
   emailComponents      EmailComponent[]
   emailTemplates       EmailTemplate[]
   targetRuleReferences RuleReference[]       @relation("RuleReferenceTarget")
-  customerRefs         CustomerRef[]         @relation("customerRefs")
-  providerRefs         CustomerRef[]         @relation("providerRefs")
+  customerRelationshipsAsProvider         CustomerRelationship[]         @relation("CustomerRelationshipAsProvider")
+  customerRelationshipsAsCustomer         CustomerRelationship[]         @relation("CustomerRelationshipAsCustomer")
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
   auditLogsAsContext   AuditLog[]            @relation("AuditLogContextSpace")

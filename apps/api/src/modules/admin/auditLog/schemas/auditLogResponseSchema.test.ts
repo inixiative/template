@@ -33,7 +33,7 @@ const baseAuditLog = {
   subjectCronJobId: null,
   subjectEmailTemplateId: null,
   subjectEmailComponentId: null,
-  subjectCustomerRefId: null,
+  subjectCustomerRelationshipId: null,
   subjectIntegrationId: null,
   subjectSegmentId: null,
   subjectEntitlementId: null,

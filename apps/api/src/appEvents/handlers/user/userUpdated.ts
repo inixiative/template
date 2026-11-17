@@ -13,7 +13,7 @@ export type UserUpdatedPayload = { user: User };
 export const userUpdated = makeAppEvent<UserUpdatedPayload>({
   cb: [
     async ({ user }) => {
-      await enqueueJob('reconcileCustomerRefSegments', {
+      await enqueueJob('reconcileCustomerRelationshipSegments', {
         customerModel: 'User',
         customerId: user.id,
       });

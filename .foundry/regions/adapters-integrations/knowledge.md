@@ -37,7 +37,7 @@ The adapter that reports errors to the configured provider; app code never impor
 A named provider connection owned by a user, organization, OrganizationUser, space or SpaceUser.
 
 **IntegrationRecord**  
-Links an Integration to a synced CustomerRef, with poisonedAt for repeated rejections.
+Links an Integration to a synced CustomerRelationship, with poisonedAt for repeated rejections.
 
 **integrations**  
 Class: owner Integrations (provider connections) and the IntegrationRecords they sync.
@@ -123,7 +123,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
 | the owner's connection to an outside provider; an org connected its CRM account; I'll add a provider enum on the token instead; the connection itself, not the records synced through it; credentials don't live here, they live on the token | **Integration** · model `packages/db/prisma/schema/integration.prisma` — synced external items: IntegrationRecord instead; credentials live on the Integration's Credential, never on a Token (a Token is an API key for this API; a Signet is the only grant for using an integration) | docs/claude/PERMISSIONS.md § Integrations and Tokens by Owner Kind; docs/claude/HOOKS.md § False Polymorphism | — |
-| an external item synced under a connection; the CRM contact we mirrored for this integration; I'll store synced items in a JSON column on the integration; external identity for a customer is a different model | **IntegrationRecord** · model `packages/db/prisma/schema/integrationRecord.prisma` — the connection itself: Integration instead; external identity relation: CustomerRef | docs/claude/HOOKS.md § Webhooks | — |
+| an external item synced under a connection; the CRM contact we mirrored for this integration; I'll store synced items in a JSON column on the integration; external identity for a customer is a different model | **IntegrationRecord** · model `packages/db/prisma/schema/integrationRecord.prisma` — the connection itself: Integration instead; external identity relation: CustomerRelationship | docs/claude/HOOKS.md § Webhooks | — |
 | the display name and icon for each provider; provider metadata for the settings UI; I'll hardcode provider labels in the component; custom integrations without a provider get their own entry | **integrationProviders** · primitive `packages/ui/src/lib/integrationProviders.ts#integrationProviders` — Use for provider display metadata; customIntegration covers custom integrations without a provider. | docs/claude/FRONTEND/COMPONENTS.md § Settings | — |
 | the settings page listing an owner's connections; group providers into buckets on the integrations screen; I'll open the create integration modal from my own page; where users add and manage their integrations | **IntegrationsPage** · primitive `packages/ui/src/pages/IntegrationsPage.tsx#IntegrationsPage` — Use instead of opening CreateIntegrationModal directly; it owns provider buckets from lib/integrationProviders.ts. | docs/claude/FRONTEND/COMPONENTS.md § Settings; docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages | a new settings page that renders CreateIntegrationModal directly and re-buckets providers itself (catalog IntegrationsPage) |
 | validate integration update bodies: create fields minus entitlements, plus nullable role | **integrationUpdateBodySchema** · primitive `apps/api/src/modules/integration/schemas/integrationSchemas.ts#integrationUpdateBodySchema` — validate integration update bodies: create fields minus entitlements, plus nullable role | — | — |
@@ -312,7 +312,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 
 #### Class `integrations`
 - **Integration** `packages/db/prisma/schema/integration.prisma` [model] represent an owned integration with provider, role, entitlements and tokens Use: prisma.integration with ownerModel, name, provider, role
-- **IntegrationRecord** `packages/db/prisma/schema/integrationRecord.prisma` [model] link an integration to a synced customer ref, with poison flagging for failures Use: db.integrationRecord.create({ data: { integrationId, model, customerRefId } })
+- **IntegrationRecord** `packages/db/prisma/schema/integrationRecord.prisma` [model] link an integration to a synced customer relationship, with poison flagging for failures Use: db.integrationRecord.create({ data: { integrationId, model, customerRelationshipId } })
 - **integrationProviders** `packages/ui/src/lib/integrationProviders.ts#integrationProviders` [primitive] display label, icon and direct-connect flag per integration provider Use: const { label, icon } = integrationProviders[provider];
 - **IntegrationsPage** `packages/ui/src/pages/IntegrationsPage.tsx#IntegrationsPage` [primitive] manage integrations per provider bucket plus custom, opening connect flows Use: <IntegrationsPage connectFlows={{ [provider]: MyConnectFlow }} />
 - **integrationUpdateBodySchema** `apps/api/src/modules/integration/schemas/integrationSchemas.ts#integrationUpdateBodySchema` [primitive] validate integration update bodies: create fields minus entitlements, plus nullable role Use: import { integrationUpdateBodySchema } from '@/modules/integration/schemas/integrationSchemas'
