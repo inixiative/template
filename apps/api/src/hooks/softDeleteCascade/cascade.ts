@@ -9,6 +9,7 @@ import { uniq } from 'lodash-es';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
 import {
   CLOSE_ON_PARENT_DELETE,
+  closeChildren,
   isClosedOnParentDelete,
 } from '#/hooks/softDeleteCascade/closeOnParentDelete';
 import { REGENERATE_ON_REVIVE } from '#/hooks/softDeleteCascade/regenerateOnRevive';
@@ -58,10 +59,7 @@ export const tombstoneChildren = async (model: string, rows: Row[], deletedAt: u
     if (!where) continue;
     const closes = CLOSE_ON_PARENT_DELETE[child.model];
     if (closes) {
-      await db.delegate(child.model).updateManyAndReturn({
-        where: { ...where, ...closes.open },
-        data: closes.closed,
-      });
+      await closeChildren(child.model, where, closes);
     } else if (isHardDeletedOnTombstone(child.model)) {
       await hardDelete(child.model, where);
     } else if (child.hasDeletedAt) {
