@@ -20,7 +20,7 @@ export const inquiryCancelController = makeController(inquiryCancelRoute, async 
     validateInquiryIsCancelable(await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt));
     await db.inquiry.update({
       where: { id: inquiry.id },
-      data: { ...inquiryCancellation, deletedAt: new Date() },
+      data: inquiryCancellation,
     });
   });
 
