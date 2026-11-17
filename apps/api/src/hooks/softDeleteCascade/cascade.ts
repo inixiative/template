@@ -8,6 +8,7 @@ import { db, isHardDeletedOnTombstone, isSkippedOnRevive } from '@template/db';
 import { uniq } from 'lodash-es';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
 import { REGENERATE_ON_REVIVE } from '#/hooks/softDeleteCascade/regenerateOnRevive';
+import { TOMBSTONE_CLOSES } from '#/hooks/softDeleteCascade/tombstoneCloses';
 
 type Row = Record<string, unknown>;
 
@@ -55,9 +56,10 @@ export const tombstoneChildren = async (model: string, rows: Row[], deletedAt: u
     if (isHardDeletedOnTombstone(child.model)) {
       await hardDelete(child.model, where);
     } else if (child.hasDeletedAt) {
+      const closes = TOMBSTONE_CLOSES[child.model];
       await db.delegate(child.model).updateManyAndReturn({
-        where: { ...where, deletedAt: null },
-        data: { deletedAt },
+        where: { ...where, deletedAt: null, ...closes?.open },
+        data: { deletedAt, ...closes?.closed },
       });
     }
   }

@@ -5,6 +5,8 @@
  * @uses primitive:authz, infrastructure:prisma
  */
 import { db, type EntitlementTarget, polymorphicTarget } from '@template/db';
+import { toEntitlementEntry } from '@template/permissions';
+import { entitlementProblem } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateEntitlementWriter } from '#/lib/permissions/validateEntitlementWriter';
@@ -16,7 +18,18 @@ import {
 } from '#/modules/inquiry/handlers/changeEntitlements/schema';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
 
-const holderModels: readonly EntitlementTarget['model'][] = ['Token', 'Integration'];
+export const holderModels: readonly EntitlementTarget['model'][] = ['Token', 'Integration'];
+
+// why: the same check the writer runs, so a request the writer would refuse is refused when asked
+const validate = async (_inquiry: Partial<Inquiry>, content: ChangeEntitlementsContent) => {
+  const problem = content.add
+    .map((input, index) => {
+      const found = entitlementProblem(toEntitlementEntry(input));
+      return found && `add.${index}: ${found}`;
+    })
+    .find(Boolean);
+  if (problem) throw makeError({ status: 422, message: problem });
+};
 
 const holderOf = async (inquiry: Inquiry) => {
   const target = polymorphicTarget(inquiry, 'Inquiry', 'targetModel');
@@ -38,6 +51,7 @@ export const changeEntitlementsHandler: InquiryHandler<
   resolutionSchema: changeEntitlementsResolutionInputSchema,
   defaultExpirationDays: 30,
   unique: 'targeted',
+  validate,
   autoApprove: async () => false,
 
   handleApprove: async (c, inquiry, _content, response) => {

@@ -130,7 +130,7 @@ describe('changeEntitlements: a request addressed to the record whose entitlemen
       content: { add: [negated] },
     });
     expect(response.status).toBe(422);
-    expect(JSON.stringify(await response.json())).toContain('add.0.where');
+    expect(((await response.json()) as { message: string }).message).toContain('add.0');
     expect(await db.inquiry.count({ where: { targetTokenId: token.id } })).toBe(0);
   });
 
@@ -174,6 +174,10 @@ describe('changeEntitlements: a request addressed to the record whose entitlemen
     const inquiry = await asked([], [row!.id]);
     expect((await answer(admin, inquiry, { remove: [row!.id] })).status).toBe(200);
     expect(await held()).toEqual([]);
+    const approved = await db.withDeleted(() =>
+      db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } }),
+    );
+    expect(approved).toMatchObject({ status: 'approved', content: { remove: [row!.id] } });
   });
 
   it('an approver who could not grant it directly is refused, and the inquiry stays open with nothing written', async () => {

@@ -4,6 +4,7 @@ import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
+import { registerEntitlementChangeRequestsHook } from '#/hooks/entitlementChangeRequests/hook';
 import { registerEntitlementLensHook } from '#/hooks/entitlementLens/hook';
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 import { registerFullDelegateHook } from '#/hooks/fullDelegate/hook';
@@ -27,6 +28,7 @@ export const registerHooks = () => {
   registerDelegatedKeysHook();
   registerFullDelegateHook();
   registerEntitlementLensHook();
+  registerEntitlementChangeRequestsHook();
   registerMemberSelfGrantHook();
   registerRulesHook();
   registerAuditLogHook();
