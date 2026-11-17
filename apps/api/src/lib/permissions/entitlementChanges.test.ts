@@ -112,16 +112,14 @@ describe("a member's entitlements change only through its entitlement rows: crea
     );
   });
 
-  it('removing a row whose anchor is tombstoned still needs the ability to grant it', async () => {
+  it('a row whose anchor is tombstoned is removed by whoever manages the member (Aron, 2026-11-16)', async () => {
     const { entity: space } = await createSpace({}, { organization });
     const onSpace = entry('db:space', ['db:space', space.id], ['manage']);
     const target = await member();
     expect((await change('owner', target, { add: [onSpace] })).status).toBe(201);
     await db.space.update({ where: { id: space.id }, data: { deletedAt: new Date() } });
 
-    expect((await change('admin', target, { remove: [onSpace] })).status).toBe(403);
-    expect(await stored(target)).toEqual([onSpace]);
-    expect((await change('owner', target, { remove: [onSpace] })).status).toBe(204);
+    expect((await change('admin', target, { remove: [onSpace] })).status).toBe(204);
     expect(await stored(target)).toEqual([]);
   });
 
