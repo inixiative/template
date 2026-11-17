@@ -375,6 +375,7 @@ Nested updates log a warning (can't fetch previous for each nested record withou
 ---
 
 <!-- unit doc:docs/claude/COMMUNICATIONS.md#email/rule-references-the-rows-a-rule-names -->
+
 **Source:** `docs/claude/COMMUNICATIONS.md` § Email › Rule References (the rows a rule names) (in "Communications")
 
 ##### Rule References (the rows a rule names)
@@ -385,20 +386,21 @@ edges are persisted so that "who references X" is an index and a stale rule is n
 
 - **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
   (source row → target row), false-polymorphic on both ends — `sourceModel` + one typed FK per
-  rule-bearing model (`sourceEmailTemplateId` / `sourceEmailComponentId` / `sourceSegmentId`), `targetModel` + one typed FK per
-  referenceable model (`targetTagId` / `targetOrganizationId` / `targetSpaceId` / `targetSegmentId`), both axes in `PolymorphismRegistry`.
+  rule-bearing model (`sourceEmailTemplateId` / `sourceEmailComponentId` / `sourceSegmentId` / `sourceEntitlementId`), `targetModel` + one typed FK per
+  referenceable model (`targetTagId`, `targetOrganizationId`, `targetSpaceId`, `targetSegmentId`, and one per rebac resource an entitlement's `where` can name), both axes in `PolymorphismRegistry`.
   Real relations on both ends: the source side cascades, the target side is left to `SET NULL` on a
   purge. Edges are written by the sync (create, delete, restamp) and stamped by `ruleReference:target`.
 - **Which models are referenceable is the registry's answer, not any surface's.**
   `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `targetModel` axis of
   `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it.
 - **A rule-tracked lens has one spelling per reference: the row's `id`, never an FK column.**
-  `omitForeignKeys(lens)` (`packages/db/lens`, the same shape as `redactLens`) omits every FK
+  `omitForeignKeys(lens)` (`packages/db/src/lens/omitForeignKeys.ts`, the same shape as `redactLens`) omits every FK
   column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
   itself in it and declares its own id sources. Each model-rooted lens of the email lens
   (`emailLens`, `packages/email/src/rules/emailLens.ts`) wraps in `omitForeignKeys` and declares
-  `sources: { id: { label: 'name' } }` as a `mapDefaults` entry for each of
-  `RULE_REFERENCEABLE_MODELS`, so the id answers on every path to the model. The default
+  `sources: { id: { label: 'name' } }` (or `sources: { id: true }` for a model without a
+  `name`) as a `mapDefaults` entry for each of `RULE_REFERENCEABLE_MODELS`, so the id answers on
+  every path to the model. The default
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
   and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
@@ -438,11 +440,11 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   referenced row is copied onto every edge naming it by `ruleReference:target` (one
   `updateManyAndReturn`, matched on `(targetModel, targetId)`, cleared on undelete); a
   purge `SET NULL`s the typed FK and leaves `targetId` naming the row that went. The referenced
-  axis therefore carries true polymorphism beside the false — the FK is the relation and may go
+  axis is dual-polymorphic ([DATABASE.md](DATABASE.md#false-polymorphism)): the FK is the relation and may go
   null, `targetId` is the name and never changes. The false-polymorphism rules hook writes `sourceId`
-  and `targetId` from the set typed FK on create (`materialized` on the registry axis), refuses a
+  and `targetId` from the set typed FK on create (`dualPolymorphismId` on the registry axis), refuses a
   row where they disagree, and the immutable-fields hook refuses any update to an edge's typed FKs
-  or materialized ids, so the only updatable column on an edge is its `targetDeletedAt` stamp.
+  or dual polymorphism ids, so the only updatable column on an edge is its `targetDeletedAt` stamp.
   `ruleReferenceTargets(edges)` reads both from the edge rows alone (each target as `existing`, `deleted` or `purged`), so consumers
   write `include: { sourceRuleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the

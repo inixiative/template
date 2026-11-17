@@ -73,6 +73,7 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
       type: InquiryType.updateSpace,
       status: InquiryStatus.sent,
       sourceModel: InquiryResourceModel.Space,
+      sourceOrganizationId: space.organizationId,
       sourceSpaceId: space.id,
       targetModel: InquiryResourceModel.admin,
       content: { spaceId: space.id },
@@ -82,6 +83,7 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
       type: InquiryType.updateSpace,
       status: InquiryStatus.sent,
       sourceModel: InquiryResourceModel.Space,
+      sourceOrganizationId: otherSpace.organizationId,
       sourceSpaceId: otherSpace.id,
       targetModel: InquiryResourceModel.admin,
       content: { spaceId: otherSpace.id },
@@ -245,6 +247,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
       sourceModel: InquiryResourceModel.User,
       sourceUserId: sender.id,
       targetModel: InquiryResourceModel.Space,
+      targetOrganizationId: space.organizationId,
       targetSpaceId: space.id,
       content: { spaceId: space.id },
     });
@@ -255,6 +258,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
       sourceModel: InquiryResourceModel.User,
       sourceUserId: sender.id,
       targetModel: InquiryResourceModel.Space,
+      targetOrganizationId: space.organizationId,
       targetSpaceId: space.id,
       content: { spaceId: space.id },
     });
@@ -265,6 +269,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
       sourceModel: InquiryResourceModel.User,
       sourceUserId: sender.id,
       targetModel: InquiryResourceModel.Space,
+      targetOrganizationId: space.organizationId,
       targetSpaceId: space.id,
       content: { spaceId: space.id },
     });
@@ -275,6 +280,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
       sourceModel: InquiryResourceModel.User,
       sourceUserId: sender.id,
       targetModel: InquiryResourceModel.Space,
+      targetOrganizationId: otherSpace.organizationId,
       targetSpaceId: otherSpace.id,
       content: { spaceId: otherSpace.id },
     });

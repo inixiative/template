@@ -125,7 +125,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     );
     expect(response.status).toBe(403);
     expect(((await response.json()) as { message: string }).message).toBe(
-      'A delegate holds your permissions or less',
+      `A delegate holds your permissions or less: you cannot give manage on db:integration at db:organization ${organization.id} by space.organization`,
     );
   });
 

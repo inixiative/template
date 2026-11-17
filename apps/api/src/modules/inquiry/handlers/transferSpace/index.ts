@@ -2,8 +2,10 @@ import { db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
 import {
+  type BaseResolution,
   baseResolutionInputSchema,
   type TransferSpaceContent,
+  type TransferSpaceResolutionInput,
   transferSpaceContentSchema,
   transferSpaceResolutionInputSchema,
 } from '@template/shared/inquiry';
@@ -12,7 +14,11 @@ import { clearSpaceRowCaches } from '#/modules/inquiry/handlers/transferSpace/cl
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
 import { validateSpaceSlugFree } from '#/modules/inquiry/validations/validateSpaceSlugFree';
 
-export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
+export const transferSpaceHandler: InquiryHandler<
+  TransferSpaceContent,
+  BaseResolution,
+  TransferSpaceResolutionInput
+> = {
   contentSchema: transferSpaceContentSchema,
   resolutionInputSchema: transferSpaceResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
@@ -20,12 +26,12 @@ export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
   defaultExpirationDays: 30,
   autoApprove: async () => false,
 
-  handleApprove: async (inquiry, content) => {
+  handleApprove: async (_c, inquiry, content, response) => {
     const spaceId = inquiry.sourceSpaceId!;
     const organizationId = inquiry.targetOrganizationId!;
 
     const [space] = await db.findForUpdate<Space>('Space', { id: spaceId }, { changesKey: true });
-    const slug = content.slug ?? space!.slug;
+    const slug = response.slug ?? content.slug ?? space!.slug;
     await validateSpaceSlugFree({ organizationId, slug });
 
     const transferredAt = new Date();

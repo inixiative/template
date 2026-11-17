@@ -43,10 +43,11 @@ describe('the real schema map: a path admits every kind that carries its keys (R
     expect(kinds('integration', 'user', 'user')).toEqual(['User', 'OrganizationUser', 'SpaceUser']);
   });
 
-  it('an inquiry names a side: what the organization or its members received', () => {
+  it('an inquiry names a side: what the organization, its spaces or its members received', () => {
     expect(kinds('inquiry', 'organization', 'targetOrganization', 'targetModel')).toEqual([
       'OrganizationUser',
       'Organization',
+      'Space',
       'SpaceUser',
     ]);
     expect(kinds('inquiry', 'space', 'sourceSpace', 'sourceModel')).toEqual(['Space', 'SpaceUser']);

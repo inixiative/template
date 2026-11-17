@@ -8,8 +8,7 @@ import {
   type AdminInquiryReadManyResponses,
   adminInquiryReadMany,
   adminInquiryReadManyQueryKey,
-  type InquiryReceivedItem,
-  type InquirySentItem,
+  type InquiryItem,
 } from '@template/sdk';
 import { Badge, EmptyState, Page, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
@@ -194,14 +193,14 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
           const SourceSummary = entry?.source?.summary;
           const TargetSummary = entry?.target?.summary;
 
-          // Registry components expect InquirySentItem / InquiryReceivedItem; admin item is structurally compatible
+          // Registry components expect InquiryItem / InquiryItem; admin item is structurally compatible
           const sourceNode = SourceSummary ? (
-            <SourceSummary inquiry={inq as unknown as InquirySentItem} />
+            <SourceSummary inquiry={inq as unknown as InquiryItem} />
           ) : (
             actorLabel(inq, 'source')
           );
           const targetNode = TargetSummary ? (
-            <TargetSummary inquiry={inq as unknown as InquiryReceivedItem} />
+            <TargetSummary inquiry={inq as unknown as InquiryItem} />
           ) : (
             actorLabel(inq, 'target')
           );
@@ -227,7 +226,7 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
                   {inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—'}
                 </td>
                 <td className="px-4 pt-3 pb-1">
-                  <InquirySourceControls inquiry={inq as unknown as InquirySentItem} />
+                  <InquirySourceControls inquiry={inq as unknown as InquiryItem} />
                 </td>
               </tr>
               <tr className="group-hover:bg-muted/40 transition-colors">
@@ -236,7 +235,7 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
                   {targetNode}
                 </td>
                 <td className="px-4 pb-3 pt-1">
-                  <InquiryTargetControls inquiry={inq as unknown as InquiryReceivedItem} />
+                  <InquiryTargetControls inquiry={inq as unknown as InquiryItem} />
                 </td>
               </tr>
             </tbody>

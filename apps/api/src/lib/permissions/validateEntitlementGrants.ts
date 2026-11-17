@@ -41,6 +41,9 @@ const placedRecords = async (entry: EntitlementEntry) => {
   return placed as HydratedRecord[];
 };
 
+const describeEntry = ({ resource, anchor, actions }: EntitlementEntry) =>
+  `${Object.keys(actions).join(', ')} on ${resource} at ${anchor.resource} ${anchor.id}${anchor.path ? ` by ${anchor.path}` : ''}`;
+
 export const validateEntitlementGrants = async (
   writer: Permix,
   entries: EntitlementEntry[],
@@ -48,5 +51,8 @@ export const validateEntitlementGrants = async (
   for (const entry of entries)
     for (const placed of await placedRecords(entry))
       if (!canGrantEntitlement(writer, entry, placed))
-        throw makeError({ status: 403, message: 'A delegate holds your permissions or less' });
+        throw makeError({
+          status: 403,
+          message: `A delegate holds your permissions or less: you cannot give ${describeEntry(entry)}`,
+        });
 };

@@ -85,4 +85,27 @@ describe('handler: createSpace — approve', () => {
     const space = await db.space.findFirst({ where: { slug: 'denied-space' } });
     expect(space).toBeNull();
   });
+
+  it('a deny stores nothing the handler did not produce', async () => {
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.createSpace,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.admin,
+      content: { name: 'Forged Space', slug: 'forged-space' },
+    });
+
+    await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+        explanation: 'no',
+        spaceId: 'forged',
+      }),
+    );
+
+    const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(stored.resolution).toEqual({ explanation: 'no' });
+  });
 });

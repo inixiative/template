@@ -9,7 +9,7 @@ import {
   inquiryCreateBodySchema,
   inquiryCreateSanitizeKeys,
 } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
-import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
+import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
@@ -17,7 +17,7 @@ export const organizationCreateInquiryRoute = createRoute({
   model: Modules.organization,
   submodel: Modules.inquiry,
   bodySchema: inquiryCreateBodySchema,
-  responseSchema: inquirySentResponseSchema,
+  responseSchema: inquiryResponseSchema,
   sanitizeKeys: inquiryCreateSanitizeKeys,
   tags: [Tags.organization, Tags.inquiry],
 });

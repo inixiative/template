@@ -1,16 +1,16 @@
 import { type Condition, check } from '@inixiative/json-rules';
 import {
   DbAction,
+  dualPolymorphismIdColumns,
+  dualPolymorphismIdConflicts,
   type HookOptions,
   HookTiming,
   isPrismaNull,
   type ModelName,
-  materializedColumns,
-  materializedIdConflicts,
   registerDbHook,
   type SingleAction,
   withDiscriminatorDefaults,
-  withMaterializedIds,
+  withDualPolymorphismIds,
 } from '@template/db';
 import { castArray, without } from 'lodash-es';
 import { getRule, RulesRegistry } from '#/hooks/rules/registry';
@@ -45,11 +45,11 @@ const processCreateArgs = (args: unknown, model: ModelName): void => {
   for (const row of castArray(data) as Record<string, unknown>[]) {
     const defaulted = withDiscriminatorDefaults(model, row);
     validateRules(defaulted, model);
-    const [conflict] = materializedIdConflicts(model, defaulted);
+    const [conflict] = dualPolymorphismIdConflicts(model, defaulted);
     if (conflict) throw makeError({ status: 422, message: conflict });
-    const materialized = withMaterializedIds(model, defaulted);
-    for (const column of materializedColumns(model))
-      if (materialized[column] != null) row[column] = materialized[column];
+    const withIds = withDualPolymorphismIds(model, defaulted);
+    for (const column of dualPolymorphismIdColumns(model))
+      if (withIds[column] != null) row[column] = withIds[column];
   }
 };
 

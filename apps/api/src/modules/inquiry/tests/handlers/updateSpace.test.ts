@@ -80,6 +80,7 @@ describe('handler: updateSpace — validate', () => {
       type: InquiryType.updateSpace,
       status: InquiryStatus.sent,
       sourceModel: InquiryResourceModel.Space,
+      sourceOrganizationId: space.organizationId,
       sourceSpaceId: space.id,
       targetModel: InquiryResourceModel.admin,
       content: { slug: 'pending-update-slug' },

@@ -262,28 +262,40 @@ Then `validateDelegateRole` refuses a role on a token whose integration has no r
 ---
 
 <!-- unit doc:docs/claude/PERMISSIONS.md#writing-delegates -->
+
 **Source:** `docs/claude/PERMISSIONS.md` § Writing Delegates (in "Permissions")
 
 #### Writing Delegates
 
 ##### Integrations Are Delegates
 
-An integration has a nullable `role`, `full` and `entitlements`, held over its owner (a user, a member or a tenant), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:delegatedKeys` hook; the keys are tenancy, for scans, list routes, revocation and rate-limit buckets. An integration acts only through its tokens (`integrationDelegate.test.ts`, `packages/permissions/src/rebac/delegation.test.ts`).
+An integration has a nullable `role`, `full` and `entitlements`, held over its owner (a user, a member or a tenant), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:carriedOwnerKeys` hook; the keys are tenancy, for scans, revocation and rate-limit buckets. It is listed only under its integration (`/integration/:id/tokens`), never in its tenant's list. An integration acts only through its tokens (`integrationDelegate.test.ts`, `packages/permissions/src/rebac/delegation.test.ts`).
 
 ##### An Integration's Role
 
-`validateIntegrationRole` (`apps/api/src/modules/integration/validations/validateIntegrationGrant.ts`) checks the body on a hydrated pseudo integration: `validateFullGrant` when it is `full`, else `integrationRoleWrite`: `manage` on the integration, and the role being set held at its owner (`roleHeldAtOwner`: `owner` needs `own` there, `admin` `manage`, `member` `operate`, `viewer` or none `read`). On I1 the owner is M1, so U1 sets any role M1's actions allow U1: `member` through `operate` on M1, `admin` or `owner` only when U1 also administers O1.
+`validateIntegrationRole` (`apps/api/src/modules/integration/validations/validateIntegrationRole.ts`) checks the body on a hydrated pseudo integration: `validateFullGrant` when it is `full`, else `integrationRoleWrite`: `manage` on the integration, and the role being set held at its owner (`roleHeldAtOwner`: `owner` needs `own` there, `admin` `manage`, `member` `operate`, `viewer` or none `read`). On I1 the owner is M1, so U1 sets any role M1's actions allow U1: `member` through `operate` on M1, `admin` or `owner` only when U1 also administers O1.
 
-Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on the row as it is and as it will be. Setting `role` to null is refused (422) unless the integration will be `full` or holds well-formed entitlements.
+Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on the row as it is and as it will be. Setting `role` to null is allowed; an integration left with no role and no entitlements holds nothing.
 
 ##### Granting an Entitlement
 
 A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
 
-1. **The writer's role table.** The writer's table alone (no entitlements, no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable.
-2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed, and its granter still backing each action. Held entitlements never combine: to pass on two, grant two.
+1. **The writer's role table, and what it holds outright above the record.** The writer's table (no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable. An entitlement the writer holds counts here too, like a role on its record, when it is marked `grantsBelow` and sits on a real row above the pseudo record ([Granting below a held row](#granting-below-a-held-row)).
+2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed (an `all` holding every conjunct of the held `where` plus more: held `C`, granted `all: [A, B, C]`), and its granter still backing each action. The lens is never copied: lenses compose down the chain ([the lens](../../packages/permissions/src/rebac/ENTITLEMENTS.md#the-lens)). Held entitlements never combine: to pass on two, grant two.
 
-Every entry goes through this check, whoever writes it and whatever delegate it lands on. A malformed entry or an anchor that does not exist is 422; a refusal is 403.
+###### Granting below a held row
+
+An entitlement held with no `where` and no lens grants below its record, as a role there would (Aron, 2026-11-14). `entitlementsOf` marks every such row `grantsBelow: true` as it turns rows into entries for a table; the library counts a marked entry in the first pass only on a hydrated row above the granted record (the entry's anchor row when the entry sits under it by a path, or a row the anchor holds under its own foreign keys), never on the granted record itself or a pseudo record, and asks the same of whoever backs it at every depth. So M1's self-grant lets a `full` delegate of M1 give `manage` on I1, M1's integration, to another of M1's delegates; a holder of `manage` on S1 (no `where`, no lens) grants `manage` on S1's integrations instead of only a copy of itself.
+
+- **Why no `where`.** A held `where` would be read on today's anchor row and left out of the grant, so the new row would outlive the condition. A row with a `where` is handed on only by the second pass, which keeps every held condition.
+- **Why no lens.** The library never sees a lens; the mark is the app's statement that nothing narrows the row. A lensed row is handed on by the second pass, where its lens composes down the chain at read. Aron: "we shouldn't pass lensed grants… That way, it's just maximally open."
+- **Why derived, not stored.** The mark is a fact about the row's `where` and `lens` columns, so a column would only restate them and could disagree. It is set in `entitlementsOf` alone, not in `toEntitlementEntry`: that one also compares rows (`sameEntitlement`, the writer's coverage), where the lens is deliberately not part of the grant and a mark would make a lensed row and its unlensed twin unequal.
+- **A capped delegate is unchanged.** A role-capped token drops its owner's entitlements (the library's `delegate` keeps only the owner's unowned groups when capping), the self-grant included, so it is still not the member and grants nothing below M1.
+
+Situations: `apps/api/src/lib/permissions/memberGrantsBelowItself.test.ts`.
+
+Every added entry goes through this check, whoever writes it and whatever delegate it lands on. A removal does not: it takes administering the record that holds the row (the check each remove route runs on the holder), not the right to grant it, so an admin who manages a member removes what an owner granted that member. On a token that check is `delete` (administering it), not the `create` check its add route runs: minting on a tenant needs only access to the tenant, and that must not be enough to strip a token's rows. Why: taking away never hands on authority, and whoever administers a holder could already remove it whole (Aron, 2026-11-16: "Removal takes slightly fewer permissions than granting. It just takes ownership over the record, not necessarily over the entitlement"). A malformed entry or an anchor that does not exist is 422; a refusal is 403.
 
 Each pseudo record is built from the anchor down the path: the foreign keys the parent knows, one record per kind the step admits, each with its owner placed under the anchor, ids below the anchor unknown, plus the `where`'s exact `equals` values. The `where`'s root leaves (the `where` itself, or each leaf of its top `all`; nothing nested) on the kind field are checked on each kind the first step admits, and a kind a leaf fails is dropped. So, for the owner and an admin of O1:
 

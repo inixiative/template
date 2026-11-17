@@ -20,10 +20,10 @@ template level with it.
 1. **Plain ids beside the false polymorphism.** `RuleReference` keeps its typed FKs and relations
    on both axes, and also carries plain `sourceId` and `targetId`. Edge identity is one unique,
    `(sourceModel, sourceId, targetModel, targetId)`. The false-polymorphism primitive writes the
-   plain ids, not the edge writer. An axis declares `materialized` (the column holding the one id
+   plain ids, not the edge writer. An axis declares `dualPolymorphismId` (the column holding the one id
    its set typed FK points at). The rules hook writes that column on create, createMany and an
    upsert's create arm, and refuses a row where they disagree.
-2. **An edge's ends never change.** The typed FKs and materialized ids are immutable after
+2. **An edge's ends never change.** The typed FKs and dual polymorphism ids are immutable after
    create. The immutable-fields hook refuses an update that touches them. The only updatable
    column on an edge is the `targetDeletedAt` stamp. A different target is a different edge.
 3. **The sync mirrors the rule; the save path checks.** `syncRuleReferenceEdges` writes exactly
@@ -69,7 +69,7 @@ template level with it.
 - [x] Reads carry the edge rows.
 - [x] Agreement test (`hooks/ruleReference/registryAgreement.test.ts`), no edge-free list.
 - [x] Names; admission deleted; health over edges; labels deleted.
-- [x] Materialized ids in the polymorphism registry; immutable edge ends.
+- [x] Dual polymorphism ids in the polymorphism registry; immutable edge ends.
 - [x] Static email scopes; `ownedSegments` without a caller where.
 - [x] One sync entry for save and revive; save-gate helpers in `validations/`; one edge reader.
 - [x] Static lens files: `customerRef/lib/lenses/` (`customerRefLens`, `customerRefsByIdLens`),
@@ -92,8 +92,8 @@ template level with it.
   outside its scope's owner scope, as `{ model, id, state }`.
 - `validations/assertRuleReferencesExist(scopes, references?)`: throws a `RuleReferenceError` with
   those as `details`, which the API answers with a 422.
-- `materializedIdConflicts`, `withMaterializedIds`, `materializedColumns`: the polymorphism
-  registry's materialized-id step, applied by the rules hook and the factories.
+- `dualPolymorphismIdConflicts`, `withDualPolymorphismIds`, `dualPolymorphismIdColumns`: the polymorphism
+  registry's dual-polymorphism-id step, applied by the rules hook and the factories.
 - `snapshotHookRegistry()`: for tests; restores the hook registry to the snapshot.
 
 `apps/api/src/hooks/ruleReference/` (edge code only):

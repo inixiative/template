@@ -4,11 +4,11 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
+import type { InquiryItem } from '@template/sdk';
 import type { UpdateSpaceContent } from '@template/shared/inquiry';
 import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 
-const UpdateSpaceSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => {
+const UpdateSpaceSourceSummary = ({ inquiry }: { inquiry: InquiryItem }) => {
   const content = inquiry.content as UpdateSpaceContent | null | undefined;
   const changes = [
     content?.name && `name -> ${content.name}`,
@@ -19,7 +19,7 @@ const UpdateSpaceSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => 
   return <span>{changes || 'Space update request'}</span>;
 };
 
-const UpdateSpaceTargetSummary = ({ inquiry }: { inquiry: InquiryReceivedItem }) => (
+const UpdateSpaceTargetSummary = ({ inquiry }: { inquiry: InquiryItem }) => (
   <span>{inquiry.sourceSpace?.name ?? inquiry.sourceOrganization?.name ?? '—'}</span>
 );
 

@@ -1856,8 +1856,8 @@ Per-model include/exclude adjustments to the default immutable set (id, createdA
 **includeCustomer**  
 Prisma include for the customer side, used when a provider lists its customers. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
-**includeInquirySent / includeInquiryReceived / includeInquiryResponse**  
-Prisma includes matched to the acting side: targets only, sources only, or all six relations. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
+**includeInquiryResponse**  
+The one Prisma include: both sides in full (user, organization, space, integration, token, project) and the audit logs. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
 
 **includeProvider**  
 Prisma include for the provider side, used when a customer lists its providers. *Region:* [Customers and segments](customers-segments/knowledge.md)
@@ -3197,8 +3197,8 @@ Promise.all over thunks with an optional cap; results in input order. *Region:* 
 **resolveDateConfig**  
 The single resolver seam (src/date.ts): zone from a name, a value source, or 'UTC'. *Region:* [json-rules dates, windows and verbs](json-rules-dates/knowledge.md)
 
-**resolvedContent**  
-inquiry.content merged with the resolver's declared override fields, passed to handleApprove. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
+**handleApprove(c, inquiry, content, response)**  
+The approval side effect: `content` is what was asked, `response` is the copy the approver sends back; nothing is merged. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
 **resolvedCustomerRefLens**  
 customerRefLens bound to one provider owner (ownerModel, ownerId). *Region:* [Customers and segments](customers-segments/knowledge.md)
@@ -3644,7 +3644,7 @@ Standard prop: boolean or () => boolean; false renders null. *Region:* [UI compo
 { predicate, permission?, requires? } for the from or to end of a transition. *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
 
 **Side-matched includes**  
-includeInquirySent / Received / Response: the include each acting side needs, so related rows come back in one call. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
+includeInquiryResponse: the one include, so both sides' rows come back in one call. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
 
 **sidecar**  
 The plain-markdown gloss file: # <source path>, optional preamble, ## <symbol> sections. *Region:* [Gloss (margin comments)](lib-gloss/knowledge.md)

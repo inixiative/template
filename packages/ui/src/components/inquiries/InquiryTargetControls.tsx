@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquiryReceivedItem } from '@template/sdk';
+import type { InquiryItem } from '@template/sdk';
 import { Button } from '@template/ui/components/primitives/Button';
 import { useResolveInquiryMutation } from '@template/ui/hooks/inquiry';
 import { useInquiryPermission } from '@template/ui/hooks/useInquiryPermission';
@@ -13,7 +13,7 @@ import { getInquiryInterface } from '@template/ui/lib/inquiries/registry';
 import { useState } from 'react';
 
 type InquiryTargetControlsProps = {
-  inquiry: InquiryReceivedItem;
+  inquiry: InquiryItem;
   size?: 'sm' | 'default' | 'lg';
 };
 

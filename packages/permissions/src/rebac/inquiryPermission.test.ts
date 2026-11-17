@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { Operator } from '@inixiative/json-rules';
 import type { HydratedRecord } from '@template/db';
 import { InquiryType, Role } from '@template/db/generated/client/enums';
 import { prismaMap } from '@template/db/generated/prismaMap';
@@ -42,6 +43,8 @@ const leafNames = (rule: ActionRule): string[] => {
 };
 
 const isKnown = (name: string) => {
+  // why: `__actor` is the credential the check runs for, not a column of the inquiry
+  if (name.startsWith('__actor.')) return true;
   if (!name.includes(':')) return name.split('.')[0] in fieldsOf('Inquiry');
   const [rel, action] = name.split(':');
   const model = rel ? modelAt(rel) : 'Inquiry';
@@ -119,16 +122,21 @@ describe('inquiryPermission', () => {
     expect(gates(actions.resolve)).toEqual(expected);
   });
 
-  it('reads party-wide, whatever the type: the person on a side, or its organization or space with manage', () => {
-    expect(inquiryPermission(INQUIRY_TYPES).actions.read).toEqual({
-      any: [
-        { rel: 'sourceUser', action: 'read' },
-        { rel: 'sourceOrganization', action: 'manage' },
-        { rel: 'sourceSpace', action: 'manage' },
-        { rel: 'targetUser', action: 'read' },
-        { rel: 'targetOrganization', action: 'manage' },
-        { rel: 'targetSpace', action: 'manage' },
+  it('reads party-wide, whatever the type, each party on its own channel: a person the sides that name them, an organization the sides on it alone, a space the sides with no person', () => {
+    const channel = (side: string, model: string, clear: string[]) => ({
+      all: [
+        ...clear.map((key) => ({
+          rule: { field: `${side}${key}`, operator: Operator.equals, value: null },
+        })),
+        { rel: `${side}${model}`, action: 'manage' },
       ],
+    });
+    expect(inquiryPermission(INQUIRY_TYPES).actions.read).toEqual({
+      any: (['source', 'target'] as const).flatMap((side) => [
+        { rel: `${side}User`, action: 'read' },
+        channel(side, 'Organization', ['SpaceId', 'UserId']),
+        channel(side, 'Space', ['UserId']),
+      ]),
     });
   });
 

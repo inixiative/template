@@ -8,13 +8,11 @@ import { z } from '@hono/zod-openapi';
 import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { inquiryResolutionStatusSchema } from '#/modules/inquiry/schemas/inquiryResolutionStatusSchema';
-import { inquiryReceivedResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
+import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { inquiryVersionSchema } from '#/modules/inquiry/schemas/inquiryVersionSchema';
 import { Modules } from '#/modules/modules';
 
-// Per-handler resolution fields get validated downstream against
-// `handler.resolutionInputSchema` and filtered in `resolveContent`. Pass them
-// through here instead of stripping them.
+// why: a type's own response fields are parsed downstream by its handler's `resolutionInputSchema`
 const bodySchema = inquiryVersionSchema
   .extend({
     status: inquiryResolutionStatusSchema,
@@ -27,7 +25,7 @@ export const inquiryResolveRoute = actionRoute({
   action: 'resolve',
   method: 'post',
   bodySchema,
-  responseSchema: inquiryReceivedResponseSchema,
+  responseSchema: inquiryResponseSchema,
   description:
     "Resolves an inquiry: approve, deny, or request changes from the source. Other body fields are the type's resolution input; see GET /api/v1/inquiry/info (`types.<type>.resolutionInput`).",
   middleware: [validatePermission('resolve')],

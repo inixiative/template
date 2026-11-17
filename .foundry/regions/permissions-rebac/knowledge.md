@@ -118,7 +118,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | check writer's role table without actor, else pass one held entitlement on whole | **Two-pass entitlement grant check** · pattern docs/claude/PERMISSIONS.md — Granting an Entitlement — check writer's role table without actor, else pass one held entitlement on whole | part 4 | — |
 | stop hydration from following a to-one relation during permission checks | **@permissions(hydrate: false)** · primitive Prisma schema relation annotation — stop hydration from following a to-one relation during permission checks | part 4 | — |
 | the shape of one permission rule; delegate, relation walk, self match or condition; how a single action's grant is written | **ActionRule** · primitive @inixiative/permissions/README.md § Vocabulary — decide one action via grant, relation walk, condition, delegation or combination | code `delegate` | — |
-| copy an integration's owner keys onto its tokens at create for tenancy scans | **falsePolymorphism:delegatedKeys** · primitive docs/claude/PERMISSIONS.md — Integrations Are Delegates — copy an integration's owner keys onto its tokens at create for tenancy scans | part 4 | — |
+| copy an integration's owner keys onto its tokens at create for tenancy scans | **falsePolymorphism:carriedOwnerKeys** · primitive docs/claude/PERMISSIONS.md — Integrations Are Delegates — copy an integration's owner keys onto its tokens at create for tenancy scans | part 4 | — |
 | detect the exact self-grant entry of a given member row | **isMemberSelfGrant** · primitive packages/permissions/src/roles/memberSelfGrant.ts — detect the exact self-grant entry of a given member row | part 4 | — |
 | append the self-grant and pre-generate the row id when member rows are created | **memberSelfGrant hook** · primitive apps/api/src/hooks/memberSelfGrant/hook.ts — Writes the grant; memberSelfGrantRules enforces it stays. | part 4 | — |
 | refuse with 422 any member row write that removes or alters its self-grant | **memberSelfGrantRules** · primitive apps/api/src/hooks/rules/memberSelfGrantRules.ts — refuse with 422 any member row write that removes or alters its self-grant | part 4 | — |
@@ -359,28 +359,40 @@ A viewer member's token naming `manage` on O1 reads it and does not manage it; a
 ---
 
 <!-- unit doc:docs/claude/PERMISSIONS.md#writing-delegates -->
+
 **Source:** `docs/claude/PERMISSIONS.md` § Writing Delegates (in "Permissions")
 
 #### Writing Delegates
 
 ##### Integrations Are Delegates
 
-An integration has a nullable `role`, `full` and `entitlements`, held over its owner (a user, a member or a tenant), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:delegatedKeys` hook; the keys are tenancy, for scans, list routes, revocation and rate-limit buckets. An integration acts only through its tokens (`integrationDelegate.test.ts`, `packages/permissions/src/rebac/delegation.test.ts`).
+An integration has a nullable `role`, `full` and `entitlements`, held over its owner (a user, a member or a tenant), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:carriedOwnerKeys` hook; the keys are tenancy, for scans, revocation and rate-limit buckets. It is listed only under its integration (`/integration/:id/tokens`), never in its tenant's list. An integration acts only through its tokens (`integrationDelegate.test.ts`, `packages/permissions/src/rebac/delegation.test.ts`).
 
 ##### An Integration's Role
 
-`validateIntegrationRole` (`apps/api/src/modules/integration/validations/validateIntegrationGrant.ts`) checks the body on a hydrated pseudo integration: `validateFullGrant` when it is `full`, else `integrationRoleWrite`: `manage` on the integration, and the role being set held at its owner (`roleHeldAtOwner`: `owner` needs `own` there, `admin` `manage`, `member` `operate`, `viewer` or none `read`). On I1 the owner is M1, so U1 sets any role M1's actions allow U1: `member` through `operate` on M1, `admin` or `owner` only when U1 also administers O1.
+`validateIntegrationRole` (`apps/api/src/modules/integration/validations/validateIntegrationRole.ts`) checks the body on a hydrated pseudo integration: `validateFullGrant` when it is `full`, else `integrationRoleWrite`: `manage` on the integration, and the role being set held at its owner (`roleHeldAtOwner`: `owner` needs `own` there, `admin` `manage`, `member` `operate`, `viewer` or none `read`). On I1 the owner is M1, so U1 sets any role M1's actions allow U1: `member` through `operate` on M1, `admin` or `owner` only when U1 also administers O1.
 
-Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on the row as it is and as it will be. Setting `role` to null is refused (422) unless the integration will be `full` or holds well-formed entitlements.
+Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on the row as it is and as it will be. Setting `role` to null is allowed; an integration left with no role and no entitlements holds nothing.
 
 ##### Granting an Entitlement
 
 A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
 
-1. **The writer's role table.** The writer's table alone (no entitlements, no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable.
-2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed, and its granter still backing each action. Held entitlements never combine: to pass on two, grant two.
+1. **The writer's role table, and what it holds outright above the record.** The writer's table (no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable. An entitlement the writer holds counts here too, like a role on its record, when it is marked `grantsBelow` and sits on a real row above the pseudo record ([Granting below a held row](#granting-below-a-held-row)).
+2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed (an `all` holding every conjunct of the held `where` plus more: held `C`, granted `all: [A, B, C]`), and its granter still backing each action. The lens is never copied: lenses compose down the chain ([the lens](../../packages/permissions/src/rebac/ENTITLEMENTS.md#the-lens)). Held entitlements never combine: to pass on two, grant two.
 
-Every entry goes through this check, whoever writes it and whatever delegate it lands on. A malformed entry or an anchor that does not exist is 422; a refusal is 403.
+###### Granting below a held row
+
+An entitlement held with no `where` and no lens grants below its record, as a role there would (Aron, 2026-11-14). `entitlementsOf` marks every such row `grantsBelow: true` as it turns rows into entries for a table; the library counts a marked entry in the first pass only on a hydrated row above the granted record (the entry's anchor row when the entry sits under it by a path, or a row the anchor holds under its own foreign keys), never on the granted record itself or a pseudo record, and asks the same of whoever backs it at every depth. So M1's self-grant lets a `full` delegate of M1 give `manage` on I1, M1's integration, to another of M1's delegates; a holder of `manage` on S1 (no `where`, no lens) grants `manage` on S1's integrations instead of only a copy of itself.
+
+- **Why no `where`.** A held `where` would be read on today's anchor row and left out of the grant, so the new row would outlive the condition. A row with a `where` is handed on only by the second pass, which keeps every held condition.
+- **Why no lens.** The library never sees a lens; the mark is the app's statement that nothing narrows the row. A lensed row is handed on by the second pass, where its lens composes down the chain at read. Aron: "we shouldn't pass lensed grants… That way, it's just maximally open."
+- **Why derived, not stored.** The mark is a fact about the row's `where` and `lens` columns, so a column would only restate them and could disagree. It is set in `entitlementsOf` alone, not in `toEntitlementEntry`: that one also compares rows (`sameEntitlement`, the writer's coverage), where the lens is deliberately not part of the grant and a mark would make a lensed row and its unlensed twin unequal.
+- **A capped delegate is unchanged.** A role-capped token drops its owner's entitlements (the library's `delegate` keeps only the owner's unowned groups when capping), the self-grant included, so it is still not the member and grants nothing below M1.
+
+Situations: `apps/api/src/lib/permissions/memberGrantsBelowItself.test.ts`.
+
+Every added entry goes through this check, whoever writes it and whatever delegate it lands on. A removal does not: it takes administering the record that holds the row (the check each remove route runs on the holder), not the right to grant it, so an admin who manages a member removes what an owner granted that member. On a token that check is `delete` (administering it), not the `create` check its add route runs: minting on a tenant needs only access to the tenant, and that must not be enough to strip a token's rows. Why: taking away never hands on authority, and whoever administers a holder could already remove it whole (Aron, 2026-11-16: "Removal takes slightly fewer permissions than granting. It just takes ownership over the record, not necessarily over the entitlement"). A malformed entry or an anchor that does not exist is 422; a refusal is 403.
 
 Each pseudo record is built from the anchor down the path: the foreign keys the parent knows, one record per kind the step admits, each with its owner placed under the anchor, ids below the anchor unknown, plus the `where`'s exact `equals` values. The `where`'s root leaves (the `where` itself, or each leaf of its top `all`; nothing nested) on the kind field are checked on each kind the first step admits, and a kind a leaf fails is dropped. So, for the owner and an admin of O1:
 
@@ -411,6 +423,7 @@ Situations: `integrationGrantsUnderOrganization.test.ts`, `entitlementGrants.tes
 ---
 
 <!-- unit doc:docs/claude/PERMISSIONS.md#rebac -->
+
 **Source:** `docs/claude/PERMISSIONS.md` § REBAC (in "Permissions")
 
 #### REBAC
@@ -427,6 +440,7 @@ The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed
 | `memberRowActions(tenant)` | a member row's actions |
 | `memberRoleWrite(tenant)`, `memberRemoval(tenant)` | writing a member's role; removing a member |
 | `integrationAdministering`, `integrationAccess` | `db:integration`'s `create`, `manage`, `delete`, `delegateFull`; its `operate` and `read` |
+| `administeredByOwnerKind` | the same by owner kind without `delegateFull`, for a model owned by any of the five owners (`db:project`) |
 | `integrationRoleWrite`, `roleHeldAtOwner(at?)` | writing an integration's role; the role on the row held at its owner |
 | `tokenAccessIsYours`, `tokenAdministering` | `db:token`'s `create`; its `read` and `delete` |
 | `chainedStandardActions`, `ownerActions(rels?)` | the standard chain; the owner fan-out over it |
@@ -440,6 +454,7 @@ The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed
 | `string` | another action on the same record | `manage: 'own'` |
 | `{ rel, action }` | the action on a related record (dot-paths walk further) | `{ rel: 'organization', action: 'own' }` |
 | `{ rule: Condition }` | a json-rules condition over the record and `__actor` | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
+| `{ rel, arrayOperator: 'any', condition }` | some item of a declared list passes `condition`, judged on the item ([Crossing a List](#crossing-a-list-down)) | `{ rel: 'participants', arrayOperator: 'any', condition: { rel: 'user', action: 'operate' } }` |
 | `{ any: ActionRule[] }` | at least one passes | `{ any: [{ rel: 'user', action: 'read' }, 'read'] }` |
 | `{ all: ActionRule[] }` | all pass | `{ all: [actorIsUser, 'own'] }` |
 | `null` | only a held grant passes | `own: null` |
@@ -454,6 +469,47 @@ Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'o
 4. **Entitlements**: consulted at a record only after the table and the schema rule miss.
 5. **Cycle detection** stops a rule that comes back to itself.
 
+##### Crossing a List (`down`)
+
+A `{ rel, action }` walk goes up: from a record to a parent it holds the key of. Some rules turn on a child row instead, and the record holds no key to it:
+
+- **Membership.** You may post in a conversation when you are one of its participants.
+- **A junction table.** A resource is attached to many projects, and whoever reads one of those projects reads the resource. The role or entitlement stays on the project.
+
+The list arm says "some item passes": `{ rel: '<list field>', arrayOperator: 'any', condition }`, where `condition` is an ActionRule judged on each item as the item's own resource. `any` is the only operator; the others hold on an empty list or count rows, and the library refuses them.
+
+The list is declared on the Prisma field, and the declaration is the load plan:
+
+```prisma
+model Resource {
+  /// @permissions(down: [project.organization])
+  projects ProjectResource[]
+}
+```
+
+```ts
+'db:resource': {
+  actions: {
+    read: { rel: 'projects', arrayOperator: 'any', condition: { rel: 'project', action: 'read' } },
+  },
+},
+```
+
+- **`down` is a list of dotted to-one paths from an item**, each leaf by its full path (`[a.b, a.c]`). `down: []` loads the items alone.
+- **What loads.** Wherever the model is hydrated, the hydrator makes one `loadMany` read of the items, then loads only the declared paths under each. Nothing else loads from an item, so hydration goes one jump down and never back up into the record it came from. Any other to-one relation on an item ends empty.
+- **The declaration carries what the rule walks.** Every relation the `condition` walks, followed through the actions it lands on, must be inside a declared path. Above, `project.read` walks on to the organization, so the path is `project.organization`. A shorter declaration is a `validateSchema` error and the check refuses the schema on first use.
+- **One jump.** A list arm under an item denies. A list that is not declared is never crossed.
+- **Never on a stand-in.** A record that does not exist yet has no list, so a grant that rests on a list is anchored where a real list is (the record itself, or one below it), not above.
+- **Wiring.** `createHydrator` needs `loadMany` once any list is declared and refuses to build without it. Add it beside `load` in `packages/db/src/hydrate/hydrate.ts`, reading live rows through the same cache layer. Template declares no list today.
+
+When the record holds the key itself, use a plain `rel`. The library README (`@inixiative/permissions`, "Crossing a list") has the full rules.
+
+##### Placing a Field on a Stand-In (`place`)
+
+A grant is checked on a stand-in record before the real one exists. A rule that reads a type field one level down (`resource.kind`) finds it unknown there. Mark the scalar `/// @permissions(place: true)` and a grant whose `where` states `<path>.<field> equals <literal>` builds the stand-in with that value. The condition stays on the row, so it is still judged on the real record at read. Allowed on String, Int, Boolean and enum fields; never on an id, a relation key, a discriminator or a relation. Use it instead of copying the field onto the root model.
+
+`@permissions(...)` takes three keys (`hydrate: false`, `down`, `place`) and is read strictly: a typo throws on first use of the map.
+
 ##### Dot-path vs. Single-hop Delegation
 
 ```typescript
@@ -466,6 +522,16 @@ Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'o
 ```
 
 In the inquiry schema, `updateSpace` uses single-hop and `transferSpace` uses the dot-path.
+
+##### Inquiry permissions
+
+`db:inquiry` is the `inquiry` object `inquiryPermission.ts` builds from `INQUIRY_TYPES`; the schema imports it like any other resource. Each inquiry type declares, in `INQUIRY_TYPES` (`inquiryTypes.ts`), the party models that may stand on each side and the level each needs: `send` for a source, `resolve` for a target. A level is an action of that party model's own resource; `inquiryPermission.test.ts` walks every send, resolve and read rule and fails when a relation, action or field it names, in a plain action or inside a rule-form level, does not exist. A level can instead be a plain rebac rule in the schema's own vocabulary, used as written, for a case one action cannot say: `transferSpace` is `{ rel: 'sourceSpace.organization', action: 'own' }`, and an invite picks `own` or `manage` with `any`/`all` over its role.
+
+- **`read`** is party-wide, whatever the type, each party on its own ownership channel (`INQUIRY_READ_LEVELS`): a person reads the sides that name them (`read` on that user): what belongs to a member, or chains through one, is the member's and never the organization's; `manage` on an organization reads the sides on the organization alone (the side's space and user keys are null), which includes its own integrations, tokens and projects; `manage` on a space reads the sides on the space with no user. Why: an inquiry carries its delegates' owner keys, so the organization is on every row beneath it; a member's own integration stays the member's and a space's inquiries the space's (Aron, 2026-11-16). See [INQUIRIES.md](INQUIRIES.md#permissions-rebac).
+- **`send`** and **`resolve`** are one branch per type, each gated on the type and on the party model, asking the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`).
+- A platform (`admin`) party has no relation, so only a superadmin acts for it.
+
+The API reads the same declarations to check that a create's parties are ones the type accepts (`validateInquiryHandler`).
 
 ---
 

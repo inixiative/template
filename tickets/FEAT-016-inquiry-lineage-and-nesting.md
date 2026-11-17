@@ -68,7 +68,7 @@ If audit logs track all mutations, they may already cover "who created this and 
 
 ### 5. How does this interact with `handleApprove`?
 
-Currently `handleApprove(db, inquiry, resolvedContent)` runs side effects and returns partial resolution data. If approval should spawn a child inquiry, the handler would need:
+Currently `handleApprove(c, inquiry, content, response)` runs side effects and returns partial resolution data. If approval should spawn a child inquiry, the handler would need:
 - Access to context (userId, source org, etc.) — currently not available in `handleApprove`
 - A way to set `parentInquiryId` on the spawned inquiry
 

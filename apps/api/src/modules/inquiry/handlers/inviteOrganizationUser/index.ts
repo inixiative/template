@@ -29,18 +29,18 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
 
   autoApprove: async () => false,
 
-  handleApprove: async (inquiry: Inquiry, resolvedContent: InviteOrganizationUserContent) => {
+  handleApprove: async (_c, inquiry: Inquiry, content: InviteOrganizationUserContent) => {
     const organizationId = inquiry.sourceOrganizationId!;
     const userId = inquiry.targetUserId!;
     const [revived] = await revive(db.organizationUser, { organizationId, userId });
     if (revived)
       await db.organizationUser.update({
         where: { id: revived.id },
-        data: { role: resolvedContent.role },
+        data: { role: content.role },
       });
     else
       await db.organizationUser.create({
-        data: { organizationId, userId, role: resolvedContent.role },
+        data: { organizationId, userId, role: content.role },
       });
   },
 

@@ -5,11 +5,12 @@
  * @uses none
  */
 
+import { keysHeldOnAxis } from '@template/db/registries/carriedOwnerKeys';
 import {
   discriminatorDefault,
   discriminatorRequiresValue,
 } from '@template/db/registries/discriminatorDefaults';
-import { delegatedKeys, getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/test/factoryTypes';
 
 const axesOf = (modelName: ModelName) => getPolymorphismConfig(modelName)?.axes ?? [];
@@ -50,7 +51,7 @@ export const assertSelectedForeignKeys = (
       throw new Error(
         `${modelName} ${axis.field}=${String(value)} needs ${missing.join(', ')} — pass the ${String(value)}`,
       );
-    const carried = [...selected, ...delegatedKeys(axis, value)];
+    const carried = keysHeldOnAxis(modelName, axis, value);
     const stray = [...new Set(Object.values(foreignKeysByValue).flat())].filter(
       (foreignKey) => foreignKey && !carried.includes(foreignKey) && fields[foreignKey] != null,
     );

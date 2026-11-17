@@ -7,7 +7,7 @@
 import { getPolymorphismConfig } from '@template/db';
 
 // The relation names of a false-polymorphic axis, one per model it can point at.
-const axisRelations = (model: 'Entitlement' | 'Inquiry' | 'RuleReference', side: string) =>
+const axisRelations = (model: 'Entitlement' | 'RuleReference', side: string) =>
   Object.keys(
     getPolymorphismConfig(model)?.axes.find((axis) => axis.field === `${side}Model`)?.fkMap ?? {},
   )
@@ -22,8 +22,6 @@ export const CASCADE_EXEMPT: Record<string, readonly string[]> = {
   // An entitlement acts from its anchor; it does not belong to it. A deleted anchor is stamped on
   // the row (`sourceDeletedAt`), and the row dies only with its target.
   Entitlement: axisRelations('Entitlement', 'source'),
-  // An inquiry stays when a party dies and shows that party as deleted.
-  Inquiry: [...axisRelations('Inquiry', 'source'), ...axisRelations('Inquiry', 'target')],
   // A rule names these rows; it does not own them. Tombstoning one stamps the edges that name it
   // (ruleReference:target) — deleting them would erase the record that a rule is degraded.
   RuleReference: axisRelations('RuleReference', 'target'),

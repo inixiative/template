@@ -49,7 +49,7 @@ describe('DELETE /api/v1/inquiry/:id/cancel', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('cancels a sent inquiry', async () => {
+  it('cancels a sent inquiry and leaves it live', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -67,6 +67,10 @@ describe('DELETE /api/v1/inquiry/:id/cancel', () => {
       ),
     );
     expect(response.status).toBe(204);
+    expect(await db.inquiry.findUnique({ where: { id: inquiry.id } })).toMatchObject({
+      status: InquiryStatus.canceled,
+      deletedAt: null,
+    });
   });
 
   it('clears expiresAt when canceling an expiring inquiry', async () => {
@@ -89,9 +93,7 @@ describe('DELETE /api/v1/inquiry/:id/cancel', () => {
     );
     expect(response.status).toBe(204);
 
-    const updated = await db.withDeleted(() =>
-      db.inquiry.findUnique({ where: { id: inquiry.id } }),
-    );
+    const updated = await db.inquiry.findUnique({ where: { id: inquiry.id } });
     expect(updated?.expiresAt).toBeNull();
   });
 

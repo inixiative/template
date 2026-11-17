@@ -174,15 +174,19 @@ describe('emailLens — the rows a rule names', () => {
     ]);
   });
 
-  it('dotted spellings reach the same sources', () => {
+  it('membership in a space or organization, crossed under an array rule, names each row', () => {
     expect(
       emailRuleReferences(lens, {
         any: [
-          { field: 'recipient.spaceUsers.space.id', operator: 'equals', value: 'space-1' },
           {
-            field: 'recipient.organizationUsers.organization.id',
-            operator: 'notEquals',
-            value: 'org-1',
+            field: 'recipient.spaceUsers',
+            arrayOperator: 'any',
+            condition: { field: 'space.id', operator: 'equals', value: 'space-1' },
+          },
+          {
+            field: 'recipient.organizationUsers',
+            arrayOperator: 'any',
+            condition: { field: 'organization.id', operator: 'notEquals', value: 'org-1' },
           },
         ],
       }),
@@ -202,11 +206,23 @@ describe('emailLens — the rows a rule names', () => {
     expect(
       emailRuleReferences(lens, {
         all: [
-          { field: 'recipient.tagAttachments.tag.name', operator: 'equals', value: 'vip' },
+          {
+            field: 'recipient.tagAttachments',
+            arrayOperator: 'any',
+            condition: { field: 'tag.name', operator: 'equals', value: 'vip' },
+          },
           { field: 'recipient.name', operator: 'equals', value: 'tag-a' },
           { field: 'data.tagId', operator: 'equals', value: 'tag-a' },
-          { field: 'recipient.tagAttachments.tag.id', operator: 'equals', path: 'data.tagId' },
-          { field: 'recipient.tagAttachments.tag.id', operator: 'equals', bind: 'tagId' },
+          {
+            field: 'recipient.tagAttachments',
+            arrayOperator: 'any',
+            condition: { field: 'tag.id', operator: 'equals', path: 'data.tagId' },
+          },
+          {
+            field: 'recipient.tagAttachments',
+            arrayOperator: 'any',
+            condition: { field: 'tag.id', operator: 'equals', bind: 'tagId' },
+          },
         ],
       }),
     ).toEqual([]);
@@ -458,14 +474,33 @@ describe('emailSurface — the four lenses composed for the builder', () => {
     const surface = emailSurface(emailLens({ sender: lensFor('Organization') }));
     const gate = { parent: surface, root: surface.narrowing.root };
     expect(validateNarrowing(gate).ok).toBe(true);
-    const ok = (field: string) =>
-      validateRuleInLens({ field, operator: 'exists' } as Condition, gate).ok;
-    expect(ok('recipient.organizationUsers.organization.name')).toBe(true);
-    expect(ok('recipient.tagAttachments.tag.name')).toBe(true);
-    expect(ok('recipient.providerRefs.segmentMembers.segment.name')).toBe(true);
-    expect(ok('sender.name')).toBe(true);
-    expect(ok('recipient.organizationUsers.organization.organizationUsers.role')).toBe(false);
-    expect(ok('recipient.organizationUsers.organization.emailTemplates')).toBe(false);
+    const ok = (rule: Condition) => validateRuleInLens(rule, gate).ok;
+    const exists = (field: string): Condition => ({ field, operator: 'exists' }) as Condition;
+    const across = (field: string, condition: Condition): Condition => ({
+      field,
+      arrayOperator: 'any',
+      condition,
+    });
+    expect(ok(across('recipient.organizationUsers', exists('organization.name')))).toBe(true);
+    expect(ok(across('recipient.tagAttachments', exists('tag.name')))).toBe(true);
+    expect(
+      ok(across('recipient.providerRefs', across('segmentMembers', exists('segment.name')))),
+    ).toBe(true);
+    expect(ok(exists('sender.name'))).toBe(true);
+    expect(
+      ok(
+        across(
+          'recipient.organizationUsers',
+          across('organization.organizationUsers', exists('role')),
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      ok(
+        across('recipient.organizationUsers', across('organization.emailTemplates', exists('id'))),
+      ),
+    ).toBe(false);
+    expect(ok(exists('recipient.organizationUsers.organization.name'))).toBe(false);
   });
 
   it('derives one facet per slot present', () => {

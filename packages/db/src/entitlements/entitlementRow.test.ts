@@ -84,7 +84,7 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     });
   });
 
-  it("a member arm carries the member's whole owner chain, its id materialized", async () => {
+  it("a member arm carries the member's whole owner chain, its dual polymorphism id set", async () => {
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
     const { entity: spaceUser } = await createSpaceUser({}, { organization, space });

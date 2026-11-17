@@ -4,11 +4,11 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
+import type { InquiryItem } from '@template/sdk';
 import type { SpaceContent } from '@template/shared/inquiry';
 import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 
-const CreateSpaceSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => {
+const CreateSpaceSourceSummary = ({ inquiry }: { inquiry: InquiryItem }) => {
   const content = inquiry.content as SpaceContent | null | undefined;
   return (
     <span>
@@ -18,7 +18,7 @@ const CreateSpaceSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => 
   );
 };
 
-const CreateSpaceTargetSummary = ({ inquiry }: { inquiry: InquiryReceivedItem }) => (
+const CreateSpaceTargetSummary = ({ inquiry }: { inquiry: InquiryItem }) => (
   <span>{inquiry.sourceOrganization?.name ?? '—'}</span>
 );
 

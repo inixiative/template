@@ -6,16 +6,15 @@
  */
 import type { Prisma } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
-import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import type { InquiryResolutionStatus } from '#/modules/inquiry/schemas/inquiryResolutionStatusSchema';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
-import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 import { validateInquiryIsResolvable } from '#/modules/inquiry/validations/validateInquiryStatus';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -28,43 +27,47 @@ export const resolveInquiry = async (
 ): Promise<Inquiry> => {
   const db = c.get('db');
 
-  auditActorContext.extend({ sourceInquiryId: inquiry.id });
+  // why: the resolving inquiry is known to every write below (audit attribution, the request hooks), with or without a request scope
+  return auditActorContext.scope(
+    { ...(auditActorContext.getScope() ?? nullAuditActor), sourceInquiryId: inquiry.id },
+    () =>
+      db.txn(async () => {
+        const fresh = await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt);
+        validateInquiryIsResolvable(fresh);
 
-  try {
-    return await db.txn(async () => {
-      const fresh = await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt);
-      validateInquiryIsResolvable(fresh);
+        const handler = inquiryHandlers[fresh.type];
+        const response = handler.resolutionInputSchema.parse(resolutionData);
+        let approvalOutput: Record<string, unknown> = {};
 
-      const handler = inquiryHandlers[fresh.type];
-      let approvalOutput: Record<string, unknown> = {};
+        if (status === InquiryStatus.approved) {
+          approvalOutput =
+            (await handler.handleApprove(
+              c,
+              fresh,
+              handler.contentSchema.parse(fresh.content),
+              response,
+            )) ?? {};
+        }
 
-      if (status === InquiryStatus.approved) {
-        const content = handler.contentSchema.parse(fresh.content);
-        const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
-        approvalOutput = (await handler.handleApprove(fresh, merged, c.get('permix'))) ?? {};
-      }
+        const expiresAt =
+          status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;
 
-      const expiresAt =
-        status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;
+        const updated = await db.inquiry.update({
+          where: { id: fresh.id },
+          data: {
+            status,
+            resolution: handler.resolutionSchema.parse({
+              ...response,
+              ...approvalOutput,
+            }) as Prisma.InputJsonValue,
+            expiresAt,
+          },
+          include: includeInquiryResponse,
+        });
 
-      const updated = await db.inquiry.update({
-        where: { id: fresh.id },
-        data: {
-          status,
-          resolution: handler.resolutionSchema.parse({
-            ...resolutionData,
-            ...approvalOutput,
-          }) as Prisma.InputJsonValue,
-          expiresAt,
-        },
-        include: includeInquiryReceived,
-      });
+        await emitAppEvent('inquiry.resolved', updated);
 
-      await emitAppEvent('inquiry.resolved', updated);
-
-      return updated;
-    });
-  } finally {
-    auditActorContext.extend({ sourceInquiryId: null });
-  }
+        return updated;
+      }),
+  );
 };

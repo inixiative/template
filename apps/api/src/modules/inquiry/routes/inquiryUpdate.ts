@@ -8,7 +8,7 @@ import { z } from '@hono/zod-openapi';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
-import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
+import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { inquiryVersionSchema } from '#/modules/inquiry/schemas/inquiryVersionSchema';
 import { Modules } from '#/modules/modules';
 
@@ -25,6 +25,6 @@ const bodySchema = z
 export const inquiryUpdateRoute = updateRoute({
   model: Modules.inquiry,
   bodySchema,
-  responseSchema: inquirySentResponseSchema,
+  responseSchema: inquiryResponseSchema,
   middleware: [validatePermission('send')],
 });

@@ -38,7 +38,7 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^3.6.0",
+    "@inixiative/json-rules": "^4.1.0",
     "@inixiative/permissions": "^0.22.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",

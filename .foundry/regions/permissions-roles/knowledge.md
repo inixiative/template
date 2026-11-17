@@ -401,11 +401,12 @@ The table says what a principal holds. The actor says only who is acting: `permi
 ---
 
 <!-- unit doc:docs/claude/PERMISSIONS.md#entitlements -->
+
 **Source:** `docs/claude/PERMISSIONS.md` § Entitlements (in "Permissions")
 
 #### Entitlements
 
-Grants beyond a role, stored as library entries `{ resource, anchor: { resource, id, path? }, where?, actions }` (`entitlementEntriesSchema`). A flat action map is refused (422). Stored entries are pruned to the well-formed ones wherever they are read (`wellFormedEntitlements`, by the library's `entitlementProblem`, dropping entries another one already covers), so a write starts from what is valid. How to write one: [building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md).
+Grants beyond a role. Each is one row of the `Entitlement` table (`packages/db/prisma/schema/entitlement.prisma`, [DATABASE.md](DATABASE.md#entitlement)): its **source** is the anchor (`sourceModel`, `sourceId`, `sourcePath`), its **target** the holder (a `Token`, `Integration`, `OrganizationUser` or `SpaceUser`), `resource` the model its `actions` apply to, `where` a positive json-rules condition. The grantor is never a column: it is the target's owner, re-walked live. The API speaks rows: a write takes `EntitlementInput` rows (`entitlementInputSchema`: `resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`), and every read of a token, integration or member row (single reads, list reads and `/me`) includes its live rows as stored under `targetEntitlements` (`EntitlementScalarSchema`). The library keeps its own words, and one small transformer in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`) moves between the two only where a holder meets the library: `toEntitlementEntry` turns a row into the entry `{ resource, anchor: { resource, id, path? }, where?, actions }`, with no `path` or `where` when the row has none and `actions` as a map; `toEntitlementInput` turns an entry the library hands back (a self-grant) into a row; `entitlementsOf(holder)` gives the well-formed entries a holder's rows grant (`wellFormedEntitlements`, by the library's `entitlementProblem`, dropping entries another one covers). Its callers are `delegatedPermissions` / `ownerPermissions`, `permissionsOfUser`, `changeEntitlements` (validation and coverage) and the `memberSelfGrant` hook. Why rows: "who holds what on this record?" is a query, and every grant and revocation is its own audit entry. How to write one: [building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md).
 
 ##### How Entitlements Are Applied
 
@@ -419,11 +420,20 @@ The action is checked on the record, never asked of the anchor. Who backs it: fo
 
 ##### Changing Entitlements
 
-Entitlements change only through their own endpoint, never through a record update: `PATCH /organizationUser/:id/entitlements`, `/spaceUser/:id/entitlements`, `/integration/:id/entitlements` and `/token/:id/entitlements`, with body `{ add?, remove? }` (`changeEntitlements`, `apps/api/src/lib/permissions/changeEntitlements.ts`).
+Entitlements are read on their holder (every read of a token, integration or member row includes `targetEntitlements`; there is no list route of their own) and change only through the holder's `entitlements` sub-resource, never through a record update, and every change goes through one writer, `changeEntitlements` (`apps/api/src/lib/permissions/changeEntitlements.ts`), inside `db.txn()` and the holder's `entitlements` owner lock:
 
-- The writer must be able to change the holder: `memberRoleWrite` on a member row, `validateIntegrationRole` on an integration, `validateTokenWrite` on a token.
-- Every entry in `add`, and every entry in `remove` that matches a stored one, goes through the same grant check: you remove only what you could grant. A removal that matches nothing stored is skipped, unchecked.
-- On a member row the self-grant is put back by the hook whatever the body says.
+| Route | Body | Answer |
+|---|---|---|
+| `POST /{token,integration,organizationUser,spaceUser}/:id/entitlements` | a JSON array of `EntitlementInput` rows | 201, every live row the holder now holds, as stored |
+| `DELETE /{token,integration,organizationUser,spaceUser}/:id/entitlements` | a JSON array of `Entitlement` row ids | 204 |
+
+- The writer must be able to change the holder: `validateMemberGrant` (`memberRoleWrite`) on a member row, `validateIntegrationRole` on an integration (plus `manage` at the route), `validateTokenWrite` on a token.
+- Every added entry goes through the grant check; a removed row does not, whatever became of its anchor. A removal names rows the holder holds live; any other id is 404 and nothing changes.
+- An added entry already covered (`coversEntitlement`) by a row the holder holds with no lens or the same lens is skipped. A held row equal to an added entry but for its lens (no lens counts as one) is replaced: it is removed, through the same removal check, and the entry is added unless another held row covers it. One grant holds one lens ([the lens](../../packages/permissions/src/rebac/ENTITLEMENTS.md#the-lens)). Of equal entries in one write, the last is written.
+- Rows are immutable (`immutableFields` refuses a change to any column but the tombstones): a change is a removal plus a grant. A removal is a soft delete, audited per row, as is every created row.
+- A member's self-grant can't be removed ([The Member Self-Grant](#the-member-self-grant)); a `full` holder takes none. A holder left with no rows holds nothing ([The Backstop Rules](#the-backstop-rules)).
+- The create body of a token or an integration may carry `entitlements`; they are written by the same writer in the same transaction as the row.
+- The `entitlement-writer-only` CI rule holds the one-writer line above: a write outside `changeEntitlements` fails, nested writes and `delegate('Entitlement')` included ([SCRIPTS.md § CI Rule Scripts](./SCRIPTS.md#ci-rule-scripts)). A gap in the check is fixed inside the writer, never beside it.
 
 ##### The Path Names the Anchor and the Axis; the Where Narrows
 
@@ -437,6 +447,14 @@ A polymorphic record carries the ids of everything above it: S1's integration ha
 | `user` | the user's, and the user's members' (narrow with `where ownerModel = User`) |
 
 Sides are separate axes: `targetOrganization` reaches what O1 (or its members) received, never what it sent. A self anchor (the entitled record itself) has no path. Only the anchor's id is fixed: a record that moves within the anchor stays reached, one that moves out stops.
+
+##### Lenses Keep `id`; Paths Merge by `id`
+
+A holder can be admitted along several delegation paths, each with its own lens (a `where` on the rows, picks and omits on their shape). The holder gets the union of what every path gives, the chimera (Aron, 2026-11-14): each object comes back through every path whose filter admits it, and the projections are merged object by object. Why: extra access from a second grantor has to reach the holder; taking one path's lens, or the intersection, drops what the second grantor gave.
+
+- **A lens never removes `id`.** The `entitlementLens` hook (`apps/api/src/hooks/entitlementLens/hook.ts`), before every `Entitlement` create, runs `validateEntitlementLens` (`apps/api/src/lib/permissions/validateEntitlementLens.ts`). The lens must be a json-rules narrowing over the resource's base lens (`validateNarrowing`; a malformed one is a 422). The base lens comes from a resolver the validator takes (`baseLensOf`, default `lensFor`); an app whose entitlement resources are not all Prisma models passes its own, and a resource the resolver has no base lens for takes no lens (422). No visit it shows may hide `id` on a model whose field map has one (`visitsDroppingId`, `packages/permissions/src/lens`, over `projectLens`), and neither may a `mapDefaults` model narrowing, wherever its model is visited. It refuses rather than adding `id`, so a stored lens always says what it shows. Rows are immutable (`immutableFields` refuses a `lens` change), so create is the only way in, and every writer (`changeEntitlements`, factories, a direct create) passes the hook. The rule is template's (and Kingdom's), not json-rules': the `id` convention is ours. Why: with `id` always present, every projection can be matched object by object, and the guard sits once, on the row.
+- **`mergeProjections(sourceRows, projections)`** (`packages/permissions/src/lens/mergeProjections.ts`) takes the source rows and each path's `projectRows` output over them, with the path's lens and key. Objects with one `id` become one object holding every key any path kept; a to-one is merged recursively, and every to-many list is merged by its items' `id`, recursively, never by position. A relation present in one projection beats one missing or `null` in another (`projectRows` turns a to-one its filter hides into `null`). Scalars and Json kept by two paths must be equal, and an object without `id` in a model that has one throws. Every list, the root included, follows the source rows' order, so a database `orderBy` and a cursor survive the merge and nothing depends on the order the paths are given in; the result shares no object with its inputs. Why: a plain deep merge pairs list items by index and invents rows (one item's field glued onto another's `id`), and lets a hidden `null` overwrite a shown to-one depending on order.
+- **Attribution, not billing.** `attribution` names every path that admitted at least one object in the result. Each is noted as used and never charged; only the routed path's budget is charged, so there is no superset or subset calculation. A path out of budget does not admit (Aron, 2026-11-14: "It's treated as if it doesn't exist"), so the caller leaves it out before projecting, the same as a revoked one. Why: attribution answers who was involved without one provider call becoming several charges.
 
 ---
 

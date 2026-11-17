@@ -6,19 +6,20 @@
  */
 import type { Prisma, PrismaBaseArgs } from '@template/db';
 import type { InquiryResourceModel } from '@template/db/generated/client/enums';
-import type { Permix } from '@template/permissions';
 import type { BaseResolution } from '@template/shared/inquiry';
+import type { Context } from 'hono';
 import type { z } from 'zod';
 import type { AppEventHandlerDefinition } from '#/appEvents/types';
 import type { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
+import type { AppEnv } from '#/types/appEnv';
 
 export type Inquiry = Prisma.InquiryGetPayload<PrismaBaseArgs>;
 
 // InquiryWithIncludes is the contract app-event handlers see. Different routes
 // load different subsets — sent routes hydrate target* relations only, received
 // routes hydrate source* only — so the shape must accept either. We mark each
-// relation Partial<> so a value loaded with includeInquirySent OR
-// includeInquiryReceived OR includeInquiryResponse is assignable. Handlers
+// relation Partial<> so a value loaded with includeInquiryResponse OR
+// includeInquiryResponse OR includeInquiryResponse is assignable. Handlers
 // that read a relation must check for undefined.
 type InquiryAllRelations = Prisma.InquiryGetPayload<{ include: typeof includeInquiryResponse }>;
 type InquiryRelationsOnly = Omit<InquiryAllRelations, keyof Inquiry>;
@@ -41,9 +42,10 @@ export type InquiryHandler<
   resolutionInputSchema: z.ZodType<TResolutionInput>;
   resolutionSchema: z.ZodType<TResolution>;
   handleApprove(
+    c: Context<AppEnv>,
     inquiry: Inquiry,
-    resolvedContent: TContent,
-    approver: Permix,
+    content: TContent,
+    response: TResolutionInput,
   ): Promise<Partial<TResolution> | undefined | void>;
   validate?(inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
   autoApprove(inquiry: Inquiry): Promise<boolean>;

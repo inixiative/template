@@ -103,7 +103,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
     expect(new Date(data.expiresAt!).getTime()).toBeGreaterThan(Date.now());
   });
 
-  it('returns target relations but not source relations in response', async () => {
+  it('returns both sides in the response', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -124,7 +124,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
 
     expect(response.status).toBe(200);
     expect(data.targetUser).toBeDefined();
-    expect(data.sourceOrganization).toBeUndefined();
+    expect(data.sourceOrganization).toMatchObject({ id: org.id });
   });
 
   it('is a no-op for an already sent inquiry', async () => {
@@ -318,7 +318,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
     expect(membership?.role).toBe('member');
   });
 
-  it('auto-approve response only contains target relations, not source', async () => {
+  it('auto-approve response carries both sides', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -338,7 +338,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
     const { data } = await json<Record<string, unknown>>(response);
 
     expect(data.targetUser).toBeDefined();
-    expect(data.sourceOrganization).toBeUndefined();
+    expect(data.sourceOrganization).toMatchObject({ id: org.id });
   });
 
   it('auto-approve response matches the final sent-side inquiry record', async () => {

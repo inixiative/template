@@ -11,6 +11,7 @@ import {
   createWebhookSubscription,
 } from '@template/db/test';
 import {
+  closeOnParentDeleteViolations,
   deleteBehaviorViolations,
   skipReviveViolations,
 } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
@@ -141,6 +142,24 @@ describe('SKIP_REVIVE validation', () => {
 
   it('refuses a model that is not in the schema', () => {
     expect(skipReviveViolations(['NotAModel']).join('\n')).toContain(
+      'is not a model in the schema',
+    );
+  });
+});
+
+describe('CLOSE_ON_PARENT_DELETE validation', () => {
+  it('finds every closed model kept by soft-delete parents only', () => {
+    expect(closeOnParentDeleteViolations()).toEqual([]);
+  });
+
+  it('refuses a model a hard-deletable parent would take along', () => {
+    expect(closeOnParentDeleteViolations(['WebhookEvent']).join('\n')).toContain(
+      'its parent WebhookSubscription can be hard-deleted',
+    );
+  });
+
+  it('refuses a model that is not in the schema', () => {
+    expect(closeOnParentDeleteViolations(['NotAModel']).join('\n')).toContain(
       'is not a model in the schema',
     );
   });

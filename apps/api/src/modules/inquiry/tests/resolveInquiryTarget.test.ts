@@ -2,8 +2,11 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
+  createIntegration,
+  createOrganization,
   createOrganizationUser,
   createSpaceUser,
+  createToken,
   createUser,
 } from '@template/db/test';
 import { validator } from 'hono/validator';
@@ -47,6 +50,7 @@ describe('resolveInquiryTarget', () => {
       targetSpaceId: null,
       targetIntegrationId: null,
       targetTokenId: null,
+      targetProjectId: null,
     });
   });
 
@@ -84,6 +88,7 @@ describe('resolveInquiryTarget', () => {
       targetUserId: membership.userId,
       targetIntegrationId: null,
       targetTokenId: null,
+      targetProjectId: null,
     });
   });
 
@@ -104,8 +109,32 @@ describe('resolveInquiryTarget', () => {
     ).toBe(422);
   });
 
-  it('keeps Integration and Token targets out of request resolution', async () => {
-    expect((await resolve({ targetModel: InquiryResourceModel.Integration })).status).toBe(422);
-    expect((await resolve({ targetModel: InquiryResourceModel.Token })).status).toBe(422);
+  it('resolves a token or an integration by its id; a missing one is a 404, a project cannot be named', async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+    });
+    const { entity: token } = await createToken({ ownerModel: 'Integration' }, { integration });
+    expect(
+      (
+        await json(
+          await resolve({ targetModel: InquiryResourceModel.Token, targetTokenId: token.id }),
+        )
+      ).data,
+    ).toMatchObject({ targetModel: 'Token', targetTokenId: token.id, targetOrganizationId: null });
+    expect(
+      (
+        await json(
+          await resolve({
+            targetModel: InquiryResourceModel.Integration,
+            targetIntegrationId: integration.id,
+          }),
+        )
+      ).data,
+    ).toMatchObject({ targetModel: 'Integration', targetIntegrationId: integration.id });
+    expect((await resolve({ targetModel: InquiryResourceModel.Token })).status).toBe(404);
+    expect((await resolve({ targetModel: InquiryResourceModel.Integration })).status).toBe(404);
+    expect((await resolve({ targetModel: InquiryResourceModel.Project })).status).toBe(422);
   });
 });

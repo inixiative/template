@@ -3,11 +3,11 @@
  * @kind controller
  * @partOf feature:users
  */
-import { InquiryResourceModel } from '@template/db/generated/client/enums';
+import { whereAxisCarriesOwnerKeys } from '@template/db';
 import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { meReadManyInquiriesSentRoute } from '#/modules/me/routes/meReadManyInquiriesSent';
 
 export const meReadManyInquiriesSentController = makeController(
@@ -15,10 +15,12 @@ export const meReadManyInquiriesSentController = makeController(
   async (c, respond) => {
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.inquiry, {
-      where: { sourceModel: InquiryResourceModel.User, sourceUserId: me(c)!.id },
+      where: {
+        ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', { User: me(c)!.id }),
+      },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },
-      include: includeInquirySent,
+      include: includeInquiryResponse,
     });
     return respond.ok(data, { pagination });
   },

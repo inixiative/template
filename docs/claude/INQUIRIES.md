@@ -18,10 +18,10 @@
 - [Handler Architecture](#handler-architecture)
   - [`unique` enforcement](#unique-enforcement)
   - [`validate` — pre-create and pre-update checks](#validate--pre-create-and-pre-update-checks)
-  - [`resolvedContent` and the Override Pattern](#resolvedcontent-and-the-override-pattern)
+  - [The request and the response](#the-request-and-the-response)
   - [Current Handlers](#current-handlers)
+  - [Asking to change a record's entitlements](#asking-to-change-a-records-entitlements)
 - [Response Schemas](#response-schemas)
-  - [Standardized includes](#standardized-includes)
 - [Permissions (ReBAC)](#permissions-rebac)
 - [Adding a New Handler](#adding-a-new-handler)
   - [Status utilities (`validations/validateInquiryStatus.ts`)](#status-utilities-validationsvalidateinquirystatusts)
@@ -81,7 +81,7 @@ enum InquiryResourceModel {
 }
 ```
 
-Both ends carry a real relation per party: `sourceUser`, `sourceOrganization`, `sourceSpace`, `sourceIntegration`, `sourceToken`, plus the membership relations `sourceOrganizationUser` (on `[sourceOrganizationId, sourceUserId]`) and `sourceSpaceUser` (on `[sourceOrganizationId, sourceSpaceId, sourceUserId]`); the target side mirrors them. A membership party has no column of its own: it fills the user + organization (+ space) columns. `admin` has no FK. All relations cascade on delete.
+Both ends carry a real relation per party: `sourceUser`, `sourceOrganization`, `sourceSpace`, `sourceIntegration`, `sourceToken`, plus the membership relations `sourceOrganizationUser` (on `[sourceOrganizationId, sourceUserId]`) and `sourceSpaceUser` (on `[sourceOrganizationId, sourceSpaceId, sourceUserId]`); the target side mirrors them. A membership party has no column of its own: it fills the user + organization (+ space) columns. `admin` has no FK. The relations cascade on delete in the database, but no party can be hard-deleted (every party model is soft-delete); a soft-deleted party cancels its open inquiries and keeps every inquiry live (see *Data Model*).
 
 ### Status Flow
 
@@ -135,7 +135,7 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 }
 ```
 
-**Response:** `inquirySentResponseSchema` — includes `targetUser`, `targetOrganization`, `targetSpace`.
+**Response:** `inquiryResponseSchema` — includes `targetUser`, `targetOrganization`, `targetSpace`.
 
 **Which `targetModel` and `content` a type takes:** `GET /api/v1/inquiry/info` (public) lists, for every registered handler, its `sources`, `targets`, the JSON Schema of `content`, of the extra resolve-body fields (`resolutionInput`) and of the stored `resolution`, plus `unique` and `defaultExpirationDays`. It is generated from `inquiryHandlers`, so a new handler appears there without route changes. A `targetModel` outside `targets` answers 422 (`validateInquiryHandler`); content that fails `contentSchema` answers 422 too.
 
@@ -147,7 +147,7 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 | `PATCH` | `/api/v1/inquiry/:id` | `send` | Update `content`; `status: draft` moves it back to draft (clears `expiresAt`), `status: sent` sends it. Allowed in draft, sent, or changesRequested |
 | `POST` | `/api/v1/inquiry/:id/send` | `send` | Send a draft or changesRequested inquiry |
 | `POST` | `/api/v1/inquiry/:id/resolve` | `resolve` | Approve, deny, or request changes |
-| `DELETE` | `/api/v1/inquiry/:id/cancel` | `send` | Cancel (source only): sets `canceled`, clears `expiresAt`, soft-deletes |
+| `DELETE` | `/api/v1/inquiry/:id/cancel` | `send` | Cancel (source only): sets `canceled` and clears `expiresAt`; the inquiry stays live, so both sides see it withdrawn |
 
 **Every state-changing action carries the version the actor saw.** `expectedUpdatedAt` is the inquiry's `updatedAt` as the actor read it: in the body of `PATCH`, `/send` and `/resolve`, and as a query parameter on `DELETE /cancel`. `lockInquiryAtVersion` row-locks the inquiry (`db.findForUpdate`, inside the action's `db.txn`) and answers **409** when the version moved, so an edit between reading and approving fails the approval instead of approving something nobody looked at. The status checks run on the locked row. The UI hooks send `inquiry.updatedAt` on every mutation.
 
@@ -173,9 +173,12 @@ Each context exposes two list endpoints. Requires `manage` on the parent resourc
 | `GET` | `/api/v1/space/:id/inquiries/sent` | Inquiries sent by this space |
 | `GET` | `/api/v1/space/:id/inquiries/received` | Non-draft inquiries received by this space |
 
-- **Sent** endpoints include `targetUser`, `targetOrganization`, `targetSpace`
-- **Received** endpoints include `sourceUser`, `sourceOrganization`, `sourceSpace`
+- Every list loads both sides in full: the user, organization, space, integration, token and project on the source and on the target, so a row says who it acts on and through what
 - Draft inquiries are always hidden from received lists
+
+**What a list holds.** Each owner's list holds what is addressed to it and to what it holds beneath it: an organization's holds the inquiries on the organization, its integrations, their tokens and its projects. It does not hold a space's or a member's; those are in the space's list and the member's own. The filter is `whereAxisCarriesOwnerKeys('Inquiry', '<side>Model', owner)` (`packages/db/src/registries/ownerWhere.ts`): one flat filter on the side's own columns, because each row carries the owner keys of what it names. The owner is given by kind (`OwnerKeys`) with null for "holds none": `{ Organization: id, Space: null, User: null }` is the organization alone.
+
+**Carried keys.** An inquiry whose side names an Integration, Token or Project also carries that record's owner keys on the same side (`targetTokenId` plus `targetIntegrationId` and `targetOrganizationId`), written by the carried-owner-keys hook ([DATABASE.md](DATABASE.md#carried-owner-keys)). So the row itself says whose it is, for attribution, audit and events. `inquiryCarriedOwnerKeys.test.ts` checks each owner's list holds its own and what it holds beneath it, and nothing a member or space holds. A space's inquiries carry its organization in a composite key, so a transfer re-keys them and the ones addressed to what the space holds.
 
 ### Admin
 
@@ -191,12 +194,12 @@ Each context exposes two list endpoints. Requires `manage` on the parent resourc
 
 ```
 POST /organization/:id/inquiries → sourceModel: Organization, sourceOrganizationId: org.id
-POST /space/:id/inquiries        → sourceModel: Space, sourceSpaceId: space.id
+POST /space/:id/inquiries        → sourceModel: Space, sourceOrganizationId: space.organizationId, sourceSpaceId: space.id
 POST /me/inquiries               → sourceModel: User, sourceUserId: user.id
 POST /api/admin/inquiry          → sourceModel: admin (no FK)
 ```
 
-No create route sources an `OrganizationUser`, `SpaceUser`, `Integration` or `Token` inquiry; those sources are set by the service that already holds the party.
+No create route sources an `OrganizationUser`, `SpaceUser`, `Integration`, `Token` or `Project` inquiry; those sources are set by the service that already holds the party.
 
 The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/rebac/inquiryTypes.ts`) are checked by `validateInquiryHandler` to confirm the resolved source is valid for this inquiry type.
 
@@ -206,11 +209,12 @@ The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/reba
 
 - `targetModel: User` → `targetUserId` OR `targetEmail`: `findUserOrCreateGuest` (`apps/api/src/modules/user/services/findOrCreateGuest.ts`) returns the user with that normalized email or creates an unverified guest and emits `user.created` with `isGuest: true`
 - `targetModel: Organization` → `targetOrganizationId` OR `targetOrganizationSlug`
-- `targetModel: Space` → `targetSpaceId` OR `targetOrganizationSlug` + `targetSpaceSlug` (space slugs are org-scoped)
+- `targetModel: Space` → `targetSpaceId` OR `targetOrganizationSlug` + `targetSpaceSlug` (space slugs are org-scoped); its organization fills `targetOrganizationId`
 - `targetModel: OrganizationUser` → `targetOrganizationId` + `targetUserId` (the membership must exist)
 - `targetModel: SpaceUser` → `targetSpaceId` + `targetUserId` (the membership must exist; its organization fills `targetOrganizationId`)
 - `targetModel: admin` → no FK, just sets the model
-- `targetModel: Integration` / `Token` → 422; a request body cannot name them, only a service that holds the party
+- `targetModel: Token` → `targetTokenId`; `targetModel: Integration` → `targetIntegrationId` (the row must exist; its owner keys are carried, never taken from the body)
+- `targetModel: Project` → 422; a request body cannot name it, only a service that holds the party
 
 Slug-based lookups are useful when callers know human-readable identifiers rather than UUIDs.
 
@@ -222,9 +226,9 @@ Every inquiry type maps to a handler registered in `handlers/index.ts`.
 type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   contentSchema: z.ZodType<TContent>;            // parsed on create/update; stored in inquiry.content
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
-  resolutionSchema: z.ZodType<TResolution>;      // full stored shape (includes computed fields from handleApprove)
+  resolutionSchema: z.ZodType<TResolution>;      // full stored shape: the parsed input plus handleApprove's output, nothing else from the body
   validate?(inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
-  handleApprove(inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
+  handleApprove(c, inquiry, content: TContent, response: TResolutionInput): Promise<Partial<TResolution> | undefined | void>; // c is the resolve request's context, first as on every service that takes one: the approver acts from it. Approval runs only inside a request (resolve, or auto-approval on send), never in a job
   autoApprove(inquiry): Promise<boolean>;    // called after send; return true to skip human review
   unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
   defaultExpirationDays?: number;     // drives computeExpiresAt on send and changesRequested; undefined = no expiry
@@ -271,24 +275,23 @@ const validate = async (inquiry, content: SpaceContent) => {
 };
 ```
 
-### `resolvedContent` and the Override Pattern
+### The request and the response
 
-On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution body. `resolveContent` (`services/resolveContent.ts`) parses the resolution against `resolutionInputSchema` first and merges the **parsed** values, so defaults and transforms inside an override apply and a refined schema works the same as a plain object. Only keys the resolver actually sent that the schema keeps can flow into `resolvedContent`; a key the schema defaults but the resolver didn't send never overrides content. `explanation` is always excluded (resolution-only metadata), so it never overrides content fields.
+An inquiry keeps both sides apart: what was asked is `inquiry.content`, and what the resolver answered is the resolve body. `handleApprove(c, inquiry, content, response)` gets them as two arguments, `content` parsed by `contentSchema` and `response` parsed by `resolutionInputSchema`. Nothing is merged or computed from one onto the other; a handler reads each value from the side it belongs to, and says so in its own code. Auto-approval sends the request back as the response, so a handler always gets the thing it approves (Aron, 2026-11-16).
 
-**Opt-in to allow resolver overrides** by declaring the field in `resolutionInputSchema`:
+**A field the resolver may set** is declared in `resolutionInputSchema` and read from `response`:
 ```typescript
-// createSpace — admin can rename the space at approval time
-const resolutionInputSchema = baseResolutionInputSchema.extend({
-  name: z.string().optional(), // ← declared → flows into resolvedContent
-});
+// transferSpace: the approving org may give the space another slug
+const slug = response.slug ?? content.slug ?? space.slug;
 ```
 
-**Opt-out to lock the field** by omitting it from `resolutionInputSchema`:
+**A field the resolver may not set** is left out of `resolutionInputSchema`, so it is never in `response`:
 ```typescript
-// inviteOrganizationUser — role is locked; resolver cannot change it
-// 'role' is NOT in resolutionInputSchema, so it never reaches resolvedContent
-const { role } = resolvedContent; // always from original inquiry.content
+// inviteOrganizationUser: the role is the inviter's
+const { role } = content;
 ```
+
+Why: an approval is the approver's own answer, kept beside the request, never a patch applied to it (Aron, 2026-11-15: "no merge logic and nothing computed against the request"). A shared overlay made every handler's input a mix of the two with nothing saying which side a value came from.
 
 ### Current Handlers
 
@@ -298,14 +301,26 @@ const { role } = resolvedContent; // always from original inquiry.content
 | `createSpace` | Organization | admin | — | 90 days | Creates `Space` under source org |
 | `updateSpace` | Space | admin | `untargeted` | 90 days | Updates `Space` with content fields |
 | `transferSpace` | Space | Organization | `untargeted` | 30 days | Moves the space and everything keyed to it into the target org; see *Transferring a space* |
+| `changeEntitlements` | User | Token, Integration | `targeted` | 30 days | Adds and removes the target's entitlements through `changeEntitlements`; see *Asking to change a record's entitlements* |
 
-All four handlers return `autoApprove: async () => false` — no type currently auto-approves.
+All five handlers return `autoApprove: async () => false` — no type currently auto-approves.
+
+### Asking to change a record's entitlements
+
+`changeEntitlements` is addressed to the record whose entitlements change (a Token or an Integration), never to its owner: whoever administers the record answers it (a person, never a token), and it shows in that record's owner's list through the carried keys. Someone who can read the record asks from their own inbox (`POST /api/v1/me/inquiries` with `targetModel` and `targetTokenId` or `targetIntegrationId`); a stranger is refused, so nobody probes ids or is shown another tenant's token and its owner. One open request per asker and record (`unique: 'targeted'`).
+
+- **The request** is `{ add, remove }`: `add` is entitlement entries in the shape the direct add route takes, `remove` is row ids.
+- **The response** is the approver's own `{ add, remove }`, narrower or wider than asked. An approval with neither is refused (422, in `handleApprove`): to give nothing, deny. A denial needs neither.
+- **Approving is issuing.** `handleApprove` runs the checks the record's own add and remove routes run (`validateTokenWrite` and `validateDelegateRole`, or `validateIntegrationRole`) and then the one writer, `changeEntitlements`, with the approver as writer. An approver who could not grant an added entry directly gets the writer's 403 (a removal needs only administering the record); the resolve transaction rolls back, nothing is written and the inquiry stays open (Aron, 2026-11-16: "The grantor and the person who approves the inquiry need to have access to approve that level… Otherwise, it should error and stay open").
+- **The request is checked when asked.** The handler's `validate` runs the writer's own entry check (`entitlementProblem`) on each `add` entry, so a request the writer would refuse (a negated `where`, a malformed anchor) is refused at create and update with 422, not at approval.
+- **A removed row leaves open requests.** When an entitlement row is soft-deleted, every open `changeEntitlements` request to the same holder drops that id from its `remove`, as its own audited update; a request left with nothing to add or remove is canceled (`apps/api/src/hooks/entitlementChangeRequests/hook.ts`). The request being approved is left as it was asked (it is the resolve's `sourceInquiryId`). A deleted holder cancels its open requests through the cascade (see *Data Model*).
+- Member rows also hold entitlements but are not targets yet: an inquiry addressed to a member is the member's to read, and a member does not administer their own row, so nobody who could answer would see it.
 
 ### Transferring a space
 
 Approving a transfer moves the space, its members and everything downstream into the target org, in the resolution transaction. A member who already belongs to the target org keeps their membership. Every other member is removed; their space membership and its rows move to the target org as tombstones, and hiring them there later does not bring the space back. Nobody becomes a live member of an org they didn't join.
 
-1. The space is locked (`db.findForUpdate`). Its slug in the target org is the resolution's `slug` when the approver gives one (a rename, merged into content by `resolveContent`), else its current slug. A slug the target org already holds, or an open `createSpace` request for it, refuses the transfer with a 409 (`validateSpaceSlugFree`, shared with `createSpace` and `updateSpace`). The target org's Review dialog offers the rename.
+1. The space is locked (`db.findForUpdate`). Its slug in the target org is the resolution's `slug` when the approver gives one (a rename, read from the response), else its current slug. A slug the target org already holds, or an open `createSpace` request for it, refuses the transfer with a 409 (`validateSpaceSlugFree`, shared with `createSpace` and `updateSpace`). The target org's Review dialog offers the rename.
 2. One update tombstones every live `SpaceUser` whose user is not a live member of the target org, stamped with the transfer time; `softDeleteCascade` tombstones what they owned and deletes their tokens.
 3. Every space member, live or tombstoned, gets a tombstoned `member` row in the target org unless they already have one (`skipDuplicates`): the `SpaceUser` → `OrganizationUser` key needs it once step 4 re-keys their space membership. Its stamp is one no space membership carries, so hiring the person revives only their org membership. Putting them back in the space is a manual re-add; the transfer revives nothing.
 4. `Space.organizationId` is set. Every row keyed to the space or a space member carries the org in a composite key (`SpaceUser`; Integration, Token, EmailTemplate and EmailComponent; Inquiry and AuditLog rows keyed to a space member), so one statement re-keys them all by `ON UPDATE CASCADE`; Postgres runs every cascade of a statement before it checks the keys. `spaceKeys.test.ts` (`packages/db/src/registries`) fails when a Space- or SpaceUser-owned model carries an org column outside such a key.
@@ -326,35 +341,17 @@ No row keyed to the space keeps the old org's membership, so reviving a membersh
 
 ## Response Schemas
 
-Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
-
-| Schema | Relations included | Used on |
-|--------|--------------------|---------|
-| `inquiryResponseSchema` | All 6 (sources + targets) + `auditLogsAsSubject` | Single read (`GET /inquiry/:id`), admin list |
-| `inquirySentResponseSchema` | Targets only + `auditLogsAsSubject` | Sent lists, create response, update, send |
-| `inquiryReceivedResponseSchema` | Sources only + `auditLogsAsSubject` | Received lists, resolve |
-
-The schemas are chosen to return only the relations the current side needs — source-side mutations (update, send) include target data; target-side mutations (resolve) include source data; admin/read endpoints include all 6.
-
-### Standardized includes
-
-Each mutation uses the include that matches what its caller needs:
-
-| Endpoint | Prisma include | Why |
-|----------|---------------|-----|
-| `PATCH /inquiry/:id` | `includeInquirySent` | Source is editing; only targets relevant |
-| `POST /inquiry/:id/send` | `includeInquirySent` | Source is sending; only targets relevant |
-| `POST /inquiry/:id/resolve` | `includeInquiryReceived` | Target is resolving; only sources relevant |
-| `GET /inquiry/:id` | `includeInquiryResponse` | Preloaded by resource context middleware — no extra DB call |
-| Admin list | `includeInquiryResponse` | All relations for full audit view |
+There is one response, `inquiryResponseSchema` (`InquiryItem`, `modules/inquiry/schemas/inquiryResponseSchemas.ts`), with one Prisma include, `includeInquiryResponse` (`queries/inquiryIncludes.ts`): both sides in full (user, organization, space, integration, token, project) and `auditLogsAsSubject`. Every read, list and mutation returns it. A token is returned without its `keyHash`. Why: a row addressed to a token or an integration is only readable in a list when the row shows that record and its owners, whichever side the reader is on (Aron, 2026-11-16: "We should make everything a full response").
 
 ## Permissions (ReBAC)
 
 | Action | Who can perform it |
 |--------|--------------------|
-| `read` | Party-wide, whatever the type: the user on either side (`read`), or `manage` on the organization or space on either side (`INQUIRY_READ_LEVELS`) |
+| `read` | Party-wide, whatever the type, each party on its own channel (`INQUIRY_READ_LEVELS`): a person reads the sides that name them (`read` on that user): what belongs to a member, or chains through one, is the member's and never the organization's; `manage` on an organization reads the sides on the organization alone (no space, no person); `manage` on a space reads the sides on the space with no person |
 | `send` | The source party's declared `send` level for that type (table above) |
 | `resolve` | The target party's declared `resolve` level for that type; a platform (`admin`) target has no relation, so only a superadmin resolves it |
+
+Reading is by ownership channel because carried keys put the organization on every row beneath it. An organization's managers see what is the organization's, including its own integrations and tokens; a member's own integration is the member's, and a space's inquiries are the space's (Aron, 2026-11-16). Seeing is not resolving: `resolve` stays the per-type level. An inquiry entitlement by a tenant path (`targetOrganization`) admits every kind that carries the key, so a grant kept to the tenant's own channel says so in its `where` (`targetSpaceId` and `targetUserId` equal null); without it the granter must be able to read every kind the path reaches.
 
 `db:inquiry` is the `inquiry` object built by `inquiryPermission(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
 
@@ -363,10 +360,10 @@ Each mutation uses the include that matches what its caller needs:
 1. Declare the type's parties and their `send` / `resolve` levels in `INQUIRY_TYPES` (`packages/permissions/src/rebac/inquiryTypes.ts`); the record is keyed by `InquiryType`, so a new type does not compile until it does
 2. Create `handlers/<type>/index.ts` implementing `InquiryHandler<TContent, TResolution>`
 2. Define `contentSchema` (stored on create) and `resolutionInputSchema` / `resolutionSchema` (validated on resolve) in `packages/shared/src/inquiry/<type>.ts`, so web/admin type `inquiry.content` with the same schema the API parses; `baseResolutionInputSchema` lives there too
-   - `resolutionInputSchema` — what the resolver submits; fields here (except `explanation`) can override content
+   - `resolutionInputSchema` — the copy the resolver sends back, parsed and passed to `handleApprove` as `response`; nothing in it is merged into `content`
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
    - If no computed fields, both can be the same schema
-3. Implement `handleApprove(inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
+3. Implement `handleApprove(c, inquiry, content: TContent, response: TResolutionInput)` — runs side effects; return partial resolution output (merged into stored `resolution`)
 4. Implement `autoApprove(inquiry)` — required; called immediately after send; return `true` to resolve as approved without human review, `async () => false` otherwise. Future: organizations may configure this via JSON rules stored on the organization record.
 5. Add `validate(inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
 6. Set `defaultExpirationDays` if the inquiry should auto-expire (e.g. `30` for invitations). Drives `computeExpiresAt` on send and changesRequested. Omit for no expiry.
@@ -460,7 +457,7 @@ The inquiry object carries the other side's FK data. This is needed because inqu
 
 ```typescript
 // packages/ui/src/components/inquiries/InquirySourceControls.tsx
-<InquirySourceControls inquiry={InquirySentItem} size? />
+<InquirySourceControls inquiry={InquiryItem} size? />
 ```
 
 Renders Edit / Send / Cancel buttons for the source side. Buttons are conditionally shown based on `isTerminalInquiry` and status:
@@ -474,7 +471,7 @@ All buttons are disabled when `useInquiryPermission(inquiry, 'send', 'source')` 
 
 ```typescript
 // packages/ui/src/components/inquiries/InquiryTargetControls.tsx
-<InquiryTargetControls inquiry={InquiryReceivedItem} size? />
+<InquiryTargetControls inquiry={InquiryItem} size? />
 ```
 
 Renders Approve / Decline buttons, plus Review when the type registers a `target.review` component. Visible when not terminal and status is `sent` or `changesRequested`. Disabled when `useInquiryPermission(inquiry, 'resolve', 'target')` is false.

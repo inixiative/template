@@ -8,8 +8,9 @@
 import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { withDiscriminatorDefaults } from '@template/db/registries/discriminatorDefaults';
+import { withDualPolymorphismIds } from '@template/db/registries/dualPolymorphismIds';
 import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
-import { withMaterializedIds } from '@template/db/registries/materializedIds';
+import { polymorphicKeyColumns } from '@template/db/registries/polymorphicIs';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import {
   assertDiscriminatorsChosen,
@@ -29,7 +30,7 @@ import type {
   Serialized,
   WhereUniqueOf,
 } from '@template/db/test/factoryTypes';
-import { carryDelegatedKeys } from '@template/db/utils/carryDelegatedKeys';
+import { carryOwnerKeys } from '@template/db/utils/carryOwnerKeys';
 import { toAccessor } from '@template/db/utils/modelNames';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
@@ -197,7 +198,7 @@ export const createFactory = <K extends ModelName>(
           if (!axis) return true;
           const discriminator = merged[axis.field] as string | undefined;
           if (!discriminator) return true;
-          return (axis.fkMap[discriminator as keyof typeof axis.fkMap] ?? []).includes(fkField);
+          return polymorphicKeyColumns(modelName, axis.field, discriminator).includes(fkField);
         };
 
         if (typeof dep.foreignKey === 'string') {
@@ -214,10 +215,10 @@ export const createFactory = <K extends ModelName>(
       }
     }
 
-    await carryDelegatedKeys(modelName, merged);
+    await carryOwnerKeys(modelName, merged);
 
     assertSelectedForeignKeys(modelName, merged);
-    Object.assign(merged, withMaterializedIds(modelName, merged));
+    Object.assign(merged, withDualPolymorphismIds(modelName, merged));
 
     const delegate = db.delegate(modelName);
     const entity: ModelOf<K> = persist
