@@ -2,11 +2,11 @@
  * @atlas
  * @kind service
  * @partOf primitive:batch
- * @uses none
+ * @uses primitive:shared
  */
 import {
   type BatchInterpolationReference,
-  decodePercentEncodedReferences,
+  decodePercentEncodedBatchReferences,
   tokenizeBatchInterpolation,
 } from '@template/shared/batchInterpolation';
 import { isValidPathNotation } from '#/lib/prisma/pathNotation';
@@ -122,7 +122,7 @@ export const interpolateRequest = (
 ): BatchRequest => {
   return {
     ...request,
-    path: interpolateString(decodePercentEncodedReferences(request.path), context),
+    path: interpolateString(decodePercentEncodedBatchReferences(request.path), context),
     body: request.body ? interpolateValue(request.body, context) : undefined,
     headers: request.headers ? interpolateHeaders(request.headers, context) : undefined,
   };

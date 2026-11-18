@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind utils
- * @partOf primitive:batch
+ * @partOf primitive:shared, primitive:batch
  * @uses none
  */
 

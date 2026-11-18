@@ -310,6 +310,22 @@ describe('interpolation', () => {
       expect(() => interpolateValue('a << b', context)).toThrow('unclosed <<');
     });
 
+    it('reads escapes in headers too', () => {
+      const request = interpolateRequest(
+        { method: 'GET', path: '/api/v1/me', headers: { 'x-note': '\\<<kept\\>> <<0.0.id>>' } },
+        context,
+      );
+      expect(request.headers?.['x-note']).toBe('<<kept>> org-1');
+    });
+
+    it('keeps an encoded escaped reference in a path literal', () => {
+      const request = interpolateRequest(
+        { method: 'GET', path: '/api/v1/search?q=%5C%3C%3C0.0.id%5C%3E%3E' },
+        context,
+      );
+      expect(request.path).toBe('/api/v1/search?q=<<0.0.id>>');
+    });
+
     it('resolves a percent-encoded reference in a path and leaves other encodings alone', () => {
       const request = interpolateRequest(
         { method: 'GET', path: '/api/v1/organization/%3C%3C0.0.id%3E%3E/users?q=a%2Fb%20c' },

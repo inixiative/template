@@ -56,6 +56,9 @@ each word below has one meaning and every name uses it.
 | `aToB` | Converts one shape to another | `stripeToUser` |
 | `read` | Route and controller names only | `organizationRead`, `readRoute` |
 | `resolve` | Picks one value from several sources by precedence | |
+| `tokenize` | Splits text into the tokens of a grammar | `tokenizeBatchInterpolation` |
+| `escape` | Rewrites text so a grammar reads all of it as literal | `escapeBatchInterpolation` |
+| `decode` | Reverses an encoding | `decodePercentEncodedBatchReferences` |
 | `get` | Never in our names; only where a library defines it | `getByRole`, Hono's `c.get` |
 
 A boolean is a question (`isUsableLoopBindingName`). A function that does two things says both

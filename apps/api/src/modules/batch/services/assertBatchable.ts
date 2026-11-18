@@ -2,9 +2,10 @@
  * @atlas
  * @kind service
  * @partOf primitive:batch
- * @uses primitive:routeTemplates
+ * @uses primitive:routeTemplates, primitive:shared
  */
 import type { OpenAPIHono } from '@hono/zod-openapi';
+import { tokenizeBatchInterpolation } from '@template/shared/batchInterpolation';
 import { makeError } from '#/lib/errors';
 import type { BatchRequest } from '#/modules/batch/services/strategies/types';
 import type { AppEnv } from '#/types/appEnv';
@@ -18,6 +19,14 @@ const segmentsOf = (path: string) =>
     }
   });
 
+const segmentHoldsBatchReference = (segment: string) => {
+  try {
+    return tokenizeBatchInterpolation(segment).some((token) => token.kind === 'reference');
+  } catch {
+    return true;
+  }
+};
+
 const isParam = (segment: string) => /^\{.+\}$/.test(segment);
 
 // An interpolated segment resolves only once its round runs, so it may reach any route below it.
@@ -25,7 +34,7 @@ const matchesRoute = (requestPath: string, routePath: string) => {
   const route = segmentsOf(routePath);
   const requested = segmentsOf(requestPath);
   for (const [index, segment] of requested.entries()) {
-    if (segment.includes('<<')) return true;
+    if (segmentHoldsBatchReference(segment)) return true;
     const routeSegment = route[index];
     if (routeSegment === '*') return true;
     if (routeSegment === undefined) return false;

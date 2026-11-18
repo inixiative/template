@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind utils
- * @partOf primitive:batch
+ * @partOf primitive:shared, primitive:batch
  * @uses none
  */
 
@@ -53,6 +53,11 @@ export const tokenizeBatchInterpolation = (value: string): BatchInterpolationTok
     }
 
     if (value.startsWith(OPEN, index)) {
+      if (value[index + OPEN.length] === '<') {
+        text += '<';
+        index++;
+        continue;
+      }
       const closeIndex = value.indexOf(CLOSE, index + OPEN.length);
       if (closeIndex === -1) throw new Error('Unbalanced interpolation brackets: unclosed <<');
       const inner = value.slice(index + OPEN.length, closeIndex);
