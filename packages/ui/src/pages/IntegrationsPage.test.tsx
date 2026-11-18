@@ -6,12 +6,23 @@
  */
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { buildIntegration, buildOrganization, buildSpace, buildUser } from '@template/db/test';
+import { flowReadQueryKeyFor } from '@template/ui/lib/flows/flowReadQueryOptions';
 import {
   type IntegrationProvider,
   integrationProviderValues,
 } from '@template/ui/lib/integrationProviders';
-import { IntegrationsPage } from '@template/ui/pages/IntegrationsPage';
+import {
+  type IntegrationConnectFlows,
+  IntegrationsPage,
+  type ProviderFitsOwner,
+} from '@template/ui/pages/IntegrationsPage';
 import { useAppStore } from '@template/ui/store';
 import type { TenantContext } from '@template/ui/store/types/tenant';
 import {
@@ -83,26 +94,54 @@ const buildStoredIntegrationRow = async (
   return entity.__serialize() as StoredIntegration;
 };
 
-const setTenantContextAndStubManagePermission = (context: TenantContext, canManage: boolean) =>
+const setTenantContextAndStubManagePermission = (
+  context: TenantContext,
+  canManage: boolean | readonly string[],
+) =>
   useAppStore.setState((state) => ({
     tenant: { ...state.tenant, context },
     permissions: {
       ...state.permissions,
       check: (model, record, action) => {
         permissionChecks.push({ model, id: record.id, action });
-        return canManage && action === 'manage';
+        const managesModel = typeof canManage === 'boolean' ? canManage : canManage.includes(model);
+        return managesModel && action === 'manage';
       },
     },
   }));
 
-const renderPage = () =>
-  render(
-    <QueryClientProvider client={client}>
-      <IntegrationsPage />
-    </QueryClientProvider>,
-  );
+type RenderPageOptions = {
+  connectFlows?: IntegrationConnectFlows;
+  providerFitsOwner?: ProviderFitsOwner;
+  entry?: string;
+};
 
-const providerCard = (provider: string) => screen.getByTestId(`provider-${provider}`);
+const pageElement = ({
+  connectFlows,
+  providerFitsOwner,
+  entry = '/settings/integrations',
+}: RenderPageOptions = {}) => (
+  <QueryClientProvider client={client}>
+    <RouterProvider
+      router={createRouter({
+        routeTree: createRootRoute({
+          component: () => (
+            <IntegrationsPage connectFlows={connectFlows} providerFitsOwner={providerFitsOwner} />
+          ),
+        }),
+        history: createMemoryHistory({ initialEntries: [entry] }),
+      })}
+    />
+  </QueryClientProvider>
+);
+
+const renderPage = (options: RenderPageOptions = {}) => render(pageElement(options));
+
+const ownerSection = (sectionKey: string) =>
+  within(screen.getByTestId(`integrations-section-${sectionKey}`));
+
+const providerCard = (provider: string, scope = within(document.body)) =>
+  scope.getByTestId(`provider-${provider}`);
 
 const listRequests = () =>
   requests.filter((request): request is ListRequest => request.method === 'GET');
@@ -277,10 +316,10 @@ describe('IntegrationsPage', () => {
     expect(listRequests().filter((request) => request.provider === 'slack')).toHaveLength(1);
   });
 
-  it('lists the integrations of the current context: me, organization or space', async () => {
+  it('lists the integrations of the current context, with your personal ones on every tenant page', async () => {
     const organization = (await buildOrganization()).entity.__serialize();
     const space = (await buildSpace({ organizationId: organization.id })).entity.__serialize();
-    stored['/api/v1/me/integrations'] = [await buildStoredIntegrationRow('Personal', 'notion')];
+    stored['/api/v1/me/integrations'] = [await buildStoredIntegrationRow('My notes', 'notion')];
     stored[`/api/v1/organization/${organization.id}/integrations`] = [
       await buildStoredIntegrationRow('Company', 'notion'),
     ];
@@ -289,31 +328,27 @@ describe('IntegrationsPage', () => {
     ];
 
     const view = renderPage();
-    await screen.findByText('Personal');
+    await screen.findByText('My notes');
+    expect(screen.queryByText('Personal')).toBeNull();
 
     setTenantContextAndStubManagePermission(
       { type: 'organization', organization } as unknown as TenantContext,
       true,
     );
-    view.rerender(
-      <QueryClientProvider client={client}>
-        <IntegrationsPage />
-      </QueryClientProvider>,
-    );
-    await screen.findByText('Company');
-    expect(screen.queryByText('Personal')).toBeNull();
+    view.rerender(pageElement());
+    await waitFor(() => expect(ownerSection('tenant').getByText('Company')).toBeTruthy());
+    expect(ownerSection('personal').getByText('Personal')).toBeTruthy();
+    expect(ownerSection('personal').getByText('My notes')).toBeTruthy();
+    expect(ownerSection('tenant').queryByText('My notes')).toBeNull();
 
     setTenantContextAndStubManagePermission(
       { type: 'space', organization, space } as unknown as TenantContext,
       true,
     );
-    view.rerender(
-      <QueryClientProvider client={client}>
-        <IntegrationsPage />
-      </QueryClientProvider>,
-    );
-    await screen.findByText('Workspace');
+    view.rerender(pageElement());
+    await waitFor(() => expect(ownerSection('tenant').getByText('Workspace')).toBeTruthy());
     expect(screen.queryByText('Company')).toBeNull();
+    expect(ownerSection('personal').getByText('My notes')).toBeTruthy();
 
     expect([...new Set(listRequests().map((request) => request.path))]).toEqual([
       '/api/v1/me/integrations',
@@ -378,19 +413,15 @@ describe('IntegrationsPage', () => {
   });
 
   it("a provider's own connect flow replaces the generic one and refreshes the list", async () => {
-    render(
-      <QueryClientProvider client={client}>
-        <IntegrationsPage
-          connectFlows={{
-            github: ({ onConnected }) => (
-              <button type="button" onClick={onConnected}>
-                Finish GitHub
-              </button>
-            ),
-          }}
-        />
-      </QueryClientProvider>,
-    );
+    renderPage({
+      connectFlows: {
+        github: ({ onConnected }) => (
+          <button type="button" onClick={onConnected}>
+            Finish GitHub
+          </button>
+        ),
+      },
+    });
     await waitForEveryProviderListRequest();
 
     fireEvent.click(screen.getByRole('button', { name: 'Connect GitHub' }));
@@ -411,13 +442,17 @@ describe('IntegrationsPage', () => {
     renderPage();
     await waitForEveryProviderListRequest();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connect Linear' }));
+    fireEvent.click(ownerSection('tenant').getByRole('button', { name: 'Connect Linear' }));
     fireEvent.change(screen.getByLabelText('Integration name'), {
       target: { value: 'Product' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
-    await waitFor(() => expect(within(providerCard('linear')).getByText('Product')).toBeTruthy());
+    await waitFor(() =>
+      expect(
+        within(providerCard('linear', ownerSection('tenant'))).getByText('Product'),
+      ).toBeTruthy(),
+    );
     expect(requests.find((request) => request.method === 'POST')?.path).toBe(
       `/api/v1/organization/${organization.id}/integrations`,
     );
@@ -437,5 +472,154 @@ describe('IntegrationsPage', () => {
     const deleted = requests.filter((request) => request.method === 'DELETE');
     expect(deleted).toHaveLength(1);
     expect(deleted[0]?.path).toMatch(/^\/api\/v1\/integration\//);
+  });
+
+  it('opens a connect section from its link', async () => {
+    renderPage({ entry: '/settings/integrations#connect-slack' });
+    fireEvent.change(await screen.findByLabelText('Integration name'), {
+      target: { value: 'Linked' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+    await waitFor(() =>
+      expect(requests.find((request) => request.method === 'POST')).toEqual({
+        method: 'POST',
+        path: '/api/v1/me/integrations',
+        body: { name: 'Linked', provider: 'slack' },
+      }),
+    );
+  });
+
+  it('gives each owner section on a tenant page its own connect links', async () => {
+    const organization = (await buildOrganization()).entity.__serialize();
+    setTenantContextAndStubManagePermission(
+      { type: 'organization', organization } as unknown as TenantContext,
+      true,
+    );
+    renderPage({ entry: '/settings/integrations#personal-connect-linear' });
+    await screen.findByLabelText('Integration name');
+    fireEvent.change(screen.getByLabelText('Integration name'), { target: { value: 'Mine' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+    await waitFor(() =>
+      expect(requests.find((request) => request.method === 'POST')?.path).toBe(
+        '/api/v1/me/integrations',
+      ),
+    );
+  });
+
+  it('offers only the providers that fit the owner each section is for', async () => {
+    const organization = (await buildOrganization()).entity.__serialize();
+    setTenantContextAndStubManagePermission(
+      { type: 'organization', organization } as unknown as TenantContext,
+      true,
+    );
+    renderPage({
+      providerFitsOwner: (provider, ownerModel) =>
+        provider !== 'slack' || ownerModel === 'Organization',
+    });
+    await waitFor(() => expect(ownerSection('tenant').getByTestId('provider-slack')).toBeTruthy());
+    expect(ownerSection('personal').queryByTestId('provider-slack')).toBeNull();
+    expect(ownerSection('personal').getByTestId('provider-linear')).toBeTruthy();
+  });
+
+  it('rechecks the active flow once a connect flow finishes', async () => {
+    useAppStore.getState().navigation.setFlowId('flow-1');
+    const invalidate = spyOn(client, 'invalidateQueries');
+    renderPage({
+      connectFlows: {
+        github: ({ onConnected }) => (
+          <button type="button" onClick={onConnected}>
+            Finish GitHub
+          </button>
+        ),
+      },
+    });
+    await waitForEveryProviderListRequest();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect GitHub' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish GitHub' }));
+
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: flowReadQueryKeyFor('flow-1') }),
+    );
+  });
+
+  it('keeps your personal integrations manageable on a tenant page you cannot manage', async () => {
+    const organization = (await buildOrganization()).entity.__serialize();
+    setTenantContextAndStubManagePermission(
+      { type: 'organization', organization } as unknown as TenantContext,
+      ['user'],
+    );
+    renderPage();
+    await waitForEveryProviderListRequest();
+
+    await waitFor(() =>
+      expect(
+        ownerSection('personal')
+          .getByRole('button', { name: 'Connect Slack' })
+          .hasAttribute('disabled'),
+      ).toBe(false),
+    );
+    expect(
+      ownerSection('tenant')
+        .getByRole('button', { name: 'Connect Slack' })
+        .hasAttribute('disabled'),
+    ).toBe(true);
+  });
+
+  it('connects through your membership from its own link, and through the tenant from the plain one', async () => {
+    const organization = (await buildOrganization()).entity.__serialize();
+    const membershipId = '0195f7a2-0000-7000-8000-00000000a001';
+    useAppStore.setState((state) => ({
+      auth: {
+        ...state.auth,
+        organizationUsers: {
+          [organization.id]: {
+            id: membershipId,
+            organizationId: organization.id,
+            userId: owner.id,
+          },
+        } as unknown as typeof state.auth.organizationUsers,
+      },
+    }));
+    setTenantContextAndStubManagePermission(
+      { type: 'organization', organization } as unknown as TenantContext,
+      true,
+    );
+    const seenOwnerModels = new Set<string>();
+    const view = renderPage({
+      entry: '/settings/integrations#member-connect-linear',
+      providerFitsOwner: (_provider, ownerModel) => {
+        seenOwnerModels.add(ownerModel);
+        return true;
+      },
+    });
+    await waitFor(() =>
+      expect(ownerSection('member').getByText(`Yours in ${organization.name}`)).toBeTruthy(),
+    );
+    fireEvent.change(await screen.findByLabelText('Integration name'), {
+      target: { value: 'Mine here' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    await waitFor(() =>
+      expect(requests.find((request) => request.method === 'POST')?.path).toBe(
+        `/api/v1/organizationUser/${membershipId}/integrations`,
+      ),
+    );
+    expect([...seenOwnerModels].sort()).toEqual(['Organization', 'OrganizationUser', 'User']);
+
+    view.unmount();
+    requests.length = 0;
+    renderPage({ entry: '/settings/integrations#connect-linear' });
+    fireEvent.change(await screen.findByLabelText('Integration name'), {
+      target: { value: 'Team' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    await waitFor(() =>
+      expect(requests.find((request) => request.method === 'POST')?.path).toBe(
+        `/api/v1/organization/${organization.id}/integrations`,
+      ),
+    );
   });
 });

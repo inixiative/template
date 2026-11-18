@@ -82,7 +82,7 @@ The response is the `Flow` row with `steps` parsed, plus the computed `stepState
 All of it is in `packages/ui`; pages need no flow code.
 
 - **State**: the store holds only `navigation.flowId` (`setFlowId(id | null)`). The flow itself lives in the React Query cache (`lib/flows/flowReadQueryOptions.ts`, `staleTime: 0`) and is read with `useActiveFlow()`. The `flow` search param mirrors `flowId` like `spoof` (`useSyncTenantContextWithUrlAndAuthorizeRoute`), is seeded from `?flow=` on load, and is kept by `navigateKeepingSearchParams`.
-- **Rechecks**: the app `MutationCache` invalidates the flow read after every successful mutation, unless the mutation has `meta: { skipFlowInvalidate: true }` or the cached flow is already finished.
+- **Rechecks**: the app `MutationCache` invalidates the flow read after every successful mutation, unless the mutation has `meta: { skipFlowInvalidate: true }` or the cached flow is already finished. The check is `invalidateUnfinishedActiveFlow` (`packages/ui/src/lib/flows/invalidateUnfinishedActiveFlow.ts`); work that finishes outside a React Query mutation, such as a provider's connect flow, calls it directly.
 - **What's next**: `nextFlowStepLink(flow, pathname)` is the one rule. Finished → `Finish` to `returnUrl ?? '/dashboard'`. Otherwise, if the current step's `to` is on another page → `Continue: <step label>`. Otherwise nothing (you are already where the step happens).
   - `FlowBanner`, mounted once in each app's `__root.tsx`, shows it as a button.
   - Any open `Modal` turns its close button into it, so closing a dialog continues the flow.
