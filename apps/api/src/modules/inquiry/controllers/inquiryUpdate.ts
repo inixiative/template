@@ -11,9 +11,9 @@ import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
+import { inquiryServices } from '#/modules/inquiry/services';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
 import { sendInquiry } from '#/modules/inquiry/services/sendInquiry';
 import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
@@ -24,7 +24,7 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   const inquiry = getResource<'inquiry'>(c);
   const { content, status, expectedUpdatedAt } = c.req.valid('json');
 
-  const handler = inquiryHandlers[inquiry.type];
+  const handler = inquiryServices[inquiry.type];
   const effectiveContent = handler.contentSchema.parse(content ?? inquiry.content);
   if (handler.validate) await handler.validate(inquiry, effectiveContent);
 

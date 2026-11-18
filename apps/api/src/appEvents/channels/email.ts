@@ -16,7 +16,7 @@ export const deliverEmailHandoffs = async (
   await Promise.all(
     handoffs.map(async (handoff) => {
       const job = await enqueueJob(
-        'sendEmail',
+        'planEmailDeliveries',
         { ...handoff, eventName: event.name },
         { id: plannerJobId(event.name, handoff.template, event.data) },
       );

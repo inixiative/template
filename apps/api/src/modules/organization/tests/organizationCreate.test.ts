@@ -5,7 +5,7 @@ import { cleanupTouchedTables, createUser, nextFactorySequenceNumber } from '@te
 import { organizationRouter } from '#/modules/organization';
 import type { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';
 import { createTestApp } from '#tests/createTestApp';
-import { json, jsonError, post } from '#tests/utils/request';
+import { parseErrorBody, parseSuccessBody, post } from '#tests/utils/request';
 
 type CreateOrgResponse = z.infer<typeof organizationCreateRoute.responseSchema>;
 
@@ -38,7 +38,7 @@ describe('POST /api/v1/organization', () => {
         slug: `test-org-${seq}`,
       }),
     );
-    const { data } = await json<CreateOrgResponse>(response);
+    const { data } = await parseSuccessBody<CreateOrgResponse>(response);
 
     expect(response.status).toBe(201);
     expect(data.name).toBe(`Test Org ${seq}`);
@@ -61,7 +61,7 @@ describe('POST /api/v1/organization', () => {
     const response = await fetch(
       post('/api/v1/organization', { name: 'Second', slug: `dup-slug-${seq}` }),
     );
-    const body = await jsonError(response);
+    const body = await parseErrorBody(response);
 
     expect(response.status).toBe(409);
     expect(body.error).toBeDefined();

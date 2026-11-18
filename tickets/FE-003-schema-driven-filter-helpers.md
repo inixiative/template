@@ -34,7 +34,7 @@ The data hooks (`usePaginatedData`, `useInfiniteData`, `useDataFilters`) support
 
 ### Backend (`apps/api`)
 
-- `searchable()` in `lib/prisma/searchable.ts` reads the Prisma runtime data model to validate field paths and detect relations
+- `searchable()` (`lib/prisma/searchable.ts`) was deleted on 2026-11-17 because nothing called it; the sections below that build on it need a field-path validator written again when this ticket is taken
 - `buildWhereClause()` in `lib/prisma/buildWhereClause.ts` accepts `searchFields` (validated) or `filters` (admin, direct Prisma)
 - Shared operators in `@template/shared/bracketQuery`: scalar (`contains`, `equals`, `lt`, `lte`, `gt`, `gte`, `startsWith`, `endsWith`, `not`), array (`in`, `notIn`), relation (`some`, `every`, `none`, `is`, `isNot`)
 

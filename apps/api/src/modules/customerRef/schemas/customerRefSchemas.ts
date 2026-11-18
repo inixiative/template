@@ -5,7 +5,7 @@
  * @uses none
  */
 import { CustomerRefScalarSchema, OrganizationScalarSchema, SpaceScalarSchema } from '@template/db';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
 // Customer side - who is the customer (User, Org, or Space)
@@ -38,10 +38,10 @@ export const customerRefAsProviderSchema = CustomerRefScalarSchema.extend({
 
 // Combined tags for CustomerRef routes (alphabetized)
 export const customerRefTags = [
-  Tags.customer,
-  Tags.customerRef,
-  Tags.organization,
-  Tags.provider,
-  Tags.space,
-  Tags.user,
+  OpenApiTags.customer,
+  OpenApiTags.customerRef,
+  OpenApiTags.organization,
+  OpenApiTags.provider,
+  OpenApiTags.space,
+  OpenApiTags.user,
 ] as const;

@@ -497,7 +497,7 @@ const internalRequest = new Request(url, {
 Each batch sub-request gets **deep clones** of mutable context to prevent state leakage:
 
 ```typescript
-// apps/api/src/middleware/prepareRequest.ts
+// apps/api/src/middleware/prepareRequestMiddleware.ts
 if (batchContext) {
   // Read-only metadata (safe to share)
   c.set('app', batchContext.baseContext.get('app'));
@@ -542,7 +542,7 @@ transaction a sibling had open.
 
 **Key files:**
 - `apps/api/src/modules/batch/services/batchRegistry.ts` - In-memory storage
-- `apps/api/src/middleware/prepareRequest.ts` - Context injection + deep cloning
+- `apps/api/src/middleware/prepareRequestMiddleware.ts` - Context injection + deep cloning
 - `apps/api/src/middleware/auth/*.ts` - Auth skipping logic
 
 ---

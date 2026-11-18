@@ -8,8 +8,8 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { segmentReadResponseSchema } from '#/modules/segment/schemas/segmentSchemas';
-import { Tags } from '#/modules/tags';
 
 export const userReadManySegmentsRoute = readRoute({
   model: Modules.user,
@@ -19,5 +19,5 @@ export const userReadManySegmentsRoute = readRoute({
   filterLens: { parent: lensFor('Segment') },
   responseSchema: segmentReadResponseSchema,
   middleware: [validatePermission('read')],
-  tags: [Tags.user, Tags.segment],
+  tags: [OpenApiTags.user, OpenApiTags.segment],
 });

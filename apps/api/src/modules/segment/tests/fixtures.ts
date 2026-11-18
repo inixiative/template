@@ -1,7 +1,7 @@
 import { Operator } from '@inixiative/json-rules';
 import { db } from '@template/db';
 
-export const acmeRule = {
+export const acmeEmailDomainRule = {
   field: 'customerUser.email',
   operator: Operator.endsWith,
   value: '@acme.test',

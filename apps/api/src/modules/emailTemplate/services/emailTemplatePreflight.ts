@@ -21,8 +21,8 @@ import { assertValidConditions } from '@template/email/validations/validateCondi
 import type { RuleReference } from '@template/shared/rules';
 import { referenceKey } from '@template/shared/rules';
 import mjml2html from 'mjml';
-import { emailLensAt, emailLensFor } from '#/lib/email/emailLensFor';
-import { withoutDegradedSegments } from '#/lib/email/withoutDegradedSegments';
+import { emailLensFor, fetchStoredLensAndBuildEmailLens } from '#/lib/email/emailLensFor';
+import { fetchReferenceKeysExcludingDegradedSegments } from '#/lib/email/fetchReferenceKeysExcludingDegradedSegments';
 
 export type EmailTemplatePreflightInput = Partial<EmailOwnerRef> & {
   mjml: string;
@@ -84,7 +84,9 @@ export const emailTemplatePreflight = async (
     locale,
   };
 
-  const lens = input.slug ? await emailLensAt(input.slug, ctx) : emailLensFor(undefined, ctx);
+  const lens = input.slug
+    ? await fetchStoredLensAndBuildEmailLens(input.slug, ctx)
+    : emailLensFor(undefined, ctx);
   assertValidConditions(input.mjml, { lens });
   if (input.subject) assertValidConditions(input.subject, { isSubject: true, lens });
   const variables = sampleVariables(lens);
@@ -95,7 +97,7 @@ export const emailTemplatePreflight = async (
   };
 
   const expandedMjml = await expandDraft(input.mjml, ctx);
-  const existingTargets = await withoutDegradedSegments(
+  const existingTargets = await fetchReferenceKeysExcludingDegradedSegments(
     await existingReferences(lens, expandedMjml, input.subject ?? ''),
   );
   const options = { locale, lens, existingTargets };

@@ -135,13 +135,13 @@
     {
       "tag": "ws-data-streams",
       "atlas": "primitive:websockets",
-      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppend, routeRow, appendToStream), useStream / useStreamAction and the stream folds",
+      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useStream / useStreamAction and the stream folds",
       "region": "ws-data-streams"
     },
     {
       "tag": "ws-data-streams",
       "atlas": "primitive:websockets",
-      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppend, routeRow, appendToStream), useStream / useStreamAction and the stream folds",
+      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useStream / useStreamAction and the stream folds",
       "region": "ws-data-streams"
     },
     {
@@ -171,7 +171,7 @@
     {
       "tag": "email-delivery",
       "atlas": "feature:email / integration:resend",
-      "description": "Email sending: sendEmail planner, deliverEmail, senders, provider adapters",
+      "description": "Email sending: planEmailDeliveries planner, deliverEmail, senders, provider adapters",
       "region": "email-delivery"
     },
     {
@@ -351,7 +351,7 @@
     {
       "tag": "request-context",
       "atlas": "primitive:requestContext",
-      "description": "Request lifecycle: AppEnv, prepareRequest, context setters/accessors, resource and job context",
+      "description": "Request lifecycle: AppEnv, prepareRequestMiddleware, context setters/accessors, resource and job context",
       "region": "request-context-errors"
     },
     {

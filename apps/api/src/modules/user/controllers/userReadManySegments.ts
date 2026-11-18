@@ -8,7 +8,7 @@ import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { includeSegmentRuleReferences } from '#/modules/segment/queries/segmentIncludes';
-import { withSegmentsRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { attachRuleHealthToSegments } from '#/modules/segment/services/attachRuleHealthToSegments';
 import { userReadManySegmentsRoute } from '#/modules/user/routes/userReadManySegments';
 
 export const userReadManySegmentsController = makeController(
@@ -22,6 +22,6 @@ export const userReadManySegmentsController = makeController(
       include: includeSegmentRuleReferences,
     });
 
-    return respond.ok(await withSegmentsRuleIssues(data), { pagination });
+    return respond.ok(await attachRuleHealthToSegments(data), { pagination });
   },
 );

@@ -281,7 +281,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - Why: ids are time-ordered, and `paginate()`'s `{ id: desc }` tiebreaker and cursors depend on it
 
 **one-middleware-chain.sh:**
-- Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequest → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
+- Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequestMiddleware → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
 - A mount (`.route`, `.get`, `.all`, `.doc31`, …, chained or across lines, or a `.use` on a path with an inline handler) before the chain completes, on `routes` other than `/api`, on `app` other than `/`, or on `app`/`routes`/`apiRouter` from any other file fails unless its full path is in `scripts/ci/one-middleware-chain/exempt.txt` with a reason (template: `/health`, `/bullBoard`, `/test`, `/openapi/docs`, `/api/telemetry/browser`, `/api/internal`, `/api/auth/*`, `/api/unsubscribe`)
 
 **no-raw-locks.sh:**
@@ -299,7 +299,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 
 **bearer-only-auth.sh:**
 - Fails, in non-test source under `apps/` and `packages/`, on `cookieCache`, `credentials` set to `'include'`, `withCredentials`, `document.cookie`, any session lookup (a `getSession(...)` or `findSession(...)` call, or a read of the `session` table: `<x>.session.findUnique`, `findUniqueOrThrow`, `findFirst`, `findFirstOrThrow`, `findMany` or `count`), importing BetterAuth's `bearer` plugin, and building a session credential (importing or re-exporting `makeSignature`, `setRequestCookie`, `setSessionCookie`, `serializeSignedCookie`, `signCookieValue` or `createHMAC` from better-auth, `@better-auth/*` or better-call; a namespace import or re-export of a signer module; any reference to `createSession`: property, string element access or destructuring). No `exempt.txt`; one named file, `apps/api/src/lib/auth/withThrowawaySession.ts`, may build a session credential ([AUTH.md](./AUTH.md#account-changes-through-betterauth-withthrowawaysession))
-- Why: API auth is bearer-only and session-free ([AUTH.md](./AUTH.md#overview)). A person presents a JWT; a session exists only inside BetterAuth's `/api/auth/*` handler for the sign-in handshake, and `jwtHandoff` swaps it for a JWT. A cookie path was a second way in, a session lookup is a second way to resolve a person, and the `bearer` plugin turns a session token into a credential. A session built anywhere but the throwaway-session helper is a session that can outlive its one server call
+- Why: API auth is bearer-only and session-free ([AUTH.md](./AUTH.md#overview)). A person presents a JWT; a session exists only inside BetterAuth's `/api/auth/*` handler for the sign-in handshake, and `jwtHandoffPlugin` swaps it for a JWT. A cookie path was a second way in, a session lookup is a second way to resolve a person, and the `bearer` plugin turns a session token into a credential. A session built anywhere but the throwaway-session helper is a session that can outlive its one server call
 
 **ui-tests-serialize-factory-records.sh:**
 - For UI tests importing `@template/db/test`, requires `__serialize()` usage

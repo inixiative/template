@@ -11,7 +11,7 @@ import {
 import { meRouter } from '#/modules/me';
 import type { meReadManyProvidersRoute } from '#/modules/me/routes/meReadManyProviders';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type ReadManyProvidersResponse = z.infer<typeof meReadManyProvidersRoute.responseSchema>[];
 
@@ -46,7 +46,7 @@ describe('GET /me/providers', () => {
 
   it('returns empty array when user has no providers', async () => {
     const response = await fetch(get('/api/v1/me/providers'));
-    const { data, pagination } = await json<ReadManyProvidersResponse>(response);
+    const { data, pagination } = await parseSuccessBody<ReadManyProvidersResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data).toEqual([]);
@@ -62,7 +62,7 @@ describe('GET /me/providers', () => {
     });
 
     const response = await fetch(get('/api/v1/me/providers'));
-    const { data } = await json<ReadManyProvidersResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyProvidersResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(1);
@@ -71,7 +71,7 @@ describe('GET /me/providers', () => {
 
   it('filters by providerModel', async () => {
     const response = await fetch(get('/api/v1/me/providers?providerModel=Space'));
-    const { data } = await json<ReadManyProvidersResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyProvidersResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.every((p) => p.providerModel === 'Space')).toBe(true);
@@ -79,7 +79,7 @@ describe('GET /me/providers', () => {
 
   it('filters by providerSpaceId', async () => {
     const response = await fetch(get(`/api/v1/me/providers?providerSpaceId=${space.id}`));
-    const { data } = await json<ReadManyProvidersResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyProvidersResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.every((p) => p.providerSpaceId === space.id)).toBe(true);
@@ -100,7 +100,7 @@ describe('GET /me/providers', () => {
     });
 
     const response = await fetch(get('/api/v1/me/providers'));
-    const { data } = await json<ReadManyProvidersResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyProvidersResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.every((p) => p.customerUserId === user.id)).toBe(true);

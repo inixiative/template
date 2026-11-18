@@ -156,7 +156,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | return 204 from the delete; respond with no body after deleting; I'll return c.body null with 204; the delete should send back nothing | **respond.noContent** · primitive § /lib/utils/makeController — Respond Types — Deletes; respond.ok when returning data. | part 4 | return c.body(null, 204) or returning { data: null } from a delete controller (docs/claude/API_ROUTES.md § Controllers, Respond Types) |
 | return 200 with the record; respond from a read or update; send the data back with pagination metadata beside it; just respond ok for everything and let the payload say what happened | **respond.ok** · primitive § /lib/utils/makeController — Respond Types — Reads/updates; respond.created for creates, respond.noContent for deletes. | part 4 | — |
 | strip fields the client must not set from the body; I'll delete organizationId off the body in the controller; don't let the caller send ownerId or createdBy; deletedAt shouldn't be allowed in the body; drop the keys we don't want touched before saving | **sanitizeKeys** · primitive § /lib/routeTemplates — Template Args — strip listed keys from request body before it reaches Prisma | part 4 | delete body.organizationId / destructuring client-unsettable keys out of c.req.valid('json') in the controller before Prisma (docs/claude/API_ROUTES.md § Route Templates, Template Args) |
-| derive dotted-path key descriptions from a schema's .describe() annotations | **schemaGuide** · primitive lib/jsonSchema/schemaGuide.ts — derive dotted-path key descriptions from a schema's .describe() annotations | part 4 | — |
+| derive dotted-path key descriptions from a schema's .describe() annotations | **descriptionsBySchemaFieldPath** · primitive lib/jsonSchema/schemaGuide.ts — derive dotted-path key descriptions from a schema's .describe() annotations | part 4 | — |
 | omit the id path param from a templated route | **skipId** · primitive § /lib/routeTemplates — Template Args — omit the id path param from a templated route | part 4 | — |
 | convert OpenAPI {id} paths back to :id for frontend telemetry and MSW handlers | **toRoutePattern** · primitive @template/ui/lib/toRoutePattern — The single frontend place to convert paths; never hand-convert {id} to :id elsewhere. | part 4 | — |
 | substitute JSON values for Json fields while keeping their descriptions | **transformJsonFields** · primitive docs/claude/API_ROUTES.md § Router Exports › Info routes — substitute JSON values for Json fields while keeping their descriptions | code `toJsonSchema`, `registry`, `webhookOwnerAllowedModels`, `ContactRegistry` | — |
@@ -317,8 +317,8 @@ createRoute({ model: 'organization', submodel: 'token', bodySchema, responseSche
 // Action
 actionRoute({ model: 'user', action: 'activate', bodySchema, responseSchema })
 
-// Action on a subresource collection → POST /{id}/segments/reach
-actionRoute({ model: 'space', submodel: 'segment', action: 'reach', bodySchema, responseSchema })
+// Action on a subresource collection → POST /{id}/segments/estimateReach
+actionRoute({ model: 'space', submodel: 'segment', action: 'estimateReach', bodySchema, responseSchema })
 
 // Admin
 readRoute({ model: 'user', many: true, admin: true, responseSchema })
@@ -621,7 +621,7 @@ createRoute({
   responseSchema,
 });
 
-// The /me router loads me(c) as the owner
+// The /me router loads actingUser(c) as the owner
 readRoute({
   model: 'me',
   submodel: 'integration',
@@ -665,11 +665,11 @@ A body field stored in a Prisma `Json` column (inquiry `content`, contact `value
 | Route | Generated from | Lists |
 |-------|---------------|-------|
 | `/webhookSubscription/info` | `webhookOwnerAllowedModels` | `models` per owner, `signature` key |
-| `/inquiry/info` | `inquiryHandlers` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
+| `/inquiry/info` | `inquiryServices` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
 | `/contact/info` | `ContactRegistry` | per type: `input` and stored `value` JSON Schema, `subtype` rule, `uniqueness`, label and icon |
 | `/segment/info` | `customerRefLens` | every readable field with its kind; `conditions` is tagged `rule` and points at json-rules |
 
-Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `schemaGuide(responseSchema)` (`lib/jsonSchema/schemaGuide.ts`) reads those descriptions back through `z.toJSONSchema`. `schemaGuide.test.ts` fails on any key left undescribed.
+Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `descriptionsBySchemaFieldPath(responseSchema)` (`lib/jsonSchema/descriptionsBySchemaFieldPath.ts`) reads those descriptions back through `z.toJSONSchema`. `descriptionsBySchemaFieldPath.test.ts` fails on any key left undescribed.
 
 An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand ahead of `autoRegisterRoutes` (see `modules/inquiry/index.ts`). It checks no action, so it answers without a session. Zod schemas become JSON Schema through `toJsonSchema` (`lib/jsonSchema/toJsonSchema.ts`, zod 4 `z.toJSONSchema`): `input` for what a caller sends, `output` for what is stored. The body field points at its route with `z.unknown().describe('… see GET /api/v1/<module>/info')`; `transformJsonFields` keeps that description on the JSON value it substitutes.
 

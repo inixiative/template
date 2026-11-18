@@ -18,7 +18,7 @@ import {
 import { integrationReadResponseSchema } from '#/modules/integration/schemas/integrationSchemas';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/v1/space/:id/integrations', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -95,7 +95,7 @@ describe('GET /api/v1/space/:id/integrations', () => {
 
   it("lists only the space's own integrations to a member who can read it", async () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/integrations`));
-    const { data } = await json<Integration[]>(response);
+    const { data } = await parseSuccessBody<Integration[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.map((integration) => integration.name).sort()).toEqual([...names].sort());
@@ -124,7 +124,7 @@ describe('GET /api/v1/space/:id/integrations', () => {
 
   it('paginates', async () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/integrations?pageSize=1`));
-    const { data, pagination } = await json<Integration[]>(response);
+    const { data, pagination } = await parseSuccessBody<Integration[]>(response);
 
     expect(response.status).toBe(200);
     expect(data).toHaveLength(1);
@@ -138,7 +138,7 @@ describe('GET /api/v1/space/:id/integrations', () => {
         `/api/v1/space/${space.id}/integrations?searchFields[name]=${encodeURIComponent(names[0])}`,
       ),
     );
-    const { data } = await json<Integration[]>(response);
+    const { data } = await parseSuccessBody<Integration[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.map((integration) => integration.name)).toEqual([names[0]]);
@@ -146,7 +146,7 @@ describe('GET /api/v1/space/:id/integrations', () => {
 
   it('returns exactly the integration read fields', async () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/integrations`));
-    const { data } = await json<Integration[]>(response);
+    const { data } = await parseSuccessBody<Integration[]>(response);
     const readFields = Object.keys(integrationReadResponseSchema.shape).sort();
 
     for (const integration of data) {

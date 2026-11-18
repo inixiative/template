@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   findReferenceCycle,
   type ReferenceMap,
-  referencedBy,
+  segmentIdsReferencingSegment,
   sortByDependency,
 } from '#/modules/segment/services/segmentReferenceGraph';
 
@@ -35,7 +35,7 @@ describe('segmentReferenceGraph', () => {
 
   it('answers who references a segment', () => {
     const references = graph({ a: ['c'], b: ['c'], c: [] });
-    expect(referencedBy(references, 'c').sort()).toEqual(['a', 'b']);
-    expect(referencedBy(references, 'a')).toEqual([]);
+    expect(segmentIdsReferencingSegment(references, 'c').sort()).toEqual(['a', 'b']);
+    expect(segmentIdsReferencingSegment(references, 'a')).toEqual([]);
   });
 });

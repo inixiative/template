@@ -9,7 +9,7 @@
 
 ## ✅ Direction settled (2026-07-04, later session) — supersedes the pause note below
 
-**Simple model wins for now:** a **code registry** (evolve `apps/api/src/lib/email/registry.ts`
+**Simple model wins for now:** a **code registry** (evolve `apps/api/src/lib/email/emailTemplateRegistry.ts`
 `EmailEntry` — do NOT rebuild), **one sender + one recipient lens per template** — one path, one
 hydration boundary per side, no lens-selection/resolution logic. Different audiences = different
 templates; one app event may fan out to several handoffs (bridge already supports it). The
@@ -22,7 +22,7 @@ customer-rep/join-is-the-real-target insight.
 dynamic: recipient `picks`/`relations` declared **statically** (the interpolation surface, knowable at
 template-save time), only the scoping `where(entity, sender)` predicate is a closure; `recipientLens()`
 assembles the User-rooted narrowing, so the recipient-root invariant and the hydration boundary are
-enforced **by construction** (a closure cannot widen picks). Planner (`sendEmail`) builds the lens from
+enforced **by construction** (a closure cannot widen picks). Planner (`planEmailDeliveries`) builds the lens from
 the definition. Entries migrated; `registry.test.ts` covers assembly + the delivery-leaf invariant.
 
 **Next when wanted:** save-time `{{recipient.*}}`/`{{#if}}` validation against the entry's static
@@ -187,7 +187,7 @@ one mechanism.**
 
 ## Dispatch, hydration boundary & collision (send path)
 
-**Lens selection happens once, at the planner (`sendEmail`) — the send→deliver bridge.** That's already
+**Lens selection happens once, at the planner (`planEmailDeliveries`) — the send→deliver bridge.** That's already
 where the sender is resolved, recipients are `fetchLens`ed, `prune(user, lens)`d, and fanned out to
 `deliverEmail`. We extend that stage; we don't add a new one.
 
@@ -229,8 +229,8 @@ superadmins edit **send-governance for existing templates** with no deploy. `isS
 ### What DB storage does NOT unlock (the honest boundary)
 
 Serializable matrix ≠ superadmin-authored *new functioning slugs*. A template still binds to code in
-two places: **emission** (a code call site fires `enqueueJob('sendEmail', …)`) and **resolution**
-(`apps/api/src/lib/email/registry.ts` `EmailEntry` turns an event into sender/recipient/data **rows**
+two places: **emission** (a code call site fires `enqueueJob('planEmailDeliveries', …)`) and **resolution**
+(`apps/api/src/lib/email/emailTemplateRegistry.ts` `EmailEntry` turns an event into sender/recipient/data **rows**
 via lens queries). Content + matrix = data; emission + resolution = code. Making net-new slugs fully
 runtime-authored requires the *resolution* layer to become declarative too — a separate, larger
 feature. Deferred (YAGNI) until asked. (Encouraging note: `EmailEntry` already returns serializable
@@ -267,7 +267,7 @@ stays with the owner cascade + component slots (COMM-009). No selector semantics
 - [ ] **Slice 2b — `composeLenses(template, data)`** — the ordered pipeline `data → sender(select+bind)
   → merge → recipient(bind, assert User leaf)`, producing `{ sender, recipient, data, system }` for
   interpolation. Mirrors `transitions` `from → merge → to`.
-- [ ] **Slice 3 — send enforcement + dispatch.** At the planner (`sendEmail`, the send→deliver bridge):
+- [ ] **Slice 3 — send enforcement + dispatch.** At the planner (`planEmailDeliveries`, the send→deliver bridge):
   resolve each `to` lens → **precedence-dedup by identity** → prune each survivor to its assigned lens →
   serialize `{ recipient (pruned), recipientLens: key, sender, data }` into the deliver handoff. Guard via
   `canSend(matrix, sender, recipient, { actor, authorize })` over `checkTransition` (rebac `authorize` from
@@ -280,5 +280,5 @@ stays with the owner cascade + component slots (COMM-009). No selector semantics
 ## Related
 
 - `@inixiative/transitions` (FEAT-018), `@inixiative/permissions`, `@inixiative/json-rules`.
-- COMM-009 (lenses + component slots), COMM-001 (email system), `apps/api/src/lib/email/registry.ts`
+- COMM-009 (lenses + component slots), COMM-001 (email system), `apps/api/src/lib/email/emailTemplateRegistry.ts`
   (the code `EmailEntry` resolver — the emission/resolution binding).

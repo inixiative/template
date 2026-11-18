@@ -7,9 +7,9 @@
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { segmentReadRoute } from '#/modules/segment/routes/segmentRead';
-import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { attachRuleHealthToSegment } from '#/modules/segment/services/attachRuleHealthToSegments';
 
 export const segmentReadController = makeController(segmentReadRoute, async (c, respond) => {
   const segment = getResource<'segment'>(c);
-  return respond.ok(await withSegmentRuleIssues(segment));
+  return respond.ok(await attachRuleHealthToSegment(segment));
 });

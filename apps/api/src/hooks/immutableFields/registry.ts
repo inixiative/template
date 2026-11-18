@@ -84,5 +84,5 @@ export const getImmutableFields = (model: ModelName): readonly string[] => {
   return result;
 };
 
-export const getRefusedFields = (model: ModelName): readonly string[] =>
+export const fieldsRefusedAfterCreate = (model: ModelName): readonly string[] =>
   ImmutableFieldsOverrides[model]?.refuse ?? [];

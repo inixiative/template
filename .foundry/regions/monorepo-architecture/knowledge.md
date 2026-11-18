@@ -27,7 +27,7 @@
 ## Glossary
 
 **#/**  
-Alias for imports inside the same app (e.g. #/lib/context/me).
+Alias for imports inside the same app (e.g. #/lib/context/actingUser).
 
 **architecture**  
 Class: system overview, request and data flow, key architectural patterns.

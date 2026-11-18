@@ -40,7 +40,7 @@
 - [Contact Rules](#contact-rules)
   - [Adding a Contact Type](#adding-a-contact-type)
 - [Rules Registry](#rules-registry)
-  - [shadowMerge for Updates](#shadowmerge-for-updates)
+  - [applyWriteDataOverPreviousRow for Updates](#applywritedataoverpreviousrow-for-updates)
   - [Recursive Validation](#recursive-validation)
 - [Ordered List](#ordered-list)
   - [Registry](#registry)
@@ -80,7 +80,7 @@ All Prisma mutations wrapped with before/after hooks via `mutationLifeCycle` ext
 | `result` | object/array | Mutation result projected onto the model's columns (after only). An `include` on the write never reaches hooks, so `result` and `previous` have the same shape |
 | `previous` | object/array | Previous state (if fetched) |
 
-To read what a write sets, call `writeData({ action, args })` (`apps/api/src/hooks/shared/hookRows.ts`): it returns the rows as an array, coalesced across single and bulk `create`/`update` and both arms of an `upsert` (`isManyAction(action)` tells single from bulk). Hooks that need the written values read them there, not `args.data` by hand, which misses the bulk and upsert shapes.
+To read what a write sets, call `rowsBeingWritten({ action, args })` (`apps/api/src/hooks/shared/hookRows.ts`): it returns the rows as an array, coalesced across single and bulk `create`/`update` and both arms of an `upsert` (`isManyAction(action)` tells single from bulk). Hooks that need the written values read them there, not `args.data` by hand, which misses the bulk and upsert shapes.
 
 ### Action Types
 
@@ -164,7 +164,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 | `subjectModel` | Which model was mutated |
 | `before` / `after` | The record's own columns (filtered + masked). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
 | `changes` | Field-level diff for updates only |
-| `actorUserId` | `me(c)`: the JWT's or spoofed user, or the user of an acting User token (a member's, organization's, space's or integration's token names none) |
+| `actorUserId` | `actingUser(c)`: the JWT's or spoofed user, or the user of an acting User token (a member's, organization's, space's or integration's token names none) |
 | `actorSpoofUserId` | The superadmin spoofing, when spoofing |
 | `actorTokenId` | The acting token (nulled when the token is deleted) |
 | `actorJobName` | Background job name (if triggered by a job) |
@@ -172,19 +172,19 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 | `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorFromRecordOmittingSensitiveFields` sanitized (sensitive fields removed); survives the token's deletion |
 | `ipAddress` / `userAgent` | Request metadata |
 | `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
-| `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's tenancy, for filtering the log: its own `organizationId` / `spaceId` / `userId`, or, for a child with none ([parent edges](DATABASE.md#parent-edges)), its parent's (`contextRows`, `apps/api/src/hooks/auditLog/contextRows.ts`). An entitlement row is filed under its holder's tenancy, so an organization's audit view shows the entitlements its members' tokens gained and lost |
+| `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's tenancy, for filtering the log: its own `organizationId` / `spaceId` / `userId`, or, for a child with none ([parent edges](DATABASE.md#parent-edges)), its parent's (`fetchRowsCarryingTenantColumns`, `apps/api/src/hooks/auditLog/fetchRowsCarryingTenantColumns.ts`). An entitlement row is filed under its holder's tenancy, so an organization's audit view shows the entitlements its members' tokens gained and lost |
 | `subject*Id` | The mutated record, by `subjectModel` |
 
 ### Field Processing Pipeline
 
 `buildAuditEntry` (`apps/api/src/hooks/auditLog/hook.ts`) runs each record through:
 
-1. **Filter** (`filterForAudit` → `omitRegisteredFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
+1. **Filter** (`omitNoopFieldsForAudit` → `omitRegisteredFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
 2. **Diff** — for updates, `computeDiff` compares the filtered, **unmasked** before/after, so a change to a sensitive column is still detected.
 3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
 4. **Mask** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[MASKED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
-`processAuditData` (filter + mask) builds the same column-only snapshot for the email-versioning hook.
+`maskSensitiveAndOmitNoopFieldsForAudit` (filter + mask) builds the same column-only snapshot for the email-versioning hook.
 
 ### Reading the Log
 
@@ -345,7 +345,7 @@ Private fields of a party stay off the row (a settings or config table that is n
 
 ## Cache Invalidation
 
-Automatic cache clearing on mutations via `cacheReference`.
+Automatic cache clearing on mutations via `cacheKeysByModel`.
 
 **Note**: Cache invalidation shares the same no-op detection logic as webhooks (`isNoOpUpdate`). If only ignored fields changed (see [Ignored Fields](#ignored-fields)), cache clearing is skipped.
 
@@ -353,7 +353,7 @@ Automatic cache clearing on mutations via `cacheReference`.
 
 ```typescript
 // hooks/cache/constants/cacheReference.ts
-export const cacheReference: CacheReference = {
+export const cacheKeysByModel: CacheReference = {
   User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
   Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
   // ...
@@ -364,7 +364,7 @@ On mutation, the hook marks the keys of both the previous and the resulting row 
 
 ### Parent edges
 
-A child whose change is a change to its parent names that parent once, in the parent edge registry (`packages/db/src/registries/parentEdges.ts`, [DATABASE.md](DATABASE.md#parent-edges)). `Entitlement`'s parent is its target: the hook loads the parent rows (`loadParentRows` (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheReference` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
+A child whose change is a change to its parent names that parent once, in the parent edge registry (`packages/db/src/registries/parentEdges.ts`, [DATABASE.md](DATABASE.md#parent-edges)). `Entitlement`'s parent is its target: the hook loads the parent rows (`loadParentRows` (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheKeysByModel` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
 
 ### Wildcard Keys
 
@@ -604,9 +604,9 @@ export const RulesRegistry = {
 };
 ```
 
-### shadowMerge for Updates
+### applyWriteDataOverPreviousRow for Updates
 
-Updates are validated by merging `previous` record with update `data` using `shadowMerge`. This handles Prisma's atomic operations:
+Updates are validated by merging `previous` record with update `data` using `applyWriteDataOverPreviousRow`. This handles Prisma's atomic operations:
 
 ```typescript
 // Prisma update with atomic ops
@@ -618,8 +618,8 @@ await db.user.update({
   },
 });
 
-// shadowMerge computes final state for validation
-shadowMerge(
+// applyWriteDataOverPreviousRow computes final state for validation
+applyWriteDataOverPreviousRow(
   { balance: 500, tags: ['a', 'b'] },           // previous
   { balance: { increment: 100 }, tags: { push: 'new-tag' } }  // update data
 );
@@ -752,7 +752,7 @@ Supports dot notation for JSON paths: `'payload.canInvite'` on a `CronJob` locks
 
 `Entitlement` rows are immutable: an update naming `resource`, `actions`, `where`, `lens`, `sourcePath` or either axis is a 422; only `deletedAt` and `sourceDeletedAt` move.
 
-`getImmutableFields(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with dual polymorphism ids, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`getRefusedFields`).
+`getImmutableFields(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with dual polymorphism ids, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`fieldsRefusedAfterCreate`).
 
 ### Why Strip Instead of Throw?
 

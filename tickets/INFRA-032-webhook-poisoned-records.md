@@ -26,7 +26,7 @@ foreign-org record.
   per value (`customerRefId` today), registered in `PolymorphismRegistry.IntegrationRecord`.
   `poisonedAt` / `poisonedReason`. Partial unique `[integrationId, customerRefId]`, cascades from
   Integration and CustomerRef.
-- **Column projection** — `integrationRecordColumn(model: WebhookModel)` reads the registry axis.
+- **Column projection** — `integrationRecordForeignKeyForModel(model: WebhookModel)` reads the registry axis.
   `PolymorphismRegistry` is now declared with `satisfies` instead of a type annotation, so its
   literal keys survive: a `WebhookModel` value with no FK in the axis is a compile error there.
   Indexing by a runtime `ModelName` goes through `getPolymorphismConfig` (used by the factory and
@@ -66,7 +66,7 @@ foreign-org record.
   `integration.prisma` / `customerRef.prisma` (back-relations)
 - `packages/db/src/registries/falsePolymorphism.ts`, `packages/db/src/test/factory.ts`
 - `packages/db/src/test/factories/integrationRecordFactory.ts` (new)
-- `apps/api/src/modules/integration/services/{integrationRecordColumn,isIntegrationRecordPoisoned,poisonIntegrationRecord}.ts` (new)
+- `apps/api/src/modules/integration/services/{integrationRecordForeignKeyForModel,isIntegrationRecordPoisoned,poisonIntegrationRecord}.ts` (new)
 - `apps/api/src/jobs/handlers/sendWebhook.ts`
 
 ## Tests

@@ -6,8 +6,8 @@
  */
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
+import { actingUser } from '#/lib/context/actingUser';
 import { getResource, getResourceType } from '#/lib/context/getResource';
-import { me } from '#/lib/context/me';
 import type { AppEnv } from '#/types/appEnv';
 
 const nullSourceFields = {
@@ -54,7 +54,7 @@ export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields =>
     };
   }
 
-  const user = me(c)!;
+  const user = actingUser(c)!;
   return {
     ...nullSourceFields,
     sourceModel: InquiryResourceModel.User,

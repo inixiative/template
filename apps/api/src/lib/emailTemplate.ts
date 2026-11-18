@@ -21,12 +21,12 @@ import {
 import { type EmailLens, narrowVariables } from '@template/email/rules';
 import { LogScope, log } from '@template/shared/logger';
 import { emailLensFor } from '#/lib/email/emailLensFor';
-import { type RenderIssuePolicy, renderPolicyFor } from '#/lib/email/registry';
+import { type RenderIssuePolicy, renderPolicyFor } from '#/lib/email/emailTemplateRegistry';
+import { fetchReferenceKeysExcludingDegradedSegments } from '#/lib/email/fetchReferenceKeysExcludingDegradedSegments';
 import { renderForRecipient } from '#/lib/email/renderForRecipient';
 import type { Sender } from '#/lib/email/sender';
-import { withoutDegradedSegments } from '#/lib/email/withoutDegradedSegments';
 
-export const ownerScope = (sender: Sender): OwnerScope => {
+export const senderToOwnerScope = (sender: Sender): OwnerScope => {
   switch (sender.type) {
     case 'Organization':
       return { locale: 'en', ownerModel: 'Organization', organizationId: sender.organizationId };
@@ -63,7 +63,7 @@ export const ownerScope = (sender: Sender): OwnerScope => {
   }
 };
 
-export type SettledTemplate = {
+export type RenderedEmailTemplate = {
   slug: string;
   subject: string;
   mjml: string;
@@ -76,7 +76,7 @@ export type SettledTemplate = {
 };
 
 type Rendered = {
-  settled: SettledTemplate;
+  settled: RenderedEmailTemplate;
   subjectIssues: RenderIssue[];
   ownerModel: OwnerScope['ownerModel'];
 };
@@ -121,14 +121,14 @@ const describe = (issues: RenderIssue[]): string =>
 
 export type RenderPolicy = { onIssue: RenderIssuePolicy; substitute?: string };
 
-export const settleTemplate = async (
+export const renderEmailTemplateWithFallback = async (
   template: string,
   sender: Sender,
   variablesFor: (lens: EmailLens) => Promise<Variables>,
   systemVarsForKind?: (kind: CommunicationKind) => Record<string, unknown>,
   policy: RenderPolicy = renderPolicyFor(template),
-): Promise<SettledTemplate> => {
-  const scope = ownerScope(sender);
+): Promise<RenderedEmailTemplate> => {
+  const scope = senderToOwnerScope(sender);
   let primaryLens: EmailLens | undefined;
 
   const primaryBound = async (): Promise<EmailLens> => {
@@ -151,7 +151,9 @@ export const settleTemplate = async (
     const vars: Variables = systemVarsForKind
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
-    const existingTargets = await withoutDegradedSegments(composed.existingTargets);
+    const existingTargets = await fetchReferenceKeysExcludingDegradedSegments(
+      composed.existingTargets,
+    );
     return renderComposed(slug, composed, vars, at, lens, existingTargets);
   };
 
@@ -168,7 +170,7 @@ export const settleTemplate = async (
     slug: string,
     at: OwnerScope,
     label: string,
-  ): Promise<SettledTemplate> => {
+  ): Promise<RenderedEmailTemplate> => {
     log.warn(
       `Email ${label}: template=${template} → ${slug}@${at.ownerModel} — ${reason}`,
       LogScope.email,
@@ -182,7 +184,7 @@ export const settleTemplate = async (
     return { ...rendered.settled, kind: primaryKind ?? rendered.settled.kind };
   };
 
-  const substituted = async (reason: string): Promise<SettledTemplate> => {
+  const substituted = async (reason: string): Promise<RenderedEmailTemplate> => {
     if (policy.substitute) return fallback(reason, policy.substitute, scope, 'substituted');
     const platformCanDiffer =
       primaryOwner !== 'default' && primaryOwner !== 'admin' && scope.ownerModel !== 'admin';

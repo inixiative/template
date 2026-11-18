@@ -14,7 +14,7 @@ import {
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
@@ -60,7 +60,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
         explanation: 'Please change the role',
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.changesRequested);
@@ -107,7 +107,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
         explanation: 'Needs review',
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.expiresAt).not.toBeNull();

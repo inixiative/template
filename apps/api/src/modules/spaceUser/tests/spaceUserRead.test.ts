@@ -10,7 +10,7 @@ import type {
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/v1/spaceUser/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -57,7 +57,7 @@ describe('GET /api/v1/spaceUser/:id', () => {
     const response = await fetch(get(`/api/v1/spaceUser/${spaceUser.id}`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<SpaceUser>(response);
+    const { data } = await parseSuccessBody<SpaceUser>(response);
     expect(data.id).toBe(spaceUser.id);
     expect(data.role).toBe('admin');
   });

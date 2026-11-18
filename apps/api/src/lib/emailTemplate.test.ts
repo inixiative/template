@@ -12,7 +12,7 @@ import {
 } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { saveEmailTemplate } from '@template/email/render';
-import { settleTemplate } from '#/lib/emailTemplate';
+import { renderEmailTemplateWithFallback } from '#/lib/emailTemplate';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -48,7 +48,7 @@ const variables = given({
   data: {},
 });
 
-describe('settleTemplate — the registry entry decides what an issue does', () => {
+describe('renderEmailTemplateWithFallback — the registry entry decides what an issue does', () => {
   let organization: Organization;
 
   beforeEach(async () => {
@@ -69,14 +69,14 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
   });
 
   it('a clean render carries no issues', async () => {
-    const settled = await settleTemplate('clean', platform, variables);
+    const settled = await renderEmailTemplateWithFallback('clean', platform, variables);
     expect(settled.slug).toBe('clean');
     expect(settled.issues).toEqual([]);
     expect(settled.mjml).toContain('Hi Ada');
   });
 
   it('the default is the platform tier: a broken branded template sends the unbranded one', async () => {
-    const settled = await settleTemplate(
+    const settled = await renderEmailTemplateWithFallback(
       'branded',
       { type: 'Organization', organizationId: organization.id },
       variables,
@@ -86,14 +86,14 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
   });
 
   it('the platform tier has nowhere to fall back to, so its own issue refuses the send', async () => {
-    await expect(settleTemplate('holey', platform, variables)).rejects.toBeInstanceOf(
-      EmailRenderError,
-    );
+    await expect(
+      renderEmailTemplateWithFallback('holey', platform, variables),
+    ).rejects.toBeInstanceOf(EmailRenderError);
   });
 
   it('fail is an opt-in: a branded template that would rather wait refuses instead of unbranding', async () => {
     await expect(
-      settleTemplate(
+      renderEmailTemplateWithFallback(
         'branded',
         { type: 'Organization', organizationId: organization.id },
         variables,
@@ -106,7 +106,7 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
   });
 
   it('degrade sends the body with the token empty and records the typed issue', async () => {
-    const settled = await settleTemplate('holey', platform, variables, undefined, {
+    const settled = await renderEmailTemplateWithFallback('holey', platform, variables, undefined, {
       onIssue: 'degrade',
     });
     expect(settled.mjml).toContain('Hi Ada ');
@@ -118,12 +118,14 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
 
   it('a subject issue is fatal even under degrade', async () => {
     await expect(
-      settleTemplate('bad-subject', platform, variables, undefined, { onIssue: 'degrade' }),
+      renderEmailTemplateWithFallback('bad-subject', platform, variables, undefined, {
+        onIssue: 'degrade',
+      }),
     ).rejects.toThrow(/subject/);
   });
 
   it("a substitute renders instead when the primary would fail, with the primary's variables", async () => {
-    const settled = await settleTemplate('holey', platform, variables, undefined, {
+    const settled = await renderEmailTemplateWithFallback('holey', platform, variables, undefined, {
       onIssue: 'fail',
       substitute: 'clean',
     });
@@ -133,16 +135,22 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
   });
 
   it('a substitute also covers a primary that cannot be composed at all', async () => {
-    const settled = await settleTemplate('never-saved', platform, variables, undefined, {
-      onIssue: 'fail',
-      substitute: 'clean',
-    });
+    const settled = await renderEmailTemplateWithFallback(
+      'never-saved',
+      platform,
+      variables,
+      undefined,
+      {
+        onIssue: 'fail',
+        substitute: 'clean',
+      },
+    );
     expect(settled.slug).toBe('clean');
   });
 
   it('a substitute that renders with issues fails the send rather than degrading silently', async () => {
     await expect(
-      settleTemplate('never-saved', platform, variables, undefined, {
+      renderEmailTemplateWithFallback('never-saved', platform, variables, undefined, {
         onIssue: 'fail',
         substitute: 'holey',
       }),
@@ -155,14 +163,20 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
       mjml: mjml('{{#component:removed-child}}{{/component:removed-child}}'),
       subject: 'Hello',
     });
-    const expected = await settleTemplate('clean', platform, variables);
+    const expected = await renderEmailTemplateWithFallback('clean', platform, variables);
     await db.raw.emailComponent.delete({ where: { id: component.id } });
     const before = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
     expect(before.missingComponentSlugs).toEqual([]);
-    const settled = await settleTemplate(template.slug, platform, variables, undefined, {
-      onIssue: 'fail',
-      substitute: 'clean',
-    });
+    const settled = await renderEmailTemplateWithFallback(
+      template.slug,
+      platform,
+      variables,
+      undefined,
+      {
+        onIssue: 'fail',
+        substitute: 'clean',
+      },
+    );
     expect(settled).toEqual(expected);
     const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
     expect(stored.missingComponentSlugs).toEqual(['removed-child']);
@@ -177,7 +191,9 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     });
     await db.raw.emailComponent.delete({ where: { id: component.id } });
     await expect(
-      settleTemplate(template.slug, platform, variables, undefined, { onIssue: 'fail' }),
+      renderEmailTemplateWithFallback(template.slug, platform, variables, undefined, {
+        onIssue: 'fail',
+      }),
     ).rejects.toMatchObject({
       type: 'render_failed',
       path: ['Component not found: removed-fatal-child'],
@@ -187,7 +203,9 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
         .missingComponentSlugs,
     ).toEqual(['removed-fatal-child']);
     await expect(
-      settleTemplate(template.slug, platform, variables, undefined, { onIssue: 'fail' }),
+      renderEmailTemplateWithFallback(template.slug, platform, variables, undefined, {
+        onIssue: 'fail',
+      }),
     ).rejects.toMatchObject({
       type: 'render_failed',
       path: ['Component not found: removed-fatal-child'],
@@ -204,10 +222,16 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
       where: { id: template.id },
       data: { missingComponentSlugs: ['already-missing', 'previously-missing'] },
     });
-    const settled = await settleTemplate(template.slug, platform, variables, undefined, {
-      onIssue: 'fail',
-      substitute: 'clean',
-    });
+    const settled = await renderEmailTemplateWithFallback(
+      template.slug,
+      platform,
+      variables,
+      undefined,
+      {
+        onIssue: 'fail',
+        substitute: 'clean',
+      },
+    );
     expect(settled.slug).toBe('clean');
     const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
     expect(stored.missingComponentSlugs).toEqual(['already-missing', 'previously-missing']);
@@ -215,7 +239,7 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
   });
 });
 
-describe("settleTemplate — rules evaluate through the owner's lens", () => {
+describe("renderEmailTemplateWithFallback — rules evaluate through the owner's lens", () => {
   let organization: Organization;
   let other: Organization;
   let myTag: { id: string };
@@ -315,13 +339,13 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
   });
 
   it("a tag the owner can see matches; the same rule over another owner's tag does not", async () => {
-    const own = await settleTemplate(
+    const own = await renderEmailTemplateWithFallback(
       'scoped-tag',
       sender(),
       recipientWith({ id: myTag.id, ownerModel: 'Organization', organizationId: organization.id }),
     );
     expect(own.mjml).toContain('VIP');
-    const foreign = await settleTemplate(
+    const foreign = await renderEmailTemplateWithFallback(
       'scoped-tag',
       sender(),
       recipientWith({ id: theirTag.id, ownerModel: 'Organization', organizationId: other.id }),
@@ -331,7 +355,7 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
   });
 
   it('a segment whose own rule is degraded leaves the existing-target set, so the branch degrades', async () => {
-    const settled = await settleTemplate(
+    const settled = await renderEmailTemplateWithFallback(
       'scoped-segment',
       sender(),
       recipientWith({ id: myTag.id, ownerModel: 'Organization', organizationId: organization.id }),

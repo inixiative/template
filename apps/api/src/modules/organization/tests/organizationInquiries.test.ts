@@ -17,10 +17,10 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import { inquiryServices } from '#/modules/inquiry/services';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get, json, post } from '#tests/utils/request';
+import { get, parseSuccessBody, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/organization', organizationRouter)];
 
@@ -82,7 +82,7 @@ describe('GET /api/v1/organization/:id/inquiries/sent', () => {
     });
 
     const response = await fetch(get(`/api/v1/organization/${org.id}/inquiries/sent`));
-    const { data } = await json<Inquiry[]>(response);
+    const { data } = await parseSuccessBody<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
@@ -110,7 +110,7 @@ describe('POST /api/v1/organization/:id/inquiries — create and send with autoA
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
   let org: Organization;
-  const origAutoApprove = inquiryHandlers.inviteOrganizationUser.autoApprove;
+  const origAutoApprove = inquiryServices.inviteOrganizationUser.autoApprove;
 
   beforeEach(async () => {
     const { entity: adminUser } = await createUser();
@@ -127,11 +127,11 @@ describe('POST /api/v1/organization/:id/inquiries — create and send with autoA
   });
 
   beforeEach(() => {
-    inquiryHandlers.inviteOrganizationUser.autoApprove = async () => true;
+    inquiryServices.inviteOrganizationUser.autoApprove = async () => true;
   });
 
   afterEach(() => {
-    inquiryHandlers.inviteOrganizationUser.autoApprove = origAutoApprove;
+    inquiryServices.inviteOrganizationUser.autoApprove = origAutoApprove;
   });
 
   afterEach(async () => {
@@ -150,7 +150,7 @@ describe('POST /api/v1/organization/:id/inquiries — create and send with autoA
         targetUserId: invitee.id,
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(201);
     expect(data.status).toBe(InquiryStatus.approved);
@@ -176,7 +176,7 @@ describe('POST /api/v1/organization/:id/inquiries — create and send with autoA
         targetUserId: invitee.id,
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(201);
     expect(data.status).toBe(InquiryStatus.draft);
@@ -204,7 +204,7 @@ describe('POST /api/v1/organization/:id/inquiries — create and send with autoA
     }
 
     const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, body));
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(201);
 
@@ -250,7 +250,7 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (lo
         targetUserId: invitee.id,
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(201);
     expect(data.type).toBe(InquiryType.inviteOrganizationUser);
@@ -273,7 +273,7 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (lo
         targetUserId: invitee.id,
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(201);
     expect(data.status).toBe(InquiryStatus.sent);
@@ -399,7 +399,7 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (hi
     );
 
     expect(response.status).toBe(201);
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
     expect(data.type).toBe(InquiryType.inviteOrganizationUser);
   });
 
@@ -495,7 +495,7 @@ describe('POST /api/v1/organization/:id/inquiries — createSpace', () => {
         content: { name: 'My New Space', slug: 'my-new-space' },
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(201);
     expect(data.type).toBe(InquiryType.createSpace);
@@ -581,7 +581,7 @@ describe('GET /api/v1/organization/:id/inquiries/received', () => {
     });
 
     const response = await fetch(get(`/api/v1/organization/${org.id}/inquiries/received`));
-    const { data } = await json<Inquiry[]>(response);
+    const { data } = await parseSuccessBody<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);

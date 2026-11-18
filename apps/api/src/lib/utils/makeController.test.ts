@@ -4,7 +4,7 @@ import { actionRoute, createRoute, readRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { Modules } from '#/modules/modules';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, jsonError, post } from '#tests/utils/request';
+import { get, parseErrorBody, parseSuccessBody, post } from '#tests/utils/request';
 
 const ranResponse = z.object({ ran: z.boolean() });
 
@@ -32,7 +32,7 @@ describe('makeController', () => {
       const { fetch } = createTestApp({ mount: [(app) => app.openapi(testRoute, controller)] });
 
       const response = await fetch(get('/'));
-      const { data } = await json<Record<string, unknown>>(response);
+      const { data } = await parseSuccessBody<Record<string, unknown>>(response);
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ id: 'user-123', name: 'Test User' });
@@ -61,7 +61,7 @@ describe('makeController', () => {
       const { fetch } = createTestApp({ mount: [(app) => app.openapi(testRoute, controller)] });
 
       const response = await fetch(get('/'));
-      const { data } = await json<Record<string, unknown>[]>(response);
+      const { data } = await parseSuccessBody<Record<string, unknown>[]>(response);
 
       expect(response.status).toBe(200);
       expect(data).toHaveLength(2);
@@ -95,7 +95,9 @@ describe('makeController', () => {
       const { fetch } = createTestApp({ mount: [(app) => app.openapi(testRoute, controller)] });
 
       const response = await fetch(get('/'));
-      const { data } = await json<{ id: string; profile: Record<string, unknown> }>(response);
+      const { data } = await parseSuccessBody<{ id: string; profile: Record<string, unknown> }>(
+        response,
+      );
 
       expect(response.status).toBe(200);
       expect(data.profile).toEqual({ displayName: 'Test' });
@@ -136,8 +138,8 @@ describe('makeController', () => {
 
       const refinementResponse = await fetch(post('/range', { min: 5, max: 1 }));
       const schemaResponse = await fetch(post('/range', { min: 'five', max: 1 }));
-      const refinementBody = await jsonError(refinementResponse);
-      const schemaBody = await jsonError(schemaResponse);
+      const refinementBody = await parseErrorBody(refinementResponse);
+      const schemaBody = await parseErrorBody(schemaResponse);
 
       expect(refinementResponse.status).toBe(422);
       expect(schemaResponse.status).toBe(422);
@@ -150,7 +152,7 @@ describe('makeController', () => {
 
     it('runs the controller when the refinement passes', async () => {
       const response = await rangeRoute()(post('/range', { min: 1, max: 5 }));
-      const { data } = await json<{ ran: boolean }>(response);
+      const { data } = await parseSuccessBody<{ ran: boolean }>(response);
 
       expect(response.status).toBe(200);
       expect(data.ran).toBe(true);
@@ -210,7 +212,7 @@ describe('makeController', () => {
       const accepted = await fetch(post('/range', { min: 1, max: 5 }));
 
       expect(rejected.status).toBe(422);
-      expect((await jsonError(rejected)).fieldErrors).toEqual({
+      expect((await parseErrorBody(rejected)).fieldErrors).toEqual({
         min: ['min must not exceed max'],
       });
       expect(accepted.status).toBe(200);
@@ -242,7 +244,7 @@ describe('makeController', () => {
       );
 
       expect(response.status).toBe(422);
-      expect((await jsonError(response)).fieldErrors).toEqual({
+      expect((await parseErrorBody(response)).fieldErrors).toEqual({
         '1.min': ['min must not exceed max'],
       });
     });
@@ -282,7 +284,7 @@ describe('makeController', () => {
       const accepted = await fetch(get('/range?min=1&max=5'));
 
       expect(rejected.status).toBe(422);
-      expect((await jsonError(rejected)).fieldErrors).toEqual({
+      expect((await parseErrorBody(rejected)).fieldErrors).toEqual({
         min: ['min must not exceed max'],
       });
       expect(accepted.status).toBe(200);

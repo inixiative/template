@@ -6,11 +6,11 @@
  */
 import type { WSSocket } from '#/ws/types';
 
-export const byId = new Map<string, WSSocket>();
-export const byChannel = new Map<string, Set<string>>();
-export const byStream = new Map<string, Set<string>>();
+export const connectionsById = new Map<string, WSSocket>();
+export const connectionIdsByChannel = new Map<string, Set<string>>();
+export const connectionIdsByStream = new Map<string, Set<string>>();
 
-export const indexInto = (
+export const addConnectionIdToIndex = (
   map: Map<string, Set<string>>,
   key: string,
   connectionId: string,
@@ -23,7 +23,7 @@ export const indexInto = (
   set.add(connectionId);
 };
 
-export const deindexFrom = (
+export const removeConnectionIdFromIndex = (
   map: Map<string, Set<string>>,
   key: string,
   connectionId: string,
@@ -35,19 +35,21 @@ export const deindexFrom = (
 };
 
 export const addConnection = (ws: WSSocket): void => {
-  byId.set(ws.data.connectionId, ws);
+  connectionsById.set(ws.data.connectionId, ws);
 };
 
 export const removeConnection = (ws: WSSocket): void => {
   const { connectionId, channels, streams, heldAppends } = ws.data;
-  byId.delete(connectionId);
-  for (const channel of channels) deindexFrom(byChannel, channel, connectionId);
-  for (const stream of streams) deindexFrom(byStream, stream, connectionId);
+  connectionsById.delete(connectionId);
+  for (const channel of channels)
+    removeConnectionIdFromIndex(connectionIdsByChannel, channel, connectionId);
+  for (const stream of streams)
+    removeConnectionIdFromIndex(connectionIdsByStream, stream, connectionId);
   heldAppends.clear();
 };
 
 export const clearRegistry = (): void => {
-  byId.clear();
-  byChannel.clear();
-  byStream.clear();
+  connectionsById.clear();
+  connectionIdsByChannel.clear();
+  connectionIdsByStream.clear();
 };

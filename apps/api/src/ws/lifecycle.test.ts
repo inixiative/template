@@ -5,7 +5,7 @@ import {
   getConnectionStats,
   updateLastPing,
 } from '#/ws/lifecycle';
-import { addConnection, byId, clearRegistry } from '#/ws/registry';
+import { addConnection, clearRegistry, connectionsById } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket, sentFrames } from '#tests/createTestSocket';
@@ -32,8 +32,8 @@ describe('lifecycle', () => {
     const cleaned = cleanupStaleConnections();
 
     expect(cleaned).toBe(1);
-    expect(byId.has('stale')).toBe(false);
-    expect(byId.has('fresh')).toBe(true);
+    expect(connectionsById.has('stale')).toBe(false);
+    expect(connectionsById.has('fresh')).toBe(true);
     expect(stale.closeInfo()?.reason).toBe('Connection stale');
   });
 

@@ -13,10 +13,10 @@ import {
 import { saveEmailTemplate } from '@template/email/render';
 import { messageUser } from '#/jobs/handlers/messageUser';
 import { recipientVariables } from '#/lib/email/renderForRecipient';
-import { settleTemplate } from '#/lib/emailTemplate';
+import { renderEmailTemplateWithFallback } from '#/lib/emailTemplate';
 import { type MessageContent, messageProviderRegistry } from '#/lib/messaging/providers';
 import { createTestApp } from '#tests/createTestApp';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 type DispatchedCall = {
   contactId: string;
@@ -27,7 +27,7 @@ type DispatchedCall = {
 describe('messageUser handler', () => {
   let testDb: ReturnType<typeof createTestApp>['db'];
   const dispatched: DispatchedCall[] = [];
-  const worker = createTestWorker();
+  const worker = makeTestWorker();
 
   beforeEach(() => {
     const harness = createTestApp({});
@@ -313,7 +313,7 @@ describe('messageUser handler', () => {
       });
       const sender = { type: 'Organization', organizationId: mine.id } as const;
       const messaged = await send(user.id, mine.id, text);
-      const emailed = await settleTemplate('same-render', sender, (lens) =>
+      const emailed = await renderEmailTemplateWithFallback('same-render', sender, (lens) =>
         recipientVariables(lens, { recipientId: user.id, sender }),
       );
       expect(messaged).toBe('Hi Ada [Mine:admin] ADMIN');

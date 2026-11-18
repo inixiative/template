@@ -42,7 +42,7 @@ describe('resolveUserByContact', () => {
   });
 
   // Stub-create paths exercise the auditLog hook, which uses `db` from the
-  // request scope set up by prepareRequest middleware. Calling the helper
+  // request scope set up by prepareRequestMiddleware. Calling the helper
   // directly here would FK-violate against AuditLog.subjectUserId. Cover
   // those paths via integration tests in createTestApp instead.
 

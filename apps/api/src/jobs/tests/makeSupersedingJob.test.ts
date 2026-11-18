@@ -10,13 +10,13 @@ import {
 import { WaitingChildrenError } from 'bullmq';
 import { makeSupersedingJob, type SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import type { WorkerContext } from '#/jobs/types';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 describe('makeSupersedingJob', () => {
   let ctx: WorkerContext;
 
   beforeEach(() => {
-    ctx = createTestWorker();
+    ctx = makeTestWorker();
   });
 
   afterEach(async () => {

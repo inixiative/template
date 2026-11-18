@@ -16,7 +16,7 @@ import { coordinateRollingCaches } from '#/jobs/handlers/coordinateRollingCaches
 import { refreshRollingCache } from '#/jobs/handlers/refreshRollingCache';
 import { queue } from '#/jobs/queue';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 const INTERVAL_SECONDS = 300;
 
@@ -29,7 +29,7 @@ const uniqueName = (label: string): string => {
 };
 
 const coordinate = (tick = 'coordinateRollingCaches') =>
-  coordinateRollingCaches(createTestWorker({ name: tick }));
+  coordinateRollingCaches(makeTestWorker({ name: tick }));
 
 const makeDue = (name: string) => getRedisClient().pexpire(rollingCacheTimerKey(name), 1_000);
 
@@ -107,7 +107,7 @@ describe('coordinateRollingCaches', () => {
     await createSpace({ name: `${name} a` }, { organization: acme });
     await createSpace({ name: `${name} b` }, { organization: globex });
     const rollingCache = makeSpaceCountCache(name, () => '', INTERVAL_SECONDS / 2);
-    const branch = createTestWorker({
+    const branch = makeTestWorker({
       name: 'refreshRollingCache',
       token: 'worker-token',
       updateData: mock(async () => {}),

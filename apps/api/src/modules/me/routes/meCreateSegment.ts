@@ -7,12 +7,12 @@
 import { createRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
+import { OpenApiTags } from '#/modules/openApiTags';
 import {
   SEGMENT_CREATE_IMMUTABLE_FIELDS,
   segmentCreateBodySchema,
   segmentReadResponseSchema,
 } from '#/modules/segment/schemas/segmentSchemas';
-import { Tags } from '#/modules/tags';
 
 export const meCreateSegmentRoute = createRoute({
   model: Modules.me,
@@ -22,5 +22,5 @@ export const meCreateSegmentRoute = createRoute({
   bodySchema: segmentCreateBodySchema,
   responseSchema: segmentReadResponseSchema,
   sanitizeKeys: SEGMENT_CREATE_IMMUTABLE_FIELDS,
-  tags: [Tags.me, Tags.segment],
+  tags: [OpenApiTags.me, OpenApiTags.segment],
 });

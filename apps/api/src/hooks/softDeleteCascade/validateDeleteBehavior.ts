@@ -22,7 +22,7 @@ const optionalForeignKey = (model: string, fromFields: readonly string[]): boole
   return fromFields.every((name) => fields?.[name]?.isRequired !== true);
 };
 
-export const deleteBehaviorViolations = (
+export const hardDeleteOnTombstoneViolations = (
   models: readonly string[] = HARD_DELETE_ON_TOMBSTONE,
 ): string[] => {
   const listed = new Set(models);
@@ -90,7 +90,7 @@ export const closeOnParentDeleteViolations = (
 
 export const validateDeleteBehavior = () => {
   const violations = [
-    ...deleteBehaviorViolations(),
+    ...hardDeleteOnTombstoneViolations(),
     ...skipReviveViolations(),
     ...closeOnParentDeleteViolations(),
   ];

@@ -10,7 +10,7 @@ import {
 } from '@template/permissions';
 import { check } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import { delegatedPermissions } from '#/lib/permissions/ownerPermissions';
+import { narrowOwnerPermissionsToDelegate } from '#/lib/permissions/ownerPermissions';
 
 const o1 = { id: 'o1' };
 const o2 = { id: 'o2' };
@@ -41,7 +41,10 @@ const permixOf = async (permissions: Permissions) => {
   return permix;
 };
 
-const operates = async (table: ReturnType<typeof delegatedPermissions>, member: Member) =>
+const operates = async (
+  table: ReturnType<typeof narrowOwnerPermissionsToDelegate>,
+  member: Member,
+) =>
   check(
     await permixOf(table),
     rebacSchema,
@@ -52,7 +55,7 @@ const operates = async (table: ReturnType<typeof delegatedPermissions>, member: 
 
 describe("only a member's self-grant is backed by its user", () => {
   it('a full token on M1 operates M1, and not M2 or M3', async () => {
-    const table = delegatedPermissions(
+    const table = narrowOwnerPermissionsToDelegate(
       { full: true },
       permissionsOfUser(null, [withSelfGrant(m1)], []),
     );
@@ -62,7 +65,7 @@ describe("only a member's self-grant is backed by its user", () => {
   });
 
   it('a role token on M1 does not operate M1', async () => {
-    const table = delegatedPermissions(
+    const table = narrowOwnerPermissionsToDelegate(
       { role: 'owner' },
       permissionsOfUser(null, [withSelfGrant(m1)], []),
     );
@@ -86,7 +89,7 @@ describe("only a member's self-grant is backed by its user", () => {
       ],
     };
     const full = await permixOf(
-      delegatedPermissions({ full: true }, permissionsOfUser(null, [wider], [])),
+      narrowOwnerPermissionsToDelegate({ full: true }, permissionsOfUser(null, [wider], [])),
     );
     expect(
       check(full, rebacSchema, 'organizationUser', m3 as unknown as HydratedRecord, 'operate'),
@@ -99,7 +102,10 @@ describe("only a member's self-grant is backed by its user", () => {
       ...m2,
       targetEntitlements: [toEntitlementInput(memberSelfGrant('db:organizationUser', m1))],
     };
-    const table = delegatedPermissions({ full: true }, permissionsOfUser(null, [borrowed], []));
+    const table = narrowOwnerPermissionsToDelegate(
+      { full: true },
+      permissionsOfUser(null, [borrowed], []),
+    );
     expect(await operates(table, m1)).toBe(false);
   });
 });

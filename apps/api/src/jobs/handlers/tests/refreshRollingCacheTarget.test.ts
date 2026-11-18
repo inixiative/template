@@ -12,7 +12,7 @@ import {
 import { cleanupTouchedTables, createOrganization } from '@template/db/test';
 import { enqueueJob } from '#/jobs/enqueue';
 import { refreshRollingCacheTarget } from '#/jobs/handlers/refreshRollingCacheTarget';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 const registered: string[] = [];
 
@@ -183,7 +183,7 @@ describe('refreshRollingCacheTarget', () => {
     });
     const key = rollingCache.targetKey();
     await rollingCache.markQueued(undefined);
-    const ctx = createTestWorker();
+    const ctx = makeTestWorker();
 
     const lane = laneKey(ctx.job.name, key);
 

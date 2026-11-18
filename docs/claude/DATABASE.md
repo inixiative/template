@@ -888,7 +888,7 @@ See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.
 | Consumer | Reads |
 |---|---|
 | Cache hook (`apps/api/src/hooks/cache/hook.ts`) | `loadParentRows`: a child's write clears its parent's keys ([HOOKS.md](HOOKS.md#parent-edges)) |
-| Audit hook (`contextRows`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
+| Audit hook (`fetchRowsCarryingTenantColumns`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
 | Audit history read (`auditHistoryWhere`) | `childrenOf(record)`: a record's entries and its children's in one stream ([HOOKS.md](HOOKS.md#reading-the-log)) |
 
 Why one registry: the cache traversal, the audit tenancy and the history read are the same fact ("this row's change is a change to that row"), and stating it once keeps them from drifting. Register a child only when a consumer would otherwise special-case it; a model with its own tenant columns and its own cache keys needs no edge.

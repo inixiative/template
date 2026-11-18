@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db, revive } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createEmailTemplate } from '@template/db/test';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
 
 const runRestamp = (slug: string) =>
-  createTestWorker({ name: 'recomputeEmailDependents', id: Bun.randomUUIDv7() }).run({ slug });
+  makeTestWorker({ name: 'recomputeEmailDependents', id: Bun.randomUUIDv7() }).run({ slug });
 
 const badges = async (ids: { components: string[]; templates: string[] }) => ({
   components: (

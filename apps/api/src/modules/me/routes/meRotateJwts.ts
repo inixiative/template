@@ -9,7 +9,7 @@ import { UserAction } from '@template/permissions/client';
 import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meRotateJwtsRoute = actionRoute({
   model: Modules.me,
@@ -19,6 +19,6 @@ export const meRotateJwtsRoute = actionRoute({
   description:
     'Rotates your JWT version: every JWT this API has signed for you, on every device, stops working. ' +
     'Sign in again afterwards. Signing out of one browser needs no call; that browser drops its JWT.',
-  tags: [Tags.me, Tags.user],
+  tags: [OpenApiTags.me, OpenApiTags.user],
   'x-batch': false,
 });

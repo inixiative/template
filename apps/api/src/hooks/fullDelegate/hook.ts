@@ -38,7 +38,7 @@ const refuseRowsOnFull = async (rows: Row[]) => {
   }
 };
 
-export const registerFullDelegateHook = () => {
+export const registerFullDelegateTakesNoRoleOrEntitlementsHook = () => {
   registerDbHook(
     'fullDelegate',
     DELEGATE_MODELS,

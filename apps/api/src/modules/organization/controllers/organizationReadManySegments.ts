@@ -9,7 +9,7 @@ import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationReadManySegmentsRoute } from '#/modules/organization/routes/organizationReadManySegments';
 import { includeSegmentRuleReferences } from '#/modules/segment/queries/segmentIncludes';
-import { withSegmentsRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { attachRuleHealthToSegments } from '#/modules/segment/services/attachRuleHealthToSegments';
 
 export const organizationReadManySegmentsController = makeController(
   organizationReadManySegmentsRoute,
@@ -22,6 +22,6 @@ export const organizationReadManySegmentsController = makeController(
       include: includeSegmentRuleReferences,
     });
 
-    return respond.ok(await withSegmentsRuleIssues(data), { pagination });
+    return respond.ok(await attachRuleHealthToSegments(data), { pagination });
   },
 );

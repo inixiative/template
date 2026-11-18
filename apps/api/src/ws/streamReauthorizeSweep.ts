@@ -7,7 +7,7 @@
 import { LogScope, log } from '@template/shared/logger';
 import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
 import { reauthorizeStreams } from '#/ws/reauthorizeStreams';
-import { byId, removeConnection } from '#/ws/registry';
+import { connectionsById, removeConnection } from '#/ws/registry';
 import type { WSSocket } from '#/ws/types';
 
 const REAUTHORIZE_INTERVAL_MS = 45_000;
@@ -31,7 +31,9 @@ const reauthorizeQueued = async (ws: WSSocket): Promise<void> => {
 };
 
 export const reauthorizeOpenStreams = async (): Promise<void> => {
-  const sockets = [...byId.values()].filter((ws) => ws.data.streams.size > 0 && !pending.has(ws));
+  const sockets = [...connectionsById.values()].filter(
+    (ws) => ws.data.streams.size > 0 && !pending.has(ws),
+  );
   await Promise.all(sockets.map(reauthorizeQueued));
 };
 

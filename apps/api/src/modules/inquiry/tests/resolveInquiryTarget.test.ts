@@ -15,7 +15,7 @@ import {
   resolveInquiryTarget,
 } from '#/modules/inquiry/services/resolveInquiryTarget';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 const { fetch, db } = createTestApp({
   mount: [
@@ -43,7 +43,7 @@ describe('resolveInquiryTarget', () => {
       targetUserId: membership.userId,
     });
     expect(response.status).toBe(200);
-    expect((await json(response)).data).toEqual({
+    expect((await parseSuccessBody(response)).data).toEqual({
       targetModel: 'OrganizationUser',
       targetOrganizationId: membership.organizationId,
       targetUserId: membership.userId,
@@ -81,7 +81,7 @@ describe('resolveInquiryTarget', () => {
       targetUserId: membership.userId,
     });
     expect(response.status).toBe(200);
-    expect((await json(response)).data).toEqual({
+    expect((await parseSuccessBody(response)).data).toEqual({
       targetModel: 'SpaceUser',
       targetOrganizationId: membership.organizationId,
       targetSpaceId: membership.spaceId,
@@ -118,14 +118,14 @@ describe('resolveInquiryTarget', () => {
     const { entity: token } = await createToken({ ownerModel: 'Integration' }, { integration });
     expect(
       (
-        await json(
+        await parseSuccessBody(
           await resolve({ targetModel: InquiryResourceModel.Token, targetTokenId: token.id }),
         )
       ).data,
     ).toMatchObject({ targetModel: 'Token', targetTokenId: token.id, targetOrganizationId: null });
     expect(
       (
-        await json(
+        await parseSuccessBody(
           await resolve({
             targetModel: InquiryResourceModel.Integration,
             targetIntegrationId: integration.id,

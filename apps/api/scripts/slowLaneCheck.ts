@@ -18,7 +18,7 @@ import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import { SLOW_PARK_MIN_MS } from '#/jobs/slowLaneSignals';
-import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { makeSlowSlotPool } from '#/jobs/slowSlotPool';
 import { JobLane, JobType } from '#/jobs/types';
 
 const checkEnv = z
@@ -106,7 +106,7 @@ const assertDisposableTarget = (): void => {
 };
 
 const startWorker = (concurrency: number, handlers: (job: Job) => Handlers): Worker => {
-  const slowSlots = createSlowSlotPool(concurrency);
+  const slowSlots = makeSlowSlotPool(concurrency);
   return new Worker(
     'jobs',
     (job: Job) => processJob(job, { handlers: handlers(job) as never, slowSlots }),
@@ -133,7 +133,7 @@ const checkLaneCapacity = async () => {
       slowRunning--;
       completions.set(payload.n, (completions.get(payload.n) ?? 0) + 1);
     },
-    cleanStaleData: async (_ctx, payload: { enqueuedAt: number }) => {
+    hardDeleteRecordsPastRetention: async (_ctx, payload: { enqueuedAt: number }) => {
       fastWaits.push(Date.now() - payload.enqueuedAt);
     },
   };
@@ -141,7 +141,7 @@ const checkLaneCapacity = async () => {
   const workers = Array.from({ length: WORKERS }, () => startWorker(concurrency, () => handlers));
   startOutboxDrainLoop();
 
-  const slowSlots = WORKERS * createSlowSlotPool(concurrency).capacity;
+  const slowSlots = WORKERS * makeSlowSlotPool(concurrency).capacity;
   const startedAt = Date.now();
   const slowEnqueue = runAllWithConcurrencyLimit(
     Array.from(
@@ -153,7 +153,7 @@ const checkLaneCapacity = async () => {
   await waitUntil(() => slowRunning >= slowSlots, 30_000);
   const fastEvery = Math.max(20, Math.floor((SLOW_JOBS * SLOW_JOB_MS) / slowSlots / FAST_JOBS / 2));
   for (let i = 0; i < FAST_JOBS; i++) {
-    await enqueueJob('cleanStaleData', { enqueuedAt: Date.now() } as never);
+    await enqueueJob('hardDeleteRecordsPastRetention', { enqueuedAt: Date.now() } as never);
     await sleep(fastEvery);
   }
   const outboxedAtEnqueue = (await slowEnqueue).filter((r) => 'outboxed' in r && r.outboxed).length;
@@ -224,7 +224,7 @@ const checkSendLargerThanShare = async () => {
   });
   await Promise.all([events.waitUntilReady(), ...workers.map((worker) => worker.waitUntilReady())]);
 
-  const slowSlots = WORKERS * createSlowSlotPool(concurrency).capacity;
+  const slowSlots = WORKERS * makeSlowSlotPool(concurrency).capacity;
   const share = maxSlowQueueDepth();
   const startedAt = Date.now();
   await Promise.all(
@@ -428,7 +428,7 @@ const checkJumpedJobRepair = async () => {
   await waitUntil(async () => (await slowJob.getState()) === 'failed', 30_000);
   await failing.close();
 
-  await enqueueJob('cleanStaleData', { enqueuedAt: Date.now() } as never);
+  await enqueueJob('hardDeleteRecordsPastRetention', { enqueuedAt: Date.now() } as never);
   await slowJob.retry();
 
   const ran: Array<{ name: string; priority: number }> = [];
@@ -437,7 +437,7 @@ const checkJumpedJobRepair = async () => {
   };
   const recorder = startWorker(1, (job) => ({
     sendWebhook: recordRun(job),
-    cleanStaleData: recordRun(job),
+    hardDeleteRecordsPastRetention: recordRun(job),
   }));
   await waitUntil(() => ran.length === 2, 30_000);
   await recorder.close();
@@ -445,7 +445,7 @@ const checkJumpedJobRepair = async () => {
   return {
     report: { runOrder: ran },
     failures: failuresOf([
-      ran[0]?.name !== 'cleanStaleData' &&
+      ran[0]?.name !== 'hardDeleteRecordsPastRetention' &&
         `a retried slow job ran before waiting fast work: ${JSON.stringify(ran)}`,
       ran.find((entry) => entry.name === 'sendWebhook')?.priority !== SLOW_LANE_PRIORITY &&
         'the retried slow job lost its priority',

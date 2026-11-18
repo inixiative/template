@@ -76,16 +76,16 @@ export const buildSubjectFkFields = (
   return subjectFields;
 };
 
-export const filterForAudit = (
+export const omitNoopFieldsForAudit = (
   model: string,
   data: Record<string, unknown>,
 ): Record<string, unknown> =>
   omitRegisteredFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
 
-export const processAuditData = (
+export const maskSensitiveAndOmitNoopFieldsForAudit = (
   model: string,
   data: Record<string, unknown>,
-): Record<string, unknown> => maskSensitiveFields(model, filterForAudit(model, data));
+): Record<string, unknown> => maskSensitiveFields(model, omitNoopFieldsForAudit(model, data));
 
 export const computeDiff = (
   before: Record<string, unknown>,

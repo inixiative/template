@@ -14,7 +14,7 @@ import {
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { del, json, patch, post } from '#tests/utils/request';
+import { del, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
@@ -144,7 +144,7 @@ describe('acting on an inquiry carries the version the actor saw', () => {
       }),
     );
     expect(sent.status).toBe(200);
-    const { data } = await json<Inquiry>(sent);
+    const { data } = await parseSuccessBody<Inquiry>(sent);
     expect(
       (
         await ownerFetch(

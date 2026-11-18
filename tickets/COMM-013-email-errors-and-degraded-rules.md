@@ -34,7 +34,7 @@ that save, so the lens check never runs at save.
   with backoff, then DLQ. The error is deterministic and is retried anyway.
 - *The sink*: `evaluateTemplateBlocksAndTokens` reports strings (a rule threw, rule JSON invalid, each attribute
   errors, each over cap, each path not an array, token resolved to an object,
-  unterminated each). `settleTemplate` collects them, logs a warning, then applies the
+  unterminated each). `renderEmailTemplateWithFallback` collects them, logs a warning, then applies the
   row's policy: `fail` throws `render_failed` into the same retry path; `degrade` sends
   what settled; `fallback` recomposes one owner up and re-settles, looping until a base
   owner, where the policy is forced to `fail`.
@@ -58,7 +58,7 @@ that save, so the lens check never runs at save.
 | 13 | No template anywhere in the cascade | render | `template_missing`, failed, retries, DLQ | ops |
 | 14 | Base owner with `degrade` or `fallback` | render | forced to `fail` | ops |
 | 15 | Rail-provided system token not supplied | never | literal token ships | the recipient |
-| 16 | Bind name missing at planning | planning | plain `Error` in `sendEmail` before any CommunicationLog exists; retries; DLQ | ops |
+| 16 | Bind name missing at planning | planning | plain `Error` in `planEmailDeliveries` before any CommunicationLog exists; retries; DLQ | ops |
 | 17 | Bind present but null | planning | where equals null, zero recipients, info log "jobs=0" | nobody |
 | 18 | Sender pick reads an empty field | planning | plain `Error`, as 16 | ops |
 
@@ -149,7 +149,7 @@ the failing block, and it walks down to the base owner and then fails.
 4. **One render behaviour, declared in the registry entry.** `EmailErrorPolicy`, the row's
    `onError`, and `EMAIL_INLINE_RENDER_ERRORS` are gone. Render produces `RenderIssue[]`
    (`kind: rule | token | each`, `path`, `detail`); a failing block or token renders nothing.
-   `settleTemplate` reads `render: { onIssue, substitute }` from the code registry entry:
+   `renderEmailTemplateWithFallback` reads `render: { onIssue, substitute }` from the code registry entry:
    `platform` (default, Aron 2026-09-10 after the first merge: "the default needs to be the one
    that falls back to the system template, which should be stable, so these things could go out
    even if they're not branded properly") re-renders the platform tier's own row of the slug when
@@ -160,7 +160,7 @@ the failing block, and it walks down to the base owner and then fails.
    A non-system template with no recipient contact fails (`unsubscribe_unavailable`) — the
    unsubscribe link is not optional. `{{#each}}` with a throwing filter renders nothing (no more
    partial lists).
-5. **Planning failures are loud.** `sendEmail` throws on a missing registry entry, a missing
+5. **Planning failures are loud.** `planEmailDeliveries` throws on a missing registry entry, a missing
    adapter, and a declared `data` field the event did not supply; zero recipients stays an
    info line. `branchOnRuleHealth` gained the `bindings` question (json-rules 2.22.0 `bindOptional`).
 

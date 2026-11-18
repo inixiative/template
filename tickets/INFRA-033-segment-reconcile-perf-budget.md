@@ -12,9 +12,9 @@
 
 ## What to measure
 
-- **Customer rail** (`reconcileCustomerRefSegments` → `reconcileCustomerRef`): queries per run. Today it evaluates *every* dynamic segment of the customer's providers (`dynamicSegmentsOf(...).filter(isContinuous)`) and runs `check()` per segment over one hydrated ref. Count segments evaluated × queries per evaluation at current segment counts.
+- **Customer rail** (`reconcileCustomerRefSegments` → `reconcileCustomerRef`): queries per run. Today it evaluates *every* dynamic segment of the customer's providers (`dynamicSegmentsOf(...).filter(isReconcilableDynamicSegment)`) and runs `check()` per segment over one hydrated ref. Count segments evaluated × queries per evaluation at current segment counts.
 - **Segment rail** (`reconcileSegment`): set-based, one query per segment via `toPrisma` over the resolved lens, plus junction diff writes. Count queries + write volume per rule change.
-- **Sweep** (`sweepSegments`, 04:00 UTC): full pass over sound dynamic segments in dependency order. Cost per night at current scale.
+- **Sweep** (`reconcileEveryHealthyDynamicSegment`, 04:00 UTC): full pass over sound dynamic segments in dependency order. Cost per night at current scale.
 - **Trigger frequency**: events per customer per day across `RECONCILE_TRIGGERS`. The job supersedes per customer, so burst writes collapse — measure how much that actually absorbs.
 
 ## The question to answer

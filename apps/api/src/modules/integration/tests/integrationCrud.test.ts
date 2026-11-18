@@ -12,7 +12,7 @@ import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
-import { del, get, json, patch, post } from '#tests/utils/request';
+import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 describe('Integration CRUD', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -50,7 +50,7 @@ describe('Integration CRUD', () => {
           role: 'viewer',
         }),
       );
-      const { data } = await json<Integration>(response);
+      const { data } = await parseSuccessBody<Integration>(response);
       expect(response.status).toBe(201);
       expect(data.ownerModel).toBe('User');
       expect(data.userId).toBe(user.id);
@@ -63,7 +63,7 @@ describe('Integration CRUD', () => {
           role: 'viewer',
         }),
       );
-      const { data } = await json<Integration>(response);
+      const { data } = await parseSuccessBody<Integration>(response);
       expect(response.status).toBe(201);
       expect(data.ownerModel).toBe('Organization');
       expect(data.organizationId).toBe(org.id);
@@ -106,7 +106,7 @@ describe('Integration CRUD', () => {
       const response = await fetch(
         patch(`/api/v1/integration/${integration.id}`, { name: 'After' }),
       );
-      const { data } = await json<Integration>(response);
+      const { data } = await parseSuccessBody<Integration>(response);
       expect(response.status).toBe(200);
       expect(data.name).toBe('After');
     });

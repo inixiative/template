@@ -18,7 +18,7 @@ import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName } from '#/appEvents/handlers';
 import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefReachedModels';
 import { RECONCILE_TRIGGERS } from '#/modules/segment/lib/reconcileTriggers';
-import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
+import { acmeEmailDomainRule, memberIds } from '#/modules/segment/tests/fixtures';
 
 const taggedRule = (tagId: string) => ({
   field: 'customerUser.tagAttachments',
@@ -122,7 +122,7 @@ describe('reconcile triggers — membership follows the events', () => {
   });
 
   it('a user update and a new customer reference reconcile that customer', async () => {
-    const segment = await liveSegment(acmeRule);
+    const segment = await liveSegment(acmeEmailDomainRule);
     const newcomer = (
       await createUser({ email: `newcomer-${nextFactorySequenceNumber()}@example.test` })
     ).entity;

@@ -13,7 +13,7 @@ import { senderOrganizationUserLens } from '#/lib/email/lenses/senderOrganizatio
 import { senderSpaceLens } from '#/lib/email/lenses/senderSpaceLens';
 import { senderSpaceUserLens } from '#/lib/email/lenses/senderSpaceUserLens';
 import { senderUserLens } from '#/lib/email/lenses/senderUserLens';
-import { lensOutput } from '#tests/utils/lensOutput';
+import { lensProjectionSourcesAndSelect } from '#tests/utils/lensProjectionSourcesAndSelect';
 
 const deletedPerCallLens = (model: ModelName, key: Record<string, string>): LensNarrowing => {
   const lens = lensFor(model);
@@ -64,8 +64,10 @@ describe('the sender row lenses', () => {
     }
   });
 
-  it('bound, each projects, sources and selects as the lens resolveSender assembled per call', () => {
+  it('bound, each projects, sources and selects as the lens fetchSenderRowThroughLens assembled per call', () => {
     for (const [lens, bindings, perCall] of SENDER_ROWS)
-      expect(lensOutput(bindLens(lens, bindings))).toEqual(lensOutput(perCall));
+      expect(lensProjectionSourcesAndSelect(bindLens(lens, bindings))).toEqual(
+        lensProjectionSourcesAndSelect(perCall),
+      );
   });
 });

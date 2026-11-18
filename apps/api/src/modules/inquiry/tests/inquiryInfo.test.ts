@@ -2,9 +2,9 @@ import { describe, expect, it } from 'bun:test';
 import { type InquiryType, Role } from '@template/db/generated/client/enums';
 import { INQUIRY_TYPES } from '@template/permissions';
 import { inquiryRouter } from '#/modules/inquiry';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import { inquiryServices } from '#/modules/inquiry/services';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type InquiryTypeInfo = {
   sources: string[];
@@ -23,18 +23,18 @@ const { fetch } = createTestApp({
 const loadInfo = async () => {
   const response = await fetch(get('/api/v1/inquiry/info'));
   expect(response.status).toBe(200);
-  return (await json<{ types: Record<string, InquiryTypeInfo> }>(response)).data.types;
+  return (await parseSuccessBody<{ types: Record<string, InquiryTypeInfo> }>(response)).data.types;
 };
 
 describe('GET /api/v1/inquiry/info', () => {
   it('answers without a session and lists every registered handler', async () => {
     const types = await loadInfo();
-    expect(Object.keys(types).sort()).toEqual(Object.keys(inquiryHandlers).sort());
+    expect(Object.keys(types).sort()).toEqual(Object.keys(inquiryServices).sort());
   });
 
   it('reports each type’s declared source and target models and its handler rules', async () => {
     const types = await loadInfo();
-    for (const [type, handler] of Object.entries(inquiryHandlers)) {
+    for (const [type, handler] of Object.entries(inquiryServices)) {
       const { sources, targets } = INQUIRY_TYPES[type as InquiryType];
       expect(types[type]!.sources).toEqual(sources.map(({ model }) => model));
       expect(types[type]!.targets).toEqual(targets.map(({ model }) => model));

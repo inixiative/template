@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { EntitlementInput } from '@template/db';
 import { db } from '@template/db';
 import type { Integration, Organization } from '@template/db/generated/client/client';
 import {
@@ -12,7 +13,7 @@ import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { heldEntitlements } from '#tests/utils/entitlements';
 import { patch, post } from '#tests/utils/request';
 
@@ -34,15 +35,20 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-const broken = () => entry('db:integration', ['db:organization', organization.id], ['read']);
+const broken = () =>
+  entitlementInputFor('db:integration', ['db:organization', organization.id], ['read']);
 const readOrganization = () =>
-  entry('db:organization', ['db:organization', organization.id], ['read']);
-const manageItsIntegrations = (): Entry => ({
-  ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
+  entitlementInputFor('db:organization', ['db:organization', organization.id], ['read']);
+const manageItsIntegrations = (): EntitlementInput => ({
+  ...entitlementInputFor(
+    'db:integration',
+    ['db:organization', organization.id, 'organization'],
+    ['manage'],
+  ),
   where: { field: 'ownerModel', operator: 'equals', value: 'Organization' },
 });
 
-const memberKey = async (entitlements: Entry[]) => {
+const memberKey = async (entitlements: EntitlementInput[]) => {
   const { entity: organizationUser } = await createOrganizationUser(
     { role: 'viewer', entitlements },
     { organization },
@@ -55,7 +61,7 @@ const memberKey = async (entitlements: Entry[]) => {
   ).rawKey;
 };
 
-const tokenKey = async (role: 'viewer' | null, entitlements: Entry[]) => {
+const tokenKey = async (role: 'viewer' | null, entitlements: EntitlementInput[]) => {
   const { entity: organizationUser } = await createOrganizationUser(
     { role: 'owner' },
     { organization },

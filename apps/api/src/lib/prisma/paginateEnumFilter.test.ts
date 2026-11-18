@@ -9,7 +9,7 @@ import { readRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { Modules } from '#/modules/modules';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, jsonError } from '#tests/utils/request';
+import { get, parseErrorBody, parseSuccessBody } from '#tests/utils/request';
 
 const route = readRoute({
   model: Modules.inquiry,
@@ -60,7 +60,7 @@ describe('paginate — enum values in searchFields honour the filter lens', () =
     const response = await fetch(get('/enumFilterProbe?searchFields[status][in]=sent'));
 
     expect(response.status).toBe(200);
-    const body = await json<{ id: string; status: string }[]>(response);
+    const body = await parseSuccessBody<{ id: string; status: string }[]>(response);
     expect(body.data).toEqual([{ id: sent.id, status: InquiryStatus.sent }]);
   });
 
@@ -68,7 +68,7 @@ describe('paginate — enum values in searchFields honour the filter lens', () =
     const response = await fetch(get('/enumFilterProbe?searchFields[status][in]=draft'));
 
     expect(response.status).toBe(400);
-    expect((await jsonError(response)).message).toContain(
+    expect((await parseErrorBody(response)).message).toContain(
       "Value 'draft' is not valid for field 'status'",
     );
   });
@@ -77,7 +77,7 @@ describe('paginate — enum values in searchFields honour the filter lens', () =
     const response = await fetch(get('/enumFilterProbe?searchFields[status][in]=bogus'));
 
     expect(response.status).toBe(400);
-    expect((await jsonError(response)).message).toContain(
+    expect((await parseErrorBody(response)).message).toContain(
       "Value 'bogus' is not valid for field 'status'",
     );
   });
@@ -86,7 +86,7 @@ describe('paginate — enum values in searchFields honour the filter lens', () =
     const response = await fetch(get('/enumFilterProbe?searchFields[status]=canceled'));
 
     expect(response.status).toBe(400);
-    expect((await jsonError(response)).message).toContain(
+    expect((await parseErrorBody(response)).message).toContain(
       "Value 'canceled' is not valid for field 'status'",
     );
   });

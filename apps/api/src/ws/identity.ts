@@ -11,7 +11,11 @@ import { unsubscribeFromChannel } from '#/ws/subscriptions';
 import type { WSSocket } from '#/ws/types';
 
 // Grants were authorized under the previous credential, so any change of user or credential drops them.
-export const setIdentity = (ws: WSSocket, userId: string | null, headers: WSHeaders): void => {
+export const setSocketIdentityAndDropSubscriptionsOnChange = (
+  ws: WSSocket,
+  userId: string | null,
+  headers: WSHeaders,
+): void => {
   const unchanged = ws.data.userId === userId && isEqual(ws.data.headers, headers);
   ws.data.headers = headers;
   if (unchanged) return;

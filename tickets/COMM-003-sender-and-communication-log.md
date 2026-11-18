@@ -37,7 +37,7 @@ type Sender =
 ```
 - `senderKey(s)` → stable string (`type` + ids), used in idempotency keys (replaces `contextKey`).
 - Casing: non-model tiers lowercase (`platform`, `admin`); model types PascalCase = Prisma model names (mirrors `EmailOwnerModel`). `platform` = today's `default`.
-- **Users are first-class senders.** Sender = *identity* (drives from-address/display via `resolveSender`/`resolveFromAddress`). Branding (which template) is separate — the scope cascade below.
+- **Users are first-class senders.** Sender = *identity* (drives from-address/display via `fetchSenderRowThroughLens`/`resolveFromAddress`). Branding (which template) is separate — the scope cascade below.
 
 ## 1b. Recipients (declarative targeting + two-layer gate)
 
@@ -54,7 +54,7 @@ type RecipientTargets = {
 };
 ```
 
-`sendEmail` resolution:
+`planEmailDeliveries` resolution:
 1. Expand `organizations`/`spaces` → members, `customerRefs` → contacts; `users` direct.
 2. Resolve each candidate down to its email `Contact` (where `acceptedKinds`/`verifiedAt` live); the `to` is that contact's value.
 3. **Keep the resolution trace** (the org/space/customerRef + membership it came through) on each recipient → feeds `{{...}}` interpolation. A recipient is `{ final user/contact + trace }`, never a bare email.
@@ -103,7 +103,7 @@ Per-recipient delivery ledger. **One row per recipient per send** (grouped by `s
 - `idempotencyKey @unique`.
 - **Metadata only — never store the rendered body** (re-render from `emailTemplateId` + `data`). Retention/TTL policy required (mechanism TBD).
 
-**Flow / at-most-once fence:** `sendEmail` **find-or-creates** the `queued` row on `idempotencyKey`; `deliver` anti-joins (skip if `sent`) → `canDeliver` → `sending` → transmit → `sent`/`failed`. This find-or-create is the real fence (BullMQ `jobId` dedup only holds within the retention window).
+**Flow / at-most-once fence:** `planEmailDeliveries` **find-or-creates** the `queued` row on `idempotencyKey`; `deliver` anti-joins (skip if `sent`) → `canDeliver` → `sending` → transmit → `sent`/`failed`. This find-or-create is the real fence (BullMQ `jobId` dedup only holds within the retention window).
 
 ## 4. Idempotency keys (aligned with Zealot)
 
@@ -132,9 +132,9 @@ Aligned (no divergence): CommunicationLog shape + **FP template ref**, find-or-c
 
 ## Build plan (phased)
 1. **Sender** — `CommunicationLogSenderModel` enum + `Sender` DU + `senderKey`; rename `ReachContext`/`contextKey`; bridge to `ComposeContext`; update registry `senders()` + `deliverJobId`.
-2. **Cascade + fallback** — `parentForTemplate`; rewrite `lookupTemplate`/`settleTemplate` to walk it for not-found **and** render-error; DLQ at floor.
-3. **CommunicationLog** — enums + model + `falsePolymorphism.ts` entry + migration; wire `sendEmail` find-or-create + `deliver` anti-join/status.
-4. **User-actor template ownership** (not deferred) — grow `EmailOwnerModel` (+`User`/`OrganizationUser`/`SpaceUser`) + `userId` owner FK on `EmailTemplate`/`EmailComponent` + denormalized parent FKs + per-tier partial uniques (migration); add the **user chain** to `parentForTemplate`/`lookupCascade`; map `ownerScope(sender)` user-actors to their own owner tier (not peeled to scope).
+2. **Cascade + fallback** — `parentForTemplate`; rewrite `lookupTemplate`/`renderEmailTemplateWithFallback` to walk it for not-found **and** render-error; DLQ at floor.
+3. **CommunicationLog** — enums + model + `falsePolymorphism.ts` entry + migration; wire `planEmailDeliveries` find-or-create + `deliver` anti-join/status.
+4. **User-actor template ownership** (not deferred) — grow `EmailOwnerModel` (+`User`/`OrganizationUser`/`SpaceUser`) + `userId` owner FK on `EmailTemplate`/`EmailComponent` + denormalized parent FKs + per-tier partial uniques (migration); add the **user chain** to `parentForTemplate`/`lookupCascade`; map `senderToOwnerScope(sender)` user-actors to their own owner tier (not peeled to scope).
 
 ## Acceptance
 - `ReachContext`/`contextKey` gone; `Sender`/`senderKey` throughout; DU type-safety retained.

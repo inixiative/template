@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { basicAuthMiddleware } from '#/middleware/auth/basicAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
-import { get, jsonError } from '#tests/utils/request';
+import { get, parseErrorBody } from '#tests/utils/request';
 
 const { fetch } = createTestApp({
   mount: [
@@ -17,7 +17,7 @@ const basic = (credentials: string) => ({ Authorization: `Basic ${btoa(credentia
 const expectChallenge = async (response: Response) => {
   expect(response.status).toBe(401);
   expect(response.headers.get('www-authenticate')).toBe('Basic realm="Queues"');
-  const body = await jsonError(response);
+  const body = await parseErrorBody(response);
   expect(body).toMatchObject({ error: 'AUTHENTICATION_FAILED', guidance: 'reauthenticate' });
   expect(body.requestId).toEqual(expect.any(String));
 };

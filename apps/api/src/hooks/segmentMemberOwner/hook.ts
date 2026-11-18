@@ -25,7 +25,7 @@ const assertMemberBelongsToOwner = async (row: MemberRow): Promise<void> => {
   }
 };
 
-export const registerSegmentMemberOwnerHook = () => {
+export const registerValidateSegmentMemberIsCustomerOfSegmentOwnerHook = () => {
   registerDbHook(
     'segmentMemberOwner:create',
     'SegmentMember',

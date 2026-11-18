@@ -9,7 +9,7 @@ import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateSegmentRoute } from '#/modules/organization/routes/organizationCreateSegment';
-import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { attachRuleHealthToSegment } from '#/modules/segment/services/attachRuleHealthToSegments';
 
 export const organizationCreateSegmentController = makeController(
   organizationCreateSegmentRoute,
@@ -28,6 +28,6 @@ export const organizationCreateSegmentController = makeController(
 
     await emitAppEvent('segment.created', { segment });
 
-    return respond.created(await withSegmentRuleIssues(segment));
+    return respond.created(await attachRuleHealthToSegment(segment));
   },
 );

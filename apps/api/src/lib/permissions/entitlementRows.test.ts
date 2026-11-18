@@ -19,13 +19,13 @@ import {
 import { memberSelfGrant, type Permix, toEntitlementInput } from '@template/permissions';
 import { rebacSchema } from '@template/permissions/rebac';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
-import { userPermissions } from '#/lib/permissions/userPermissions';
+import { fetchPermixForUser } from '#/lib/permissions/userPermissions';
 import { integrationRouter } from '#/modules/integration';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import {
   entitlementIds,
   grantEntitlements,
@@ -38,9 +38,9 @@ let organization: Organization;
 let owner: { user: User; member: OrganizationUser; permix: Permix };
 
 const readOrganization = (): EntitlementInput =>
-  entry('db:organization', ['db:organization', organization.id], ['read']);
+  entitlementInputFor('db:organization', ['db:organization', organization.id], ['read']);
 const readSpace = (spaceId: string): EntitlementInput =>
-  entry('db:space', ['db:space', spaceId], ['read']);
+  entitlementInputFor('db:space', ['db:space', spaceId], ['read']);
 
 const rowsOf = (model: 'Token' | 'Integration' | 'OrganizationUser', id: string) =>
   db.withDeleted(() =>
@@ -56,7 +56,7 @@ beforeEach(async () => {
     { role: 'owner' },
     { organization },
   );
-  owner = { user: context.user, member, permix: (await userPermissions(context.user.id))! };
+  owner = { user: context.user, member, permix: (await fetchPermixForUser(context.user.id))! };
 });
 
 afterEach(async () => {
@@ -172,7 +172,7 @@ describe('a gone anchor is stamped on the row, like a rule reference target', ()
       {
         ownerModel: 'OrganizationUser',
         role: 'viewer',
-        entitlements: [entry('db:flow', ['db:flow', flow.id], ['read'])],
+        entitlements: [entitlementInputFor('db:flow', ['db:flow', flow.id], ['read'])],
       },
       { organizationUser: owner.member },
     );
@@ -363,7 +363,11 @@ describe("an entitlement's where names rows as rule-reference edges", () => {
   it("a row's where names the space it pins; the edge goes with the row and comes back with it", async () => {
     const { entity: space } = await createSpace({}, { organization });
     const pinned = {
-      ...entry('db:space', ['db:organization', organization.id, 'organization'], ['read']),
+      ...entitlementInputFor(
+        'db:space',
+        ['db:organization', organization.id, 'organization'],
+        ['read'],
+      ),
       where: { field: 'id', operator: 'equals', value: space.id },
     };
     const { entity: member } = await createOrganizationUser(

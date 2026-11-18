@@ -10,6 +10,7 @@ import type { Context, MiddlewareHandler, Next } from 'hono';
 import { errorReporter } from '#/lib/errorReporter';
 import { makeError } from '#/lib/errors';
 import { incrementFixedWindows } from '#/middleware/rateLimit/queries/incrementFixedWindows';
+import type { RateLimitKey } from '#/middleware/rateLimit/rateLimitKeys';
 import type { AppEnv } from '#/types/appEnv';
 
 // Rules AND together: every rule must pass. An OR would let a tenant buy N times the throughput by minting N tokens.
@@ -17,24 +18,24 @@ export type RateLimitRule = {
   scope: string;
   windowMs: number;
   max: number | ((c: Context<AppEnv>) => number);
-  key: (c: Context<AppEnv>) => string | null;
+  key: (c: Context<AppEnv>) => RateLimitKey | null;
 };
 
 export type RateLimitOptions = {
   onLimited?: (c: Context<AppEnv>, retryAfterSeconds: number) => Response | Promise<Response>;
 };
 
-type ActiveRule = { rule: RateLimitRule; identity: string };
+type ActiveRule = { rule: RateLimitRule; key: RateLimitKey };
 
-const windowKey = ({ rule, identity }: ActiveRule) =>
-  `${redisNamespace.limit}:${rule.scope}:${rule.windowMs}:${identity}`;
+const windowKey = ({ rule, key }: ActiveRule) =>
+  `${redisNamespace.limit}:${rule.scope}:${rule.windowMs}:${key}`;
 
 export const rateLimit =
   (rules: RateLimitRule[], options: RateLimitOptions = {}): MiddlewareHandler<AppEnv> =>
   async (c: Context<AppEnv>, next: Next) => {
     const active = rules
-      .map((rule) => ({ rule, identity: rule.key(c) }))
-      .filter((entry): entry is ActiveRule => entry.identity !== null);
+      .map((rule) => ({ rule, key: rule.key(c) }))
+      .filter((entry): entry is ActiveRule => entry.key !== null);
 
     if (!active.length) return next();
 

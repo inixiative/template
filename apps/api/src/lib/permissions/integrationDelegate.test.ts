@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { EntitlementInput } from '@template/db';
 import { db } from '@template/db';
 import type {
   Integration,
@@ -23,7 +24,7 @@ import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { heldEntitlements } from '#tests/utils/entitlements';
 import { patch, post } from '#tests/utils/request';
 
@@ -62,7 +63,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
   const memberIntegration = (
     member: OrganizationUser,
     role: Role | null,
-    entitlements: Entry[] | null = null,
+    entitlements: EntitlementInput[] | null = null,
   ) =>
     createIntegration({
       ownerModel: 'OrganizationUser',
@@ -127,7 +128,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     it('a full token on an integration entitled to one space reaches that space and no other (R114)', async () => {
       const member = await memberOf('owner', organization, (await createUser()).entity);
       const integration = await memberIntegration(member, null, [
-        entry('db:space', ['db:space', space.id], ['read', 'operate', 'manage']),
+        entitlementInputFor('db:space', ['db:space', space.id], ['read', 'operate', 'manage']),
       ]);
       const key = (
         await createKeyedToken(
@@ -236,7 +237,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
   });
 
   describe('granting an integration: the writer could take every action it would hold', () => {
-    const grant = async (writerRole: Role, entitlements: Entry[]) => {
+    const grant = async (writerRole: Role, entitlements: EntitlementInput[]) => {
       const { entity: writer } = await createUser();
       const member = await memberOf(writerRole, organization, writer);
       const integration = await memberIntegration(member, 'viewer');
@@ -250,7 +251,9 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     };
 
     it('its user cannot give their member integration an entitlement they do not hold (Aron, 2026-10-31)', async () => {
-      const manage = [entry('db:organization', ['db:organization', organization.id], ['manage'])];
+      const manage = [
+        entitlementInputFor('db:organization', ['db:organization', organization.id], ['manage']),
+      ];
       const { entity: writer } = await createUser();
       const member = await memberOf('member', organization, writer);
       const integration = await memberIntegration(member, 'viewer');
@@ -261,13 +264,13 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     });
 
     it('an admin-role member cannot give manage on a space it does not manage (Aron, 2026-10-31)', async () => {
-      const manageSpace = [entry('db:space', ['db:space', space.id], ['manage'])];
+      const manageSpace = [entitlementInputFor('db:space', ['db:space', space.id], ['manage'])];
       expect((await grant('admin', manageSpace)).status).toBe(403);
     });
 
     it('an entitlement from an organization the member is not in is refused (Aron, 2026-10-31)', async () => {
       const elsewhere = [
-        entry('db:organization', ['db:organization', otherOrganization.id], ['read']),
+        entitlementInputFor('db:organization', ['db:organization', otherOrganization.id], ['read']),
       ];
       const { entity: writer } = await createUser();
       const member = await memberOf('owner', organization, writer);
@@ -313,7 +316,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     it('entitlements must be well formed', async () => {
       const response = await grant('owner', [
         { resource: 'db:organization' },
-      ] as unknown as Entry[]);
+      ] as unknown as EntitlementInput[]);
       expect(response.status).toBe(422);
     });
   });

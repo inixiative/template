@@ -67,7 +67,7 @@ business logic is `services`; `handlers` are jobs and frontend event handlers. Z
 
 - describes the mechanism instead of the meaning (`materialized` for a dual polymorphism id);
 - uses a metaphor only its author reads (`settle`, `shadow`, `trip`, `sweep`);
-- says something the code does not do (`clientIp` returning a rate-limit bucket address);
+- says something the code does not do (a clientIp that returns a rate-limit bucket address, now `clientRateLimitBucketAddress`);
 - is a bare verb, a bare noun or a past participle (`collect`, `registry`, `built`);
 - abbreviates a model or concept (`CustomerRef`, `orgId`). `Nav` is accepted.
 

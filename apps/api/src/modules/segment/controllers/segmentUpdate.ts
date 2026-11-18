@@ -11,7 +11,7 @@ import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { makeController } from '#/lib/utils/makeController';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentUpdateRoute } from '#/modules/segment/routes/segmentUpdate';
-import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { attachRuleHealthToSegment } from '#/modules/segment/services/attachRuleHealthToSegments';
 
 export const segmentUpdateController = makeController(segmentUpdateRoute, async (c, respond) => {
   const db = c.get('db');
@@ -38,5 +38,5 @@ export const segmentUpdateController = makeController(segmentUpdateRoute, async 
 
   await emitAppEvent('segment.updated', { segment: updated, previous: segment });
 
-  return respond.ok(await withSegmentRuleIssues(updated));
+  return respond.ok(await attachRuleHealthToSegment(updated));
 });

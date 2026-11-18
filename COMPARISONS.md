@@ -211,7 +211,7 @@ It's not a workaround for a missing Prisma feature — it's a pattern that's str
 
 ### Redis cache layer
 
-The template's Redis caching deserves separate mention: composite cache keys with alphabetical sorting for consistency, SCAN-based pattern clearing (non-blocking, unlike `KEYS`), thundering herd prevention (null values cached with 60s TTL to prevent repeated expensive misses), fire-and-forget cache writes (Redis outages don't crash the application), 7 namespaces (`cache:*`, `session:*`, `job:*`, `ws:*`, `otp:*`, `limit:*`, `flag:*`), and a `cacheReference` registry that auto-generates invalidation keys per model.
+The template's Redis caching deserves separate mention: composite cache keys with alphabetical sorting for consistency, SCAN-based pattern clearing (non-blocking, unlike `KEYS`), thundering herd prevention (null values cached with 60s TTL to prevent repeated expensive misses), fire-and-forget cache writes (Redis outages don't crash the application), 7 namespaces (`cache:*`, `session:*`, `job:*`, `ws:*`, `otp:*`, `limit:*`, `flag:*`), and a `cacheKeysByModel` registry that auto-generates invalidation keys per model.
 
 Most startups use Redis as a flat key-value store with `KEYS *` for clearing and no null-value caching. The template's cache layer is closer to what you'd find at a mid-to-large company that's already been burned by thundering herds and blocking `KEYS` calls in production.
 

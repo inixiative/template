@@ -6,7 +6,7 @@ import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 const mount =
   (asBatchSubRequest: boolean): MountFn =>
@@ -72,7 +72,7 @@ describe('apiRateLimit', () => {
 
     const response = await fetch(post('/api/v1/batch/execute', { requests }));
     expect(response.status).toBe(200);
-    const { data } = await json<{
+    const { data } = await parseSuccessBody<{
       batch: { status: number }[][];
       summary: { failedRequests: number };
     }>(response);

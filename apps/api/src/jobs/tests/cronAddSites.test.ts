@@ -17,7 +17,7 @@ describe('cron schedulers stamp the resolved lane and the row retry settings', (
 
   it('the cronJobSync hook builds the same envelope as enqueue, lane included', async () => {
     const { entity } = await createCronJob({
-      handler: 'sweepSegments',
+      handler: 'reconcileEveryHealthyDynamicSegment',
       maxAttempts: 2,
       backoffMs: 1234,
     });
@@ -31,7 +31,7 @@ describe('cron schedulers stamp the resolved lane and the row retry settings', (
   });
 
   it('registerCronJobs builds the same envelope', async () => {
-    const { entity } = await createCronJob({ handler: 'sweepSegments' });
+    const { entity } = await createCronJob({ handler: 'reconcileEveryHealthyDynamicSegment' });
     await jobs().realQueue.removeJobScheduler(entity.jobId);
 
     await registerCronJobs();

@@ -6,7 +6,7 @@
 **Created**: 2026-06-18
 **Updated**: 2026-06-24
 
-> **Shipped (reconciled with implementation):** depth probe counts `waiting + active` (not `delayed` — that includes scheduled cron repeats). No `collapseKey` column — the row stores `jobId @unique` + nullable `dedupeKey`, with `@@unique([handlerName, dedupeKey])`. **Everything (fan-out + superseding) routes through the one accumulator.** The flush dedups in a txn: latest-per-lane within the batch, then plain rows via `createMany({ skipDuplicates })` and superseding lanes via `upsert` (cross-process last-wins — `skipDuplicates` would keep whichever commits first and silently drop the latest). The lane claim happens on the *direct* path (the spill path claims at drain admission). The flush and drain share one mutex (`runOnOutboxQueue`). The overflow flag is a start-timestamp with a drain-renewed TTL + a stuck-overflow alert. Shutdown loops + bounded-retries, resets `closing`, wired into worker **and** API. `enqueueJobs(payloads[])` not built — the accumulator makes a single caller unnecessary. Tests written (unrun without Postgres/Redis); cap-edge cases testable via lazy config.
+> **Shipped (reconciled with implementation):** depth probe counts `waiting + active` (not `delayed` — that includes scheduled cron repeats). No `collapseKey` column — the row stores `jobId @unique` + nullable `dedupeKey`, with `@@unique([handlerName, dedupeKey])`. **Everything (fan-out + superseding) routes through the one accumulator.** The flush dedups in a txn: latest-per-lane within the batch, then plain rows via `createMany({ skipDuplicates })` and superseding lanes via `upsert` (cross-process last-wins — `skipDuplicates` would keep whichever commits first and silently drop the latest). The lane claim happens on the *direct* path (the spill path claims at drain admission). The flush and drain share one mutex (`runUnderJobOutboxWriteMutex`). The overflow flag is a start-timestamp with a drain-renewed TTL + a stuck-overflow alert. Shutdown loops + bounded-retries, resets `closing`, wired into worker **and** API. `enqueueJobs(payloads[])` not built — the accumulator makes a single caller unnecessary. Tests written (unrun without Postgres/Redis); cap-edge cases testable via lazy config.
 >
 > **Drain execution model (INFRA-022, 2026-06-24):** the drain moved off the shared-queue cron onto a **per-worker in-process loop** (`startOutboxDrainLoop`, every 15s) under a `makeLock` single-drainer guarantee, and gained an `attempts`-based poison-row quarantine. The architecture below reflects that. The standalone `docs/design/jobs-overflow-buffer.md` was folded into this ticket and removed.
 
@@ -212,7 +212,7 @@ Spilling one `INSERT` per enqueue is slow under a fan-out. Instead, spills coale
 
 ```
 acc = []                                  # { row, resolve, reject }
-flushQueue = makeSerializedQueue()      # serialize the writes — one createMany at a time
+jobOutboxWriteMutex = makeSerializedQueue()      # serialize the writes — one createMany at a time
 
 spill(row) => new Promise((resolve, reject) => {
   acc.push({ row, resolve, reject })
@@ -223,7 +223,7 @@ spill(row) => new Promise((resolve, reject) => {
 flush() => {
   clearTimer()
   const batch = acc; acc = []             # synchronous swap — single-threaded JS, no await between
-  flushQueue.run(async () => {
+  jobOutboxWriteMutex.run(async () => {
     try { await db.jobOutbox.createMany({ data: batch.map(b => b.row) }); batch.forEach(b => b.resolve()) }
     catch (e) { batch.forEach(b => b.reject(e)) }
   })
@@ -239,7 +239,7 @@ Design rules, each load-bearing:
   "chunk a huge insert" path. Pick `FLUSH_MAX_ROWS` under Postgres's parameter ceiling
   (~65535 / columns-per-row).
 - **One shared mutex for the flush *and* the drain** (`makeSerializedQueue`, exposed as
-  `runOnOutboxQueue`). It serializes the `createMany`s so they don't swamp the pool with concurrent
+  `runUnderJobOutboxWriteMutex`). It serializes the `createMany`s so they don't swamp the pool with concurrent
   inserts, **and** the drain runs its table read+delete through the same queue — so a flush and a
   drain can never touch `JobOutbox` at the same time (no stale re-enqueue racing a lane delete).
   Canonical "serialize writes to one resource" (`CONCURRENCY.md`); cross-process the drain is also a

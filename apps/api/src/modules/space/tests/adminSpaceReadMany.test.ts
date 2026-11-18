@@ -10,7 +10,7 @@ import {
 } from '@template/db/test';
 import { adminSpaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/admin/space', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -51,7 +51,7 @@ describe('GET /api/admin/space', () => {
     const response = await fetch(get('/api/admin/space'));
     expect(response.status).toBe(200);
 
-    const { data } = await json<Space[]>(response);
+    const { data } = await parseSuccessBody<Space[]>(response);
     expect(data.length).toBeGreaterThanOrEqual(3);
   });
 
@@ -59,7 +59,7 @@ describe('GET /api/admin/space', () => {
     const response = await fetch(get(`/api/admin/space?organizationId=${org1.id}`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<Space[]>(response);
+    const { data } = await parseSuccessBody<Space[]>(response);
     expect(data.every((s) => s.organizationId === org1.id)).toBe(true);
   });
 
@@ -67,7 +67,7 @@ describe('GET /api/admin/space', () => {
     const response = await fetch(get('/api/admin/space?search=Alpha'));
     expect(response.status).toBe(200);
 
-    const { data } = await json<Space[]>(response);
+    const { data } = await parseSuccessBody<Space[]>(response);
     expect(data.some((s) => s.name === 'Alpha Space')).toBe(true);
   });
 
@@ -75,15 +75,15 @@ describe('GET /api/admin/space', () => {
     await db.space.update({ where: { id: space2.id }, data: { deletedAt: new Date() } });
 
     const activeResponse = await fetch(get('/api/admin/space?deleted=false'));
-    const { data: activeData } = await json<Space[]>(activeResponse);
+    const { data: activeData } = await parseSuccessBody<Space[]>(activeResponse);
     expect(activeData.some((s) => s.id === space2.id)).toBe(false);
 
     const deletedResponse = await fetch(get('/api/admin/space?deleted=true'));
-    const { data: deletedData } = await json<Space[]>(deletedResponse);
+    const { data: deletedData } = await parseSuccessBody<Space[]>(deletedResponse);
     expect(deletedData.some((s) => s.id === space2.id)).toBe(true);
 
     const allResponse = await fetch(get('/api/admin/space?deleted=all'));
-    const { data: allData } = await json<Space[]>(allResponse);
+    const { data: allData } = await parseSuccessBody<Space[]>(allResponse);
     expect(allData.length).toBeGreaterThanOrEqual(3);
   });
 });

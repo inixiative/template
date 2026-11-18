@@ -18,6 +18,7 @@ import { stableHash } from '@template/shared/utils';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
+import { applyFilterLensWheresToPrismaWhere } from '#/lib/prisma/applyFilterLensWheresToPrismaWhere';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import {
@@ -29,7 +30,6 @@ import {
   hydrateCursorValues,
   type SortKey,
 } from '#/lib/prisma/keysetCursor';
-import { lensWhere } from '#/lib/prisma/lensWhere';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 const DEFAULT_CURSOR_PAGE_SIZE = 100;
@@ -142,7 +142,7 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
   });
 
   // Lens relation wheres are authorization scope — they apply on superadmin endpoints too.
-  const composed = await lensWhere(
+  const composed = await applyFilterLensWheresToPrismaWhere(
     filterLens,
     andWhere([baseWhere, searchWhere as Record<string, unknown>]),
   );

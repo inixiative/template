@@ -14,7 +14,7 @@ import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin'
 import { Modules } from '#/modules/modules';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
-import { get, json, patch } from '#tests/utils/request';
+import { get, parseSuccessBody, patch } from '#tests/utils/request';
 
 useRealJobsQueue();
 
@@ -134,7 +134,7 @@ describe('resourceContextMiddleware', () => {
   it('loads the resource into context when the id exists', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.id}`));
     expect(response.status).toBe(200);
-    const { data } = await json<Organization>(response);
+    const { data } = await parseSuccessBody<Organization>(response);
     expect(data.id).toBe(org.id);
     expect(data.name).toBe(org.name);
   });
@@ -152,7 +152,7 @@ describe('resourceContextMiddleware', () => {
   it('supports lookup by another field — `?lookup=slug` accepts non-uuid id', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.slug}?lookup=slug`));
     expect(response.status).toBe(200);
-    const { data } = await json<Organization>(response);
+    const { data } = await parseSuccessBody<Organization>(response);
     expect(data.id).toBe(org.id);
   });
 
@@ -169,7 +169,7 @@ describe('resourceContextMiddleware', () => {
   it('loads a soft-deleted resource for a superadmin on a superadmin endpoint', async () => {
     const response = await adminFetch(get(`/api/admin/organization/${deletedOrg.id}`));
     expect(response.status).toBe(200);
-    const { data } = await json<Organization>(response);
+    const { data } = await parseSuccessBody<Organization>(response);
     expect(data.id).toBe(deletedOrg.id);
   });
 
@@ -189,7 +189,7 @@ describe('resourceContextMiddleware', () => {
       get(`/api/v1/organization/${deletedOrg.id}/history?includeDeleted=true`),
     );
     expect(response.status).toBe(200);
-    const { data } = await json<Organization>(response);
+    const { data } = await parseSuccessBody<Organization>(response);
     expect(data.id).toBe(deletedOrg.id);
   });
 
@@ -214,7 +214,7 @@ describe('resourceContextMiddleware', () => {
   it('leaves models without a deletedAt column unaffected', async () => {
     const response = await fetch(get(`/api/v1/cronJob/${cronJob.id}`));
     expect(response.status).toBe(200);
-    const { data } = await json<CronJob>(response);
+    const { data } = await parseSuccessBody<CronJob>(response);
     expect(data.id).toBe(cronJob.id);
   });
 });

@@ -91,7 +91,7 @@ calls it for every failed query and mutation unless its `meta` sets `skipErrorTo
 Every branch, and the not-found handler, answers through `respondAppError`, which
 stamps `requestId` and builds the response through the Hono context so headers
 set with `c.header()` (`Cache-Control: no-store`, `request-id`) are kept. A
-request that failed before `prepareRequest` ran (a root-level 404) gets a fresh id.
+request that failed before `prepareRequestMiddleware` ran (a root-level 404) gets a fresh id.
 
 Responses that do not go through the handler, and so are not the envelope:
 better-auth's own `/api/auth/*` answers, the browser-telemetry beacon

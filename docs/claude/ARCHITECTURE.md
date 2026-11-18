@@ -68,7 +68,7 @@
 ```
 Request
   │
-  ├─► prepareRequest     # Initialize context (db, requestId, permix)
+  ├─► prepareRequestMiddleware     # Initialize context (db, requestId, permix)
   ├─► jwtAuthMiddleware  # User JWT
   ├─► tokenAuthMiddleware # API token auth
   ├─► spoofMiddleware    # Superadmin impersonation

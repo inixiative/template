@@ -15,7 +15,7 @@ import {
 import { WS_CHANNELS } from '@template/shared/ws';
 import { websocketHandler } from '#/ws/handler';
 import { meChannel } from '#/ws/meChannel';
-import { byChannel, byId, clearRegistry } from '#/ws/registry';
+import { clearRegistry, connectionIdsByChannel, connectionsById } from '#/ws/registry';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket, sentFrames } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
@@ -52,7 +52,7 @@ describe('websocketHandler', () => {
   it('open registers the connection and sends a connected frame', () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
-    expect(byId.has('c1')).toBe(true);
+    expect(connectionsById.has('c1')).toBe(true);
     expect(sentFrames(sent).at(-1)).toEqual({ type: 'connected', connectionId: 'c1' });
   });
 
@@ -60,7 +60,7 @@ describe('websocketHandler', () => {
     const { socket } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
     websocketHandler.close(socket);
-    expect(byId.has('c1')).toBe(false);
+    expect(connectionsById.has('c1')).toBe(false);
   });
 
   it('subscribe indexes a probe-approved channel and confirms', async () => {
@@ -71,7 +71,7 @@ describe('websocketHandler', () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1', headers: { authorization } });
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
-    expect([...(byChannel.get(channel) ?? [])]).toEqual(['c1']);
+    expect([...(connectionIdsByChannel.get(channel) ?? [])]).toEqual(['c1']);
     expect(sentFrames(sent).at(-1)).toEqual({ type: 'subscribed', channel });
   });
 
@@ -87,8 +87,8 @@ describe('websocketHandler', () => {
     });
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
-    expect([...(byChannel.get(meChannel(channel, user.id)) ?? [])]).toEqual(['c1']);
-    expect(byChannel.has(channel)).toBe(false);
+    expect([...(connectionIdsByChannel.get(meChannel(channel, user.id)) ?? [])]).toEqual(['c1']);
+    expect(connectionIdsByChannel.has(channel)).toBe(false);
     expect(sentFrames(sent).at(-1)).toEqual({ type: 'subscribed', channel });
   });
 
@@ -99,7 +99,7 @@ describe('websocketHandler', () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
-    expect(byChannel.has(channel)).toBe(false);
+    expect(connectionIdsByChannel.has(channel)).toBe(false);
     expect(sentFrames(sent).at(-1)).toEqual({ type: 'subscribeRejected', channel });
   });
 
@@ -110,7 +110,7 @@ describe('websocketHandler', () => {
       socket,
       JSON.stringify({ action: 'subscribe', channel: 'nope:id:x' }),
     );
-    expect(byChannel.has('nope:id:x')).toBe(false);
+    expect(connectionIdsByChannel.has('nope:id:x')).toBe(false);
     expect(sentFrames(sent).at(-1)).toEqual({ type: 'subscribeRejected', channel: 'nope:id:x' });
   });
 
@@ -122,7 +122,7 @@ describe('websocketHandler', () => {
       socket,
       JSON.stringify({ action: 'unsubscribe', channel: 'ch1' }),
     );
-    expect(byChannel.has('ch1')).toBe(false);
+    expect(connectionIdsByChannel.has('ch1')).toBe(false);
     expect(sentFrames(sent).at(-1)).toEqual({ type: 'unsubscribed', channel: 'ch1' });
   });
 
@@ -209,7 +209,7 @@ describe('websocketHandler', () => {
     websocketHandler.close(socket);
     await pending;
 
-    expect(byId.has('c1')).toBe(false);
+    expect(connectionsById.has('c1')).toBe(false);
   });
 
   it('a subscribe resolving after close does not re-index the dead connection', async () => {
@@ -226,8 +226,8 @@ describe('websocketHandler', () => {
     websocketHandler.close(socket);
     await pending;
 
-    expect(byId.has('c1')).toBe(false);
-    expect(byChannel.has(channel)).toBe(false);
+    expect(connectionsById.has('c1')).toBe(false);
+    expect(connectionIdsByChannel.has(channel)).toBe(false);
   });
 
   it('drops a malformed frame without throwing or sending', async () => {

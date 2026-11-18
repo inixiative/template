@@ -6,7 +6,7 @@ import {
   createOrganizationUser,
 } from '@template/db/test';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
-import { userPermissions } from '#/lib/permissions/userPermissions';
+import { fetchPermixForUser } from '#/lib/permissions/userPermissions';
 
 afterEach(async () => {
   await cleanupTouchedTables(db);
@@ -22,7 +22,7 @@ const scene = async () => {
   const { entity: organization } = await createOrganization();
   const { context } = await createOrganizationUser({ role: 'owner' }, { organization });
   const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization });
-  const writer = await userPermissions(context.user.id);
+  const writer = await fetchPermixForUser(context.user.id);
   if (!writer) throw new Error('no writer');
   const target = { model: 'OrganizationUser' as const, id: member.id };
   const onOrganization = ({ actions = ['read'], where, lens }: Grant = {}): EntitlementInput => ({

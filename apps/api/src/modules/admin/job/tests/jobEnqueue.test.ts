@@ -5,7 +5,7 @@ import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { adminJobRouter } from '#/modules/admin/job';
 import type { JobEnqueueResponse } from '#/modules/admin/job/routes/jobEnqueue';
 import { createTestApp } from '#tests/createTestApp';
-import { json, jsonError, post } from '#tests/utils/request';
+import { parseErrorBody, parseSuccessBody, post } from '#tests/utils/request';
 
 describe('admin/job', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -32,21 +32,21 @@ describe('admin/job', () => {
     it('enqueues a job with valid handler', async () => {
       const response = await fetch(
         post('/api/admin/job', {
-          handler: 'cleanStaleData',
+          handler: 'hardDeleteRecordsPastRetention',
           payload: { model: 'WebhookEvent', retentionDays: 90 },
         }),
       );
-      const { data } = await json<JobEnqueueResponse>(response);
+      const { data } = await parseSuccessBody<JobEnqueueResponse>(response);
 
       expect(response.status).toBe(201);
-      expect(data.name).toBe('cleanStaleData');
+      expect(data.name).toBe('hardDeleteRecordsPastRetention');
       expect(data.enqueuedAt).toBeDefined();
     });
 
     it('enqueues a job with options', async () => {
       const response = await fetch(
         post('/api/admin/job', {
-          handler: 'cleanStaleData',
+          handler: 'hardDeleteRecordsPastRetention',
           payload: { model: 'WebhookEvent', retentionDays: 90 },
           options: {
             priority: 5,
@@ -55,16 +55,16 @@ describe('admin/job', () => {
           },
         }),
       );
-      const { data } = await json<JobEnqueueResponse>(response);
+      const { data } = await parseSuccessBody<JobEnqueueResponse>(response);
 
       expect(response.status).toBe(201);
-      expect(data.name).toBe('cleanStaleData');
+      expect(data.name).toBe('hardDeleteRecordsPastRetention');
     });
 
     it('accepts a lane override', async () => {
       const response = await fetch(
         post('/api/admin/job', {
-          handler: 'cleanStaleData',
+          handler: 'hardDeleteRecordsPastRetention',
           payload: { model: 'WebhookEvent', retentionDays: 90 },
           options: { lane: 'slow' },
         }),
@@ -76,7 +76,7 @@ describe('admin/job', () => {
     it('rejects an unknown lane', async () => {
       const response = await fetch(
         post('/api/admin/job', {
-          handler: 'cleanStaleData',
+          handler: 'hardDeleteRecordsPastRetention',
           payload: { model: 'WebhookEvent', retentionDays: 90 },
           options: { lane: 'medium' },
         }),
@@ -88,14 +88,14 @@ describe('admin/job', () => {
     it('accepts the slow-lane priority and rejects anything past it', async () => {
       const at = await fetch(
         post('/api/admin/job', {
-          handler: 'cleanStaleData',
+          handler: 'hardDeleteRecordsPastRetention',
           payload: { model: 'WebhookEvent', retentionDays: 90 },
           options: { priority: SLOW_LANE_PRIORITY },
         }),
       );
       const past = await fetch(
         post('/api/admin/job', {
-          handler: 'cleanStaleData',
+          handler: 'hardDeleteRecordsPastRetention',
           payload: { model: 'WebhookEvent', retentionDays: 90 },
           options: { priority: SLOW_LANE_PRIORITY + 1 },
         }),
@@ -112,7 +112,7 @@ describe('admin/job', () => {
           payload: {},
         }),
       );
-      const body = await jsonError(response);
+      const body = await parseErrorBody(response);
 
       expect(response.status).toBe(422);
       expect(body.error).toBeDefined();

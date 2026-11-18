@@ -36,7 +36,7 @@ static rule over customer-reference IDs. There is no direct member add/remove AP
 - `reconcileCustomerRefSegments` accepts `{ customerModel, customerId }`, finds that customer's
   references, hydrates each through `fetchLens`, and evaluates dynamic segments with `check()`
   in dependency order. Its superseding key is the customer model and ID.
-- `sweepSegments`, seeded for 04:00 UTC, queues sound dynamic segments in dependency order.
+- `reconcileEveryHealthyDynamicSegment`, seeded for 04:00 UTC, queues sound dynamic segments in dependency order.
   It is the backstop for writes that do not emit business events.
 
 Controllers emit business events; event handlers enqueue reconciliation jobs. Reconciliation
@@ -65,7 +65,7 @@ Paths below are relative to `/api/v1`:
 | List members | `/segment/:id/segmentMembers` |
 | List owned segments or memberships | `/me`, `/user/:id`, `/organization/:id`, `/space/:id`, each with `/segments` or `/segmentMemberships` |
 | Create a segment | `/me/segments`, `/organization/:id/segments`, `/space/:id/segments` |
-| Estimate rule reach without saving | `POST /me/segments/reach`, `/organization/:id/segments/reach`, `/space/:id/segments/reach` |
+| Estimate rule reach without saving | `POST /me/segments/estimateReach`, `/organization/:id/segments/estimateReach`, `/space/:id/segments/estimateReach` |
 
 `GET /segment/info` (public) describes what `conditions` may read: every field `customerRefLens`
 exposes (dotted path from `CustomerRef`, kind, enum values, list relations, and `sourced` fields that

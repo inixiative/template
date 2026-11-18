@@ -11,7 +11,7 @@ import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLen
 
 export type ReferenceMap = Map<string, Set<string>>;
 
-export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
+export const targetSegmentIdsBySegmentId = (segments: Segment[]): ReferenceMap => {
   const map: ReferenceMap = new Map();
   for (const segment of segments) {
     if (!segment.conditions) {
@@ -68,5 +68,5 @@ export const sortByDependency = <T extends { id: string }>(
   return ordered;
 };
 
-export const referencedBy = (references: ReferenceMap, id: string): string[] =>
+export const segmentIdsReferencingSegment = (references: ReferenceMap, id: string): string[] =>
   [...references.entries()].filter(([, targets]) => targets.has(id)).map(([owner]) => owner);

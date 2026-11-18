@@ -8,7 +8,7 @@ import type { Prisma } from '@template/db';
 import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
-import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { attachRuleHealthToSegment } from '#/modules/segment/services/attachRuleHealthToSegments';
 import { spaceCreateSegmentRoute } from '#/modules/space/routes/spaceCreateSegment';
 
 export const spaceCreateSegmentController = makeController(
@@ -28,6 +28,6 @@ export const spaceCreateSegmentController = makeController(
 
     await emitAppEvent('segment.created', { segment });
 
-    return respond.created(await withSegmentRuleIssues(segment));
+    return respond.created(await attachRuleHealthToSegment(segment));
   },
 );

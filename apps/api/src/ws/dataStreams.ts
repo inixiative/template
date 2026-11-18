@@ -5,12 +5,15 @@
  * @uses none
  */
 import { getRedisClient } from '@template/db';
-import { streamDefinitionForChannelKey, WS_MAX_STREAM_NAME_LENGTH } from '@template/shared/ws';
-import { streamSnapshotFrame } from '#/ws/dataFrame';
+import {
+  streamDefinitionForChannelKey,
+  streamSnapshotFrame,
+  WS_MAX_STREAM_NAME_LENGTH,
+} from '@template/shared/ws';
 import { sendFrame, sendTo } from '#/ws/delivery';
 import { claimStreamSeq } from '#/ws/queries/claimStreamSeq';
 import { readStreamSeq } from '#/ws/queries/readStreamSeq';
-import { byId } from '#/ws/registry';
+import { connectionsById } from '#/ws/registry';
 import { rejectDataStream } from '#/ws/rejectDataStream';
 import { streamSeqKeyFor } from '#/ws/streamSeq';
 import { fetchStreamSnapshot, type StreamRead } from '#/ws/streamSnapshot';
@@ -42,7 +45,7 @@ const readSnapshot = async (
 
 // Subscribed before the snapshot read so no later append is missed; held appends flush after it.
 export const openDataStream = async (ws: WSSocket, stream: string): Promise<void> => {
-  if (!byId.has(ws.data.connectionId)) return;
+  if (!connectionsById.has(ws.data.connectionId)) return;
   if (!isOpenableStreamName(stream)) return rejectDataStream(ws, stream, 'rejected');
   subscribeToStream(ws, stream);
   const held: string[] = [];
@@ -52,7 +55,7 @@ export const openDataStream = async (ws: WSSocket, stream: string): Promise<void
     unsubscribeFromStream(ws, stream);
     throw error;
   });
-  if (!byId.has(ws.data.connectionId)) return;
+  if (!connectionsById.has(ws.data.connectionId)) return;
 
   if (read.access !== 'granted') return rejectDataStream(ws, stream, read.access);
   ws.data.heldAppends.delete(stream);

@@ -5,9 +5,9 @@ import { setEnvOverride } from '@template/shared/utils';
 import { PRIORITY_LIMIT } from 'bullmq';
 import { enqueueOrSpill } from '#/jobs/enqueueOrSpill';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
-import { flagKey } from '#/jobs/outbox/config';
+import { overflowFlagRedisKey } from '#/jobs/outbox/config';
 import { queue } from '#/jobs/queue';
-import { readSlowDeferred } from '#/jobs/slowLaneSignals';
+import { fetchSlowDeferredJobCount } from '#/jobs/slowLaneSignals';
 import { type JobData, JobLane, type JobOptions, JobType } from '#/jobs/types';
 
 const envelope = (lane: JobLane): JobData => ({ type: JobType.adhoc, lane, payload: { lane } });
@@ -109,15 +109,15 @@ describe('enqueueOrSpill', () => {
     setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
 
     await place(JobLane.fast, 'fast-delayed', { delay: 30_000 });
-    expect(await readSlowDeferred(queue.redis, queue.name)).toBe(0);
+    expect(await fetchSlowDeferredJobCount(queue.redis, queue.name)).toBe(0);
 
     await place(JobLane.slow, 'slow-delayed', { delay: 30_000 });
-    expect(await readSlowDeferred(queue.redis, queue.name)).toBe(1);
-    expect(await queue.redis.get(flagKey(JobLane.slow))).not.toBeNull();
+    expect(await fetchSlowDeferredJobCount(queue.redis, queue.name)).toBe(1);
+    expect(await queue.redis.get(overflowFlagRedisKey(JobLane.slow))).not.toBeNull();
   });
 
   it('spills slow work once the slow lane is over pressure, while fast work still goes direct', async () => {
-    await queue.redis.set(flagKey(JobLane.slow), String(Date.now()));
+    await queue.redis.set(overflowFlagRedisKey(JobLane.slow), String(Date.now()));
 
     await place(JobLane.fast, 'fast-direct');
     const spilled = await place(JobLane.slow, 'slow-spilled');
@@ -150,7 +150,7 @@ describe('enqueueOrSpill', () => {
   });
 
   it('adds a flow child straight to the queue even when its lane is over pressure', async () => {
-    await queue.redis.set(flagKey(JobLane.fast), String(Date.now()));
+    await queue.redis.set(overflowFlagRedisKey(JobLane.fast), String(Date.now()));
 
     const result = await place(JobLane.fast, 'flow-child', {
       parent: { id: 'parent-job', queue: 'bull:jobs' },
@@ -162,7 +162,7 @@ describe('enqueueOrSpill', () => {
   });
 
   it('spills both lanes when the whole budget is over pressure', async () => {
-    await queue.redis.set(flagKey(JobLane.fast), String(Date.now()));
+    await queue.redis.set(overflowFlagRedisKey(JobLane.fast), String(Date.now()));
 
     await place(JobLane.fast, 'fast-spilled');
     await place(JobLane.slow, 'slow-spilled');
@@ -179,7 +179,7 @@ describe('enqueueOrSpill', () => {
   describe('singletons', () => {
     const placeSingleton = (jobId: string, singletonKey: string) =>
       enqueueOrSpill({
-        handlerName: 'cleanStaleData',
+        handlerName: 'hardDeleteRecordsPastRetention',
         jobId,
         data: envelope(JobLane.fast),
         options: {},
@@ -194,18 +194,18 @@ describe('enqueueOrSpill', () => {
       expect(first).toEqual({ jobId: 'first-run' });
       expect(second).toEqual({ jobId: 'first-run' });
       expect(added).toEqual([
-        { jobId: 'first-run', deduplication: { id: 'cleanStaleData-cron-row' } },
+        { jobId: 'first-run', deduplication: { id: 'hardDeleteRecordsPastRetention-cron-row' } },
       ]);
     });
 
     it('keeps the deduplication id on a singleton spilled to the outbox', async () => {
-      await queue.redis.set(flagKey(JobLane.fast), String(Date.now()));
+      await queue.redis.set(overflowFlagRedisKey(JobLane.fast), String(Date.now()));
 
       await placeSingleton('spilled-run', 'cron-row');
 
       const [row] = await db.jobOutbox.findMany();
       expect((row?.options as { deduplication?: { id: string } }).deduplication).toEqual({
-        id: 'cleanStaleData-cron-row',
+        id: 'hardDeleteRecordsPastRetention-cron-row',
       });
     });
   });

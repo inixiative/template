@@ -12,7 +12,7 @@ import {
 } from '@template/db/test';
 import {
   closeOnParentDeleteViolations,
-  deleteBehaviorViolations,
+  hardDeleteOnTombstoneViolations,
   skipReviveViolations,
 } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
 
@@ -95,27 +95,29 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
 
 describe('validateDeleteBehavior', () => {
   it('finds the registry consistent with the schema', () => {
-    expect(deleteBehaviorViolations()).toEqual([]);
+    expect(hardDeleteOnTombstoneViolations()).toEqual([]);
   });
 
   it('catches a required child left behind by a hard delete', () => {
-    expect(deleteBehaviorViolations(['WebhookSubscription']).join('\n')).toContain(
+    expect(hardDeleteOnTombstoneViolations(['WebhookSubscription']).join('\n')).toContain(
       'WebhookEvent.webhookSubscriptionId is a required reference to WebhookSubscription',
     );
   });
 
   it('refuses a model that carries deletedAt', () => {
-    expect(deleteBehaviorViolations(['Account']).join('\n')).toContain('has a deletedAt column');
+    expect(hardDeleteOnTombstoneViolations(['Account']).join('\n')).toContain(
+      'has a deletedAt column',
+    );
   });
 
   it('refuses a model that is also registered as soft-delete', () => {
-    expect(deleteBehaviorViolations(['User']).join('\n')).toContain(
+    expect(hardDeleteOnTombstoneViolations(['User']).join('\n')).toContain(
       'both hard-delete-on-tombstone and soft-delete',
     );
   });
 
   it('refuses a model that is not in the schema', () => {
-    expect(deleteBehaviorViolations(['NotAModel']).join('\n')).toContain(
+    expect(hardDeleteOnTombstoneViolations(['NotAModel']).join('\n')).toContain(
       'is not a model in the schema',
     );
   });

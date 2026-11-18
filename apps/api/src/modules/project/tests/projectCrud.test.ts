@@ -26,7 +26,7 @@ import { projectRouter } from '#/modules/project';
 import { spaceRouter } from '#/modules/space';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
-import { del, get, json, patch, post } from '#tests/utils/request';
+import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 const appFor = (user: User, organizationUsers: OrganizationUser[], spaceUsers: SpaceUser[] = []) =>
   createTestApp({
@@ -98,7 +98,7 @@ describe('Project', () => {
         const response = await app.fetch(
           post(`${owner.path}/projects`, { name, description: 'the base repo' }),
         );
-        const { data } = await json<Project>(response);
+        const { data } = await parseSuccessBody<Project>(response);
         expect(response.status).toBe(201);
         expect(data).toMatchObject({ name, ownerModel: owner.ownerModel, ...owner.ids });
       }
@@ -111,7 +111,7 @@ describe('Project', () => {
       }
       for (const owner of owners()) {
         const response = await app.fetch(get(`${owner.path}/projects`));
-        const { data } = await json<Project[]>(response);
+        const { data } = await parseSuccessBody<Project[]>(response);
         expect(response.status).toBe(200);
         const listed = data.filter((project) => project.name.startsWith(name));
         expect(listed.map((project) => project.name)).toEqual([`${name} ${owner.ownerModel}`]);
@@ -155,7 +155,7 @@ describe('Project', () => {
       const renamed = await app.fetch(
         patch(`/api/v1/project/${project.id}`, { description: 'renamed' }),
       );
-      expect((await json<Project>(renamed)).data.description).toBe('renamed');
+      expect((await parseSuccessBody<Project>(renamed)).data.description).toBe('renamed');
 
       expect((await app.fetch(del(`/api/v1/project/${project.id}`))).status).toBe(204);
       expect((await app.fetch(get(`/api/v1/project/${project.id}`))).status).toBe(404);

@@ -12,8 +12,8 @@ import { setEnvOverride } from '@template/shared/utils';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
 import { app } from '#/app';
 import { auth } from '#/lib/auth';
-import type { UserJwtHandoff } from '#/lib/auth/jwtHandoff';
-import { selfIssuer } from '#/lib/auth/userJwt';
+import type { UserJwtHandoff } from '#/lib/auth/jwtHandoffPlugin';
+import { userJwtIssuerUrlOrThrow } from '#/lib/auth/userJwt';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 import { resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
@@ -231,8 +231,8 @@ describe('JWT verification', () => {
     const pair = await generateKeyPair('ES256');
     const unsigned = await new SignJWT({ sub: user.id })
       .setProtectedHeader({ alg: 'ES256' })
-      .setIssuer(selfIssuer())
-      .setAudience(selfIssuer())
+      .setIssuer(userJwtIssuerUrlOrThrow())
+      .setAudience(userJwtIssuerUrlOrThrow())
       .setExpirationTime('5m')
       .sign(pair.privateKey);
     expect((await readMe(bearer(unsigned))).status).toBe(401);
@@ -270,7 +270,7 @@ describe('JWTs from a configured external issuer', () => {
     new SignJWT({ sub: user.id })
       .setProtectedHeader({ alg: 'ES256', kid })
       .setIssuer(claimedIssuer)
-      .setAudience(claimedIssuer === issuer ? audience : selfIssuer())
+      .setAudience(claimedIssuer === issuer ? audience : userJwtIssuerUrlOrThrow())
       .setIssuedAt()
       .setExpirationTime('5m')
       .sign(signingKey);
@@ -282,7 +282,7 @@ describe('JWTs from a configured external issuer', () => {
 
   it('refuses the external key claiming to be this API', async () => {
     configureIssuer();
-    expect((await readMe(bearer(await signExternal(selfIssuer())))).status).toBe(401);
+    expect((await readMe(bearer(await signExternal(userJwtIssuerUrlOrThrow())))).status).toBe(401);
   });
 
   it('refuses the issuer when it is not configured', async () => {

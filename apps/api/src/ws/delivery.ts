@@ -4,7 +4,12 @@
  * @partOf primitive:websockets
  * @uses none
  */
-import { byChannel, byId, byStream, removeConnection } from '#/ws/registry';
+import {
+  connectionIdsByChannel,
+  connectionIdsByStream,
+  connectionsById,
+  removeConnection,
+} from '#/ws/registry';
 import type { WSOutbound, WSSocket } from '#/ws/types';
 
 // Bun returns 0 for a dropped frame; closing makes the client reconnect and resync instead of drift.
@@ -22,7 +27,7 @@ const sendOrEvict = (ws: WSSocket, message: string): void => {
 // Iterates a copy: evicting a dead socket mutates the very index being delivered to.
 const deliver = (connectionIds: Set<string>, send: (ws: WSSocket) => void): void => {
   for (const id of [...connectionIds]) {
-    const ws = byId.get(id);
+    const ws = connectionsById.get(id);
     if (!ws) {
       connectionIds.delete(id);
       continue;
@@ -41,7 +46,7 @@ export const sendTo = (ws: WSSocket, event: WSOutbound): void => {
 };
 
 export const sendToChannelLocal = (channel: string, event: WSOutbound): void => {
-  const ids = byChannel.get(channel);
+  const ids = connectionIdsByChannel.get(channel);
   if (ids) deliverMessage(ids, event);
 };
 
@@ -50,7 +55,7 @@ export const sendToStreamLocal = (
   stream: string,
   messageFor: (ws: WSSocket) => string | null,
 ): void => {
-  const ids = byStream.get(stream);
+  const ids = connectionIdsByStream.get(stream);
   if (!ids) return;
   deliver(ids, (ws) => {
     const message = messageFor(ws);
@@ -62,5 +67,5 @@ export const sendToStreamLocal = (
 };
 
 export const broadcastLocal = (event: WSOutbound): void => {
-  deliverMessage(new Set(byId.keys()), event);
+  deliverMessage(new Set(connectionsById.keys()), event);
 };

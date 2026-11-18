@@ -15,12 +15,12 @@ import {
 } from '#/jobs/outbox/accumulator';
 import { laneDepthCap, lowWater, MAX_DRAIN_ATTEMPTS } from '#/jobs/outbox/config';
 import {
-  clearOverflow,
-  tripFromDepths,
+  clearOverflowFlag,
+  setOverflowFlagForLanesAtCap,
   warnIfOverflowStuck,
   withOverflowRenew,
 } from '#/jobs/outbox/flag';
-import { runOnOutboxQueue } from '#/jobs/outbox/mutex';
+import { runUnderJobOutboxWriteMutex } from '#/jobs/outbox/mutex';
 import { laneDepth, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
 import { readSlowLaneState } from '#/jobs/readSlowLaneState';
@@ -32,7 +32,7 @@ import { isValidJobId } from '#/jobs/validateJobId';
 // row, one delete for the batch. Slow rows re-enter at the slow lane's priority.
 const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
   if (room <= 0) return 0;
-  return runOnOutboxQueue(async () => {
+  return runUnderJobOutboxWriteMutex(async () => {
     const rows = await db.jobOutbox.findMany({
       where: { lane, attempts: { lt: MAX_DRAIN_ATTEMPTS } },
       orderBy: { id: 'asc' }, // uuidv7 id is time-ordered → FIFO
@@ -123,7 +123,7 @@ const settleFlags = async (depths: QueueDepths): Promise<void> => {
     return;
   }
   // Counted, reset, and cleared under the outbox mutex so a flush can't commit a row between them.
-  await runOnOutboxQueue(async () => {
+  await runUnderJobOutboxWriteMutex(async () => {
     const [fastAdmittable, slowAdmittable] = await Promise.all(
       [JobLane.fast, JobLane.slow].map((lane) =>
         db.jobOutbox.count({ where: { lane, attempts: { lt: MAX_DRAIN_ATTEMPTS } } }),
@@ -145,10 +145,10 @@ const settleFlags = async (depths: QueueDepths): Promise<void> => {
     // Each lane's flag clears below its own low-water once none of its rows wait — clearing earlier
     // would let a fresh enqueue jump that lane's buffered FIFO.
     if (belowLowWater(JobLane.fast) && fastAdmittable === 0 && !hasPendingFastSpills()) {
-      await clearOverflow(JobLane.fast);
+      await clearOverflowFlag(JobLane.fast);
     }
     if (belowLowWater(JobLane.slow) && slowAdmittable === 0 && !hasPendingSlowSpills()) {
-      await clearOverflow(JobLane.slow);
+      await clearOverflowFlag(JobLane.slow);
     }
   });
   if (!belowLowWater(JobLane.fast)) await warnIfOverflowStuck(JobLane.fast, depths.total);
@@ -164,7 +164,7 @@ export const runDrainOutboxPass = async (): Promise<void> => {
     await admitLaneRows(JobLane.slow, slowRoom);
 
     const { depths: settled } = await readSlowLaneState();
-    await tripFromDepths(settled);
+    await setOverflowFlagForLanesAtCap(settled);
     await settleFlags(settled);
   });
 };

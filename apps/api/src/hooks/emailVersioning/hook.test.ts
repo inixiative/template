@@ -9,7 +9,7 @@ import {
 import { expandComponentTagsFromOwnerCascade, saveEmailTemplate } from '@template/email/render';
 import * as enqueueModule from '#/jobs/enqueue';
 import { recomposeSnapshot } from '#/lib/email/recompose';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
@@ -27,7 +27,7 @@ const latestSnapshot = (where: Record<string, unknown>) =>
   db.auditLog.findFirst({ where, orderBy: { createdAt: 'desc' } });
 
 const runRestamp = (slug: string) =>
-  createTestWorker({ name: 'recomputeEmailDependents', id: Bun.randomUUIDv7() }).run({ slug });
+  makeTestWorker({ name: 'recomputeEmailDependents', id: Bun.randomUUIDv7() }).run({ slug });
 
 const restampEnqueues = (spy: Mock<typeof enqueueModule.enqueueJob>) =>
   spy.mock.calls.filter(([name]) => name === 'recomputeEmailDependents');

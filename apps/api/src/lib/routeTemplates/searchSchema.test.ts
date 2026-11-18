@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { createAdvancedSearchSchema } from '#/lib/routeTemplates/searchSchema';
+import { advancedSearchSchemaForFields } from '#/lib/routeTemplates/searchSchema';
 
-describe('createAdvancedSearchSchema', () => {
+describe('advancedSearchSchemaForFields', () => {
   it('should create schema with specified fields', () => {
-    const schema = createAdvancedSearchSchema(['name', 'email']);
+    const schema = advancedSearchSchemaForFields(['name', 'email']);
     const result = schema.safeParse({ name: 'john', email: 'test@example.com' });
 
     expect(result.success).toBe(true);
@@ -13,14 +13,14 @@ describe('createAdvancedSearchSchema', () => {
   });
 
   it('should accept any string keys (validation happens in buildWhereClause)', () => {
-    const schema = createAdvancedSearchSchema(['name', 'email']);
+    const schema = advancedSearchSchemaForFields(['name', 'email']);
     const result = schema.safeParse({ name: 'john', other: 'field' });
 
     expect(result.success).toBe(true);
   });
 
   it('should allow partial field usage', () => {
-    const schema = createAdvancedSearchSchema(['name', 'email', 'phone']);
+    const schema = advancedSearchSchemaForFields(['name', 'email', 'phone']);
     const result = schema.safeParse({ name: 'john' });
 
     expect(result.success).toBe(true);
@@ -30,7 +30,7 @@ describe('createAdvancedSearchSchema', () => {
   });
 
   it('should allow empty object', () => {
-    const schema = createAdvancedSearchSchema(['name', 'email']);
+    const schema = advancedSearchSchemaForFields(['name', 'email']);
     const result = schema.safeParse({});
 
     expect(result.success).toBe(true);
@@ -40,7 +40,7 @@ describe('createAdvancedSearchSchema', () => {
   });
 
   it('should allow undefined', () => {
-    const schema = createAdvancedSearchSchema(['name', 'email']);
+    const schema = advancedSearchSchemaForFields(['name', 'email']);
     const result = schema.safeParse(undefined);
 
     expect(result.success).toBe(true);
@@ -50,7 +50,7 @@ describe('createAdvancedSearchSchema', () => {
   });
 
   it('should handle nested field paths', () => {
-    const schema = createAdvancedSearchSchema(['user.name', 'user.email']);
+    const schema = advancedSearchSchemaForFields(['user.name', 'user.email']);
     const result = schema.safeParse({ 'user.name': 'john' });
 
     expect(result.success).toBe(true);

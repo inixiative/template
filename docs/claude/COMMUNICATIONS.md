@@ -26,9 +26,9 @@
   - [Save Pipeline](#save-pipeline)
   - [MJML Validation](#mjml-validation)
   - [Send Pipeline](#send-pipeline)
-    - [Registry (`apps/api/src/lib/email/registry.ts`)](#registry-appsapisrclibemailregistryts)
+    - [Registry (`apps/api/src/lib/email/emailTemplateRegistry.ts`)](#registry-appsapisrclibemailemailtemplateregistryts)
     - [Sender (`apps/api/src/lib/email/sender.ts`)](#sender-appsapisrclibemailsenderts)
-    - [Planner (`sendEmail`)](#planner-sendemail)
+    - [Planner (`planEmailDeliveries`)](#planner-planemaildeliveries)
     - [Deliver (`deliverEmail`) — per recipient](#deliver-deliveremail--per-recipient)
     - [Render issues — behaviour lives in the registry entry](#render-issues--behaviour-lives-in-the-registry-entry)
   - [Template Versioning & Recompose](#template-versioning--recompose)
@@ -75,7 +75,7 @@ Located in `packages/email` (`@template/email`).
 | Compose pipeline | Done | Fetch + expand components |
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
 | Render issues | Done | Save refuses what the lens can decide; render records typed issues; the registry entry says `fail` (default), `degrade`, or names a `substitute` |
-| **Sending jobs** | Done | `sendEmail` BullMQ job (resolve → verify → compose → interpolate → render → send) |
+| **Sending jobs** | Done | `planEmailDeliveries` BullMQ job (resolve → verify → compose → interpolate → render → send) |
 | **Authoring layer** | Planned | Narrowed-lens rule builder + field selector (COMM-001 / INFRA-002 / INFRA-017) |
 | **Data hydration** | TODO | Pipe `{sender,recipient,data}` in; the lens is its schema |
 | **Preference management** | TODO | Unsubscribe, categories |
@@ -374,13 +374,13 @@ Organization its organization memberships, a Space its own space's memberships, 
 platform or admin both. A stored recipient lens that turns on `organizationUsers` or `spaceUsers`
 widens it, still within the organization. Targeting follows the same bound: a `messageUser` rule
 from an Organization- or Space-level sender reaches only people holding a membership the recipient
-lens shows (`targetedBySender`), so a space reaches its own members by default and its organization's
+lens shows (`restrictRuleToSenderMembers`), so a space reaches its own members by default and its organization's
 when its lens widens. Registry sends target the entity's own recipient (an invite's target need not
 be a member yet). Without a sender (save, preview, rule surface) the template owner stands in. The owner
 is decided per site: save takes it from the input, the rule surface and preflight from the body
 (default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
-the tree for now. The picker gets real options for Tag and Segment (`emailSourceValues`, the lens's
+the tree for now. The picker gets real options for Tag and Segment (`fetchSourceValuesOfEmailLens`, the lens's
 `toSourceQueries` run through Prisma by `sourceQueryValues`, keyed onto the `email` surface map by
 `emailSurfaceSourceValues`). A source across a bridge returns candidates (`recheck`):
 `sourceQueryValues` / `sourceQueryWhere` re-check them with the far side the caller's `farSide`
@@ -570,15 +570,15 @@ try {
 
 Outbound email is **event-driven** and runs as two BullMQ jobs — never a direct client
 call. Business logic emits an app event; the email bridge enqueues the **planner**
-(`sendEmail`), which fans out one **deliver** job (`deliverEmail`) per recipient.
+(`planEmailDeliveries`), which fans out one **deliver** job (`deliverEmail`) per recipient.
 
 ```
-emitAppEvent(name, data) → email bridge → sendEmail (planner) → deliverEmail (per recipient)
+emitAppEvent(name, data) → email bridge → planEmailDeliveries (planner) → deliverEmail (per recipient)
 ```
 
-`SendEmailPayload` is `{ eventName, template, data }` — no caller-supplied recipients.
+`PlanEmailDeliveriesPayload` is `{ eventName, template, data }` — no caller-supplied recipients.
 
-#### Registry (`apps/api/src/lib/email/registry.ts`)
+#### Registry (`apps/api/src/lib/email/emailTemplateRegistry.ts`)
 
 Each template slug maps to an `EmailEntry` describing how to resolve its data + recipients
 from the event — all as **lenses** (`@inixiative/json-rules`), resolved in the worker:
@@ -599,21 +599,21 @@ type EmailEntry = {
 
 The identity an email is sent *as* — a discriminated union keyed on `CommunicationLogSenderModel`
 (`platform | admin | User | Organization | Space | OrganizationUser | SpaceUser`).
-Identity (from-address/display, via `resolveSender`/`resolveFromAddress`) is separate
-from branding (which template), which the cascade resolves. `resolveSender` loads the sending row
+Identity (from-address/display, via `fetchSenderRowThroughLens`/`resolveFromAddress`) is separate
+from branding (which template), which the cascade resolves. `fetchSenderRowThroughLens` loads the sending row
 through its lens (`lensFor(type)`, scalar columns) as the `sender` variable, so `{{sender.*}}`
 reads what the sender slot's lens declares; a platform or admin send has no `sender`. The
-platform's own name and URL are system tokens: `{{system.platformName}}`, `{{system.webUrl}}`. `ownerScope(sender)` maps a sender to
+platform's own name and URL are system tokens: `{{system.platformName}}`, `{{system.webUrl}}`. `senderToOwnerScope(sender)` maps a sender to
 its own owner tier — user-actors keep their tier (`SpaceUser`/`OrganizationUser`/`User`), and
 `platform → default` (the one bridge between the two enums) — then the cascade walks that tier's
 chain (user or org) down to the `default` floor, carrying the user id for interpolation.
 
-#### Planner (`sendEmail`)
+#### Planner (`planEmailDeliveries`)
 
 1. Resolve the entity lens; bail if missing or no email adapter is registered.
 2. Resolve the template row for the sender's scope and build the owner-scoped email lens from that
    row; fetch recipients in one batch through its **recipient lens** with the entry's targeting
-   `where` (`slotRowsLens`), pruned to what the lens picks plus what its `where`s read. The
+   `where` (`narrowSlotLensToRowsMatchingOrThrow`), pruned to what the lens picks plus what its `where`s read. The
    delivery job carries the recipient's id, the bound targeting `where` and the cc / bcc rules — no
    addresses: `deliverEmail` re-reads the recipient through the lens at send time with the
    targeting re-checked (`not_found` once it no longer matches), resolves cc / bcc through the same
@@ -636,13 +636,13 @@ claim and settle leaves `sending` for a person to resolve (an explicit resend wi
 for the claim to reopen.
 
 1. Load the log; **skip unless `queued`**.
-2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
+2. **Resolve** the template via the cascade (`renderEmailTemplateWithFallback`) → subject/mjml + `kind` + `emailTemplateId`.
    The recipient is loaded through the lens of the row that won the cascade (`composed.owner`) and
    the sender (`recipientVariables`), and a model-lens data slot is re-read the same way from the
    payload's `data.id`; a recipient or data entity that no longer resolves → `failed` with
    `reasonCode: not_found`, no send. Rendering is `renderForRecipient` (see
    [Messaging](#messaging-non-email-channels)). Rules evaluate through that lens; a referenced
-   segment whose own rule is degraded leaves the live set first (`withoutDegradedSegments`).
+   segment whose own rule is degraded leaves the live set first (`fetchReferenceKeysExcludingDegradedSegments`).
    A content error (`isEmailContentError`: render, parse, MJML, token, condition) → `failed` with
    `reasonCode: render_failed`, no retry. Any other error before the claim (database, verifier) throws with
    the row still `queued`, so the job retry picks it up — nothing has been sent.
@@ -675,8 +675,8 @@ Idempotency keys are event-anchored, hash-last: planner `{event}:{template}:{has
 
 #### Render issues — behaviour lives in the registry entry
 
-`settleTemplate` renders subject and body, collecting `RenderIssue`s. What happens next is
-declared on the template's code registry entry (`apps/api/src/lib/email/registry.ts`,
+`renderEmailTemplateWithFallback` renders subject and body, collecting `RenderIssue`s. What happens next is
+declared on the template's code registry entry (`apps/api/src/lib/email/emailTemplateRegistry.ts`,
 `render: { onIssue, substitute }`), never on the row:
 
 - **subject issue** — always fatal for that render (a truncated subject is never sent).
@@ -852,8 +852,8 @@ Two BullMQ handlers (`messageUser`, `messageContact`), shaped like the email job
 cascade, no `CommunicationLog`, and no fan-out planner:
 
 - **`messageUser`** — `{ rule, kind, content, sender? }` (sender defaults to platform). It builds the
-  sender's email lens (`emailLensFor(undefined, ownerScope(sender), undefined, sender)`), and
-  `resolveUsers(rule, lens.recipient)` compiles the `@inixiative/json-rules` `Condition` through its
+  sender's email lens (`emailLensFor(undefined, senderToOwnerScope(sender), undefined, sender)`), and
+  `fetchUsersMatchingRuleWithContacts(rule, lens.recipient)` compiles the `@inixiative/json-rules` `Condition` through its
   recipient lens to a Prisma query at job time. Each resolved user is rendered through the same
   primitive email uses, then dispatched to every `canDeliver(kind, contact)` contact via that
   contact's registered adapter. A missing adapter for a `ContactType` throws. Not registered in
@@ -935,7 +935,7 @@ are opt-out (default on); `marketing` is opt-in. Every `User` gets an email `Con
   prefetch (scanners, Safe Links, hover previews) can never unsubscribe anyone.
 - Non-`system` templates **must** contain an *unconditional* `{{system.unsubscribeUrl}}`, enforced at
   save (`saveEmailTemplate` — checks the composed body with conditional blocks stripped). The URL is a
-  platform-injected `system`-lens value (set per-kind in `settleTemplate`), not recipient data.
+  platform-injected `system`-lens value (set per-kind in `renderEmailTemplateWithFallback`), not recipient data.
 - Rich preference management (toggle all kinds) is the **authenticated in-app** surface, rebac-governed —
   not the link. The emailed link is deliberately the narrow one-click only.
 

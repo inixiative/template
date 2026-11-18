@@ -12,7 +12,7 @@ import {
 import { integrationReadResponseSchema } from '#/modules/integration/schemas/integrationSchemas';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/v1/me/integrations', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -86,7 +86,7 @@ describe('GET /api/v1/me/integrations', () => {
 
   it("lists only the user's personal integrations", async () => {
     const response = await fetch(get('/api/v1/me/integrations'));
-    const { data } = await json<Integration[]>(response);
+    const { data } = await parseSuccessBody<Integration[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.map((integration) => integration.name).sort()).toEqual(
@@ -101,7 +101,7 @@ describe('GET /api/v1/me/integrations', () => {
 
   it('paginates', async () => {
     const response = await fetch(get('/api/v1/me/integrations?page=1&pageSize=2'));
-    const { data, pagination } = await json<Integration[]>(response);
+    const { data, pagination } = await parseSuccessBody<Integration[]>(response);
 
     expect(response.status).toBe(200);
     expect(data).toHaveLength(2);
@@ -113,7 +113,7 @@ describe('GET /api/v1/me/integrations', () => {
     const response = await fetch(
       get('/api/v1/me/integrations?searchFields[provider][equals][:]=null'),
     );
-    const { data, pagination } = await json<Integration[]>(response);
+    const { data, pagination } = await parseSuccessBody<Integration[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.map((integration) => [integration.name, integration.provider])).toEqual([
@@ -126,7 +126,7 @@ describe('GET /api/v1/me/integrations', () => {
     const response = await fetch(
       get('/api/v1/me/integrations?searchFields[provider][equals]=github&pageSize=2'),
     );
-    const { data, pagination } = await json<Integration[]>(response);
+    const { data, pagination } = await parseSuccessBody<Integration[]>(response);
 
     expect(response.status).toBe(200);
     expect(data).toHaveLength(2);
@@ -138,7 +138,7 @@ describe('GET /api/v1/me/integrations', () => {
     const response = await fetch(
       get(`/api/v1/me/integrations?searchFields[name]=${encodeURIComponent(names[1])}`),
     );
-    const { data } = await json<Integration[]>(response);
+    const { data } = await parseSuccessBody<Integration[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.map((integration) => integration.name)).toEqual([names[1]]);
@@ -146,7 +146,7 @@ describe('GET /api/v1/me/integrations', () => {
 
   it('returns exactly the integration read fields', async () => {
     const response = await fetch(get('/api/v1/me/integrations'));
-    const { data } = await json<Integration[]>(response);
+    const { data } = await parseSuccessBody<Integration[]>(response);
     const readFields = Object.keys(integrationReadResponseSchema.shape).sort();
 
     for (const integration of data) {

@@ -35,8 +35,8 @@
   - [Hydration](#hydration)
   - [installPermissions](#installpermissions)
   - [permissionsOfUser](#permissionsofuser)
-  - [ownerPermissions](#ownerpermissions)
-  - [delegatedPermissions](#delegatedpermissions)
+  - [fetchPermissionsOfDelegateOwner](#fetchpermissionsofdelegateowner)
+  - [narrowOwnerPermissionsToDelegate](#narrowownerpermissionstodelegate)
   - [A Token on a Member Row](#a-token-on-a-member-row)
   - [Worked Example: I1](#worked-example-i1)
   - [A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)
@@ -130,7 +130,7 @@ One word per party, used in code and prose alike. Names in code are composed of 
 | **delegateFull** | the person-only action on an owner that lets you set `full` on its delegate ([Full and delegateFull](#full-and-delegatefull)) |
 | **anchor** | the record an entitlement acts from, reached from the entitled record along `path` |
 | **pseudo record** | the would-be row a create, a collection action or a grant is checked on |
-| **me** | the user when the actor is a user, or a User-owned token's user (`me(c)`) |
+| **me** | the user when the actor is a user, or a User-owned token's user (`actingUser(c)`) |
 
 ### Tenants and Members
 
@@ -362,7 +362,7 @@ Then `validateDelegateRole` refuses a role on a token whose integration has no r
 
 ### What Full Is
 
-`full` makes a delegate its owner: the owner's permissions are installed unchanged, on every request (`delegatedPermissions` returns `owner` as is). Writing `full` clears the delegate's role before the write and tombstones its live entitlement rows after it (the `fullDelegate` hook, `apps/api/src/hooks/fullDelegate/hook.ts`); the same hook refuses any `Entitlement` row created for a `full` delegate (422), through the writer or not. The schema never reads `full`, on the record or on the actor (CI rule `rebac-schema-never-reads-full`).
+`full` makes a delegate its owner: the owner's permissions are installed unchanged, on every request (`narrowOwnerPermissionsToDelegate` returns `owner` as is). Writing `full` clears the delegate's role before the write and tombstones its live entitlement rows after it (the `fullDelegate` hook, `apps/api/src/hooks/fullDelegate/hook.ts`); the same hook refuses any `Entitlement` row created for a `full` delegate (422), through the writer or not. The schema never reads `full`, on the record or on the actor (CI rule `rebac-schema-never-reads-full`).
 
 ### Who May Set It
 
@@ -390,7 +390,7 @@ So U1 mints a full token on M1 and makes I1 full; the owner of O1 mints a full t
 
 ### The Backstop Rules
 
-`delegatePermissionRules` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`, enforced on every write by the rules hook through `RulesRegistry`) states where `full` may sit, on the row's own columns:
+`fullDelegateRules` (`apps/api/src/hooks/rules/fullDelegateRules.ts`, enforced on every write by the rules hook through `RulesRegistry`) states where `full` may sit, on the row's own columns:
 
 - `full` takes no role;
 - an integration is `full` only when owned by a User, OrganizationUser or SpaceUser;
@@ -413,9 +413,9 @@ A delegate that is not `full` and has no role and no entitlements is not refused
 One builder fills a permix for whoever acts: `installPermissionsFor(permix, { user, token, organizationUsers, spaceUsers })` (`apps/api/src/lib/permissions/userPermissions.ts`). It resets the permix, sets the actor (the token if there is one, else the user) and the superadmin bypass from the user's platform role, then installs:
 
 - no token (JWT or spoof): `permissionsOfUser(user.id, organizationUsers, spaceUsers)`;
-- a token: `delegatedPermissions(token, owner)`, where `owner` is those same permissions for a User-owned token and `ownerPermissions(token)` otherwise.
+- a token: `narrowOwnerPermissionsToDelegate(token, owner)`, where `owner` is those same permissions for a User-owned token and `fetchPermissionsOfDelegateOwner(token)` otherwise.
 
-`installPermissions(c)` (`apps/api/src/lib/context/installPermissions.ts`) is the request's call. For a user who is not the requester (a job acting as a user), `userPermissions(userId)` builds the same permix on a fresh instance, or returns `null` when the user does not exist.
+`installPermissions(c)` (`apps/api/src/lib/context/installPermissionsFromRequestContext.ts`) is the request's call. For a user who is not the requester (a job acting as a user), `fetchPermixForUser(userId)` builds the same permix on a fresh instance, or returns `null` when the user does not exist.
 
 ### permissionsOfUser
 
@@ -426,25 +426,25 @@ One builder fills a permix for whoever acts: `installPermissionsFor(permix, { us
 
 The library's `installPermissions` sets each group up with its owner, so an owned entitlement holds only while that owner allows it on the record.
 
-### ownerPermissions
+### fetchPermissionsOfDelegateOwner
 
-`ownerPermissions(delegated)` (`apps/api/src/lib/permissions/ownerPermissions.ts`) builds the owner's permissions from the owner model:
+`fetchPermissionsOfDelegateOwner(delegated)` (`apps/api/src/lib/permissions/ownerPermissions.ts`) builds the owner's permissions from the owner model:
 
 | Owner model | Owner's permissions |
 |---|---|
 | `User` | `permissionsOfUser` for the user: the user entry, every member row and its entitlements |
 | `OrganizationUser` / `SpaceUser` | `permissionsOfUser` for that one member row: its role at the tenant, its self-grant (owned by its user) and its other entitlements (owned by the tenant) |
 | `Organization` / `Space` | `own` on the tenant: `organizationOwnerPermissions(organizationId)` / `spaceOwnerPermissions(spaceId)` (`packages/permissions/src/roles/permissionsOfUser.ts`) |
-| `Integration` | `delegatedPermissions(integration, ownerPermissions(integration))`: the integration's own permissions over its owner |
+| `Integration` | `narrowOwnerPermissionsToDelegate(integration, fetchPermissionsOfDelegateOwner(integration))`: the integration's own permissions over its owner |
 
 The permissions are read from the database on every request, so demote M1 and its tokens lose it on the next request.
 
-### delegatedPermissions
+### narrowOwnerPermissionsToDelegate
 
 The library's `delegate` resolves a delegate from its owner's permissions; the template maps the row onto it:
 
 ```typescript
-export const delegatedPermissions = (delegated, owner) =>
+export const narrowOwnerPermissionsToDelegate = (delegated, owner) =>
   delegate(rebacSchema, owner, {
     full: delegated.full,
     ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
@@ -543,7 +543,7 @@ Situations: `integrationGrantsUnderOrganization.test.ts`, `entitlementGrants.tes
 
 ## Entitlements
 
-Grants beyond a role. Each is one row of the `Entitlement` table (`packages/db/prisma/schema/entitlement.prisma`, [DATABASE.md](DATABASE.md#entitlement)): its **source** is the anchor (`sourceModel`, `sourceId`, `sourcePath`), its **target** the holder (a `Token`, `Integration`, `OrganizationUser` or `SpaceUser`), `resource` the model its `actions` apply to, `where` a positive json-rules condition. The grantor is never a column: it is the target's owner, re-walked live. The API speaks rows: a write takes `EntitlementInput` rows (`entitlementInputSchema`: `resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`), and every read of a token, integration or member row (single reads, list reads and `/me`) includes its live rows as stored under `targetEntitlements` (`EntitlementScalarSchema`). The library keeps its own words, and one small transformer in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`) moves between the two only where a holder meets the library: `toEntitlementEntry` turns a row into the entry `{ resource, anchor: { resource, id, path? }, where?, actions }`, with no `path` or `where` when the row has none and `actions` as a map; `toEntitlementInput` turns an entry the library hands back (a self-grant) into a row; `entitlementEntriesOfHolder(holder)` gives the well-formed entries a holder's rows grant (`wellFormedEntitlements`, by the library's `entitlementProblem`, dropping entries another one covers). Its callers are `delegatedPermissions` / `ownerPermissions`, `permissionsOfUser`, `changeEntitlements` (validation and coverage) and the `memberSelfGrant` hook. Why rows: "who holds what on this record?" is a query, and every grant and revocation is its own audit entry. How to write one: [building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md).
+Grants beyond a role. Each is one row of the `Entitlement` table (`packages/db/prisma/schema/entitlement.prisma`, [DATABASE.md](DATABASE.md#entitlement)): its **source** is the anchor (`sourceModel`, `sourceId`, `sourcePath`), its **target** the holder (a `Token`, `Integration`, `OrganizationUser` or `SpaceUser`), `resource` the model its `actions` apply to, `where` a positive json-rules condition. The grantor is never a column: it is the target's owner, re-walked live. The API speaks rows: a write takes `EntitlementInput` rows (`entitlementInputSchema`: `resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`), and every read of a token, integration or member row (single reads, list reads and `/me`) includes its live rows as stored under `targetEntitlements` (`EntitlementScalarSchema`). The library keeps its own words, and one small transformer in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`) moves between the two only where a holder meets the library: `toEntitlementEntry` turns a row into the entry `{ resource, anchor: { resource, id, path? }, where?, actions }`, with no `path` or `where` when the row has none and `actions` as a map; `toEntitlementInput` turns an entry the library hands back (a self-grant) into a row; `entitlementEntriesOfHolder(holder)` gives the well-formed entries a holder's rows grant (`wellFormedEntitlements`, by the library's `entitlementProblem`, dropping entries another one covers). Its callers are `narrowOwnerPermissionsToDelegate` / `fetchPermissionsOfDelegateOwner`, `permissionsOfUser`, `changeEntitlements` (validation and coverage) and the `memberSelfGrant` hook. Why rows: "who holds what on this record?" is a query, and every grant and revocation is its own audit entry. How to write one: [building entitlements](../../packages/permissions/src/rebac/ENTITLEMENTS.md).
 
 ### How Entitlements Are Applied
 
@@ -609,11 +609,11 @@ A holder can be admitted along several delegation paths, each with its own lens 
 
 ## Permix
 
-Permix is the permission checker. Each request gets a fresh instance via `prepareRequest`.
+Permix is the permission checker. Each request gets a fresh instance via `prepareRequestMiddleware`.
 
 - `permix.setup(entries, { replace?, owner? })` installs entries: a grant `{ resource, id?, actions }` or an entitlement `{ resource, anchor, where?, actions }`. Entries installed with an `owner` permix hold an action only while that owner still allows it on the record.
 - `permix.setActor(actor)` / `permix.getActor()` set and read who is acting.
-- `permix.setSuperadmin(value)` turns on the bypass; `installPermissions` sets it from `isSuperadmin(me(c))`.
+- `permix.setSuperadmin(value)` turns on the bypass; `installPermissions` sets it from `isSuperadmin(actingUser(c))`.
 
 The engine is `@inixiative/permissions`; `createPermissions` in `packages/permissions/src/client.ts` types it with the app's actions and actor. A check is always `check(permix, rebacSchema, model, record, action)` from `@template/permissions/rebac` on a hydrated record.
 
@@ -724,7 +724,7 @@ In the inquiry schema, `updateSpace` uses single-hop and `transferSpace` uses th
 - **`send`** and **`resolve`** are one branch per type, each gated on the type and on the party model, asking the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`).
 - A platform (`admin`) party has no relation, so only a superadmin acts for it.
 
-The API reads the same declarations to check that a create's parties are ones the type accepts (`validateInquiryHandler`).
+The API reads the same declarations to check that a create's parties are ones the type accepts (`validateInquiryTypeAcceptsSourceAndTargetModels`).
 
 ---
 
@@ -870,13 +870,13 @@ A member's list is read by the member and by the organization's owner, never by 
 
 ### The user as a resource
 
-`/me/*` routes check their action like any other route; `meResourceMiddleware` loads `me(c)` as the resource, typed `user`. `me(c)` is the request's user (a user JWT or a spoof), or the user of a User-owned token; anything else has no me and gets 401.
+`/me/*` routes check their action like any other route; `meResourceMiddleware` loads `actingUser(c)` as the resource, typed `user`. `actingUser(c)` is the request's user (a user JWT or a spoof), or the user of a User-owned token; anything else has no me and gets 401.
 
 ```typescript
 middleware: [validateSubmodelPermission('read')]     // meReadManyContacts, -Integrations, -WebhookSubscriptions, -Tokens
 middleware: [validateSubmodelPermission('create')]   // meCreateContact, -Flow, -Integration, -WebhookSubscription
 middleware: [validatePermission('read')]             // the other meReadMany*
-middleware: [validatePermission('operate')]          // meCreateInquiry, meCreateSegment, meReachSegment
+middleware: [validatePermission('operate')]          // meCreateInquiry, meCreateSegment, meEstimateReachSegment
 ```
 
 Person-only situations: `apps/api/src/middleware/validations/userOnlyActions.test.ts`, `apps/api/src/lib/context/userActsDirectly.test.ts`.

@@ -104,20 +104,20 @@ provenance in the audit log. IPv6 compounds it: the key is a full /128, so a rou
   `Cache-Control: no-store` (`makeError` grew a `headers` option); fail-open on any Redis error with a warn and
   an `errorReporter` capture.
 - **These are identity rate limits.** Abuse-shape buckets keyed on who is calling (user / space / organization / IP). A **cost** limit — how many AI calls a tenant may make, or any cap that bounds spend — is a different detector with its own semantics, not a rule in `apiRateLimit`; it lives with the thing it meters and must still be able to run inside a batch. When one arrives it gets its own factory or a flag on `RateLimitRule`, never a share of the identity buckets.
-- **Batch sub-requests are not counted by identity limits** (ruling 2026-09-17): the batch request paid once. The skip keys on the batch transaction prepareRequest resolves from the registry, since the `x-batch-id` header alone is spoofable.
+- **Batch sub-requests are not counted by identity limits** (ruling 2026-09-17): the batch request paid once. The skip keys on the batch transaction prepareRequestMiddleware resolves from the registry, since the `x-batch-id` header alone is spoofable.
 - **Wired.** `apiRateLimit` (principal AND space AND organization, 1 s windows) on every route after auth in
   `routes/api.ts`; `authRateLimit` (per IP, 1 min) on `/api/auth/*`. `emailRateLimit` had no consumer and is gone.
-- **`clientIp` / `clientAddress`.** Trusted right-most XFF hop; `clientIp` buckets IPv6 to /64 for limiting,
-  `clientAddress` keeps the full address for `auditActorMiddleware`.
+- **`clientRateLimitBucketAddress` / `trustedClientAddress`.** Trusted right-most XFF hop; `clientRateLimitBucketAddress` buckets IPv6 to /64 for limiting,
+  `trustedClientAddress` keeps the full address for `auditActorMiddleware`.
 
 ## Tasks
 
 - [x] Atomic `INCR` + first-hit `PEXPIRE` Lua window (`incrementFixedWindows`, batch of windows per call)
 - [x] Fail-open on Redis error: warn + `errorReporter.captureException`, request allowed
 - [x] Rule-array `rateLimit` middleware, AND-checked, `Retry-After`, `onLimited` hook
-- [x] Identities: `userIdentity` / `principalIdentity` / `organizationIdentity` / `spaceIdentity` / `ipIdentity` in `apps/api/src/middleware/rateLimit/identities.ts`
+- [x] Identities: `userRateLimitKey` / `principalRateLimitKey` / `organizationRateLimitKey` / `spaceRateLimitKey` / `ipRateLimitKey` in `apps/api/src/middleware/rateLimit/rateLimitKeys.ts`
 - [x] `rateLimitMax(tier, c)` seam with code defaults (user 20/s, space 30/s, org 60/s, auth 60/min)
-- [x] `clientIp` trusted-hop + /64 bucketing; `clientAddress` feeding `auditActorMiddleware`
+- [x] `clientRateLimitBucketAddress` trusted-hop + /64 bucketing; `trustedClientAddress` feeding `auditActorMiddleware`
 - [x] Wire `apiRateLimit` after auth and `authRateLimit` on `/api/auth/*`
 - [x] Tests: window count/ttl, 429 + `Retry-After` + envelope, `onLimited`, per-client isolation, AND rules, fn max, null-key skip, spoofed XFF, fail-open, identities per owner model
 - [ ] Feed `rateLimitMax` from subscriptions / feature flags (FEAT-003) and drop `Token.rateLimitPerSecond` — ASAP per Aron 2026-09-17; flags also govern whether limiting is on at all

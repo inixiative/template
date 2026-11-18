@@ -21,7 +21,7 @@ import {
   scopeEmailLens,
 } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
-import { registry } from '#/lib/email/registry';
+import { emailTemplateRegistry } from '#/lib/email/emailTemplateRegistry';
 import type { Sender } from '#/lib/email/sender';
 import { senderLensOwner } from '#/lib/email/senderLensOwner';
 
@@ -34,7 +34,7 @@ export const emailLensFor = (
   stored?: unknown,
   sender?: Sender,
 ): EmailLens => {
-  const entry = slug ? registry[slug] : undefined;
+  const entry = slug ? emailTemplateRegistry[slug] : undefined;
   const scope = emailLensOwnerOf(owner);
   const memberships = (sender && senderLensOwner(sender)) ?? scope;
   const lens = scopeEmailLens(
@@ -56,5 +56,7 @@ export const emailLensFor = (
   return lens;
 };
 
-export const emailLensAt = async (slug: string, owner: OwnerScope): Promise<EmailLens> =>
-  emailLensFor(slug, owner, await lookupLens(slug, owner));
+export const fetchStoredLensAndBuildEmailLens = async (
+  slug: string,
+  owner: OwnerScope,
+): Promise<EmailLens> => emailLensFor(slug, owner, await lookupLens(slug, owner));

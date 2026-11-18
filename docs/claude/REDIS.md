@@ -127,7 +127,7 @@ cacheKey('user', { email })            // → cache:user:email:foo@example.com
 
 ### Sessions (`session:*`)
 
-BetterAuth's `secondaryStorage` (in `apps/api/src/lib/auth.ts`). It holds only the sign-in handshake: a session lives at most 10 minutes and `jwtHandoff` deletes it as soon as it hands out the person's JWT, plus the 1-minute OAuth one-time tokens. No request outside `/api/auth` reads it ([AUTH.md](./AUTH.md#what-lives-where)).
+BetterAuth's `secondaryStorage` (in `apps/api/src/lib/auth.ts`). It holds only the sign-in handshake: a session lives at most 10 minutes and `jwtHandoffPlugin` deletes it as soon as it hands out the person's JWT, plus the 1-minute OAuth one-time tokens. No request outside `/api/auth` reads it ([AUTH.md](./AUTH.md#what-lives-where)).
 
 ```typescript
 // In lib/auth.ts
@@ -148,10 +148,10 @@ with `Retry-After`. Redis down = fail open (warn + report, request allowed).
 ```typescript
 // `${redisNamespace.limit}:${scope}:${windowMs}:${identity}`
 `limit:api:principal:1000:user:${userId}`        // the user's JWT, or any token owned by / through the user
-`limit:api:principal:1000:ip:${clientIp}`        // anonymous fallback
+`limit:api:principal:1000:ip:${clientRateLimitBucketAddress}`        // anonymous fallback
 `limit:api:space:1000:space:${spaceId}`          // Space / SpaceUser tokens
 `limit:api:organization:1000:organization:${organizationId}`
-`limit:auth:60000:ip:${clientIp}`                // /api/auth/* per IP
+`limit:auth:60000:ip:${clientRateLimitBucketAddress}`                // /api/auth/* per IP
 ```
 
 Lua scripts are queries: each lives in its module's `queries/` folder (`lanes/queries/`, `lock/queries/`,
@@ -163,11 +163,11 @@ are not counted (the batch request paid once; the skip keys on the registry-reso
 transaction, not the spoofable `x-batch-id` header). A **cost** limit — AI calls, anything that bounds
 spend — is a separate detector that must still run inside a batch; it is not an `apiRateLimit` rule.
 
-The identity a rule keys on is one of the functions in `apps/api/src/middleware/rateLimit/identities.ts`:
-`userIdentity` (the JWT's user, or the token's `userId`, so a user and every token owned by or through
-them share one bucket and minting tokens buys nothing), `principalIdentity` (`userIdentity`, else the IP),
-`organizationIdentity` / `spaceIdentity` (the token's organization or space) and `ipIdentity` (the trusted
-`x-forwarded-for` hop bucketed to /64, `clientIp`). A new limit picks one of these; it does not build its own key. Maxes resolve through `rateLimitMax(tier, c)`,
+The identity a rule keys on is one of the functions in `apps/api/src/middleware/rateLimit/rateLimitKeys.ts`:
+`userRateLimitKey` (the JWT's user, or the token's `userId`, so a user and every token owned by or through
+them share one bucket and minting tokens buys nothing), `principalRateLimitKey` (`userRateLimitKey`, else the IP),
+`organizationRateLimitKey` / `spaceRateLimitKey` (the token's organization or space) and `ipRateLimitKey` (the trusted
+`x-forwarded-for` hop bucketed to /64, `clientRateLimitBucketAddress`). A new limit picks one of these; it does not build its own key. Maxes resolve through `rateLimitMax(tier, c)`,
 the seam for subscriptions / feature flags (INFRA-027) — never a column on Token, Organization or Space.
 
 ### Job Coordination (`job:*`, `lock:*`)
@@ -439,8 +439,8 @@ export const spaceStats = makeRollingCache({
   channel: ({ id }) => WS_CHANNELS.someRead.name(id), // optional: announce refreshes
 });
 
-// api (apps/api/src/jobs/checkRollingCache.ts): name the result and pass its params; never build a key
-const check = await checkRollingCache(spaceStats, 'total', { id: organizationId });
+// api (apps/api/src/jobs/fetchRollingCacheAndQueueRefreshWhenMissing.ts): name the result and pass its params; never build a key
+const check = await fetchRollingCacheAndQueueRefreshWhenMissing(spaceStats, 'total', { id: organizationId });
 // → { state: 'empty' | 'queued' | 'computing' | 'fresh' | 'stale', value?, writtenAt?, isComputing?, isQueued?, channel? }
 ```
 
@@ -475,7 +475,7 @@ const check = await checkRollingCache(spaceStats, 'total', { id: organizationId 
 - **A read never computes.** `read(result, params)` is `checkCache` on that result's key: `empty`,
   `queued` (a refresh is enqueued), `computing` (the target's lock is held), `fresh`, or `stale`
   (older than one scheduled refresh, with `isComputing` and `isQueued` beside it).
-  `checkRollingCache` (`apps/api/src/jobs/checkRollingCache.ts`) is the api read: on `empty`, or
+  `fetchRollingCacheAndQueueRefreshWhenMissing` (`apps/api/src/jobs/fetchRollingCacheAndQueueRefreshWhenMissing.ts`) is the api read: on `empty`, or
   `stale` with nothing computing or queued, it sets the target's queued marker and, only if it set
   it, enqueues the target's leaf, so N cold readers send one job. A failed enqueue clears the marker.
   It reads again and returns the cache's `channel` so a client knows where to wait.

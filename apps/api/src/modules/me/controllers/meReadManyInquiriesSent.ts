@@ -4,7 +4,7 @@
  * @partOf feature:users
  */
 import { whereAxisCarriesOwnerKeys } from '@template/db';
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
@@ -16,7 +16,7 @@ export const meReadManyInquiriesSentController = makeController(
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', { User: me(c)!.id }),
+        ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', { User: actingUser(c)!.id }),
       },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },

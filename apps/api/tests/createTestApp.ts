@@ -2,12 +2,12 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { type Db, db, includeTargetEntitlements } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
 import { auth } from '#/lib/auth';
-import { installPermissions } from '#/lib/context/installPermissions';
+import { installPermissionsFromRequestContext } from '#/lib/context/installPermissionsFromRequestContext';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
-import { prepareRequest } from '#/middleware/prepareRequest';
+import { prepareRequestMiddleware } from '#/middleware/prepareRequestMiddleware';
 import type { AppEnv } from '#/types/appEnv';
 
 export type MountFn = (app: OpenAPIHono<AppEnv>) => void;
@@ -30,7 +30,7 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
     return next();
   });
 
-  app.use('*', prepareRequest);
+  app.use('*', prepareRequestMiddleware);
 
   const mocksCredential = Boolean(
     options?.mockUser ||
@@ -66,7 +66,7 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
       c.set('spaces', spaces);
     }
     if (options?.mockToken) c.set('token', options.mockToken);
-    if (mocksCredential) await installPermissions(c);
+    if (mocksCredential) await installPermissionsFromRequestContext(c);
     await next();
   });
 

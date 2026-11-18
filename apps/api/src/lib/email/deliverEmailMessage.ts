@@ -17,10 +17,13 @@ import mjml2html from 'mjml';
 import { emitAppEvent } from '#/appEvents/emit';
 import { defaultEmailClient, emailVerifier, resolveFromAddress } from '#/lib/email';
 import { communicationReasonCodeFor } from '#/lib/email/communicationReasonCode';
-import { addressesThrough, recipientVariables } from '#/lib/email/renderForRecipient';
+import {
+  fetchRecipientEmailAddressesMatching,
+  recipientVariables,
+} from '#/lib/email/renderForRecipient';
 import type { Sender } from '#/lib/email/sender';
 import { unsubscribeUrl } from '#/lib/email/unsubscribe';
-import { type SettledTemplate, settleTemplate } from '#/lib/emailTemplate';
+import { type RenderedEmailTemplate, renderEmailTemplateWithFallback } from '#/lib/emailTemplate';
 import { canDeliver } from '#/lib/messaging/canDeliver';
 import { settleCommunication } from '#/lib/messaging/settleCommunication';
 import { isShutdownInProgress, sleepUnlessShuttingDown } from '#/lib/shutdown';
@@ -96,12 +99,12 @@ export const deliverEmailMessage = async (
       error: errorMessageOf(error),
     });
 
-  let settled: SettledTemplate;
+  let settled: RenderedEmailTemplate;
   let address = entry.address;
   let cc: string[] | undefined;
   let bcc: string[] | undefined;
   try {
-    settled = await settleTemplate(
+    settled = await renderEmailTemplateWithFallback(
       template,
       sender,
       async (lens) => {
@@ -113,8 +116,8 @@ export const deliverEmailMessage = async (
           label: template,
         });
         address = String(variables.recipient?.email ?? entry.address);
-        cc = await addressesThrough(lens, payload.cc);
-        bcc = await addressesThrough(lens, payload.bcc);
+        cc = await fetchRecipientEmailAddressesMatching(lens, payload.cc);
+        bcc = await fetchRecipientEmailAddressesMatching(lens, payload.bcc);
         return variables;
       },
       (kind) => {

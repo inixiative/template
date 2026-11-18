@@ -19,10 +19,10 @@ import {
   type HydratedCustomerRef,
   hydrateCustomerRefs,
 } from '#/modules/segment/services/hydrateCustomerRefs';
-import { isContinuous } from '#/modules/segment/services/reconcileSegment';
+import { isReconcilableDynamicSegment } from '#/modules/segment/services/reconcileSegment';
 import {
-  buildReferenceMap,
   sortByDependency,
+  targetSegmentIdsBySegmentId,
 } from '#/modules/segment/services/segmentReferenceGraph';
 import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth';
 
@@ -58,12 +58,12 @@ export const reconcileCustomerRef = async (
   if (!provider) return [];
 
   const segments = (await dynamicSegmentsOf(provider.ownerModel, provider.ownerId)).filter(
-    isContinuous,
+    isReconcilableDynamicSegment,
   );
   if (!segments.length) return [];
 
   const lens = resolvedCustomerRefLens(provider.ownerModel, provider.ownerId);
-  const ordered = sortByDependency(segments, buildReferenceMap(segments));
+  const ordered = sortByDependency(segments, targetSegmentIdsBySegmentId(segments));
   const states = await segmentRuleStates(ordered);
   const [row] = await hydrateCustomerRefs(provider.ownerModel, provider.ownerId, [customerRefId]);
 

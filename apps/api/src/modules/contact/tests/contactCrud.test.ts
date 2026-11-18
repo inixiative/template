@@ -20,7 +20,7 @@ import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { del, get, json, patch, post } from '#tests/utils/request';
+import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 describe('Contact CRUD', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -61,7 +61,7 @@ describe('Contact CRUD', () => {
           value: { e164: e164(), country: 'US' },
         }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(201);
       expect(data.userId).toBe(user.id);
       expect(data.ownerModel).toBe('User');
@@ -76,7 +76,7 @@ describe('Contact CRUD', () => {
           value: { url: `https://linkedin.com/in/${handle}` },
         }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(201);
       expect(data.value).toEqual({ classifier: 'personal', handle });
       expect(data.valueKey).toBe(`personal:${handle.toLowerCase()}`);
@@ -124,7 +124,7 @@ describe('Contact CRUD', () => {
           permissionRules: { read: { all: [] } },
         }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(201);
       expect(data.permissionRules).toEqual({ read: { all: [] } });
     });
@@ -178,7 +178,7 @@ describe('Contact CRUD', () => {
         value: { address: `read${nextFactorySequenceNumber()}@example.com` },
       });
       const response = await fetch(get(`/api/v1/contact/${contact.id}`));
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(200);
       expect(data.id).toBe(contact.id);
     });
@@ -232,7 +232,7 @@ describe('Contact CRUD', () => {
       const response = await fetch(
         patch(`/api/v1/contact/${contact.id}`, { label: 'Work', position: 1 }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(200);
       expect(data.label).toBe('Work');
       expect(data.position).toBe(1);
@@ -344,7 +344,7 @@ describe('Contact CRUD', () => {
   describe('re-adding a deleted contact', () => {
     const readd = async (fetchFor: typeof fetch, createPath: string) => {
       const address = `readd${nextFactorySequenceNumber()}@example.com`;
-      const first = await json<Contact>(
+      const first = await parseSuccessBody<Contact>(
         await fetchFor(post(createPath, { type: 'email', value: { address }, label: 'Old' })),
       );
       await db.contact.update({
@@ -356,7 +356,7 @@ describe('Contact CRUD', () => {
       const response = await fetchFor(
         post(createPath, { type: 'email', value: { address }, label: 'New' }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(201);
       expect(data.id).toBe(first.data.id);
       expect(data.label).toBe('New');

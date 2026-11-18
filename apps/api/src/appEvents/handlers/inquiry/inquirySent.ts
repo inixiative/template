@@ -5,13 +5,13 @@
  * @uses feature:inquiry
  */
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import type { InquiryWithIncludes } from '#/modules/inquiry/handlers/types';
+import { inquiryServices } from '#/modules/inquiry/services';
+import type { InquiryWithIncludes } from '#/modules/inquiry/services/types';
 
 export type InquirySentPayload = InquiryWithIncludes;
 
 export const inquirySent = makeAppEvent<InquirySentPayload>({
-  email: (inquiry) => inquiryHandlers[inquiry.type]?.appEvents?.sent?.email?.(inquiry) ?? null,
+  email: (inquiry) => inquiryServices[inquiry.type]?.appEvents?.sent?.email?.(inquiry) ?? null,
   websocket: (inquiry) =>
-    inquiryHandlers[inquiry.type]?.appEvents?.sent?.websocket?.(inquiry) ?? null,
+    inquiryServices[inquiry.type]?.appEvents?.sent?.websocket?.(inquiry) ?? null,
 });

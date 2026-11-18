@@ -16,7 +16,7 @@ import {
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/v1/space/:id/customers', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -63,7 +63,7 @@ describe('GET /api/v1/space/:id/customers', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<CustomerRef[]>(response);
+    const { data } = await parseSuccessBody<CustomerRef[]>(response);
     expect(data.length).toBe(0);
   });
 
@@ -81,7 +81,7 @@ describe('GET /api/v1/space/:id/customers', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<CustomerRef[]>(response);
+    const { data } = await parseSuccessBody<CustomerRef[]>(response);
     expect(data.length).toBeGreaterThanOrEqual(1);
     expect(data.some((c) => c.customerUserId === customerUser.id)).toBe(true);
   });
@@ -100,7 +100,7 @@ describe('GET /api/v1/space/:id/customers', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<CustomerRef[]>(response);
+    const { data } = await parseSuccessBody<CustomerRef[]>(response);
     expect(data.some((c) => c.customerOrganizationId === customerOrg.organizationId)).toBe(true);
   });
 });

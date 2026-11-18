@@ -5,9 +5,8 @@
  * @uses primitive:websockets
  */
 import type { CustomerModel } from '@template/db/generated/client/enums';
-import { WS_CHANNELS } from '@template/shared/ws';
+import { refetchQueryEvent, WS_CHANNELS } from '@template/shared/ws';
 import { lowerFirst } from 'lodash-es';
-import { refetch } from '#/appEvents/refetch';
 import type { WSHandoff } from '#/appEvents/types';
 import { meChannel } from '#/ws/meChannel';
 
@@ -19,14 +18,14 @@ const channelOf = ({ customerModel, customerId }: Customer): WSHandoff => {
     return {
       kind: 'channels',
       target: { channels: [meChannel(WS_CHANNELS[_id].name(), customerId)] },
-      message: { data: refetch({ _id }) },
+      message: { data: refetchQueryEvent({ _id }) },
     };
   }
   const _id = `${lowerFirst(customerModel)}ReadManySegmentMemberships` as const;
   return {
     kind: 'channels',
     target: { channels: [WS_CHANNELS[_id].name(customerId)] },
-    message: { data: refetch({ _id, path: { id: customerId } }) },
+    message: { data: refetchQueryEvent({ _id, path: { id: customerId } }) },
   };
 };
 

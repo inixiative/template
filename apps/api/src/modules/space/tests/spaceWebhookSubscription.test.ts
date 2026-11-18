@@ -17,7 +17,7 @@ import {
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, post } from '#tests/utils/request';
+import { get, parseSuccessBody, post } from '#tests/utils/request';
 
 describe('space/webhookSubscriptions', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -84,7 +84,7 @@ describe('space/webhookSubscriptions', () => {
           url: `https://example.com/space-webhook-${seq}`,
         }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(201);
       expect(data.ownerModel).toBe('Space');
@@ -122,7 +122,7 @@ describe('space/webhookSubscriptions', () => {
       );
 
       expect(response.status).toBe(201);
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
       expect(data.ownerModel).toBe('Space');
       expect(data.spaceId).toBe(space.id);
       expect(data.organizationId).toBeNull();
@@ -140,7 +140,7 @@ describe('space/webhookSubscriptions', () => {
       });
 
       const response = await fetch(get(`/api/v1/space/${space.id}/webhookSubscriptions`));
-      const { data } = await json<WebhookSubscription[]>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription[]>(response);
 
       expect(response.status).toBe(200);
       expect(Array.isArray(data)).toBe(true);
@@ -159,7 +159,7 @@ describe('space/webhookSubscriptions', () => {
       });
 
       const response = await fetch(get(`/api/v1/space/${space.id}/webhookSubscriptions`));
-      const { data } = await json<WebhookSubscription[]>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription[]>(response);
 
       expect(response.status).toBe(200);
       expect(data.every((s) => s.spaceId === space.id)).toBe(true);

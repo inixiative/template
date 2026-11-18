@@ -106,7 +106,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 
-**Job: render an email for sending, previewing or reconstruction** (settleTemplate vs renderForRecipient vs interpolate vs recompose) — docs/claude/COMMUNICATIONS.md § Render Pipeline; § Deliver; § Template Versioning & Recompose
+**Job: render an email for sending, previewing or reconstruction** (renderEmailTemplateWithFallback vs renderForRecipient vs interpolate vs recompose) — docs/claude/COMMUNICATIONS.md § Render Pipeline; § Deliver; § Template Versioning & Recompose
 
 *Said as:* "render the email", "fill in the template for this recipient", "turn the template into html for sending", "show what we actually sent"
 
@@ -172,7 +172,7 @@ Located in `packages/email` (`@template/email`).
 | Compose pipeline | Done | Fetch + expand components |
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
 | Render issues | Done | Save refuses what the lens can decide; render records typed issues; the registry entry says `fail` (default), `degrade`, or names a `substitute` |
-| **Sending jobs** | Done | `sendEmail` BullMQ job (resolve → verify → compose → interpolate → render → send) |
+| **Sending jobs** | Done | `planEmailDeliveries` BullMQ job (resolve → verify → compose → interpolate → render → send) |
 | **Authoring layer** | Planned | Narrowed-lens rule builder + field selector (COMM-001 / INFRA-002 / INFRA-017) |
 | **Data hydration** | TODO | Pipe `{sender,recipient,data}` in; the lens is its schema |
 | **Preference management** | TODO | Unsubscribe, categories |
@@ -403,7 +403,7 @@ lives in the audit log**:
 #### Email System
 
 - ✅ **Templates and Components** — Stored MJML, subjects, locales, reusable nested components, audit-backed versions and owner-tier cascade. Ownership supports default/admin, User, Organization, Space, OrganizationUser and SpaceUser tiers.
-- ✅ **Planner and Delivery** — App-event handoffs select a registry template plus bindings. `sendEmail` resolves sender and recipients, records per-recipient `CommunicationLog` intent and enqueues `deliverEmail`; delivery settles, renders, sends and records the outcome.
+- ✅ **Planner and Delivery** — App-event handoffs select a registry template plus bindings. `planEmailDeliveries` resolves sender and recipients, records per-recipient `CommunicationLog` intent and enqueues `deliverEmail`; delivery settles, renders, sends and records the outcome.
 - ✅ **Preferences and Verification** — Communication kind, contact acceptance and cached address deliverability participate in delivery. System messages bypass preference opt-out; other kinds must be accepted by the contact.
 - ✅ **Owner-Scoped Email Lenses** — Separate sender, recipient, data and system lenses govern tokens, rules, loops, picker options and runtime projection. Recipient data can include scoped tags and segment memberships; foreign data is filtered before interpolation.
 - ✅ **Rule References and Degradation** — Save paths maintain `RuleReference` edges; stale or transitively degraded segment references affect rule health. Preflight and render use the same lens vocabulary and reference admission.

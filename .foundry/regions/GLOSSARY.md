@@ -9,7 +9,7 @@
 ## #
 
 **#/**  
-Alias for imports inside the same app (e.g. #/lib/context/me). *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
+Alias for imports inside the same app (e.g. #/lib/context/actingUser). *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
 
 ## A
 
@@ -421,7 +421,7 @@ The lane's mutually verified version every repo's ecosystem dependency must admi
 Bill of materials; one config version names one coherent ecosystem state. *Region:* [Config package (toolchain, train)](lib-config/knowledge.md)
 
 **bracket notation**  
-Nested query params like searchFields[price][gte]=100, parsed by prepareRequest / parseBracketNotation. *Region:* [List filtering and search](filtering-search/knowledge.md)
+Nested query params like searchFields[price][gte]=100, parsed by prepareRequestMiddleware / parseBracketNotation. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
 **bracketQuery**  
 Encodes list filters as bracket query notation (filter[field]=…) the API parses. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
@@ -557,7 +557,7 @@ Get-or-compute with TTL (default 24h), single-flight on misses, negative caching
 **cacheKey**  
 The one builder of canonical keys: cache:{accessor}:{field}:{value}[:{tags}][:*]. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
-**cacheReference**  
+**cacheKeysByModel**  
 The reverse-reference map: per model, every cache key a record is reachable by; cleared after commit on mutation. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 **caching**  
@@ -629,7 +629,7 @@ Fails on relative internal imports that should use #/ or @template/. *Region:* [
 **checkContextPermission**  
 Tries current context, then the space's organization, user, public; switches to the first that allows the page. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
-**checkFlow**  
+**advanceFlowAndDeleteWhenFinished**  
 Re-evaluates steps from step 0 as the caller; computes stepStates and currentStep; deletes the flow when done. *Region:* [Guided flows](flows/knowledge.md)
 
 **checkPath**  
@@ -671,7 +671,7 @@ The agent guidance snippet gloss setup installs into CLAUDE.md: the three commen
 **Clean status list**  
 All steps rendered upfront with done / spinner / pending markers instead of streaming logs. *Region:* [Writing an init task](init-tasks/knowledge.md)
 
-**cleanStaleData**  
+**hardDeleteRecordsPastRetention**  
 Singleton cron handler that hard-deletes rows idle past a retention window. *Region:* [Cron jobs and schedulers](cron/knowledge.md)
 
 **cleanupTouchedTables**  
@@ -680,10 +680,10 @@ afterAll truncation of only the tables written during the suite. *Region:* [Test
 **clearCacheKeysMatchingPattern**  
 Delete an exact cache key or a wildcard pattern via SCAN. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
-**clientIp**  
+**clientRateLimitBucketAddress**  
 Non-null caller IP from the trusted x-forwarded-for hop, IPv6 bucketed to /64. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
-**clientIp / clientAddress**  
+**clientRateLimitBucketAddress / trustedClientAddress**  
 Bucketed, never-null client key for rate limits vs the exact address that may be missing. *Region:* [Request context](request-context-errors/knowledge.md)
 
 **ClientSlice**  
@@ -801,7 +801,7 @@ Apply versions.json pins and presets locally / verify them read-only. *Region:* 
 Root context in init/utils/configState.tsx; the single source of config for every TUI view. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
 
 **connection registry**  
-Indexes of open sockets by id, user, channel and stream (byId, byUser, byChannel, byStream; addConnection, removeConnection). *Region:* [WebSocket connections](ws-connections/knowledge.md)
+Indexes of open sockets by id, user, channel and stream (connectionsById, connectionIdsByChannel, connectionIdsByStream; addConnection, removeConnection). *Region:* [WebSocket connections](ws-connections/knowledge.md)
 
 **@constructs**  
 The factory output a constructor file builds. *Region:* [Atlas code map (library + template usage)](lib-atlas/knowledge.md)
@@ -935,8 +935,8 @@ Fakes a WebSocket handle with WSData for socket handler tests. *Region:* [Test h
 **createTestStore**  
 Isolated app store with a retry-free query client for UI tests; testStore is the shared default. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
 
-**createTestWorker**  
-Runs a job handler in tests with a mock job and worker context; createMockJob for just a Job object. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
+**makeTestWorker**  
+Runs a job handler in tests with a mock job and worker context; mockJob for just a Job object. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
 
 **createToken**  
 The service every create-token route calls; checks create on a pseudo token, then mints and hashes it. *Region:* [API tokens and login providers](tokens-providers/knowledge.md)
@@ -1162,7 +1162,7 @@ The library call resolving a delegate from its owner's permissions: full, a role
 **delegateFull**  
 Person-only action on an owner that lets you set full on its delegate. *Region:* [Member rows and delegates](permissions-members/knowledge.md)
 
-**delegatePermissionRules**  
+**fullDelegateRules**  
 Backstop rules on every write: where full may sit, and a non-full delegate holds a role or entitlements (delegateHoldsSomething). *Region:* [Member rows and delegates](permissions-members/knowledge.md)
 
 **delegation**  
@@ -1181,7 +1181,7 @@ Cached address validity on Contact; distinct from preference (acceptedKinds) and
 Per-recipient job (body in deliverEmailMessage) that settles, gates, renders, claims, sends and records one email. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **deliverEmailHandoffs**  
-Email bridge that enqueues sendEmail for handoffs with deterministic planner job ids. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
+Email bridge that enqueues planEmailDeliveries for handoffs with deterministic planner job ids. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **dependencies**  
 Class: third-party dependency inventory and tech stack. *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
@@ -1270,7 +1270,7 @@ Compiles an action into json-rules' Prisma plan selecting every record currently
 What an app-event handler returns to request a templated email: template slug plus binding data, never recipients. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **email-delivery**  
-Class: email sending through the sendEmail planner, deliverEmail, senders and provider adapters. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
+Class: email sending through the planEmailDeliveries planner, deliverEmail, senders and provider adapters. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **email-lens**  
 Class: the email lens and email rule blocks: sender/recipient/data/system lenses, recipient variables, rule references on templates, packages/email/src/rules. *Region:* [The email lens](email-lens/knowledge.md)
@@ -1502,8 +1502,8 @@ A discriminator enum plus one nullable typed FK per kind, instead of a `type` + 
 **False polymorphism**  
 Polymorphic relations as one nullable FK per possible type, with PolymorphismRegistry for constraints and resolution. *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
 
-**fanOutLane**  
-sendEmail's per-enqueue lane choice: slow above EMAIL_SLOW_LANE_MIN_RECIPIENTS recipients. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
+**emailJobLaneForRecipientCount**  
+planEmailDeliveries's per-enqueue lane choice: slow above EMAIL_SLOW_LANE_MIN_RECIPIENTS recipients. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **FEATURES.md / COMPARISONS.md**  
 Subsystem inventory and comparisons to consult before concluding something is missing. *Region:* [Engineering process and docs](engineering-process-docs/knowledge.md)
@@ -1842,7 +1842,7 @@ Create call that treats 'already exists' as success and returns the existing id 
 updateManyAndReturn with the old version in the where clause, so a rerun or a racing worker never double-encrypts. *Region:* [Field encryption and key rotation](encryption/knowledge.md)
 
 **identity**  
-The function keying a bucket: userIdentity, principalIdentity, spaceIdentity, organizationIdentity, ipIdentity. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
+The function keying a bucket: userRateLimitKey, principalRateLimitKey, spaceRateLimitKey, organizationRateLimitKey, ipRateLimitKey. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 **{{#if rule=…}}**  
 Conditional block whose json-rules condition is checked at save and evaluated through the lens at render. *Region:* [Email compose, render and save](email-render/knowledge.md)
@@ -1907,7 +1907,7 @@ Class tag: the Inquiry model, handlers and services. *Region:* [Inquiry model an
 **inquiry-routes-ui**  
 Class tag: inquiry endpoints, schemas and frontend. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
 
-**InquiryHandler**  
+**InquiryService**  
 Per-type definition of sources, targets, schemas, validate, handleApprove, autoApprove, unique, expiry and appEvents. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
 **InquiryResourceModel**  
@@ -1928,7 +1928,7 @@ Enum of inquiry kinds: inviteOrganizationUser, createSpace, updateSpace, transfe
 **inScope**  
 Gate ① rebac scope check in deliver; a pass-through stub today (COMM-005). *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
-**installPermissions**  
+**installPermissionsFromRequestContext**  
 The request's one call that fills its permix for whoever acts (installPermissionsFor underneath). *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **inStreamOrder**  
@@ -2053,7 +2053,7 @@ Signing keys in the Jwks table (private key encrypted) and the public key set se
 **jwtAuthMiddleware**  
 Claims every JWT-shaped bearer: verifies it, checks ver against User.jwtVersion, sets the user context; 401 on failure. *Region:* [Auth middleware chain and users](auth-middleware-users/knowledge.md)
 
-**jwtHandoff**  
+**jwtHandoffPlugin**  
 BetterAuth plugin (last in authPlugins) that expires the session cookie, signs the user JWT, deletes the session and answers { token, expiresAt, user }. *Region:* [Sign-in, user JWTs and OAuth](authentication/knowledge.md)
 
 ## K
@@ -2165,7 +2165,7 @@ The scope a lens binds rule conditions to; lensScopeSurface lists its values and
 **lensVisit**  
 One visit as projectLens would give it, resolved on demand at a relation path; null when not shown. *Region:* [Using a lens: build, gate, fetch](lens-usage/knowledge.md)
 
-**lensWhere**  
+**applyFilterLensWheresToPrismaWhere**  
 Folds a lens's non-root narrowing clauses into a composed Prisma where across relations. *Region:* [Template lenses](lenses/knowledge.md)
 
 **lib-atlas**  
@@ -2360,10 +2360,10 @@ Required for DB-backed test scripts so files don't truncate each other's tables.
 **--max-concurrency=1**  
 Required for DB-backed test scripts so files don't truncate each other's tables. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
 
-**me(c)**  
+**actingUser(c)**  
 The request's user (JWT or spoof), or a User-owned token's user; otherwise /me answers 401. *Region:* [Auth middleware chain and users](auth-middleware-users/knowledge.md)
 
-**me(c)**  
+**actingUser(c)**  
 The request's user (a JWT or a spoof), or the user of a User-owned token; anything else has no me. *Region:* [Request context](request-context-errors/knowledge.md)
 
 **meChangePassword**  
@@ -2772,7 +2772,7 @@ Permix instance with setup(me), check(model, record, action) and clear(). *Regio
 The grant holder: role-derived grants keyed by resource or resource:id, a superadmin bypass, and the actor id. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **permix**  
-Per-request permission checker created in prepareRequest: setup installs entries, setActor sets who acts, setSuperadmin bypasses. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Per-request permission checker created in prepareRequestMiddleware: setup installs entries, setActor sets who acts, setSuperadmin bypasses. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **permix**  
 The per-request permission checker, empty until installPermissions fills it. *Region:* [Request context](request-context-errors/knowledge.md)
@@ -2867,7 +2867,7 @@ A json-rules Condition giving legality; from reads the current record, to reads 
 **Preflight**  
 Pre-send content checks (subject, image alt, preheader, spam phrases, unresolved lens paths) via runPreflight / emailTemplatePreflight. *Region:* [Email compose, render and save](email-render/knowledge.md)
 
-**prepareRequest**  
+**prepareRequestMiddleware**  
 First middleware: sets db, requestId, bracketQuery, a fresh permix, nulls auth and resource vars, wraps the request in db.scope; minimal setup for /api/batch. *Region:* [Request context](request-context-errors/knowledge.md)
 
 **Prerequisites**  
@@ -3111,8 +3111,8 @@ Registers a type's label and its source/target summary, detail, compose and revi
 **registerTestTracker**  
 Starts tracking touched tables; the db client registers it, tests do not call it. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 
-**registry**  
-apps/api/src/lib/email/registry.ts: per-slug entry declaring lenses, sender, recipients and render policy. *Region:* [Email compose, render and save](email-render/knowledge.md)
+**emailTemplateRegistry**  
+apps/api/src/lib/email/emailTemplateRegistry.ts: per-slug entry declaring lenses, sender, recipients and render policy. *Region:* [Email compose, render and save](email-render/knowledge.md)
 
 **rehydration**  
 Recognizing a saved raw rule as its named facet again (matchFacet, lockedLeading, hoist). *Region:* [Rule builder: template usage](rules-builder/knowledge.md)
@@ -3213,10 +3213,10 @@ Looks up an operationId's route and fills path params for in-process callers. *R
 **resolveRelation**  
 The injected, ORM-specific function returning the model a relation segment points at. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
-**resolveSender**  
+**fetchSenderRowThroughLens**  
 Loads the sending row through its lens as the sender variable; identity only, not branding. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
-**resolveUsers**  
+**fetchUsersMatchingRuleWithContacts**  
 Compiles a json-rules Condition through the recipient lens into a Prisma query for recipients at job time. *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
 
 **resource**  
@@ -3315,7 +3315,7 @@ Class: the route factories in #/lib/routeTemplates and the makeController respon
 **routeAccessOf**  
 Classifies a status: 2xx granted, 429/5xx retryable, anything else rejected (openRejected). *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
 
-**routeRow**  
+**parseRowWithRouteResponseSchema**  
 Parses an upsert row with the route's responseSchema and brands it; raw models do not typecheck. *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
 
 **routes/api vs routes/internal**  
@@ -3405,7 +3405,7 @@ Runs a callback with a given transaction client as the ambient db, so nested db.
 **running / loading<Entity> / storing<Action>**  
 Boolean execution-state naming in init views. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
 
-**runOnOutboxQueue**  
+**runUnderJobOutboxWriteMutex**  
 The outbox mutex: runs a JobOutbox write on the serialized queue shared by flushes and drains. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **RuntimeDelegate**  
@@ -3566,7 +3566,7 @@ static (computed after create or rule change) or dynamic (also reacts to custome
 **send / resolve / read**  
 The inquiry ReBAC actions: source-side send (create, edit, send, cancel), target-side resolve, either-side read. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
-**sendEmail**  
+**planEmailDeliveries**  
 Planner job: resolve entity, sender, template and recipients, find-or-create per-recipient CommunicationLog rows, enqueue deliverEmail. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **senderLensOwner**  
@@ -3594,12 +3594,12 @@ Factory entity helper that converts Date fields to ISO strings for API/SDK/UI-sh
 Shared MSW mock server for UI tests; per-test responses via server.use. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
 
 **Session**  
-BetterAuth's handshake session: created at the end of a sign-in, at most 10 minutes in Redis, deleted by jwtHandoff; never authenticates an API request. The Prisma Session model holds no rows. *Region:* [Sign-in, user JWTs and OAuth](authentication/knowledge.md)
+BetterAuth's handshake session: created at the end of a sign-in, at most 10 minutes in Redis, deleted by jwtHandoffPlugin; never authenticates an API request. The Prisma Session model holds no rows. *Region:* [Sign-in, user JWTs and OAuth](authentication/knowledge.md)
 
 **setEnvOverride / withEnv**  
 Schema-parsed env overrides for tests, persistent (reset by resetEnvOverrides) or scoped to one call. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
 
-**setIdentity**  
+**setSocketIdentityAndDropSubscriptionsOnChange**  
 Attaches or replaces the user and header state on a socket. *Region:* [WebSocket connections](ws-connections/knowledge.md)
 
 **setLogService**  
@@ -3608,7 +3608,7 @@ Process-wide constant fields stamped on every record. *Region:* [Logging, teleme
 **SettingsLayout**  
 The settings pages' shared layout; settings are nested routes under it, not tabs. *Region:* [UI components and shared pages](ui-components/knowledge.md)
 
-**settleTemplate**  
+**renderEmailTemplateWithFallback**  
 API entry that resolves a template through the cascade and renders subject and body with system tokens and RenderIssue collection. *Region:* [Email compose, render and save](email-render/knowledge.md)
 
 **setTokenContext**  
@@ -3623,10 +3623,10 @@ Init task that provisions Infisical and seeds each encryption prefix's keyring o
 **setUserContext**  
 Stores user, organizationUsers, organizations, spaceUsers and spaces from a loaded UserWithRelations, then installs permissions. *Region:* [Request context](request-context-errors/knowledge.md)
 
-**shadowMerge**  
+**applyWriteDataOverPreviousRow**  
 Computes the post-update record from previous state plus Prisma atomic ops (increment, push, …) so updates can be validated. *Region:* [Template rules and rule references](json-rules/knowledge.md)
 
-**shadowMerge**  
+**applyWriteDataOverPreviousRow**  
 Merges previous with update data, resolving increment/push/set, so rules validate the resulting row. *Region:* [Mutation hooks, immutable fields, ordered lists](mutation-hooks/knowledge.md)
 
 **shareableUrl**  
@@ -3648,7 +3648,7 @@ includeInquiryResponse: the one include, so both sides' rows come back in one ca
 The plain-markdown gloss file: # <source path>, optional preamble, ## <symbol> sections. *Region:* [Gloss (margin comments)](lib-gloss/knowledge.md)
 
 **Sign-in handshake**  
-BetterAuth's sign-in flow; it ends with jwtHandoff swapping the new session for a user JWT. *Region:* [Sign-in, user JWTs and OAuth](authentication/knowledge.md)
+BetterAuth's sign-in flow; it ends with jwtHandoffPlugin swapping the new session for a user JWT. *Region:* [Sign-in, user JWTs and OAuth](authentication/knowledge.md)
 
 **SignupForm**  
 Sign-up form; shows the verification message on verification-pending. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
@@ -3689,7 +3689,7 @@ Class: deletedAt tombstones, cascade and revive, and automatic soft-delete read 
 **softDeleteScopeExtension**  
 Client extension that auto-injects `deletedAt: null` into reads, write wheres and nested includes. *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
 
-**soundSegments**  
+**fetchSegmentsWithoutRuleIssues**  
 Filters a list to segments whose rules have no issues. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **source**  
@@ -3818,10 +3818,10 @@ The shared registry of stream definitions (packages/shared/src/ws/streamDefiniti
 **STREAM_FOLDS**  
 Maps each kind to its snapshot and op folds (listStream, logStream); folds must be idempotent. *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
 
-**streamAppend**  
-Builds a stream handoff from a shared STREAM_DEFINITIONS entry, its params, an op and a typed payload; upsert rows come from routeRow. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
+**streamAppendHandoff**  
+Builds a stream handoff from a shared STREAM_DEFINITIONS entry, its params, an op and a typed payload; upsert rows come from parseRowWithRouteResponseSchema. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
 
-**streamAppend**  
+**streamAppendHandoff**  
 Builds the branded stream handoff from a definition, params, op and payload; options carry revive and userIds. *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
 
 **streamSeqKeyFor**  
@@ -3875,7 +3875,7 @@ Class tag: newest work for a key wins via claimLane/watchLane batons and superse
 **SupersededError**  
 Thrown by a job replaced by newer lane work so it is not treated as a failure. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
-**sweepSegments**  
+**reconcileEveryHealthyDynamicSegment**  
 Nightly 04:00 UTC cron that queues sound dynamic segments in dependency order as the backstop. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **sync**  
@@ -3934,10 +3934,10 @@ A /// @name(key: value) annotation, e.g. @tree(parent: true); meaning is up to t
 **target**  
 The party that receives and resolves an inquiry. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
-**targetedBySender**  
+**restrictRuleToSenderMembers**  
 Bounds a messageUser rule from an Organization or Space sender to members the recipient lens shows. *Region:* [The email lens](email-lens/knowledge.md)
 
-**targetedBySender**  
+**restrictRuleToSenderMembers**  
 Restricts a recipient rule to users the sender's lens may reach. *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
 
 **telemetry**  
@@ -4293,7 +4293,7 @@ Stores the app's nav config and router navigate in the navigation slice, once in
 **userEmailContact**  
 After-create hook giving every User an email Contact so preferences exist. *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
 
-**userPermissions**  
+**fetchPermixForUser**  
 Builds a permix for a user who is not the requester, such as a job acting as a user. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **users**  
@@ -4594,7 +4594,7 @@ A number 1-9 in .worktrees/.slots/<N> and WORKTREE_SLOT that owns a worktree's p
 **worktrees**  
 Class: worktree lifecycle through the repo scripts, with slots and per-slot DBs/ports. *Region:* [Dev setup and worktrees](dx-setup/knowledge.md)
 
-**writeData**  
+**rowsBeingWritten**  
 The rows a write sets, coalesced across single and bulk data and both arms of an upsert. *Region:* [Mutation hooks, immutable fields, ordered lists](mutation-hooks/knowledge.md)
 
 **ws-channels**  
@@ -4628,10 +4628,10 @@ The wire contract: a hint or a stream frame, never persisted or replayed. *Regio
 The inbound event shape: query-refetch hints and data-stream frames, dispatched by category and action. *Region:* [WebSocket connections](ws-connections/knowledge.md)
 
 **WSHandoff**  
-WebSocket handoff: kind 'channels' or 'users' with a message (refetch hints), or kind 'stream' with an append built by streamAppend. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
+WebSocket handoff: kind 'channels' or 'users' with a message (refetch hints), or kind 'stream' with an append built by streamAppendHandoff. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
 
 **WSHandoff**  
-What an app-event websocket handler returns: a message handoff ({ channels } or { userIds }) or a stream handoff from streamAppend. *Region:* [WebSocket channels and refetch hints](ws-channels/knowledge.md)
+What an app-event websocket handler returns: a message handoff ({ channels } or { userIds }) or a stream handoff from streamAppendHandoff. *Region:* [WebSocket channels and refetch hints](ws-channels/knowledge.md)
 
 ## X
 

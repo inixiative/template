@@ -12,7 +12,7 @@ import {
   contactReadResponseSchema,
 } from '#/modules/contact/schemas/contactSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meCreateContactRoute = createRoute({
   model: Modules.me,
@@ -23,5 +23,5 @@ export const meCreateContactRoute = createRoute({
   bodySchema: contactCreateBodySchema,
   responseSchema: contactReadResponseSchema,
   sanitizeKeys: CONTACT_CREATE_IMMUTABLE_FIELDS,
-  tags: [Tags.me, Tags.contact],
+  tags: [OpenApiTags.me, OpenApiTags.contact],
 });

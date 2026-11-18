@@ -9,8 +9,8 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { spaceUserReadResponseSchema } from '#/modules/spaceUser/schemas/spaceUserSchemas';
-import { Tags } from '#/modules/tags';
 
 const responseSchema = spaceUserReadResponseSchema.extend({
   user: UserScalarSchema,
@@ -24,5 +24,5 @@ export const spaceReadManySpaceUsersRoute = readRoute({
   filterLens: { parent: lensFor('SpaceUser') },
   responseSchema,
   middleware: [validatePermission('read')],
-  tags: [Tags.spaceUser, Tags.user],
+  tags: [OpenApiTags.spaceUser, OpenApiTags.user],
 });

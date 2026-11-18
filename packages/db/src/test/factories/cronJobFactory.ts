@@ -14,7 +14,7 @@ const cronJobFactory = registerFactory('CronJob', {
     description: faker.lorem.sentence(),
     pattern: '0 0 * * *', // Daily at midnight
     enabled: true,
-    handler: 'cleanStaleData',
+    handler: 'hardDeleteRecordsPastRetention',
     payload: { model: 'WebhookEvent', retentionDays: 90 },
     maxAttempts: 3,
     backoffMs: 5000,

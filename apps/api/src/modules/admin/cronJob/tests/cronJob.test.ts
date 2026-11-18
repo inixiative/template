@@ -10,7 +10,7 @@ import {
 import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { createTestApp } from '#tests/createTestApp';
 import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
-import { del, get, json, jsonError, patch, post } from '#tests/utils/request';
+import { del, get, parseErrorBody, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 useRealJobsQueue();
 
@@ -41,7 +41,7 @@ describe('admin/cronJob', () => {
       await createCronJob({ name });
 
       const response = await fetch(get('/api/admin/cronJob'));
-      const { data } = await json<CronJob[]>(response);
+      const { data } = await parseSuccessBody<CronJob[]>(response);
       expect(response.status).toBe(200);
       expect(Array.isArray(data)).toBe(true);
       expect(data.some((j) => j.name === name)).toBe(true);
@@ -65,7 +65,7 @@ describe('admin/cronJob', () => {
           createdById: null,
         }),
       );
-      const { data } = await json<CronJob>(response);
+      const { data } = await parseSuccessBody<CronJob>(response);
       expect(response.status).toBe(201);
       expect(data.name).toBe(`new-cron-${seq}`);
       expect(data.pattern).toBe('*/5 * * * *');
@@ -89,7 +89,7 @@ describe('admin/cronJob', () => {
           createdById: null,
         }),
       );
-      await jsonError(response);
+      await parseErrorBody(response);
       expect(response.status).toBe(409);
     });
   });
@@ -100,7 +100,7 @@ describe('admin/cronJob', () => {
       const { entity: cronJob } = await createCronJob({ name });
 
       const response = await fetch(get(`/api/admin/cronJob/${cronJob.id}`));
-      const { data } = await json<CronJob>(response);
+      const { data } = await parseSuccessBody<CronJob>(response);
       expect(response.status).toBe(200);
       expect(data.id).toBe(cronJob.id);
       expect(data.name).toBe(name);
@@ -120,7 +120,7 @@ describe('admin/cronJob', () => {
           description: 'Updated description',
         }),
       );
-      const { data } = await json<CronJob>(response);
+      const { data } = await parseSuccessBody<CronJob>(response);
       expect(response.status).toBe(200);
       expect(data.enabled).toBe(false);
       expect(data.description).toBe('Updated description');

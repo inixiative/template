@@ -5,7 +5,7 @@
  */
 import { whereAxisCarriesOwnerKeys } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
@@ -17,7 +17,7 @@ export const meReadManyInquiriesReceivedController = makeController(
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        ...whereAxisCarriesOwnerKeys('Inquiry', 'targetModel', { User: me(c)!.id }),
+        ...whereAxisCarriesOwnerKeys('Inquiry', 'targetModel', { User: actingUser(c)!.id }),
         status: { notIn: [InquiryStatus.draft, InquiryStatus.canceled] },
       },
       orNullFields: ['expiresAt'],

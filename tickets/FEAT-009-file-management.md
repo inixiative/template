@@ -1360,7 +1360,7 @@ Product surface that matters once there are many files and users.
 
 ## 15. Space Transfer Cascade Audit
 
-Current handler (`apps/api/src/modules/inquiry/handlers/transferSpace/index.ts`) only updates `Space.organizationId`.
+Current handler (`apps/api/src/modules/inquiry/services/transferSpace/index.ts`) only updates `Space.organizationId`.
 
 ### Must update on transfer
 
@@ -1824,7 +1824,7 @@ transfer) with a per-dependent disposition chosen by the **receiving** owner:
 ## Reference
 
 - S3 type stubs: `apps/api/src/types/optionalDeps.d.ts`
-- Transfer handler: `apps/api/src/modules/inquiry/handlers/transferSpace/index.ts`
+- Transfer handler: `apps/api/src/modules/inquiry/services/transferSpace/index.ts`
 - Permissions client: `packages/permissions/src/client.ts`
 - Carde Image model: `~/Carde.io/organized-play-api/src/db/postgres/prisma/models/Image.part.prisma`
 - Carde ResourceImage: `~/Carde.io/organized-play-api/src/db/postgres/prisma/models/ResourceImage.part.prisma`

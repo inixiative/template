@@ -29,7 +29,7 @@ Every place a compiled where is composed with our own filters goes through json-
 | Site | Composition |
 |---|---|
 | `packages/db/src/utils/whereWalker.ts` | `merge`, `asOne`, and the `every` arm's implication |
-| `apps/api/src/lib/prisma/lensWhere.ts` | a plan step's where plus the scope back to the root |
+| `apps/api/src/lib/prisma/applyFilterLensWheresToPrismaWhere.ts` | a plan step's where plus the scope back to the root |
 | `apps/api/src/modules/segment/services/evaluateSegment.ts` | the compiled rule plus the provider FK |
 | `apps/api/src/modules/customerRef/lib/customerRefLens.ts` | the segment source plus the caller's where |
 | `packages/db/src/utils/sourceQueryValues.ts` | the compiled source plus the caller's where |

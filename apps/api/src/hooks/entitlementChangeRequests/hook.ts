@@ -16,8 +16,8 @@ import type { Entitlement, Prisma } from '@template/db/generated/client/client';
 import { InquiryType } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { castArray, groupBy, keyBy } from 'lodash-es';
-import { holderModels } from '#/modules/inquiry/handlers/changeEntitlements';
-import type { ChangeEntitlementsContent } from '#/modules/inquiry/handlers/changeEntitlements/schema';
+import { holderModels } from '#/modules/inquiry/services/changeEntitlements';
+import type { ChangeEntitlementsContent } from '#/modules/inquiry/services/changeEntitlements/schema';
 import { inquiryCancellation } from '#/modules/inquiry/services/inquiryCancellation';
 import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
 

@@ -6,10 +6,10 @@
  */
 import { getRedisPub, getRedisSub } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { type StreamAppend, streamAppendFrame } from '#/ws/dataFrame';
+import { type StreamAppend, streamAppendFrame } from '@template/shared/ws';
 import { broadcastLocal, sendToChannelLocal, sendToStreamLocal } from '#/ws/delivery';
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
-import { byId, byStream } from '#/ws/registry';
+import { connectionIdsByStream, connectionsById } from '#/ws/registry';
 import { resyncDataStream } from '#/ws/resyncDataStream';
 import { inStreamOrder } from '#/ws/streamPublishOrder';
 import { streamSeqKey } from '#/ws/streamSeq';
@@ -30,17 +30,17 @@ let pubsubEnabled = false;
 
 // An unsequenced append would drift its holders, so they re-open for a snapshot instead.
 const resyncLocalHolders = (stream: string): void => {
-  for (const id of [...(byStream.get(stream) ?? [])]) {
-    const ws = byId.get(id);
+  for (const id of [...(connectionIdsByStream.get(stream) ?? [])]) {
+    const ws = connectionsById.get(id);
     if (!ws) continue;
     void ws.data.queue.run(async () => {
-      if (byId.has(id) && ws.data.streams.has(stream)) resyncDataStream(ws, stream);
+      if (connectionsById.has(id) && ws.data.streams.has(stream)) resyncDataStream(ws, stream);
     });
   }
 };
 
 const resyncEveryLocalStream = (): void => {
-  for (const stream of [...byStream.keys()]) resyncLocalHolders(stream);
+  for (const stream of [...connectionIdsByStream.keys()]) resyncLocalHolders(stream);
 };
 
 // Appends published while the subscriber was down never reached this instance, and a quiet stream

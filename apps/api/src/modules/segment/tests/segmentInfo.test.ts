@@ -3,7 +3,7 @@ import { Operator } from '@inixiative/json-rules';
 import { segmentRouter } from '#/modules/segment';
 import { validateSegmentConditions } from '#/modules/segment/validations/validateSegmentConditions';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type SegmentInfo = {
   conditions: string;
@@ -24,7 +24,8 @@ const { fetch } = createTestApp({
 const loadInfo = async () => {
   const response = await fetch(get('/api/v1/segment/info'));
   expect(response.status).toBe(200);
-  return (await json<{ guide: Record<string, string>; types: SegmentInfo }>(response)).data.types;
+  return (await parseSuccessBody<{ guide: Record<string, string>; types: SegmentInfo }>(response))
+    .data.types;
 };
 
 describe('GET /api/v1/segment/info', () => {

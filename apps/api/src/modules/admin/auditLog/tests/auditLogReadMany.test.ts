@@ -17,7 +17,7 @@ import {
 import { adminAuditLogRouter } from '#/modules/admin/auditLog';
 import type { auditLogReadManyRoute } from '#/modules/admin/auditLog/routes/auditLogReadMany';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type ReadManyResponse = z.infer<typeof auditLogReadManyRoute.responseSchema>[];
 
@@ -65,7 +65,7 @@ describe('GET /api/admin/auditLog: a record and its children in one stream', () 
   const read = async (query: string) => {
     const response = await fetch(get(`/api/admin/auditLog?pageSize=100&${query}`));
     expect(response.status).toBe(200);
-    return (await json<ReadManyResponse>(response)).data;
+    return (await parseSuccessBody<ReadManyResponse>(response)).data;
   };
 
   it("a token's history holds its own events and its entitlement rows' create and delete, newest first", async () => {

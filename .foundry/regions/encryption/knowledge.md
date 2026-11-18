@@ -658,7 +658,7 @@ A: **Idempotent protection**. The where clause includes version field - if anoth
 
 ##### General Security
 
-- ✅ **Cookies and Sessions Never Authenticate the API** - BetterAuth's cookies on the API origin are used only inside `/api/auth/*` (OAuth state); `jwtHandoff` expires the session cookie on every sign-in response. The CI rule `bearer-only-auth` fences cookie and session auth (cookie cache, `credentials: 'include'`, `withCredentials`, `document.cookie`, any `getSession` / `findSession` / session-table read, the BetterAuth `bearer` plugin)
+- ✅ **Cookies and Sessions Never Authenticate the API** - BetterAuth's cookies on the API origin are used only inside `/api/auth/*` (OAuth state); `jwtHandoffPlugin` expires the session cookie on every sign-in response. The CI rule `bearer-only-auth` fences cookie and session auth (cookie cache, `credentials: 'include'`, `withCredentials`, `document.cookie`, any `getSession` / `findSession` / session-table read, the BetterAuth `bearer` plugin)
 - ✅ **Bearer JWT** - Both email/password and OAuth sign-ins store the person JWT in localStorage and send it as `Authorization: Bearer <jwt>`. No cookie, so CSRF is not a risk, but XSS is (localStorage is JS-accessible); revocation ends a stolen JWT. Trade-off accepted for cross-origin SPAs
 - ✅ **SQL Injection Prevention** - Prisma uses parameterized queries exclusively. No string interpolation in queries. Raw SQL escape hatches disabled by convention
 - ✅ **XSS Prevention** - React escapes all interpolated values by default. No `dangerouslySetInnerHTML` usage. Content Security Policy headers configurable via Hono middleware

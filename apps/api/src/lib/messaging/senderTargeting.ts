@@ -11,7 +11,7 @@ import { senderLensOwner } from '#/lib/email/senderLensOwner';
 
 const MEMBERSHIPS = ['organizationUsers', 'spaceUsers'] as const;
 
-export const targetedBySender = (
+export const restrictRuleToSenderMembers = (
   rule: Condition,
   recipient: RuleLens,
   sender: Sender,

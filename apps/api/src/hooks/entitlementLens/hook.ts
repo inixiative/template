@@ -11,7 +11,7 @@ import { validateEntitlementLens } from '#/lib/permissions/validateEntitlementLe
 
 type EntitlementRow = { resource: EntitlementResourceModel; lens?: unknown };
 
-export const registerEntitlementLensHook = () => {
+export const registerValidateEntitlementLensHook = () => {
   registerDbHook(
     'entitlementLens',
     'Entitlement',

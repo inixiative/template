@@ -16,7 +16,7 @@ import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 export const isReconcilable = (segment: Segment): boolean =>
   !segment.deletedAt && !!segment.conditions;
 
-export const isContinuous = (segment: Segment): boolean =>
+export const isReconcilableDynamicSegment = (segment: Segment): boolean =>
   segment.type === SegmentType.dynamic && isReconcilable(segment);
 
 export const segmentNeedsReconcile = (segment: Segment, previous?: Segment): boolean => {

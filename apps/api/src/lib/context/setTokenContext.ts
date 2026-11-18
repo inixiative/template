@@ -5,7 +5,7 @@
  * @uses primitive:authz
  */
 import type { Context } from 'hono';
-import { installPermissions } from '#/lib/context/installPermissions';
+import { installPermissionsFromRequestContext } from '#/lib/context/installPermissionsFromRequestContext';
 import type { TokenContext } from '#/lib/context/loadTokenContext';
 import { setMemberContext } from '#/lib/context/setUserContext';
 import type { AppEnv } from '#/types/appEnv';
@@ -13,5 +13,5 @@ import type { AppEnv } from '#/types/appEnv';
 export const setTokenContext = async (c: Context<AppEnv>, { token, user }: TokenContext) => {
   c.set('token', token);
   setMemberContext(c, user);
-  await installPermissions(c);
+  await installPermissionsFromRequestContext(c);
 };

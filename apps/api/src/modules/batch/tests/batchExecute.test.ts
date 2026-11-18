@@ -8,7 +8,7 @@ import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { json, jsonError, post } from '#tests/utils/request';
+import { parseErrorBody, parseSuccessBody, post } from '#tests/utils/request';
 
 type BatchExecuteResponse = z.infer<typeof batchExecuteRoute.responseSchema>;
 
@@ -49,7 +49,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(1);
@@ -72,7 +72,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(1);
@@ -100,7 +100,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(2);
@@ -126,7 +126,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch[0][0].status).toBe(201);
@@ -145,7 +145,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch[0][0].status).toBe(200);
@@ -168,7 +168,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch[0][0].status).toBe(200);
@@ -199,7 +199,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(2);
@@ -240,7 +240,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.summary.status).toBe('failed');
@@ -277,7 +277,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(2);
@@ -313,7 +313,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.summary.status).toBe('partialSuccess');
@@ -338,7 +338,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(4);
@@ -363,7 +363,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch[0]).toHaveLength(3);
@@ -386,7 +386,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(2);
@@ -409,7 +409,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(1);
@@ -431,7 +431,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.batch).toHaveLength(3);
@@ -476,7 +476,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(500);
       expect(data.batch[1][0].error).toContain('Malformed interpolation syntax');
@@ -493,7 +493,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(500);
       expect(data.batch[1][0].error).toContain('Nested interpolation');
@@ -510,7 +510,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(500);
       expect(data.batch[1][0].error).toContain('Invalid round reference');
@@ -527,7 +527,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(500);
       expect(data.batch[1][0].error).toContain('Invalid round reference');
@@ -551,7 +551,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(204);
       expect(data.batch[2][0].status).toBe(500);
@@ -566,7 +566,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      const { data } = await json<BatchExecuteResponse>(response);
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
       expect(response.status).toBe(200);
       expect(data.batch[0][0].status).toBe(500);
       expect(data.batch[0][0].error).toContain('Absolute URLs are not allowed');
@@ -594,7 +594,7 @@ describe('POST /api/v1/batch/execute', () => {
           strategy: 'allowFailures',
         }),
       );
-      const body = await jsonError(response);
+      const body = await parseErrorBody(response);
 
       expect(response.status).toBe(422);
       expect(body).toMatchObject({
@@ -612,7 +612,7 @@ describe('POST /api/v1/batch/execute', () => {
           strategy: 'allowFailures',
         }),
       );
-      const body = await jsonError(response);
+      const body = await parseErrorBody(response);
 
       expect(response.status).toBe(422);
       expect(body).toMatchObject({

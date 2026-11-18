@@ -61,7 +61,7 @@ A user's own content is still published under the user's id, but the client subs
   socket's user (`meChannel(channel, userId)`, for a `WS_CHANNELS` entry marked `me`). A socket
   with no user (a member, organization, space or integration token) cannot subscribe.
 - **publish**: the event sends to that user-keyed channel (`meChannel(…, customerId)`).
-- the socket's user is what `me(c)` is over HTTP: the user for a JWT or spoof, the token's user for
+- the socket's user is what `actingUser(c)` is over HTTP: the user for a JWT or spoof, the token's user for
   a User-owned token, none otherwise. So `ws.data.userId` stays, as the proxy's key.
 
 Subscribing to another user's content directly (`/user/:id/…`) is a separate subscription, not

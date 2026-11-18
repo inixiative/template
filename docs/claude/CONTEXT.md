@@ -6,7 +6,7 @@
 
 - [Request Lifecycle](#request-lifecycle)
 - [AppEnv Types](#appenv-types)
-- [prepareRequest](#preparerequest)
+- [prepareRequestMiddleware](#preparerequestmiddleware)
   - [What It Does](#what-it-does)
 - [Context Setters](#context-setters)
   - [setUserContext](#setusercontext)
@@ -54,7 +54,7 @@ Request arrives
 corsMiddleware
   - Handles CORS headers and preflight
     ↓
-prepareRequest
+prepareRequestMiddleware
   - Sets db, requestId, permix (fresh instance)
   - Initializes all context vars to null
   - Wraps request in db.scope(requestId)
@@ -138,12 +138,12 @@ type AppEnv = { Variables: AppVars };
 
 ---
 
-## prepareRequest
+## prepareRequestMiddleware
 
-Located in `apps/api/src/middleware/prepareRequest.ts`. Runs first on every request.
+Located in `apps/api/src/middleware/prepareRequestMiddleware.ts`. Runs first on every request.
 
 ```typescript
-export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
+export const prepareRequestMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const isBatch = c.req.path === '/api/batch';
 
   // Batch requests: minimal context setup (full setup happens per sub-request)
@@ -218,7 +218,7 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
 };
 ```
 
-`installPermissions` (`apps/api/src/lib/context/installPermissions.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's user, or the user behind a User, OrganizationUser or SpaceUser token), and installs either the user's table or the token's permissions over its owner. Every token goes through `setTokenContext`, which never sets a user: a User token carries its user's members as context, any other token none.
+`installPermissions` (`apps/api/src/lib/context/installPermissionsFromRequestContext.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's user, or the user behind a User, OrganizationUser or SpaceUser token), and installs either the user's table or the token's permissions over its owner. Every token goes through `setTokenContext`, which never sets a user: a User token carries its user's members as context, any other token none.
 
 ### What It Does
 

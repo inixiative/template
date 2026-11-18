@@ -14,7 +14,7 @@ import {
   jwtVerify,
 } from 'jose';
 import { onSigningKeyCreated, publicJwks } from '#/lib/auth/jwksStore';
-import { selfIssuer, USER_JWT_TTL_SECONDS } from '#/lib/auth/userJwt';
+import { USER_JWT_TTL_SECONDS, userJwtIssuerUrlOrThrow } from '#/lib/auth/userJwt';
 
 type TrustedIssuer = { issuer: string; audience: string; keySet: JWTVerifyGetKey };
 
@@ -55,7 +55,7 @@ const selfKeySet: JWTVerifyGetKey = async (protectedHeader, token) => {
 };
 
 const trustedIssuers = (): TrustedIssuer[] => {
-  const self = selfIssuer();
+  const self = userJwtIssuerUrlOrThrow();
   const issuers: TrustedIssuer[] = [{ issuer: self, audience: self, keySet: selfKeySet }];
   const { AUTH_ISSUER, AUTH_JWKS_URL, AUTH_AUDIENCE } = process.env;
   if (AUTH_ISSUER && AUTH_JWKS_URL && AUTH_AUDIENCE && AUTH_ISSUER !== self)

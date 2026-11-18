@@ -45,7 +45,7 @@ export const auth = betterAuth({
         : undefined,
   },
 
-  // Sessions exist only for the sign-in handshake; jwtHandoff swaps each one for a JWT.
+  // Sessions exist only for the sign-in handshake; jwtHandoffPlugin swaps each one for a JWT.
   session: {
     expiresIn: 10 * 60,
   },

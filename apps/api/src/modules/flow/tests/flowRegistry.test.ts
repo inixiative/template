@@ -14,7 +14,7 @@ import type { flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, post } from '#tests/utils/request';
+import { get, parseSuccessBody, post } from '#tests/utils/request';
 
 type FlowResponse = z.infer<typeof flowResponseSchema>;
 type Harness = ReturnType<typeof createTestApp>;
@@ -60,7 +60,7 @@ describe('flow registry', () => {
       );
       expect(response.status).toBe(201);
 
-      const { steps } = (await json<FlowResponse>(response)).data;
+      const { steps } = (await parseSuccessBody<FlowResponse>(response)).data;
       for (const step of steps) {
         const read = await app.fetch(get(step.readPath));
         expect({ step: step.key, status: read.status }).toEqual({ step: step.key, status: 200 });

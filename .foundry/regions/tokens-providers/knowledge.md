@@ -212,7 +212,7 @@ Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`; the sign-in it
 
 URL token is useful for email links and file downloads (where headers can't be set). Only API tokens are read from the URL; a user JWT never is.
 
-**Security:** The token row is cached for 10 minutes and its key clears on every Token write, so a revoked token stops working on the next request. The owner records are never copied into the token's entry: the cache hook (`cacheReference`) clears their keys when they change, so a demoted member, a removed member and a revoked superadmin take effect on the next request. `lastUsedAt` is touched on cache miss only.
+**Security:** The token row is cached for 10 minutes and its key clears on every Token write, so a revoked token stops working on the next request. The owner records are never copied into the token's entry: the cache hook (`cacheKeysByModel`) clears their keys when they change, so a demoted member, a removed member and a revoked superadmin take effect on the next request. `lastUsedAt` is touched on cache miss only.
 
 ##### tokenAuthMiddleware
 

@@ -9,7 +9,7 @@ import {
 } from '@template/db/test';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
-import { entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { del } from '#tests/utils/request';
 
 let organization: Organization;
@@ -35,7 +35,9 @@ beforeEach(async () => {
     ownerModel: 'Organization',
     organizationId: organization.id,
     role: null,
-    entitlements: [entry('db:organization', ['db:organization', organization.id], ['manage'])],
+    entitlements: [
+      entitlementInputFor('db:organization', ['db:organization', organization.id], ['manage']),
+    ],
   }));
 });
 

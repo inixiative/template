@@ -8,7 +8,7 @@ import {
 } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, post } from '#tests/utils/request';
+import { get, parseSuccessBody, post } from '#tests/utils/request';
 
 describe('me/webhookSubscriptions', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -55,7 +55,7 @@ describe('me/webhookSubscriptions', () => {
           url: `https://example.com/webhook-${seq}`,
         }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(201);
       expect(data.model).toBe('CustomerRef');
@@ -87,7 +87,7 @@ describe('me/webhookSubscriptions', () => {
       });
 
       const response = await fetch(get('/api/v1/me/webhookSubscriptions'));
-      const { data } = await json<WebhookSubscription[]>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription[]>(response);
 
       expect(response.status).toBe(200);
       expect(Array.isArray(data)).toBe(true);
@@ -105,7 +105,7 @@ describe('me/webhookSubscriptions', () => {
       });
 
       const response = await fetch(get('/api/v1/me/webhookSubscriptions'));
-      const { data } = await json<WebhookSubscription[]>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription[]>(response);
 
       expect(response.status).toBe(200);
       expect(data.every((s) => s.userId === user.id)).toBe(true);
@@ -113,7 +113,7 @@ describe('me/webhookSubscriptions', () => {
 
     it('excludes org-owned webhooks', async () => {
       const response = await fetch(get('/api/v1/me/webhookSubscriptions'));
-      const { data } = await json<WebhookSubscription[]>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription[]>(response);
 
       expect(response.status).toBe(200);
       expect(data.every((s) => s.ownerModel === 'User')).toBe(true);

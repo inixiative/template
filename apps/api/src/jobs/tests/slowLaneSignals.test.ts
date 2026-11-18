@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { queue } from '#/jobs/queue';
 import {
+  fetchSlowDeferredJobCount,
   pruneSlowDeferred,
-  readSlowDeferred,
   readSlowIdleMs,
   recordSlowDeferral,
   recordSlowFinished,
@@ -26,7 +26,7 @@ describe('slow-lane deferral list', () => {
     await recordSlowDeferral(redis, name, 'b', now + 5_000);
     await recordSlowDeferral(redis, name, 'a', now + 9_000);
 
-    expect(await readSlowDeferred(redis, name, now)).toBe(2);
+    expect(await fetchSlowDeferredJobCount(redis, name, now)).toBe(2);
   });
 
   it('keeps a job counted after its due time until a worker picks it back up', async () => {
@@ -34,10 +34,10 @@ describe('slow-lane deferral list', () => {
     const now = Date.now();
     await recordSlowDeferral(redis, name, 'late', now - 20_000);
 
-    expect(await readSlowDeferred(redis, name, now)).toBe(1);
+    expect(await fetchSlowDeferredJobCount(redis, name, now)).toBe(1);
 
     await releaseSlowDeferral(redis, name, 'late');
-    expect(await readSlowDeferred(redis, name, now)).toBe(0);
+    expect(await fetchSlowDeferredJobCount(redis, name, now)).toBe(0);
   });
 
   it('stops counting an entry past its due time by more than the grace, and prunes it', async () => {
@@ -46,7 +46,7 @@ describe('slow-lane deferral list', () => {
     await recordSlowDeferral(redis, name, 'orphaned', now - SLOW_DEFERRED_GRACE_MS - 1);
     await recordSlowDeferral(redis, name, 'waiting', now + 1_000);
 
-    expect(await readSlowDeferred(redis, name, now)).toBe(1);
+    expect(await fetchSlowDeferredJobCount(redis, name, now)).toBe(1);
     await pruneSlowDeferred(redis, name, now);
     expect(await redis.zcard(slowDeferredKey(name))).toBe(1);
   });
@@ -55,7 +55,7 @@ describe('slow-lane deferral list', () => {
     const [first, second] = [queueName(), queueName()];
     await recordSlowDeferral(redis, first, 'x', Date.now() + 1_000);
 
-    expect(await readSlowDeferred(redis, second)).toBe(0);
+    expect(await fetchSlowDeferredJobCount(redis, second)).toBe(0);
   });
 });
 

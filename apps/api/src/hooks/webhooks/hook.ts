@@ -14,7 +14,7 @@ import { ConcurrencyType } from '@template/shared/utils';
 import { keyBy } from 'lodash-es';
 import { isManyAction } from '#/hooks/shared/hookRows';
 import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
-import { recordAudiences, type WebhookRow } from '#/hooks/webhooks/parties';
+import { fetchWebhookPartiesByRow, type WebhookRow } from '#/hooks/webhooks/parties';
 import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -127,7 +127,7 @@ export const registerWebhookHook = () => {
         });
       }
 
-      const audiences = await recordAudiences(
+      const audiences = await fetchWebhookPartiesByRow(
         model,
         records.map(({ resultData }) => resultData),
       );

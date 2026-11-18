@@ -8,7 +8,7 @@ import { createRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { flowCreateBodySchema, flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meCreateFlowRoute = createRoute({
   model: Modules.me,
@@ -19,5 +19,5 @@ export const meCreateFlowRoute = createRoute({
     "Starts a registered flow for the current user. bindings are validated against the flow's bindings schema and the steps are resolved and checked at once.",
   bodySchema: flowCreateBodySchema,
   responseSchema: flowResponseSchema,
-  tags: [Tags.me, Tags.flow],
+  tags: [OpenApiTags.me, OpenApiTags.flow],
 });

@@ -18,7 +18,7 @@ import {
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 describe('POST /api/v1/space/:id/integrations', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -65,7 +65,7 @@ describe('POST /api/v1/space/:id/integrations', () => {
         role: 'viewer',
       }),
     );
-    const { data } = await json<Integration>(response);
+    const { data } = await parseSuccessBody<Integration>(response);
     expect(response.status).toBe(201);
     expect(data.ownerModel).toBe('Space');
     expect(data.spaceId).toBe(space.id);

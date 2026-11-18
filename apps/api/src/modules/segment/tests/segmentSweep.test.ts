@@ -11,7 +11,11 @@ import {
 } from '@template/db/test';
 import { sweepableSegments } from '#/modules/segment/services/sweepableSegments';
 
-const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+const acmeEmailDomainRule = {
+  field: 'customerUser.email',
+  operator: Operator.endsWith,
+  value: '@acme.test',
+};
 
 const membersOf = (segmentId: string) => ({
   field: 'segmentMembers',
@@ -33,11 +37,11 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
 
   it('enqueues sound dynamic segments only: a degraded one is skipped, not warned about by its job', async () => {
     const { entity: target } = await createSegment(
-      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeEmailDomainRule },
       { space },
     );
     const { entity: sound } = await createSegment(
-      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeEmailDomainRule },
       { space },
     );
     const { entity: degraded } = await createSegment(
@@ -45,7 +49,7 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
       { space },
     );
     const { entity: pinned } = await createSegment(
-      { ownerModel: 'Space', type: SegmentType.static, conditions: acmeRule },
+      { ownerModel: 'Space', type: SegmentType.static, conditions: acmeEmailDomainRule },
       { space },
     );
     await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });

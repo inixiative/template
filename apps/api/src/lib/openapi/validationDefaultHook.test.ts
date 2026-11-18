@@ -8,7 +8,7 @@ import { actionRoute, readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { createBearerToken } from '#tests/utils/createBearerToken';
-import { get, jsonError, post } from '#tests/utils/request';
+import { get, parseErrorBody, post } from '#tests/utils/request';
 
 const probeResponse = z.object({ accepted: z.boolean() });
 
@@ -34,7 +34,7 @@ const mountProbes: MountFn = (router) => {
 
 const expectValidationEnvelope = async (response: Response) => {
   expect(response.status).toBe(422);
-  const body = await jsonError(response);
+  const body = await parseErrorBody(response);
   expect(body).toMatchObject({
     error: 'VALIDATION_ERROR',
     message: 'Validation failed',
@@ -71,7 +71,7 @@ describe('validationDefaultHook', () => {
     );
 
     expect(response.status).toBe(422);
-    const body = await jsonError(response);
+    const body = await parseErrorBody(response);
     expect(body).toMatchObject({ error: 'VALIDATION_ERROR', message: 'Validation failed' });
     expect(Object.keys(body.fieldErrors ?? {}).length).toBeGreaterThan(0);
     expect(response.headers.get('request-id')).toBe(body.requestId);

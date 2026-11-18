@@ -80,7 +80,7 @@ const selectedFields = (selector: AnyRollingCacheTargets | undefined): string[] 
 // - `read(result, params)` never computes. It is `checkCache` on that result's key, fresh for one
 //   scheduled refresh (interval + spread + one attempt + a tick), with `computing` taken from the
 //   target's lock. Only a leaf computes; a caller that wants a miss to start one goes through
-//   `checkRollingCache` in the api.
+//   `fetchRollingCacheAndQueueRefreshWhenMissing` in the api.
 // - `refresh(target)` holds the target's single-flight lock from the start of `compute` until its last
 //   write lands, so every result reads "computing", never "empty", meanwhile. It waits up to
 //   `timeoutSeconds` for the lock (the usual holder is a superseded refresh that is stopping) and

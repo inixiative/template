@@ -4,7 +4,7 @@ import { bindLens, type LensNarrowing, Operator, validateNarrowing } from '@inix
 import { polymorphicBindings } from '@template/db';
 import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 import { customerRefsByIdLens } from '#/modules/customerRef/lib/lenses/customerRefsByIdLens';
-import { lensOutput } from '#tests/utils/lensOutput';
+import { lensProjectionSourcesAndSelect } from '#tests/utils/lensProjectionSourcesAndSelect';
 
 const OWNER = '00000000-0000-7000-8000-0000000000aa';
 const IDS = ['00000000-0000-7000-8000-0000000000b1', '00000000-0000-7000-8000-0000000000b2'];
@@ -51,7 +51,9 @@ describe('the customer ref lenses', () => {
         root: { where: { field: 'id', operator: Operator.in, value: IDS } },
       };
       const bound = bindLens(customerRefsByIdLens, { ...owner, customerRefIds: IDS });
-      expect(lensOutput(bound)).toEqual(lensOutput(perCall));
+      expect(lensProjectionSourcesAndSelect(bound)).toEqual(
+        lensProjectionSourcesAndSelect(perCall),
+      );
     }
   });
 });

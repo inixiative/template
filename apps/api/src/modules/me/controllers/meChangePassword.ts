@@ -7,7 +7,7 @@
 import { db } from '@template/db';
 import { auth } from '#/lib/auth';
 import { withThrowawaySession } from '#/lib/auth/withThrowawaySession';
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { meChangePasswordRoute } from '#/modules/me/routes/meChangePassword';
@@ -18,7 +18,7 @@ export const meChangePasswordController = makeController(
   async (c, respond) => {
     const { currentPassword, newPassword } = c.req.valid('json');
     const handoff = await db.txn(() =>
-      withThrowawaySession(me(c)!.id, (headers) =>
+      withThrowawaySession(actingUser(c)!.id, (headers) =>
         auth.api.changePassword({
           body: { currentPassword, newPassword, revokeOtherSessions: true },
           headers,

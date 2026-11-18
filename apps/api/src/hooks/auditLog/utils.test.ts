@@ -4,14 +4,14 @@ import {
   buildContextFkFields,
   buildSubjectFkFields,
   computeDiff,
-  processAuditData,
+  maskSensitiveAndOmitNoopFieldsForAudit,
 } from '#/hooks/auditLog/utils';
 
 describe('auditLog/utils', () => {
-  describe('processAuditData', () => {
+  describe('maskSensitiveAndOmitNoopFieldsForAudit', () => {
     it('removes updatedAt from all models', () => {
       const data = { id: '1', name: 'test', updatedAt: new Date() };
-      const result = processAuditData('Organization', data);
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('Organization', data);
       expect(result).not.toHaveProperty('updatedAt');
       expect(result).toHaveProperty('id', '1');
     });
@@ -23,7 +23,7 @@ describe('auditLog/utils', () => {
         lastLoginAt: new Date(),
         updatedAt: new Date(),
       };
-      const result = processAuditData('User', data);
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('User', data);
       expect(result).not.toHaveProperty('lastLoginAt');
       expect(result).not.toHaveProperty('updatedAt');
       expect(result).toHaveProperty('email', 'test@example.com');
@@ -31,25 +31,25 @@ describe('auditLog/utils', () => {
 
     it('redacts sensitive Account fields', () => {
       const data = { id: '1', accountId: 'acc-1', password: 'secret', providerId: 'email' };
-      const result = processAuditData('Account', data);
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('Account', data);
       expect(result.password).toBe('[MASKED]');
       expect(result.providerId).toBe('email');
     });
 
     it('redacts keyHash on Token', () => {
       const data = { id: '1', name: 'tok', keyHash: 'sha256-hash' };
-      const result = processAuditData('Token', data);
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('Token', data);
       expect(result.keyHash).toBe('[MASKED]');
       expect(result.name).toBe('tok');
     });
 
     it('strips orderedList position field for Contact so ordering-only updates produce no diff', () => {
-      const before = processAuditData('Contact', {
+      const before = maskSensitiveAndOmitNoopFieldsForAudit('Contact', {
         id: '1',
         value: { e164: '+15551234567' },
         position: 3,
       });
-      const after = processAuditData('Contact', {
+      const after = maskSensitiveAndOmitNoopFieldsForAudit('Contact', {
         id: '1',
         value: { e164: '+15551234567' },
         position: 1,
@@ -201,7 +201,7 @@ describe('auditLog/utils', () => {
       // computeDiff is a pure diff — caller should pass pre-processed (filtered) data
       const diff = computeDiff(before, after);
       expect(diff).toHaveProperty('updatedAt');
-      // the caller (buildAuditEntry) passes processAuditData output which strips updatedAt first
+      // the caller (buildAuditEntry) passes maskSensitiveAndOmitNoopFieldsForAudit output which strips updatedAt first
     });
 
     it('handles multiple changed fields', () => {

@@ -6,7 +6,7 @@
  */
 import { db } from '@template/db';
 import type { WebhookModel } from '@template/db/generated/client/enums';
-import { integrationRecordColumn } from '#/modules/integration/services/integrationRecordColumn';
+import { integrationRecordForeignKeyForModel } from '#/modules/integration/services/integrationRecordForeignKeyForModel';
 
 export const isIntegrationRecordPoisoned = async (input: {
   integrationId: string;
@@ -16,7 +16,7 @@ export const isIntegrationRecordPoisoned = async (input: {
   const record = await db.integrationRecord.findFirst({
     where: {
       integrationId: input.integrationId,
-      [integrationRecordColumn(input.model)]: input.resourceId,
+      [integrationRecordForeignKeyForModel(input.model)]: input.resourceId,
       poisonedAt: { not: null },
     },
     select: { id: true },

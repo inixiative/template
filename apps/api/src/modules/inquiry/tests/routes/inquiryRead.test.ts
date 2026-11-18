@@ -19,7 +19,7 @@ import {
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
@@ -67,7 +67,7 @@ describe('GET /api/v1/inquiry/:id', () => {
     });
 
     const response = await fetch(get(`/api/v1/inquiry/${inquiry.id}`));
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.id).toBe(inquiry.id);
@@ -88,7 +88,9 @@ describe('GET /api/v1/inquiry/:id', () => {
     expect(written.map(({ action }) => action)).toEqual(['create']);
 
     const response = await fetch(get(`/api/v1/inquiry/${inquiry.id}`));
-    const { data } = await json<Inquiry & { auditLogsAsSubject: { id: string }[] }>(response);
+    const { data } = await parseSuccessBody<Inquiry & { auditLogsAsSubject: { id: string }[] }>(
+      response,
+    );
 
     expect(response.status).toBe(200);
     expect(data.auditLogsAsSubject.map(({ id }) => id)).toEqual([written[0]?.id]);
@@ -108,7 +110,7 @@ describe('GET /api/v1/inquiry/:id', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     const response = await targetFetch(get(`/api/v1/inquiry/${inquiry.id}`));
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.id).toBe(inquiry.id);

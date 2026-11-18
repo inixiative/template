@@ -23,7 +23,7 @@ import {
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get, json, post } from '#tests/utils/request';
+import { get, parseSuccessBody, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/space', spaceRouter)];
 
@@ -90,7 +90,7 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
     });
 
     const response = await fetch(get(`/api/v1/space/${space.id}/inquiries/sent`));
-    const { data } = await json<Inquiry[]>(response);
+    const { data } = await parseSuccessBody<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
@@ -168,7 +168,7 @@ describe('POST /api/v1/space/:id/inquiries', () => {
         content: { spaceId: space.id },
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(201);
     expect(data.type).toBe(InquiryType.updateSpace);
@@ -186,7 +186,7 @@ describe('POST /api/v1/space/:id/inquiries', () => {
         content: {},
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(201);
     expect(data.type).toBe(InquiryType.transferSpace);
@@ -286,7 +286,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     });
 
     const response = await fetch(get(`/api/v1/space/${space.id}/inquiries/received`));
-    const { data } = await json<Inquiry[]>(response);
+    const { data } = await parseSuccessBody<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);

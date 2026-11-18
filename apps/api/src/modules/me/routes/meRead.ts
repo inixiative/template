@@ -9,9 +9,9 @@ import { OrganizationScalarSchema, SpaceScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { organizationUserReadResponseSchema } from '#/modules/organizationUser/schemas/organizationUserSchemas';
 import { spaceUserReadResponseSchema } from '#/modules/spaceUser/schemas/spaceUserSchemas';
-import { Tags } from '#/modules/tags';
 import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
 const responseSchema = userResponseSchema.extend({
@@ -26,5 +26,5 @@ export const meReadRoute = readRoute({
   middleware: [validatePermission('read')],
   skipId: true,
   responseSchema,
-  tags: [Tags.me, Tags.user],
+  tags: [OpenApiTags.me, OpenApiTags.user],
 });

@@ -9,7 +9,7 @@ import type { WSSocket } from '#/ws/types';
 
 const frameWindows = new WeakMap<WSSocket, { start: number; count: number }>();
 
-export const overFrameLimit = (ws: WSSocket): boolean => {
+export const countFrameAndCheckOverFrameLimit = (ws: WSSocket): boolean => {
   const now = Date.now();
   const window = frameWindows.get(ws);
   if (!window || now - window.start > WS_FRAME_WINDOW_MS) {

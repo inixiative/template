@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
+import type { EntitlementInput } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -13,9 +14,9 @@ import { organizationUserRouter } from '#/modules/organizationUser';
 import type { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { changeEntitlements, heldEntitlements } from '#tests/utils/entitlements';
-import { del, json, patch, post } from '#tests/utils/request';
+import { del, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 type UpdateOrgUserResponse = z.infer<typeof organizationUserUpdateRoute.responseSchema>;
 
@@ -54,14 +55,14 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     const response = await fetch(
       patch(`/api/v1/organizationUser/${member.id}`, { role: 'viewer' }),
     );
-    const { data } = await json<UpdateOrgUserResponse>(response);
+    const { data } = await parseSuccessBody<UpdateOrgUserResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.role).toBe('viewer');
   });
 
-  const onOrganization = (...actions: string[]): Entry[] => [
-    entry('db:organization', ['db:organization', org.id], actions),
+  const onOrganization = (...actions: string[]): EntitlementInput[] => [
+    entitlementInputFor('db:organization', ['db:organization', org.id], actions),
   ];
 
   describe("a member's entitlements are library entries the writer could grant (Aron, 2026-10-26)", () => {
@@ -128,7 +129,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
       });
 
-    const entitledMemberWith = async (held: ReturnType<typeof entry>) => {
+    const entitledMemberWith = async (held: ReturnType<typeof entitlementInputFor>) => {
       const { entity, context } = await createOrganizationUser(
         { role: 'member' },
         { organization: org },
@@ -143,7 +144,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     describe('you write a role you hold, with manage at the organization (Aron, 2026-10-26)', () => {
       const holderOf = async (action: string) => {
         const { row, user } = await entitledMemberWith(
-          entry('db:organization', ['db:organization', org.id], [action]),
+          entitlementInputFor('db:organization', ['db:organization', org.id], [action]),
         );
         return { user, app: memberApp(user, row) };
       };
@@ -191,7 +192,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         const grantOn = (action: string) =>
           admin.fetch(
             post(`/api/v1/organizationUser/${target.id}/entitlements`, [
-              entry('db:organization', ['db:organization', org.id], [action]),
+              entitlementInputFor('db:organization', ['db:organization', org.id], [action]),
             ]),
           );
         expect((await grantOn('manage')).status).toBe(201);
@@ -258,7 +259,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       return rawKey;
     };
 
-    const grantAs = async (key: string, entitlements: Entry[]) => {
+    const grantAs = async (key: string, entitlements: EntitlementInput[]) => {
       const { entity: target } = await createOrganizationUser(
         { role: 'member' },
         { organization: org },

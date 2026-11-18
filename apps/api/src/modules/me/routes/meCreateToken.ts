@@ -7,7 +7,7 @@
 
 import { createRoute, permissionsBodyRefinement } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 import {
   tokenCreateBodySchema,
   tokenCreateResponseSchema,
@@ -20,5 +20,5 @@ export const meCreateTokenRoute = createRoute({
   bodyRefinement: permissionsBodyRefinement,
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
-  tags: [Tags.me, Tags.token],
+  tags: [OpenApiTags.me, OpenApiTags.token],
 });

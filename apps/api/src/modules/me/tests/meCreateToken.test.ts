@@ -5,7 +5,7 @@ import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import type { meCreateTokenRoute } from '#/modules/me/routes/meCreateToken';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 type CreateTokenResponse = z.infer<typeof meCreateTokenRoute.responseSchema>;
 
@@ -32,7 +32,7 @@ describe('POST /me/tokens', () => {
 
   it('creates a user token and returns raw key', async () => {
     const response = await fetch(post('/api/v1/me/tokens', { name: 'My API Key', role: 'owner' }));
-    const { data } = await json<CreateTokenResponse>(response);
+    const { data } = await parseSuccessBody<CreateTokenResponse>(response);
 
     expect(response.status).toBe(201);
     expect(data.name).toBe('My API Key');
@@ -53,7 +53,7 @@ describe('POST /me/tokens', () => {
         expiresAt,
       }),
     );
-    const { data } = await json<CreateTokenResponse>(response);
+    const { data } = await parseSuccessBody<CreateTokenResponse>(response);
 
     expect(response.status).toBe(201);
     expect(new Date(data.expiresAt!).toISOString()).toBe(expiresAt);
@@ -63,7 +63,7 @@ describe('POST /me/tokens', () => {
     const response = await fetch(
       post('/api/v1/me/tokens', { name: 'Stored Token', role: 'owner' }),
     );
-    const { data } = await json<CreateTokenResponse>(response);
+    const { data } = await parseSuccessBody<CreateTokenResponse>(response);
 
     const dbToken = await db.token.findUnique({ where: { id: data.id } });
     expect(dbToken).not.toBeNull();

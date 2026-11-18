@@ -16,7 +16,7 @@ import {
 } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/me', meRouter)];
 
@@ -65,7 +65,7 @@ describe('GET /api/v1/me/inquiries/sent', () => {
     });
 
     const response = await fetch(get('/api/v1/me/inquiries/sent'));
-    const { data } = await json<Inquiry[]>(response);
+    const { data } = await parseSuccessBody<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
@@ -128,7 +128,7 @@ describe('GET /api/v1/me/inquiries/received', () => {
     });
 
     const response = await fetch(get('/api/v1/me/inquiries/received'));
-    const { data } = await json<Inquiry[]>(response);
+    const { data } = await parseSuccessBody<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
@@ -170,7 +170,7 @@ describe('GET /api/v1/me/inquiries/received', () => {
     });
 
     const response = await fetch(get('/api/v1/me/inquiries/received'));
-    const { data } = await json<Inquiry[]>(response);
+    const { data } = await parseSuccessBody<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === toOrgUser.id)).toBe(true);

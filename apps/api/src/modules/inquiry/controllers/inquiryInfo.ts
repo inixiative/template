@@ -6,19 +6,19 @@
  */
 import { INQUIRY_TYPES } from '@template/permissions';
 import { mapValues } from 'lodash-es';
-import { schemaGuide } from '#/lib/jsonSchema/schemaGuide';
+import { descriptionsBySchemaFieldPath } from '#/lib/jsonSchema/descriptionsBySchemaFieldPath';
 import { toJsonSchema } from '#/lib/jsonSchema/toJsonSchema';
 import { makeController } from '#/lib/utils/makeController';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { inquiryInfoRoute } from '#/modules/inquiry/routes/inquiryInfo';
 import { inquiryInfoResponseSchema } from '#/modules/inquiry/schemas/inquiryInfoResponseSchema';
+import { inquiryServices } from '#/modules/inquiry/services';
 
-const guide = schemaGuide(inquiryInfoResponseSchema);
+const guide = descriptionsBySchemaFieldPath(inquiryInfoResponseSchema);
 
 export const inquiryInfoController = makeController(inquiryInfoRoute, async (_c, respond) => {
   return respond.ok({
     guide,
-    types: mapValues(inquiryHandlers, (handler, type: keyof typeof INQUIRY_TYPES) => ({
+    types: mapValues(inquiryServices, (handler, type: keyof typeof INQUIRY_TYPES) => ({
       sources: INQUIRY_TYPES[type].sources.map(({ model }) => model),
       targets: INQUIRY_TYPES[type].targets.map(({ model }) => model),
       unique: handler.unique ?? null,

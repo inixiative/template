@@ -10,7 +10,7 @@ import type {
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/v1/space/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -57,7 +57,7 @@ describe('GET /api/v1/space/:id', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<Space>(response);
+    const { data } = await parseSuccessBody<Space>(response);
     expect(data.id).toBe(space.id);
     expect(data.name).toBe(space.name);
   });

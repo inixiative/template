@@ -41,7 +41,7 @@ import { recomputeAndStoreMissingComponentSlugs } from '@template/email/render';
 import { log } from '@template/shared/logger';
 import { ConcurrencyType } from '@template/shared/utils';
 import { castArray, isEqual } from 'lodash-es';
-import { processAuditData } from '#/hooks/auditLog/utils';
+import { maskSensitiveAndOmitNoopFieldsForAudit } from '#/hooks/auditLog/utils';
 import {
   resolveComponentVersions,
   type VersionedRecord,
@@ -84,8 +84,8 @@ const extractChanges = (options: HookOptions): Change[] => {
 const wroteSnapshot = (model: EmailModel, change: Change): boolean =>
   !change.previous ||
   !isEqual(
-    processAuditData(model, change.previous as Record<string, unknown>),
-    processAuditData(model, change.record as Record<string, unknown>),
+    maskSensitiveAndOmitNoopFieldsForAudit(model, change.previous as Record<string, unknown>),
+    maskSensitiveAndOmitNoopFieldsForAudit(model, change.record as Record<string, unknown>),
   );
 
 const isSoftDelete = (change: Change): boolean =>

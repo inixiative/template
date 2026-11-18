@@ -142,8 +142,8 @@ createRoute({ model: 'organization', submodel: 'token', bodySchema, responseSche
 // Action
 actionRoute({ model: 'user', action: 'activate', bodySchema, responseSchema })
 
-// Action on a subresource collection → POST /{id}/segments/reach
-actionRoute({ model: 'space', submodel: 'segment', action: 'reach', bodySchema, responseSchema })
+// Action on a subresource collection → POST /{id}/segments/estimateReach
+actionRoute({ model: 'space', submodel: 'segment', action: 'estimateReach', bodySchema, responseSchema })
 
 // Admin
 readRoute({ model: 'user', many: true, admin: true, responseSchema })
@@ -166,7 +166,7 @@ A lens narrowing can declare a `where` in three places, and they assert three di
 ### How pagination applies them
 
 - **Root clauses**: compiled in `buildWhereClause` and ANDed into the query unconditionally — superadmin included. Lens narrowing is authorization shape, not a visibility preference.
-- **Non-root clauses**: `lensWhere` compiles each once, keyed by dotted path, then walks the fully composed where (caller base where + client filters + global search). Wherever the query traverses a relation, the clause folds in with operator-aware semantics: ANDed inside `some`/`none`/`is` and bare to-one nesting; into `every` by implication (an out-of-scope row must never fail it); as a fail-closed `is` sibling on bare `isNot`. A relation the query never touches contributes nothing — the lens where doesn't add joins, it colors the joins the query already makes.
+- **Non-root clauses**: `applyFilterLensWheresToPrismaWhere` compiles each once, keyed by dotted path, then walks the fully composed where (caller base where + client filters + global search). Wherever the query traverses a relation, the clause folds in with operator-aware semantics: ANDed inside `some`/`none`/`is` and bare to-one nesting; into `every` by implication (an out-of-scope row must never fail it); as a fail-closed `is` sibling on bare `isNot`. A relation the query never touches contributes nothing — the lens where doesn't add joins, it colors the joins the query already makes.
 - **Soft-delete live scope** is not paginate's job: the db client's soft-delete extension scopes the final query, its include/select trees and the lens count plans. It is visibility, not authorization, and the endpoint decides it — superadmin endpoints (the admin router) run unscoped; every other route is live-scoped for every caller, superadmin included.
 
 One line: **root where = who's in the list; relation where = what you see when you look sideways from a row; model where = the same, declared once per model instead of once per edge.**
@@ -473,7 +473,7 @@ If you need relation data, pass `include` in the options first. In many cases th
 
 **What paginate() handles automatically:**
 - Reads `page`, `pageSize` from query params
-- Reads `search`, `searchFields` from bracket notation (parsed in prepareRequest)
+- Reads `search`, `searchFields` from bracket notation (parsed in prepareRequestMiddleware)
 - Reads `filterLens` from route context (set by middleware) — used for picks-based whitelist + server-side where
 - Reads `orderBy` from query and parses it
 - Appends `{ id: desc }` as stable pagination tiebreaker
@@ -664,7 +664,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 ### How it works
 
-1. `prepareRequest` middleware parses bracket notation (`?searchFields[name]=value`) into nested objects
+1. `prepareRequestMiddleware` middleware parses bracket notation (`?searchFields[name]=value`) into nested objects
 2. `prepareMiddleware` injects an inline middleware that sets `filterLens` on context from the route's static `filterLens`
 3. `paginate()` binds the narrowing's tokens from its `bindings`, reads bracket-query searchFields, calls `buildWhereClause`
 4. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), validates enum values against the same lens projection the `searchFields` query schema is built from, translates the lens's wheres via `toPrisma`, AND-merges everything
@@ -682,7 +682,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 ### Bracket Notation Query Parsing
 
-The API automatically parses bracket notation in query strings into nested objects. Supports arbitrary nesting levels for complex Prisma queries. This happens in `prepareRequest` middleware before Zod validation.
+The API automatically parses bracket notation in query strings into nested objects. Supports arbitrary nesting levels for complex Prisma queries. This happens in `prepareRequestMiddleware` middleware before Zod validation.
 
 **Single level**: `?filters[status]=active&filters[tier]=premium`
 ```typescript
@@ -700,7 +700,7 @@ The API automatically parses bracket notation in query strings into nested objec
 ```
 
 **How it works:**
-1. `prepareRequest` calls `parseBracketNotation(url)`
+1. `prepareRequestMiddleware` calls `parseBracketNotation(url)`
 2. Result stored in context as `c.get('bracketQuery')`
 3. Controllers read from context (e.g., `paginate` reads `bracketQuery.searchFields`)
 4. Zod validates the final query object
@@ -1045,7 +1045,7 @@ createRoute({
   responseSchema,
 });
 
-// The /me router loads me(c) as the owner
+// The /me router loads actingUser(c) as the owner
 readRoute({
   model: 'me',
   submodel: 'integration',
@@ -1137,11 +1137,11 @@ A body field stored in a Prisma `Json` column (inquiry `content`, contact `value
 | Route | Generated from | Lists |
 |-------|---------------|-------|
 | `/webhookSubscription/info` | `webhookOwnerAllowedModels` | `models` per owner, `signature` key |
-| `/inquiry/info` | `inquiryHandlers` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
+| `/inquiry/info` | `inquiryServices` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
 | `/contact/info` | `ContactRegistry` | per type: `input` and stored `value` JSON Schema, `subtype` rule, `uniqueness`, label and icon |
 | `/segment/info` | `customerRefLens` | every readable field with its kind; `conditions` is tagged `rule` and points at json-rules |
 
-Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `schemaGuide(responseSchema)` (`lib/jsonSchema/schemaGuide.ts`) reads those descriptions back through `z.toJSONSchema`. `schemaGuide.test.ts` fails on any key left undescribed.
+Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `descriptionsBySchemaFieldPath(responseSchema)` (`lib/jsonSchema/descriptionsBySchemaFieldPath.ts`) reads those descriptions back through `z.toJSONSchema`. `descriptionsBySchemaFieldPath.test.ts` fails on any key left undescribed.
 
 An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand ahead of `autoRegisterRoutes` (see `modules/inquiry/index.ts`). It checks no action, so it answers without a session. Zod schemas become JSON Schema through `toJsonSchema` (`lib/jsonSchema/toJsonSchema.ts`, zod 4 `z.toJSONSchema`): `input` for what a caller sends, `output` for what is stored. The body field points at its route with `z.unknown().describe('… see GET /api/v1/<module>/info')`; `transformJsonFields` keeps that description on the JSON value it substitutes.
 

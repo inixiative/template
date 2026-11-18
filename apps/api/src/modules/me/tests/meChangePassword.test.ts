@@ -13,7 +13,7 @@ import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { passwordLength } from '@template/shared/auth/passwordLength';
 import { app } from '#/app';
 import { auth } from '#/lib/auth';
-import type { UserJwtHandoff } from '#/lib/auth/jwtHandoff';
+import type { UserJwtHandoff } from '#/lib/auth/jwtHandoffPlugin';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';

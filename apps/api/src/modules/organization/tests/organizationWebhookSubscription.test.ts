@@ -13,7 +13,7 @@ import {
 } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, post } from '#tests/utils/request';
+import { get, parseSuccessBody, post } from '#tests/utils/request';
 
 describe('organization/webhookSubscriptions', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -65,7 +65,7 @@ describe('organization/webhookSubscriptions', () => {
           url: `https://example.com/org-webhook-${seq}`,
         }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(201);
       expect(data.model).toBe('CustomerRef');
@@ -108,7 +108,7 @@ describe('organization/webhookSubscriptions', () => {
       });
 
       const response = await fetch(get(`/api/v1/organization/${org.id}/webhookSubscriptions`));
-      const { data } = await json<WebhookSubscription[]>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription[]>(response);
 
       expect(response.status).toBe(200);
       expect(Array.isArray(data)).toBe(true);
@@ -127,7 +127,7 @@ describe('organization/webhookSubscriptions', () => {
       });
 
       const response = await fetch(get(`/api/v1/organization/${org.id}/webhookSubscriptions`));
-      const { data } = await json<WebhookSubscription[]>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription[]>(response);
 
       expect(response.status).toBe(200);
       expect(data.every((s) => s.organizationId === org.id)).toBe(true);

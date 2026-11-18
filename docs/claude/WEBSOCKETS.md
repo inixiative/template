@@ -40,7 +40,7 @@ Data streams carry a per-stream `seq` so the client can *detect* a lost append a
 is ever re-sent (see [Sequence numbers](#sequence-numbers)).
 
 An app-event handler returns `WSHandoff[]`: a message handoff (`{ channels }`
-target plus `message.data`) or a stream handoff built by `streamAppend`. Any further payload type
+target plus `message.data`) or a stream handoff built by `streamAppendHandoff`. Any further payload type
 needs its own authorization, frontend handling and recovery behavior.
 
 ## Channels vs streams: when to use which
@@ -139,7 +139,7 @@ Register a channel family in `WS_CHANNELS` and return a handoff from a business-
 ```typescript
 websocket: (data) => [{
   target: { channels: [WS_CHANNELS.segmentReadManySegmentMembers.name(data.segmentId)] },
-  message: { data: refetch({ _id: 'segmentReadManySegmentMembers', path: { id: data.segmentId } }) },
+  message: { data: refetchQueryEvent({ _id: 'segmentReadManySegmentMembers', path: { id: data.segmentId } }) },
 }],
 ```
 
@@ -218,7 +218,7 @@ just documented:
 - The same test proves the check bites: a `'shared'` definition over the per-caller
   `meReadManyContacts` route fails, and passes once declared `'perRecipient'`.
 
-A `'perRecipient'` stream opts out: `streamAppend` then requires the recipient `userIds`, and
+A `'perRecipient'` stream opts out: `streamAppendHandoff` then requires the recipient `userIds`, and
 delivery skips every holder whose user is not listed (anonymous holders included). Superadmin and
 spoofed callers remain the one deliberate exception to "identical data": superadmin list reads
 include soft-deleted rows.
@@ -266,7 +266,7 @@ A removal is final. The list fold keeps a bounded set of removed ids (`__removed
 and ignores any later `upsert` for a removed id, so a late update from another instance cannot
 resurrect a row. Only an upsert flagged `revive` clears a removed id: the flag rides on the append
 frame (`{ type: 'upsert', payload, revive: true }`), outside the route-shaped row, set with
-`streamAppend(definition, params, 'upsert', row, { revive: true })`. A fresh snapshot (resync, retry or
+`streamAppendHandoff(definition, params, 'upsert', row, { revive: true })`. A fresh snapshot (resync, retry or
 reconnect) keeps the removed ids, dropping only those whose row the snapshot shows alive. Among
 upserts of a live row, the definition's `ordering` decides: by default an update older than the
 held row (by `updatedAt`) is ignored, so the folded state only moves forward. Action listeners
@@ -337,12 +337,12 @@ twice.
 
 ### Producing appends
 
-Appends are app-event output, like refetch hints, built only with `streamAppend`. The handoff
+Appends are app-event output, like refetch hints, built only with `streamAppendHandoff`. The handoff
 type is branded (`ValidatedStreamAppend`), so a hand-built stream handoff does not typecheck, and
 message handoffs are typed as `WSQueryEvent`, so a data frame cannot be smuggled through a
-`{ userIds }` or `{ channels }` message. In `streamAppend` (`apps/api/src/appEvents/streamAppend.ts`)
+`{ userIds }` or `{ channels }` message. In `streamAppendHandoff` (`apps/api/src/appEvents/streamAppendHandoff.ts`)
 the op is checked against the definition's kind and the payload is typed by the op. An upsert
-row must come from `routeRow(route, value)` (`apps/api/src/appEvents/routeRow.ts`), which parses
+row must come from `parseRowWithRouteResponseSchema(route, value)` (`apps/api/src/appEvents/routeRow.ts`), which parses
 it with the route's `responseSchema` and brands it, so a raw model or hand-built object does not
 typecheck. The options argument carries `revive` (upserts only) and `userIds`, which a
 `perRecipient` definition requires both in its type and at runtime:
@@ -351,8 +351,8 @@ typecheck. The options argument carries `revive` (upserts only) and `userIds`, w
 websocket: ({ contact }) => organizationContactUpsert(contact),
 
 // organizationContactUpsert:
-streamAppend(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.organizationId }, 'upsert',
-  routeRow(organizationReadManyContactsRoute, contact));
+streamAppendHandoff(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.organizationId }, 'upsert',
+  parseRowWithRouteResponseSchema(organizationReadManyContactsRoute, contact));
 ```
 
 `deliverWSHandoffs` calls `appendToStream`, which sequences the action and publishes it through

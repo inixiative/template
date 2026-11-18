@@ -7,7 +7,7 @@
 import { createRoute } from '#/lib/routeTemplates';
 import {
   inquiryCreateBodySchema,
-  inquiryCreateSanitizeKeys,
+  inquiryCreateServerOwnedKeys,
 } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
 import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
@@ -17,5 +17,5 @@ export const adminInquiryCreateRoute = createRoute({
   admin: true,
   bodySchema: inquiryCreateBodySchema,
   responseSchema: inquiryResponseSchema,
-  sanitizeKeys: inquiryCreateSanitizeKeys,
+  sanitizeKeys: inquiryCreateServerOwnedKeys,
 });

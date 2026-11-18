@@ -1,7 +1,7 @@
 import { describe, expect, it, spyOn } from 'bun:test';
 import { getRedisClient } from '@template/db';
-import { clientIp } from '#/lib/clientIp';
 import { type RateLimitRule, rateLimit } from '#/middleware/rateLimit/rateLimit';
+import { globalRateLimitKey, ipRateLimitKey } from '#/middleware/rateLimit/rateLimitKeys';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 
 const mount =
@@ -14,7 +14,7 @@ const ipRule = (over: Partial<RateLimitRule> = {}): RateLimitRule => ({
   scope: 'test:ip',
   windowMs: 60_000,
   max: 2,
-  key: (c) => `ip:${clientIp(c)}`,
+  key: ipRateLimitKey,
   ...over,
 });
 
@@ -77,7 +77,7 @@ describe('rateLimit', () => {
       mount: [
         mount([
           ipRule({ max: 100 }),
-          { scope: 'test:global', windowMs: 60_000, max: 1, key: () => 'all' },
+          { scope: 'test:global', windowMs: 60_000, max: 1, key: globalRateLimitKey },
         ]),
       ],
     });

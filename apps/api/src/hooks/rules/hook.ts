@@ -13,8 +13,8 @@ import {
   withDualPolymorphismIds,
 } from '@template/db';
 import { castArray, without } from 'lodash-es';
+import { applyWriteDataOverPreviousRow } from '#/hooks/rules/applyWriteDataOverPreviousRow';
 import { getRule, RulesRegistry } from '#/hooks/rules/registry';
-import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { makeError } from '#/lib/errors';
 
 const evaluate = (rule: Condition, row: Record<string, unknown>): boolean | string => {
@@ -61,7 +61,7 @@ const processUpdateArgs = (
   const data = ((args as Record<string, unknown>)?.data ??
     (args as Record<string, unknown>)?.update) as Record<string, unknown> | undefined;
   if (data && typeof data === 'object' && !Array.isArray(data))
-    validateRules(shadowMerge(previous, data), model);
+    validateRules(applyWriteDataOverPreviousRow(previous, data), model);
 };
 
 export const registerRulesHook = () => {

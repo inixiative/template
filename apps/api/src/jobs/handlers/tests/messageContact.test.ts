@@ -8,7 +8,7 @@ import {
   messageProviderRegistry,
 } from '#/lib/messaging/providers';
 import { createTestApp } from '#tests/createTestApp';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 type DispatchedCall = {
   contactId: string;
@@ -20,7 +20,7 @@ type DispatchedCall = {
 describe('messageContact handler', () => {
   let testDb: ReturnType<typeof createTestApp>['db'];
   const dispatched: DispatchedCall[] = [];
-  const worker = createTestWorker();
+  const worker = makeTestWorker();
 
   beforeEach(() => {
     const harness = createTestApp({});

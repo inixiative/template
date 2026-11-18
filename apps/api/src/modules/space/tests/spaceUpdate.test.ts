@@ -10,7 +10,7 @@ import type {
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { json, patch } from '#tests/utils/request';
+import { parseSuccessBody, patch } from '#tests/utils/request';
 
 describe('PATCH /api/v1/space/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -59,7 +59,7 @@ describe('PATCH /api/v1/space/:id', () => {
     );
     expect(response.status).toBe(200);
 
-    const { data } = await json<Space>(response);
+    const { data } = await parseSuccessBody<Space>(response);
     expect(data.name).toBe('Updated Space Name');
   });
 });

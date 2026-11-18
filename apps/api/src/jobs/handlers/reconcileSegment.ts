@@ -10,14 +10,17 @@ import { RuleDegradedError } from '@template/shared/rules';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { fetchSegmentsWithoutRuleIssues } from '#/modules/segment/services/attachRuleHealthToSegments';
 import { publishMembershipChanges } from '#/modules/segment/services/publishMembershipChanges';
 import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRef';
 import {
   isReconcilable,
   reconcileSegment as reconcile,
 } from '#/modules/segment/services/reconcileSegment';
-import { buildReferenceMap, referencedBy } from '#/modules/segment/services/segmentReferenceGraph';
-import { soundSegments } from '#/modules/segment/services/withSegmentRuleIssues';
+import {
+  segmentIdsReferencingSegment,
+  targetSegmentIdsBySegmentId,
+} from '#/modules/segment/services/segmentReferenceGraph';
 
 export type ReconcileSegmentPayload = {
   segmentId: string;
@@ -43,12 +46,13 @@ export const reconcileSegment = makeSupersedingJob<ReconcileSegmentPayload>(
     await publishMembershipChanges([{ segment, diff }]);
 
     const path = [...referencePath, segmentId];
-    const siblings = await soundSegments(
+    const siblings = await fetchSegmentsWithoutRuleIssues(
       await dynamicSegmentsOf(segment.ownerModel, segmentOwnerId(segment)),
     );
-    const dependents = referencedBy(buildReferenceMap(siblings), segmentId).filter(
-      (id) => !path.includes(id),
-    );
+    const dependents = segmentIdsReferencingSegment(
+      targetSegmentIdsBySegmentId(siblings),
+      segmentId,
+    ).filter((id) => !path.includes(id));
     for (const dependentId of dependents) {
       await enqueueJob('reconcileSegment', { segmentId: dependentId, referencePath: path });
     }

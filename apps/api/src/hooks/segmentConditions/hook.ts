@@ -12,7 +12,7 @@ import {
 import type { Segment } from '@template/db/generated/client/client';
 import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
-import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
+import { invalidSegmentConditionsError } from '#/modules/segment/lib/invalidSegmentConditionsError';
 import { validateSegmentConditions } from '#/modules/segment/validations/validateSegmentConditions';
 import { validateSegmentReferences } from '#/modules/segment/validations/validateSegmentReferences';
 
@@ -27,7 +27,7 @@ const validateRow = async (row: SegmentRow, previous?: Segment): Promise<void> =
   const result = validateSegmentConditions(row.conditions, owner.ownerModel, {
     selfId: previous?.id,
   });
-  if (!result.valid) throw invalidSegmentConditions(result.errors);
+  if (!result.valid) throw invalidSegmentConditionsError(result.errors);
   row.conditions = result.normalized;
   await validateSegmentReferences(owner, result.normalized as Condition, previous);
 };

@@ -39,7 +39,7 @@ import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
-import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { makeSlowSlotPool } from '#/jobs/slowSlotPool';
 import { JobLane, JobType, type StageContext } from '#/jobs/types';
 
 type LeafPayload = { key: string; ms: number; fail?: boolean };
@@ -153,7 +153,7 @@ const main = async (): Promise<void> => {
   });
   const worker = new Worker(
     queue.name,
-    (job: Job) => processJob(job, { slowSlots: createSlowSlotPool(10) }),
+    (job: Job) => processJob(job, { slowSlots: makeSlowSlotPool(10) }),
     { connection: workerRedis, concurrency: 10 },
   );
   worker.on('failed', (job, err) => record('jobFailed', `${job?.name}:${err.message}`));

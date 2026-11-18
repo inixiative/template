@@ -13,7 +13,7 @@ import {
 import { setEnvOverride } from '@template/shared/utils';
 import { sendWebhook } from '#/jobs/handlers/sendWebhook';
 import { createTestApp } from '#tests/createTestApp';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -32,7 +32,7 @@ describe('sendWebhook handler', () => {
   let testCounter = 0;
 
   const getUniqueUrl = (suffix = '') => `https://test-webhook.local/${++testCounter}${suffix}`;
-  const worker = createTestWorker();
+  const worker = makeTestWorker();
 
   beforeEach(async () => {
     const { entity } = await createUser();
@@ -278,7 +278,7 @@ describe('sendWebhook handler', () => {
 
   describe('retries', () => {
     const attempt = (attemptNumber: number, attempts = 3) =>
-      createTestWorker({ attemptsMade: attemptNumber - 1, opts: { attempts } });
+      makeTestWorker({ attemptsMade: attemptNumber - 1, opts: { attempts } });
 
     const respondWith = (status: number, statusText = '') =>
       spyOn(globalThis, 'fetch').mockImplementation(
@@ -304,7 +304,7 @@ describe('sendWebhook handler', () => {
       return sub;
     };
 
-    const deliver = (ctx: ReturnType<typeof createTestWorker>, subscriptionId: string) =>
+    const deliver = (ctx: ReturnType<typeof makeTestWorker>, subscriptionId: string) =>
       sendWebhook(ctx, {
         subscriptionId,
         action: 'update',

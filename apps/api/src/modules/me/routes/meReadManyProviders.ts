@@ -13,7 +13,7 @@ import {
   customerRefTags,
 } from '#/modules/customerRef/schemas/customerRefSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meReadManyProvidersRoute = readRoute({
   model: Modules.me,
@@ -25,5 +25,5 @@ export const meReadManyProvidersRoute = readRoute({
   filterLens: { parent: lensFor('CustomerRef') },
   query: providerFilterSchema,
   responseSchema: customerRefAsCustomerSchema,
-  tags: [Tags.me, Tags.provider, ...customerRefTags],
+  tags: [OpenApiTags.me, OpenApiTags.provider, ...customerRefTags],
 });

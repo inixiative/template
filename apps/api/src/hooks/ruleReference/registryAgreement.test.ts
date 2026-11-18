@@ -12,7 +12,7 @@ import { emailSlotLenses } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
 import type { RULE_REFERENCE_SURFACES } from '#/hooks/ruleReference/surfaces';
 import { emailLensFor } from '#/lib/email/emailLensFor';
-import { registry } from '#/lib/email/registry';
+import { emailTemplateRegistry } from '#/lib/email/emailTemplateRegistry';
 import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
 import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
@@ -34,7 +34,7 @@ const emailLenses = (slugs: (string | undefined)[]): RuleLens[] =>
   );
 
 const AUTHORED_UNDER = {
-  EmailTemplate: emailLenses(Object.keys(registry)),
+  EmailTemplate: emailLenses(Object.keys(emailTemplateRegistry)),
   EmailComponent: emailLenses([undefined]),
   Segment: [customerRefLens],
   Entitlement: Object.values(EntitlementResourceModel).map(entitlementWhereLens),

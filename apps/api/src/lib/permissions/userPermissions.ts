@@ -15,7 +15,10 @@ import {
 } from '@template/permissions';
 import { createPermissions, type Permix } from '@template/permissions/client';
 import type { TokenWithRelations } from '#/lib/context/types';
-import { delegatedPermissions, ownerPermissions } from '#/lib/permissions/ownerPermissions';
+import {
+  fetchPermissionsOfDelegateOwner,
+  narrowOwnerPermissionsToDelegate,
+} from '#/lib/permissions/ownerPermissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
 type Acting = Pick<UserWithRelations, 'organizationUsers' | 'spaceUsers'> & {
@@ -34,11 +37,12 @@ export const installPermissionsFor = async (
 
   const usersPermissions = permissionsOfUser(user?.id ?? null, organizationUsers, spaceUsers);
   if (!token) return installPermissions(permix, usersPermissions);
-  const owner = token.ownerModel === 'User' ? usersPermissions : await ownerPermissions(token);
-  await installPermissions(permix, delegatedPermissions(token, owner));
+  const owner =
+    token.ownerModel === 'User' ? usersPermissions : await fetchPermissionsOfDelegateOwner(token);
+  await installPermissions(permix, narrowOwnerPermissionsToDelegate(token, owner));
 };
 
-export const userPermissions = async (userId: string): Promise<Permix | null> => {
+export const fetchPermixForUser = async (userId: string): Promise<Permix | null> => {
   const userWithRelations = await findUserWithRelations(userId);
   if (!userWithRelations) return null;
   const {

@@ -49,12 +49,12 @@ type FlowStep = {                // exactly what is stored on Flow.steps
 POST me/flows {flowKey, bindings}
   → bindings parsed by bindingsSchema (422, fieldErrors under bindings.*)
   → steps(bindings, { userId: caller, now }) → stored on Flow.steps (immutable: editing the registry never touches a running flow)
-  → checkFlow
+  → advanceFlowAndDeleteWhenFinished
 
 GET flow/:id   (on mount, and after every successful mutation)
-  → checkFlow
+  → advanceFlowAndDeleteWhenFinished
 
-checkFlow
+advanceFlowAndDeleteWhenFinished
   → from step 0, in order, as the caller; stop at the first step that does not hold
   → currentStep = that step; stepStates = done / pending per step (computed, not stored)
   → update (touches updatedAt), or delete when every step holds
@@ -65,7 +65,7 @@ checkFlow
 - **Any read error drops the flow**: non-2xx, a thrown rule, or a `fetchAllPages` cap. The row is deleted and the route answers 404. Two tabs racing to finish the same flow end the same way: the loser's write misses the row (P2025) and answers 404.
 - **Finished**: when every step holds, the response carries `currentStep === steps.length` and the row is hard-deleted.
 - **Don't pre-check; create and see.** Create runs the same checks. A flow whose steps all hold already comes back complete and is never stored, so a caller never has to ask "does this user need the flow?" first.
-- **Cleanup**: `Flow` rows hold only `id, userId, flowKey, steps, returnUrl, createdAt, updatedAt`. The `cleanStaleFlows` cron row runs `cleanStaleData` every 5 minutes on `updatedAt` with a 15-minute retention. Flows are hard-deleted with their user.
+- **Cleanup**: `Flow` rows hold only `id, userId, flowKey, steps, returnUrl, createdAt, updatedAt`. The `cleanStaleFlows` cron row runs `hardDeleteRecordsPastRetention` every 5 minutes on `updatedAt` with a 15-minute retention. Flows are hard-deleted with their user.
 
 ## Routes
 

@@ -1,7 +1,7 @@
 export const apiRouter = new OpenAPIHono();
 
 apiRouter.use('*', corsMiddleware);
-apiRouter.use('*', prepareRequest);
+apiRouter.use('*', prepareRequestMiddleware);
 apiRouter.use('/auth/*', authRateLimit);
 apiRouter.use(selfAuthenticated, auditActorMiddleware);
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
