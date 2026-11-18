@@ -18,7 +18,7 @@
  * Reads are free. An exception goes in scripts/ci/entitlement-writer-only/exempt.txt as
  * `<file>:<key>\t<reason>`: a write the system makes from the schema, never one a caller asks for.
  * Not seen: a model name that arrives at run time (the cascade's parent/child registry, a
- * cleanStaleData cron payload) and raw SQL; PERMISSIONS.md names them.
+ * hardDeleteRecordsPastRetention cron payload) and raw SQL; PERMISSIONS.md names them.
  */
 import ts from 'typescript';
 import {
