@@ -109,6 +109,63 @@ describe('POST /api/v1/batch/execute', () => {
       expect(data.batch[1][0].body.data.slug).toBe(`test-org-${seq}`);
     });
 
+    it('resolves a reference the SDK percent-encoded into a path', async () => {
+      const seq = nextFactorySequenceNumber();
+      const response = await fetch(
+        post('/api/v1/batch/execute', {
+          requests: [
+            [
+              {
+                method: 'POST',
+                path: '/api/v1/organization',
+                body: { name: `Encoded Org ${seq}`, slug: `encoded-org-${seq}` },
+              },
+            ],
+            [{ method: 'GET', path: '/api/v1/organization/%3C%3C0.0.body.data.id%3E%3E' }],
+          ],
+          strategy: 'allowFailures',
+        }),
+      );
+
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
+
+      expect(data.batch[1][0].status).toBe(200);
+      expect(data.batch[1][0].body.data.slug).toBe(`encoded-org-${seq}`);
+    });
+
+    it('sends escaped brackets in a body as literal text beside a live reference', async () => {
+      const seq = nextFactorySequenceNumber();
+      const response = await fetch(
+        post('/api/v1/batch/execute', {
+          requests: [
+            [
+              {
+                method: 'POST',
+                path: '/api/v1/organization',
+                body: { name: `Base ${seq}`, slug: `base-org-${seq}` },
+              },
+            ],
+            [
+              {
+                method: 'POST',
+                path: '/api/v1/organization',
+                body: {
+                  name: 'After <<0.0.body.data.slug>> \\<<kept\\>>',
+                  slug: `escaped-org-${seq}`,
+                },
+              },
+            ],
+          ],
+          strategy: 'allowFailures',
+        }),
+      );
+
+      const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
+
+      expect(data.batch[1][0].status).toBe(201);
+      expect(data.batch[1][0].body.data.name).toBe(`After base-org-${seq} <<kept>>`);
+    });
+
     it('treats 204 responses as successful empty results', async () => {
       const response = await (await memberlessUserFetch())(
         post('/api/v1/batch/execute', {
