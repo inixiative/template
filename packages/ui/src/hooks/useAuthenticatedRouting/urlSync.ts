@@ -8,6 +8,7 @@ import type {
   RoutingSearchParams,
   UrlSearchParamUpdates,
 } from '@template/ui/hooks/useAuthenticatedRouting/types';
+import { type SearchInput, toUrlSearchParams } from '@template/ui/lib/searchParams';
 import type { TenantContext } from '@template/ui/store/types/tenant';
 
 export type BuildSearchParamUpdatesInput = {
@@ -15,6 +16,8 @@ export type BuildSearchParamUpdatesInput = {
   context: TenantContext;
   spoofUserEmail: string | null;
   flowId: string | null;
+  isKnownOrganization: (organizationId: string) => boolean;
+  isKnownSpace: (spaceId: string) => boolean;
 };
 
 export const buildSearchParamUpdates = ({
@@ -22,6 +25,8 @@ export const buildSearchParamUpdates = ({
   context,
   spoofUserEmail,
   flowId,
+  isKnownOrganization,
+  isKnownSpace,
 }: BuildSearchParamUpdatesInput): UrlSearchParamUpdates | null => {
   const updates: UrlSearchParamUpdates = {};
   if (spoofUserEmail !== searchParams.spoofEmail) updates.spoof = spoofUserEmail;
@@ -36,25 +41,24 @@ export const buildSearchParamUpdates = ({
   ) {
     updates.org = context.organization!.id;
     updates.space = null;
-  } else if (
-    (context.type === 'user' || context.type === 'public') &&
-    (searchParams.organizationId || searchParams.spaceId)
-  ) {
-    updates.org = null;
-    updates.space = null;
+  } else if (context.type === 'user' || context.type === 'public') {
+    if (searchParams.organizationId && isKnownOrganization(searchParams.organizationId))
+      updates.org = null;
+    if (searchParams.spaceId && isKnownSpace(searchParams.spaceId)) updates.space = null;
   }
 
   if (!Object.keys(updates).length) return null;
   return updates;
 };
 
-export const replaceUrlSearchParams = (updates: UrlSearchParamUpdates): void => {
-  const url = new URL(window.location.href);
-
+export const applySearchParamUpdates = (
+  search: SearchInput,
+  updates: UrlSearchParamUpdates,
+): Record<string, string> => {
+  const params = toUrlSearchParams(search);
   Object.entries(updates).forEach(([key, value]) => {
-    if (value != null) url.searchParams.set(key, value);
-    else url.searchParams.delete(key);
+    if (value != null) params.set(key, value);
+    else params.delete(key);
   });
-
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  return Object.fromEntries(params);
 };
