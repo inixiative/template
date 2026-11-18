@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { createLens, type FieldMap } from '@inixiative/json-rules';
+import type { FieldMap } from '@inixiative/field-map';
+import { createLens } from '@inixiative/json-rules';
 import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { EACH_MAX_DEPTH } from '@template/email/render/limits';
 import { type EmailLens, emailLens } from '@template/email/rules/emailLens';

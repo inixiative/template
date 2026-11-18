@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { fieldOf } from '@inixiative/field-map';
 import { projectLens } from '@inixiative/json-rules';
 import { polymorphismConfigForModel, RULE_REFERENCEABLE_MODELS } from '@template/db';
 import type { EmailOwnerModel } from '@template/db/generated/client/enums';
@@ -16,7 +17,10 @@ import { emailTemplateRegistry } from '#/lib/email/emailTemplateRegistry';
 import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
 import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 
-type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
+const isIdColumn = (model: string, field: string): boolean => {
+  const entry = fieldOf(prismaMap, model, field);
+  return entry?.kind === 'scalar' && entry.isId === true;
+};
 
 const ORG = '00000000-0000-7000-8000-000000000001';
 const SPACE = '00000000-0000-7000-8000-000000000002';
@@ -44,11 +48,7 @@ const idSourceModels = (lens: RuleLens): Set<string> => {
   const models = new Set<string>();
   for (const visit of Object.values(projectLens(lens)))
     for (const field of Object.keys(visit.sources))
-      if (
-        visit.fields[field] &&
-        (prismaMap.models as unknown as IdFields)[visit.model]?.fields[field]?.isId
-      )
-        models.add(visit.model);
+      if (visit.fields[field] && isIdColumn(visit.model, field)) models.add(visit.model);
   return models;
 };
 

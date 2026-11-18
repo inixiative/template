@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { pickColumns } from '@inixiative/field-map';
 import type { OpenTransaction } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import {
@@ -14,7 +15,7 @@ import {
 } from '@template/db/extensions/hookRegistry';
 import { openTransactionForPrismaQueryOrThrow } from '@template/db/extensions/transactionRegistry';
 import type { Prisma } from '@template/db/generated/client/client';
-import { pickColumns } from '@template/db/utils/pickColumns';
+import { prismaMap } from '@template/db/generated/prismaMap';
 
 // Hooks run on a Prisma continuation where the caller's async-local storage has not survived, so
 // they get the caller's context re-entered around them rather than passed in. See
@@ -65,8 +66,13 @@ export const makeMutationLifecycleInterceptor =
     const result = await query(args);
     if (action === DbAction.deleteMany) hookOptions.result = hookOptions.previous as never;
     else if (Array.isArray(result))
-      hookOptions.result = result.map((row) => pickColumns(model, row)) as never;
-    else hookOptions.result = pickColumns(model, result as Record<string, unknown>) as never;
+      hookOptions.result = result.map((row) => pickColumns(prismaMap, model, row)) as never;
+    else
+      hookOptions.result = pickColumns(
+        prismaMap,
+        model,
+        result as Record<string, unknown>,
+      ) as never;
     await runHooks(openTransaction, HookTiming.after, hookOptions);
     return result;
   };

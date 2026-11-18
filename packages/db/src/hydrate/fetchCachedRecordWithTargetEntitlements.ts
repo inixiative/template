@@ -4,6 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses infrastructure:redis
  */
+
+import type { Identifier } from '@inixiative/field-map';
 import { db } from '@template/db/client';
 import {
   entitlementTargetModelOf,
@@ -13,7 +15,6 @@ import {
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cacheKey, fetchThroughCache } from '@template/db/redis';
 import type { AccessorName } from '@template/db/utils/modelNames';
-import type { Identifier } from '@template/db/utils/prismaMapRelations';
 
 const DEFAULT_TTL = 60 * 60; // 1 hour
 

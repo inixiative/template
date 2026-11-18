@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { createLens, type FieldMap } from '@inixiative/json-rules';
+import type { FieldMap } from '@inixiative/field-map';
+import { createLens } from '@inixiative/json-rules';
 import { tokenGuardedByExistsCheck } from '@template/email/render/tokenGuardedByExistsCheck';
 import { type EmailLens, OPAQUE_SLOT, systemFieldsSlotLens } from '@template/email/rules/emailLens';
 import { validateTokens } from '@template/email/validations/validateTokens';

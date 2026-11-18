@@ -1,4 +1,3 @@
-export type { Identifier } from '../utils/prismaMapRelations';
 export { fetchCachedRecordWithTargetEntitlements } from './fetchCachedRecordWithTargetEntitlements';
 export { fetchLens } from './fetchLens';
 export { hydrate } from './hydrate';

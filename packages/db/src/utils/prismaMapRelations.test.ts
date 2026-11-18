@@ -12,7 +12,7 @@ describe('relationsOfModel', () => {
   it('includes simple FK relations', () => {
     const relations = relationsOfModel('Session');
 
-    const userRel = relations.find((r) => r.relationName === 'user');
+    const userRel = relations.find((r) => r.field === 'user');
     expect(userRel).toBeDefined();
     expect(userRel?.targetModel).toBe('User');
     expect(userRel?.targetAccessor).toBe('user');
@@ -23,7 +23,7 @@ describe('relationsOfModel', () => {
   it('includes composite FK relations', () => {
     const relations = relationsOfModel('Token');
 
-    const orgUserRel = relations.find((r) => r.relationName === 'organizationUser');
+    const orgUserRel = relations.find((r) => r.field === 'organizationUser');
     expect(orgUserRel).toBeDefined();
     expect(orgUserRel?.targetModel).toBe('OrganizationUser');
     expect(orgUserRel?.foreignKey).toEqual({
@@ -36,7 +36,7 @@ describe('relationsOfModel', () => {
     const relations = relationsOfModel('Token');
 
     // space: fields: [organizationId, spaceId], references: [organizationId, id]
-    const spaceRel = relations.find((r) => r.relationName === 'space');
+    const spaceRel = relations.find((r) => r.field === 'space');
     expect(spaceRel).toBeDefined();
     expect(spaceRel?.foreignKey).toEqual({
       organizationId: 'organizationId',
@@ -48,7 +48,7 @@ describe('relationsOfModel', () => {
     const relations = relationsOfModel('OrganizationUser');
 
     // tokens is a reverse relation (Token[] on OrganizationUser)
-    const tokensRel = relations.find((r) => r.relationName === 'tokens');
+    const tokensRel = relations.find((r) => r.field === 'tokens');
     expect(tokensRel).toBeDefined();
     expect(tokensRel?.foreignKey).toBeNull();
   });
@@ -56,12 +56,12 @@ describe('relationsOfModel', () => {
   it('resolves named relations (e.g. @relation("InquirySource", fields: [...]))', () => {
     const relations = relationsOfModel('Inquiry');
 
-    const sourceOrgRel = relations.find((r) => r.relationName === 'sourceOrganization');
+    const sourceOrgRel = relations.find((r) => r.field === 'sourceOrganization');
     expect(sourceOrgRel).toBeDefined();
     expect(sourceOrgRel?.targetModel).toBe('Organization');
     expect(sourceOrgRel?.foreignKey).toEqual({ id: 'sourceOrganizationId' });
 
-    const targetUserRel = relations.find((r) => r.relationName === 'targetUser');
+    const targetUserRel = relations.find((r) => r.field === 'targetUser');
     expect(targetUserRel).toBeDefined();
     expect(targetUserRel?.foreignKey).toEqual({ id: 'targetUserId' });
   });

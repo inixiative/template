@@ -4,9 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import type { FieldEntry } from '@inixiative/field-map';
+import { fieldAtPath } from '@inixiative/field-map';
 import { andWhere, orWhere } from '@inixiative/json-rules';
-import type { ModelField } from '@inixiative/prisma-map';
-import { modelFieldAtPath } from '@template/db/utils/fieldMetadata';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { isRelationOperator } from '@template/shared/bracketQuery';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
@@ -68,7 +69,7 @@ const walkEntries = (
           : value;
       continue;
     }
-    const field = modelFieldAtPath(ctx.model, key);
+    const field = fieldAtPath(prismaMap, ctx.model, key);
     out[key] =
       field?.kind === 'object' && isPlainObject(value)
         ? hop(
@@ -84,7 +85,7 @@ const walkEntries = (
 
 const hop = (
   ctx: NodeContext,
-  field: ModelField,
+  field: FieldEntry,
   value: Record<string, unknown>,
   scopeAt: NodeScope,
 ): Record<string, unknown> => {

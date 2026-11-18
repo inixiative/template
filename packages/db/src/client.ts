@@ -6,6 +6,7 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { columnName, fieldOf, hasColumn, modelOf, tableName } from '@inixiative/field-map';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type {
   AfterCommitFn,
@@ -321,16 +322,15 @@ const dbMethods = {
     const keys = Object.keys(where);
     if (!keys.length) throw new Error('db.findForUpdate() requires at least one predicate');
     const modelName = toModelName(model);
-    const meta = prismaMap.models[modelName];
-    const table = meta.dbName ?? modelName;
-    // why: prismaMap carries no per-field dbName, so a predicate on an @map'd column would build
-    // why: SQL against a name that does not exist. No column in this schema is mapped; the field
-    // why: check is what keeps that true, by refusing any predicate the map cannot account for.
+    const meta = modelOf(prismaMap, modelName);
+    if (!meta) throw new Error(`db.findForUpdate(): unknown model '${model}'`);
+    const table = tableName(meta, modelName);
+    // A predicate names a column (`@map` resolved); a relation or an unknown field is refused.
     const columnFor = (key: string): string => {
-      const fields = meta.fields as Record<string, unknown>;
-      if (!fields[key])
+      const field = fieldOf(prismaMap, modelName, key);
+      if (!field || !hasColumn(field))
         throw new Error(`db.findForUpdate(): unknown field '${key}' on model '${model}'`);
-      return key;
+      return columnName(field, key);
     };
     const conds = keys.map((key) => {
       const column = Prisma.raw(`"${columnFor(key)}"`);

@@ -6,7 +6,7 @@ describe('lensFromOperation', () => {
     const lens = lensFromOperation('meReceivedManyInquiries');
     expect(lens.model).toBe('InquiryItem');
     const fields = lens.maps.sdk.models.InquiryItem.fields;
-    expect(fields.createdAt).toEqual({ kind: 'scalar', type: 'DateTime' });
+    expect(fields.createdAt).toMatchObject({ kind: 'scalar', type: 'DateTime', isList: false });
     expect(fields.status.kind).toBe('enum');
   });
 
@@ -28,9 +28,10 @@ describe('lensFromOperation', () => {
   it('renders Json columns as scalar Json and inline relations as child models', () => {
     const lens = lensFromOperation('adminInquiryReadMany');
     const fields = lens.maps.sdk.models.InquiryItem.fields;
-    expect(fields.content).toEqual({ kind: 'scalar', type: 'Json' });
+    expect(fields.content).toMatchObject({ kind: 'scalar', type: 'Json' });
     expect(fields.sourceUser.kind).toBe('object');
-    expect(lens.maps.sdk.models['InquiryItem.sourceUser'].fields.id).toEqual({
+    const sourceUser = fields.sourceUser.kind === 'object' ? fields.sourceUser.type : '';
+    expect(lens.maps.sdk.models[sourceUser]?.fields.id).toMatchObject({
       kind: 'scalar',
       type: 'String',
     });

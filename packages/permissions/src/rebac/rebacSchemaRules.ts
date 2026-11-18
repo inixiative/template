@@ -68,8 +68,8 @@ const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   ],
 });
 
-export const roleHeldAtOwner = (at = ''): ActionRule =>
-  roleHeldVia((action) => actorMayPerformActionOnOwner(action, at));
+export const roleHeldAtOwner = (at = '', owners: OwnerModel[] = everyOwner): ActionRule =>
+  roleHeldVia((action) => actorMayPerformActionOnOwner(action, at, owners));
 
 export const memberRoleWrite = (tenant: 'organization' | 'space'): ActionRule => ({
   all: [{ rel: tenant, action: 'manage' }, roleHeldVia((action) => ({ rel: tenant, action }))],
@@ -161,8 +161,12 @@ export const actionsForRecordOwnedByAnyOwnerModel = {
   ...integrationAccess,
 } satisfies Record<string, ActionRule>;
 
+// Read on an integration row, whose owner is never another integration.
 export const integrationRoleWrite: ActionRule = {
-  any: [actorMayPerformActionOnOwner('delegateFull'), { all: ['manage', roleHeldAtOwner()] }],
+  any: [
+    actorMayPerformActionOnOwner('delegateFull', '', notIntegration),
+    { all: ['manage', roleHeldAtOwner('', notIntegration)] },
+  ],
 };
 
 export const actorMayCreateTokenAtOwnerWithRole: ActionRule = {
@@ -181,7 +185,8 @@ export const actorMayCreateTokenAtOwnerWithRole: ActionRule = {
         {
           any: [
             ownerModelIsOneOf(['User', ...members], 'integration.'),
-            roleHeldAtOwner('integration.'),
+            // An integration's owner is never another integration: no `integration.integration`.
+            roleHeldAtOwner('integration.', notIntegration),
           ],
         },
       ],

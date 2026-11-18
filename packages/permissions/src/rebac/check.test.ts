@@ -258,11 +258,11 @@ describe('rebac check', () => {
       permissions: {
         'db:inquiry': {
           actions: {
-            read: { rule: { field: 'isPublic', operator: Operator.equals, value: true } },
+            read: { rule: { field: 'status', operator: Operator.equals, value: 'sent' } },
             edit: {
               all: [
                 { rule: { field: 'status', operator: Operator.equals, value: 'draft' } },
-                { rule: { field: 'isLocked', operator: Operator.equals, value: false } },
+                { rule: { field: 'content.locked', operator: Operator.equals, value: false } },
               ],
             },
           },
@@ -270,28 +270,28 @@ describe('rebac check', () => {
       },
     };
 
-    it('grants read when isPublic is true', () => {
-      const record = { id: 'inq-1', isPublic: true };
+    it('grants read when the inquiry is sent', () => {
+      const record = { id: 'inq-1', status: 'sent' };
       expect(check(permix, schema, 'inquiry', record, 'read')).toBe(true);
     });
 
-    it('denies read when isPublic is false', () => {
-      const record = { id: 'inq-1', isPublic: false };
+    it('denies read when the inquiry is not sent', () => {
+      const record = { id: 'inq-1', status: 'draft' };
       expect(check(permix, schema, 'inquiry', record, 'read')).toBe(false);
     });
 
     it('grants edit when all attribute conditions match', () => {
-      const record = { id: 'inq-1', status: 'draft', isLocked: false };
+      const record = { id: 'inq-1', status: 'draft', content: { locked: false } };
       expect(check(permix, schema, 'inquiry', record, 'edit')).toBe(true);
     });
 
     it('denies edit when status is not draft', () => {
-      const record = { id: 'inq-1', status: 'published', isLocked: false };
+      const record = { id: 'inq-1', status: 'sent', content: { locked: false } };
       expect(check(permix, schema, 'inquiry', record, 'edit')).toBe(false);
     });
 
-    it('denies edit when inquiry is locked', () => {
-      const record = { id: 'inq-1', status: 'draft', isLocked: true };
+    it('denies edit when the inquiry content is locked', () => {
+      const record = { id: 'inq-1', status: 'draft', content: { locked: true } };
       expect(check(permix, schema, 'inquiry', record, 'edit')).toBe(false);
     });
   });
@@ -306,15 +306,22 @@ describe('rebac check', () => {
           actions: {
             // Can only access if parent org has enterprise plan
             access: {
-              rule: { field: 'organization.plan', operator: Operator.equals, value: 'enterprise' },
+              rule: { field: 'organization.slug', operator: Operator.equals, value: 'enterprise' },
             },
-            // Check deeply nested entitlement
+          },
+        },
+        'db:inquiry': {
+          actions: {
+            // A Json column reads on by dotted path
             useFeature: {
               rule: {
-                field: 'organization.entitlements.advancedFeatures',
+                field: 'sourceOrganization.slug',
                 operator: Operator.equals,
-                value: true,
+                value: 'enterprise',
               },
+            },
+            readContent: {
+              rule: { field: 'content.advancedFeatures', operator: Operator.equals, value: true },
             },
           },
         },
@@ -323,7 +330,7 @@ describe('rebac check', () => {
             // Check 3 levels deep
             accessPremium: {
               rule: {
-                field: 'space.organization.plan',
+                field: 'space.organization.slug',
                 operator: Operator.equals,
                 value: 'enterprise',
               },
@@ -333,10 +340,10 @@ describe('rebac check', () => {
       },
     };
 
-    it('accesses parent relation attribute (organization.plan)', () => {
+    it('accesses parent relation attribute (organization.slug)', () => {
       const record = {
         id: 'space-1',
-        organization: { id: 'org-1', plan: 'enterprise' },
+        organization: { id: 'org-1', slug: 'enterprise' },
       };
       expect(check(permix, schema, 'space', record, 'access')).toBe(true);
     });
@@ -344,25 +351,22 @@ describe('rebac check', () => {
     it('denies when parent attribute does not match', () => {
       const record = {
         id: 'space-1',
-        organization: { id: 'org-1', plan: 'free' },
+        organization: { id: 'org-1', slug: 'free' },
       };
       expect(check(permix, schema, 'space', record, 'access')).toBe(false);
     });
 
-    it('accesses nested object property (organization.entitlements.advancedFeatures)', () => {
-      const record = {
-        id: 'space-1',
-        organization: { id: 'org-1', entitlements: { advancedFeatures: true } },
-      };
-      expect(check(permix, schema, 'space', record, 'useFeature')).toBe(true);
+    it('reads into a Json column by dotted path (content.advancedFeatures)', () => {
+      const record = { id: 'inq-1', content: { advancedFeatures: true } };
+      expect(check(permix, schema, 'inquiry', record, 'readContent')).toBe(true);
     });
 
-    it('accesses 3 levels deep (space.organization.plan)', () => {
+    it('accesses 3 levels deep (space.organization.slug)', () => {
       const record = {
         id: 'su-1',
         space: {
           id: 'space-1',
-          organization: { id: 'org-1', plan: 'enterprise' },
+          organization: { id: 'org-1', slug: 'enterprise' },
         },
       };
       expect(check(permix, schema, 'spaceUser', record, 'accessPremium')).toBe(true);
@@ -731,12 +735,12 @@ describe('rebac check', () => {
       expect(check(permix, schema, 'organization', record, 'own')).toBe(false);
     });
 
-    it('returns false when relation field missing from Prisma schema', () => {
+    it('throws when a rule names a relation the schema map does not declare', () => {
       const badSchema: RebacSchema = {
         permissions: { 'db:space': { actions: { own: { rel: 'fakeRelation', action: 'own' } } } },
       };
       const record = { id: 'space-1', fakeRelation: { id: 'fake-1' } };
-      expect(check(permix, badSchema, 'space', record, 'own')).toBe(false);
+      expect(() => check(permix, badSchema, 'space', record, 'own')).toThrow('has no relation');
     });
 
     it('handles deeply nested delegation chains', async () => {
@@ -760,14 +764,20 @@ describe('rebac check', () => {
       expect(check(permix, deepSchema, 'organization', record, 'd')).toBe(false);
     });
 
-    it('throws on cycle in permission graph', () => {
+    it('a loop made by data denies (permissions 0.23)', () => {
       // The prisma map template bakes into `check` has no cycle, so generate a relation map with a
       // real space <-> organization cycle and drive the imported engine with it directly.
       const relations: Record<string, Record<string, string>> = {
         space: { organization: 'organization' },
         organization: { parentSpace: 'space' },
       };
-      const toOne = (type: string) => ({ kind: 'object' as const, type, isList: false });
+      const toOne = (type: string, segment: string) => ({
+        kind: 'object' as const,
+        type,
+        isList: false,
+        fromFields: [`${segment}Id`],
+        toFields: ['id'],
+      });
       const cyclicCheck = createRebacCheck({
         resources: { space: 'space', organization: 'organization' },
         fieldMap: {
@@ -776,7 +786,7 @@ describe('rebac check', () => {
               model,
               {
                 fields: Object.fromEntries(
-                  Object.entries(fields).map(([segment, type]) => [segment, toOne(type)]),
+                  Object.entries(fields).map(([segment, type]) => [segment, toOne(type, segment)]),
                 ),
               },
             ]),
@@ -795,9 +805,9 @@ describe('rebac check', () => {
 
       // No grants — forces schema evaluation down the cyclic relation walk.
       const noGrants = { check: () => false, isSuperadmin: () => false, getActor: () => null };
-      expect(() =>
-        cyclicCheck(noGrants, cyclicSchema, { resource: 'space', record: space }, 'own'),
-      ).toThrow(/Cycle detected/);
+      expect(cyclicCheck(noGrants, cyclicSchema, { resource: 'space', record: space }, 'own')).toBe(
+        false,
+      );
     });
   });
 
@@ -911,7 +921,7 @@ describe('rebac check', () => {
           read: {
             any: [
               { rel: 'user', action: 'read' },
-              { rule: { field: 'shareToken', operator: Operator.equals, value: 'public' } },
+              { rule: { field: 'label', operator: Operator.equals, value: 'public' } },
             ],
           },
         },

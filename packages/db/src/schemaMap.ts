@@ -4,7 +4,7 @@
  * @partOf primitive:authz, infrastructure:prisma
  * @uses none
  */
-import type { FieldMap } from '@inixiative/json-rules';
+import type { FieldMap } from '@inixiative/field-map';
 import type { SchemaMap } from '@inixiative/permissions';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
@@ -14,6 +14,6 @@ export const schemaMap: SchemaMap = {
   resources: Object.fromEntries(
     Object.keys(prismaMap.models).map((model) => [`db:${lowerFirst(model)}`, model]),
   ),
-  fieldMap: prismaMap as unknown as FieldMap,
+  fieldMap: prismaMap,
   polymorphism: PolymorphismRegistry,
 };

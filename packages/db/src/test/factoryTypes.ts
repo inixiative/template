@@ -73,7 +73,7 @@ export type TypedBuildResult<
   context: BuildContext & { [D in Deps[number] as Uncapitalize<D>]: ModelOf<D> };
 };
 
-import type { Identifier } from '@template/db/utils/prismaMapRelations';
+import type { Identifier } from '@inixiative/field-map';
 
 export type DependencyConfig = {
   modelName: ModelName;

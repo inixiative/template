@@ -6,7 +6,7 @@
  */
 import { isArmColumns } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { type RelationInfo, relationsOfModel } from '@template/db/utils/prismaMapRelations';
+import { type ModelRelation, relationsOfModel } from '@template/db/utils/prismaMapRelations';
 
 type Row = Record<string, unknown>;
 
@@ -15,7 +15,7 @@ export const polymorphicArmRelation = (
   model: ModelName,
   axisField: string,
   value: string,
-): RelationInfo => {
+): ModelRelation => {
   const relation = relationsOfModel(model).find(
     ({ targetModel, foreignKey }) =>
       targetModel === value &&
