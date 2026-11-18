@@ -37,7 +37,7 @@
 
 A name says exactly what the thing is, so someone reading it for the first time, outside this team,
 knows what a call does without opening it. Long names that read like a sentence are fine
-(`describeWhetherLensFiltersOperationRows`); shortcuts, metaphors and mechanism words are not. When
+(`actorOperatesOwnerUserOrManagesOwnerTenant`); shortcuts, metaphors and mechanism words are not. When
 the vocabulary drifts (seven verbs for "read", one word for two ideas), every reader pays for it, so
 each word below has one meaning and every name uses it.
 
@@ -45,21 +45,21 @@ each word below has one meaning and every name uses it.
 
 | Word | Means | Example |
 |------|-------|---------|
-| `fetch` | Reads with I/O: database, cache, Redis, HTTP | `fetchSenderRowThroughLens`, `fetchThroughCache` |
-| no verb | A pure in-memory lookup, or a plain value built from inputs | `cacheKeysForRecord`, `sensitiveFieldsOf`, `lensFromFieldTypes` |
+| `fetch` | Reads with I/O: database, cache, Redis, HTTP | `fetchCachedRecordWithTargetEntitlements`, `fetchThroughCache` |
+| no verb | A pure in-memory lookup, or a plain value built from inputs | `encryptedColumnNamesForKey`, `sensitiveFieldsOf`, `lensFromFieldTypes` |
 | `…OrThrow` | Throws when nothing is there | `openTransactionForPrismaQueryOrThrow` |
 | `make` | Returns a function, handler or stateful handle | `makeController`, `makeJob`, `makeLock` |
 | `create` | Writes a record, or builds an adapter client | `createInquiry`, `createResendClient` |
 | `register` | Adds something to a registry (a side effect) | `registerFactory`, `registerTestTracker` |
 | `define` | Declares a typed definition and returns it; registers nothing | `defineStream` |
 | `validate` | Throws when the input is wrong; never returns a problem | `validateWhereIsNotEmpty` |
-| `aToB` | Converts one shape to another | `stripeToUser`, `senderToOwnerScope` |
+| `aToB` | Converts one shape to another | `stripeToUser` |
 | `read` | Route and controller names only | `organizationRead`, `readRoute` |
 | `resolve` | Picks one value from several sources by precedence | |
 | `get` | Never in our names; only where a library defines it | `getByRole`, Hono's `c.get` |
 
 A boolean is a question (`isUsableLoopBindingName`). A function that does two things says both
-(`readRollingCacheAndQueueRefreshWhenMissing`). Code lives in `util`, never `helper`; backend
+(`recomputeAndStoreMissingComponentSlugs`). Code lives in `util`, never `helper`; backend
 business logic is `services`; `handlers` are jobs and frontend event handlers. Zustand slices keep
 `create…Slice` (`ZUSTAND.md`).
 
