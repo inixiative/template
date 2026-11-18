@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  type Condition,
-  createLens,
-  type FieldMap,
-  type LensNarrowing,
-} from '@inixiative/json-rules';
+import type { FieldMap } from '@inixiative/field-map';
+import { type Condition, createLens, type LensNarrowing } from '@inixiative/json-rules';
 import { branchOnRuleHealth, referenceKey, ruleIssues } from '@template/shared/rules/ruleHealth';
 
 const map: FieldMap = {

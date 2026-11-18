@@ -4,7 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { hasDeletedAt, modelFieldAtPath, modelFields } from '@template/db/utils/fieldMetadata';
+import { fieldAtPath, modelOf } from '@inixiative/field-map';
+import { prismaMap } from '@template/db/generated/prismaMap';
+import { hasDeletedAt } from '@template/db/utils/fieldMetadata';
 import { type NodeScope, walkWhere } from '@template/db/utils/whereWalker';
 import { castArray } from 'lodash-es';
 
@@ -39,7 +41,7 @@ export const liveWhere = (model: string, where: Record<string, unknown>): Record
 
 const listRelationNames = (model: string): Record<string, true> =>
   Object.fromEntries(
-    Object.entries(modelFields(model) ?? {})
+    Object.entries(modelOf(prismaMap, model)?.fields ?? {})
       .filter(([, field]) => field.kind === 'object' && field.isList)
       .map(([name]) => [name, true as const]),
   );
@@ -54,7 +56,7 @@ const liveCount = (model: string, count: unknown): unknown => {
   if (!select) return count;
   const scoped: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(select)) {
-    const field = modelFieldAtPath(model, name);
+    const field = fieldAtPath(prismaMap, model, name);
     const live = field ? liveScope(field.type) : undefined;
     if (!value || !field || !live) {
       scoped[name] = value;
@@ -78,7 +80,7 @@ export const liveIncludes = (
       out[name] = liveCount(model, value);
       continue;
     }
-    const field = modelFieldAtPath(model, name);
+    const field = fieldAtPath(prismaMap, model, name);
     if (!value || field?.kind !== 'object') {
       out[name] = value;
       continue;

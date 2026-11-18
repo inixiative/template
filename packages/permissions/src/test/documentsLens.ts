@@ -4,9 +4,10 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { createLens, type FieldMap, type Lens } from '@inixiative/json-rules';
+import type { FieldMap, ScalarType } from '@inixiative/field-map';
+import { createLens, type Lens } from '@inixiative/json-rules';
 
-const scalar = (type: string) => ({ kind: 'scalar' as const, type });
+const scalar = (type: ScalarType) => ({ kind: 'scalar' as const, type });
 const toMany = (type: string) => ({ kind: 'object' as const, type, isList: true });
 const toOne = (type: string) => ({ kind: 'object' as const, type, isList: false });
 

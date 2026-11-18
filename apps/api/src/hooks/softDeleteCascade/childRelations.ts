@@ -4,14 +4,15 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { modelOf } from '@inixiative/field-map';
 import {
   hasDeletedAt,
   isArmColumns,
   type ModelName,
-  modelFields,
   modelNames,
   polymorphismConfigForModel,
 } from '@template/db';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { CASCADE_EXEMPT } from '#/hooks/softDeleteCascade/cascadeExempt';
 
 export type ChildRelation = {
@@ -42,7 +43,7 @@ export const childRelations = (model: string): ChildRelation[] => {
   if (cached) return cached;
 
   const children = modelNames.flatMap((child) =>
-    Object.entries(modelFields(child) ?? {}).flatMap(([field, def]) => {
+    Object.entries(modelOf(prismaMap, child)?.fields ?? {}).flatMap(([field, def]) => {
       if (
         def.kind !== 'object' ||
         def.type !== model ||

@@ -4,6 +4,8 @@
  * @partOf primitive:caching, infrastructure:redis
  * @uses infrastructure:prisma
  */
+
+import type { Identifier } from '@inixiative/field-map';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import {
   type AccessorName,
@@ -12,8 +14,6 @@ import {
   toAccessor,
 } from '@template/db/utils/modelNames';
 import { compact } from 'lodash-es';
-
-type Identifier = string | Record<string, string>;
 
 type CacheDomain = AccessorName | ModelName | (string & {});
 

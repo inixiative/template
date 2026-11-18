@@ -4,16 +4,16 @@
  * @partOf infrastructure:prisma
  * @uses primitive:routeTemplates
  */
+import { fieldAtPath, isScalarField, modelOf } from '@inixiative/field-map';
 import {
   andWhere,
   bindLens,
   getLensRoot,
-  type LensNarrowing,
   listLensBindings,
   type RuleValue,
 } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
-import { isScalarField, modelFieldAtPath, modelFields } from '@template/db';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { stableHash } from '@template/shared/utils';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
@@ -196,13 +196,13 @@ export const paginate = async <
 // why: either voids the boundary comparison or silently skips rows on ties. That column is the
 // why: model's own @id, read off prismaMap rather than assumed by name.
 const primaryKeysOf = (model: string): string[] =>
-  Object.entries(modelFields(model) ?? {})
+  Object.entries(modelOf(prismaMap, model)?.fields ?? {})
     .filter(([, field]) => isScalarField(field) && field.isId && field.isRequired)
     .map(([name]) => name);
 
 export const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
   const lastKey = chain[chain.length - 1]?.[0];
-  const lastField = lastKey ? modelFieldAtPath(model, lastKey) : undefined;
+  const lastField = lastKey ? fieldAtPath(prismaMap, model, lastKey) : undefined;
   if (lastField && isScalarField(lastField) && lastField.isId && lastField.isRequired) return chain;
 
   const [primaryKey, ...rest] = primaryKeysOf(model);

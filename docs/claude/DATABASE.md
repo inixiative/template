@@ -110,7 +110,7 @@ packages/db/prisma/
 ```
 packages/db/src/generated/
 ├── client/           # Prisma client
-├── prismaMap.gen.ts  # Runtime model map (@inixiative/prisma-map)
+├── prismaMap.gen.ts  # The field map, with literal types (`field-map generate`, @inixiative/field-map)
 └── zod/              # Zod schemas (prisma-zod-generator)
 ```
 

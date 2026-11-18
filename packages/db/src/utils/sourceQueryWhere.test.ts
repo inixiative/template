@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import type { FieldMap } from '@inixiative/field-map';
 import {
   type Bridge,
   type Condition,
   createLens,
-  type FieldMap,
   indexBridges,
   type LensNarrowing,
   type SourceQuery,
@@ -84,7 +84,7 @@ describe('a source across a bridge — its rows are candidates, re-checked with 
       cardinality: 'oneToOne',
     },
   ];
-  const maps = { prisma: prismaMap as unknown as FieldMap, crm };
+  const maps = { prisma: prismaMap, crm };
   const goldTags: LensNarrowing = {
     parent: createLens({ maps, bridges, mapName: 'prisma', model: 'Tag' }),
     root: {

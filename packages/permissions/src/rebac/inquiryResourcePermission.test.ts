@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { fieldOf, relationTarget } from '@inixiative/field-map';
 import { Operator } from '@inixiative/json-rules';
 import type { HydratedRecord } from '@template/db';
 import { InquiryType, Role } from '@template/db/generated/client/enums';
@@ -21,16 +22,8 @@ import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser
 import { lowerFirst } from 'lodash-es';
 
 type Gated = { any: { all: [{ rule: { operator: string; value: string } }, unknown] }[] };
-type FieldEntry = { kind: string; type: string };
-
-const fieldsOf = (model: string): Record<string, FieldEntry> =>
-  (prismaMap.models as Record<string, { fields: Record<string, FieldEntry> }>)[model]?.fields ?? {};
-
 const modelAt = (path: string): string | undefined =>
-  path.split('.').reduce<string | undefined>((model, name) => {
-    const field = model ? fieldsOf(model)[name] : undefined;
-    return field?.kind === 'object' ? field.type : undefined;
-  }, 'Inquiry');
+  relationTarget(prismaMap, 'Inquiry', path) ?? undefined;
 
 const actionsOf = (model: string) =>
   Object.keys(rebacSchema.permissions[`db:${lowerFirst(model)}`]?.actions ?? {});
@@ -48,7 +41,7 @@ const leafNames = (rule: ActionRule): string[] => {
 const isKnown = (name: string) => {
   // why: `__actor` is the credential the check runs for, not a column of the inquiry
   if (name.startsWith('__actor.')) return true;
-  if (!name.includes(':')) return name.split('.')[0] in fieldsOf('Inquiry');
+  if (!name.includes(':')) return fieldOf(prismaMap, 'Inquiry', name.split('.')[0]) !== undefined;
   const [rel, action] = name.split(':');
   const model = rel ? modelAt(rel) : 'Inquiry';
   return !!model && actionsOf(model).includes(action as string);

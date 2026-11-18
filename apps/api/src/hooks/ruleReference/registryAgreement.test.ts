@@ -6,7 +6,7 @@ import {
   EntitlementResourceModel,
   RuleReferenceTargetModel,
 } from '@template/db/generated/client/enums';
-import { prismaMap } from '@template/db/generated/prismaMap';
+import { isRowIdSource } from '@template/db/utils/ruleReferences';
 import type { EmailOwnerRef } from '@template/email/render';
 import { emailSlotLenses } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
@@ -15,8 +15,6 @@ import { emailLensFor } from '#/lib/email/emailLensFor';
 import { emailTemplateRegistry } from '#/lib/email/emailTemplateRegistry';
 import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
 import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
-
-type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
 
 const ORG = '00000000-0000-7000-8000-000000000001';
 const SPACE = '00000000-0000-7000-8000-000000000002';
@@ -44,11 +42,7 @@ const idSourceModels = (lens: RuleLens): Set<string> => {
   const models = new Set<string>();
   for (const visit of Object.values(projectLens(lens)))
     for (const field of Object.keys(visit.sources))
-      if (
-        visit.fields[field] &&
-        (prismaMap.models as unknown as IdFields)[visit.model]?.fields[field]?.isId
-      )
-        models.add(visit.model);
+      if (visit.fields[field] && isRowIdSource(visit.model, field)) models.add(visit.model);
   return models;
 };
 

@@ -4,8 +4,11 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+import type { FieldEntry } from '@inixiative/field-map';
+import { fieldAtPath } from '@inixiative/field-map';
 import { getLensRoot, type LensNarrowing, projectLens } from '@inixiative/json-rules';
-import { type ModelField, type ModelName, modelFieldAtPath, toModelName } from '@template/db';
+import { type ModelName, toModelName } from '@template/db';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { dialect, searchablePaths } from '@template/db/lens';
 import { omitSensitiveFieldsFromLens } from '@template/db/lens/omitSensitiveFieldsFromLens';
 import {
@@ -96,16 +99,16 @@ const indexedChildren = (
     .map(([, child]) => child as BracketQueryRecord);
 };
 
-const kindLabel = (field: ModelField): string => (field.kind === 'enum' ? 'enum' : field.type);
+const kindLabel = (field: FieldEntry): string => (field.kind === 'enum' ? 'enum' : field.type);
 
 const PATTERN_OPS = new Set(['contains', 'startsWith', 'endsWith']);
 const EQUALITY_OPS = new Set(['equals', 'not']);
 
-const isTextField = (field: ModelField): boolean =>
+const isTextField = (field: FieldEntry): boolean =>
   field.kind === 'scalar' && field.type === 'String' && !field.isList;
 
 const matchesLiterally = (
-  field: ModelField,
+  field: FieldEntry,
   op: string,
   value: unknown,
   insensitive: boolean,
@@ -117,7 +120,7 @@ const matchesLiterally = (
     : value;
 
 const wrapBareValue = (
-  field: ModelField,
+  field: FieldEntry,
   value: BracketQueryPrimitive,
 ): Record<string, unknown> => {
   // Bare symbols (null/true/false) on a json column → equals that json scalar (null
@@ -133,7 +136,7 @@ const wrapBareValue = (
 };
 
 const transformOperatorValue = (
-  field: ModelField,
+  field: FieldEntry,
   value: BracketQueryRecord,
   fieldPath: string,
 ): Record<string, unknown> => {
@@ -245,7 +248,7 @@ const validateAndTransformSearchFields = (
           message: `Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
         });
       }
-      const field = modelFieldAtPath(model, stripRelationOperators(currentPath));
+      const field = fieldAtPath(prismaMap, model, stripRelationOperators(currentPath));
       if (!field) {
         // Path doesn't resolve in the schema (admin bypass let through an
         // unknown field, or it's a synthetic path). Pass through as-is.
@@ -277,7 +280,7 @@ const validateAndTransformSearchFields = (
 
     // Json fields use their own operator set (path/string_contains/…), translated
     // to a Prisma JSON where rather than the scalar operator pipeline.
-    const jsonField = modelFieldAtPath(model, stripRelationOperators(currentPath));
+    const jsonField = fieldAtPath(prismaMap, model, stripRelationOperators(currentPath));
     if (jsonField?.kind === 'scalar' && jsonField.type === 'Json') {
       if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
         throw makeError({
@@ -331,7 +334,7 @@ const validateAndTransformSearchFields = (
           message: `Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
         });
       }
-      const field = modelFieldAtPath(model, stripRelationOperators(currentPath));
+      const field = fieldAtPath(prismaMap, model, stripRelationOperators(currentPath));
       if (!field) {
         // Unknown path under skip-bypass — pass through unchanged.
         result[key] = value;
@@ -436,7 +439,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     // tokens AND together.
     for (const token of search.trim().split(/\s+/)) {
       const searchConditions = globalSearchFields.flatMap((field) => {
-        const def = modelFieldAtPath(model, stripRelationOperators(field));
+        const def = fieldAtPath(prismaMap, model, stripRelationOperators(field));
         const clause = def && fieldSearchOperator(def, token);
         if (!clause) return [];
         if (!isValidPathNotation(field))

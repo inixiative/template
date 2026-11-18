@@ -4,22 +4,23 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { fieldOf } from '@inixiative/field-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 
-type MappedField = { isRequired: boolean; default?: { kind: string; value?: unknown } };
-
-const fieldOf = (modelName: ModelName, field: string) =>
-  (prismaMap.models[modelName]?.fields as Record<string, MappedField> | undefined)?.[field];
+const defaultOf = (modelName: ModelName, field: string) => {
+  const entry = fieldOf(prismaMap, modelName, field);
+  return entry && 'default' in entry ? entry.default : undefined;
+};
 
 export const discriminatorDefault = (modelName: ModelName, field: string): unknown => {
-  const fieldDefault = fieldOf(modelName, field)?.default;
+  const fieldDefault = defaultOf(modelName, field);
   return fieldDefault?.kind === 'literal' ? fieldDefault.value : undefined;
 };
 
 export const discriminatorRequiresValue = (modelName: ModelName, field: string) =>
-  fieldOf(modelName, field)?.isRequired === true &&
+  fieldOf(prismaMap, modelName, field)?.isRequired === true &&
   discriminatorDefault(modelName, field) === undefined;
 
 export const withDiscriminatorDefaults = <T extends Record<string, unknown>>(

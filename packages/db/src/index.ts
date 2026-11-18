@@ -23,7 +23,7 @@ export { Prisma } from './generated/client/client';
 export * from './generated/zod/enums.gen';
 // Scalar schemas (model schemas without relations)
 export * from './generated/zod/scalarSchemas.gen';
-export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
+export type { HydratedRecord, HydrateInclude } from './hydrate';
 // Hydration
 export { fetchCachedRecordWithTargetEntitlements, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
@@ -97,13 +97,6 @@ export {
 export * from './registries';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
-export {
-  type EnumField,
-  isScalarField,
-  type ModelField,
-  type RelationField,
-  type ScalarField,
-} from '@inixiative/prisma-map';
 export { equalsSuppliedBind } from './registries/equalsSuppliedBind';
 export {
   BIND_NAME_BY_OWNER_MODEL,
@@ -156,7 +149,7 @@ export {
   fetchRuleReferenceTargetsDeletedAtForUpdate,
   type RuleReferenceTargetDeletedState,
 } from './utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
-export { hasDeletedAt, modelFieldAtPath, modelFields } from './utils/fieldMetadata';
+export { hasDeletedAt } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';

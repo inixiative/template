@@ -20,7 +20,7 @@ const subjectIs = (
   where: Record<string, string>,
 ): Prisma.AuditLogWhereInput => ({
   subjectModel: model,
-  [polymorphicArmRelation('AuditLog', 'subjectModel', model).relationName]: {
+  [polymorphicArmRelation('AuditLog', 'subjectModel', model).field]: {
     ...where,
     ...(hasDeletedAt(model) ? { deletedAt: undefined } : {}),
   },

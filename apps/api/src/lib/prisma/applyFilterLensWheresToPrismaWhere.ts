@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { modelOf } from '@inixiative/field-map';
 import {
   andWhere,
   describeRule,
@@ -13,7 +14,8 @@ import {
   projectLens,
   toPrisma,
 } from '@inixiative/json-rules';
-import { db, modelFields, walkWhere } from '@template/db';
+import { db, walkWhere } from '@template/db';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { makeError } from '#/lib/errors';
 
 type PlanStep = {
@@ -35,7 +37,7 @@ const scopePlan = (
   const step = plan.steps[0] as PlanStep;
   const fk = step.args?.by?.[0];
   if (!step.model || !fk || !step.args) return;
-  const back = Object.entries(modelFields(step.model) ?? {}).find(
+  const back = Object.entries(modelOf(prismaMap, step.model)?.fields ?? {}).find(
     ([, def]) => def.kind === 'object' && def.type === rootModel && def.fromFields?.includes(fk),
   );
   if (!back) return;

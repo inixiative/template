@@ -22,8 +22,9 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^4.1.0",
-    "@inixiative/rules-builder": "^0.32.0",
+    "@inixiative/field-map": "^0.1.1",
+    "@inixiative/json-rules": "^4.2.0",
+    "@inixiative/rules-builder": "^0.33.0",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
     "html-to-text": "^10.0.1",

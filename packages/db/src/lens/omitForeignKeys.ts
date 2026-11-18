@@ -5,19 +5,22 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { modelOf } from '@inixiative/field-map';
 import type { Lens, LensNarrowing, NarrowingDefaults } from '@inixiative/json-rules';
 import { prismaMap } from '@template/db/generated/prismaMap';
 
-type RelationFields = Record<string, { fromFields?: readonly string[] }>;
-
-const foreignKeyColumns = (fields: RelationFields): string[] => [
-  ...new Set(Object.values(fields).flatMap((field) => field.fromFields ?? [])),
+const foreignKeyColumns = (model: string): string[] => [
+  ...new Set(
+    Object.values(modelOf(prismaMap, model)?.fields ?? {}).flatMap((field) =>
+      field.kind === 'object' ? (field.fromFields ?? []) : [],
+    ),
+  ),
 ];
 
 const foreignKeyDefaults: NarrowingDefaults = {
   models: Object.fromEntries(
-    Object.entries(prismaMap.models as Record<string, { fields: RelationFields }>)
-      .map(([model, { fields }]) => [model, { omits: foreignKeyColumns(fields) }] as const)
+    Object.keys(prismaMap.models)
+      .map((model) => [model, { omits: foreignKeyColumns(model) }] as const)
       .filter(([, { omits }]) => omits.length > 0),
   ),
 };

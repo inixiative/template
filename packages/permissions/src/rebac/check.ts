@@ -19,6 +19,4 @@ export const check = (
   record: HydratedRecord,
   actionOrRule: ActionRule,
   data?: Record<string, HydratedRecord[]>,
-  visited?: Set<string>,
-): boolean =>
-  rebacCheck(permix, schema, { resource: `db:${model}`, record, data }, actionOrRule, visited);
+): boolean => rebacCheck(permix, schema, { resource: `db:${model}`, record, data }, actionOrRule);

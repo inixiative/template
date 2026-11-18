@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { modelOf, tableName } from '@inixiative/field-map';
 import { db, hasDeletedAt, orderedListRegistry, Prisma } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
 
@@ -13,8 +14,8 @@ type Row = Record<string, unknown>;
 // --- SQL building via Prisma.sql (parameterized, no string interpolation for values) ---
 
 const table = (model: string) => {
-  const entry = (prismaMap.models as Record<string, { dbName: string | null }>)[model];
-  return Prisma.raw(`"${entry?.dbName ?? model}"`);
+  const entry = modelOf(prismaMap, model);
+  return Prisma.raw(`"${entry ? tableName(entry, model) : model}"`);
 };
 
 const col = (name: string) => Prisma.raw(`"${name}"`);

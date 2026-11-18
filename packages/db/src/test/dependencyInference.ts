@@ -16,7 +16,7 @@ export const inferDependencies = (modelName: ModelName): Record<string, Dependen
     if (!rel.foreignKey) continue;
 
     // Include all relations - required ones auto-create, optional ones use context if provided
-    deps[rel.relationName] = {
+    deps[rel.field] = {
       modelName: rel.targetModel,
       foreignKey: rel.foreignKey,
       required: rel.isRequired,

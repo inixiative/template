@@ -4,7 +4,9 @@
  * @partOf feature:auditLogs
  * @uses infrastructure:prisma
  */
-import { fetchParentRows, type ModelName, modelFieldAtPath, parentEdgeOf } from '@template/db';
+import { fieldAtPath } from '@inixiative/field-map';
+import { fetchParentRows, type ModelName, parentEdgeOf } from '@template/db';
+import { prismaMap } from '@template/db/generated/prismaMap';
 
 type Row = Record<string, unknown>;
 
@@ -13,7 +15,8 @@ export type ContextRow = { model: ModelName; row: Row };
 const TENANT_COLUMNS = ['organizationId', 'spaceId', 'userId'] as const;
 
 const carriesTenant = (model: ModelName): boolean =>
-  model === 'Organization' || TENANT_COLUMNS.some((column) => modelFieldAtPath(model, column));
+  model === 'Organization' ||
+  TENANT_COLUMNS.some((column) => fieldAtPath(prismaMap, model, column));
 
 /** The row whose tenant columns an audit entry takes: the record's own, or else up its parent edges. */
 export const fetchRowsCarryingTenantColumns = async (

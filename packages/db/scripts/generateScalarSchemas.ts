@@ -3,8 +3,10 @@
  * @kind utils
  * @partOf infrastructure:prisma
  */
+
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { modelOf, relationsOf } from '@inixiative/field-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
 
 const inputDir = join(import.meta.dir, '../src/generated/zod/schemas/variants/input');
@@ -25,11 +27,8 @@ const modelNames = [...new Set([...inputModelNames, ...pureModelNames])].sort();
 const modelRelations: Record<string, string[]> = {};
 
 for (const modelName of modelNames) {
-  const model = prismaMap.models[modelName as keyof typeof prismaMap.models];
-  modelRelations[modelName] = model
-    ? Object.entries(model.fields)
-        .filter(([, field]) => (field as { kind: string }).kind === 'object')
-        .map(([name]) => name)
+  modelRelations[modelName] = modelOf(prismaMap, modelName)
+    ? relationsOf(prismaMap, modelName).map((relation) => relation.field)
     : [];
 }
 

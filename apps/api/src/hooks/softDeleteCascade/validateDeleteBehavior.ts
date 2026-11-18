@@ -4,22 +4,22 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { fieldOf } from '@inixiative/field-map';
 import {
   HARD_DELETE_ON_TOMBSTONE,
   hasDeletedAt,
   isHardDeletedOnTombstone,
   isModelName,
-  modelFields,
   modelNames,
   SKIP_REVIVE,
   SOFT_DELETE_MODEL_SET,
 } from '@template/db';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { childRelations } from '#/hooks/softDeleteCascade/childRelations';
 import { CLOSE_ON_PARENT_DELETE } from '#/hooks/softDeleteCascade/closeOnParentDelete';
 
 const optionalForeignKey = (model: string, fromFields: readonly string[]): boolean => {
-  const fields = modelFields(model);
-  return fromFields.every((name) => fields?.[name]?.isRequired !== true);
+  return fromFields.every((name) => fieldOf(prismaMap, model, name)?.isRequired !== true);
 };
 
 export const hardDeleteOnTombstoneViolations = (

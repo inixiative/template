@@ -4,32 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { ModelField, PrismaMap } from '@inixiative/prisma-map';
+import { fieldOf } from '@inixiative/field-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
 
-// The generated map is declared `as const` (readonly literal arrays); cast once to the lib's
-// structural PrismaMap shape, as prismaMapRelations does.
-const MAP = prismaMap.models as unknown as PrismaMap;
-
-const fieldOfModel = (modelName: string, fieldName: string): ModelField | undefined =>
-  MAP[modelName]?.fields?.[fieldName];
-
-export const modelFields = (modelName: string): Record<string, ModelField> | undefined =>
-  MAP[modelName]?.fields;
-
+/** Whether a model soft-deletes: it has a `deletedAt` column. */
 export const hasDeletedAt = (modelName: string): boolean =>
-  fieldOfModel(modelName, 'deletedAt') !== undefined;
-
-export const modelFieldAtPath = (modelName: string, path: string): ModelField | undefined => {
-  const segments = path.split('.');
-  let currentModel: string | undefined = modelName;
-  for (let i = 0; i < segments.length; i += 1) {
-    if (!currentModel) return undefined;
-    const field = fieldOfModel(currentModel, segments[i]);
-    if (!field) return undefined;
-    if (i === segments.length - 1) return field;
-    if (field.kind !== 'object') return undefined;
-    currentModel = field.type;
-  }
-  return undefined;
-};
+  fieldOf(prismaMap, modelName, 'deletedAt') !== undefined;

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { LensFieldMap } from '@inixiative/json-rules';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -21,7 +22,7 @@ type Surface = {
   source: {
     model: string;
     mapName: string;
-    maps: Record<string, { models: Record<string, { fields: Record<string, unknown> }> }>;
+    maps: Record<string, LensFieldMap>;
   };
   decoration: { facets: { path: string; label: string }[] };
   sourceValues: { model: string; field: string; options: { value: unknown; label?: string }[] }[];
