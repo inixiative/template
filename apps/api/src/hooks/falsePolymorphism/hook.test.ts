@@ -6,7 +6,7 @@ import {
   createOrganizationUser,
   createToken,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 
 // Polymorphism validation is now handled via rules (auto-injected from FalsePolymorphismRegistry)
@@ -49,7 +49,7 @@ describe('falsePolymorphism hook', () => {
   it('fail: User owner with extra organizationId', async () => {
     const { entity: user } = await createUser();
     const { entity: org } = await createOrganization();
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
 
     const promise = async () =>
       db.token.createManyAndReturn({
@@ -72,8 +72,8 @@ describe('falsePolymorphism hook', () => {
   it('fail: createManyAndReturn with invalid item', async () => {
     const { entity: user } = await createUser();
     const { entity: org } = await createOrganization();
-    const seq1 = getNextSeq();
-    const seq2 = getNextSeq();
+    const seq1 = nextFactorySequenceNumber();
+    const seq2 = nextFactorySequenceNumber();
 
     const promise = async () =>
       db.token.createManyAndReturn({
@@ -104,7 +104,7 @@ describe('falsePolymorphism hook', () => {
   describe('create path polymorphism validation', () => {
     it('pass: upsert create path with valid polymorphism', async () => {
       const { entity: user } = await createUser();
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
 
       const result = await db.token.upsert({
         where: { id: 'nonexistent' },
@@ -125,7 +125,7 @@ describe('falsePolymorphism hook', () => {
     it('fail: upsert create path with invalid polymorphism', async () => {
       const { entity: user } = await createUser();
       const { entity: org } = await createOrganization();
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
 
       const promise = async () =>
         db.token.upsert({

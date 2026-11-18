@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { EntitlementInput } from '@template/db';
 import { db } from '@template/db';
 import type { Integration, Organization, Role } from '@template/db/generated/client/client';
 import {
@@ -13,7 +14,7 @@ import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { patch, post } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
@@ -56,7 +57,7 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-const memberKey = async (role: Role, entitlements?: Entry[]) => {
+const memberKey = async (role: Role, entitlements?: EntitlementInput[]) => {
   const { entity: member } = await createOrganizationUser({ role, entitlements }, { organization });
   return (
     await createKeyedToken(
@@ -67,7 +68,7 @@ const memberKey = async (role: Role, entitlements?: Entry[]) => {
 };
 
 describe('granted: the where narrows the kinds an entitlement under the organization reaches (R81, R83)', () => {
-  const grant = async (role: Role, granted: Entry, held?: Entry[]) => {
+  const grant = async (role: Role, granted: EntitlementInput, held?: EntitlementInput[]) => {
     const { entity: member, context } = await createOrganizationUser(
       { role, entitlements: held },
       { organization },
@@ -82,8 +83,12 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
       .status;
   };
 
-  const underOrganization = (where?: Entry['where']) => ({
-    ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['delete']),
+  const underOrganization = (where?: EntitlementInput['where']) => ({
+    ...entitlementInputFor(
+      'db:integration',
+      ['db:organization', organization.id, 'organization'],
+      ['delete'],
+    ),
     ...(where ? { where } : {}),
   });
   const theOrganizations = () =>
@@ -112,7 +117,7 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
   });
 
   it('an admin entitled to read every kind under the organization grants that onward', async () => {
-    const owning = entry(
+    const owning = entitlementInputFor(
       'db:integration',
       ['db:organization', organization.id, 'organization'],
       ['read'],
@@ -122,8 +127,12 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
   });
 
   it("an admin entitled to read the organization's own integrations grants that, not every kind", async () => {
-    const owning = (where?: Entry['where']) => ({
-      ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['read']),
+    const owning = (where?: EntitlementInput['where']) => ({
+      ...entitlementInputFor(
+        'db:integration',
+        ['db:organization', organization.id, 'organization'],
+        ['read'],
+      ),
       ...(where ? { where } : {}),
     });
     const theOrganizationsOwn = owning({
@@ -168,7 +177,7 @@ describe('granted: the where narrows the kinds an entitlement under the organiza
 });
 
 describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one held entitlement (R103)', () => {
-  const grant = async (granted: Entry, held: Entry[]) => {
+  const grant = async (granted: EntitlementInput, held: EntitlementInput[]) => {
     const { entity: member, context } = await createOrganizationUser(
       { role: 'admin', entitlements: held },
       { organization },
@@ -182,8 +191,12 @@ describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one
     return (await app.fetch(post(`/api/v1/organizationUser/${target.id}/entitlements`, [granted])))
       .status;
   };
-  const staticSegments = (where: Entry['where']) => ({
-    ...entry('db:segment', ['db:organization', organization.id, 'organization'], ['own']),
+  const staticSegments = (where: EntitlementInput['where']) => ({
+    ...entitlementInputFor(
+      'db:segment',
+      ['db:organization', organization.id, 'organization'],
+      ['own'],
+    ),
     where,
   });
   const isStatic = { field: 'type', operator: 'equals', value: 'static' };
@@ -199,7 +212,11 @@ describe('an entitlement from an entitlement: a copy, or a narrowed copy, of one
     ).toBe(201);
     expect(
       await grant(
-        entry('db:segment', ['db:organization', organization.id, 'organization'], ['own']),
+        entitlementInputFor(
+          'db:segment',
+          ['db:organization', organization.id, 'organization'],
+          ['own'],
+        ),
         [held],
       ),
     ).toBe(403);

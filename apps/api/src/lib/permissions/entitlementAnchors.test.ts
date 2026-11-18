@@ -10,7 +10,7 @@ import {
 } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
-import { entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { grantEntitlements } from '#tests/utils/entitlements';
 
 describe("an entitlement's anchor is read when the row is written, even past the grant check", () => {
@@ -36,7 +36,11 @@ describe("an entitlement's anchor is read when the row is written, even past the
 
   it('an anchor that does not exist is refused with a 422, not a 500', async () => {
     const response = await grantEntitlements(app, onHolder(), [
-      entry('db:organizationUser', ['db:organizationUser', 'no-such-member'], ['read']),
+      entitlementInputFor(
+        'db:organizationUser',
+        ['db:organizationUser', 'no-such-member'],
+        ['read'],
+      ),
     ]);
     expect(response.status).toBe(422);
     expect(((await response.json()) as { message: string }).message).toBe(
@@ -49,7 +53,7 @@ describe("an entitlement's anchor is read when the row is written, even past the
     await db.organizationUser.update({ where: { id: anchor.id }, data: { deletedAt: new Date() } });
 
     const response = await grantEntitlements(app, onHolder(), [
-      entry('db:organizationUser', ['db:organizationUser', anchor.id], ['read']),
+      entitlementInputFor('db:organizationUser', ['db:organizationUser', anchor.id], ['read']),
     ]);
     expect(response.status).toBe(422);
   });

@@ -7,7 +7,7 @@ import { del, post } from '#tests/utils/request';
 type Fetch = { fetch: (request: Request) => Promise<Response> };
 
 /** A stored row as the input that writes it: no where or path when it has none. */
-export const asInput = (row: Entitlement): EntitlementInput =>
+export const entitlementRowToInput = (row: Entitlement): EntitlementInput =>
   toEntitlementInput(toEntitlementEntry(row));
 
 const liveRows = (target: EntitlementTarget) =>
@@ -18,7 +18,7 @@ const liveRows = (target: EntitlementTarget) =>
 
 /** The rows a target holds now, as inputs, in the order they were granted. */
 export const heldEntitlements = async (target: EntitlementTarget): Promise<EntitlementInput[]> =>
-  (await liveRows(target)).map(asInput);
+  (await liveRows(target)).map(entitlementRowToInput);
 
 /** The ids of the target's live rows that store these inputs. */
 export const entitlementIds = async (
@@ -26,7 +26,7 @@ export const entitlementIds = async (
   inputs: EntitlementInput[],
 ): Promise<string[]> =>
   (await liveRows(target))
-    .filter((row) => inputs.some((input) => isEqual(asInput(row), input)))
+    .filter((row) => inputs.some((input) => isEqual(entitlementRowToInput(row), input)))
     .map((row) => row.id);
 
 const routeOf = (target: EntitlementTarget) =>

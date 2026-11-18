@@ -9,7 +9,7 @@ import { readRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { integrationReadResponseSchema } from '#/modules/integration/schemas/integrationSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meReadManyIntegrationsRoute = readRoute({
   model: Modules.me,
@@ -20,5 +20,5 @@ export const meReadManyIntegrationsRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('Integration') },
   responseSchema: integrationReadResponseSchema,
-  tags: [Tags.me, Tags.integration],
+  tags: [OpenApiTags.me, OpenApiTags.integration],
 });

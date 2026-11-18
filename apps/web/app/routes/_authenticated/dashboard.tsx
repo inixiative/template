@@ -4,12 +4,12 @@
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
-import { usePageMeta } from '@template/ui/hooks';
+import { useDocumentTitleAndDescription } from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
 
 const DashboardPage = () => {
   const context = useAppStore((state) => state.tenant.context);
-  const { title, description } = usePageMeta();
+  const { title, description } = useDocumentTitleAndDescription();
 
   return (
     <div className="p-8">

@@ -110,7 +110,7 @@ Each workflow step ultimately produces the same typed handoff to an adapter clas
 
 ### Typed Event Definitions (like Jobs + Inquiries)
 
-Each event has a typed payload schema, following the pattern established by `JobPayloads` and `InquiryHandler`:
+Each event has a typed payload schema, following the pattern established by `JobPayloads` and `InquiryService`:
 
 ```typescript
 type AppEventPayloads = {
@@ -329,14 +329,14 @@ The template ships with all adapter class keys visible but noop/null for unconfi
 - `emitAppEvent(name, data, options?)` — typed, auto-enriches actor from `auditActorContext`
 - `makeAppEvent(handler)` — returns `AppEventHandlerFn`, wired via centralized barrel
 - `AppEventPayloads` map + `AppEventName` const (mirrors `JobPayloads`/`JobHandlerName`)
-- Bridges: email (enqueues `sendEmail` job), websocket (targeted channels/users), observe (enqueues `recordAppEvent` job)
+- Bridges: email (enqueues `planEmailDeliveries` job), websocket (targeted channels/users), observe (enqueues `recordAppEvent` job)
 - `BroadcastRegistry<A>` — unified adapter primitive (pick-one or broadcast-all)
 - Email registry (`lib/email.ts`): Resend + Console adapters
 - Observe registry (`lib/observe.ts`): DB adapter (writes to `AppEvent` table via job)
-- Bouncer email verification in `sendEmail` job (skip undeliverable/disposable)
+- Bouncer email verification in `planEmailDeliveries` job (skip undeliverable/disposable)
 - `EmailClient.sendBatch` — required interface, Resend chunks at 100, Console loops
 - `EmailTarget` union: `userIds`, `raw`, `orgRole`, `spaceRole` with role escalation
-- `InquiryHandler.appEvents` key — per-type notification callbacks (sent/approved/denied/changesRequested/resolved)
+- `InquiryService.appEvents` key — per-type notification callbacks (sent/approved/denied/changesRequested/resolved)
 - System email template seeds: email-verification, org-invitation, welcome + shared MJML components
 - `AppEvent` Prisma model — persistent event log (name, actor, resource, data)
 - Transaction-aware: defers to `db.onCommit()` inside transactions

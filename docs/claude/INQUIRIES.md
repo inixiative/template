@@ -15,21 +15,22 @@
 - [Source & Target Resolution](#source--target-resolution)
   - [Source](#source)
   - [Target](#target)
-- [Handler Architecture](#handler-architecture)
+- [Service Architecture](#service-architecture)
   - [`unique` enforcement](#unique-enforcement)
   - [`validate` — pre-create and pre-update checks](#validate--pre-create-and-pre-update-checks)
   - [The request and the response](#the-request-and-the-response)
-  - [Current Handlers](#current-handlers)
+  - [Current Services](#current-services)
   - [Asking to change a record's entitlements](#asking-to-change-a-records-entitlements)
+  - [Transferring a space](#transferring-a-space)
 - [Response Schemas](#response-schemas)
 - [Permissions (ReBAC)](#permissions-rebac)
-- [Adding a New Handler](#adding-a-new-handler)
+- [Adding a New Service](#adding-a-new-service)
   - [Status utilities (`validations/validateInquiryStatus.ts`)](#status-utilities-validationsvalidateinquirystatusts)
   - [Create route permission pattern](#create-route-permission-pattern)
 - [Frontend](#frontend)
   - [Constants and utilities (`packages/ui/src/lib/inquiries/queryKeys.ts`)](#constants-and-utilities-packagesuisrclibinquiriesquerykeysts)
   - [Query key invalidation maps](#query-key-invalidation-maps)
-  - [`useInquiryPermission`](#useinquirypermission)
+  - [`useCanActOnInquiry`](#usecanactoninquiry)
   - [UI Components](#ui-components)
     - [`InquirySourceControls`](#inquirysourcecontrols)
     - [`InquiryTargetControls`](#inquirytargetcontrols)
@@ -44,7 +45,7 @@ The inquiry system is a generic, type-safe workflow engine for requests that req
 
 An inquiry has a **source** (who sends it) and a **target** (who receives and resolves it). Both sides are represented with explicit polymorphic fields (`sourceModel` + the matching FK) rather than a single generic ID.
 
-Every inquiry type is backed by a **handler** that defines its source/target structure, content schema, validation logic, and the side effect that runs on approval.
+Every inquiry type is backed by a **service** that defines its source/target structure, content schema, validation logic, and the side effect that runs on approval.
 
 ## Data Model
 
@@ -100,7 +101,7 @@ sent  → canceled
 | `draft` | Created but not yet sent. Editable. |
 | `sent` | Sent to target. Awaiting resolution. |
 | `changesRequested` | Target asked source to revise and re-send. |
-| `approved` | Target approved. Handler's side effect has run. |
+| `approved` | Target approved. Service's side effect has run. |
 | `denied` | Target denied. No side effect. |
 | `canceled` | Source withdrew the inquiry. |
 
@@ -124,7 +125,7 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 {
   type: InquiryType;
   targetModel: InquiryResourceModel;
-  content: Record<string, unknown>;   // validated against handler's contentSchema
+  content: Record<string, unknown>;   // validated against service's contentSchema
   status?: 'draft' | 'sent';          // defaults to 'draft'; 'sent' sends immediately
   targetUserId?: string;              // User (or targetEmail), OrganizationUser, SpaceUser
   targetEmail?: string;               // User only; creates a guest user if not found
@@ -137,7 +138,7 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 
 **Response:** `inquiryResponseSchema` — includes `targetUser`, `targetOrganization`, `targetSpace`.
 
-**Which `targetModel` and `content` a type takes:** `GET /api/v1/inquiry/info` (public) lists, for every registered handler, its `sources`, `targets`, the JSON Schema of `content`, of the extra resolve-body fields (`resolutionInput`) and of the stored `resolution`, plus `unique` and `defaultExpirationDays`. It is generated from `inquiryHandlers`, so a new handler appears there without route changes. A `targetModel` outside `targets` answers 422 (`validateInquiryHandler`); content that fails `contentSchema` answers 422 too.
+**Which `targetModel` and `content` a type takes:** `GET /api/v1/inquiry/info` (public) lists, for every registered service, its `sources`, `targets`, the JSON Schema of `content`, of the extra resolve-body fields (`resolutionInput`) and of the stored `resolution`, plus `unique` and `defaultExpirationDays`. It is generated from `inquiryServices`, so a new service appears there without route changes. A `targetModel` outside `targets` answers 422 (`validateInquiryTypeAcceptsSourceAndTargetModels`); content that fails `contentSchema` answers 422 too.
 
 ### Lifecycle — on the inquiry resource directly
 
@@ -201,11 +202,11 @@ POST /api/admin/inquiry          → sourceModel: admin (no FK)
 
 No create route sources an `OrganizationUser`, `SpaceUser`, `Integration`, `Token` or `Project` inquiry; those sources are set by the service that already holds the party.
 
-The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/rebac/inquiryTypes.ts`) are checked by `validateInquiryHandler` to confirm the resolved source is valid for this inquiry type.
+The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/rebac/inquiryTypes.ts`) are checked by `validateInquiryTypeAcceptsSourceAndTargetModels` to confirm the resolved source is valid for this inquiry type.
 
 ### Target
 
-`resolveInquiryTarget` resolves from `body.targetModel` (already validated by `validateInquiryHandler`):
+`resolveInquiryTarget` resolves from `body.targetModel` (already validated by `validateInquiryTypeAcceptsSourceAndTargetModels`):
 
 - `targetModel: User` → `targetUserId` OR `targetEmail`: `findUserOrCreateGuest` (`apps/api/src/modules/user/services/findOrCreateGuest.ts`) returns the user with that normalized email or creates an unverified guest and emits `user.created` with `isGuest: true`
 - `targetModel: Organization` → `targetOrganizationId` OR `targetOrganizationSlug`
@@ -218,12 +219,12 @@ The type's declared `sources` (`INQUIRY_TYPES` in `packages/permissions/src/reba
 
 Slug-based lookups are useful when callers know human-readable identifiers rather than UUIDs.
 
-## Handler Architecture
+## Service Architecture
 
-Every inquiry type maps to a handler registered in `handlers/index.ts`.
+Every inquiry type maps to a service registered in `services/index.ts`.
 
 ```typescript
-type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
+type InquiryService<TContent, TResolution, TResolutionInput = TResolution> = {
   contentSchema: z.ZodType<TContent>;            // parsed on create/update; stored in inquiry.content
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
   resolutionSchema: z.ZodType<TResolution>;      // full stored shape: the parsed input plus handleApprove's output, nothing else from the body
@@ -236,21 +237,21 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
 };
 ```
 
-A type's parties are not on the handler: they are declared once, with their permission levels, in `INQUIRY_TYPES` (`packages/permissions/src/rebac/inquiryTypes.ts`). `createInquiry` checks the resolved source and target against them (`validateInquiryHandler`, 422 on mismatch). `sendInquiry` flips the status to `sent`, sets `sentAt` (first send only) and `expiresAt`, then calls `autoApprove`; on `true` it runs `resolveInquiry(..., approved)` — and with it `handleApprove` — before emitting `inquiry.sent`.
+A type's parties are not on the service: they are declared once, with their permission levels, in `INQUIRY_TYPES` (`packages/permissions/src/rebac/inquiryTypes.ts`). `createInquiry` checks the resolved source and target against them (`validateInquiryTypeAcceptsSourceAndTargetModels`, 422 on mismatch). `sendInquiry` flips the status to `sent`, sets `sentAt` (first send only) and `expiresAt`, then calls `autoApprove`; on `true` it runs `resolveInquiry(..., approved)` — and with it `handleApprove` — before emitting `inquiry.sent`.
 
-All three type params default to `BaseResolution` (`{ explanation?: string }`), so simple handlers need no generics:
+All three type params default to `BaseResolution` (`{ explanation?: string }`), so simple services need no generics:
 
 ```typescript
 // No generics needed — uses defaults
-export const simpleHandler: InquiryHandler = { ... };
+export const simpleHandler: InquiryService = { ... };
 
-// Typed handler with custom content and resolution
-export const createSpaceHandler: InquiryHandler<SpaceContent, CreateSpaceResolution> = { ... };
+// Typed service with custom content and resolution
+export const createSpaceService: InquiryService<SpaceContent, CreateSpaceResolution> = { ... };
 ```
 
 ### `unique` enforcement
 
-Setting `unique` on a handler is automatically enforced — no controller code needed. `validateInquiryPreCreate` reads the flag and calls `validateUniqueInquiry`:
+Setting `unique` on a service is automatically enforced — no controller code needed. `validateInquiryPreCreate` reads the flag and calls `validateUniqueInquiry`:
 
 - `'targeted'` — one open inquiry per source + target + type (e.g. you can't invite the same user twice)
 - `'untargeted'` — one open inquiry per source + type, regardless of target (e.g. a space can only have one open transfer, even to a different target org)
@@ -263,7 +264,7 @@ Setting `unique` on a handler is automatically enforced — no controller code n
 - **On update** — with the effective post-update content (incoming `content` merged over stored `inquiry.content`)
 
 ```typescript
-// createSpace handler
+// createSpace service
 const validate = async (inquiry, content: SpaceContent) => {
   const { slug } = content; // typed — no cast needed
   const [existingSpace, existingInquiry] = await Promise.all([
@@ -277,7 +278,7 @@ const validate = async (inquiry, content: SpaceContent) => {
 
 ### The request and the response
 
-An inquiry keeps both sides apart: what was asked is `inquiry.content`, and what the resolver answered is the resolve body. `handleApprove(c, inquiry, content, response)` gets them as two arguments, `content` parsed by `contentSchema` and `response` parsed by `resolutionInputSchema`. Nothing is merged or computed from one onto the other; a handler reads each value from the side it belongs to, and says so in its own code. Auto-approval sends the request back as the response, so a handler always gets the thing it approves (Aron, 2026-11-16).
+An inquiry keeps both sides apart: what was asked is `inquiry.content`, and what the resolver answered is the resolve body. `handleApprove(c, inquiry, content, response)` gets them as two arguments, `content` parsed by `contentSchema` and `response` parsed by `resolutionInputSchema`. Nothing is merged or computed from one onto the other; a service reads each value from the side it belongs to, and says so in its own code. Auto-approval sends the request back as the response, so a service always gets the thing it approves (Aron, 2026-11-16).
 
 **A field the resolver may set** is declared in `resolutionInputSchema` and read from `response`:
 ```typescript
@@ -291,9 +292,9 @@ const slug = response.slug ?? content.slug ?? space.slug;
 const { role } = content;
 ```
 
-Why: an approval is the approver's own answer, kept beside the request, never a patch applied to it (Aron, 2026-11-15: "no merge logic and nothing computed against the request"). A shared overlay made every handler's input a mix of the two with nothing saying which side a value came from.
+Why: an approval is the approver's own answer, kept beside the request, never a patch applied to it (Aron, 2026-11-15: "no merge logic and nothing computed against the request"). A shared overlay made every service's input a mix of the two with nothing saying which side a value came from.
 
-### Current Handlers
+### Current Services
 
 | Type | Source | Target | Unique | Expiry | Side Effect |
 |------|--------|--------|--------|--------|-------------|
@@ -303,7 +304,7 @@ Why: an approval is the approver's own answer, kept beside the request, never a 
 | `transferSpace` | Space | Organization | `untargeted` | 30 days | Moves the space and everything keyed to it into the target org; see *Transferring a space* |
 | `changeEntitlements` | User | Token, Integration | `targeted` | 30 days | Adds and removes the target's entitlements through `changeEntitlements`; see *Asking to change a record's entitlements* |
 
-All five handlers return `autoApprove: async () => false` — no type currently auto-approves.
+All five services return `autoApprove: async () => false` — no type currently auto-approves.
 
 ### Asking to change a record's entitlements
 
@@ -312,7 +313,7 @@ All five handlers return `autoApprove: async () => false` — no type currently 
 - **The request** is `{ add, remove }`: `add` is entitlement entries in the shape the direct add route takes, `remove` is row ids.
 - **The response** is the approver's own `{ add, remove }`, narrower or wider than asked. An approval with neither is refused (422, in `handleApprove`): to give nothing, deny. A denial needs neither.
 - **Approving is issuing.** `handleApprove` runs the checks the record's own add and remove routes run (`validateTokenWrite` and `validateDelegateRole`, or `validateIntegrationRole`) and then the one writer, `changeEntitlements`, with the approver as writer. An approver who could not grant an added entry directly gets the writer's 403 (a removal needs only administering the record); the resolve transaction rolls back, nothing is written and the inquiry stays open (Aron, 2026-11-16: "The grantor and the person who approves the inquiry need to have access to approve that level… Otherwise, it should error and stay open").
-- **The request is checked when asked.** The handler's `validate` runs the writer's own entry check (`entitlementProblem`) on each `add` entry, so a request the writer would refuse (a negated `where`, a malformed anchor) is refused at create and update with 422, not at approval.
+- **The request is checked when asked.** The service's `validate` runs the writer's own entry check (`entitlementProblem`) on each `add` entry, so a request the writer would refuse (a negated `where`, a malformed anchor) is refused at create and update with 422, not at approval.
 - **A removed row leaves open requests.** When an entitlement row is soft-deleted, every open `changeEntitlements` request to the same holder drops that id from its `remove`, as its own audited update; a request left with nothing to add or remove is canceled (`apps/api/src/hooks/entitlementChangeRequests/hook.ts`). The request being approved is left as it was asked (it is the resolve's `sourceInquiryId`). A deleted holder cancels its open requests through the cascade (see *Data Model*).
 - Member rows also hold entitlements but are not targets yet: an inquiry addressed to a member is the member's to read, and a member does not administer their own row, so nobody who could answer would see it.
 
@@ -353,12 +354,12 @@ There is one response, `inquiryResponseSchema` (`InquiryItem`, `modules/inquiry/
 
 Reading is by ownership channel because carried keys put the organization on every row beneath it. An organization's managers see what is the organization's, including its own integrations and tokens; a member's own integration is the member's, and a space's inquiries are the space's (Aron, 2026-11-16). Seeing is not resolving: `resolve` stays the per-type level. An inquiry entitlement by a tenant path (`targetOrganization`) admits every kind that carries the key, so a grant kept to the tenant's own channel says so in its `where` (`targetSpaceId` and `targetUserId` equal null); without it the granter must be able to read every kind the path reaches.
 
-`db:inquiry` is the `inquiry` object built by `inquiryPermission(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
+`db:inquiry` is the `inquiryResourcePermission` object built by `inquiryResourcePermissionFromParties(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
 
-## Adding a New Handler
+## Adding a New Service
 
 1. Declare the type's parties and their `send` / `resolve` levels in `INQUIRY_TYPES` (`packages/permissions/src/rebac/inquiryTypes.ts`); the record is keyed by `InquiryType`, so a new type does not compile until it does
-2. Create `handlers/<type>/index.ts` implementing `InquiryHandler<TContent, TResolution>`
+2. Create `services/<type>/index.ts` implementing `InquiryService<TContent, TResolution>`
 2. Define `contentSchema` (stored on create) and `resolutionInputSchema` / `resolutionSchema` (validated on resolve) in `packages/shared/src/inquiry/<type>.ts`, so web/admin type `inquiry.content` with the same schema the API parses; `baseResolutionInputSchema` lives there too
    - `resolutionInputSchema` — the copy the resolver sends back, parsed and passed to `handleApprove` as `response`; nothing in it is merged into `content`
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
@@ -368,7 +369,7 @@ Reading is by ownership channel because carried keys put the organization on eve
 5. Add `validate(inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
 6. Set `defaultExpirationDays` if the inquiry should auto-expire (e.g. `30` for invitations). Drives `computeExpiresAt` on send and changesRequested. Omit for no expiry.
 7. Set `unique: 'targeted'` (one per source+target+type) or `unique: 'untargeted'` (one per source+type regardless of target) if uniqueness should be enforced — automatic
-8. Register in `handlers/index.ts`
+8. Register in `services/index.ts`
 9. Add the new type to `InquiryType` enum in `packages/db/prisma/schema/inquiry.prisma`
 10. Run `bun run db:generate` in `packages/db/`
 11. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`. If the source is a `User` (not an org or space), add the type string to the `value: []` list in the existing `rel: 'sourceUser'` rule block so the source user can cancel/edit/re-send from any context.
@@ -404,38 +405,38 @@ This allows per-type permission rules (e.g. `inviteOrganizationUser` with a high
 export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled'];
 
 // Frontend terminal check — also treats past-expiresAt as terminal
-export const isTerminalInquiry = (inq: { status: InquiryStatus; expiresAt?: string | null }): boolean => {
+export const isInquiryClosedOrExpired = (inq: { status: InquiryStatus; expiresAt?: string | null }): boolean => {
   if (INQUIRY_TERMINAL_STATUSES.includes(inq.status)) return true;
   if (inq.expiresAt && new Date(inq.expiresAt) < new Date()) return true;
   return false;
 };
 
 // Tailwind class string per status (+ synthetic 'expired' key)
-export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string>;
+export const INQUIRY_STATUS_BADGE_CLASSES: Record<InquiryStatus | 'expired', string>;
 
 // Human-readable labels per type
 export const INQUIRY_TYPE_LABELS: Record<InquiryType, string>;
 ```
 
-`isTerminalInquiry` differs from `inquiryTerminalStatuses` (backend): the frontend also treats an expired inquiry as terminal so controls disable immediately without a server round-trip.
+`isInquiryClosedOrExpired` differs from `inquiryTerminalStatuses` (backend): the frontend also treats an expired inquiry as terminal so controls disable immediately without a server round-trip.
 
 ### Query key invalidation maps
 
 ```typescript
 // Keys to invalidate when the SOURCE side mutates (cancel/delete)
-export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
+export const queryKeysToInvalidateWhenSourceMutates: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
 
 // Keys to invalidate when the TARGET side mutates (resolve/approve/deny)
-export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
+export const queryKeysToInvalidateWhenTargetMutates: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
 ```
 
-Each handler that resolves in a list (e.g. `transferSpace` received by an org) must add the relevant query key to `targetMutations` so the list refetches after approval.
+Each service that resolves in a list (e.g. `transferSpace` received by an org) must add the relevant query key to `queryKeysToInvalidateWhenTargetMutates` so the list refetches after approval.
 
-### `useInquiryPermission`
+### `useCanActOnInquiry`
 
 ```typescript
-// packages/ui/src/hooks/useInquiryPermission.ts
-useInquiryPermission(
+// packages/ui/src/hooks/useCanActOnInquiry.ts
+useCanActOnInquiry(
   inquiry: CheckableInquiry, // { type, sourceModel, targetModel, content? }: a stored inquiry, or a draft
   action: ActionRule,
   side: 'source' | 'target',
@@ -449,7 +450,7 @@ Side-aware permission check. `side` determines which side of the inquiry the cur
 
 The inquiry object carries the other side's FK data. This is needed because inquiries only partially hydrate relations in list responses (sent = targets only, received = sources only).
 
-`db:inquiry` gates every send and resolve branch on `sourceModel` / `targetModel`, so a check needs both models and the type. A form that offers sending an inquiry not yet created passes a draft (`{ type: 'transferSpace', sourceModel: 'Space', targetModel: 'Organization' }`). Where the parties come from a prop or the check runs per option (the invite form checks each role), build the record with `inquiryCheckRecord(inquiry, side, parties)` (`packages/ui/src/lib/inquiries/inquiryCheckRecord.ts`), the builder the hook uses, and pass it to `checkPermission`. Never hand-roll the record.
+`db:inquiry` gates every send and resolve branch on `sourceModel` / `targetModel`, so a check needs both models and the type. A form that offers sending an inquiry not yet created passes a draft (`{ type: 'transferSpace', sourceModel: 'Space', targetModel: 'Organization' }`). Where the parties come from a prop or the check runs per option (the invite form checks each role), build the record with `inquiryRecordForPermissionCheck(inquiry, side, parties)` (`packages/ui/src/lib/inquiries/inquiryRecordForPermissionCheck.ts`), the builder the hook uses, and pass it to `canActOnRecordIfPresent`. Never hand-roll the record.
 
 ### UI Components
 
@@ -460,12 +461,12 @@ The inquiry object carries the other side's FK data. This is needed because inqu
 <InquirySourceControls inquiry={InquiryItem} size? />
 ```
 
-Renders Edit / Send / Cancel buttons for the source side. Buttons are conditionally shown based on `isTerminalInquiry` and status:
+Renders Edit / Send / Cancel buttons for the source side. Buttons are conditionally shown based on `isInquiryClosedOrExpired` and status:
 - **Edit** — visible when not terminal and the type registers a `source.compose` component (opens it)
 - **Send** — visible when status is `draft` or `changesRequested`
 - **Cancel** — visible when not terminal and status is `sent` or `draft`
 
-All buttons are disabled when `useInquiryPermission(inquiry, 'send', 'source')` is false or the row is still the optimistic placeholder.
+All buttons are disabled when `useCanActOnInquiry(inquiry, 'send', 'source')` is false or the row is still the optimistic placeholder.
 
 #### `InquiryTargetControls`
 
@@ -474,11 +475,11 @@ All buttons are disabled when `useInquiryPermission(inquiry, 'send', 'source')` 
 <InquiryTargetControls inquiry={InquiryItem} size? />
 ```
 
-Renders Approve / Decline buttons, plus Review when the type registers a `target.review` component. Visible when not terminal and status is `sent` or `changesRequested`. Disabled when `useInquiryPermission(inquiry, 'resolve', 'target')` is false.
+Renders Approve / Decline buttons, plus Review when the type registers a `target.review` component. Visible when not terminal and status is `sent` or `changesRequested`. Disabled when `useCanActOnInquiry(inquiry, 'resolve', 'target')` is false.
 
 #### Per-type UI registry (`packages/ui/src/lib/inquiries/registry.ts`)
 
-`registerInquiryType(type, { label, source?, target? })` registers a type's components: `source.summary` / `detail` / `compose` and `target.summary` / `detail` / `review`. Registrations live in `lib/inquiries/registrations/<type>.tsx`; list pages and the controls read them through `getInquiryInterface(type)`.
+`registerInquiryType(type, { label, source?, target? })` registers a type's components: `source.summary` / `detail` / `compose` and `target.summary` / `detail` / `review`. Registrations live in `lib/inquiries/registrations/<type>.tsx`; list pages and the controls read them through `inquiryTypeComponentsFor(type)`.
 
 ### Pages
 

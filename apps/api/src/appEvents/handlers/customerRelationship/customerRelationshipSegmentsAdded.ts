@@ -5,7 +5,7 @@
  * @uses primitive:websockets
  */
 import type { CustomerModel } from '@template/db/generated/client/enums';
-import { customerSegmentsChanged } from '#/appEvents/handlers/customerRelationship/customerSegmentsChanged';
+import { customerRelationshipSegmentMembershipRefetchHandoffs } from '#/appEvents/handlers/customerRelationship/customerRelationshipSegmentMembershipRefetchHandoffs';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
 export type CustomerRelationshipSegmentsAddedPayload = {
@@ -17,5 +17,5 @@ export type CustomerRelationshipSegmentsAddedPayload = {
 
 export const customerRelationshipSegmentsAdded =
   makeAppEvent<CustomerRelationshipSegmentsAddedPayload>({
-    websocket: customerSegmentsChanged,
+    websocket: customerRelationshipSegmentMembershipRefetchHandoffs,
   });

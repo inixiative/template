@@ -5,19 +5,19 @@
 import { QueryClient } from '@tanstack/react-query';
 import type { Permix } from '@template/permissions/client';
 import { createAuthSlice } from '@template/ui/store/slices/auth';
-import { createClientSlice } from '@template/ui/store/slices/client';
 import { createNavigationSlice } from '@template/ui/store/slices/navigation';
+import { createQueryClientAndWebsocketSlice } from '@template/ui/store/slices/queryClientAndWebsocket';
 import { createTenantSlice } from '@template/ui/store/slices/tenant';
 import { createUISlice } from '@template/ui/store/slices/ui';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
 import { createStore, type StateCreator, type StoreApi } from 'zustand';
 
-const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlice> = (
+const createDenyAllPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlice> = (
   set,
   _get,
 ) => {
-  const makeMockPermix = (): Permix => ({
+  const denyAllPermix = (): Permix => ({
     check: () => false,
     setup: async () => {},
     setSuperadmin: () => {},
@@ -28,14 +28,14 @@ const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlic
     getJSON: () => null,
   });
 
-  let mockPermix = makeMockPermix();
+  let mockPermix = denyAllPermix();
 
   return {
     permissions: {
       permix: mockPermix,
       check: () => false,
       clear: () => {
-        mockPermix = makeMockPermix();
+        mockPermix = denyAllPermix();
         set((state) => ({
           permissions: {
             ...state.permissions,
@@ -43,16 +43,16 @@ const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlic
           },
         }));
       },
-      setup: async () => {},
+      installPermissionsForUser: async () => {},
     },
   };
 };
 
 export const createTestStore = (initialState?: Partial<AppStore>) => {
   const store = createStore<AppStore>()((set, get) => ({
-    // Client slice (real implementation; override the client with a retry-free test QueryClient)
-    ...createClientSlice(set, get, {} as StoreApi<AppStore>),
-    client: new QueryClient({
+    // Query client and websocket slice (real implementation; override the query client with a retry-free test QueryClient)
+    ...createQueryClientAndWebsocketSlice(set, get, {} as StoreApi<AppStore>),
+    queryClient: new QueryClient({
       defaultOptions: {
         queries: { retry: false },
         mutations: { retry: false },
@@ -66,7 +66,7 @@ export const createTestStore = (initialState?: Partial<AppStore>) => {
     ...createTenantSlice(set, get, {} as StoreApi<AppStore>),
 
     // Permissions slice (test version)
-    ...createTestPermissionsSlice(set, get, {} as StoreApi<AppStore>),
+    ...createDenyAllPermissionsSlice(set, get, {} as StoreApi<AppStore>),
 
     // Navigation slice (real implementation)
     ...createNavigationSlice(set, get, {} as StoreApi<AppStore>),

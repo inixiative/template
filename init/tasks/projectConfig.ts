@@ -1,7 +1,7 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execAsync } from '../utils/exec';
-import { getProjectConfig, writeProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig, writeProjectConfig } from '../utils/fetchProjectConfig';
 import { isComplete, markComplete } from '../utils/progressTracking';
 
 type ProjectConfigData = {
@@ -11,8 +11,8 @@ type ProjectConfigData = {
 
 export type StepCallback = (action?: string) => Promise<void>;
 
-export const getCurrentConfig = async (): Promise<ProjectConfigData> => {
-  const config = await getProjectConfig();
+export const fetchCurrentConfig = async (): Promise<ProjectConfigData> => {
+  const config = await fetchProjectConfig();
   return {
     name: config.project.name,
     organization: config.project.organization,
@@ -20,7 +20,7 @@ export const getCurrentConfig = async (): Promise<ProjectConfigData> => {
 };
 
 export const updateProjectConfig = async (data: ProjectConfigData): Promise<void> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   config.project.name = data.name;
   config.project.organization = data.organization;
   await writeProjectConfig(config);

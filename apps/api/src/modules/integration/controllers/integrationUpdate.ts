@@ -1,5 +1,5 @@
 import { includeTargetEntitlements, type Prisma } from '@template/db';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationUpdateRoute } from '#/modules/integration/routes/integrationUpdate';
 import { validateIntegrationRole } from '#/modules/integration/validations/validateIntegrationRole';
@@ -10,7 +10,7 @@ export const integrationUpdateController = makeController(
   integrationUpdateRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const integration = getResource<'integration'>(c);
+    const integration = contextResource<'integration'>(c);
     const body = c.req.valid('json');
 
     if (permissionFields.some((field) => field in body)) {

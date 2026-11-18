@@ -9,7 +9,7 @@ import { UserAction } from '@template/permissions/client';
 import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meRedactRoute = actionRoute({
   model: Modules.me,
@@ -17,5 +17,5 @@ export const meRedactRoute = actionRoute({
   action: 'redact',
   skipId: true,
   description: 'Permanently redacts your account data (GDPR right to be forgotten)',
-  tags: [Tags.me, Tags.user],
+  tags: [OpenApiTags.me, OpenApiTags.user],
 });

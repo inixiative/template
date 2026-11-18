@@ -4,15 +4,15 @@
  * @partOf primitive:caching, infrastructure:redis
  * @uses none
  */
-import { queuedKey } from '@template/db/redis/cache/queued/queuedKey';
-import { getRedisClient } from '@template/db/redis/client';
+import { cacheQueuedMarkerKeyFor } from '@template/db/redis/cache/queued/cacheQueuedMarkerKeyFor';
+import { redisClient } from '@template/db/redis/client';
 
 export const markCacheQueued = async (
   computedUnder: string,
   ttlSeconds: number,
 ): Promise<boolean> =>
-  (await getRedisClient().set(
-    queuedKey(computedUnder),
+  (await redisClient().set(
+    cacheQueuedMarkerKeyFor(computedUnder),
     String(Date.now()),
     'EX',
     ttlSeconds,

@@ -9,12 +9,12 @@ import {
   type EntitlementsOverride,
   storeEntitlements,
 } from '@template/db/test/factories/entitlementFactory';
-import { createFactory, getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 import type { BuildContext, CreateInputOf } from '@template/db/test/factoryTypes';
 
-const integrationFactory = createFactory('Integration', {
+const integrationFactory = registerFactory('Integration', {
   defaults: () => ({
-    name: `${faker.company.name()} ${getNextSeq()}`,
+    name: `${faker.company.name()} ${nextFactorySequenceNumber()}`,
     role: 'viewer' as const,
   }),
 });

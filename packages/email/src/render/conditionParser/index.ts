@@ -5,7 +5,6 @@
  * @uses none
  */
 
-export { bindsAs } from './bindsAs';
 export { collectRules } from './collectRules';
 export { findJsonEnd } from './findJsonEnd';
 export {
@@ -23,6 +22,7 @@ export {
   TOKEN_PATTERN,
 } from './grammar';
 export { isStructurallyBalanced } from './isStructurallyBalanced';
+export { isUsableLoopBindingName } from './isUsableLoopBindingName';
 export { parseEachBlock } from './parseEachBlock';
 export { parseIfBlock } from './parseIfBlock';
 export type { Branch, EachBlock, IfBlock } from './types';

@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:ui
  * @uses none
  */
@@ -15,7 +15,7 @@ type Breadcrumb = {
 export const buildBreadcrumbs = (
   match: RouteMatch,
   context: TenantContext,
-  pageContext?: Record<string, unknown>,
+  viewedRecords?: Record<string, unknown>,
   spoofUserEmail?: string | null,
 ): Breadcrumb[] => {
   const breadcrumbs: Breadcrumb[] = [];
@@ -45,12 +45,12 @@ export const buildBreadcrumbs = (
     const href = queryString ? `${resolvedPath}?${queryString}` : resolvedPath;
 
     let label = item.label;
-    if (item.breadcrumbLabel && pageContext) {
-      const recordKey = Object.keys(pageContext).find((key) =>
+    if (item.breadcrumbLabel && viewedRecords) {
+      const recordKey = Object.keys(viewedRecords).find((key) =>
         item.label.toLowerCase().includes(key.toLowerCase()),
       );
-      if (recordKey && pageContext[recordKey]) {
-        label = item.breadcrumbLabel(pageContext[recordKey] as Record<string, unknown>);
+      if (recordKey && viewedRecords[recordKey]) {
+        label = item.breadcrumbLabel(viewedRecords[recordKey] as Record<string, unknown>);
       }
     }
 

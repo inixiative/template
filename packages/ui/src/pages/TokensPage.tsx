@@ -4,7 +4,9 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+
 import { Icon } from '@iconify/react';
+import { useQuery } from '@tanstack/react-query';
 import type { MeCreateTokenData, OrganizationReadManyTokensResponse } from '@template/sdk';
 import {
   Button,
@@ -21,10 +23,10 @@ import { SecretRevealModal } from '@template/ui/components/utility/SecretRevealM
 import {
   createOptimisticListTarget,
   useOptimisticMutation,
-  useQuery,
   useSectionOpen,
 } from '@template/ui/hooks';
-import { type TokenOwnerScope, tokenContextQueries } from '@template/ui/lib/tokenContextQueries';
+import type { MyMembershipOwnership } from '@template/ui/lib/myMembership';
+import { tokenContextQueries } from '@template/ui/lib/tokenContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { useState } from 'react';
@@ -34,18 +36,24 @@ type CreatedToken = Token & { key: string };
 
 type TokenSectionProps = {
   context: AuthenticatedContext;
-  scope?: TokenOwnerScope;
+  ownership?: MyMembershipOwnership;
   title?: string;
   description?: string;
   sectionKey: string;
 };
 
-const TokenSection = ({ context, scope, title, description, sectionKey }: TokenSectionProps) => {
+const TokenSection = ({
+  context,
+  ownership,
+  title,
+  description,
+  sectionKey,
+}: TokenSectionProps) => {
   const [isModalOpen, setIsModalOpen] = useSectionOpen(
     sectionKey === 'member' ? 'create-token-member' : 'create-token',
   );
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
-  const tokenQueries = tokenContextQueries(context, scope);
+  const tokenQueries = tokenContextQueries(context, ownership);
 
   const { data, isLoading } = useQuery({
     queryKey: tokenQueries.readMany.queryKey,
@@ -203,7 +211,7 @@ export const TokensPage = () => {
           {hasMembership ? (
             <TokenSection
               context={context}
-              scope={{ member: true }}
+              ownership={{ ownedByMyMembership: true }}
               sectionKey="member"
               title={`Yours in ${tenant.name}`}
               description={`Tokens that act as you within ${tenant.name}. Only you and its owners see them.`}

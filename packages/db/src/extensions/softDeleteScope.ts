@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { hasDeletedAt, lookupField, modelFields } from '@template/db/utils/fieldMetadata';
+import { hasDeletedAt, modelFieldAtPath, modelFields } from '@template/db/utils/fieldMetadata';
 import { type NodeScope, walkWhere } from '@template/db/utils/whereWalker';
 import { castArray } from 'lodash-es';
 
@@ -54,7 +54,7 @@ const liveCount = (model: string, count: unknown): unknown => {
   if (!select) return count;
   const scoped: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(select)) {
-    const field = lookupField(model, name);
+    const field = modelFieldAtPath(model, name);
     const live = field ? liveScope(field.type) : undefined;
     if (!value || !field || !live) {
       scoped[name] = value;
@@ -78,7 +78,7 @@ export const liveIncludes = (
       out[name] = liveCount(model, value);
       continue;
     }
-    const field = lookupField(model, name);
+    const field = modelFieldAtPath(model, name);
     if (!value || field?.kind !== 'object') {
       out[name] = value;
       continue;

@@ -1,7 +1,7 @@
 export const apiRouter = new OpenAPIHono();
 
 apiRouter.use('*', corsMiddleware);
-apiRouter.use('*', prepareRequest);
+apiRouter.use('*', prepareRequestMiddleware);
 apiRouter.use('/hooks/*', (c) => c.text('ok'));
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 // apiRouter.route('/v1/commented', commentedRouter);

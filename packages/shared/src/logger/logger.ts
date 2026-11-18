@@ -6,10 +6,15 @@
  */
 import { context, isSpanContextValid, trace } from '@opentelemetry/api';
 import { consolaAdapter } from '@template/shared/logger/consolaAdapter';
+import { maskLogValue, stringifyLogValue } from '@template/shared/logger/maskLogValue';
 import { pinoAdapter } from '@template/shared/logger/pinoAdapter';
-import { getLogContext, publishLogRecord } from '@template/shared/logger/records';
-import { redactLogValue, stringifyLogValue } from '@template/shared/logger/redact';
-import { getLogBroadcasts, getLogScopes, LogScope, logScope } from '@template/shared/logger/scope';
+import { logContextFields, publishLogRecord } from '@template/shared/logger/records';
+import {
+  currentLogBroadcasts,
+  currentLogScopes,
+  LogScope,
+  withLogScope,
+} from '@template/shared/logger/scope';
 import type { LoggerAdapter, LogLevel } from '@template/shared/logger/types';
 import { isLocal, isTest } from '@template/shared/utils/env';
 
@@ -28,7 +33,7 @@ const levels: Record<string, number> = {
 };
 let minimumLevel: string = process.env.LOG_LEVEL ?? 'info';
 const childLabel = (bindings?: Record<string, unknown>): string => {
-  const safe = redactLogValue(bindings ?? {}) as Record<string, unknown>;
+  const safe = maskLogValue(bindings ?? {}) as Record<string, unknown>;
   return String(safe.class ?? Object.values(safe)[0] ?? 'child');
 };
 
@@ -37,16 +42,16 @@ const emit = (level: LogLevel, rawArgs: unknown[], bindings: Record<string, unkn
   const last = rawArgs.at(-1);
   const manualScope = typeof last === 'string' && scopeValues.has(last);
   const args = manualScope ? rawArgs.slice(0, -1) : rawArgs;
-  const fields: Record<string, unknown> = { ...getLogContext(), ...bindings };
+  const fields: Record<string, unknown> = { ...logContextFields(), ...bindings };
   const messages: string[] = [];
   for (const arg of args) {
     if (arg instanceof Error) {
       fields.err = arg;
-      messages.push((redactLogValue(arg) as { message: string }).message);
+      messages.push((maskLogValue(arg) as { message: string }).message);
     } else if (arg && typeof arg === 'object' && !Array.isArray(arg)) Object.assign(fields, arg);
     else messages.push(typeof arg === 'string' ? arg : stringifyLogValue(arg));
   }
-  fields.scopes = manualScope ? [...getLogScopes(), last] : getLogScopes();
+  fields.scopes = manualScope ? [...currentLogScopes(), last] : currentLogScopes();
   const activeSpan = trace.getSpan(context.active())?.spanContext();
   const span = activeSpan && isSpanContextValid(activeSpan) ? activeSpan : undefined;
   if (span) {
@@ -54,8 +59,8 @@ const emit = (level: LogLevel, rawArgs: unknown[], bindings: Record<string, unkn
     fields.span_id = span.spanId;
   }
   let safeFields: Record<string, unknown> = {
-    ...(redactLogValue(fields) as Record<string, unknown>),
-    scopes: redactLogValue(fields.scopes),
+    ...(maskLogValue(fields) as Record<string, unknown>),
+    scopes: maskLogValue(fields.scopes),
     ...(span ? { trace_id: span.traceId, span_id: span.spanId } : {}),
   };
   if (JSON.stringify(safeFields).length > 16_000)
@@ -65,13 +70,13 @@ const emit = (level: LogLevel, rawArgs: unknown[], bindings: Record<string, unkn
       span_id: safeFields.span_id,
       truncated: true,
     };
-  const message = redactLogValue(messages.join(' ')) as string;
+  const message = maskLogValue(messages.join(' ')) as string;
   const record = { level, message, fields: safeFields, timestamp: new Date() };
   for (const adapter of adapters) adapter[level](safeFields, message);
   publishLogRecord(record);
   const scopes = (safeFields.scopes as string[]).map((scope) => `[${scope}]`).join(' ');
   const formatted = `${scopes} ${message} ${JSON.stringify(safeFields)}`.trim();
-  for (const broadcast of getLogBroadcasts()) {
+  for (const broadcast of currentLogBroadcasts()) {
     try {
       Promise.resolve(broadcast(level, formatted)).catch(() => {});
     } catch {}
@@ -82,7 +87,7 @@ const createLogger = (bindings: Record<string, unknown> = {}, scope?: string): L
   const method =
     (level: LogLevel) =>
     (...args: unknown[]) =>
-      scope ? logScope(scope, () => emit(level, args, bindings)) : emit(level, args, bindings);
+      scope ? withLogScope(scope, () => emit(level, args, bindings)) : emit(level, args, bindings);
   return {
     get level() {
       return minimumLevel;

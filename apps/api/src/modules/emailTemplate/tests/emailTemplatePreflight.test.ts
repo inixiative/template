@@ -12,7 +12,7 @@ import {
 import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
 import { emailTemplatePreflight } from '#/modules/emailTemplate/services/emailTemplatePreflight';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 const COMPLETE = [
   '<mjml><mj-head><mj-preview>Your week at a glance</mj-preview></mj-head><mj-body><mj-section><mj-column>',
@@ -139,7 +139,7 @@ describe('POST /api/admin/emailTemplate/preflight', () => {
   });
 
   it('returns the findings for the draft in the response envelope', async () => {
-    const { data } = await json<Body>(
+    const { data } = await parseSuccessBody<Body>(
       await fetch(post('/api/admin/emailTemplate/preflight', { mjml: SLOPPY, subject: 'Digest' })),
     );
 

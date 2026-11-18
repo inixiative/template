@@ -1,11 +1,12 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses none
  */
-import { bindsAs } from '@template/email/render/conditionParser/bindsAs';
+
 import { EACH, IF } from '@template/email/render/conditionParser/grammar';
+import { isUsableLoopBindingName } from '@template/email/render/conditionParser/isUsableLoopBindingName';
 import { parseEachBlock } from '@template/email/render/conditionParser/parseEachBlock';
 import { parseIfBlock } from '@template/email/render/conditionParser/parseIfBlock';
 import type { Branch, EachBlock, IfBlock } from '@template/email/render/conditionParser/types';
@@ -81,8 +82,8 @@ export const visitTemplateBlocks = <S = undefined>(
     }
     const iterated = resolveBindingPath(block.path, scope.bindings);
     const bindings: BindingChain = new Map(scope.bindings);
-    if (bindsAs(block.as)) bindings.set(block.as, iterated);
-    if (bindsAs(block.index)) bindings.set(block.index, undefined);
+    if (isUsableLoopBindingName(block.as)) bindings.set(block.as, iterated);
+    if (isUsableLoopBindingName(block.index)) bindings.set(block.index, undefined);
     const state = visitor.loop?.(block, { iterated, bindings }, position, scope) ?? scope.state;
     visitTemplateBlocks(block.body, visitor, { bindings, state });
     i = block.end;

@@ -1,7 +1,7 @@
 {
   "id": "cron",
   "title": "Cron jobs and schedulers",
-  "routing": "Is this about recurring work stored as a CronJob row: its UTC pattern, handler, payload, enabled flag and retries, the BullMQ job scheduler behind it (upsertCronJobScheduler, syncCronJobScheduler, the cronJobSync hook, registerCronJobs at worker start, never the repeatable API), a tick handing off to a cronTrigger run (enqueueCronRun), validateCronJob, the admin cron routes and manual trigger (triggerCronJob, POST /api/admin/cronJob/:id/trigger), the seeded system cron rows, or retention handlers (cleanStaleData, archiveStaleRecords)? Defining and enqueuing jobs in general is `jobs-cron`.",
+  "routing": "Is this about recurring work stored as a CronJob row: its UTC pattern, handler, payload, enabled flag and retries, the BullMQ job scheduler behind it (upsertCronJobScheduler, syncCronJobScheduler, the cronJobSync hook, registerCronJobs at worker start, never the repeatable API), a tick handing off to a cronTrigger run (enqueueCronRun), validateCronJob, the admin cron routes and manual trigger (triggerCronJob, POST /api/admin/cronJob/:id/trigger), the seeded system cron rows, or retention handlers (hardDeleteRecordsPastRetention, archiveStaleRecords)? Defining and enqueuing jobs in general is `jobs-cron`.",
   "concepts": ["cron"],
   "tokens": 8045,
   "tokenMethod": "chars/4",

@@ -5,7 +5,7 @@
  * @uses infrastructure:redis
  * @constructs jobHandler
  */
-import { createLock } from '@template/db';
+import { makeLock } from '@template/db';
 import { log } from '@template/shared/logger';
 import { toJobHandler } from '#/jobs/toJobHandler';
 import type { JobData, JobHandler, JobHandlerArgs, StagedJob } from '#/jobs/types';
@@ -56,7 +56,7 @@ export const makeSingletonJob = <TPayload = void>(
 
     // The lock lives on the queue's connection, not the shared cache client: an evicted cache
     // key would silently open the singleton to a second run.
-    const lock = createLock({
+    const lock = makeLock({
       service: 'job-singleton',
       identifier,
       redis: ctx.queue.redis,

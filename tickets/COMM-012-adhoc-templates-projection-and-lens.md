@@ -9,7 +9,7 @@
 
 The email stack (#74 → #91 → #96 → headless authoring) is the **system-email** build. A send is
 triggered by an app event; the event handler names the template; the template's registry entry
-(`apps/api/src/lib/email/registry.ts`) fixes the sender and the audience in code. Nobody chooses who
+(`apps/api/src/lib/email/emailTemplateRegistry.ts`) fixes the sender and the audience in code. Nobody chooses who
 they send as at send time — the entry's `SenderSpec` is bound off the entity row the email is about.
 Recipients are always `User` (COMM-010). Identity (from-address, sender variables) is still a stub.
 
@@ -69,7 +69,7 @@ Two things adhoc needs that system does not:
 
 - **Demarcation is not a flag.** A system template has a registry entry. An adhoc template has none and
   carries its lens on its row. The planner resolves the entry registry-first, then row. Today a slug
-  with no entry is silently skipped in `sendEmail` — that skip is the line that becomes the socket.
+  with no entry is silently skipped in `planEmailDeliveries` — that skip is the line that becomes the socket.
 - The floor is bound from the sender at send time and never stored on the row.
 - Multi-lens recipients and the sender × recipient governance matrix stay parked in COMM-011.
 
@@ -94,7 +94,7 @@ Two things adhoc needs that system does not:
    model (a `welcome` template whose recipient and entity are both `User`) expose the union of both
    narrowings to each slot. Harmless for system templates; decide whether an adhoc picker needs a
    path-keyed surface before it matters.
-6. **Adhoc send event** + the `sendEmail` fallback from "no entry → skip" to "no entry → row".
+6. **Adhoc send event** + the `planEmailDeliveries` fallback from "no entry → skip" to "no entry → row".
 
 ## Forms — the palette and the shell (Aron, on top of #97)
 

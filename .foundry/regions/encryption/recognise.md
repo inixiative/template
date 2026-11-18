@@ -144,7 +144,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - rotation is safe to run twice
 - keep the previous key until every row is verified
 - changing a key
-- redact secrets from logs
+- mask secrets in logs
 - re-encrypt rows still on the stale version
 - a method missing on the dynamic delegate type
 - are all rows on the current version yet

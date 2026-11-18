@@ -24,7 +24,7 @@ export const registerBatch = (batchId: string, baseContext: Context<AppEnv>): vo
   registry.set(batchId, { baseContext, baseHeaders });
 };
 
-export const getBatchContext = (batchId: string): BatchContext | undefined => {
+export const batchContextById = (batchId: string): BatchContext | undefined => {
   return registry.get(batchId);
 };
 

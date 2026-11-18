@@ -8,14 +8,17 @@ import type { UserWithRelations } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import {
   ActorModel,
-  actorOf,
+  actorFromRecordOmittingSensitiveFields,
   installPermissions,
   isSuperadmin,
   permissionsOfUser,
 } from '@template/permissions';
 import { createPermissions, type Permix } from '@template/permissions/client';
 import type { TokenWithRelations } from '#/lib/context/types';
-import { delegatedPermissions, ownerPermissions } from '#/lib/permissions/ownerPermissions';
+import {
+  fetchPermissionsOfDelegateOwner,
+  narrowOwnerPermissionsToDelegate,
+} from '#/lib/permissions/ownerPermissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
 type Acting = Pick<UserWithRelations, 'organizationUsers' | 'spaceUsers'> & {
@@ -28,17 +31,18 @@ export const installPermissionsFor = async (
   { user, token, organizationUsers, spaceUsers }: Acting,
 ) => {
   await permix.setup([], { replace: true });
-  if (token) permix.setActor(actorOf(ActorModel.Token, token));
-  else if (user) permix.setActor(actorOf(ActorModel.User, user));
+  if (token) permix.setActor(actorFromRecordOmittingSensitiveFields(ActorModel.Token, token));
+  else if (user) permix.setActor(actorFromRecordOmittingSensitiveFields(ActorModel.User, user));
   permix.setSuperadmin(isSuperadmin(user));
 
   const usersPermissions = permissionsOfUser(user?.id ?? null, organizationUsers, spaceUsers);
   if (!token) return installPermissions(permix, usersPermissions);
-  const owner = token.ownerModel === 'User' ? usersPermissions : await ownerPermissions(token);
-  await installPermissions(permix, delegatedPermissions(token, owner));
+  const owner =
+    token.ownerModel === 'User' ? usersPermissions : await fetchPermissionsOfDelegateOwner(token);
+  await installPermissions(permix, narrowOwnerPermissionsToDelegate(token, owner));
 };
 
-export const userPermissions = async (userId: string): Promise<Permix | null> => {
+export const fetchPermixForUser = async (userId: string): Promise<Permix | null> => {
   const userWithRelations = await findUserWithRelations(userId);
   if (!userWithRelations) return null;
   const {

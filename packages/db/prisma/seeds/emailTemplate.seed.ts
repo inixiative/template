@@ -19,7 +19,7 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
       ownerModel: 'default',
       kind: 'system',
       inheritToSpaces: true,
-      componentRefs: ['system-header', 'system-footer'],
+      componentSlugs: ['system-header', 'system-footer'],
       subject: 'Verify your email address',
       mjml: [
         '<mjml>',
@@ -62,7 +62,7 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
       ownerModel: 'default',
       kind: 'system',
       inheritToSpaces: true,
-      componentRefs: ['system-header', 'system-footer'],
+      componentSlugs: ['system-header', 'system-footer'],
       subject:
         'You\'ve been invited to {{#if rule={"field":"data.sourceOrganization.name","operator":"exists"}}}{{data.sourceOrganization.name}}{{else}}an organization{{/if}}',
       mjml: [
@@ -106,7 +106,7 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
       ownerModel: 'default',
       kind: 'system',
       inheritToSpaces: true,
-      componentRefs: ['system-header', 'system-footer'],
+      componentSlugs: ['system-header', 'system-footer'],
       subject: 'Welcome to {{system.platformName}}',
       mjml: [
         '<mjml>',

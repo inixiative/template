@@ -9,7 +9,7 @@ import {
   includeTargetEntitlements,
   type Prisma,
 } from '@template/db';
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManySpacesRoute } from '#/modules/me/routes/meReadManySpaces';
@@ -28,7 +28,7 @@ type SpaceWithUsers = Prisma.SpaceGetPayload<{
 export const meReadManySpacesController = makeController(
   meReadManySpacesRoute,
   async (c, respond) => {
-    const user = me(c)!;
+    const user = actingUser(c)!;
     const db = c.get('db');
 
     const { data: spaces, pagination } = await paginate<typeof db.space, SpaceWithUsers>(

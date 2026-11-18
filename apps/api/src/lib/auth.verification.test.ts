@@ -58,7 +58,7 @@ test('signup delivers a verification email through app events and keeps the acco
   expect(url.pathname).toBe('/api/auth/verify-email');
   expect(url.searchParams.get('token')).toBeTruthy();
   const recordedEvent = await db.appEvent.findUniqueOrThrow({ where: { id: event.id } });
-  expect(recordedEvent.data).toEqual({ userId: result.user.id, verificationUrl: '[REDACTED]' });
+  expect(recordedEvent.data).toEqual({ userId: result.user.id, verificationUrl: '[MASKED]' });
   expect(JSON.stringify(recordedEvent.data)).not.toContain(url.searchParams.get('token')!);
   expect(sent).toHaveLength(1);
   expect(sent[0].to).toBe(email);

@@ -27,7 +27,7 @@
 ## Glossary
 
 **#/**  
-Alias for imports inside the same app (e.g. #/lib/context/me).
+Alias for imports inside the same app (e.g. #/lib/context/actingUser).
 
 **architecture**  
 Class: system overview, request and data flow, key architectural patterns.
@@ -120,7 +120,7 @@ We are moving from A to B. Do not copy A, even where you find it next door.
 
 ## 3. Everything that exists here, by class
 
-Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: makeLock, packages/db/src/lock/makeLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `monorepo-layout`: Workspaces, packages, path aliases, import direction, where things live
 
@@ -453,7 +453,7 @@ Originally, `@template/shared` was meant for code shared between frontend and ba
 
 ```
 ui/src/components/
-├── auth/              # LoginForm, SignupForm
+├── auth/              # LoginForm, SignUpForm
 ├── layout/            # AppShell, Sidebar, Header
 ├── organizations/     # CreateOrganizationModal
 ├── primitives/        # Button, Input, Card (shadcn/ui)
@@ -506,7 +506,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getResource } from '#/lib/context/getResource'` |
+| Within an app | `#/` | `import { contextResource } from '#/lib/context/contextResource'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -515,7 +515,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 ```typescript
 // In apps/api - use #/ for internal imports
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 ```
 
@@ -525,7 +525,7 @@ import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 // Cross-package (from anywhere)
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { actorOf } from '@template/permissions';
+import { actorFromRecordOmittingSensitiveFields } from '@template/permissions';
 
 // Within a shared package - ALSO use @template/
 // packages/db/src/extensions/mutationLifeCycle/mutationLifeCycleExtension.ts
@@ -539,7 +539,7 @@ Top-level `index.ts` files are the public API - they make exports accessible out
 ```typescript
 // packages/shared/src/logger/index.ts - public API for @template/shared/logger
 export { log } from './logger';
-export { logScope } from './scope';
+export { withLogScope } from './scope';
 ```
 
 Actual code files always use aliases.
@@ -688,11 +688,11 @@ bun add -d <package>
 
 ```typescript
 // Good - direct imports
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { emailRegistry } from '#/lib/email';
 
 // Bad - intermediate barrel
-import { getResource, emailRegistry } from '#/lib';
+import { contextResource, emailRegistry } from '#/lib';
 ```
 
 Direct imports:

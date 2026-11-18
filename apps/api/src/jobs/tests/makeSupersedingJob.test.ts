@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import {
   claimLane,
-  getJobSupersededBy,
+  fetchJobSupersededBy,
   laneKey,
+  markJobSupersededBy,
   reclaimLane,
-  tombstoneJob,
   watchLane,
 } from '@template/db';
 import { WaitingChildrenError } from 'bullmq';
 import { makeSupersedingJob, type SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import type { WorkerContext } from '#/jobs/types';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 describe('makeSupersedingJob', () => {
   let ctx: WorkerContext;
 
   beforeEach(() => {
-    ctx = createTestWorker();
+    ctx = makeTestWorker();
   });
 
   afterEach(async () => {
@@ -40,7 +40,7 @@ describe('makeSupersedingJob', () => {
     expect(result).toBe(10);
   });
 
-  test('a job that parks waiting on its children keeps its lane for as long as a tombstone lives', async () => {
+  test('a job that parks waiting on its children keeps its lane for as long as a superseded mark lives', async () => {
     const handler = makeSupersedingJob<Record<string, never>>(
       async () => {
         throw new WaitingChildrenError();
@@ -71,19 +71,19 @@ describe('makeSupersedingJob', () => {
     expect(await ctx.queue.redis.ttl(lane)).toBeLessThanOrEqual(300);
   });
 
-  test('a child of a superseded parent exits at start and passes the tombstone down', async () => {
+  test('a child of a superseded parent exits at start and passes the superseded mark down', async () => {
     const innerHandler = mock(async () => {});
     const handler = makeSupersedingJob<Record<string, never>>(innerHandler, () => 'child-lane');
     ctx.job.parent = { id: 'old-parent', queueKey: 'bull:jobs' };
-    await tombstoneJob('old-parent', 'new-parent');
+    await markJobSupersededBy('old-parent', 'new-parent');
 
     await handler(ctx, {});
 
     expect(innerHandler).toHaveBeenCalledTimes(0);
-    expect(await getJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
+    expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
   });
 
-  test('a running child aborts when its parent is superseded, and passes the tombstone down', async () => {
+  test('a running child aborts when its parent is superseded, and passes the superseded mark down', async () => {
     let handlerFinished = false;
     const handler = makeSupersedingJob<Record<string, never>>(
       async () => {
@@ -96,13 +96,13 @@ describe('makeSupersedingJob', () => {
     const handlerPromise = handler(ctx, {});
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    await tombstoneJob('running-parent', 'new-parent');
+    await markJobSupersededBy('running-parent', 'new-parent');
     const startTime = Date.now();
     await handlerPromise;
 
     expect(Date.now() - startTime).toBeLessThan(1000);
     expect(handlerFinished).toBe(false);
-    expect(await getJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
+    expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
   });
 
   test('should abort when superseded during execution', async () => {
@@ -167,10 +167,10 @@ describe('makeSupersedingJob', () => {
     expect(signalAborted).toBe(true);
   });
 
-  test('should not run when the job was displaced while queued (tombstoned before start)', async () => {
+  test('should not run when the job was displaced while queued (marked superseded before start)', async () => {
     const lane = laneKey(ctx.job.name, 'test-1');
     await claimLane(lane, ctx.job.id!);
-    await claimLane(lane, 'newer'); // displaces this job → tombstone survives even if the lane expires
+    await claimLane(lane, 'newer'); // displaces this job → superseded mark survives even if the lane expires
 
     const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {});
     const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
@@ -217,7 +217,7 @@ describe('makeSupersedingJob', () => {
     stopOlder();
 
     expect(holdersDuringRun).toEqual([ctx.job.id!]);
-    expect(await getJobSupersededBy('0-older')).toBe(ctx.job.id!);
+    expect(await fetchJobSupersededBy('0-older')).toBe(ctx.job.id!);
     expect(olderUsurped).toBe(true);
   });
 

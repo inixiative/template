@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:customer
  */
 
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { includeProvider } from '#/modules/customerRelationship/queries/customerRelationshipIncludes';
@@ -14,7 +14,7 @@ import { meReadManyProvidersRoute } from '#/modules/me/routes/meReadManyProvider
 export const meReadManyProvidersController = makeController(
   meReadManyProvidersRoute,
   async (c, respond) => {
-    const user = me(c)!;
+    const user = actingUser(c)!;
     const db = c.get('db');
     const { providerModel, providerSpaceId, providerOrganizationId } = c.req.valid('query');
 

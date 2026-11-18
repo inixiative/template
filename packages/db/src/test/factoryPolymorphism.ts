@@ -10,10 +10,10 @@ import {
   discriminatorDefault,
   discriminatorRequiresValue,
 } from '@template/db/registries/discriminatorDefaults';
-import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/test/factoryTypes';
 
-const axesOf = (modelName: ModelName) => getPolymorphismConfig(modelName)?.axes ?? [];
+const axesOf = (modelName: ModelName) => polymorphismConfigForModel(modelName)?.axes ?? [];
 
 export const assertNoDiscriminatorDefaults = (
   modelName: ModelName,

@@ -6,13 +6,13 @@
  */
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { isSystemProbe } from '#/lib/utils/authProbe';
-import {
-  organizationIdentity,
-  principalIdentity,
-  spaceIdentity,
-} from '#/middleware/rateLimit/identities';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { rateLimit } from '#/middleware/rateLimit/rateLimit';
+import {
+  organizationRateLimitKey,
+  principalRateLimitKey,
+  spaceRateLimitKey,
+} from '#/middleware/rateLimit/rateLimitKeys';
 import type { AppEnv } from '#/types/appEnv';
 
 const limiter = rateLimit([
@@ -20,19 +20,24 @@ const limiter = rateLimit([
     scope: 'api:principal',
     windowMs: 1_000,
     max: (c) => rateLimitMax('user', c),
-    key: principalIdentity,
+    key: principalRateLimitKey,
   },
-  { scope: 'api:space', windowMs: 1_000, max: (c) => rateLimitMax('space', c), key: spaceIdentity },
+  {
+    scope: 'api:space',
+    windowMs: 1_000,
+    max: (c) => rateLimitMax('space', c),
+    key: spaceRateLimitKey,
+  },
   {
     scope: 'api:organization',
     windowMs: 1_000,
     max: (c) => rateLimitMax('organization', c),
-    key: organizationIdentity,
+    key: organizationRateLimitKey,
   },
 ]);
 
 // A batch's sub-requests were paid for by the batch request. The x-batch-id header alone is spoofable; the
-// transaction prepareRequest resolves from the batch registry is not.
+// transaction prepareRequestMiddleware resolves from the batch registry is not.
 const isBatchSubRequest = (c: Context<AppEnv>): boolean => c.get('txn') !== undefined;
 
 // Server-initiated re-authorization probes spend no caller budget; client-driven probes and reads still do.

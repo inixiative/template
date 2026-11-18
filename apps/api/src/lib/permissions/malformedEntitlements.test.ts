@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { EntitlementInput } from '@template/db';
 import { db } from '@template/db';
 import type { Integration, Organization } from '@template/db/generated/client/client';
 import {
@@ -12,7 +13,7 @@ import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { heldEntitlements } from '#tests/utils/entitlements';
 import { patch, post } from '#tests/utils/request';
 
@@ -34,15 +35,20 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-const broken = () => entry('db:integration', ['db:organization', organization.id], ['read']);
-const readOrganization = () =>
-  entry('db:organization', ['db:organization', organization.id], ['read']);
-const manageItsIntegrations = (): Entry => ({
-  ...entry('db:integration', ['db:organization', organization.id, 'organization'], ['manage']),
+const broken = () =>
+  entitlementInputFor('db:integration', ['db:organization', organization.id], ['read']);
+const organizationReadEntitlement = () =>
+  entitlementInputFor('db:organization', ['db:organization', organization.id], ['read']);
+const manageItsIntegrations = (): EntitlementInput => ({
+  ...entitlementInputFor(
+    'db:integration',
+    ['db:organization', organization.id, 'organization'],
+    ['manage'],
+  ),
   where: { field: 'ownerModel', operator: 'equals', value: 'Organization' },
 });
 
-const memberKey = async (entitlements: Entry[]) => {
+const memberKey = async (entitlements: EntitlementInput[]) => {
   const { entity: organizationUser } = await createOrganizationUser(
     { role: 'viewer', entitlements },
     { organization },
@@ -55,7 +61,7 @@ const memberKey = async (entitlements: Entry[]) => {
   ).rawKey;
 };
 
-const tokenKey = async (role: 'viewer' | null, entitlements: Entry[]) => {
+const tokenKey = async (role: 'viewer' | null, entitlements: EntitlementInput[]) => {
   const { entity: organizationUser } = await createOrganizationUser(
     { role: 'owner' },
     { organization },
@@ -89,7 +95,7 @@ describe('a malformed stored entitlement is pruned at sign-in, the rest kept (R9
   });
 
   it('a token with no role keeps its well-formed entitlements; the broken one is gone', async () => {
-    const key = await tokenKey(null, [readOrganization(), broken()]);
+    const key = await tokenKey(null, [organizationReadEntitlement(), broken()]);
     expect(await actorModel(key)).toBe('Token');
     expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
   });
@@ -141,7 +147,7 @@ describe('the API refuses a malformed entitlement; a broken row stored by hand i
   };
 
   it('the 422 names what is wrong with the entry', async () => {
-    const noAction = { ...readOrganization(), actions: [] };
+    const noAction = { ...organizationReadEntitlement(), actions: [] };
     const response = await (await asOwner())(
       post(`/api/v1/organization/${organization.id}/integrations`, {
         name: `i-${Bun.randomUUIDv7()}`,
@@ -176,12 +182,12 @@ describe('the API refuses a malformed entitlement; a broken row stored by hand i
       entitlements: [broken()],
     });
     const response = await (await asOwner())(
-      post(`/api/v1/integration/${stored.id}/entitlements`, [readOrganization()]),
+      post(`/api/v1/integration/${stored.id}/entitlements`, [organizationReadEntitlement()]),
     );
     expect(response.status).toBe(201);
     expect((await heldEntitlements({ model: 'Integration', id: stored.id })) as unknown).toEqual([
       broken(),
-      readOrganization(),
+      organizationReadEntitlement(),
     ]);
   });
 });

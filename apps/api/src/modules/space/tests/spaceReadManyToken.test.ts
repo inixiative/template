@@ -10,7 +10,7 @@ import {
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/v1/space/:id/tokens', () => {
   let organization: Organization;
@@ -47,7 +47,7 @@ describe('GET /api/v1/space/:id/tokens', () => {
     );
     expect(response.status).toBe(200);
 
-    const { data } = await json<Token[]>(response);
+    const { data } = await parseSuccessBody<Token[]>(response);
     expect(data.some((token) => token.name === 'Test Token')).toBe(true);
   });
 

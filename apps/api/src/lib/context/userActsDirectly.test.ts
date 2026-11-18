@@ -64,7 +64,7 @@ describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () =>
     await cleanupTouchedTables(db);
   });
 
-  it("a token's actor is its row, minus what the redact registry hides", async () => {
+  it("a token's actor is its row, minus its sensitive fields", async () => {
     const key = await mint('User', { user });
     const actor = (await (await asKey(key, '/api/v1/probe/actor')).json()) as {
       model: string;

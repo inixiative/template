@@ -8,12 +8,12 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
 import { makeError } from '#/lib/errors';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import type { Inquiry } from '#/modules/inquiry/handlers/types';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
+import { inquiryServices } from '#/modules/inquiry/services';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
-import { resolveInquiry } from '#/modules/inquiry/services/resolution';
+import { resolveInquiry } from '#/modules/inquiry/services/resolveInquiry';
+import type { Inquiry } from '#/modules/inquiry/services/types';
 import { validateInquiryIsSendable } from '#/modules/inquiry/validations/validateInquiryStatus';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -48,7 +48,7 @@ export const sendInquiry = async (
       include: includeInquiryResponse,
     });
 
-    const handler = inquiryHandlers[fresh.type];
+    const handler = inquiryServices[fresh.type];
     const autoApproved = await handler.autoApprove(sent);
 
     if (autoApproved) {

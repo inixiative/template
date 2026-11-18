@@ -54,7 +54,7 @@ const waitForRedis = async (docker: string, container: string): Promise<void> =>
   throw new Error('Redis did not come up for the multi-instance websocket tests.');
 };
 
-const readReplies = async (
+const forwardRepliesFromStdout = async (
   stdout: ReadableStream<Uint8Array>,
   onReply: (reply: WSInstanceReply) => void,
 ): Promise<void> => {
@@ -102,7 +102,7 @@ const spawnInstance = async (
   let exitError: Error | undefined;
   const ready = Promise.withResolvers<void>();
 
-  void readReplies(proc.stdout, (reply) => {
+  void forwardRepliesFromStdout(proc.stdout, (reply) => {
     if ('ready' in reply) return ready.resolve();
     const waiter = pending.get(reply.id);
     pending.delete(reply.id);

@@ -6,7 +6,7 @@
  */
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { AppShell, ErrorBoundary, RouteError, Unauthorized } from '@template/ui/components';
-import { requireAuth } from '@template/ui/guards';
+import { redirectToLoginUnlessAuthenticated } from '@template/ui/guards';
 import { useAppStore } from '@template/ui/store';
 
 const AuthenticatedLayout = () => {
@@ -27,7 +27,7 @@ const AuthenticatedLayout = () => {
 };
 
 export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: (ctx) => requireAuth(ctx),
+  beforeLoad: (ctx) => redirectToLoginUnlessAuthenticated(ctx),
   component: AuthenticatedLayout,
   errorComponent: ({ error }) => <RouteError error={error} />,
 });

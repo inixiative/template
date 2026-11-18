@@ -110,7 +110,7 @@ Related regions: the Atlas code map that pattern discovery leans on (`@atlas` bl
 
 ## 3. Everything that exists here, by class
 
-Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: makeLock, packages/db/src/lock/makeLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `docs-process`: Docs workflow: read before, update after, doc structure and alignment review, doc routing
 
@@ -503,7 +503,7 @@ Always include real usage:
 ```typescript
 // Good - shows actual pattern
 import { cache, cacheKey } from '@template/db';
-const user = await cache(cacheKey('user', userId), () => db.user.findUnique(...));
+const user = await fetchThroughCache(cacheKey('user', userId), () => db.user.findUnique(...));
 
 // Not just signatures
 cache<T>(key: string, fn: () => Promise<T>, ttl?: number | ((value: T) => number)): Promise<T>

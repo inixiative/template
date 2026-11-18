@@ -132,7 +132,7 @@ Originally, `@template/shared` was meant for code shared between frontend and ba
 
 ```
 ui/src/components/
-├── auth/              # LoginForm, SignupForm
+├── auth/              # LoginForm, SignUpForm
 ├── layout/            # AppShell, Sidebar, Header
 ├── organizations/     # CreateOrganizationModal
 ├── primitives/        # Button, Input, Card (shadcn/ui)
@@ -182,7 +182,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getResource } from '#/lib/context/getResource'` |
+| Within an app | `#/` | `import { contextResource } from '#/lib/context/contextResource'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -191,7 +191,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 ```typescript
 // In apps/api - use #/ for internal imports
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 ```
 
@@ -201,7 +201,7 @@ import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 // Cross-package (from anywhere)
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { actorOf } from '@template/permissions';
+import { actorFromRecordOmittingSensitiveFields } from '@template/permissions';
 
 // Within a shared package - ALSO use @template/
 // packages/db/src/extensions/mutationLifeCycle/mutationLifeCycleExtension.ts
@@ -215,7 +215,7 @@ Top-level `index.ts` files are the public API - they make exports accessible out
 ```typescript
 // packages/shared/src/logger/index.ts - public API for @template/shared/logger
 export { log } from './logger';
-export { logScope } from './scope';
+export { withLogScope } from './scope';
 ```
 
 Actual code files always use aliases.
@@ -358,11 +358,11 @@ bun add -d <package>
 
 ```typescript
 // Good - direct imports
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { emailRegistry } from '#/lib/email';
 
 // Bad - intermediate barrel
-import { getResource, emailRegistry } from '#/lib';
+import { contextResource, emailRegistry } from '#/lib';
 ```
 
 Direct imports:

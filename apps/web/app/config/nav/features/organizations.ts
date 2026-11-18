@@ -5,13 +5,14 @@
  * @uses none
  */
 import type { NavItem } from '@template/ui/components';
-import { getContextParams } from '@template/ui/lib';
+import { permissionCheckTargetForTenantContext } from '@template/ui/lib';
 
 export const organizationsItem: NavItem = {
   label: 'Organizations',
   path: '/organizations',
   icon: 'lucide:building-2',
-  access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  access: (permissions, context) =>
+    permissions.check(...permissionCheckTargetForTenantContext(context), 'read'),
   items: [
     { label: 'My Organizations', path: '/mine' },
     { label: 'Invitations', path: '/invitations' },

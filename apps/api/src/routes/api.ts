@@ -10,7 +10,7 @@ import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
-import { prepareRequest } from '#/middleware/prepareRequest';
+import { prepareRequestMiddleware } from '#/middleware/prepareRequestMiddleware';
 import { apiRateLimit } from '#/middleware/rateLimit/apiRateLimit';
 import { authRateLimit } from '#/middleware/rateLimit/authRateLimit';
 import { authProviderRouter } from '#/modules/authProvider';
@@ -40,7 +40,7 @@ export const apiRouter = new OpenAPIHono<AppEnv>();
 
 // Middleware (order matters)
 apiRouter.use('*', corsMiddleware);
-apiRouter.use('*', prepareRequest);
+apiRouter.use('*', prepareRequestMiddleware);
 apiRouter.route('/telemetry/browser', browserTelemetryRouter);
 
 // Internal service-to-service routes (shared-secret auth). Mounted BEFORE

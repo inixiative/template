@@ -7,14 +7,14 @@ import {
   createTag,
   createTagCategory,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 
 afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-const tagName = (prefix: string) => `${prefix}-${getNextSeq()}`;
+const tagName = (prefix: string) => `${prefix}-${nextFactorySequenceNumber()}`;
 
 describe('tagOwnerCategory hook', () => {
   it('allows a platform tag in a platform category', async () => {

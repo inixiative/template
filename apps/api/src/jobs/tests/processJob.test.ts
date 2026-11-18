@@ -4,12 +4,12 @@ import { jobHandlers } from '#/jobs/handlers';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { slowLastFinishedKey } from '#/jobs/slowLaneSignals';
-import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { makeSlowSlotPool } from '#/jobs/slowSlotPool';
 import { type JobData, JobLane, JobType, type WorkerContext } from '#/jobs/types';
-import { createMockJob } from '#tests/createTestWorker';
+import { mockJob } from '#tests/makeTestWorker';
 
 const jobWith = (id: string, data: Partial<JobData> & { lane?: JobLane }) =>
-  createMockJob({
+  mockJob({
     id,
     name: 'sendWebhook',
     data: { type: JobType.adhoc, payload: { id }, ...data },
@@ -36,7 +36,7 @@ describe('processJob', () => {
   });
 
   it('releases the slow slot and stamps the slow finish when a slow handler throws', async () => {
-    const slowSlots = createSlowSlotPool(2);
+    const slowSlots = makeSlowSlotPool(2);
     const handlers = {
       sendWebhook: async () => {
         throw new Error('handler failed');
@@ -66,7 +66,7 @@ describe('processJob', () => {
     const actors: (AuditActor | null)[] = [];
     const handlers = {
       sendWebhook: async () => {
-        actors.push(auditActorContext.getScope());
+        actors.push(auditActorContext.currentActor());
       },
     };
 
@@ -82,7 +82,7 @@ describe('processJob', () => {
   it('a cron tick does not run its handler: it enqueues the real run, marked with the cron row', async () => {
     const ranDirectly: unknown[] = [];
     const enqueuedRuns: unknown[] = [];
-    const realRun = spyOn(jobHandlers, 'sweepSegments').mockImplementation(
+    const realRun = spyOn(jobHandlers, 'reconcileEveryHealthyDynamicSegment').mockImplementation(
       async (ctx: WorkerContext) => {
         enqueuedRuns.push(ctx.job.data);
       },
@@ -90,14 +90,14 @@ describe('processJob', () => {
 
     try {
       await processJob(
-        createMockJob({
+        mockJob({
           id: 'tick-job',
-          name: 'sweepSegments',
+          name: 'reconcileEveryHealthyDynamicSegment',
           data: { type: JobType.cron, id: 'cron-row-id', lane: JobLane.slow, payload: null },
         }),
         {
           handlers: {
-            sweepSegments: async () => {
+            reconcileEveryHealthyDynamicSegment: async () => {
               ranDirectly.push('tick');
             },
           } as never,
@@ -114,7 +114,7 @@ describe('processJob', () => {
   });
 
   it('rejects an unknown handler', async () => {
-    await expect(processJob(createMockJob({ name: 'noSuchHandler', data: {} }))).rejects.toThrow(
+    await expect(processJob(mockJob({ name: 'noSuchHandler', data: {} }))).rejects.toThrow(
       'Unknown job handler: noSuchHandler',
     );
   });

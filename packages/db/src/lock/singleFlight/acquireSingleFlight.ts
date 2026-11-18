@@ -5,10 +5,10 @@
  * @uses infrastructure:observability
  */
 import type { singleFlightLock } from '@template/db/lock/singleFlight/singleFlightLock';
-import { readCached } from '@template/db/redis/cache/readCached';
+import { fetchCachedValue } from '@template/db/redis/cache/fetchCachedValue';
 import { cacheAccessor } from '@template/db/redis/cache/telemetry/cacheAccessor';
 import type { CacheResult } from '@template/db/redis/cache/telemetry/withCacheSpan';
-import type { getRedisClient } from '@template/db/redis/client';
+import type { redisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import { recordDuration } from '@template/shared/telemetry';
 
@@ -17,10 +17,10 @@ const SINGLE_FLIGHT_MAX_WAIT_MS = 10_000;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-type SingleFlight<T> = { result: 'hit'; value: T } | { result: 'settled'; holdsLock: boolean };
+type SingleFlight<T> = { result: 'hit'; value: T } | { result: 'miss'; holdsLock: boolean };
 
 export const acquireSingleFlight = async <T>(
-  redis: ReturnType<typeof getRedisClient>,
+  redis: ReturnType<typeof redisClient>,
   key: string,
   lock: ReturnType<typeof singleFlightLock>,
   setResult: (result: CacheResult) => void,
@@ -40,7 +40,7 @@ export const acquireSingleFlight = async <T>(
     try {
       while (Date.now() < deadline) {
         await sleep(SINGLE_FLIGHT_POLL_MS);
-        const polled = await readCached<T>(redis, key);
+        const polled = await fetchCachedValue<T>(redis, key);
         if (polled.result === 'hit') {
           setResult('hit');
           return { result: 'hit', value: polled.value };
@@ -62,5 +62,5 @@ export const acquireSingleFlight = async <T>(
     }
   }
 
-  return { result: 'settled', holdsLock };
+  return { result: 'miss', holdsLock };
 };

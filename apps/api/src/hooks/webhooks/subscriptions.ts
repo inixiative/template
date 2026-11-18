@@ -1,20 +1,20 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:webhooks
  */
 import {
+  BIND_NAME_BY_OWNER_MODEL,
+  type BindableOwnerModel,
   db,
-  POLYMORPHIC_BINDS,
-  type PolymorphicKind,
   polymorphicKeyColumn,
-  polymorphicTarget,
+  rowPolymorphicAxisPointsAt,
 } from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
 import { uniq } from 'lodash-es';
 import type { Party } from '#/hooks/webhooks/parties';
 
-const ownerKinds = Object.keys(POLYMORPHIC_BINDS) as PolymorphicKind[];
+const ownerKinds = Object.keys(BIND_NAME_BY_OWNER_MODEL) as BindableOwnerModel[];
 
 export const findPartySubscriptions = (model: WebhookModel, parties: Party[]) =>
   db.webhookSubscription.findMany({
@@ -31,6 +31,6 @@ export const findPartySubscriptions = (model: WebhookModel, parties: Party[]) =>
   });
 
 export const isPartyTo = (subscription: WebhookSubscription, parties: Party[]) => {
-  const owner = polymorphicTarget(subscription, 'WebhookSubscription', 'ownerModel');
+  const owner = rowPolymorphicAxisPointsAt(subscription, 'WebhookSubscription', 'ownerModel');
   return !!owner && parties.some((party) => party.kind === owner.kind && party.id === owner.id);
 };

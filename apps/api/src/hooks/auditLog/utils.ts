@@ -4,11 +4,11 @@
  * @uses infrastructure:prisma
  */
 import {
-  filterFields,
+  maskSensitiveFields,
   NOOP_FIELDS,
+  omitRegisteredFields,
   Prisma,
   polymorphicKeyColumns,
-  redactSensitiveFields,
 } from '@template/db';
 import type { AuditActor } from '@template/db/lib/auditActorContext';
 import { isEqual } from 'lodash-es';
@@ -25,7 +25,11 @@ export const auditActorColumns = (actor: AuditActor | null) => ({
   sourceInquiryId: actor?.sourceInquiryId ?? null,
 });
 
-const getSubjectFieldValue = (model: string, field: string, record: Record<string, unknown>) => {
+const subjectFieldValueOfRecord = (
+  model: string,
+  field: string,
+  record: Record<string, unknown>,
+) => {
   switch (field) {
     case 'subjectOrganizationId':
       return model === 'Organization' ? record.id : record.organizationId;
@@ -70,21 +74,22 @@ export const buildSubjectFkFields = (
 
   const subjectFields: Record<string, unknown> = {};
   for (const field of fkFields) {
-    const value = getSubjectFieldValue(model, field, record);
+    const value = subjectFieldValueOfRecord(model, field, record);
     if (value !== undefined) subjectFields[field] = value;
   }
   return subjectFields;
 };
 
-export const filterForAudit = (
+export const omitNoopFieldsForAudit = (
   model: string,
   data: Record<string, unknown>,
-): Record<string, unknown> => filterFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
+): Record<string, unknown> =>
+  omitRegisteredFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
 
-export const processAuditData = (
+export const maskSensitiveAndOmitNoopFieldsForAudit = (
   model: string,
   data: Record<string, unknown>,
-): Record<string, unknown> => redactSensitiveFields(model, filterForAudit(model, data));
+): Record<string, unknown> => maskSensitiveFields(model, omitNoopFieldsForAudit(model, data));
 
 export const computeDiff = (
   before: Record<string, unknown>,

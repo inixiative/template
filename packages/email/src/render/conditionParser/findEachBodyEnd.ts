@@ -4,16 +4,17 @@
  * @partOf feature:email
  * @uses none
  */
+
+import { eachMarkerAt } from '@template/email/render/conditionParser/eachMarkerAt';
 import { END, END_EACH, IF } from '@template/email/render/conditionParser/grammar';
 import {
-  type Kind,
   nextStructuralToken,
+  type StructuralBlockKind,
 } from '@template/email/render/conditionParser/nextStructuralToken';
-import { readEachMarker } from '@template/email/render/conditionParser/readEachMarker';
-import { readRuleMarker } from '@template/email/render/conditionParser/readRuleMarker';
+import { ruleMarkerAt } from '@template/email/render/conditionParser/ruleMarkerAt';
 
 export const findEachBodyEnd = (content: string, bodyStart: number): number => {
-  const stack: Kind[] = ['each'];
+  const stack: StructuralBlockKind[] = ['each'];
   let i = bodyStart;
 
   while (stack.length > 0) {
@@ -23,10 +24,10 @@ export const findEachBodyEnd = (content: string, bodyStart: number): number => {
     if (!token.isClose) {
       stack.push(token.kind);
       if (token.kind === 'if') {
-        const marker = readRuleMarker(content, token.index, IF);
+        const marker = ruleMarkerAt(content, token.index, IF);
         i = marker ? marker.next : token.index + IF.length;
       } else {
-        const marker = readEachMarker(content, token.index);
+        const marker = eachMarkerAt(content, token.index);
         if (!marker) return -1;
         i = marker.next;
       }

@@ -36,7 +36,7 @@ let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
 let client: QueryClient;
 let owner: Awaited<ReturnType<typeof buildUser>>['entity'];
 
-const serverToken = async (name: string): Promise<StoredToken> => {
+const buildStoredTokenRow = async (name: string): Promise<StoredToken> => {
   const { entity } = await buildToken({ name, ownerModel: 'User' }, { user: owner });
   const { keyHash: _keyHash, ...token } = entity.__serialize() as StoredToken;
   return { ...token, lastUsedAt: null };
@@ -68,7 +68,7 @@ beforeEach(async () => {
     }
     if (request.method === 'POST' && path === '/api/v1/me/tokens') {
       const { name } = (await request.json()) as { name: string };
-      const token = await serverToken(name);
+      const token = await buildStoredTokenRow(name);
       stored.push(token);
       return Response.json({ data: { ...token, key: KEY } }, { status: 201 });
     }
@@ -126,7 +126,7 @@ describe('TokensPage', () => {
   });
 
   it('a delete answered with 204 removes the row and settles without an error', async () => {
-    stored = [await serverToken('Old token')];
+    stored = [await buildStoredTokenRow('Old token')];
     renderPage();
     await screen.findByText('Old token');
 
@@ -151,8 +151,10 @@ describe('TokensPage', () => {
       { organization, user: owner },
     );
     const lists: Record<string, StoredToken[]> = {
-      [`/api/v1/organizationUser/${membership.id}/tokens`]: [await serverToken('Mine here')],
-      [`/api/v1/organization/${organization.id}/tokens`]: [await serverToken('Org deploy')],
+      [`/api/v1/organizationUser/${membership.id}/tokens`]: [
+        await buildStoredTokenRow('Mine here'),
+      ],
+      [`/api/v1/organization/${organization.id}/tokens`]: [await buildStoredTokenRow('Org deploy')],
     };
     fetchSpy.mockImplementation(
       Object.assign(

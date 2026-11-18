@@ -9,7 +9,7 @@ import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { telemetryMiddleware } from '#/middleware/telemetryMiddleware';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { routes } from '#/routes';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -34,7 +34,7 @@ registerSecuritySchemes(app);
 app.doc31('/openapi/docs', {
   openapi: '3.1.0',
   info: { title: `${process.env.PROJECT_NAME ?? 'Template'} API`, version: '0.1.0' },
-  tags: Object.values(Tags).map((name) => ({ name })),
+  tags: Object.values(OpenApiTags).map((name) => ({ name })),
 });
 
 // Not found (must be last)

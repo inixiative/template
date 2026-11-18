@@ -60,7 +60,7 @@ describe('TokenInputView - setSecretAsync via VCR', () => {
   }, 60_000);
 });
 
-describe('TokenInputView - getSecretAsync via VCR', () => {
+describe('TokenInputView - fetchSecretOrThrow via VCR', () => {
   beforeEach(() => {
     infisicalApi.vcr.clear();
   });
@@ -69,17 +69,17 @@ describe('TokenInputView - getSecretAsync via VCR', () => {
     infisicalApi.vcr.clear();
   });
 
-  test('getSecretAsync returns values from VCR fixtures', async () => {
-    infisicalApi.vcr.queue('getSecret', 'planetscaleTokenId');
-    infisicalApi.vcr.queue('getSecret', 'planetscaleToken');
+  test('fetchSecretOrThrow returns values from VCR fixtures', async () => {
+    infisicalApi.vcr.queue('fetchSecret', 'planetscaleTokenId');
+    infisicalApi.vcr.queue('fetchSecret', 'planetscaleToken');
 
-    const { getSecretAsync } = await import(`../../tasks/infisicalSetup?v=${Date.now()}`);
+    const { fetchSecretOrThrow } = await import(`../../tasks/infisicalSetup?v=${Date.now()}`);
 
-    const tokenId = await getSecretAsync('PLANETSCALE_TOKEN_ID', {
+    const tokenId = await fetchSecretOrThrow('PLANETSCALE_TOKEN_ID', {
       projectId: liveProjectId,
       environment: 'root',
     });
-    const token = await getSecretAsync('PLANETSCALE_TOKEN', {
+    const token = await fetchSecretOrThrow('PLANETSCALE_TOKEN', {
       projectId: liveProjectId,
       environment: 'root',
     });

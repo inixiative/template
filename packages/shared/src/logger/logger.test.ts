@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import { log } from '@template/shared/logger/logger';
-import { addLogBroadcast, logScope } from '@template/shared/logger/scope';
+import { addLogBroadcast, withLogScope } from '@template/shared/logger/scope';
 
 // Capture composed log output via a broadcast target bound to the current scope.
 const capture = (fn: () => void): string[] => {
   const msgs: string[] = [];
   const previous = log.level;
   log.level = 'info';
-  logScope('root', () => {
+  withLogScope('root', () => {
     addLogBroadcast((_level, msg) => msgs.push(msg));
     fn();
   });
@@ -42,7 +42,7 @@ describe('log.child', () => {
   });
 });
 
-it('native Pino respects level and redacts child bindings as well as arguments', () => {
+it('native Pino respects level and masks child bindings as well as arguments', () => {
   const modulePath = `${import.meta.dir}/pinoAdapter.ts`;
   const result = Bun.spawnSync({
     cmd: [

@@ -5,7 +5,7 @@ import { buildUser, cleanupTouchedTables } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import type { meReadRoute } from '#/modules/me/routes/meRead';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 afterEach(async () => {
   await cleanupTouchedTables(db);
@@ -30,7 +30,7 @@ describe('GET /me', () => {
 
   it('returns current user', async () => {
     const response = await fetch(get('/api/v1/me'));
-    const { data } = await json<MeReadResponse>(response);
+    const { data } = await parseSuccessBody<MeReadResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.id).toBe(mockUser.id);

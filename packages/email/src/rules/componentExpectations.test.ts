@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { lensFor } from '@template/db/lens';
 import {
-  checkExpectations,
+  checkExpectedPathsResolveInLens,
   collectUnprovidedPathWarnings,
   deriveComponentExpectations,
 } from '@template/email/rules/componentExpectations';
-import { type EmailLens, systemSlot } from '@template/email/rules/emailLens';
+import { type EmailLens, systemFieldsSlotLens } from '@template/email/rules/emailLens';
 
 describe('deriveComponentExpectations', () => {
   it('derives the absolute paths a component body demands, from tokens, rules and loops alike', () => {
@@ -28,14 +28,14 @@ describe('deriveComponentExpectations', () => {
   });
 });
 
-describe('checkExpectations (the "can this belong to this template" walk)', () => {
+describe('checkExpectedPathsResolveInLens (the "can this belong to this template" walk)', () => {
   const lens: EmailLens = {
     recipient: { parent: lensFor('User'), root: { relations: { contacts: {} } } },
-    system: systemSlot(),
+    system: systemFieldsSlotLens(),
   };
 
   it('accepts paths that resolve against the lens, across scalars and through relations', () => {
-    const checks = checkExpectations(
+    const checks = checkExpectedPathsResolveInLens(
       ['recipient.email', 'recipient.displayName', 'recipient.contacts.label'],
       lens,
     );
@@ -43,7 +43,7 @@ describe('checkExpectations (the "can this belong to this template" walk)', () =
   });
 
   it('rejects paths the lens never exposed — including ones that merely resemble real fields', () => {
-    const checks = checkExpectations(
+    const checks = checkExpectedPathsResolveInLens(
       ['recipient.notAColumn', 'recipient.contacts.notAField', 'sender.name'],
       lens,
     );
@@ -52,17 +52,22 @@ describe('checkExpectations (the "can this belong to this template" walk)', () =
 
   it('accepts the open-ended tail beneath a Json column (covered by the opacity warning instead)', () => {
     expect(
-      checkExpectations(['recipient.contacts.permissionRules.anything.below'], lens)[0]?.ok,
+      checkExpectedPathsResolveInLens(
+        ['recipient.contacts.permissionRules.anything.below'],
+        lens,
+      )[0]?.ok,
     ).toBe(true);
   });
 
   it('resolves system.* against the system lens like any other root', () => {
-    const checks = checkExpectations(['system.now', 'system.notAToken'], lens);
+    const checks = checkExpectedPathsResolveInLens(['system.now', 'system.notAToken'], lens);
     expect(checks.map((check) => check.ok)).toEqual([true, false]);
   });
 
   it('treats {{system.unsubscribeUrl}} as rail-provided, and nothing else beyond the token list', () => {
-    expect(checkExpectations(['system.unsubscribeUrl', 'system.notAToken'], lens)).toEqual([
+    expect(
+      checkExpectedPathsResolveInLens(['system.unsubscribeUrl', 'system.notAToken'], lens),
+    ).toEqual([
       { path: 'system.unsubscribeUrl', ok: true },
       { path: 'system.notAToken', ok: false },
     ]);

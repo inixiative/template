@@ -5,16 +5,16 @@
  * @uses none
  */
 import { db } from '@template/db/client';
-import { loadEntitlementAnchors } from '@template/db/entitlements/entitlementAnchors';
+import { fetchEntitlementAnchors } from '@template/db/entitlements/entitlementAnchors';
 import {
   type EntitlementHolder,
   type EntitlementInput,
   toEntitlementCreateData,
 } from '@template/db/entitlements/entitlementRow';
 import { EntitlementResourceModel } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const entitlementFactory = createFactory('Entitlement', {
+const entitlementFactory = registerFactory('Entitlement', {
   defaults: () => ({
     resource: EntitlementResourceModel.Organization,
     actions: ['read'],
@@ -28,7 +28,7 @@ export const createEntitlement = entitlementFactory.create;
 export const storeEntitlements = async (holder: EntitlementHolder, inputs: EntitlementInput[]) =>
   inputs.length
     ? db.entitlement.createManyAndReturn({
-        data: toEntitlementCreateData(inputs, holder, await loadEntitlementAnchors(inputs)),
+        data: toEntitlementCreateData(inputs, holder, await fetchEntitlementAnchors(inputs)),
       })
     : [];
 

@@ -9,7 +9,7 @@ import {
   OrganizationScalarSchema,
   SpaceScalarSchema,
 } from '@template/db';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
 // Customer side - who is the customer (User, Org, or Space)
@@ -42,10 +42,10 @@ export const customerRelationshipAsProviderSchema = CustomerRelationshipScalarSc
 
 // Combined tags for CustomerRelationship routes (alphabetized)
 export const customerRelationshipTags = [
-  Tags.customer,
-  Tags.customerRelationship,
-  Tags.organization,
-  Tags.provider,
-  Tags.space,
-  Tags.user,
+  OpenApiTags.customer,
+  OpenApiTags.customerRelationship,
+  OpenApiTags.organization,
+  OpenApiTags.provider,
+  OpenApiTags.space,
+  OpenApiTags.user,
 ] as const;

@@ -10,7 +10,7 @@ export type VercelProject = { id: string; name: string; framework: string | null
 class VercelApi {
   readonly vcr = new VCR(FIXTURES_DIR, { service: 'vercel', version: () => cliVersion('vercel') });
 
-  async getVercelToken(): Promise<string> {
+  async fetchVercelToken(): Promise<string> {
     const { homedir } = await import('node:os');
     const path = await import('node:path');
     const { readFile } = await import('node:fs/promises');
@@ -24,7 +24,7 @@ class VercelApi {
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET',
     body?: unknown,
   ): Promise<Record<string, unknown>> {
-    const token = await this.getVercelToken();
+    const token = await this.fetchVercelToken();
     const url = `https://api.vercel.com${endpoint}`;
     const response = await fetch(url, {
       method,
@@ -52,8 +52,8 @@ class VercelApi {
     });
   }
 
-  async getProject(projectName: string, teamId?: string): Promise<VercelProject | null> {
-    return this.vcr.capture('getProject', async () => {
+  async fetchProject(projectName: string, teamId?: string): Promise<VercelProject | null> {
+    return this.vcr.capture('fetchProject', async () => {
       try {
         const teamFlag = teamId ? `--scope ${teamId}` : '';
         const { stdout, stderr } = await execAsync(
@@ -78,7 +78,7 @@ class VercelApi {
       try {
         const teamFlag = teamId ? `--scope ${teamId}` : '';
         await execAsync(`vercel project add ${projectName} ${teamFlag}`, { encoding: 'utf-8' });
-        const projectInfo = await this.getProject(projectName, teamId);
+        const projectInfo = await this.fetchProject(projectName, teamId);
         if (!projectInfo) throw new Error('Project created but could not retrieve project info');
         return projectInfo;
       } catch (error) {

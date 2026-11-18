@@ -4,6 +4,7 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+import { useQuery } from '@tanstack/react-query';
 import {
   type OrganizationUpdateData,
   organizationProtected,
@@ -12,7 +13,7 @@ import {
 } from '@template/sdk';
 import { Page } from '@template/ui/components';
 import { ProfileFormCard } from '@template/ui/components/settings';
-import { useOptimisticMutation, useQuery } from '@template/ui/hooks';
+import { useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';

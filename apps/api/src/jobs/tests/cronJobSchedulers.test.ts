@@ -5,7 +5,7 @@ import { registerCronJobs } from '#/jobs/registerCronJobs';
 import { withCronJobsLock } from '#/jobs/withCronJobsLock';
 import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 
-const handler = 'sweepSegments';
+const handler = 'reconcileEveryHealthyDynamicSegment';
 const patterns = ['17 3 * * *', '19 5 * * *'] as const;
 
 const jobs = useRealJobsQueue();
@@ -65,7 +65,7 @@ describe('registerCronJobs reconciles the schedulers with the enabled rows', () 
     expect(turnedOff).toEqual([{ enabled: false }, { enabled: false }]);
   });
 
-  it('throws before the sweep when an upsert fails, so a working legacy repeatable stays', async () => {
+  it('throws before removing orphaned schedulers when an upsert fails, so a working legacy repeatable stays', async () => {
     const cronJob = await createScheduledCronJob();
     await jobs().realQueue.removeJobScheduler(cronJob.jobId);
     const legacy = await jobs().realQueue.add(
@@ -113,11 +113,11 @@ describe('the cronJobSync hook', () => {
     const renamed = newJobId();
     await db.cronJob.update({
       where: { id: row.id },
-      data: { handler: 'cleanStaleData', jobId: renamed },
+      data: { handler: 'hardDeleteRecordsPastRetention', jobId: renamed },
     });
     expect(await jobs().schedulerOf(row.jobId)).toBeNull();
     expect(await jobs().schedulerOf(renamed)).toEqual({
-      name: 'cleanStaleData',
+      name: 'hardDeleteRecordsPastRetention',
       pattern: patterns[1],
     });
 

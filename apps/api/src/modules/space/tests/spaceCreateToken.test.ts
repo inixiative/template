@@ -14,7 +14,7 @@ import {
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 describe('POST /api/v1/space/:id/tokens', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -59,7 +59,7 @@ describe('POST /api/v1/space/:id/tokens', () => {
     );
     expect(response.status).toBe(201);
 
-    const { data } = await json<{ id: string; name: string; key: string }>(response);
+    const { data } = await parseSuccessBody<{ id: string; name: string; key: string }>(response);
     expect(data.name).toBe('New Token');
     expect(data.key).toBeDefined();
   });

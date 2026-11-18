@@ -1,7 +1,7 @@
 {
   "id": "encryption",
   "title": "Field encryption and key rotation",
-  "routing": "Is this about encrypting a field at rest or reading it back: encryptField / decryptField, the ENCRYPTED_MODELS registry (envPrefix, buildAAD), the encrypted{Key} / \u2026Metadata / \u2026KeyVersion columns, createEncryption / encryptionService, the keyring env schema (encryptionEnv), rotating keys (rotateEncryptionKeys, the version-guarded update), validateEncryptionVersions, or the Jwks signing keys under field encryption? Where secret values live per environment (Infisical, env files) is `secrets`.",
+  "routing": "Is this about encrypting a field at rest or reading it back: encryptField / decryptField, the ENCRYPTED_MODELS registry (envPrefix, buildAAD), the encrypted{Key} / \u2026Metadata / \u2026KeyVersion columns, makeEncryptionService / encryptionService, the keyring env schema (encryptionEnv), rotating keys (rotateEncryptionKeys, the version-guarded update), validateEncryptionVersions, or the Jwks signing keys under field encryption? Where secret values live per environment (Infisical, env files) is `secrets`.",
   "concepts": ["encryption"],
   "tokens": 12470,
   "tokenMethod": "chars/4",

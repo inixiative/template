@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   DbAction,
   db,
-  getRedisClient,
   HookTiming,
+  redisClient,
   redisNamespace,
   registerDbHook,
   unregisterDbHook,
@@ -13,7 +13,7 @@ import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { passwordLength } from '@template/shared/auth/passwordLength';
 import { app } from '#/app';
 import { auth } from '#/lib/auth';
-import type { UserJwtHandoff } from '#/lib/auth/jwtHandoff';
+import type { UserJwtHandoff } from '#/lib/auth/jwtHandoffPlugin';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
@@ -24,15 +24,15 @@ afterEach(async () => {
 
 beforeEach(async () => {
   const keys = [
-    ...(await getRedisClient().keys(`${redisNamespace.limit}:auth:*`)),
-    ...(await getRedisClient().keys(`${redisNamespace.limit}:credentialChange:*`)),
+    ...(await redisClient().keys(`${redisNamespace.limit}:auth:*`)),
+    ...(await redisClient().keys(`${redisNamespace.limit}:credentialChange:*`)),
   ];
-  if (keys.length) await getRedisClient().del(...keys);
+  if (keys.length) await redisClient().del(...keys);
 });
 
 const json = { 'content-type': 'application/json' };
 const bearer = (credential: string) => ({ authorization: `Bearer ${credential}` });
-const readMe = (credential: string) => app.request('/api/v1/me', { headers: bearer(credential) });
+const fetchMe = (credential: string) => app.request('/api/v1/me', { headers: bearer(credential) });
 const currentPassword = 'synthetic-current-password';
 const newPassword = 'synthetic-new-password';
 
@@ -84,7 +84,7 @@ describe('POST /api/v1/me/changePassword', () => {
     const person = await signUpVerified();
     const jwt = await signedInJwt(person.email);
     const otherDevice = await signedInJwt(person.email);
-    expect((await readMe(otherDevice)).status).toBe(200);
+    expect((await fetchMe(otherDevice)).status).toBe(200);
 
     const response = await changePassword(jwt, { currentPassword, newPassword });
     expect(response.status).toBe(200);
@@ -93,9 +93,9 @@ describe('POST /api/v1/me/changePassword', () => {
     expect(data.token.split('.')).toHaveLength(3);
     expect(new Date(data.expiresAt).getTime()).toBeGreaterThan(Date.now());
 
-    expect((await readMe(jwt)).status).toBe(401);
-    expect((await readMe(otherDevice)).status).toBe(401);
-    expect((await readMe(data.token)).status).toBe(200);
+    expect((await fetchMe(jwt)).status).toBe(401);
+    expect((await fetchMe(otherDevice)).status).toBe(401);
+    expect((await fetchMe(data.token)).status).toBe(200);
     expect((await signIn(person.email, currentPassword)).status).toBe(401);
     expect((await signIn(person.email, newPassword)).status).toBe(200);
   });
@@ -122,7 +122,7 @@ describe('POST /api/v1/me/changePassword', () => {
     const body = (await response.json()) as { message: string };
     expect(body.message).toBe('Invalid password');
     expect(await sessionsOf(person.userId)).toEqual([]);
-    expect((await readMe(jwt)).status).toBe(200);
+    expect((await fetchMe(jwt)).status).toBe(200);
     expect((await signIn(person.email, currentPassword)).status).toBe(200);
     expect((await signIn(person.email, newPassword)).status).toBe(401);
   });
@@ -136,7 +136,7 @@ describe('POST /api/v1/me/changePassword', () => {
       const response = await changePassword(jwt, { currentPassword, newPassword: candidate });
       expect(response.status).toBe(422);
     }
-    expect((await readMe(jwt)).status).toBe(200);
+    expect((await fetchMe(jwt)).status).toBe(200);
     expect((await signIn(person.email, currentPassword)).status).toBe(200);
   });
 
@@ -237,8 +237,8 @@ describe('POST /api/v1/me/changePassword', () => {
       token: null,
       expiresAt: null,
     });
-    expect((await readMe(personJwt)).status).toBe(401);
-    expect((await readMe(jwt)).status).toBe(200);
+    expect((await fetchMe(personJwt)).status).toBe(401);
+    expect((await fetchMe(jwt)).status).toBe(200);
   });
 
   it('two concurrent changes: one wins, the other is refused without a 401, no session left', async () => {
@@ -273,7 +273,7 @@ describe('POST /api/v1/me/changePassword', () => {
     }
     expect((await signIn(person.email, currentPassword)).status).toBe(200);
     expect((await signIn(person.email, newPassword)).status).not.toBe(200);
-    expect((await readMe(jwt)).status).toBe(200);
+    expect((await fetchMe(jwt)).status).toBe(200);
     expect(await sessionsOf(person.userId)).toEqual([]);
   });
 

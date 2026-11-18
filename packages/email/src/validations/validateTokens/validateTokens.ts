@@ -11,13 +11,13 @@ import {
   visitTemplateBlocks,
 } from '@template/email/render/conditionParser';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
-import { absoluteRule } from '@template/email/rules/absoluteRule';
 import { isRailProvidedSystemField } from '@template/email/rules/railProvidedSystemFields';
+import { replaceLoopBindingsWithAbsolutePaths } from '@template/email/rules/replaceLoopBindingsWithAbsolutePaths';
 import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
-import { presenceGuards } from '@template/email/validations/validateTokens/presenceGuards';
+import { offsetsOfUnrecognizedMustaches } from '@template/email/validations/validateTokens/offsetsOfUnrecognizedMustaches';
+import { pathsGuaranteedPresentByRule } from '@template/email/validations/validateTokens/pathsGuaranteedPresentByRule';
 import { emailTokenPathKind } from '@template/email/validations/validateTokens/tokenPathKind';
 import type { ValidateTokensOptions } from '@template/email/validations/validateTokens/types';
-import { unknownMustaches } from '@template/email/validations/validateTokens/unknownMustaches';
 
 const SYSTEM_TOKEN_NAMES = new Set<string>(SYSTEM_TOKENS.map(({ name }) => name));
 
@@ -102,8 +102,8 @@ const walkContent = (content: string, walk: Omit<Walk, 'bindings'>): void =>
       branch: ({ kind, rule }, _branchIndex, _position, { bindings, state }) => {
         const guarded = new Set(state.guarded);
         if (kind !== 'else' && rule !== undefined) {
-          const judged = absoluteRule(rule, bindings);
-          if (judged) for (const guard of presenceGuards(judged)) guarded.add(guard);
+          const judged = replaceLoopBindingsWithAbsolutePaths(rule, bindings);
+          if (judged) for (const guard of pathsGuaranteedPresentByRule(judged)) guarded.add(guard);
         }
         return { ...state, guarded };
       },
@@ -127,7 +127,7 @@ export const validateTokens = (
   options: ValidateTokensOptions = {},
 ): TokenIssue[] => {
   const issues: TokenIssue[] = [];
-  for (const offset of unknownMustaches(content)) {
+  for (const offset of offsetsOfUnrecognizedMustaches(content)) {
     issues.push({
       path: `offset ${offset}`,
       message: `"${content.slice(offset, offset + 24)}" is not a token or block the engine understands`,

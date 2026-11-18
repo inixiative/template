@@ -25,7 +25,7 @@ const { app } = createTestApp({
       hono.use('*', tokenAuthMiddleware);
       hono.use('*', auditActorMiddleware);
       hono.get('/echo', (c) => {
-        const actor = auditActorContext.getScope();
+        const actor = auditActorContext.currentActor();
         return c.json({
           integrationId: actor?.integrationId ?? null,
           actorTokenId: actor?.actorTokenId ?? null,
@@ -102,7 +102,9 @@ describe('an integration acts through its token, and the audit names it (Aron, 2
       mount: [
         (hono) => {
           hono.use('*', auditActorMiddleware);
-          hono.get('/echo', (c) => c.json({ actor: auditActorContext.getScope()?.actor ?? null }));
+          hono.get('/echo', (c) =>
+            c.json({ actor: auditActorContext.currentActor()?.actor ?? null }),
+          );
         },
       ],
     });

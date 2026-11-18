@@ -1,4 +1,4 @@
-import { createSerializedQueue } from '@template/shared/utils';
+import { makeSerializedQueue } from '@template/shared/utils';
 import type { WSData, WSSocket } from '#/ws/types';
 
 // A real recorder object shaped like a ServerWebSocket — NOT a spyOn mock. Bun
@@ -42,7 +42,7 @@ export const createTestSocket = (data?: Partial<WSData>): TestSocketHandle => {
       latestStreamFrames: data?.latestStreamFrames ?? new Map(),
       connectedAt: data?.connectedAt ?? now,
       lastPing: data?.lastPing ?? now,
-      queue: data?.queue ?? createSerializedQueue(),
+      queue: data?.queue ?? makeSerializedQueue(),
     } satisfies WSData,
     get readyState() {
       return readyState;

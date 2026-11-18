@@ -9,13 +9,15 @@ type ErrorResponse = ApiErrorBody;
 
 export type ApiResponse<T = unknown> = SuccessResponse<T> | ErrorResponse;
 
-export const json = async <T = unknown>(response: Response): Promise<SuccessResponse<T>> => {
+export const parseSuccessBody = async <T = unknown>(
+  response: Response,
+): Promise<SuccessResponse<T>> => {
   const body = await response.json();
   if (!response.ok) log.error(`[${response.status}] ${JSON.stringify(body)}`, LogScope.test);
   return body as SuccessResponse<T>;
 };
 
-export const jsonError = async (response: Response): Promise<ErrorResponse> => {
+export const parseErrorBody = async (response: Response): Promise<ErrorResponse> => {
   return response.json() as Promise<ErrorResponse>;
 };
 

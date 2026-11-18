@@ -5,13 +5,13 @@
  * @uses primitive:routeTemplates
  */
 
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { makeController } from '#/lib/utils/makeController';
 import { meRedactRoute } from '#/modules/me/routes/meRedact';
 import { redactUser } from '#/modules/user/services/redactUser';
 
 export const meRedactController = makeController(meRedactRoute, async (c, respond) => {
-  const user = me(c)!;
+  const user = actingUser(c)!;
 
   await redactUser(c, user.id);
 

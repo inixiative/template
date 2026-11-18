@@ -27,7 +27,7 @@ Audit logs accumulate indefinitely and must remain queryable for compliance (SOC
 
 - [ ] Choose cold storage target (decision: TBD)
 - [ ] Build export job: batch export logs older than N days before deletion
-- [ ] Update `cleanStaleAuditLogs` to export-then-delete (not just delete)
+- [ ] Update `hardDeleteAuditLogsPastRetention` to export-then-delete (not just delete)
 - [ ] Add env vars: `AUDIT_LOG_COLD_STORAGE_TARGET`, `AUDIT_LOG_EXPORT_BATCH_SIZE`
 - [ ] Add monitoring/alerting on export failures
 - [ ] Ensure export + deletion is atomic (no data loss on failure)

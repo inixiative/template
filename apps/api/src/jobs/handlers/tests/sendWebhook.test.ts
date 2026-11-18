@@ -13,7 +13,7 @@ import {
 import { setEnvOverride } from '@template/shared/utils';
 import { sendWebhook } from '#/jobs/handlers/sendWebhook';
 import { createTestApp } from '#tests/createTestApp';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -31,8 +31,8 @@ describe('sendWebhook handler', () => {
   let user: User;
   let testCounter = 0;
 
-  const getUniqueUrl = (suffix = '') => `https://test-webhook.local/${++testCounter}${suffix}`;
-  const worker = createTestWorker();
+  const uniqueWebhookUrl = (suffix = '') => `https://test-webhook.local/${++testCounter}${suffix}`;
+  const worker = makeTestWorker();
 
   beforeEach(async () => {
     const { entity } = await createUser();
@@ -70,7 +70,7 @@ describe('sendWebhook handler', () => {
 
   describe('successful delivery', () => {
     it('delivers webhook and creates success event', async () => {
-      const testUrl = getUniqueUrl();
+      const testUrl = uniqueWebhookUrl();
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -108,7 +108,7 @@ describe('sendWebhook handler', () => {
     });
 
     it('signature can be verified with public key', async () => {
-      const testUrl = getUniqueUrl();
+      const testUrl = uniqueWebhookUrl();
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -149,7 +149,7 @@ describe('sendWebhook handler', () => {
         ),
       );
 
-      const testUrl = getUniqueUrl('/error');
+      const testUrl = uniqueWebhookUrl('/error');
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -183,7 +183,7 @@ describe('sendWebhook handler', () => {
         ),
       );
 
-      const testUrl = getUniqueUrl('/redirect');
+      const testUrl = uniqueWebhookUrl('/redirect');
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -214,7 +214,7 @@ describe('sendWebhook handler', () => {
         }),
       );
 
-      const testUrl = getUniqueUrl('/unreachable');
+      const testUrl = uniqueWebhookUrl('/unreachable');
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -239,7 +239,7 @@ describe('sendWebhook handler', () => {
     });
 
     it('skips inactive subscription', async () => {
-      const testUrl = getUniqueUrl('/inactive');
+      const testUrl = uniqueWebhookUrl('/inactive');
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -278,7 +278,7 @@ describe('sendWebhook handler', () => {
 
   describe('retries', () => {
     const attempt = (attemptNumber: number, attempts = 3) =>
-      createTestWorker({ attemptsMade: attemptNumber - 1, opts: { attempts } });
+      makeTestWorker({ attemptsMade: attemptNumber - 1, opts: { attempts } });
 
     const respondWith = (status: number, statusText = '') =>
       spyOn(globalThis, 'fetch').mockImplementation(
@@ -298,13 +298,13 @@ describe('sendWebhook handler', () => {
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
-        url: getUniqueUrl('/retries'),
+        url: uniqueWebhookUrl('/retries'),
         model: 'CustomerRelationship',
       });
       return sub;
     };
 
-    const deliver = (ctx: ReturnType<typeof createTestWorker>, subscriptionId: string) =>
+    const deliver = (ctx: ReturnType<typeof makeTestWorker>, subscriptionId: string) =>
       sendWebhook(ctx, {
         subscriptionId,
         action: 'update',
@@ -350,7 +350,7 @@ describe('sendWebhook handler', () => {
       expect(events.map((event) => [event.status, event.httpStatus])).toEqual([['retrying', null]]);
     });
 
-    it('settles the delivery on the last attempt: records it unreachable and completes', async () => {
+    it('records the final outcome on the last attempt: unreachable, and the job completes', async () => {
       respondWith(503, 'Service Unavailable');
       const sub = await createSubscription();
 
@@ -364,7 +364,7 @@ describe('sendWebhook handler', () => {
       [422, 'Unprocessable Entity'],
       [401, 'Unauthorized'],
       [302, 'Found'],
-    ])('does not retry HTTP %d: the first attempt settles the delivery as an error', async (status, statusText) => {
+    ])('does not retry HTTP %d: the first attempt records the final outcome as an error', async (status, statusText) => {
       respondWith(status, statusText);
       const sub = await createSubscription();
 
@@ -434,7 +434,7 @@ describe('sendWebhook handler', () => {
         }),
       );
 
-      const testUrl = getUniqueUrl('/circuit-break');
+      const testUrl = uniqueWebhookUrl('/circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -474,7 +474,7 @@ describe('sendWebhook handler', () => {
         }),
       );
 
-      const testUrl = getUniqueUrl('/no-circuit-break');
+      const testUrl = uniqueWebhookUrl('/no-circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -522,7 +522,7 @@ describe('sendWebhook handler', () => {
         }),
       );
 
-      const testUrl = getUniqueUrl('/few-events');
+      const testUrl = uniqueWebhookUrl('/few-events');
       const { entity: sub, context } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -583,7 +583,7 @@ describe('sendWebhook handler', () => {
       const { entity: sub, context } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
-        url: getUniqueUrl('/integration'),
+        url: uniqueWebhookUrl('/integration'),
         model: 'CustomerRelationship',
         integrationId: withIntegration ? integration.id : null,
       });

@@ -584,8 +584,8 @@ describe('buildWhereClause', () => {
     });
   });
 
-  describe('narrowing wheres (lensWhere owns them all)', () => {
-    it('composes no narrowing wheres — root and relation wheres are applied by lensWhere in paginate', () => {
+  describe('narrowing wheres (applyFilterLensWheresToPrismaWhere owns them all)', () => {
+    it('composes no narrowing wheres — root and relation wheres are applied by applyFilterLensWheresToPrismaWhere in paginate', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('User'),
@@ -613,7 +613,7 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({});
     });
 
-    it('a root deletedAt lens where is lensWhere business too — nothing composes here', () => {
+    it('a root deletedAt lens where is applyFilterLensWheresToPrismaWhere business too — nothing composes here', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('User'),

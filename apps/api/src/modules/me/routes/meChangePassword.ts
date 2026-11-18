@@ -14,7 +14,7 @@ import {
   changePasswordResponseSchema,
 } from '#/modules/me/schemas/changePasswordSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meChangePasswordRoute = actionRoute({
   model: Modules.me,
@@ -30,6 +30,6 @@ export const meChangePasswordRoute = actionRoute({
   description:
     'Changes your password after checking the current one. Every JWT signed for you before stops working; ' +
     'the response carries your new JWT, or nulls when a superadmin is spoofing you.',
-  tags: [Tags.me, Tags.user],
+  tags: [OpenApiTags.me, OpenApiTags.user],
   'x-batch': false,
 });

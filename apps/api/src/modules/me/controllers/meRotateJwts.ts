@@ -5,12 +5,12 @@
  * @uses primitive:routeTemplates
  */
 
-import { me } from '#/lib/context/me';
+import { actingUser } from '#/lib/context/actingUser';
 import { makeController } from '#/lib/utils/makeController';
 import { meRotateJwtsRoute } from '#/modules/me/routes/meRotateJwts';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
 export const meRotateJwtsController = makeController(meRotateJwtsRoute, async (c, respond) => {
-  await rotateUserJwts(me(c)!.id);
+  await rotateUserJwts(actingUser(c)!.id);
   return respond.noContent();
 });

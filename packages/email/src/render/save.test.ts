@@ -14,8 +14,8 @@ import { DependentTemplateError } from '@template/email/errors/DependentTemplate
 import { DivergentDuplicateSlugError } from '@template/email/errors/DivergentDuplicateSlugError';
 import { MjmlValidationError } from '@template/email/errors/MjmlValidationError';
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
-import { guardedToken } from '@template/email/render/guardedToken';
 import { saveEmailTemplate } from '@template/email/render/save';
+import { tokenGuardedByExistsCheck } from '@template/email/render/tokenGuardedByExistsCheck';
 import { emailLens } from '@template/email/rules/emailLens';
 
 const mjml = (content: string) =>
@@ -41,7 +41,7 @@ describe('saveEmailTemplate', () => {
     });
 
     expect(result.template.slug).toBe('simple');
-    expect(result.template.componentRefs).toEqual([]);
+    expect(result.template.componentSlugs).toEqual([]);
     expect(result.components).toEqual([]);
   });
 
@@ -283,7 +283,7 @@ describe('saveEmailTemplate', () => {
     });
 
     expect(result.template.slug).toBe('with-header');
-    expect(result.template.componentRefs).toEqual(['header']);
+    expect(result.template.componentSlugs).toEqual(['header']);
     expect(result.components.length).toBe(1);
     expect(result.components[0].slug).toBe('header');
     expect(result.components[0].mjml).toBe('<mj-text>Header</mj-text>');
@@ -332,7 +332,7 @@ describe('saveEmailTemplate', () => {
     });
 
     expect(result.components.length).toBe(1);
-    expect(result.template.componentRefs).toEqual(['header']);
+    expect(result.template.componentSlugs).toEqual(['header']);
   });
 
   it('rejects a divergent duplicate slug: two different inline bodies for one slug in one payload', async () => {
@@ -369,7 +369,7 @@ describe('saveEmailTemplate', () => {
     });
 
     expect(result.components).toEqual([]);
-    expect(result.template.componentRefs).toEqual(['footer']);
+    expect(result.template.componentSlugs).toEqual(['footer']);
   });
 
   it('a bare ref (no inlined body) writes nothing and just references the component', async () => {
@@ -389,7 +389,7 @@ describe('saveEmailTemplate', () => {
     });
 
     expect(result.components).toEqual([]);
-    expect(result.template.componentRefs).toEqual(['footer']);
+    expect(result.template.componentSlugs).toEqual(['footer']);
   });
 
   it('a divergent inline body writes the SAME slug (shadow, no variant suffix)', async () => {
@@ -433,7 +433,7 @@ describe('saveEmailTemplate', () => {
     });
 
     expect(result.components).toEqual([]);
-    expect(result.template.componentRefs).toEqual(['shared']);
+    expect(result.template.componentSlugs).toEqual(['shared']);
   });
 
   it('a divergent inline body shadows the default at the org tier (same slug)', async () => {
@@ -475,7 +475,7 @@ describe('saveEmailTemplate', () => {
 
     expect(result.components.length).toBe(2);
     const outer = result.components.find((c) => c.slug === 'outer');
-    expect(outer?.componentRefs).toEqual(['inner']);
+    expect(outer?.componentSlugs).toEqual(['inner']);
   });
 
   it('an admin template inherits an unchanged default component instead of copying it', async () => {
@@ -496,7 +496,7 @@ describe('saveEmailTemplate', () => {
 
     expect(result.template.ownerModel).toBe('admin');
     expect(result.components).toEqual([]);
-    expect(result.template.componentRefs).toEqual(['footer']);
+    expect(result.template.componentSlugs).toEqual(['footer']);
   });
 
   it('an admin template that changes a default component writes its own admin copy', async () => {
@@ -580,7 +580,7 @@ describe('saveEmailTemplate', () => {
     });
 
     expect(result.components).toEqual([]);
-    expect(result.template.componentRefs).toEqual(['org-shared']);
+    expect(result.template.componentSlugs).toEqual(['org-shared']);
   });
 
   it('throws MjmlValidationError for invalid MJML', async () => {
@@ -646,7 +646,10 @@ describe('saveEmailTemplate — the lens decides at save', () => {
       ),
     ).rejects.toThrow(/may be empty/);
     const ok = await saveEmailTemplate(
-      input('t', `<mj-text>{{recipient.email}} ${guardedToken('data.code', 'none')}</mj-text>`),
+      input(
+        't',
+        `<mj-text>{{recipient.email}} ${tokenGuardedByExistsCheck('data.code', 'none')}</mj-text>`,
+      ),
       { lens },
     );
     expect(ok.template.slug).toBe('t');
@@ -724,7 +727,7 @@ describe('saveEmailTemplate — the lens decides at save', () => {
       slug: 'probe',
       locale: 'en',
       ownerModel: 'default',
-      componentRefs: [],
+      componentSlugs: [],
       mjml: `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{/if}}{{/each}}`,
     });
 

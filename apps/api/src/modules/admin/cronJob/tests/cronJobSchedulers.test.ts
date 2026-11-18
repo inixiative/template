@@ -8,7 +8,7 @@ import { createTestApp } from '#tests/createTestApp';
 import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
 import { del, patch, post } from '#tests/utils/request';
 
-const handler = 'sweepSegments';
+const handler = 'reconcileEveryHealthyDynamicSegment';
 const patterns = ['17 3 * * *', '19 5 * * *'] as const;
 
 const jobs = useRealJobsQueue();

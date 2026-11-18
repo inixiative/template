@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { lookupField } from '@template/db';
+import { modelFieldAtPath } from '@template/db';
 
 export const buildSearchPath = (
   model: string,
@@ -14,7 +14,7 @@ export const buildSearchPath = (
   const [seg = '', ...rest] = path.split('.');
   if (!rest.length) return { [seg]: clause };
 
-  const field = lookupField(model, seg)!;
+  const field = modelFieldAtPath(model, seg)!;
   const inner = buildSearchPath(field.type, rest.join('.'), clause);
   return { [seg]: field.kind === 'object' && field.isList ? { some: inner } : inner };
 };

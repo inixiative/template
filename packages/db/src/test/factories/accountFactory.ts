@@ -5,9 +5,9 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const accountFactory = createFactory('Account', {
+const accountFactory = registerFactory('Account', {
   defaults: () => ({
     accountId: faker.string.uuid(),
     providerId: 'credential',

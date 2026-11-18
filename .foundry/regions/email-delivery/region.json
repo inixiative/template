@@ -1,7 +1,7 @@
 {
   "id": "email-delivery",
   "title": "Email delivery and preferences",
-  "routing": "Is this about getting a templated email out: an email handoff on an app event, deliverEmailHandoffs, the sendEmail planner or deliverEmail / deliverEmailMessage job, the registry's EmailEntry (entity, sender, recipients, cc/bcc, data), CommunicationLog rows, statuses, reason codes and idempotency keys, sender identity (SenderType, resolveSender, resolveFromAddress), provider clients (createResendClient, createConsoleClient, emailRegistry, defaultEmailClient), address verification (emailVerifier, Bouncer, Contact.deliverability), the slow lane for wide fan-outs, or communication preferences and unsubscribe (CommunicationKind, acceptedKinds, canDeliver, unsubscribeUrl, List-Unsubscribe, the POST-only unsubscribe route)?",
+  "routing": "Is this about getting a templated email out: an email handoff on an app event, deliverEmailHandoffs, the planEmailDeliveries planner or deliverEmail / deliverEmailMessage job, the registry's EmailEntry (entity, sender, recipients, cc/bcc, data), CommunicationLog rows, statuses, reason codes and idempotency keys, sender identity (CommunicationLogSenderModel, fetchSenderRowThroughLens, resolveFromAddress), provider clients (createResendClient, createConsoleClient, emailRegistry, defaultEmailClient), address verification (emailVerifier, Bouncer, Contact.deliverability), the slow lane for wide fan-outs, or communication preferences and unsubscribe (CommunicationKind, acceptedKinds, canDeliver, unsubscribeUrl, List-Unsubscribe, the POST-only unsubscribe route)?",
   "concepts": ["email-delivery", "communication-preferences"],
   "tokens": 16165,
   "tokenMethod": "chars/4",

@@ -9,7 +9,7 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const organizationReadManySpacesRoute = readRoute({
   model: Modules.organization,
@@ -19,5 +19,5 @@ export const organizationReadManySpacesRoute = readRoute({
   filterLens: { parent: lensFor('Space') },
   responseSchema: SpaceScalarSchema,
   middleware: [validatePermission('read')],
-  tags: [Tags.space, Tags.organization],
+  tags: [OpenApiTags.space, OpenApiTags.organization],
 });

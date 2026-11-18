@@ -1,5 +1,5 @@
 import { expect } from 'bun:test';
-import { type AccessorName, fetchOne, hydrate } from '@template/db';
+import { type AccessorName, fetchCachedRecordWithTargetEntitlements, hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
@@ -16,7 +16,7 @@ export const createTokenProbeApp = (...mount: MountFn[]) => {
             id: string;
             action: string;
           };
-          const row = await fetchOne<{ id: string }>(model, id);
+          const row = await fetchCachedRecordWithTargetEntitlements<{ id: string }>(model, id);
           if (!row) return c.json({ holds: false });
           const record = await hydrate(model, row);
           return c.json({ holds: check(c.get('permix'), rebacSchema, model, record, action) });

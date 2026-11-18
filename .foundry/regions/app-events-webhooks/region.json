@@ -1,7 +1,7 @@
 {
   "id": "app-events-webhooks",
   "title": "App events and webhooks",
-  "routing": "Is this about a side effect leaving a business write (emitAppEvent, makeAppEvent, AppEventName, the handlers index, email/WebSocket handoffs, cb callbacks, streamAppend, observeRegistry, AppEvent rows, db.onCommit deferral, db.parallel allSettled) or outbound webhooks (WebhookSubscription, WebhookEvent, sendWebhook, the webhookDelivery hook, webhookEnabledModels, webhookRelatedModels, webhookOwnerAllowedModels, x-webhook-signature, validateWebhookUrl, webhookUrlSchema, circuit breaker, HOOK_IGNORE_FIELDS)?",
+  "routing": "Is this about a side effect leaving a business write (emitAppEvent, makeAppEvent, AppEventName, the handlers index, email/WebSocket handoffs, cb callbacks, streamAppendHandoff, observeRegistry, AppEvent rows, db.onCommit deferral, db.parallel allSettled) or outbound webhooks (WebhookSubscription, WebhookEvent, sendWebhook, the webhookDelivery hook, webhookEnabledModels, webhookRelatedModels, webhookOwnerAllowedModels, x-webhook-signature, validateWebhookUrl, webhookUrlSchema, circuit breaker, NOOP_FIELDS)?",
   "concepts": ["app-events", "webhooks"],
   "tokens": 17051,
   "tokenMethod": "chars/4",

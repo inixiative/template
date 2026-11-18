@@ -5,8 +5,7 @@
  * @uses none
  */
 import type { QueryKey, UseMutationOptions } from '@tanstack/react-query';
-import { useQueryClient } from '@tanstack/react-query';
-import { useMutation } from '@template/ui/hooks/useQuery';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 type OptimisticSnapshot = {
   queryKey: QueryKey;
@@ -104,7 +103,7 @@ const OPTIMISTIC_ID = '__optimistic__';
 const isWrappedList = (currentData: unknown): currentData is { data: unknown[] } =>
   currentData !== undefined && !Array.isArray(currentData) && 'data' in (currentData as object);
 
-const readList = <TItem>(currentData: unknown): TItem[] =>
+const listItemsOf = <TItem>(currentData: unknown): TItem[] =>
   ((isWrappedList(currentData) ? currentData.data : currentData) as TItem[] | undefined) ?? [];
 
 const writeList = <TItem>(currentData: unknown, updated: TItem[]): unknown =>
@@ -120,12 +119,12 @@ const updateList = <TItem>(
   update: (list: TItem[], isLastPage: boolean) => TItem[],
 ): unknown => {
   if (!isInfiniteList(currentData))
-    return writeList(currentData, update(readList<TItem>(currentData), true));
+    return writeList(currentData, update(listItemsOf<TItem>(currentData), true));
   const lastPage = currentData.pages.length - 1;
   return {
     ...currentData,
     pages: currentData.pages.map((page, index) =>
-      writeList(page, update(readList<TItem>(page), index === lastPage)),
+      writeList(page, update(listItemsOf<TItem>(page), index === lastPage)),
     ),
   };
 };

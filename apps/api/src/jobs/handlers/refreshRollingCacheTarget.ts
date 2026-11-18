@@ -4,7 +4,7 @@
  * @partOf primitive:jobs, primitive:caching
  * @uses infrastructure:redis, primitive:appEvents
  */
-import { getRollingCache } from '@template/db';
+import { rollingCacheByNameOrThrow } from '@template/db';
 import { settleWithin } from '@template/shared/utils';
 import { emitAppEvent } from '#/appEvents/emit';
 import { isFinalAttempt } from '#/jobs/isFinalAttempt';
@@ -27,12 +27,12 @@ export type RefreshRollingCacheTargetPayload = { name: string; key: string; targ
 // when it declares one, so subscribers get a refetch hint.
 //
 // Superseding, keyed by the target's `targetKey` (cache name plus target fields): a forced refresh (enqueueing this leaf directly)
-// replaces a running copy instead of racing it. An unregistered cache name throws (getRollingCache),
+// replaces a running copy instead of racing it. An unregistered cache name throws (rollingCacheByNameOrThrow),
 // and so does a failed write.
 export const refreshRollingCacheTarget = makeSupersedingJob<RefreshRollingCacheTargetPayload>(
   makeJob<RefreshRollingCacheTargetPayload>(
     async ({ job, signal }, { name, key, target }) => {
-      const { refresh, timeoutSeconds, channel, clearQueued } = getRollingCache(name);
+      const { refresh, timeoutSeconds, channel, clearQueued } = rollingCacheByNameOrThrow(name);
       const deadline = AbortSignal.timeout(timeoutSeconds * 1000);
       const refreshSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
       const reportStuck = async (): Promise<never> => {

@@ -85,7 +85,7 @@ a generic `${resource}:${id}` keyer. The engine is untouched.
   wrapper stays **generic** (no `db:` logic). `AccessorName` import dropped.
 - `roles/{user,organization,space}.ts` — grants are explicit: `resource: 'db:user'` / `'db:organization'`
   / `'db:space'` (covers backend setup *and* the frontend store, which use the same helpers).
-- `rebac/schemaHelpers.ts`, `rebac/permissionRulesSchema.ts` — type rename;
+- `rebac/rebacSchemaRules.ts`, `rebac/permissionRulesSchema.ts` — type rename;
   `rebacSchema.permissions[\`db:${model}\`]`.
 - `rebac/check.test.ts` — fixtures wrapped + `db:`-keyed; grant setups qualified; **+2 bridge tests**.
 
@@ -117,7 +117,7 @@ as db grants are `db:…`.
 - **All 10 workspaces typecheck**; biome clean on the package.
 - Not run here: full `bun run check` is blocked by env artifacts unrelated to this change — nested
   `.worktrees/*/biome.json` (root lint) and a pre-existing UI store circular-init under `bun test`
-  (`createClientSlice` before init, untouched by this migration).
+  (`createQueryClientAndWebsocketSlice` before init, untouched by this migration).
 
 ---
 
@@ -129,7 +129,7 @@ The transition **engine** is at parity (map-qualified `resource`, bridge-aware s
 - **No consumer** — `@inixiative/transitions` is imported nowhere in the template.
 - **One real lifecycle** — `inquiry` (`draft → sent → {changesRequested, approved, denied, canceled}`),
   validators in `apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts` +
-  `services/resolution.ts`. `CommunicationLog`/`WebhookEvent` are job-driven and simple. Not enough
+  `services/resolveInquiry.ts`. `CommunicationLog`/`WebhookEvent` are job-driven and simple. Not enough
   heterogeneity to earn a framework.
 - **No multi-source/bridges** today.
 

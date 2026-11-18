@@ -17,7 +17,7 @@ import { LogScope, log } from '@template/shared/logger';
 // rejection still propagates.
 //
 // In-process only. Cross-process safety needs a separate mechanism (e.g.
-// `createLock` from @template/db for a Redis-backed lock).
+// `makeLock` from @template/db for a Redis-backed lock).
 
 export type SerializedQueue = {
   run: <T>(fn: () => Promise<T>) => Promise<T>;
@@ -35,7 +35,7 @@ const logError = (err: unknown): void => {
   );
 };
 
-export const createSerializedQueue = ({
+export const makeSerializedQueue = ({
   onError = logError,
 }: SerializedQueueOptions = {}): SerializedQueue => {
   let tail: Promise<unknown> = Promise.resolve();

@@ -1,5 +1,5 @@
 export { Role } from '@template/db/generated/client/enums';
-export { actorOf } from './actorOf';
+export { actorFromRecordOmittingSensitiveFields } from './actorFromRecordOmittingSensitiveFields';
 // Client
 export {
   type Action,
@@ -19,8 +19,8 @@ export {
   wellFormedEntitlements,
 } from './client';
 export {
-  entitlementsOf,
-  sameEntitlement,
+  entitlementEntriesOfHolder,
+  isSameEntitlement,
   toEntitlementEntry,
   toEntitlementInput,
 } from './entitlementRows';
@@ -32,7 +32,7 @@ export type { ActionRule } from './rebac/types';
 export type { DelegatePermissions } from './roles/delegatePermissions';
 export { isMemberSelfGrant, type MemberResource, memberSelfGrant } from './roles/memberSelfGrant';
 // Organization permissions
-export { getOrgPermissions } from './roles/organization';
+export { permissionEntryForOrganizationRole } from './roles/organization';
 export {
   organizationOwnerPermissions,
   permissionsOfUser,
@@ -40,5 +40,5 @@ export {
 } from './roles/permissionsOfUser';
 // Shared role utilities
 export { isSuperadmin, roleToStandardAction } from './roles/shared';
-export { getSpacePermissions } from './roles/space';
+export { permissionEntryForSpaceRole } from './roles/space';
 export type { PermissionsCheck } from './types';

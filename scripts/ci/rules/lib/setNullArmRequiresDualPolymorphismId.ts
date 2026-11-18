@@ -11,7 +11,13 @@
  * `Cascade` arms are exempt: their row goes with the target.
  */
 import ts from 'typescript';
-import { finishFence, lineAt, listFiles, readSource, type Violation } from './fence';
+import {
+  applyExemptionsAndBaselineThenExit,
+  fetchSource,
+  lineAt,
+  listFiles,
+  type Violation,
+} from './ciRuleRunner';
 
 const REGISTRY = 'packages/db/src/registries/falsePolymorphism.ts';
 const MODEL = /^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm;
@@ -37,7 +43,7 @@ const stringsIn = (node: ts.Node): string[] => {
 };
 
 const registeredAxes = (): Map<string, Axis[]> => {
-  const source = ts.createSourceFile(REGISTRY, readSource(REGISTRY), ts.ScriptTarget.Latest, true);
+  const source = ts.createSourceFile(REGISTRY, fetchSource(REGISTRY), ts.ScriptTarget.Latest, true);
   const axesByModel = new Map<string, Axis[]>();
   const visit = (node: ts.Node) => {
     if (
@@ -76,7 +82,7 @@ const axesByModel = registeredAxes();
 const violations: Violation[] = [];
 
 for (const file of listFiles(['packages'], /\.prisma$/)) {
-  const source = readSource(file);
+  const source = fetchSource(file);
   MODEL.lastIndex = 0;
   for (let m = MODEL.exec(source); m !== null; m = MODEL.exec(source)) {
     const [, model, body] = m;
@@ -103,14 +109,14 @@ for (const file of listFiles(['packages'], /\.prisma$/)) {
   }
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'set-null-arm-requires-dual-polymorphism-id',
   violations,
-  explain: [
+  failureExplanationLines: [
     'Relations on a false-polymorphic axis that set null when their target is deleted, on an axis',
     'with no dual polymorphism id: the row would lose what it pointed at. Register the axis with',
     '`dualPolymorphismId` (as Entitlement.sourceId) in packages/db/src/registries/falsePolymorphism.ts,',
     'or make the relation onDelete: Cascade.',
   ],
-  clean: 'Every set-null arm of a false-polymorphic axis keeps a dual polymorphism id.',
+  passMessage: 'Every set-null arm of a false-polymorphic axis keeps a dual polymorphism id.',
 });

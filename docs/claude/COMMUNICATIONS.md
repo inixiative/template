@@ -26,9 +26,9 @@
   - [Save Pipeline](#save-pipeline)
   - [MJML Validation](#mjml-validation)
   - [Send Pipeline](#send-pipeline)
-    - [Registry (`apps/api/src/lib/email/registry.ts`)](#registry-appsapisrclibemailregistryts)
+    - [Registry (`apps/api/src/lib/email/emailTemplateRegistry.ts`)](#registry-appsapisrclibemailemailtemplateregistryts)
     - [Sender (`apps/api/src/lib/email/sender.ts`)](#sender-appsapisrclibemailsenderts)
-    - [Planner (`sendEmail`)](#planner-sendemail)
+    - [Planner (`planEmailDeliveries`)](#planner-planemaildeliveries)
     - [Deliver (`deliverEmail`) — per recipient](#deliver-deliveremail--per-recipient)
     - [Render issues — behaviour lives in the registry entry](#render-issues--behaviour-lives-in-the-registry-entry)
   - [Template Versioning & Recompose](#template-versioning--recompose)
@@ -75,7 +75,7 @@ Located in `packages/email` (`@template/email`).
 | Compose pipeline | Done | Fetch + expand components |
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
 | Render issues | Done | Save refuses what the lens can decide; render records typed issues; the registry entry says `fail` (default), `degrade`, or names a `substitute` |
-| **Sending jobs** | Done | `sendEmail` BullMQ job (resolve → verify → compose → interpolate → render → send) |
+| **Sending jobs** | Done | `planEmailDeliveries` BullMQ job (resolve → verify → compose → interpolate → render → send) |
 | **Authoring layer** | Planned | Narrowed-lens rule builder + field selector (COMM-001 / INFRA-002 / INFRA-017) |
 | **Data hydration** | TODO | Pipe `{sender,recipient,data}` in; the lens is its schema |
 | **Preference management** | TODO | Unsubscribe, categories |
@@ -92,16 +92,16 @@ packages/email/src/
 │   ├── parseBlocks.ts    # MJML → text/component/slot node tree
 │   ├── decompose.ts      # Component extraction: strip inline bodies, collect refs + component writes
 │   ├── compose.ts        # composeTemplate/composeComponent
-│   ├── expand.ts         # Recursive component expansion
+│   ├── expandComponentTags.ts         # Recursive component expansion
 │   ├── interpolate.ts    # Variable substitution + conditionals
 │   ├── evaluateConditions.ts  # {{#if rule=...}} evaluation
-│   ├── settle/           # Token/branch/each settlement used by interpolate
-│   ├── lookup.ts         # Single-tier ownership lookup
-│   ├── lookupCascade.ts  # Cascade lookup across ownership tiers
-│   ├── lookupTemplate.ts # lookupTemplate/lookupComponent entrypoints
+│   ├── evaluateTemplate/ # Token, branch and each evaluation used by interpolate
+│   ├── fetchEmailRowsAtOwner.ts # Single-tier ownership fetch
+│   ├── fetchComponentsThroughOwnerCascade.ts  # Cascade lookup across ownership tiers
+│   ├── fetchTemplateThroughOwnerCascade.ts # fetchTemplateThroughOwnerCascade/fetchComponentThroughOwnerCascade entrypoints
 │   ├── save.ts           # saveEmailTemplate coordinator
 │   ├── saveComponents.ts # Component persistence
-│   ├── saveTemplate.ts   # Template persistence
+│   ├── upsertEmailTemplateRowAtOwnerScope.ts   # Template persistence
 │   └── types.ts          # OwnerScope, EmailModel
 ├── rules/                # emailLens + rule scoping/reference helpers
 └── validations/          # validateMjml, validateNoCycle, validateConditions, validateTokens
@@ -149,7 +149,7 @@ await client.send({
 
 #### EmailTemplate
 
-MJML templates with ownership and componentRefs.
+MJML templates with ownership and componentSlugs.
 
 ```prisma
 model EmailTemplate {
@@ -160,7 +160,7 @@ model EmailTemplate {
   kind             CommunicationKind   // system|platform|activity|marketing
   subject          String              // "Your code: {{data.code}}"
   mjml             String              // Full MJML with component refs
-  componentRefs    String[]            // Pre-computed slugs
+  componentSlugs    String[]            // Pre-computed slugs
 
   // Ownership (false polymorphism)
   ownerModel       EmailOwnerModel     // see Enums: platform, tenant and user tiers
@@ -181,7 +181,7 @@ model EmailComponent {
   slug             String              // "default-header"
   mjml             String              // MJML fragment
   locale           String
-  componentRefs    String[]            // Nested component slugs
+  componentSlugs    String[]            // Nested component slugs
 
   // Same ownership pattern as EmailTemplate
   ownerModel       EmailOwnerModel
@@ -195,7 +195,7 @@ model EmailComponent {
 #### CommunicationLog
 
 Per-recipient delivery ledger — one row per recipient per send (grouped by `sendKey`) — and the
-deduplicated send intent (`idempotencyKey @unique`). It stores the settled MJML, render variables
+deduplicated send intent (`idempotencyKey @unique`). It stores the evaluated MJML, render variables
 (including the hydrated recipient projection), render issues, and template/component audit references.
 It does not store the final provider HTML. Sender is false-polymorphic; `kind`/`emailTemplateId`
 are filled when delivery resolves the template.
@@ -209,7 +209,7 @@ model CommunicationLog {
   status               CommunicationStatus   // queued→sending→sent | failed | suppressed | undeliverable
   emailTemplateId      String?               // resolved template (onDelete: SetNull)
 
-  senderType           SenderType            // false polymorphism (platform/admin carry no FK)
+  senderModel           CommunicationLogSenderModel            // false polymorphism (platform/admin carry no FK)
   senderUserId         String?
   senderOrganizationId String?
   senderSpaceId        String?
@@ -325,9 +325,9 @@ other lens. Everything a template does with a path or a rule goes through it:
 - **Tokens and paths** — `walkEmailLensPath` / `emailTokenPathKind` walk the *narrowing* (a slot
   that drops a relation drops its tokens), at save (`validateTokens`), for component expectations
   and in preflight.
-- **Rules** — `emailRuleViolations` is the vocabulary (save and `withRule` at render),
+- **Rules** — `emailRuleViolations` is the vocabulary (save and `branchOnRuleHealth` at render),
   `emailRuleReferences` the rows a rule names, and `applyEmailLens` + `check` the evaluation:
-  settle never checks a raw rule, so a lens `where` decides at send what it decides at save. A
+  evaluation never checks a raw rule, so a lens `where` decides at send what it decides at save. A
   rule inside `{{#each}}` is the array rule it always was (`scopedRule`): one `any` per enclosing
   loop, binding leaves element-relative, root leaves climbing with `$$`; vocabulary, references
   and evaluation all read that one form, and evaluation runs slot-relative against the iterated
@@ -343,13 +343,13 @@ other lens. Everything a template does with a path or a rule goes through it:
   with `lensScopeSurface(lens, { at })`. Fetched options are keyed at the slot's path under `Email`
   (`emailSurfaceSourceValues`). `emailRuleDecoration` derives one facet per lens present.
 
-**The lens is the row owner's.** `emailOwnerProvider(owner)` (`packages/email/src/render/owner.ts`) turns
+**The lens is the row owner's.** `emailLensOwnerOf(owner)` (`packages/email/src/render/owner.ts`) turns
 an email row's owner reference into the lens owner the scope binds: an `Organization` or a `Space` is
 itself, and a `User`, `OrganizationUser` or `SpaceUser` owner is its user; platform rows (`default`,
 `admin`) have none. `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
 builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient
 over `DEFAULT_RECIPIENT_NARROWING`, a sender slot from the actual sender when no entry declares
-one; every prisma slot foreign-key-free and redacted) and narrows it by the slots stored on the
+one; every prisma slot foreign-key-free and without sensitive fields) and narrows it by the slots stored on the
 row — or on the slug's default-tier row when the row carries none. A stored slot is a **later
 layer**: it shows exactly what it names and can never turn on what the declared surface does not
 (a stored recipient lens naming `sessions` or `accounts` is refused). The lens is scoped to the
@@ -374,13 +374,13 @@ Organization its organization memberships, a Space its own space's memberships, 
 platform or admin both. A stored recipient lens that turns on `organizationUsers` or `spaceUsers`
 widens it, still within the organization. Targeting follows the same bound: a `messageUser` rule
 from an Organization- or Space-level sender reaches only people holding a membership the recipient
-lens shows (`targetedBySender`), so a space reaches its own members by default and its organization's
+lens shows (`restrictRuleToSenderMembers`), so a space reaches its own members by default and its organization's
 when its lens widens. Registry sends target the entity's own recipient (an invite's target need not
 be a member yet). Without a sender (save, preview, rule surface) the template owner stands in. The owner
 is decided per site: save takes it from the input, the rule surface and preflight from the body
-(default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
+(default: platform), and evaluation from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
-the tree for now. The picker gets real options for Tag and Segment (`emailSourceValues`, the lens's
+the tree for now. The picker gets real options for Tag and Segment (`fetchSourceValuesOfEmailLens`, the lens's
 `toSourceQueries` run through Prisma by `sourceQueryValues`, keyed onto the `email` surface map by
 `emailSurfaceSourceValues`). A source across a bridge returns candidates (`recheck`):
 `sourceQueryValues` / `sourceQueryWhere` re-check them with the far side the caller's `farSide`
@@ -445,8 +445,8 @@ The render pipeline has two phases:
 ┌─────────────────────────────────────────────────────────────┐
 │  PHASE 1: Compose (once per template)                       │
 │  composeTemplate(slug, ctx) → { id, mjml, subject, kind }   │
-│     └── expand(mjml, componentRefs, ctx)                    │
-│         └── lookupCascade → fetch components → replace refs │
+│     └── expandComponentTagsFromOwnerCascade(mjml, componentSlugs, ctx)                    │
+│         └── fetchComponentsThroughOwnerCascade → fetch components → replace refs │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -504,7 +504,7 @@ for (const recipient of recipients) {
 `evaluateConditions(template, variables, onError?, existingTargets?)` take an optional
 `onError: RuleErrorSink` (`(issue: RenderIssue) => void`, `RenderIssue = { kind:
 'rule' | 'token' | 'each', path?, detail }`). Render has one behaviour: a block whose
-rule is degraded (`withRule`: a required binding missing, the lens no longer admits
+rule is degraded (`branchOnRuleHealth`: a required binding missing, the lens no longer admits
 the rule, a row it names is gone) or throws renders nothing; an `{{#each}}` whose
 filter throws renders nothing; a token that resolves to nothing, to an object, or to
 an unknown root renders **empty** — never the literal `{{…}}`. Every such case is one
@@ -537,7 +537,7 @@ const { template, components } = await saveEmailTemplate(
 Pipeline steps:
 1. Validate MJML syntax (`validateMjml`) and conditional rules in `mjml` and `subject`
    (`assertValidConditions`): fail fast instead of shipping a render-time time-bomb
-2. Look up every referenced slug through the owner's cascade (`lookupCascade`)
+2. Look up every referenced slug through the owner's cascade (`fetchComponentsThroughOwnerCascade`)
 3. Extract components (`decomposeNodes`): inline bodies that differ from the cascade become component writes
 4. Refuse component reference cycles (`validateNoCycle`)
 5. Save components + template in one transaction (`db.txn`), then expand the saved template and
@@ -570,15 +570,15 @@ try {
 
 Outbound email is **event-driven** and runs as two BullMQ jobs — never a direct client
 call. Business logic emits an app event; the email bridge enqueues the **planner**
-(`sendEmail`), which fans out one **deliver** job (`deliverEmail`) per recipient.
+(`planEmailDeliveries`), which fans out one **deliver** job (`deliverEmail`) per recipient.
 
 ```
-emitAppEvent(name, data) → email bridge → sendEmail (planner) → deliverEmail (per recipient)
+emitAppEvent(name, data) → email bridge → planEmailDeliveries (planner) → deliverEmail (per recipient)
 ```
 
-`SendEmailPayload` is `{ eventName, template, data }` — no caller-supplied recipients.
+`PlanEmailDeliveriesPayload` is `{ eventName, template, data }` — no caller-supplied recipients.
 
-#### Registry (`apps/api/src/lib/email/registry.ts`)
+#### Registry (`apps/api/src/lib/email/emailTemplateRegistry.ts`)
 
 Each template slug maps to an `EmailEntry` describing how to resolve its data + recipients
 from the event — all as **lenses** (`@inixiative/json-rules`), resolved in the worker:
@@ -597,23 +597,23 @@ type EmailEntry = {
 
 #### Sender (`apps/api/src/lib/email/sender.ts`)
 
-The identity an email is sent *as* — a discriminated union keyed on `SenderType`
+The identity an email is sent *as* — a discriminated union keyed on `CommunicationLogSenderModel`
 (`platform | admin | User | Organization | Space | OrganizationUser | SpaceUser`).
-Identity (from-address/display, via `resolveSender`/`resolveFromAddress`) is separate
-from branding (which template), which the cascade resolves. `resolveSender` loads the sending row
+Identity (from-address/display, via `fetchSenderRowThroughLens`/`resolveFromAddress`) is separate
+from branding (which template), which the cascade resolves. `fetchSenderRowThroughLens` loads the sending row
 through its lens (`lensFor(type)`, scalar columns) as the `sender` variable, so `{{sender.*}}`
 reads what the sender slot's lens declares; a platform or admin send has no `sender`. The
-platform's own name and URL are system tokens: `{{system.platformName}}`, `{{system.webUrl}}`. `ownerScope(sender)` maps a sender to
+platform's own name and URL are system tokens: `{{system.platformName}}`, `{{system.webUrl}}`. `senderToOwnerScope(sender)` maps a sender to
 its own owner tier — user-actors keep their tier (`SpaceUser`/`OrganizationUser`/`User`), and
 `platform → default` (the one bridge between the two enums) — then the cascade walks that tier's
 chain (user or org) down to the `default` floor, carrying the user id for interpolation.
 
-#### Planner (`sendEmail`)
+#### Planner (`planEmailDeliveries`)
 
 1. Resolve the entity lens; bail if missing or no email adapter is registered.
 2. Resolve the template row for the sender's scope and build the owner-scoped email lens from that
    row; fetch recipients in one batch through its **recipient lens** with the entry's targeting
-   `where` (`slotRowsLens`), pruned to what the lens picks plus what its `where`s read. The
+   `where` (`narrowSlotLensToRowsMatchingOrThrow`), pruned to what the lens picks plus what its `where`s read. The
    delivery job carries the recipient's id, the bound targeting `where` and the cc / bcc rules — no
    addresses: `deliverEmail` re-reads the recipient through the lens at send time with the
    targeting re-checked (`not_found` once it no longer matches), resolves cc / bcc through the same
@@ -632,17 +632,17 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 The body lives in `lib/email/deliverEmailMessage.ts`; `deliverEmail` is its job wrapper. **The claim reads
 the row and nothing else: only a `queued` row is open.** `sending`, `sent`, `failed`, `suppressed` and
 `undeliverable` are all closed — a retry, a duplicate job, or a re-dispatch never resends. A crash between
-claim and settle leaves `sending` for a person to resolve (an explicit resend with a staleness bound), never
+claim and the recorded outcome leaves `sending` for a person to resolve (an explicit resend with a staleness bound), never
 for the claim to reopen.
 
 1. Load the log; **skip unless `queued`**.
-2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
+2. **Resolve** the template via the cascade (`renderEmailTemplateWithFallback`) → subject/mjml + `kind` + `emailTemplateId`.
    The recipient is loaded through the lens of the row that won the cascade (`composed.owner`) and
    the sender (`recipientVariables`), and a model-lens data slot is re-read the same way from the
    payload's `data.id`; a recipient or data entity that no longer resolves → `failed` with
    `reasonCode: not_found`, no send. Rendering is `renderForRecipient` (see
    [Messaging](#messaging-non-email-channels)). Rules evaluate through that lens; a referenced
-   segment whose own rule is degraded leaves the live set first (`withoutDegradedSegments`).
+   segment whose own rule is degraded leaves the live set first (`fetchReferenceKeysExcludingDegradedSegments`).
    A content error (`isEmailContentError`: render, parse, MJML, token, condition) → `failed` with
    `reasonCode: render_failed`, no retry. Any other error before the claim (database, verifier) throws with
    the row still `queued`, so the job retry picks it up — nothing has been sent.
@@ -665,7 +665,7 @@ for the claim to reopen.
    terminal write is CAS-guarded** so a sibling can't clobber a `sent` row; if recording the outcome itself
    fails, the job retries and meets the `sending` row.
 
-`CommunicationLog` persists `settledMjml`, `variables` and `renderIssues` alongside delivery metadata
+`CommunicationLog` persists `evaluatedMjml`, `variables` and `renderIssues` alongside delivery metadata
 and audit references. Variables currently include the hydrated recipient, not just its delivery fields.
 The retention/projection boundary for that snapshot remains a design question in FEAT-021.
 Recompose the recorded template/component versions through their audit references (see
@@ -675,8 +675,8 @@ Idempotency keys are event-anchored, hash-last: planner `{event}:{template}:{has
 
 #### Render issues — behaviour lives in the registry entry
 
-`settleTemplate` renders subject and body, collecting `RenderIssue`s. What happens next is
-declared on the template's code registry entry (`apps/api/src/lib/email/registry.ts`,
+`renderEmailTemplateWithFallback` renders subject and body, collecting `RenderIssue`s. What happens next is
+declared on the template's code registry entry (`apps/api/src/lib/email/emailTemplateRegistry.ts`,
 `render: { onIssue, substitute }`), never on the row:
 
 - **subject issue** — always fatal for that render (a truncated subject is never sent).
@@ -727,7 +727,7 @@ lives in the audit log**:
 - **Seeds**: the `packages/db` seed can't import `registerHooks`, so the canonical seed runs through
   `apps/api/scripts/seed.ts`, which registers all hooks first — seeded system templates get their
   initial snapshots. Email seed files are `savedByApp`: the api seed persists them through
-  `emailSeedSavers` (`saveEmailComponents`, the api `saveEmailTemplate`), so a seeded row meets
+  `emailSeedSavers` (`saveComponents`, the api `saveEmailTemplate`), so a seeded row meets
   the guards its save runs (a template: MJML, conditions, lens tokens, rule references; a component:
   MJML, conditions, rule references) and one that would not validate fails the run. They seed last,
   after the cron jobs. The `packages/db` seed alone refuses them.
@@ -748,7 +748,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `targetModel` axis of
   `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it.
 - **A rule-tracked lens has one spelling per reference: the row's `id`, never an FK column.**
-  `omitForeignKeys(lens)` (`packages/db/src/lens/omitForeignKeys.ts`, the same shape as `redactLens`) omits every FK
+  `omitForeignKeys(lens)` (`packages/db/src/lens/omitForeignKeys.ts`, the same shape as `omitSensitiveFieldsFromLens`) omits every FK
   column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
   itself in it and declares its own id sources. Each model-rooted lens of the email lens
   (`emailLens`, `packages/email/src/rules/emailLens.ts`) wraps in `omitForeignKeys` and declares
@@ -758,7 +758,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
   and `customerRelationshipsAsCustomer.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
-  builder gets `emailSurface` of it (which strips clamps and sources), while save and settle keep the lens
+  builder gets `emailSurface` of it (which strips clamps and sources), while save and evaluation keep the lens
   itself (`defaultEmailLens` when none is threaded) — extraction never runs on the exposed
   surface. Adding a referenceable model = a registry entry + an FK column (the hook and email's
   sources derive); a surface that reaches it declares its own labeled id source.
@@ -769,7 +769,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `dynamic`: no save can check which rows it names, so save refuses it (`dynamicRuleReferences`;
   email throws `RuleReferenceError`, a segment's conditions fail validation). When save is handed a lens (the api
   always is), its condition gate (`assertValidConditions`) refuses any rule path the lens does not
-  resolve — an FK spelling or typo path is a 422, never a silently unregistered rule; `withRule`
+  resolve — an FK spelling or typo path is a 422, never a silently unregistered rule; `branchOnRuleHealth`
   asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
   to decide and only extraction runs.
 - **Edges are written by one hook over one declaration table.** `RULE_REFERENCE_SURFACES`
@@ -802,9 +802,9 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `ruleReferenceTargets(edges)` reads both from the edge rows alone (each target as `existing`, `deleted` or `purged`), so consumers
   write `include: { sourceRuleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the
-  components the cascade resolved into one live set, and every branch goes through **`withRule`**
+  components the cascade resolved into one live set, and every branch goes through **`branchOnRuleHealth`**
   (`@template/shared/rules`) — the one fork a stored rule is evaluated through anywhere.
-- **`withRule(health, { degraded, sound })`** asks, at evaluation and against the current lens,
+- **`branchOnRuleHealth(health, { degraded, sound })`** asks, at evaluation and against the current lens,
   whether the rule can be evaluated correctly — two questions: every binding it requires is
   supplied (`bindOptional` marks the ones that may be left out and resolve to null), and it is
   still valid — the lens admits it (`validateRuleInLens`, so a lens change after save degrades
@@ -816,7 +816,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   that knows which sources are ids; the live set comes from the caller's own read, locked when the
   sound arm decides money. Nothing about degradation is stored. Client hard deletes stay prevented
   (`preventHardDelete`).
-- Component references (`componentRefs`) stay slug-keyed and do **not** ride this table: they
+- Component references (`componentSlugs`) stay slug-keyed and do **not** ride this table: they
   resolve through the owner cascade at read time, so an id persisted at save would be wrong the
   moment an override appears.
 
@@ -832,7 +832,7 @@ template/cascade/versioning system, messaging is a thin dispatch primitive: rend
 ### Provider Registry
 
 `messageProviderRegistry` (`apps/api/src/lib/messaging/providers.ts`) is a `makeBroadcastRegistry` keyed
-by `ContactType`; `getMessageProviderAdapter(type)` returns its channel sender or `undefined`. A
+by `ContactType`; `messageProviderAdapterForContactType(type)` returns its channel sender or `undefined`. A
 `MessageProviderAdapter` is `(contact, content, kind, options) => Promise<void>` — the per-channel send.
 
 ```typescript
@@ -852,8 +852,8 @@ Two BullMQ handlers (`messageUser`, `messageContact`), shaped like the email job
 cascade, no `CommunicationLog`, and no fan-out planner:
 
 - **`messageUser`** — `{ rule, kind, content, sender? }` (sender defaults to platform). It builds the
-  sender's email lens (`emailLensFor(undefined, ownerScope(sender), undefined, sender)`), and
-  `resolveUsers(rule, lens.recipient)` compiles the `@inixiative/json-rules` `Condition` through its
+  sender's email lens (`emailLensFor(undefined, senderToOwnerScope(sender), undefined, sender)`), and
+  `fetchUsersMatchingRuleWithContacts(rule, lens.recipient)` compiles the `@inixiative/json-rules` `Condition` through its
   recipient lens to a Prisma query at job time. Each resolved user is rendered through the same
   primitive email uses, then dispatched to every `canDeliver(kind, contact)` contact via that
   contact's registered adapter. A missing adapter for a `ContactType` throws. Not registered in
@@ -935,7 +935,7 @@ are opt-out (default on); `marketing` is opt-in. Every `User` gets an email `Con
   prefetch (scanners, Safe Links, hover previews) can never unsubscribe anyone.
 - Non-`system` templates **must** contain an *unconditional* `{{system.unsubscribeUrl}}`, enforced at
   save (`saveEmailTemplate` — checks the composed body with conditional blocks stripped). The URL is a
-  platform-injected `system`-lens value (set per-kind in `settleTemplate`), not recipient data.
+  platform-injected `system`-lens value (set per-kind in `renderEmailTemplateWithFallback`), not recipient data.
 - Rich preference management (toggle all kinds) is the **authenticated in-app** surface, rebac-governed —
   not the link. The emailed link is deliberately the narrow one-click only.
 

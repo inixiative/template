@@ -6,9 +6,9 @@
  */
 import { faker } from '@faker-js/faker';
 import { ContactType } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const contactFactory = createFactory('Contact', {
+const contactFactory = registerFactory('Contact', {
   defaults: () => ({
     type: ContactType.email,
     value: { address: faker.internet.email().toLowerCase() },

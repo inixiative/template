@@ -6,7 +6,7 @@
  */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
-import type { Inquiry } from '#/modules/inquiry/handlers/types';
+import type { Inquiry } from '#/modules/inquiry/services/types';
 
 export const inquiryTerminalStatuses: InquiryStatus[] = [
   InquiryStatus.approved,

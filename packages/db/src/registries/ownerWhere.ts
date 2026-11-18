@@ -1,10 +1,10 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { polymorphicKeyColumn } from '@template/db/registries/polymorphicIs';
+import { polymorphicKeyColumn } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
 
 /** An owner by the kinds it is keyed on: `{ Organization: id, Space: null, User: null }` is the organization alone. */

@@ -3,11 +3,11 @@ import {
   cacheKey,
   db,
   flushRedis,
-  getRedisClient,
   makeRollingCache,
   ROLLING_CACHE_LEAF_ATTEMPTS,
   ROLLING_CACHE_LEAF_BACKOFF_SECONDS,
   ROLLING_CACHE_TICK_SECONDS,
+  redisClient,
   unregisterRollingCache,
 } from '@template/db';
 import { cleanupTouchedTables, createOrganization, createSpace } from '@template/db/test';
@@ -16,7 +16,7 @@ import { coordinateRollingCaches } from '#/jobs/handlers/coordinateRollingCaches
 import { refreshRollingCache } from '#/jobs/handlers/refreshRollingCache';
 import { queue } from '#/jobs/queue';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 const INTERVAL_SECONDS = 300;
 
@@ -29,9 +29,10 @@ const uniqueName = (label: string): string => {
 };
 
 const coordinate = (tick = 'coordinateRollingCaches') =>
-  coordinateRollingCaches(createTestWorker({ name: tick }));
+  coordinateRollingCaches(makeTestWorker({ name: tick }));
 
-const makeDue = (name: string) => getRedisClient().pexpire(rollingCacheTimerKey(name), 1_000);
+const markRollingCacheTimerDue = (name: string) =>
+  redisClient().pexpire(rollingCacheTimerKey(name), 1_000);
 
 // One target per organization that has a space named after the cache: `distinct` over Space.
 const makeSpaceCountCache = (
@@ -86,15 +87,15 @@ describe('coordinateRollingCaches', () => {
     expect(await rollingCache.targets()).toHaveLength(2);
     await coordinate();
 
-    expect(await getRedisClient().exists(cacheKey(name, acme.id))).toBe(1);
-    expect(await rollingCache.read('value', { organizationId: acme.id })).toMatchObject({
+    expect(await redisClient().exists(cacheKey(name, acme.id))).toBe(1);
+    expect(await rollingCache.fetchResult('value', { organizationId: acme.id })).toMatchObject({
       state: 'fresh',
       value: 2,
     });
-    expect(await rollingCache.read('value', { organizationId: globex.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { organizationId: globex.id })).toMatchObject({
       value: 1,
     });
-    expect(await getRedisClient().ttl(rollingCacheTimerKey(name))).toBeGreaterThan(
+    expect(await redisClient().ttl(rollingCacheTimerKey(name))).toBeGreaterThan(
       INTERVAL_SECONDS - 5,
     );
   });
@@ -107,7 +108,7 @@ describe('coordinateRollingCaches', () => {
     await createSpace({ name: `${name} a` }, { organization: acme });
     await createSpace({ name: `${name} b` }, { organization: globex });
     const rollingCache = makeSpaceCountCache(name, () => '', INTERVAL_SECONDS / 2);
-    const branch = createTestWorker({
+    const branch = makeTestWorker({
       name: 'refreshRollingCache',
       token: 'worker-token',
       updateData: mock(async () => {}),
@@ -120,11 +121,11 @@ describe('coordinateRollingCaches', () => {
 
     const states = await Promise.all(
       [acme, globex].map(
-        async ({ id }) => (await rollingCache.read('value', { organizationId: id })).state,
+        async ({ id }) => (await rollingCache.fetchResult('value', { organizationId: id })).state,
       ),
     );
     expect(states).toContain('empty');
-    expect(await getRedisClient().ttl(rollingCacheTimerKey(name))).toBeGreaterThan(
+    expect(await redisClient().ttl(rollingCacheTimerKey(name))).toBeGreaterThan(
       INTERVAL_SECONDS - 5,
     );
   });
@@ -162,7 +163,7 @@ describe('coordinateRollingCaches', () => {
 
     release();
     await firstPass;
-    await makeDue(name);
+    await markRollingCacheTimerDue(name);
     await coordinate('thirdTick');
     expect(computes).toBe(2);
   });
@@ -191,7 +192,7 @@ describe('coordinateRollingCaches', () => {
 
     const states = await Promise.all(
       [acme, globex].map(
-        async ({ id }) => (await rollingCache.read('value', { organizationId: id })).state,
+        async ({ id }) => (await rollingCache.fetchResult('value', { organizationId: id })).state,
       ),
     );
     expect(states.sort()).toEqual(['empty', 'fresh']);
@@ -206,13 +207,13 @@ describe('coordinateRollingCaches', () => {
     await createSpace({ name: `${name} b` }, { organization: acme });
 
     await coordinate();
-    expect(await rollingCache.read('value', { organizationId: acme.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { organizationId: acme.id })).toMatchObject({
       value: 1,
     });
 
-    await makeDue(name);
+    await markRollingCacheTimerDue(name);
     await coordinate();
-    expect(await rollingCache.read('value', { organizationId: acme.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { organizationId: acme.id })).toMatchObject({
       value: 2,
     });
   });
@@ -235,10 +236,14 @@ describe('coordinateRollingCaches', () => {
 
     await coordinate();
 
-    expect(await rollingCache.read('value', { id: acme.id, name: 'ignored' })).toMatchObject({
-      value: `${name} Acme`,
-    });
-    expect(await rollingCache.read('value', { id: globex.id, name: 'ignored' })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { id: acme.id, name: 'ignored' })).toMatchObject(
+      {
+        value: `${name} Acme`,
+      },
+    );
+    expect(
+      await rollingCache.fetchResult('value', { id: globex.id, name: 'ignored' }),
+    ).toMatchObject({
       value: `${name} Globex`,
     });
   });
@@ -253,13 +258,13 @@ describe('coordinateRollingCaches', () => {
 
     failingOrganizationId = broken.id;
     await createSpace({ name: `${name} b` }, { organization: broken });
-    await makeDue(name);
+    await markRollingCacheTimerDue(name);
     await expect(coordinate()).rejects.toThrow('compute failed');
 
-    expect(await rollingCache.read('value', { organizationId: broken.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { organizationId: broken.id })).toMatchObject({
       value: 1,
     });
-    expect(await getRedisClient().pttl(rollingCacheTimerKey(name))).toBeLessThanOrEqual(
+    expect(await redisClient().pttl(rollingCacheTimerKey(name))).toBeLessThanOrEqual(
       ROLLING_CACHE_TICK_SECONDS * 1000,
     );
   });

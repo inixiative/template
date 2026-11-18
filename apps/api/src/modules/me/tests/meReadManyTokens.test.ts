@@ -14,7 +14,7 @@ import {
 import { meRouter } from '#/modules/me';
 import type { meReadManyTokensRoute } from '#/modules/me/routes/meReadManyTokens';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type ReadManyTokensResponse = z.infer<typeof meReadManyTokensRoute.responseSchema>[];
 
@@ -45,7 +45,7 @@ describe('GET /me/tokens', () => {
 
   it('returns empty array when user has no tokens', async () => {
     const response = await fetch(get('/api/v1/me/tokens'));
-    const { data, pagination } = await json<ReadManyTokensResponse>(response);
+    const { data, pagination } = await parseSuccessBody<ReadManyTokensResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data).toEqual([]);
@@ -62,7 +62,7 @@ describe('GET /me/tokens', () => {
     );
 
     const response = await fetch(get('/api/v1/me/tokens'));
-    const { data } = await json<ReadManyTokensResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyTokensResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(1);
@@ -79,7 +79,7 @@ describe('GET /me/tokens', () => {
     );
 
     const response = await fetch(get('/api/v1/me/tokens'));
-    const { data } = await json<ReadManyTokensResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyTokensResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((t) => t.name === 'Org Token')).toBe(false);
@@ -106,7 +106,7 @@ describe('GET /me/tokens', () => {
     );
 
     const response = await fetch(get('/api/v1/me/tokens'));
-    const { data } = await json<ReadManyTokensResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyTokensResponse>(response);
 
     expect(response.status).toBe(200);
     const byName = Object.fromEntries(data.map((t) => [t.name, t]));
@@ -130,7 +130,7 @@ describe('GET /me/tokens', () => {
     await createToken({ name: 'User Token', ownerModel: TokenOwnerModel.User }, { user });
 
     const response = await fetch(get('/api/v1/me/tokens'));
-    const { data } = await json<ReadManyTokensResponse>(response);
+    const { data } = await parseSuccessBody<ReadManyTokensResponse>(response);
 
     expect(data).toHaveLength(1);
     expect((data[0] as Record<string, unknown>).keyHash).toBeUndefined();

@@ -6,7 +6,11 @@
  */
 import { Operator } from '@inixiative/json-rules';
 import type { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
-import { actorIsUser, highRoles, lowRoles } from '@template/permissions/rebac/schemaHelpers';
+import {
+  actorIsUser,
+  privilegedRoles,
+  unprivilegedRoles,
+} from '@template/permissions/rebac/rebacSchemaRules';
 import type { ActionRule } from '@template/permissions/rebac/types';
 
 // A party that can stand on a side of an inquiry. `admin` is the platform (superadmin): it has no
@@ -15,7 +19,7 @@ export type InquiryPartyModel = Exclude<InquiryResourceModel, 'admin'>;
 
 // The level a party needs: an action of the party model's own resource, asked on its relation; or,
 // for a case one action cannot say, a plain rebac rule (rel, any, all, rule), used as written.
-// inquiryPermission.test.ts checks every relation, action and field either form names exists.
+// inquiryResourcePermission.test.ts checks every relation, action and field either form names exists.
 export type PartyLevel = string | Exclude<ActionRule, string>;
 
 export type InquiryParty =
@@ -53,10 +57,15 @@ export const INQUIRY_TYPES = {
         model: 'Organization',
         send: {
           any: [
-            { all: [role(Operator.in, highRoles), { rel: 'sourceOrganization', action: 'own' }] },
             {
               all: [
-                { any: [role(Operator.in, lowRoles), role(Operator.equals, null)] },
+                role(Operator.in, privilegedRoles),
+                { rel: 'sourceOrganization', action: 'own' },
+              ],
+            },
+            {
+              all: [
+                { any: [role(Operator.in, unprivilegedRoles), role(Operator.equals, null)] },
                 { rel: 'sourceOrganization', action: 'manage' },
               ],
             },

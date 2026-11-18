@@ -6,9 +6,9 @@
  */
 import { faker } from '@faker-js/faker';
 import { WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const webhookEventFactory = createFactory('WebhookEvent', {
+const webhookEventFactory = registerFactory('WebhookEvent', {
   defaults: () => ({
     status: WebhookEventStatus.success,
     action: WebhookEventAction.create,

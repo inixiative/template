@@ -11,10 +11,10 @@ import {
   type EntitlementsOverride,
   storeEntitlements,
 } from '@template/db/test/factories/entitlementFactory';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 import type { BuildContext, CreateInputOf } from '@template/db/test/factoryTypes';
 
-const tokenFactory = createFactory('Token', {
+const tokenFactory = registerFactory('Token', {
   defaults: () => {
     const rawKey = randomBytes(24).toString('hex');
     const keyHash = createHash('sha256').update(rawKey).digest('hex');

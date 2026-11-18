@@ -7,7 +7,7 @@
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { DEPTH_CACHE_MS } from '#/jobs/outbox/config';
 import { queue } from '#/jobs/queue';
-import { readSlowDeferred } from '#/jobs/slowLaneSignals';
+import { fetchSlowDeferredJobCount } from '#/jobs/slowLaneSignals';
 import { JobLane } from '#/jobs/types';
 
 export type QueueDepths = { total: number; slow: number; slowDeferred: number };
@@ -39,7 +39,7 @@ export const queueDepths = async (fresh = false): Promise<QueueDepths> => {
   const [counts, perPriority, slowListed] = await Promise.all([
     queue.getJobCounts('waiting', 'prioritized', 'active', 'delayed'),
     queue.getCountsPerPriority([SLOW_LANE_PRIORITY]),
-    readSlowDeferred(queue.redis, queue.name, now),
+    fetchSlowDeferredJobCount(queue.redis, queue.name, now),
   ]);
   cached = laneDepthsFrom(counts, perPriority[String(SLOW_LANE_PRIORITY)] ?? 0, slowListed);
   cachedAt = now;

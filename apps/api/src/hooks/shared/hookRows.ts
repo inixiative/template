@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:auditLogs, feature:webhooks
  */
 import { DbAction, type HookOptions, type ManyAction } from '@template/db';
@@ -14,7 +14,7 @@ export const isManyAction = (action: DbAction): action is ManyAction =>
   action === DbAction.deleteMany;
 
 // The rows a write sets, coalesced: `data` for create and update (single or bulk), both arms of an upsert.
-export const writeData = ({ action, args }: HookOptions): HookRow[] => {
+export const rowsBeingWritten = ({ action, args }: HookOptions): HookRow[] => {
   const { data, create, update } = (args ?? {}) as {
     data?: unknown;
     create?: unknown;

@@ -1,11 +1,11 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:websockets
  * @uses infrastructure:redis
  */
 import { redisNamespace } from '@template/db';
-import { type StreamAudience, streamDefinitionOf } from '@template/shared/ws';
+import { type StreamAudience, streamDefinitionForChannelKey } from '@template/shared/ws';
 
 export const STREAM_SEQ_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -20,4 +20,7 @@ const isPerRecipient = (audience: StreamAudience | undefined): boolean =>
   audience === 'perRecipient';
 
 export const streamSeqKeyFor = (stream: string, userId: string | null): string =>
-  streamSeqKey(stream, isPerRecipient(streamDefinitionOf(stream)?.audience) ? userId : null);
+  streamSeqKey(
+    stream,
+    isPerRecipient(streamDefinitionForChannelKey(stream)?.audience) ? userId : null,
+  );

@@ -34,14 +34,14 @@ This template provides three frontend applications that work together as a multi
 ### Superadmin - Platform Operations
 - **Who**: Platform team (you)
 - **Purpose**: Manage entire platform, system health, all customers
-- **Context**: User context only; the ContextSelector is rendered locked (`<AppShell lockedContext showSpoofControls={false}>`)
+- **Context**: User context only; the TenantContextSelector is rendered locked (`<AppShell lockedContext showSpoofControls={false}>`)
 - Non-superadmins get `<Unauthorized />` from its `_authenticated.tsx` layout
 
 ## Key Insight
 
 **All three apps share the same multi-tenant architecture:**
 - One shared store, AppShell, guards and permission system (Permix/ReBAC)
-- Web and Admin let the user switch Personal/Organization/Space in the ContextSelector
+- Web and Admin let the user switch Personal/Organization/Space in the TenantContextSelector
 - Each app has its own nav config (`apps/{app}/app/config/nav/`)
 
 **The difference is perspective, not structure:**
@@ -68,7 +68,7 @@ All three apps share common frontend infrastructure. See [FRONTEND.md](FRONTEND.
 
 ## Context Switching
 
-Web and Admin apps support **dynamic context switching** via the ContextSelector component.
+Web and Admin apps support **dynamic context switching** via the TenantContextSelector component.
 
 **Context types** (`tenant.context.type`):
 
@@ -86,20 +86,20 @@ User (always present)
 
 **State Management:**
 - Stored in the Zustand tenant slice: `tenant.context` (`type`, `organization`, `space`)
-- Carried in the URL as `?org=` / `?space=` search params, synced by `useAuthenticatedRouting`
+- Carried in the URL as `?org=` / `?space=` search params, synced by `useSyncTenantContextWithUrlAndAuthorizeRoute`
 - Permission checks evaluate nav `access` rules against the current context; an unauthorized
   route falls back to a context that authorizes it (space → its org → user → public)
 - The API is not told the context by header; routes name the org/space in their path
 
 **Navigation Behavior:**
-- Paths stay context-free (`/settings`); `navigatePreserving(path, 'context')` keeps `org`/`space`
+- Paths stay context-free (`/settings`); `navigateKeepingSearchParams(path, 'context')` keeps `org`/`space`
 - Permission-gated nav items hide/show based on current context
 - Switching context on the same page redirects to `/dashboard`
 
 ## White-Label Mode
 
 **Not built.** The pieces that exist: `AppShell`'s `lockedContext` prop renders the
-ContextSelector read-only (superadmin uses it), and `useSpaceTheme` sets per-space CSS
+TenantContextSelector read-only (superadmin uses it), and `useApplySpaceThemeCssVariables` sets per-space CSS
 variables. There is no subdomain detection, space-by-subdomain lookup, or per-space
 branding data; see `tickets/FEAT-007-white-labeling.md`.
 
@@ -125,15 +125,15 @@ branding data; see `tickets/FEAT-007-white-labeling.md`.
 ## Implementation Notes
 
 **Shared Infrastructure:**
-- All three apps render the shared `AppShell` (ContextSelector, Sidebar, UserMenu); superadmin locks the selector and hides spoof controls
-- Auth guards (`requireAuth`, `requirePublic` from `@template/ui/guards`) and public pages are shared
+- All three apps render the shared `AppShell` (TenantContextSelector, Sidebar, UserMenu); superadmin locks the selector and hides spoof controls
+- Auth guards (`redirectToLoginUnlessAuthenticated`, `redirectAuthenticatedUserAwayFromPublicPage` from `@template/ui/guards`) and public pages are shared
 - Nav configs differ based on app purpose (see [Navigation](FRONTEND/ROUTING_NAVIGATION.md#navigation))
 
 **State & Routing:**
 - All apps use the same shared Zustand store (6 slices)
-- TanStack Router with guards (`requireAuth`, `requirePublic`)
+- TanStack Router with guards (`redirectToLoginUnlessAuthenticated`, `redirectAuthenticatedUserAwayFromPublicPage`)
 - Permission checks integrated at route (nav `access`) and component level
-- Context switching logic (`useAuthenticatedRouting`) shared by all apps
+- Context switching logic (`useSyncTenantContextWithUrlAndAuthorizeRoute`) shared by all apps
 
 **Component Organization:**
 - `@template/ui` - components, hooks, pages, store and guards shared by all apps

@@ -12,7 +12,7 @@ import {
   integrationReadResponseSchema,
 } from '#/modules/integration/schemas/integrationSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meCreateIntegrationRoute = createRoute({
   model: Modules.me,
@@ -23,5 +23,5 @@ export const meCreateIntegrationRoute = createRoute({
   bodySchema: integrationCreateBodySchema,
   responseSchema: integrationReadResponseSchema,
   sanitizeKeys: INTEGRATION_IMMUTABLE_FIELDS,
-  tags: [Tags.me, Tags.integration],
+  tags: [OpenApiTags.me, OpenApiTags.integration],
 });

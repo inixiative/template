@@ -6,9 +6,9 @@
  */
 import { Icon } from '@iconify/react';
 import { AppIdentity } from '@template/ui/components/layout/AppIdentity';
-import { ContextSelector } from '@template/ui/components/layout/ContextSelector';
 import { Header } from '@template/ui/components/layout/Header';
 import { Sidebar } from '@template/ui/components/layout/Sidebar';
+import { TenantContextSelector } from '@template/ui/components/layout/TenantContextSelector';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
 import { cn } from '@template/ui/lib/utils';
 import { useState } from 'react';
@@ -39,7 +39,7 @@ export const AppShell = ({
         <div className="flex flex-col h-full">
           <div className="flex flex-col gap-3 border-b p-4">
             <AppIdentity className="h-8 px-2 text-lg" />
-            <ContextSelector locked={lockedContext} />
+            <TenantContextSelector locked={lockedContext} />
           </div>
           <div className="flex-1 overflow-y-auto">
             <Sidebar />

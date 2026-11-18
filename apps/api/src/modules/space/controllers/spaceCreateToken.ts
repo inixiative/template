@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { spaceCreateTokenRoute } from '#/modules/space/routes/spaceCreateToken';
@@ -12,7 +12,7 @@ import { spaceCreateTokenRoute } from '#/modules/space/routes/spaceCreateToken';
 export const spaceCreateTokenController = makeController(
   spaceCreateTokenRoute,
   async (c, respond) => {
-    const space = getResource<'space'>(c);
+    const space = contextResource<'space'>(c);
     const body = c.req.valid('json');
 
     const token = await createToken(c, {

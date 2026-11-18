@@ -15,7 +15,7 @@ import {
 } from '@template/db/test';
 import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 type Surface = {
   source: {
@@ -65,7 +65,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
       },
     });
 
-    const { data } = await json<Surface>(
+    const { data } = await parseSuccessBody<Surface>(
       await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'welcome' })),
     );
 
@@ -87,7 +87,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
       },
     });
 
-    const { data } = await json<Surface>(
+    const { data } = await parseSuccessBody<Surface>(
       await fetch(
         post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' }),
       ),
@@ -102,7 +102,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   });
 
   it('falls back to the engine default lens when no default-tier row declares one', async () => {
-    const { data } = await json<Surface>(
+    const { data } = await parseSuccessBody<Surface>(
       await fetch(
         post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' }),
       ),
@@ -123,7 +123,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   });
 
   it('serves a recipient plus an unknown data bag for a slug the registry does not know', async () => {
-    const { data } = await json<Surface>(
+    const { data } = await parseSuccessBody<Surface>(
       await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc' })),
     );
 
@@ -190,7 +190,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
       await createSegment({ ownerModel: 'Organization' }, { organization: theirs })
     ).entity;
 
-    const { data } = await json<Surface>(
+    const { data } = await parseSuccessBody<Surface>(
       await fetch(
         post('/api/admin/emailTemplate/ruleSurface', {
           slug: 'picker-probe',
@@ -224,7 +224,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     );
     await createSpaceUser({}, { user: member, organization: mine, space, organizationUser });
 
-    const { data } = await json<Surface>(
+    const { data } = await parseSuccessBody<Surface>(
       await fetch(
         post('/api/admin/emailTemplate/ruleSurface', {
           slug: 'picker-probe',
@@ -256,7 +256,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     ).entity;
     await createSegment({ ownerModel: 'Organization' }, { organization: org });
 
-    const { data } = await json<Surface>(
+    const { data } = await parseSuccessBody<Surface>(
       await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'picker-probe' })),
     );
 

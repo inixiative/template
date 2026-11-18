@@ -5,10 +5,10 @@
  * @uses infrastructure:prisma
  */
 import { check, narrowRule } from '@inixiative/json-rules';
-import { db, polymorphicTarget } from '@template/db';
+import { db, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { CustomerRelationship, Segment } from '@template/db/generated/client/client';
 import { type ProviderModel, SegmentType } from '@template/db/generated/client/enums';
-import { withRule } from '@template/shared/rules';
+import { branchOnRuleHealth } from '@template/shared/rules';
 import { ownedSegments } from '#/modules/customerRelationship/lib/ownedSegments';
 import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
 import {
@@ -19,10 +19,10 @@ import {
   type HydratedCustomerRelationship,
   hydrateCustomerRelationships,
 } from '#/modules/segment/services/hydrateCustomerRelationships';
-import { isContinuous } from '#/modules/segment/services/reconcileSegment';
+import { isReconcilableDynamicSegment } from '#/modules/segment/services/reconcileSegment';
 import {
-  buildReferenceMap,
   sortByDependency,
+  targetSegmentIdsBySegmentId,
 } from '#/modules/segment/services/segmentReferenceGraph';
 import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth';
 
@@ -31,7 +31,11 @@ export type CustomerRelationshipReconciliation = { segmentId: string; diff: Memb
 const providerOf = (
   customerRelationship: CustomerRelationship,
 ): { ownerModel: ProviderModel; ownerId: string } | null => {
-  const target = polymorphicTarget(customerRelationship, 'CustomerRelationship', 'providerModel');
+  const target = rowPolymorphicAxisPointsAt(
+    customerRelationship,
+    'CustomerRelationship',
+    'providerModel',
+  );
   return target ? { ownerModel: target.kind as ProviderModel, ownerId: target.id } : null;
 };
 
@@ -64,12 +68,12 @@ export const reconcileCustomerRelationship = async (
   if (!provider) return [];
 
   const segments = (await dynamicSegmentsOf(provider.ownerModel, provider.ownerId)).filter(
-    isContinuous,
+    isReconcilableDynamicSegment,
   );
   if (!segments.length) return [];
 
   const lens = resolvedCustomerRelationshipLens(provider.ownerModel, provider.ownerId);
-  const ordered = sortByDependency(segments, buildReferenceMap(segments));
+  const ordered = sortByDependency(segments, targetSegmentIdsBySegmentId(segments));
   const states = await segmentRuleStates(ordered);
   const [row] = await hydrateCustomerRelationships(provider.ownerModel, provider.ownerId, [
     customerRelationshipId,
@@ -77,7 +81,7 @@ export const reconcileCustomerRelationship = async (
 
   const results: CustomerRelationshipReconciliation = [];
   for (const segment of ordered) {
-    const matches = withRule(states.get(segment.id)!.health, {
+    const matches = branchOnRuleHealth(states.get(segment.id)!.health, {
       degraded: () => null,
       sound: (rule) => (row ? check(narrowRule(rule, lens), row) === true : false),
     });

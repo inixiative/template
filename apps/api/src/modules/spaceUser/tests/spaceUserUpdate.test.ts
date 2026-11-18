@@ -10,9 +10,9 @@ import {
 import { isMemberSelfGrant, toEntitlementEntry } from '@template/permissions';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
-import { entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { heldEntitlements } from '#tests/utils/entitlements';
-import { json, patch, post } from '#tests/utils/request';
+import { parseSuccessBody, patch, post } from '#tests/utils/request';
 
 describe('PATCH /api/v1/spaceUser/:id', () => {
   let org: Organization;
@@ -44,7 +44,9 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
     }).fetch;
   };
 
-  const onSpace = (...actions: string[]) => [entry('db:space', ['db:space', space.id], actions)];
+  const onSpace = (...actions: string[]) => [
+    entitlementInputFor('db:space', ['db:space', space.id], actions),
+  ];
 
   const write = async (by: Role, target: SpaceUser, body: object) =>
     (await writer(by))(patch(`/api/v1/spaceUser/${target.id}`, body));
@@ -55,7 +57,7 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
     const { entity: target } = await spaceMember('member');
     const response = await write('owner', target, { role: 'viewer' });
     expect(response.status).toBe(200);
-    expect((await json<SpaceUser>(response)).data.role).toBe('viewer');
+    expect((await parseSuccessBody<SpaceUser>(response)).data.role).toBe('viewer');
   });
 
   it("a space admin grants a space member's entitlements it could take itself", async () => {

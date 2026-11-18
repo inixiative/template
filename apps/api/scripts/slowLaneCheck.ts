@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 import { createRedisConnection, db } from '@template/db';
-import { resolveAll } from '@template/shared/utils';
+import { runAllWithConcurrencyLimit } from '@template/shared/utils';
 import { type Job, PRIORITY_LIMIT, Queue, QueueEvents, Worker } from 'bullmq';
 import { z } from 'zod';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
 import { enqueueJob } from '#/jobs/enqueue';
+import { fetchSlowLaneState } from '#/jobs/fetchSlowLaneState';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import {
   flushOutbox,
@@ -16,9 +17,8 @@ import {
 import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
-import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import { SLOW_PARK_MIN_MS } from '#/jobs/slowLaneSignals';
-import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { makeSlowSlotPool } from '#/jobs/slowSlotPool';
 import { JobLane, JobType } from '#/jobs/types';
 
 const checkEnv = z
@@ -106,7 +106,7 @@ const assertDisposableTarget = (): void => {
 };
 
 const startWorker = (concurrency: number, handlers: (job: Job) => Handlers): Worker => {
-  const slowSlots = createSlowSlotPool(concurrency);
+  const slowSlots = makeSlowSlotPool(concurrency);
   return new Worker(
     'jobs',
     (job: Job) => processJob(job, { handlers: handlers(job) as never, slowSlots }),
@@ -133,7 +133,7 @@ const checkLaneCapacity = async () => {
       slowRunning--;
       completions.set(payload.n, (completions.get(payload.n) ?? 0) + 1);
     },
-    cleanStaleData: async (_ctx, payload: { enqueuedAt: number }) => {
+    hardDeleteRecordsPastRetention: async (_ctx, payload: { enqueuedAt: number }) => {
       fastWaits.push(Date.now() - payload.enqueuedAt);
     },
   };
@@ -141,9 +141,9 @@ const checkLaneCapacity = async () => {
   const workers = Array.from({ length: WORKERS }, () => startWorker(concurrency, () => handlers));
   startOutboxDrainLoop();
 
-  const slowSlots = WORKERS * createSlowSlotPool(concurrency).capacity;
+  const slowSlots = WORKERS * makeSlowSlotPool(concurrency).capacity;
   const startedAt = Date.now();
-  const slowEnqueue = resolveAll(
+  const slowEnqueue = runAllWithConcurrencyLimit(
     Array.from(
       { length: SLOW_JOBS },
       (_, n) => () => enqueueJob('sendWebhook', { n } as never, { lane: JobLane.slow }),
@@ -153,7 +153,7 @@ const checkLaneCapacity = async () => {
   await waitUntil(() => slowRunning >= slowSlots, 30_000);
   const fastEvery = Math.max(20, Math.floor((SLOW_JOBS * SLOW_JOB_MS) / slowSlots / FAST_JOBS / 2));
   for (let i = 0; i < FAST_JOBS; i++) {
-    await enqueueJob('cleanStaleData', { enqueuedAt: Date.now() } as never);
+    await enqueueJob('hardDeleteRecordsPastRetention', { enqueuedAt: Date.now() } as never);
     await sleep(fastEvery);
   }
   const outboxedAtEnqueue = (await slowEnqueue).filter((r) => 'outboxed' in r && r.outboxed).length;
@@ -224,7 +224,7 @@ const checkSendLargerThanShare = async () => {
   });
   await Promise.all([events.waitUntilReady(), ...workers.map((worker) => worker.waitUntilReady())]);
 
-  const slowSlots = WORKERS * createSlowSlotPool(concurrency).capacity;
+  const slowSlots = WORKERS * makeSlowSlotPool(concurrency).capacity;
   const share = maxSlowQueueDepth();
   const startedAt = Date.now();
   await Promise.all(
@@ -324,7 +324,7 @@ const checkSendLargerThanShare = async () => {
 };
 
 const checkHungSlowHandlers = async () => {
-  const idleBefore = (await readSlowLaneState()).idleMs;
+  const idleBefore = (await fetchSlowLaneState()).idleMs;
   let releaseHung: () => void = () => {};
   const hungGate = new Promise<void>((resolve) => {
     releaseHung = resolve;
@@ -342,13 +342,13 @@ const checkHungSlowHandlers = async () => {
     await enqueueJob('sendWebhook', { n } as never, { lane: JobLane.slow });
 
   await waitUntil(() => hung.running >= 1, 30_000);
-  await readSlowLaneState();
+  await fetchSlowLaneState();
   await sleep(HUNG_FOR_MS);
-  const whileHung = await readSlowLaneState();
+  const whileHung = await fetchSlowLaneState();
   releaseHung();
   await waitUntil(async () => hung.completed === HUNG_JOBS && (await queueEmpty()), 120_000);
   await withDeadline('hung: worker close', worker.close());
-  const afterDrained = await readSlowLaneState();
+  const afterDrained = await fetchSlowLaneState();
 
   return {
     report: {
@@ -428,7 +428,7 @@ const checkJumpedJobRepair = async () => {
   await waitUntil(async () => (await slowJob.getState()) === 'failed', 30_000);
   await failing.close();
 
-  await enqueueJob('cleanStaleData', { enqueuedAt: Date.now() } as never);
+  await enqueueJob('hardDeleteRecordsPastRetention', { enqueuedAt: Date.now() } as never);
   await slowJob.retry();
 
   const ran: Array<{ name: string; priority: number }> = [];
@@ -437,7 +437,7 @@ const checkJumpedJobRepair = async () => {
   };
   const recorder = startWorker(1, (job) => ({
     sendWebhook: recordRun(job),
-    cleanStaleData: recordRun(job),
+    hardDeleteRecordsPastRetention: recordRun(job),
   }));
   await waitUntil(() => ran.length === 2, 30_000);
   await recorder.close();
@@ -445,7 +445,7 @@ const checkJumpedJobRepair = async () => {
   return {
     report: { runOrder: ran },
     failures: failuresOf([
-      ran[0]?.name !== 'cleanStaleData' &&
+      ran[0]?.name !== 'hardDeleteRecordsPastRetention' &&
         `a retried slow job ran before waiting fast work: ${JSON.stringify(ran)}`,
       ran.find((entry) => entry.name === 'sendWebhook')?.priority !== SLOW_LANE_PRIORITY &&
         'the retried slow job lost its priority',

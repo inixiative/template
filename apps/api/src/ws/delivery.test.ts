@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { broadcastLocal, sendToChannelLocal, sendToStreamLocal } from '#/ws/delivery';
-import { addConnection, byId, clearRegistry } from '#/ws/registry';
+import { addConnection, clearRegistry, connectionsById } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket, sentFrames } from '#tests/createTestSocket';
@@ -44,8 +44,8 @@ describe('delivery', () => {
 
     expect(live.sent).toHaveLength(1);
     expect(dead.sent).toEqual([]);
-    expect(byId.has('dead')).toBe(false);
-    expect(byId.has('live')).toBe(true);
+    expect(connectionsById.has('dead')).toBe(false);
+    expect(connectionsById.has('live')).toBe(true);
   });
 
   it('sendToStreamLocal delivers only to connections holding that stream open', () => {

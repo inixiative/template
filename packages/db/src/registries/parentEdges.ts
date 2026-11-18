@@ -5,7 +5,10 @@
  * @uses none
  */
 import { polymorphicAxis } from '@template/db/registries/falsePolymorphism';
-import { axisTargetIdColumn, polymorphicTarget } from '@template/db/registries/polymorphicIs';
+import {
+  axisTargetIdColumn,
+  rowPolymorphicAxisPointsAt,
+} from '@template/db/registries/polymorphicAxisPointsAt';
 import { isModelName, type ModelName } from '@template/db/utils/modelNames';
 
 // why: one statement of "this row's change is that row's" for the cache hook, audit tenancy and the history read (DATABASE.md#parent-edges).
@@ -23,7 +26,7 @@ export type ParentRow = { model: ModelName; id: string };
 export const parentEdgeOf = (child: ModelName): ParentEdge | null => parentEdges[child] ?? null;
 
 /** The row a child's edge points at: model and id, or null when the edge is unset. */
-export const parentAlong = (
+export const parentRowAlongEdge = (
   child: ModelName,
   edge: ParentEdge,
   row: Record<string, unknown>,
@@ -32,17 +35,17 @@ export const parentAlong = (
     const id = row[edge.foreignKey];
     return typeof id === 'string' ? { model: edge.parent, id } : null;
   }
-  const target = polymorphicTarget(row, child, edge.axis);
+  const target = rowPolymorphicAxisPointsAt(row, child, edge.axis);
   return target && isModelName(target.kind) ? { model: target.kind, id: target.id } : null;
 };
 
 export const parentOf = (child: ModelName, row: Record<string, unknown>): ParentRow | null => {
   const edge = parentEdgeOf(child);
-  return edge ? parentAlong(child, edge, row) : null;
+  return edge ? parentRowAlongEdge(child, edge, row) : null;
 };
 
 /** The where on a child's table for "its parent is this row", or null when the edge never reaches that model. */
-export const childWhereAlong = (
+export const childWhereForParentAlongEdge = (
   child: ModelName,
   edge: ParentEdge,
   parent: ParentRow,
@@ -60,6 +63,6 @@ export const childrenOf = (
   parent: ParentRow,
 ): { child: ModelName; where: Record<string, string> }[] =>
   (Object.entries(parentEdges) as [ModelName, ParentEdge][]).flatMap(([child, edge]) => {
-    const where = childWhereAlong(child, edge, parent);
+    const where = childWhereForParentAlongEdge(child, edge, parent);
     return where ? [{ child, where }] : [];
   });

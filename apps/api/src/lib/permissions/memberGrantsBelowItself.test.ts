@@ -21,11 +21,11 @@ import {
 } from '@template/permissions';
 import type { EntitlementFields } from '@template/permissions/entitlementRows';
 import { canGrantEntitlement, placeEntitlement, schemaMap } from '@template/permissions/rebac';
-import { delegatedPermissions } from '#/lib/permissions/ownerPermissions';
+import { narrowOwnerPermissionsToDelegate } from '#/lib/permissions/ownerPermissions';
 import { integrationRouter } from '#/modules/integration';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 
 const { call } = createTokenProbeApp((hono) =>
   hono.route('/api/v1/integration', integrationRouter),
@@ -42,7 +42,7 @@ const integrationOf = async (member: OrganizationUser) =>
   ).entity;
 
 const manageIt = (integration: Integration) =>
-  entry('db:integration', ['db:integration', integration.id], ['manage']);
+  entitlementInputFor('db:integration', ['db:integration', integration.id], ['manage']);
 
 describe("a member's operate on itself grants below it: its own integrations (Aron, 2026-11-14)", () => {
   let organization: Organization;
@@ -69,7 +69,7 @@ describe("a member's operate on itself grants below it: its own integrations (Ar
       )
     ).rawKey;
 
-  const grant = (key: string, to: Integration, granted: ReturnType<typeof entry>) =>
+  const grant = (key: string, to: Integration, granted: ReturnType<typeof entitlementInputFor>) =>
     call(key, 'POST', `/api/v1/integration/${to.id}/entitlements`, [granted]);
 
   it('a full token on the member gives one of its integrations manage on another', async () => {
@@ -103,7 +103,7 @@ describe("a member's operate on itself grants below it: its own integrations (Ar
       const permix = createPermissions();
       await installPermissions(
         permix,
-        delegatedPermissions(
+        narrowOwnerPermissionsToDelegate(
           { full: true },
           permissionsOfUser(null, [{ ...member, targetEntitlements: [row] }], []),
         ),

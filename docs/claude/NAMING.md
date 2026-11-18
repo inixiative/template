@@ -5,6 +5,9 @@
 ## Contents
 
 - [Terminology](#terminology)
+  - [Verbs](#verbs)
+  - [A name never](#a-name-never)
+  - [Field vocabulary](#field-vocabulary)
 - [Backend](#backend)
   - [Files](#files)
   - [Functions](#functions)
@@ -19,6 +22,7 @@
 - [Database](#database)
   - [Prisma Schema](#prisma-schema)
   - [Polymorphic Sides](#polymorphic-sides)
+  - [Entitlement: source, target and the library's anchor](#entitlement-source-target-and-the-librarys-anchor)
   - [IDs](#ids)
 - [Files & Directories](#files--directories)
   - [Backend Structure](#backend-structure)
@@ -31,14 +35,55 @@
 
 ## Terminology
 
-| Use | Avoid | Context |
-|-----|-------|---------|
-| `util` | helper | |
-| `services` | handlers | Backend business logic |
-| `handlers` | | Jobs, frontend event handlers |
-| `make` | create | Factories/currying |
-| `validate` | require | Middleware guards |
-| `aToB` | | Integration transformers (e.g., `stripeToUser`) |
+A name says exactly what the thing is, so someone reading it for the first time, outside this team,
+knows what a call does without opening it. Long names that read like a sentence are fine
+(`actorOperatesOwnerUserOrManagesOwnerTenant`); shortcuts, metaphors and mechanism words are not. When
+the vocabulary drifts (seven verbs for "read", one word for two ideas), every reader pays for it, so
+each word below has one meaning and every name uses it.
+
+### Verbs
+
+| Word | Means | Example |
+|------|-------|---------|
+| `fetch` | Reads with I/O: database, cache, Redis, HTTP | `fetchCachedRecordWithTargetEntitlements`, `fetchThroughCache` |
+| no verb | A pure in-memory lookup, or a plain value built from inputs | `encryptedColumnNamesForKey`, `sensitiveFieldsOf`, `lensFromFieldTypes` |
+| `…OrThrow` | Throws when nothing is there | `openTransactionForPrismaQueryOrThrow` |
+| `make` | Returns a function, handler or stateful handle | `makeController`, `makeJob`, `makeLock` |
+| `create` | Writes a record, or builds an adapter client | `createInquiry`, `createResendClient` |
+| `register` | Adds something to a registry (a side effect) | `registerFactory`, `registerTestTracker` |
+| `define` | Declares a typed definition and returns it; registers nothing | `defineStream` |
+| `validate` | Throws when the input is wrong; never returns a problem | `validateWhereIsNotEmpty` |
+| `aToB` | Converts one shape to another | `stripeToUser` |
+| `read` | Route and controller names only | `organizationRead`, `readRoute` |
+| `resolve` | Picks one value from several sources by precedence | |
+| `get` | Never in our names; only where a library defines it | `getByRole`, Hono's `c.get` |
+
+A boolean is a question (`isUsableLoopBindingName`). A function that does two things says both
+(`recomputeAndStoreMissingComponentSlugs`). Code lives in `util`, never `helper`; backend
+business logic is `services`; `handlers` are jobs and frontend event handlers. Zustand slices keep
+`create…Slice` (`ZUSTAND.md`).
+
+### A name never
+
+- describes the mechanism instead of the meaning (`materialized` for a dual polymorphism id);
+- uses a metaphor only its author reads (`settle`, `shadow`, `trip`, `sweep`);
+- says something the code does not do (a clientIp that returns a rate-limit bucket address, now `clientRateLimitBucketAddress`);
+- is a bare verb, a bare noun or a past participle (`collect`, `registry`, `built`);
+- abbreviates a model or concept (Ref for Relationship, `orgId`). `Nav` is accepted.
+
+### Field vocabulary
+
+| Word | Means | Registry or function |
+|------|-------|----------------------|
+| sensitive | The value never leaves the system | `SENSITIVE_FIELDS` (passwords, key hashes, every encrypted column) |
+| mask | Hide a value but keep that it changed (audit, logs) | `maskSensitiveFields`, `MASKED_VALUE` |
+| omit | Drop a field from what goes out | `omitRegisteredFields`, `omitSensitiveFieldsFromLens` |
+| redact | Erase a person, and nothing else | `redactUser`, `meRedact` |
+| internal | Never leaves, for privilege rather than secrecy | `INTERNAL_FIELDS` (`User.platformRole`) |
+| no-op | A change not worth recording or firing | `NOOP_FIELDS` |
+
+A webhook excludes no-op, sensitive and internal fields (`WEBHOOK_EXCLUDED_FIELDS`). Side names for
+polymorphic slots and back-relations are under [Polymorphic Sides](#polymorphic-sides).
 
 ---
 
@@ -52,7 +97,7 @@
 | Hook | `<model><Timing><Purpose>.ts` | `userAfterCreate.ts` |
 | Job | `<verb><Noun>.ts` | `sendWebhook.ts`, `processInquiry.ts` |
 | Middleware | `<purpose>Middleware.ts` | `jwtAuthMiddleware.ts` |
-| Utility | `<verb><Noun>.ts` or `<noun>.ts` | `makeController.ts`, `cache.ts` |
+| Utility | `<verb><Noun>.ts` or `<noun>.ts` | `makeController.ts`, `fetchThroughCache.ts` |
 
 **ReadMany subresources use plural form:**
 - `meReadManyOrganizations.ts` (not `meReadManyOrganization.ts`)
@@ -64,11 +109,10 @@
 | Type | Convention | Example |
 |------|------------|---------|
 | Route handler | `<model><Action>` | `userCreate`, `organizationReadMany` |
-| Getter | `get<Thing>` | `getResource` |
 | Boolean getter | `is<Condition>` | `isAuthenticated`, `isSuperadmin` |
-| Constructor / factory | `make<Thing>` | `makeError`, `makeJob`, `makeController` |
+| Builder of a function or handler | `make<Thing>` | `makeError`, `makeJob`, `makeController` |
 
-`create<Thing>` is reserved for writing a record (`createInquiry`, the DB test factories `createUser` / `createSpace` in `packages/db/src/test/factories`), not for constructing a value.
+The verb rules are in [Terminology](#terminology).
 
 ### Variables
 
@@ -102,7 +146,7 @@ Two distinct meanings — **don't mix them**:
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getResource } from '#/lib/context/getResource'` |
+| Within an app | `#/` | `import { contextResource } from '#/lib/context/contextResource'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -111,14 +155,14 @@ Two distinct meanings — **don't mix them**:
 // apps/api/src/modules/user/routes/userCreate.ts
 import { db } from '@template/db';                    // Shared package
 import { log } from '@template/shared/logger';        // Shared package
-import { getResource } from '#/lib/context/getResource';    // Internal to app
+import { contextResource } from '#/lib/context/contextResource';    // Internal to app
 
 // packages/shared/src/logger/index.ts (top-level barrel)
 export { log } from './logger';                       // Relative OK here
-export { logScope } from './scope';
+export { withLogScope } from './scope';
 
 // packages/shared/src/logger/logger.ts (NOT a barrel)
-import { getLogScopes } from '@template/shared/logger/scope';  // Use alias, not relative
+import { currentLogScopes } from '@template/shared/logger/scope';  // Use alias, not relative
 ```
 
 **Why `@template/` inside shared packages?** Ensures imports work the same whether you're inside or outside the package. Avoids confusing mixed conventions.

@@ -4,7 +4,7 @@
 
 ## What this region is
 
-The Batch API: one HTTP call that replays ordered rounds of ordinary API requests through the app's own pipeline with the caller's context, under a chosen transaction and failure strategy, plus the in-process readAsCaller/readAllAsCaller helpers built on the same registry.
+The Batch API: one HTTP call that replays ordered rounds of ordinary API requests through the app's own pipeline with the caller's context, under a chosen transaction and failure strategy, plus the in-process fetchAsCaller/fetchAllAsCaller helpers built on the same registry.
 
 ## What it exists for
 

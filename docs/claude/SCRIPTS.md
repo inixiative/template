@@ -242,7 +242,7 @@ Additional CI rules live under `scripts/ci/rules` and run alphabetically by file
 # Individual rules
 ./scripts/ci/rules/no-jest.sh
 ./scripts/ci/rules/no-vitest.sh
-./scripts/ci/rules/ui-serialized-factories.sh
+./scripts/ci/rules/ui-tests-serialize-factory-records.sh
 ```
 
 Rule self-test fixtures live at:
@@ -271,7 +271,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - External or illustrative names: `scripts/ci/doc-freshness/allow.txt` (`<doc>\t<value>` scopes one to a doc). References that were stale before the rule: `scripts/ci/doc-freshness/baseline.txt`, reported but not failed; an entry that stops occurring fails until its line is deleted
 - Warns, never fails, when the branch changes code whose `@atlas` `@partOf` concept lists docs in `.atlas/concepts.ts` and touches none of them
 
-**Fence rules** (`uuidv7-ids`, `one-middleware-chain`, `no-raw-locks`, `no-db-params`, `bearer-only-auth`, `entitlement-writer-only`) scan the whole tree through `scripts/ci/rules/lib/fence.ts`. Each keeps its data in `scripts/ci/<rule>/`:
+**Fence rules** (`uuidv7-ids`, `one-middleware-chain`, `no-raw-locks`, `no-db-params`, `bearer-only-auth`, `entitlement-writer-only`) scan the whole tree through `scripts/ci/rules/lib/ciRuleRunner.ts`. Each keeps its data in `scripts/ci/<rule>/`:
 - `exempt.txt`: `<key>\t<reason>`, a named, deliberate exception. The reason is required, and an entry that no longer matches fails.
 - `baseline.txt`: the violations that predate the rule, written by `bun scripts/ci/rules/lib/<detector>.ts --write-baseline`. Listed violations are reported, not failed, so the rule fences new code at once while the old is burned down. Keys name a violation by content (model, mount path, function and parameter, SQL text), not by line, so a new violation in a listed file fails; an identical repeat is `<key>#2`. An entry that stops occurring fails until its line is deleted, and in a git checkout a line the merge base's baseline lacks fails, so the baseline only shrinks. A rule that takes no exemptions fails on an `exempt.txt`. Template has no baselines; downstream repos start with one.
 
@@ -281,7 +281,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - Why: ids are time-ordered, and `paginate()`'s `{ id: desc }` tiebreaker and cursors depend on it
 
 **one-middleware-chain.sh:**
-- Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequest → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
+- Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequestMiddleware → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
 - A mount (`.route`, `.get`, `.all`, `.doc31`, …, chained or across lines, or a `.use` on a path with an inline handler) before the chain completes, on `routes` other than `/api`, on `app` other than `/`, or on `app`/`routes`/`apiRouter` from any other file fails unless its full path is in `scripts/ci/one-middleware-chain/exempt.txt` with a reason (template: `/health`, `/bullBoard`, `/test`, `/openapi/docs`, `/api/telemetry/browser`, `/api/internal`, `/api/auth/*`, `/api/unsubscribe`)
 
 **no-raw-locks.sh:**
@@ -299,9 +299,9 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 
 **bearer-only-auth.sh:**
 - Fails, in non-test source under `apps/` and `packages/`, on `cookieCache`, `credentials` set to `'include'`, `withCredentials`, `document.cookie`, any session lookup (a `getSession(...)` or `findSession(...)` call, or a read of the `session` table: `<x>.session.findUnique`, `findUniqueOrThrow`, `findFirst`, `findFirstOrThrow`, `findMany` or `count`), importing BetterAuth's `bearer` plugin, and building a session credential (importing or re-exporting `makeSignature`, `setRequestCookie`, `setSessionCookie`, `serializeSignedCookie`, `signCookieValue` or `createHMAC` from better-auth, `@better-auth/*` or better-call; a namespace import or re-export of a signer module; any reference to `createSession`: property, string element access or destructuring). No `exempt.txt`; one named file, `apps/api/src/lib/auth/withThrowawaySession.ts`, may build a session credential ([AUTH.md](./AUTH.md#account-changes-through-betterauth-withthrowawaysession))
-- Why: API auth is bearer-only and session-free ([AUTH.md](./AUTH.md#overview)). A person presents a JWT; a session exists only inside BetterAuth's `/api/auth/*` handler for the sign-in handshake, and `jwtHandoff` swaps it for a JWT. A cookie path was a second way in, a session lookup is a second way to resolve a person, and the `bearer` plugin turns a session token into a credential. A session built anywhere but the throwaway-session helper is a session that can outlive its one server call
+- Why: API auth is bearer-only and session-free ([AUTH.md](./AUTH.md#overview)). A person presents a JWT; a session exists only inside BetterAuth's `/api/auth/*` handler for the sign-in handshake, and `jwtHandoffPlugin` swaps it for a JWT. A cookie path was a second way in, a session lookup is a second way to resolve a person, and the `bearer` plugin turns a session token into a credential. A session built anywhere but the throwaway-session helper is a session that can outlive its one server call
 
-**ui-serialized-factories.sh:**
+**ui-tests-serialize-factory-records.sh:**
 - For UI tests importing `@template/db/test`, requires `__serialize()` usage
 - Fails on `__serialize() as any` casts
 

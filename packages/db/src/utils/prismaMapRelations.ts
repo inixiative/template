@@ -30,7 +30,7 @@ export type RelationInfo = {
 // accessor, the foreign key collapsed for lookup, and whether the relation is
 // required. Thin typed wrapper over
 // `@inixiative/prisma-map`'s `getRelations` (which is string-keyed).
-export const getModelRelations = (modelName: ModelName): RelationInfo[] =>
+export const relationsOfModel = (modelName: ModelName): RelationInfo[] =>
   getRelations(models, modelName).map((relation) => ({
     relationName: relation.relationName,
     targetModel: toModelName(relation.targetModel),

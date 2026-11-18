@@ -21,8 +21,8 @@ class GitHubApi {
     });
   }
 
-  async getAppInstallationId(org: string, appSlug: string): Promise<string | null> {
-    return this.vcr.capture('getAppInstallationId', async () => {
+  async fetchAppInstallationId(org: string, appSlug: string): Promise<string | null> {
+    return this.vcr.capture('fetchAppInstallationId', async () => {
       try {
         const { stdout } = await execAsync(
           `gh api /orgs/${org}/installations --jq '.installations[] | select(.app_slug == "${appSlug}") | .id'`,

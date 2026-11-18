@@ -5,7 +5,6 @@
  * @uses none
  */
 import type {
-  AuthStrategy,
   AuthStrategyContextType,
   EmbedAuthCompleteMessage,
   EmbedAuthRequiredMessage,
@@ -14,6 +13,7 @@ import type {
 } from '@template/ui/hooks/useAuthStrategy/types';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
+import type { AuthStrategy } from '@template/ui/store/types/auth';
 import { createContext, type ReactNode, useCallback, useEffect, useRef } from 'react';
 
 export const AuthStrategyContext = createContext<AuthStrategyContextType | null>(null);
@@ -32,7 +32,7 @@ export const AuthStrategyProvider = ({
   onTokenReceived,
 }: AuthStrategyProviderProps) => {
   const pendingCallbackRef = useRef<PendingAuthCallback | null>(null);
-  const getStore = useAppStore.getState;
+  const currentAppStore = useAppStore.getState;
 
   // Embed: Listen for token from parent
   useEffect(() => {
@@ -81,7 +81,7 @@ export const AuthStrategyProvider = ({
     }
   }, [strategy, onTokenReceived]);
 
-  const requireAuth = useCallback(
+  const runAfterAuthentication = useCallback(
     (onSuccess?: PendingAuthCallback) => {
       if (isAuthenticated) {
         onSuccess?.();
@@ -90,7 +90,7 @@ export const AuthStrategyProvider = ({
 
       switch (strategy.type) {
         case 'login': {
-          navigateToLogin(getStore);
+          navigateToLogin(currentAppStore);
           break;
         }
         case 'embed': {
@@ -120,7 +120,7 @@ export const AuthStrategyProvider = ({
       value={{
         strategy,
         isAuthenticated,
-        requireAuth,
+        runAfterAuthentication,
         setEmbedToken,
       }}
     >

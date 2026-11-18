@@ -7,7 +7,7 @@
 import { type HydratedRecord, hydrate } from '@template/db';
 import type { Permix } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { integrationRoleWrite } from '@template/permissions/rebac/schemaHelpers';
+import { integrationRoleWrite } from '@template/permissions/rebac/rebacSchemaRules';
 import { makeError } from '#/lib/errors';
 import { validateFullGrant } from '#/lib/permissions/validateFullGrant';
 

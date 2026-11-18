@@ -7,7 +7,7 @@ import type {
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 describe('GET /api/v1/organizationUser/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -37,7 +37,7 @@ describe('GET /api/v1/organizationUser/:id', () => {
     const response = await fetch(get(`/api/v1/organizationUser/${orgUser.id}`));
     expect(response.status).toBe(200);
 
-    const { data } = await json<OrgUserType>(response);
+    const { data } = await parseSuccessBody<OrgUserType>(response);
     expect(data.id).toBe(orgUser.id);
     expect(data.role).toBe('admin');
   });

@@ -18,9 +18,9 @@ import {
   createUser,
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import { inquiryServices } from '#/modules/inquiry/services';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
@@ -72,7 +72,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.sent);
@@ -96,7 +96,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.expiresAt).not.toBeNull();
@@ -120,7 +120,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Record<string, unknown>>(response);
+    const { data } = await parseSuccessBody<Record<string, unknown>>(response);
 
     expect(response.status).toBe(200);
     expect(data.targetUser).toBeDefined();
@@ -148,7 +148,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.sent);
@@ -177,7 +177,7 @@ describe('POST /api/v1/inquiry/:id/send', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.sent);
@@ -212,7 +212,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
   let org: Organization;
   let admin: User;
   let adminOrgUser: OrganizationUser;
-  const origAutoApprove = inquiryHandlers.inviteOrganizationUser.autoApprove;
+  const origAutoApprove = inquiryServices.inviteOrganizationUser.autoApprove;
 
   beforeEach(async () => {
     const { entity: u } = await createUser();
@@ -235,11 +235,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
   });
 
   beforeEach(() => {
-    inquiryHandlers.inviteOrganizationUser.autoApprove = async () => true;
+    inquiryServices.inviteOrganizationUser.autoApprove = async () => true;
   });
 
   afterEach(() => {
-    inquiryHandlers.inviteOrganizationUser.autoApprove = origAutoApprove;
+    inquiryServices.inviteOrganizationUser.autoApprove = origAutoApprove;
   });
 
   afterEach(async () => {
@@ -263,7 +263,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.approved);
@@ -335,7 +335,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Record<string, unknown>>(response);
+    const { data } = await parseSuccessBody<Record<string, unknown>>(response);
 
     expect(data.targetUser).toBeDefined();
     expect(data.sourceOrganization).toMatchObject({ id: org.id });
@@ -358,9 +358,9 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
         expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
       }),
     );
-    const { data } = await json<Record<string, unknown> & { auditLogsAsSubject?: unknown[] }>(
-      response,
-    );
+    const { data } = await parseSuccessBody<
+      Record<string, unknown> & { auditLogsAsSubject?: unknown[] }
+    >(response);
 
     const record = await db.inquiry.findUniqueOrThrow({
       where: { id: inquiry.id },

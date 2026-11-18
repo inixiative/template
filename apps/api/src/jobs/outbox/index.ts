@@ -18,17 +18,17 @@ export {
   maxSlowQueueDepth,
 } from '#/jobs/outbox/config';
 export {
-  clearOverflow,
-  createDepthEstimator,
+  clearOverflowFlag,
   isLaneOverflowing,
-  isOverflowing,
-  recordAddAndTripIfFull,
-  renewOverflow,
-  tripFromDepths,
-  tripIfFull,
+  isOverflowFlagSet,
+  makeDepthEstimator,
+  probeDepthsAndSetOverflowFlagForLanesAtCap,
+  recordEnqueueAndSetOverflowFlagForLanesAtCap,
+  renewOverflowFlagTtl,
+  setOverflowFlagForLanesAtCap,
   warnIfOverflowStuck,
   withOverflowRenew,
 } from '#/jobs/outbox/flag';
-export { runOnOutboxQueue } from '#/jobs/outbox/mutex';
+export { runUnderJobOutboxWriteMutex } from '#/jobs/outbox/mutex';
 export { laneDepth, laneDepthsFrom, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 export { type OutboxRow, outboxLaneOf, type SpillOptions, shouldSpill } from '#/jobs/outbox/types';

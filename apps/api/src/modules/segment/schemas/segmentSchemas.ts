@@ -64,6 +64,8 @@ export const segmentMembershipSchema = SegmentMemberScalarSchema.extend({
   segment: SegmentScalarSchema.pick(selectSegmentForCustomer),
 });
 
-export const segmentReachBodySchema = segmentCreateBodySchema.pick({ conditions: true });
+export const segmentEstimateReachBodySchema = segmentCreateBodySchema.pick({ conditions: true });
 
-export const segmentReachResponseSchema = z.object({ count: z.number().int().nonnegative() });
+export const segmentEstimateReachResponseSchema = z.object({
+  count: z.number().int().nonnegative(),
+});

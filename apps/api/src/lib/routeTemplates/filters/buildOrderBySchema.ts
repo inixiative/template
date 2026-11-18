@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:routeTemplates
  * @uses infrastructure:prisma
  */

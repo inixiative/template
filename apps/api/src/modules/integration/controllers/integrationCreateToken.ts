@@ -4,7 +4,7 @@
  * @partOf feature:integrations
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationCreateTokenRoute } from '#/modules/integration/routes/integrationCreateToken';
 import { createToken } from '#/modules/me/services/createToken';
@@ -12,7 +12,7 @@ import { createToken } from '#/modules/me/services/createToken';
 export const integrationCreateTokenController = makeController(
   integrationCreateTokenRoute,
   async (c, respond) => {
-    const integration = getResource<'integration'>(c);
+    const integration = contextResource<'integration'>(c);
     const body = c.req.valid('json');
 
     const token = await createToken(c, {

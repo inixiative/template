@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses primitive:appEvents, infrastructure:prisma
  */
-import { db, polymorphicTarget } from '@template/db';
+import { db, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { CustomerRelationship, Segment } from '@template/db/generated/client/client';
 import { emitAppEvent } from '#/appEvents/emit';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
@@ -16,7 +16,8 @@ type PerCustomerRelationship = { added: string[]; removed: string[] };
 
 export const customerRelationshipCustomerId = (
   customerRelationship: CustomerRelationship,
-): string => polymorphicTarget(customerRelationship, 'CustomerRelationship', 'customerModel')!.id;
+): string =>
+  rowPolymorphicAxisPointsAt(customerRelationship, 'CustomerRelationship', 'customerModel')!.id;
 
 const bySegment = async ({ segment, diff }: MembershipChange): Promise<void> => {
   const subject = {

@@ -19,7 +19,7 @@ export const orderedListRegistry: OrderedListRegistry = {
   },
 };
 
-export const getOrderedListFieldsByModel = (): Record<string, string[]> => {
+export const orderedListFieldsByModel = (): Record<string, string[]> => {
   const result: Record<string, string[]> = {};
   for (const [model, config] of Object.entries(orderedListRegistry)) {
     result[model] = Object.keys(config);

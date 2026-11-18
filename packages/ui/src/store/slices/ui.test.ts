@@ -13,7 +13,6 @@ describe('ui slice', () => {
       const { ui } = store.getState();
 
       expect(ui.theme).toBe('system');
-      expect(ui.isLoading).toBe(false);
       expect(ui.appName).toBe('App');
       expect(ui.shortName).toBe('Template');
       expect(ui.description).toBe('TanStack Router + React Aria + Tailwind');
@@ -23,8 +22,6 @@ describe('ui slice', () => {
       const { ui } = store.getState();
 
       expect(typeof ui.setTheme).toBe('function');
-      expect(typeof ui.setLoading).toBe('function');
-      expect(typeof ui.updateTheme).toBe('function');
     });
   });
 
@@ -55,7 +52,7 @@ describe('ui slice', () => {
       store.setState({
         ui: {
           ...store.getState().ui,
-          isLoading: true,
+          appName: 'Renamed',
         },
       });
 
@@ -63,54 +60,7 @@ describe('ui slice', () => {
 
       const { ui } = store.getState();
       expect(ui.theme).toBe('dark');
-      expect(ui.isLoading).toBe(true);
-    });
-  });
-
-  describe('setLoading', () => {
-    it('should set loading to true', () => {
-      store.getState().ui.setLoading(true);
-
-      expect(store.getState().ui.isLoading).toBe(true);
-    });
-
-    it('should set loading to false', () => {
-      // Set to true first
-      store.getState().ui.setLoading(true);
-      expect(store.getState().ui.isLoading).toBe(true);
-
-      // Set to false
-      store.getState().ui.setLoading(false);
-      expect(store.getState().ui.isLoading).toBe(false);
-    });
-
-    it('should preserve other UI state when updating loading', () => {
-      store.getState().ui.setTheme('dark');
-
-      store.getState().ui.setLoading(true);
-
-      const { ui } = store.getState();
-      expect(ui.isLoading).toBe(true);
-      expect(ui.theme).toBe('dark');
-    });
-  });
-
-  describe('updateTheme', () => {
-    it('should update theme asynchronously', async () => {
-      await store.getState().ui.updateTheme('light');
-
-      expect(store.getState().ui.theme).toBe('light');
-    });
-
-    it('should handle multiple theme updates', async () => {
-      await store.getState().ui.updateTheme('dark');
-      expect(store.getState().ui.theme).toBe('dark');
-
-      await store.getState().ui.updateTheme('light');
-      expect(store.getState().ui.theme).toBe('light');
-
-      await store.getState().ui.updateTheme('system');
-      expect(store.getState().ui.theme).toBe('system');
+      expect(ui.appName).toBe('Renamed');
     });
   });
 });

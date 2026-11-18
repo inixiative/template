@@ -19,7 +19,7 @@ import {
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { json, patch } from '#tests/utils/request';
+import { parseSuccessBody, patch } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
@@ -72,7 +72,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
         content: { organizationId: org.id, role: 'member' },
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect((data.content as Record<string, unknown>).role).toBe('member');

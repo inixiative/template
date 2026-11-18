@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { getRedisClient } from '@template/db';
+import { redisClient } from '@template/db';
 
 import { incrementFixedWindows } from '#/middleware/rateLimit/queries/incrementFixedWindows';
 
 describe('incrementFixedWindows', () => {
   beforeEach(async () => {
-    const keys = await getRedisClient().keys('itest:*');
-    if (keys.length) await getRedisClient().del(...keys);
+    const keys = await redisClient().keys('itest:*');
+    if (keys.length) await redisClient().del(...keys);
   });
 
   it('increments each window and reports its count + remaining ttl', async () => {
-    const redis = getRedisClient();
+    const redis = redisClient();
     const windows = [
       { key: 'itest:a', windowMs: 60_000 },
       { key: 'itest:b', windowMs: 30_000 },
@@ -26,7 +26,7 @@ describe('incrementFixedWindows', () => {
   });
 
   it('counts each key independently', async () => {
-    const redis = getRedisClient();
+    const redis = redisClient();
     await incrementFixedWindows(redis, [{ key: 'itest:a', windowMs: 60_000 }]);
     await incrementFixedWindows(redis, [{ key: 'itest:a', windowMs: 60_000 }]);
 

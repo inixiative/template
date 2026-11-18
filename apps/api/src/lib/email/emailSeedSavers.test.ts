@@ -10,7 +10,7 @@ import {
 } from '@template/db/test';
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
 import { emailSeedSavers } from '#/lib/email/emailSeedSavers';
-import { deadReferencesOf } from '#tests/utils/deadReferences';
+import { expectRuleReferenceErrorDeadReferences } from '#tests/utils/deadReferences';
 
 const emailSeeds = seeds.filter((file) => file.savedByApp);
 
@@ -89,15 +89,15 @@ describe('email seeds persist through the app save', () => {
           slug: 'seed-org-tag',
           locale: 'en',
           ownerModel: 'default',
-          componentRefs: [],
+          componentSlugs: [],
           mjml: `<mj-text>{{#if rule=${rule}}}VIP{{/if}}</mj-text>`,
         },
       ],
     };
 
-    expect(await deadReferencesOf(seedTable(component, emailSeedSavers))).toEqual([
-      { model: 'Tag', id: tag.id, state: 'missing' },
-    ]);
+    expect(
+      await expectRuleReferenceErrorDeadReferences(seedTable(component, emailSeedSavers)),
+    ).toEqual([{ model: 'Tag', id: tag.id, state: 'missing' }]);
     expect(await db.emailComponent.findFirst({ where: { slug: 'seed-org-tag' } })).toBeNull();
   });
 });

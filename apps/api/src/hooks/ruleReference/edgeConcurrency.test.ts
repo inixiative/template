@@ -13,7 +13,11 @@ import { waitFor } from '@template/shared/test/waitFor';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 
-const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+const acmeEmailDomainRule = {
+  field: 'customerUser.email',
+  operator: Operator.endsWith,
+  value: '@acme.test',
+};
 
 const membersOf = (segmentId: string) => ({
   field: 'segmentMembers',
@@ -72,11 +76,11 @@ describe('ruleReference — edges under concurrency and repair', () => {
   describe('a save racing the delete of the row it names', () => {
     it('waits for the delete to commit and writes the edge stamped, never unstamped against a deleted row', async () => {
       const { entity: target } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const { entity: other } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const held = gate();
@@ -126,7 +130,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
 
     it('repairs a drifted stamp and keeps the edge id', async () => {
       const { entity: target } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const { entity: dependent } = await createSegment(
@@ -145,7 +149,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
 
     it('stamps an edge whose target died behind the hooks, keeps the id, and a second rebuild changes nothing', async () => {
       const { entity: target } = await createSegment(
-        { ownerModel: 'Space', conditions: acmeRule },
+        { ownerModel: 'Space', conditions: acmeEmailDomainRule },
         { space },
       );
       const { entity: dependent } = await createSegment(

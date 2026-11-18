@@ -14,7 +14,7 @@ const allowedOrigins: Record<Env['ENVIRONMENT'], string[]> = {
   prod: [],
 };
 
-export const getAllowedOrigins = (): string[] => {
+export const allowedCorsOrigins = (): string[] => {
   return [
     ...(allowedOrigins[process.env.ENVIRONMENT] ?? []),
     ...[process.env.WEB_URL, process.env.ADMIN_URL, process.env.SUPERADMIN_URL].filter(
@@ -24,7 +24,7 @@ export const getAllowedOrigins = (): string[] => {
 };
 
 const validateOrigin = (origin: string): string | null => {
-  const origins = getAllowedOrigins();
+  const origins = allowedCorsOrigins();
 
   for (const pattern of origins) {
     if (pattern === '*') return origin;

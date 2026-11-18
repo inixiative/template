@@ -8,8 +8,8 @@
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import type { Context, Next } from 'hono';
 import { pick } from 'lodash-es';
-import { clientAddress } from '#/lib/clientIp';
-import { me } from '#/lib/context/me';
+import { trustedClientAddress } from '#/lib/clientAddress';
+import { actingUser } from '#/lib/context/actingUser';
 import type { AppEnv } from '#/types/appEnv';
 
 export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
@@ -17,7 +17,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const acting = c.get('permix').getActor();
 
   const actor = {
-    actorUserId: me(c)?.id ?? token?.userId ?? null,
+    actorUserId: actingUser(c)?.id ?? token?.userId ?? null,
     actorSpoofUserId: c.get('spoofedBy')?.id ?? null,
     actorTokenId: token?.id ?? null,
     actor:
@@ -25,7 +25,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
         ? { model: acting.model, record: pick(acting.record, ['id', 'platformRole']) }
         : acting,
     actorJobName: null,
-    ipAddress: clientAddress(c),
+    ipAddress: trustedClientAddress(c),
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,
     integrationId: token?.integrationId ?? null,

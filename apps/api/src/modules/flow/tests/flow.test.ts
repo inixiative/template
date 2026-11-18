@@ -22,7 +22,7 @@ import type { flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
-import { del, get, json, jsonError, post } from '#tests/utils/request';
+import { del, get, parseErrorBody, parseSuccessBody, post } from '#tests/utils/request';
 
 type FlowResponse = z.infer<typeof flowResponseSchema>;
 
@@ -83,20 +83,20 @@ describe('flows', () => {
   const started = async (app: Harness, organizationId: string) => {
     const response = await startIn(app, { organizationId, returnUrl: '/settings' });
     expect(response.status).toBe(201);
-    return (await json<FlowResponse>(response)).data;
+    return (await parseSuccessBody<FlowResponse>(response)).data;
   };
 
-  const readIn = async (app: Harness, flowId: string) => {
+  const fetchFlowThroughApp = async (app: Harness, flowId: string) => {
     const response = await app.fetch(get(`/api/v1/flow/${flowId}`));
     expect(response.status).toBe(200);
-    return (await json<FlowResponse>(response)).data;
+    return (await parseSuccessBody<FlowResponse>(response)).data;
   };
 
   it('validates bindings against the registered schema', async () => {
     const response = await startIn(harness, { organizationId: 'nope' });
 
     expect(response.status).toBe(422);
-    expect(Object.keys((await jsonError(response)).fieldErrors ?? {})).toEqual([
+    expect(Object.keys((await parseErrorBody(response)).fieldErrors ?? {})).toEqual([
       'bindings.organizationId',
     ]);
     expect(
@@ -123,7 +123,7 @@ describe('flows', () => {
       expect(stepsSpy).toHaveBeenCalledTimes(1);
       expect(stepsSpy.mock.calls[0]?.[1]).toEqual({ userId: owner.id, now: expect.any(Date) });
       expect(smuggled.status).toBe(422);
-      expect((await jsonError(smuggled)).fieldErrors).toHaveProperty('bindings');
+      expect((await parseErrorBody(smuggled)).fieldErrors).toHaveProperty('bindings');
     } finally {
       stepsSpy.mockRestore();
     }
@@ -162,19 +162,19 @@ describe('flows', () => {
     const flow = await started(app, organization.id);
 
     await sendInvite(organization, InquiryStatus.draft);
-    expect((await readIn(app, flow.id)).currentStep).toBe(0);
+    expect((await fetchFlowThroughApp(app, flow.id)).currentStep).toBe(0);
 
     await createOrganizationToken(organization, 'personal');
-    expect((await readIn(app, flow.id)).currentStep).toBe(0);
+    expect((await fetchFlowThroughApp(app, flow.id)).currentStep).toBe(0);
 
     await sendInvite(organization, InquiryStatus.sent);
     const ciToken = await createOrganizationToken(organization, 'ci runner');
-    const advanced = await readIn(app, flow.id);
+    const advanced = await fetchFlowThroughApp(app, flow.id);
     expect(advanced.currentStep).toBe(2);
     expect(advanced.stepStates).toEqual(['done', 'done', 'pending']);
 
     await harness.db.token.update({ where: { id: ciToken.id }, data: { deletedAt: new Date() } });
-    const back = await readIn(app, flow.id);
+    const back = await fetchFlowThroughApp(app, flow.id);
     expect(back.currentStep).toBe(1);
     expect(back.stepStates).toEqual(['done', 'pending', 'pending']);
   });
@@ -183,7 +183,7 @@ describe('flows', () => {
     const { organization, app } = await ownedOrganization();
     const response = await startIn(app, { organizationId: organization.id });
 
-    expect((await json<FlowResponse>(response)).data.returnUrl).toBeNull();
+    expect((await parseSuccessBody<FlowResponse>(response)).data.returnUrl).toBeNull();
   });
 
   it('returns a flow whose steps all hold at create as complete, and stores nothing', async () => {
@@ -193,7 +193,7 @@ describe('flows', () => {
     await createOrganizationToken(organization, 'local');
 
     const response = await startIn(app, { organizationId: organization.id });
-    const flow = (await json<FlowResponse>(response)).data;
+    const flow = (await parseSuccessBody<FlowResponse>(response)).data;
 
     expect(response.status).toBe(201);
     expect(flow.currentStep).toBe(3);
@@ -208,7 +208,7 @@ describe('flows', () => {
     await createOrganizationToken(organization, 'ci');
     await createOrganizationToken(organization, 'local');
 
-    const finished = await readIn(app, flow.id);
+    const finished = await fetchFlowThroughApp(app, flow.id);
 
     expect(finished.currentStep).toBe(3);
     expect(finished.stepStates).toEqual(['done', 'done', 'done']);

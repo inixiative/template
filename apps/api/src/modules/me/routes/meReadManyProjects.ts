@@ -8,8 +8,8 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { projectReadResponseSchema } from '#/modules/project/schemas/projectSchemas';
-import { Tags } from '#/modules/tags';
 
 export const meReadManyProjectsRoute = readRoute({
   model: Modules.me,
@@ -20,5 +20,5 @@ export const meReadManyProjectsRoute = readRoute({
   filterLens: { parent: lensFor('Project') },
   responseSchema: projectReadResponseSchema,
   middleware: [validateSubmodelPermission('read')],
-  tags: [Tags.me, Tags.project],
+  tags: [OpenApiTags.me, OpenApiTags.project],
 });

@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:authz
  * @uses primitive:authz, infrastructure:prisma
  */

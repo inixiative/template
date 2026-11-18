@@ -6,7 +6,7 @@
  */
 import { db } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
+import { addLogBroadcast, LogScope, log, withLogScope } from '@template/shared/logger';
 import type { Job } from 'bullmq';
 import { isSlowJobData } from '#/jobs/buildJobData';
 import { claimSlotOrRequeue } from '#/jobs/claimSlotOrRequeue';
@@ -15,7 +15,7 @@ import { isValidHandlerName, type JobHandlers, jobHandlers } from '#/jobs/handle
 import { jobAuditActor } from '#/jobs/jobAuditActor';
 import { queue } from '#/jobs/queue';
 import { recordSlowFinished } from '#/jobs/slowLaneSignals';
-import { createSlowSlotPool, type SlowSlotPool } from '#/jobs/slowSlotPool';
+import { makeSlowSlotPool, type SlowSlotPool } from '#/jobs/slowSlotPool';
 import { traceJob } from '#/jobs/traceJob';
 import { type JobData, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
 
@@ -24,7 +24,7 @@ type ProcessJobSeams = {
   slowSlots?: SlowSlotPool;
 };
 
-const processSlowSlots = createSlowSlotPool();
+const processSlowSlots = makeSlowSlotPool();
 
 const runJob = async (
   job: Job,
@@ -32,8 +32,8 @@ const runJob = async (
 ): Promise<void> => {
   const scopeId = `${job.name}:${job.id}`;
   await traceJob(job, () =>
-    logScope(LogScope.worker, () =>
-      logScope(scopeId, () =>
+    withLogScope(LogScope.worker, () =>
+      withLogScope(scopeId, () =>
         db.scope(
           scopeId,
           async () => {

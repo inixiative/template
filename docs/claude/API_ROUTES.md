@@ -142,8 +142,8 @@ createRoute({ model: 'organization', submodel: 'token', bodySchema, responseSche
 // Action
 actionRoute({ model: 'user', action: 'activate', bodySchema, responseSchema })
 
-// Action on a subresource collection → POST /{id}/segments/reach
-actionRoute({ model: 'space', submodel: 'segment', action: 'reach', bodySchema, responseSchema })
+// Action on a subresource collection → POST /{id}/segments/estimateReach
+actionRoute({ model: 'space', submodel: 'segment', action: 'estimateReach', bodySchema, responseSchema })
 
 // Admin
 readRoute({ model: 'user', many: true, admin: true, responseSchema })
@@ -159,14 +159,14 @@ A lens narrowing can declare a `where` in three places, and they assert three di
 
 **Relation-node where** (`root.relations.<rel>.where`) — a standing condition on that edge: whenever a query traverses this relation, the related rows are scoped by this condition. It says nothing about which roots qualify — a User with zero matching tokens is still in the set. It answers **what the related collection looks like when you traverse to it**. Declared per *path*, not per model: two edges reaching the same model can carry different wheres.
 
-**mapDefaults model where** (`mapDefaults.prisma.models.<Model>.where`) — the broadest: wherever this model appears anywhere in the lens's projection, apply this condition. Placement-independent; this is the mechanism `redactLens` rides.
+**mapDefaults model where** (`mapDefaults.prisma.models.<Model>.where`) — the broadest: wherever this model appears anywhere in the lens's projection, apply this condition. Placement-independent; this is the mechanism `omitSensitiveFieldsFromLens` rides.
 
 `projectLens` merges all three before consumption: each visit's `whereClauses` is the union of node-declared wheres and mapDefaults wheres for that visit's model, keyed by path.
 
 ### How pagination applies them
 
 - **Root clauses**: compiled in `buildWhereClause` and ANDed into the query unconditionally — superadmin included. Lens narrowing is authorization shape, not a visibility preference.
-- **Non-root clauses**: `lensWhere` compiles each once, keyed by dotted path, then walks the fully composed where (caller base where + client filters + global search). Wherever the query traverses a relation, the clause folds in with operator-aware semantics: ANDed inside `some`/`none`/`is` and bare to-one nesting; into `every` by implication (an out-of-scope row must never fail it); as a fail-closed `is` sibling on bare `isNot`. A relation the query never touches contributes nothing — the lens where doesn't add joins, it colors the joins the query already makes.
+- **Non-root clauses**: `applyFilterLensWheresToPrismaWhere` compiles each once, keyed by dotted path, then walks the fully composed where (caller base where + client filters + global search). Wherever the query traverses a relation, the clause folds in with operator-aware semantics: ANDed inside `some`/`none`/`is` and bare to-one nesting; into `every` by implication (an out-of-scope row must never fail it); as a fail-closed `is` sibling on bare `isNot`. A relation the query never touches contributes nothing — the lens where doesn't add joins, it colors the joins the query already makes.
 - **Soft-delete live scope** is not paginate's job: the db client's soft-delete extension scopes the final query, its include/select trees and the lens count plans. It is visibility, not authorization, and the endpoint decides it — superadmin endpoints (the admin router) run unscoped; every other route is live-scoped for every caller, superadmin included.
 
 One line: **root where = who's in the list; relation where = what you see when you look sideways from a row; model where = the same, declared once per model instead of once per edge.**
@@ -243,12 +243,12 @@ authProvider/
 ```typescript
 // controllers/authProviderReadMany.ts
 import { makeController } from '#/lib/utils/makeController';
-import { getPlatformProviders } from '#/lib/auth/platformProviders';
+import { configuredPlatformProviders } from '#/lib/auth/platformProviders';
 
 export const authProviderReadManyController = makeController(
   authProviderReadManyRoute,
   async (_c, respond) => {
-    const platformProviders = getPlatformProviders();
+    const platformProviders = configuredPlatformProviders();
     return respond.ok(platformProviders);
   },
 );
@@ -261,14 +261,14 @@ export const authProviderReadManyController = makeController(
 ```typescript
 // organization/controllers/organizationCreateAuthProvider.ts
 import { db, organizationId, userId } from '@template/db';
-import { encryptField } from '@template/db/lib/encryption/helpers';
-import { getResource } from '#/lib/context/getResource';
+import { encryptField } from '@template/db/lib/encryption/fieldEncryption';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 
 export const organizationCreateAuthProviderController = makeController(
   organizationCreateAuthProviderRoute,
   async (c, respond) => {
-    const org = getResource<'organization'>(c);
+    const org = contextResource<'organization'>(c);
     const user = c.get('user')!;
     const { secrets, ...body } = c.req.valid('json');
 
@@ -304,22 +304,22 @@ export const organizationCreateAuthProviderController = makeController(
 
 ```typescript
 // organization/controllers/organizationReadAuthProvider.ts
-import { getResource } from '#/lib/context/getResource';
-import { getPlatformProviders } from '#/lib/auth/platformProviders';
+import { contextResource } from '#/lib/context/contextResource';
+import { configuredPlatformProviders } from '#/lib/auth/platformProviders';
 import { check, rebacSchema } from '@template/permissions/rebac';
 
 export const organizationReadAuthProviderController = makeController(
   organizationReadAuthProviderRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const organization = getResource(c);
+    const organization = contextResource(c);
     const user = c.get('user');
     const permix = c.get('permix');
 
     // Owners see all providers (enabled + disabled), others see only enabled
     const isOwner = user && check(permix, rebacSchema, 'organization', organization, 'own');
 
-    const platformProviders = getPlatformProviders();
+    const platformProviders = configuredPlatformProviders();
 
     const orgProviders = await db.authProvider.findMany({
       where: {
@@ -473,7 +473,7 @@ If you need relation data, pass `include` in the options first. In many cases th
 
 **What paginate() handles automatically:**
 - Reads `page`, `pageSize` from query params
-- Reads `search`, `searchFields` from bracket notation (parsed in prepareRequest)
+- Reads `search`, `searchFields` from bracket notation (parsed in prepareRequestMiddleware)
 - Reads `filterLens` from route context (set by middleware) — used for picks-based whitelist + server-side where
 - Reads `orderBy` from query and parses it
 - Appends `{ id: desc }` as stable pagination tiebreaker
@@ -552,7 +552,7 @@ GET /api/v1/orgs?searchFields[deletedAt][equals][:]=null   # is-null
 GET /api/v1/users?searchFields[emailVerified][:]=true
 ```
 
-**Typed SDK surface:** the `searchFields` schema is generated from the route's `filterLens` — shared `<Type>Filter` components (`StringFilter`/`IntFilter`/`DateTimeFilter`/`BooleanFilter`) plus a `JsonFilter`, with operators sourced from the server's own `getValidOperators` so the schema can never advertise an operator the server rejects. Enum fields inline their lens-narrowed value set. The FE reads this back via `getQueryMetadata` (no `x-*` vendor extensions).
+**Typed SDK surface:** the `searchFields` schema is generated from the route's `filterLens` — shared `<Type>Filter` components (`StringFilter`/`IntFilter`/`DateTimeFilter`/`BooleanFilter`) plus a `JsonFilter`, with operators sourced from the server's own `validOperatorsForField` so the schema can never advertise an operator the server rejects. Enum fields inline their lens-narrowed value set. The FE reads this back via `fieldsFromOpenApiOperation` (no `x-*` vendor extensions).
 
 ### Route declaration (lens narrowing)
 
@@ -623,7 +623,7 @@ const inquiryReceivedNarrowing: LensNarrowing = {
 };
 
 const { data, pagination } = await paginate(c, db.inquiry, {
-  bindings: { organizationId: getResource<'organization'>(c).id },
+  bindings: { organizationId: contextResource<'organization'>(c).id },
 });
 ```
 
@@ -664,7 +664,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 ### How it works
 
-1. `prepareRequest` middleware parses bracket notation (`?searchFields[name]=value`) into nested objects
+1. `prepareRequestMiddleware` middleware parses bracket notation (`?searchFields[name]=value`) into nested objects
 2. `prepareMiddleware` injects an inline middleware that sets `filterLens` on context from the route's static `filterLens`
 3. `paginate()` binds the narrowing's tokens from its `bindings`, reads bracket-query searchFields, calls `buildWhereClause`
 4. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), validates enum values against the same lens projection the `searchFields` query schema is built from, translates the lens's wheres via `toPrisma`, AND-merges everything
@@ -682,7 +682,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 ### Bracket Notation Query Parsing
 
-The API automatically parses bracket notation in query strings into nested objects. Supports arbitrary nesting levels for complex Prisma queries. This happens in `prepareRequest` middleware before Zod validation.
+The API automatically parses bracket notation in query strings into nested objects. Supports arbitrary nesting levels for complex Prisma queries. This happens in `prepareRequestMiddleware` middleware before Zod validation.
 
 **Single level**: `?filters[status]=active&filters[tier]=premium`
 ```typescript
@@ -700,7 +700,7 @@ The API automatically parses bracket notation in query strings into nested objec
 ```
 
 **How it works:**
-1. `prepareRequest` calls `parseBracketNotation(url)`
+1. `prepareRequestMiddleware` calls `parseBracketNotation(url)`
 2. Result stored in context as `c.get('bracketQuery')`
 3. Controllers read from context (e.g., `paginate` reads `bracketQuery.searchFields`)
 4. Zod validates the final query object
@@ -814,13 +814,13 @@ const { data, pagination } = await paginate(c, db.organization, {
 - `user.email:desc` - Nested relation
 - `organization.user.email:asc` - Deep nested
 
-**Security:** Uses `validatePathNotation()` to prevent injection attacks.
+**Security:** Uses `isValidPathNotation()` to prevent injection attacks.
 
 ---
 
 ## Frontend Metadata
 
-Filter surface metadata (picks, enum subsets, server-side scope) is encoded in the route's `filterLens` and flows into the OpenAPI spec via the per-route `searchFields` query schema. The SDK and frontend `useQueryMetadata` extract it from there.
+Filter surface metadata (picks, enum subsets, server-side scope) is encoded in the route's `filterLens` and flows into the OpenAPI spec via the per-route `searchFields` query schema. The SDK and the frontend `fieldsFromOpenApiOperationId` read it from there.
 
 > **Filter shape vs response shape (recap):** narrowing controls what consumers can **filter** on. The response payload shape comes from `responseSchema`, totally separate. A field can be in the response but not searchable, or searchable but stripped from the response.
 
@@ -849,41 +849,35 @@ readRoute({
 
 ### Extracting Metadata
 
-Use `getQueryMetadata()` or `useQueryMetadata()` to extract metadata from the OpenAPI spec:
+Use `fieldsFromOpenApiOperation(path, method)` or `fieldsFromOpenApiOperationId(operationId)` to read the list fields from the OpenAPI spec:
 
 ```typescript
-import { getQueryMetadataByOperation, useQueryMetadata } from '@template/ui/lib';
+import { fieldsFromOpenApiOperationId } from '@template/ui/lib/fieldsFromOpenApi';
 
-// By operation ID (recommended)
-const meta = getQueryMetadataByOperation('meReadManyOrganizations');
-
-// In React component
-function OrganizationsTable() {
-  const meta = useQueryMetadata('meReadManyOrganizations');
-  // Use meta.searchableFields, meta.orderableFields, meta.enumFilters
-}
+const meta = fieldsFromOpenApiOperationId('meReadManyOrganizations');
+// meta.searchableFields, meta.orderableFields, meta.enumFilters
 ```
 
 ### Data Config + Filters
 
-`makeDataConfig(operationId, options?)` builds a `DataConfig` from the operation's metadata
+`queryCapabilitiesFromOpenApi(operationId, options?)` builds a `ListQueryCapabilities` from the operation's metadata
 (`searchableFields`, `orderableFields`, `enumFilters`, `defaultOrderBy`, `canSearch`, `canOrder`);
-`useDataFilters(config)` drives the live filter/search/order state. See [FRONTEND/API_CLIENT.md](FRONTEND/API_CLIENT.md#data-hooks) for the full
+`useListSearchFilterAndOrderState(config)` drives the live filter/search/order state. See [FRONTEND/API_CLIENT.md](FRONTEND/API_CLIENT.md#data-hooks) for the full
 wiring (debounce, URL/history state, `buildFilterQuery`).
 
 ```typescript
-import { makeDataConfig } from '@template/ui/lib';
-import { useDataFilters } from '@template/ui/hooks';
+import { queryCapabilitiesFromOpenApi } from '@template/ui/lib';
+import { useListSearchFilterAndOrderState } from '@template/ui/hooks';
 
-const config = makeDataConfig('meReadManyOrganizations', {
+const config = queryCapabilitiesFromOpenApi('meReadManyOrganizations', {
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
 });
-const { search, setSearch, orderBy, toggleOrderBy, query } = useDataFilters(config);
+const { search, setSearch, orderBy, toggleOrderBy, query } = useListSearchFilterAndOrderState(config);
 ```
 
 **Benefits:**
 - Single source of truth — searchable/orderable fields + enum values come from the OpenAPI spec (generated from the `filterLens`), no hand-maintained field lists
-- Frontend stays in sync with the API automatically; `getQueryMetadata` reads the typed schema (no `x-*` extensions)
+- Frontend stays in sync with the API automatically; `fieldsFromOpenApiOperation` reads the typed schema (no `x-*` extensions)
 
 ---
 
@@ -1045,7 +1039,7 @@ createRoute({
   responseSchema,
 });
 
-// The /me router loads me(c) as the owner
+// The /me router loads actingUser(c) as the owner
 readRoute({
   model: 'me',
   submodel: 'integration',
@@ -1137,11 +1131,11 @@ A body field stored in a Prisma `Json` column (inquiry `content`, contact `value
 | Route | Generated from | Lists |
 |-------|---------------|-------|
 | `/webhookSubscription/info` | `webhookOwnerAllowedModels` | `models` per owner, `signature` key |
-| `/inquiry/info` | `inquiryHandlers` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
+| `/inquiry/info` | `inquiryServices` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
 | `/contact/info` | `ContactRegistry` | per type: `input` and stored `value` JSON Schema, `subtype` rule, `uniqueness`, label and icon |
 | `/segment/info` | `customerRelationshipLens` | every readable field with its kind; `conditions` is tagged `rule` and points at json-rules |
 
-Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `schemaGuide(responseSchema)` (`lib/jsonSchema/schemaGuide.ts`) reads those descriptions back through `z.toJSONSchema`. `schemaGuide.test.ts` fails on any key left undescribed.
+Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `descriptionsBySchemaFieldPath(responseSchema)` (`lib/jsonSchema/descriptionsBySchemaFieldPath.ts`) reads those descriptions back through `z.toJSONSchema`. `descriptionsBySchemaFieldPath.test.ts` fails on any key left undescribed.
 
 An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand ahead of `autoRegisterRoutes` (see `modules/inquiry/index.ts`). It checks no action, so it answers without a session. Zod schemas become JSON Schema through `toJsonSchema` (`lib/jsonSchema/toJsonSchema.ts`, zod 4 `z.toJSONSchema`): `input` for what a caller sends, `output` for what is stored. The body field points at its route with `z.unknown().describe('… see GET /api/v1/<module>/info')`; `transformJsonFields` keeps that description on the JSON value it substitutes.
 

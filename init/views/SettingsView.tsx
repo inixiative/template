@@ -17,11 +17,11 @@ import {
   type DatabaseProvider,
   type EmailProvider,
   type FrontendProvider,
-  getProjectConfig,
+  fetchProjectConfig,
   type ProjectConfig,
   type RedisProvider,
   writeProjectConfig,
-} from '../utils/getProjectConfig';
+} from '../utils/fetchProjectConfig';
 
 // Map provider value → CLI key. Used by SettingsView to lazy-check that
 // the relevant CLI is installed + authenticated before allowing a switch.
@@ -119,7 +119,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
   }
 
   const writeAndSync = async (mutator: (c: ProjectConfig) => void) => {
-    const fresh = await getProjectConfig();
+    const fresh = await fetchProjectConfig();
     mutator(fresh);
     await writeProjectConfig(fresh);
     await syncConfig();

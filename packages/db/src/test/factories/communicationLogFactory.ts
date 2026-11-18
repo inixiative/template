@@ -6,14 +6,14 @@
  */
 import { faker } from '@faker-js/faker';
 import { CommunicationChannel } from '@template/db/generated/client/enums';
-import { createFactory, getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const communicationLogFactory = createFactory('CommunicationLog', {
+const communicationLogFactory = registerFactory('CommunicationLog', {
   defaults: () => ({
-    sendKey: `send-${getNextSeq()}`,
+    sendKey: `send-${nextFactorySequenceNumber()}`,
     channel: CommunicationChannel.email,
     address: faker.internet.email().toLowerCase(),
-    idempotencyKey: `idem-${getNextSeq()}-${faker.string.alphanumeric(8)}`,
+    idempotencyKey: `idem-${nextFactorySequenceNumber()}-${faker.string.alphanumeric(8)}`,
   }),
   dependencies: {
     recipientUser: {

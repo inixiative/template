@@ -11,7 +11,7 @@
 - Bun WebSockets, local connection/user/channel indexes, heartbeat and Redis pub/sub.
 - App-root `useApiWebsocket`, QueryClient subscription tracking and reconnect invalidation.
 - Message-based authentication through the real `/me` route; spoof authority follows HTTP.
-- Registered channel families in `WS_CHANNELS`; `LIVE_QUERIES` derives from that registry.
+- Registered channel families in `WS_CHANNELS`; its keys are the `WSChannelFamily` names.
 - Route-probed subscribe authorization via `canSubscribe`; unknown, malformed and unauthorized
   subscriptions are rejected. The June report of unchecked subscription is superseded.
 - Identity changes clear old channel subscriptions; reconnect replays identity before channels

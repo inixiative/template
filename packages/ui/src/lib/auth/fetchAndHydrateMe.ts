@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import { type MeReadResponses, meRead } from '@template/sdk';
-import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
+import { makeAuthenticatedApiFetch } from '@template/ui/lib/makeAuthenticatedApiFetch';
 import type { AppStore } from '@template/ui/store/types';
 import { keyBy } from 'lodash-es';
 
@@ -18,7 +18,7 @@ export const fetchAndHydrateMe = async (
   get: () => AppStore,
 ) => {
   const spoofUserEmail = get().auth.spoofUserEmail;
-  const { data, response } = await apiFetchInternal(
+  const { data, response } = await makeAuthenticatedApiFetch(
     (requestOptions) => meRead({ ...requestOptions, throwOnError: true }),
     { spoofUserEmail },
   )();
@@ -50,6 +50,6 @@ export const fetchAndHydrateMe = async (
     },
   }));
 
-  await get().permissions.setup(userData);
+  await get().permissions.installPermissionsForUser(userData);
   return user;
 };

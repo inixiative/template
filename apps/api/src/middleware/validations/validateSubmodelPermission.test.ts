@@ -146,7 +146,11 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         create: managers,
         list: members,
       },
-      { name: 'segment reach: managers', path: '/segments/reach', create: managers },
+      {
+        name: 'segment estimateReach: managers',
+        path: '/segments/estimateReach',
+        create: managers,
+      },
       { name: 'auth providers: only owners create', path: '/authProviders', create: ['owner'] },
       {
         name: "tokens: owners and admins list the organization's tokens (Aron, 2026-10-30)",
@@ -190,7 +194,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       },
       {
         name: 'segment reach: space managers and org owners',
-        path: '/segments/reach',
+        path: '/segments/estimateReach',
         create: withOrgOwner(managers),
       },
       {
@@ -246,7 +250,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
           '/integrations',
           '/webhookSubscriptions',
           '/segments',
-          '/segments/reach',
+          '/segments/estimateReach',
         ],
         passing: ['user', 'ownerToken'],
       },

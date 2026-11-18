@@ -6,13 +6,13 @@
  */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import type { InquiryWithIncludes } from '#/modules/inquiry/handlers/types';
+import { inquiryServices } from '#/modules/inquiry/services';
+import type { InquiryWithIncludes } from '#/modules/inquiry/services/types';
 
 export type InquiryResolvedPayload = InquiryWithIncludes;
 
-const getLifecycleHandlers = (data: InquiryResolvedPayload) => {
-  const handler = inquiryHandlers[data.type];
+const lifecycleAppEventsForInquiryStatus = (data: InquiryResolvedPayload) => {
+  const handler = inquiryServices[data.type];
   if (!handler?.appEvents) return null;
 
   if (data.status === InquiryStatus.approved) return handler.appEvents.approved;
@@ -22,6 +22,6 @@ const getLifecycleHandlers = (data: InquiryResolvedPayload) => {
 };
 
 export const inquiryResolved = makeAppEvent<InquiryResolvedPayload>({
-  email: (data) => getLifecycleHandlers(data)?.email?.(data) ?? null,
-  websocket: (data) => inquiryHandlers[data.type]?.appEvents?.resolved?.websocket?.(data) ?? null,
+  email: (data) => lifecycleAppEventsForInquiryStatus(data)?.email?.(data) ?? null,
+  websocket: (data) => inquiryServices[data.type]?.appEvents?.resolved?.websocket?.(data) ?? null,
 });

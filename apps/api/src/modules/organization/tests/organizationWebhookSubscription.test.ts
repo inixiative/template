@@ -9,11 +9,11 @@ import {
   cleanupTouchedTables,
   createOrganizationUser,
   createWebhookSubscription,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, post } from '#tests/utils/request';
+import { get, parseSuccessBody, post } from '#tests/utils/request';
 
 describe('organization/webhookSubscriptions', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -58,14 +58,14 @@ describe('organization/webhookSubscriptions', () => {
 
   describe('POST /organization/:id/webhookSubscriptions', () => {
     it('creates an org-owned webhook subscription', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await fetch(
         post(`/api/v1/organization/${org.id}/webhookSubscriptions`, {
           model: 'CustomerRelationship',
           url: `https://example.com/org-webhook-${seq}`,
         }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(201);
       expect(data.model).toBe('CustomerRelationship');
@@ -85,7 +85,7 @@ describe('organization/webhookSubscriptions', () => {
         mount: [(app) => app.route('/api/v1/organization', organizationRouter)],
       });
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await viewerHarness.fetch(
         post(`/api/v1/organization/${viewerOrg.id}/webhookSubscriptions`, {
           model: 'CustomerRelationship',
@@ -99,7 +99,7 @@ describe('organization/webhookSubscriptions', () => {
 
   describe('GET /organization/:id/webhookSubscriptions', () => {
     it('returns org webhooks', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
         model: 'CustomerRelationship',
         ownerModel: 'Organization',
@@ -108,7 +108,7 @@ describe('organization/webhookSubscriptions', () => {
       });
 
       const response = await fetch(get(`/api/v1/organization/${org.id}/webhookSubscriptions`));
-      const { data } = await json<WebhookSubscription[]>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription[]>(response);
 
       expect(response.status).toBe(200);
       expect(Array.isArray(data)).toBe(true);
@@ -118,7 +118,7 @@ describe('organization/webhookSubscriptions', () => {
     it('excludes other org webhooks', async () => {
       const { context: otherContext } = await createOrganizationUser();
       const otherOrg = otherContext.organization;
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
         model: 'CustomerRelationship',
         ownerModel: 'Organization',
@@ -127,7 +127,7 @@ describe('organization/webhookSubscriptions', () => {
       });
 
       const response = await fetch(get(`/api/v1/organization/${org.id}/webhookSubscriptions`));
-      const { data } = await json<WebhookSubscription[]>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription[]>(response);
 
       expect(response.status).toBe(200);
       expect(data.every((s) => s.organizationId === org.id)).toBe(true);

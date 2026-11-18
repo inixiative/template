@@ -60,7 +60,7 @@ export const registerTestTracker = () => {
   });
 };
 
-export const getTouchedTables = (): ReadonlySet<string> => touchedTables;
+export const touchedTableNames = (): ReadonlySet<string> => touchedTables;
 
 export const cleanupTouchedTables = async (db: Db) => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;

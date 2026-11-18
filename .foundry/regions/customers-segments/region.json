@@ -1,7 +1,7 @@
 {
   "id": "customers-segments",
   "title": "Customers and segments",
-  "routing": "Is this about provider/customer relationships or audiences built over them: CustomerRelationship (customer/provider pairs, includeCustomer/includeProvider, customerRelationshipLens), Segment / SegmentMember, segment conditions and their reach, membership reconciliation (reconcileSegment, reconcileCustomerRelationshipSegments, sweepSegments, RECONCILE_TRIGGERS, applyMembershipDiff), segment rule health (soundSegments, withSegmentsRuleIssues), or segment membership events and pages?",
+  "routing": "Is this about provider/customer relationships or audiences built over them: CustomerRelationship (customer/provider pairs, includeCustomer/includeProvider, customerRelationshipLens), Segment / SegmentMember, segment conditions and their reach, membership reconciliation (reconcileSegment, reconcileCustomerRelationshipSegments, reconcileEveryHealthyDynamicSegment, RECONCILE_TRIGGERS, applyMembershipDiff), segment rule health (filterSegmentsWithoutRuleIssues, attachRuleHealthToSegments), or segment membership events and pages?",
   "concepts": ["customers", "segments"],
   "tokens": 14384,
   "tokenMethod": "chars/4",

@@ -12,7 +12,7 @@ import {
 } from '@template/db/test';
 import type { Permix } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { userPermissions } from '#/lib/permissions/userPermissions';
+import { fetchPermixForUser } from '#/lib/permissions/userPermissions';
 import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
 import { createUserJwt } from '#tests/utils/createUserJwt';
@@ -50,7 +50,7 @@ const requestAnswers = async (user: User, situations: Situation[]) =>
   ).json()) as boolean[];
 
 const builtAnswers = async (user: User, situations: Situation[]) => {
-  const permix = await userPermissions(user.id);
+  const permix = await fetchPermixForUser(user.id);
   if (!permix) throw new Error('no permissions built');
   return answers(permix, situations);
 };
@@ -111,7 +111,7 @@ describe("a user's permissions, built for a user who is not the requester", () =
   });
 
   it('a superadmin is superadmin', async () => {
-    const permix = await userPermissions(superadmin.id);
+    const permix = await fetchPermixForUser(superadmin.id);
     expect(permix?.isSuperadmin()).toBe(true);
     expect(await builtAnswers(superadmin, situations)).toEqual(
       await requestAnswers(superadmin, situations),
@@ -119,11 +119,11 @@ describe("a user's permissions, built for a user who is not the requester", () =
   });
 
   it('the actor is that user', async () => {
-    const permix = await userPermissions(admin.id);
+    const permix = await fetchPermixForUser(admin.id);
     expect(permix?.getActor()).toMatchObject({ model: 'User', record: { id: admin.id } });
   });
 
   it('a user who does not exist has no permissions', async () => {
-    expect(await userPermissions(Bun.randomUUIDv7())).toBeNull();
+    expect(await fetchPermixForUser(Bun.randomUUIDv7())).toBeNull();
   });
 });

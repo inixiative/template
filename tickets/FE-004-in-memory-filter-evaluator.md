@@ -32,7 +32,7 @@ These primitives feed a **rules builder** over an in-memory collection: options 
 
 ### `@template/sdk/lenses` — `lensFromOperation.ts`
 
-`lensFromOperation(operationId)` — the primary entry. Resolves the endpoint's 200 response from `openapi.gen.json` (already in the bundle via `getQueryMetadata`), unwraps the `data` envelope (array → items), and builds the lens named by the response component (`meReceivedManyInquiries` → `InquiryReceivedItem`) or the operationId when inline. Hard-throws on unknown operationId or a response with no data envelope.
+`lensFromOperation(operationId)` — the primary entry. Resolves the endpoint's 200 response from `openapi.gen.json` (already in the bundle via `fieldsFromOpenApiOperation`), unwraps the `data` envelope (array → items), and builds the lens named by the response component (`meReceivedManyInquiries` → `InquiryReceivedItem`) or the operationId when inline. Hard-throws on unknown operationId or a response with no data envelope.
 
 ### `@template/sdk/lenses` — `lensFromSchema.ts`
 
@@ -65,10 +65,10 @@ The template takes `@inixiative/rules-builder@^0.15.0` with its first consumer (
 - **Replacing server-side filtering.** Visibility, tenancy/scope, sold-out, and ordering stay in the paginate `where` — they are server-enforced and must not move client-side. This is display-only narrowing on data the client already legitimately holds.
 - Facet counts / leave-one-out rescoping (see scope decision above).
 - A filter-builder UI (INFRA-002 / INFRA-017 territory) — `useFilteredCollection`'s `root` descriptor tree is its input.
-- FE-003's server-query construction (`useDataFilters`/`buildFilterQuery`) — unchanged, separate axis.
+- FE-003's server-query construction (`useListSearchFilterAndOrderState`/`buildFilterQuery`) — unchanged, separate axis.
 
 ## Dependencies
 
 - `@inixiative/json-rules` ^2.14.0 (`check` + `coerceType`, `stampCoercions`, `sourceValuesFromRows`, `createLens`, `projectByPath`, `exposedSurface`); 2.14.1 hardens `sources` typing (`{}` rejected — `SourceSpec` requires `where` or `label`)
 - `@inixiative/rules-builder` ^0.15.0 (`useFilteredCollection`) — taken by the first consuming surface, not by the template packages yet
-- `openapi.gen.json` (generated; already bundled via `getQueryMetadata`)
+- `openapi.gen.json` (generated; already bundled via `fieldsFromOpenApiOperation`)

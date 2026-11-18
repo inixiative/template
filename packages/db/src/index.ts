@@ -25,23 +25,22 @@ export * from './generated/zod/enums.gen';
 export * from './generated/zod/scalarSchemas.gen';
 export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 // Hydration
-export { fetchOne, hydrate } from './hydrate';
+export { fetchCachedRecordWithTargetEntitlements, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
 export {
   claimLane,
-  getJobSupersededBy,
+  fetchJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
+  markJobSupersededBy,
   reclaimLane,
   releaseLane,
   supersededKey,
-  tombstoneJob,
   watchLane,
 } from './lanes';
 // Distributed lock
 export {
   type AcquireOptions,
-  createLock,
   FindForUpdateLockTimeoutError,
   type Lock,
   LockLostError,
@@ -49,6 +48,7 @@ export {
   type LockRedis,
   type LockReleaseResult,
   type LockSetTarget,
+  makeLock,
   maxSafeHeartbeatMs,
   singleFlightLock,
 } from './lock';
@@ -58,16 +58,12 @@ export {
   type CacheCheck,
   type CacheState,
   COMMAND_TIMEOUT_MS,
-  cache,
   cacheKey,
   checkCache,
-  clearKey,
+  clearCacheKeysMatchingPattern,
   createRedisConnection,
+  fetchThroughCache,
   flushRedis,
-  getRedisClient,
-  getRedisPub,
-  getRedisSub,
-  getRollingCache,
   listRollingCaches,
   MAX_ROLLING_CACHE_TARGETS,
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
@@ -89,7 +85,11 @@ export {
   type RollingCacheTargets,
   type RollingCacheValue,
   type RollingCacheWrite,
+  redisClient,
   redisNamespace,
+  redisPublisher,
+  redisSubscriber,
+  rollingCacheByNameOrThrow,
   unregisterRollingCache,
   upsertCache,
 } from './redis';
@@ -106,16 +106,16 @@ export {
 } from '@inixiative/prisma-map';
 export { equalsSuppliedBind } from './registries/equalsSuppliedBind';
 export {
+  BIND_NAME_BY_OWNER_MODEL,
+  type BindableOwnerModel,
+  conditionPolymorphicAxisPointsAtBoundRow,
   isArmColumns,
-  isOwnerKind,
-  POLYMORPHIC_BINDS,
-  type PolymorphicKind,
+  isBindableOwnerModel,
   polymorphicBindings,
-  polymorphicIs,
   polymorphicKeyColumn,
   polymorphicKeyColumns,
-  polymorphicTarget,
-} from './registries/polymorphicIs';
+  rowPolymorphicAxisPointsAt,
+} from './registries/polymorphicAxisPointsAt';
 export { polymorphicSchema } from './registries/polymorphicSchema';
 export type {
   PolymorphicAxisField,
@@ -142,7 +142,6 @@ export {
   type Args,
   count,
   create,
-  del,
   findFirst,
   findMany,
   findUnique,
@@ -151,13 +150,16 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
-export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './utils/fieldMetadata';
+// Rule references: the rows a stored rule names, as edges
+export { fetchParentRows } from './utils/fetchParentRows';
+export {
+  fetchRuleReferenceTargetsDeletedAtForUpdate,
+  type RuleReferenceTargetDeletedState,
+} from './utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
+export { hasDeletedAt, modelFieldAtPath, modelFields } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
-// Rule references: the rows a stored rule names, as edges
-export { loadParentRows } from './utils/loadParentRows';
-export { lockedTargetStates, type TargetState } from './utils/lockedTargetStates';
 // Model name utilities
 export {
   type AccessorName,
@@ -174,7 +176,7 @@ export {
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { polymorphicArmRelation } from './utils/polymorphicArmKeys';
-export { getModelRelations } from './utils/prismaMapRelations';
+export { relationsOfModel } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';
 export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
@@ -208,8 +210,6 @@ export {
   type ValidateRuleForLensOptions,
   validateRuleForLens,
 } from './validations/validateRuleForLens';
-
-// Hook shared utilities (ignore fields, redact fields)
 
 // For model types: import from @template/db/client or @template/db/models
 // For runtime enum values: import from @template/db/enums

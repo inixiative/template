@@ -18,7 +18,7 @@ const expectedSchemes = (path: string): string[] => {
   return ['userJwt', 'apiToken'];
 };
 
-const loadSpec = async (): Promise<Spec> => {
+const fetchSpec = async (): Promise<Spec> => {
   const res = await app.request('/openapi/docs');
   expect(res.status).toBe(200);
   return (await res.json()) as Spec;
@@ -35,7 +35,7 @@ const operations = (spec: Spec) =>
 
 describe('OpenAPI security', () => {
   it('publishes the three credential schemes the API accepts', async () => {
-    const spec = await loadSpec();
+    const spec = await fetchSpec();
     const schemes = spec.components?.securitySchemes ?? {};
 
     expect(Object.keys(schemes).sort()).toEqual(['apiToken', 'internalSecret', 'userJwt']);
@@ -49,7 +49,7 @@ describe('OpenAPI security', () => {
   });
 
   it('declares security on every operation, matching the middleware it mounts', async () => {
-    const spec = await loadSpec();
+    const spec = await fetchSpec();
     const registered = Object.keys(spec.components?.securitySchemes ?? {});
     const all = operations(spec);
 

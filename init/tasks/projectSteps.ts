@@ -1,54 +1,54 @@
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import type { ProjectAction } from '../utils/progressTracking';
 
 type ProjectProgressItem = {
   action: ProjectAction;
-  getLabel: (config: ProjectConfig) => string;
+  labelFor: (config: ProjectConfig) => string;
 };
 
-const projectProgressItems: readonly ProjectProgressItem[] = [
+const projectProgressItemDefinitions: readonly ProjectProgressItem[] = [
   {
     action: 'renameOrg',
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.project.organization
         ? `Organization set: ${config.project.organization}`
         : 'Organization configured',
   },
   {
     action: 'updatePackages',
-    getLabel: () => 'Package names updated',
+    labelFor: () => 'Package names updated',
   },
   {
     action: 'updateImports',
-    getLabel: () => 'Import paths updated',
+    labelFor: () => 'Import paths updated',
   },
   {
     action: 'updateReadme',
-    getLabel: () => 'README updated',
+    labelFor: () => 'README updated',
   },
   {
     action: 'updateTsconfigs',
-    getLabel: () => 'TypeScript configs updated',
+    labelFor: () => 'TypeScript configs updated',
   },
   {
     action: 'updateEnvFiles',
-    getLabel: () => 'Environment files updated',
+    labelFor: () => 'Environment files updated',
   },
   {
     action: 'cleanInstall',
-    getLabel: () => 'Dependencies installed',
+    labelFor: () => 'Dependencies installed',
   },
   {
     action: 'setup',
-    getLabel: () => 'Setup complete (Docker, Prisma)',
+    labelFor: () => 'Setup complete (Docker, Prisma)',
   },
 ];
 
-export const getProjectProgressItems = (
+export const projectProgressItems = (
   config: ProjectConfig,
 ): Array<{ label: string; completed: boolean }> => {
-  return projectProgressItems.map((item) => ({
-    label: item.getLabel(config),
+  return projectProgressItemDefinitions.map((item) => ({
+    label: item.labelFor(config),
     completed: config.project.progress[item.action],
   }));
 };

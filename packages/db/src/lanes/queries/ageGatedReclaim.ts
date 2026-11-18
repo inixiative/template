@@ -9,7 +9,7 @@ import type { RedisEval } from '@template/db/redis/types';
 // Self-heal for the residual expiry window (queue wait > base TTL): when a superseding job STARTS, it
 // re-asserts its claim iff the lane is vacant OR held by an OLDER job — never a newer one, so the
 // newer-claim-usurps semantics are untouched. jobIds are uuidv7 (time-ordered), so a plain string
-// compare is an age compare; a displaced older holder is tombstoned exactly like a claimLane eviction.
+// compare is an age compare; a displaced older holder is marked superseded exactly like a claimLane eviction.
 // Without the older-holder displacement, two lapsed batons invert the lane: the older queued job
 // starts first, re-asserts a vacant lane, and the NEWER job aborts itself as superseded — last-wins
 // flips to stale-wins precisely under the congestion this machinery exists for. Callers supplying a

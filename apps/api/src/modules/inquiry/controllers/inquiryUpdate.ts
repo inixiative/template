@@ -8,12 +8,12 @@ import type { HydratedRecord, Prisma } from '@template/db';
 import { hydrate } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
-import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
+import { inquiryServices } from '#/modules/inquiry/services';
 import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
 import { sendInquiry } from '#/modules/inquiry/services/sendInquiry';
 import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
@@ -21,12 +21,12 @@ import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validat
 export const inquiryUpdateController = makeController(inquiryUpdateRoute, async (c, respond) => {
   const db = c.get('db');
   const permix = c.get('permix');
-  const inquiry = getResource<'inquiry'>(c);
+  const inquiry = contextResource<'inquiry'>(c);
   const { content, status, expectedUpdatedAt } = c.req.valid('json');
 
-  const handler = inquiryHandlers[inquiry.type];
-  const effectiveContent = handler.contentSchema.parse(content ?? inquiry.content);
-  if (handler.validate) await handler.validate(inquiry, effectiveContent);
+  const service = inquiryServices[inquiry.type];
+  const effectiveContent = service.contentSchema.parse(content ?? inquiry.content);
+  if (service.validate) await service.validate(inquiry, effectiveContent);
 
   const partial = await hydrate('inquiry', {
     ...inquiry,

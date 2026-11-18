@@ -9,7 +9,7 @@ import {
 } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
-import { entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { patch, post } from '#tests/utils/request';
 
 describe('granting entitlements from the organization (Aron, 2026-10-26)', () => {
@@ -41,7 +41,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
 
   const slack = { field: 'provider', operator: 'equals', value: 'slack' };
   const integrations = (path: string, actions: string[], where?: Record<string, unknown>) => ({
-    ...entry('db:integration', ['db:organization', organization.id, path], actions),
+    ...entitlementInputFor('db:integration', ['db:organization', organization.id, path], actions),
     ...(where ? { where } : {}),
   });
 
@@ -131,18 +131,31 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
 
   it('a path that does not end at the anchor is a malformed grant', async () => {
     const { entity: space } = await createSpace({}, { organization });
-    const wrongModel = entry('db:integration', ['db:space', space.id, 'organization'], ['read']);
+    const wrongModel = entitlementInputFor(
+      'db:integration',
+      ['db:space', space.id, 'organization'],
+      ['read'],
+    );
     expect((await grant('owner', wrongModel)).status).toBe(422);
   });
 
   it('an anchor on another model needs a path; a self anchor has none', async () => {
     const { entity: space } = await createSpace({}, { organization });
     expect(
-      (await grant('owner', entry('db:integration', ['db:space', space.id], ['read']))).status,
+      (
+        await grant(
+          'owner',
+          entitlementInputFor('db:integration', ['db:space', space.id], ['read']),
+        )
+      ).status,
     ).toBe(422);
     expect(
-      (await grant('owner', entry('db:space', ['db:space', space.id, 'organization'], ['read'])))
-        .status,
+      (
+        await grant(
+          'owner',
+          entitlementInputFor('db:space', ['db:space', space.id, 'organization'], ['read']),
+        )
+      ).status,
     ).toBe(422);
   });
 
@@ -161,7 +174,7 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
       mockOrganizationUsers: [writerMember, wOther],
       mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
     });
-    const sendAtOther = entry(
+    const sendAtOther = entitlementInputFor(
       'db:inquiry',
       ['db:organization', other.id, 'targetOrganization'],
       ['send'],
@@ -175,7 +188,11 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
   it('an anchor off the resource tree is a malformed grant, not a server error', async () => {
     const { entity: target } = await createOrganizationUser({ role: 'member' }, { organization });
     const { entity: space } = await createSpace({}, { organization });
-    const offTree = entry('db:organization', ['db:space', space.id, 'spaces'], ['read']);
+    const offTree = entitlementInputFor(
+      'db:organization',
+      ['db:space', space.id, 'spaces'],
+      ['read'],
+    );
     const response = await (await writer('owner')).fetch(
       post(`/api/v1/organizationUser/${target.id}/entitlements`, [offTree]),
     );
@@ -186,7 +203,11 @@ describe('granting entitlements from the organization (Aron, 2026-10-26)', () =>
     const grantTokens = async (where?: Record<string, unknown>) => {
       const { entity: target } = await createOrganizationUser({ role: 'member' }, { organization });
       const mint = {
-        ...entry('db:token', ['db:organization', organization.id, 'organization'], ['create']),
+        ...entitlementInputFor(
+          'db:token',
+          ['db:organization', organization.id, 'organization'],
+          ['create'],
+        ),
         ...(where ? { where } : {}),
       };
       return (await writer('admin')).fetch(

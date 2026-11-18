@@ -4,7 +4,9 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+
 import { Icon } from '@iconify/react';
+import { useQuery } from '@tanstack/react-query';
 import {
   type AuthProviderDeleteData,
   type AuthProviderUpdateData,
@@ -18,7 +20,7 @@ import {
 } from '@template/sdk';
 import { Badge, Button, Page, Table } from '@template/ui/components';
 import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
-import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
+import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
@@ -78,7 +80,7 @@ export const OrganizationAuthProvidersPage = () => {
     ],
   });
 
-  const getTypeLabel = (type: string) => {
+  const authProviderTypeLabel = (type: string) => {
     switch (type) {
       case 'EMAIL':
         return 'Email/Password';
@@ -101,7 +103,7 @@ export const OrganizationAuthProvidersPage = () => {
       key: 'type',
       label: 'Type',
       render: (item: AuthProvider) => (
-        <span className="text-muted-foreground">{getTypeLabel(item.type)}</span>
+        <span className="text-muted-foreground">{authProviderTypeLabel(item.type)}</span>
       ),
     },
     {

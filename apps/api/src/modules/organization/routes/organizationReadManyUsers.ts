@@ -8,8 +8,8 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { organizationUserReadResponseSchema } from '#/modules/organizationUser/schemas/organizationUserSchemas';
-import { Tags } from '#/modules/tags';
 import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
 const responseSchema = userResponseSchema.extend({
@@ -24,5 +24,5 @@ export const organizationReadManyUsersRoute = readRoute({
   filterLens: { parent: lensFor('User') },
   responseSchema,
   middleware: [validatePermission('read')],
-  tags: [Tags.user, Tags.organizationUser],
+  tags: [OpenApiTags.user, OpenApiTags.organizationUser],
 });

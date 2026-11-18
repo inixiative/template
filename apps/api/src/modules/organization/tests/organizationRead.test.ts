@@ -10,7 +10,7 @@ import {
 import { organizationRouter } from '#/modules/organization';
 import type { organizationReadRoute } from '#/modules/organization/routes/organizationRead';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, parseSuccessBody } from '#tests/utils/request';
 
 type ReadOrgResponse = z.infer<typeof organizationReadRoute.responseSchema>;
 
@@ -49,7 +49,7 @@ describe('GET /api/v1/organization/:id', () => {
 
   it('returns the organization', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.id}`));
-    const { data } = await json<ReadOrgResponse>(response);
+    const { data } = await parseSuccessBody<ReadOrgResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.id).toBe(org.id);

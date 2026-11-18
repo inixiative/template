@@ -4,7 +4,7 @@
  * @partOf primitive:routeTemplates
  * @uses none
  */
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 type BuildTagsArgs = {
   model: string;
@@ -17,7 +17,7 @@ type BuildTagsArgs = {
 export const buildTags = ({ model, submodel, tags, admin, internal }: BuildTagsArgs): string[] => {
   const baseTags = tags ?? [submodel || model];
   const sorted = [...baseTags].sort((a, b) => a.localeCompare(b));
-  if (admin) return [Tags.admin, ...sorted];
-  if (internal) return [Tags.internal, ...sorted];
+  if (admin) return [OpenApiTags.admin, ...sorted];
+  if (internal) return [OpenApiTags.internal, ...sorted];
   return sorted;
 };

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import { lensFor, live } from '@template/db/lens';
+import type { RuleErrorSink } from '@template/email/render/evaluateTemplate';
 import { interpolate } from '@template/email/render/interpolate';
-import type { RuleErrorSink } from '@template/email/render/settle';
 import { defaultEmailLens, type EmailLens, emailLens } from '@template/email/rules/emailLens';
 import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
 

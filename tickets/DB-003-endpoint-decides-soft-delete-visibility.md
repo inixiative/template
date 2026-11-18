@@ -37,12 +37,12 @@ mounts every admin router behind `validateSuperadmin`.
 | 2026-07-09 | `aa218581` | `resourceContextMiddleware` appends `deletedAt: null` for non-superadmins |
 | 2026-07-09 | `3125e22f`, `b9a516e8` | lens traversal / `paginate` inject the live scope (non-superadmin) |
 | 2026-07-10 | `bfd5c644`, `fea08cbf` | the injection becomes `liveWhere` / `liveIncludes` in `lib/prisma/softDeleteScope.ts` |
-| 2026-08-23 | `b3d6f3cf` | the Prisma extension lands, *reusing* those two functions through an IoC scoper registry, with `db.withDeleted` and the `platformSuperadmin` bypass. Same commit adds `liveScopePlan` to `lensWhere` |
+| 2026-08-23 | `b3d6f3cf` | the Prisma extension lands, *reusing* those two functions through an IoC scoper registry, with `db.withDeleted` and the `platformSuperadmin` bypass. Same commit adds `liveScopePlan` to `applyFilterLensWheresToPrismaWhere` |
 
 The hand-applied calls predate the extension; nothing was added after it for a reason of its own.
 They survived because the API test harness never registered the scoper (`registerHooks` runs in
 `index.ts` / `worker.ts` only; tests opted in per file), so route tests only saw soft-delete scoping
-through the hand-applied layer. `lensWhere`'s count-plan scoping, added in the extension's own
+through the hand-applied layer. `applyFilterLensWheresToPrismaWhere`'s count-plan scoping, added in the extension's own
 commit, is tested by a file that never registered the scoper either. In production every one of
 those positions was scoped twice.
 
@@ -54,7 +54,7 @@ the extension's implementation and stay as that — they lose every other caller
 - **The declaration is mounting on `adminRouter`.** `validateSuperadmin` (mounted only there,
   router-level, so it wraps the route's whole chain including `resourceContextMiddleware`) runs
   `next()` inside `db.withDeleted` once the check passes. No new middleware, no route option.
-- **One scoping layer.** `resourceContextMiddleware`, `paginate` and `lensWhere` stop applying
+- **One scoping layer.** `resourceContextMiddleware`, `paginate` and `applyFilterLensWheresToPrismaWhere` stop applying
   `liveWhere` / `liveIncludes` by hand and drop their superadmin branches; the extension scopes the
   lookup, the composed where, include/select trees and the count-plan `groupBy`s.
 - **The extension gains `_count`.** `liveIncludes` passed `_count` through untouched, so relation

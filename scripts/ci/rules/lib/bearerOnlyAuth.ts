@@ -6,7 +6,7 @@
  * API auth is bearer-only and session-free: a person presents a JWT, a program an API token, in
  * `Authorization: Bearer`. A cookie or a BetterAuth session never authenticates a request. Sessions
  * exist only inside BetterAuth's own `/api/auth/*` handler for the sign-in handshake (OAuth state, the
- * one-time-token handoff), and jwtHandoff swaps each for a JWT; that is library code, not ours. Each
+ * one-time-token handoff), and jwtHandoffPlugin swaps each for a JWT; that is library code, not ours. Each
  * check is one entry in CHECKS, so the rule grows by adding one.
  *
  * Fails, in non-test source under apps/ and packages/, on:
@@ -31,7 +31,14 @@
  * BetterAuth server call and deletes it.
  */
 import ts from 'typescript';
-import { finishFence, isTestFile, lineAt, listFiles, readSource, type Violation } from './fence';
+import {
+  applyExemptionsAndBaselineThenExit,
+  fetchSource,
+  isTestFile,
+  lineAt,
+  listFiles,
+  type Violation,
+} from './ciRuleRunner';
 
 type Found = { node: ts.Node; key: string; detail: string };
 type Check = (node: ts.Node, sourceFile: ts.SourceFile) => Found | null;
@@ -231,7 +238,7 @@ const checksFor = (file: string): Check[] =>
 for (const file of listFiles(['apps', 'packages'], /\.[cm]?[jt]sx?$/)) {
   const checks = checksFor(file);
   if (!checks.length) continue;
-  const source = readSource(file);
+  const source = fetchSource(file);
   const sourceFile = ts.createSourceFile(
     file,
     source,
@@ -255,13 +262,13 @@ for (const file of listFiles(['apps', 'packages'], /\.[cm]?[jt]sx?$/)) {
   visit(sourceFile);
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'bearer-only-auth',
   violations,
-  explain: [
+  failureExplanationLines: [
     'API auth is bearer-only and session-free (docs/claude/AUTH.md).',
     '  clients send   Authorization: Bearer <JWT | API token>   (API tokens also as ?token=)',
     '  the server     resolves a person from the JWT (jwtAuthMiddleware); no getSession, no cookieCache',
   ],
-  clean: 'No cookie- or session-based API auth.',
+  passMessage: 'No cookie- or session-based API auth.',
 });

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
+import type { EntitlementInput } from '@template/db';
 import { db } from '@template/db';
 import type { Organization, Space } from '@template/db/generated/client/client';
 import {
@@ -15,7 +16,7 @@ import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
-import { type Entry, entry } from '#tests/utils/entitlementEntry';
+import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 import { patch, post } from '#tests/utils/request';
 
 const { holds } = createTokenProbeApp();
@@ -34,7 +35,7 @@ afterEach(async () => {
   await cleanupTouchedTables(db);
 });
 
-const entitledKey = async (entitlements: Entry[]) => {
+const entitledKey = async (entitlements: EntitlementInput[]) => {
   const { entity: organizationUser } = await createOrganizationUser(
     { role: 'viewer', entitlements },
     { organization },
@@ -51,7 +52,7 @@ const entitledKey = async (entitlements: Entry[]) => {
 const inquiries = (path: string, actions: string[] = ['read']) => {
   const side = path.startsWith('source') ? 'source' : 'target';
   const clear = path.includes('Space') ? ['UserId'] : ['SpaceId', 'UserId'];
-  return entry('db:inquiry', ['db:organization', organization.id, path], actions, {
+  return entitlementInputFor('db:inquiry', ['db:organization', organization.id, path], actions, {
     all: clear.map((key) => ({ field: `${side}${key}`, operator: Operator.equals, value: null })),
   });
 };
@@ -127,7 +128,7 @@ describe('an inquiry entitlement names a side and its kind (R74/R76)', () => {
 });
 
 describe('granting inquiry entitlements: the writer could act on the side named', () => {
-  const grant = async (role: 'owner' | 'admin', granted: Entry) => {
+  const grant = async (role: 'owner' | 'admin', granted: EntitlementInput) => {
     const { entity: seat, context } = await createOrganizationUser({ role }, { organization });
     const { entity: target } = await createOrganizationUser({ role: 'member' }, { organization });
     const { app } = createTestApp({

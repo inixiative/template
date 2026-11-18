@@ -65,7 +65,7 @@ export const upsertDomain = async (apiKey: string, domainName: string): Promise<
       const existing = domains.find((d) => d.name === domainName);
       if (!existing) throw new Error(`Domain ${domainName} not found after conflict`);
       // List endpoint doesn't include records — fetch full domain
-      return getDomain(apiKey, existing.id);
+      return fetchResendDomain(apiKey, existing.id);
     }
     throw error;
   }
@@ -74,7 +74,10 @@ export const upsertDomain = async (apiKey: string, domainName: string): Promise<
 /**
  * Get domain details including current DNS record statuses.
  */
-export const getDomain = async (apiKey: string, domainId: string): Promise<ResendDomain> => {
+export const fetchResendDomain = async (
+  apiKey: string,
+  domainId: string,
+): Promise<ResendDomain> => {
   const data = await resendFetch(apiKey, `/domains/${domainId}`);
   return data as ResendDomain;
 };
@@ -85,5 +88,5 @@ export const getDomain = async (apiKey: string, domainId: string): Promise<Resen
 export const verifyDomain = async (apiKey: string, domainId: string): Promise<ResendDomain> => {
   await resendFetch(apiKey, `/domains/${domainId}/verify`, { method: 'POST' });
   // Re-fetch to get updated statuses after verification trigger
-  return getDomain(apiKey, domainId);
+  return fetchResendDomain(apiKey, domainId);
 };

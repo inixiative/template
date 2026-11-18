@@ -20,7 +20,7 @@ export type AuthenticatedContext = Omit<TenantContext, 'type'> & {
   type: Exclude<TenantContext['type'], 'public'>;
 };
 
-export type PageContext = {
+export type ViewedRecords = {
   organization?: Organization;
   space?: Space;
 };
@@ -28,12 +28,12 @@ export type PageContext = {
 export type TenantSlice = {
   tenant: {
     context: TenantContext;
-    page: PageContext;
-    setPublic: () => void;
-    setUser: () => void;
-    setOrganization: (organizationId: string) => boolean;
-    setSpace: (spaceId: string) => boolean;
-    setPage: (page: PageContext) => void;
-    clearPage: () => void;
+    viewedRecords: ViewedRecords;
+    switchToPublicContext: () => void;
+    switchToUserContext: () => void;
+    switchToOrganizationContext: (organizationId: string) => boolean;
+    switchToSpaceContext: (spaceId: string) => boolean;
+    setViewedRecords: (viewedRecords: ViewedRecords) => void;
+    clearViewedRecords: () => void;
   };
 };

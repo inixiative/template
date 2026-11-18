@@ -4,15 +4,15 @@ import {
   claimLane,
   db,
   flushRedis,
-  getRedisClient,
   laneKey,
   makeRollingCache,
+  redisClient,
   unregisterRollingCache,
 } from '@template/db';
 import { cleanupTouchedTables, createOrganization } from '@template/db/test';
 import { enqueueJob } from '#/jobs/enqueue';
 import { refreshRollingCacheTarget } from '#/jobs/handlers/refreshRollingCacheTarget';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 const registered: string[] = [];
 
@@ -45,7 +45,7 @@ describe('refreshRollingCacheTarget', () => {
     const key = rollingCache.targetKey({ id: organization.id });
 
     await enqueueJob('refreshRollingCacheTarget', { name, key, target: { id: organization.id } });
-    expect(await rollingCache.read('value', { id: organization.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { id: organization.id })).toMatchObject({
       state: 'fresh',
       value: 'Rolling Org',
     });
@@ -53,7 +53,7 @@ describe('refreshRollingCacheTarget', () => {
 
     await enqueueJob('refreshRollingCacheTarget', { name, key, target: { id: organization.id } });
 
-    expect(await rollingCache.read('value', { id: organization.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { id: organization.id })).toMatchObject({
       value: 'Renamed Org',
     });
   });
@@ -127,7 +127,7 @@ describe('refreshRollingCacheTarget', () => {
       timeoutSeconds: 1,
       attempt: 1,
     });
-    expect(await getRedisClient().exists(rollingCache.results.value())).toBe(0);
+    expect(await redisClient().exists(rollingCache.results.value())).toBe(0);
   });
 
   it('a leaf that fails its last attempt clears the queued marker, so the next reader can queue again', async () => {
@@ -151,7 +151,7 @@ describe('refreshRollingCacheTarget', () => {
       }),
     ).rejects.toThrow('compute failed');
 
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'empty' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'empty' });
   });
 
   it('throws when no definition registered the name', async () => {
@@ -161,7 +161,7 @@ describe('refreshRollingCacheTarget', () => {
     await expect(
       enqueueJob('refreshRollingCacheTarget', { name, key, target: { id: 'organization' } }),
     ).rejects.toThrow('is not registered');
-    expect(await getRedisClient().exists(key)).toBe(0);
+    expect(await redisClient().exists(key)).toBe(0);
   });
 
   it('a superseded last attempt leaves the queued marker for the run that replaced it', async () => {
@@ -183,18 +183,18 @@ describe('refreshRollingCacheTarget', () => {
     });
     const key = rollingCache.targetKey();
     await rollingCache.markQueued(undefined);
-    const ctx = createTestWorker();
+    const ctx = makeTestWorker();
 
     const lane = laneKey(ctx.job.name, key);
 
     const superseded = refreshRollingCacheTarget(ctx, { name, key, target: null });
-    while ((await getRedisClient().get(lane)) !== ctx.job.id) await Bun.sleep(10);
+    while ((await redisClient().get(lane)) !== ctx.job.id) await Bun.sleep(10);
     await claimLane(lane, 'newer-job');
     await superseded.catch(() => {});
     await aborted;
     await Bun.sleep(50);
 
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'queued' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'queued' });
   });
 
   it('a leaf whose compute stops quietly at the deadline still reports itself stuck and clears the queued marker on its last attempt', async () => {
@@ -216,6 +216,6 @@ describe('refreshRollingCacheTarget', () => {
       enqueueJob('refreshRollingCacheTarget', { name, key, target: null }),
     ).rejects.toThrow(`did not refresh ${key} within 1s`);
 
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'empty' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'empty' });
   });
 });

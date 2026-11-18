@@ -1,6 +1,6 @@
 import { execFileAsync } from '../utils/exec';
-import type { ProjectConfig } from '../utils/getProjectConfig';
-import { getSecretAsync } from './infisicalSetup';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
+import { fetchSecretOrThrow } from './infisicalSetup';
 
 const BASELINE_MIGRATION = '0_init';
 
@@ -58,7 +58,7 @@ export const baselineDeployedDatabases = async (config: LaunchConfig): Promise<v
   const databases = await Promise.all(
     deployedEnvironments(config).map(async (environment) => ({
       environment,
-      databaseUrl: await getSecretAsync('DATABASE_URL', {
+      databaseUrl: await fetchSecretOrThrow('DATABASE_URL', {
         projectId: config.infisical.projectId,
         environment,
         path: '/api',

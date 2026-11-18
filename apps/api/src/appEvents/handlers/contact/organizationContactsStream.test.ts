@@ -15,8 +15,8 @@ import {
   organizationContactRemove,
   organizationContactUpsert,
 } from '#/appEvents/handlers/contact/organizationContactsStream';
-import { routeRow } from '#/appEvents/routeRow';
-import { streamAppend } from '#/appEvents/streamAppend';
+import { parseRowWithRouteResponseSchema } from '#/appEvents/routeRow';
+import { streamAppendHandoff } from '#/appEvents/streamAppendHandoff';
 import { organizationReadManyContactsRoute } from '#/modules/organization/routes/organizationReadManyContacts';
 import { websocketHandler } from '#/ws/handler';
 import { initWebSocketPubSub } from '#/ws/pubsub';
@@ -43,7 +43,10 @@ describe('organization contacts stream producers', () => {
     expect(handoff).toEqual<object>({
       kind: 'stream',
       target: { stream: organizationContactsStream.name({ id: context.organization.id }) },
-      append: { type: 'upsert', payload: routeRow(organizationReadManyContactsRoute, contact) },
+      append: {
+        type: 'upsert',
+        payload: parseRowWithRouteResponseSchema(organizationReadManyContactsRoute, contact),
+      },
     });
   });
 
@@ -74,12 +77,18 @@ describe('organization contacts stream producers', () => {
       { ownerModel: 'Organization', organizationId: context.organization.id },
       { organization: context.organization },
     );
-    const row = routeRow(organizationReadManyContactsRoute, contact);
+    const row = parseRowWithRouteResponseSchema(organizationReadManyContactsRoute, contact);
 
-    const plain = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row);
-    const revived = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row, {
-      revive: true,
-    });
+    const plain = streamAppendHandoff(organizationContactsStream, { id: 'org-1' }, 'upsert', row);
+    const revived = streamAppendHandoff(
+      organizationContactsStream,
+      { id: 'org-1' },
+      'upsert',
+      row,
+      {
+        revive: true,
+      },
+    );
 
     expect(plain.append).toStrictEqual<object>({ type: 'upsert', payload: row });
     expect(revived.append).toStrictEqual<object>({ type: 'upsert', payload: row, revive: true });
@@ -93,7 +102,7 @@ describe('organization contacts stream producers', () => {
     }) as StreamDefinition;
 
     // @ts-expect-error a perRecipient stream requires userIds
-    expect(() => streamAppend(perRecipient, {}, 'remove', { id: 'c1' })).toThrow(
+    expect(() => streamAppendHandoff(perRecipient, {}, 'remove', { id: 'c1' })).toThrow(
       'requires userIds',
     );
   });

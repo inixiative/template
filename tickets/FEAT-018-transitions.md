@@ -246,10 +246,10 @@ _Source-checked 2026-06-08 against `@inixiative/json-rules@2.5.0` + `@monorepo/p
   a plan whose `where` is one OR'd filter.
 
 - **Field-scope = reuse `@monorepo/db/lens`, don't build.** `lensFor(model)` is the base lens;
-  `redactLens(lens)` narrows out redacted fields (from `HOOK_REDACT_FIELDS`); the read route
-  already composes `projectByPath(redactLens(filterLens))` for its filter surface. So a
+  `omitSensitiveFieldsFromLens(lens)` omits sensitive fields (from `SENSITIVE_FIELDS`); the read route
+  already composes `projectByPath(omitSensitiveFieldsFromLens(filterLens))` for its filter surface. So a
   transition's field allowlist + authoring validation = `checkRuleAgainstLens(predicate,
-  redactLens(lensFor(model)) [+ context narrowings])`. No new field-security layer.
+  omitSensitiveFieldsFromLens(lensFor(model)) [+ context narrowings])`. No new field-security layer.
 - **Registry mirrors `RebacSchema`.** Both are `Record<model, Record<actionName, …>>` over the
   same models on the same json-rules substrate — transitions is "the rebac schema for state
   changes." Keep shapes parallel; reuse the per-row override pattern (`record.permissionRules` ↔
@@ -265,7 +265,7 @@ _Source-checked 2026-06-08 against `@inixiative/json-rules@2.5.0` + `@monorepo/p
   `scopeNarrowing(scope)` middleware where `scope: (c: Context<AppEnv>) => WhereScope | Promise<WhereScope>`
   reads the route's static `filterLens`, then `mergeNarrowingWheres(current, await scope(c))` folds a
   per-request context where-narrowing into it. The narrowing *mechanism* (chains, `root.where`,
-  `redactLens`) is in template; the **un-ported pieces are `scopeNarrowing` +
+  `omitSensitiveFieldsFromLens`) is in template; the **un-ported pieces are `scopeNarrowing` +
   `mergeNarrowingWheres` + the `Scope = (c) => WhereScope` route field** (zealot:
   `apps/api/src/middleware/resources/{scopeNarrowing,mergeNarrowingWheres}.ts`,
   `apps/api/src/lib/requestTemplates/types.ts`). Port those first for per-actor field/where-scoping
@@ -337,8 +337,8 @@ multi-step sagas — anything that must *do*, not *gate*.
 - **json-rules** (`@inixiative/json-rules@2.5.0`): `check`, `toPrisma` (`Any→{OR}`, `All→{AND}`),
   `Any`/`All`, `applyLens`, `checkRuleAgainstLens`, `createLens`, `Lens`/`LensNarrowing`, `projectByPath`.
 - **permissions**: `packages/permissions/src/rebac/{types,check,schema,permissionRulesSchema,ownerActions}.ts`.
-- **db lens**: `packages/db/src/lens/{lensFor,redactLens,rootLens,searchablePaths,orderablePaths}.ts`;
-  `packages/db/src/registries/redactFields.ts` (`HOOK_REDACT_FIELDS`).
+- **db lens**: `packages/db/src/lens/{lensFor,omitSensitiveFieldsFromLens,rootLens,searchablePaths,orderablePaths}.ts`;
+  `packages/db/src/registries/sensitiveFields.ts` (`SENSITIVE_FIELDS`).
 - **route helpers (lens-scoped filtering precedent)**: `apps/api/src/lib/routeTemplates/read.ts`,
   `.../filters/{buildSearchFieldsSchema,buildOrderBySchema}.ts`, `.../utils/prepareMiddleware.ts`,
   `apps/api/src/lib/prisma/buildWhereClause.ts`, `apps/api/src/types/appEnv.ts`, `routeTemplates/types.ts`.
@@ -351,7 +351,7 @@ multi-step sagas — anything that must *do*, not *gate*.
   Clarifications). Overlap is legal; the authoring validator does *not* enforce path disjointness.
 - Does `available()` report near-miss reasons (for "why can't I")?
 - Per-request context-scope: zealot's dedicated `mergeNarrowingWheres` merge **vs** a second
-  narrowing layer underneath the lens chain (`{ parent: redactLens(lensFor(model)), root: { where } }`).
+  narrowing layer underneath the lens chain (`{ parent: omitSensitiveFieldsFromLens(lensFor(model)), root: { where } }`).
   Chain form is more uniform with redaction/picks; the merge form may exist because stacking multiple
   `root.where`s needs explicit AND-ing (json-rules narrowing where-semantics — "implication/negate to
   preserve filter-first meaning", per `applyLens`). Decide at build.

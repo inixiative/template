@@ -94,15 +94,15 @@ not supplied as `to`/`cc`/`bcc` on an event's email handoff.
 
 ## Email pipeline
 
-`deliverEmailHandoffs` enqueues `sendEmail` with the template, event name and binding data,
-using a deterministic planner job ID. The registry entry in `apps/api/src/lib/email/registry.ts`
+`deliverEmailHandoffs` enqueues `planEmailDeliveries` with the template, event name and binding data,
+using a deterministic planner job ID. The registry entry in `apps/api/src/lib/email/emailTemplateRegistry.ts`
 defines the entity lens, sender, recipient rules, data lens and render policy.
 
 The planner resolves entity/sender/template ownership, hydrates recipients through the
 owner-scoped recipient lens, and creates or reuses a `CommunicationLog` row per recipient
-using its idempotency key. It then enqueues `deliverEmail`. Delivery settles the template and
+using its idempotency key. It then enqueues `deliverEmail`. Delivery evaluates the template and
 its component versions, applies contact preferences and address verification, renders and
-sends, and records the result. See [COMMUNICATIONS.md](COMMUNICATIONS.md#planner-sendemail)
+sends, and records the result. See [COMMUNICATIONS.md](COMMUNICATIONS.md#planner-planemaildeliveries)
 for the complete planner/delivery and degraded-rule behavior.
 
 ## WebSocket handoffs
@@ -112,7 +112,7 @@ Channel-targeted example, from `segmentMembersAdded`:
 ```typescript
 websocket: (data) => [{
   target: { channels: [WS_CHANNELS.segmentReadManySegmentMembers.name(data.segmentId)] },
-  message: { data: refetch({ _id: 'segmentReadManySegmentMembers', path: { id: data.segmentId } }) },
+  message: { data: refetchQueryEvent({ _id: 'segmentReadManySegmentMembers', path: { id: data.segmentId } }) },
 }],
 ```
 
@@ -122,12 +122,12 @@ data-stream actions. New payload kinds require their own consumer and recovery d
 Subscription and stream-open checks use the underlying authorized route; see
 [WEBSOCKETS.md](WEBSOCKETS.md).
 
-Stream handoffs are never built by hand. `streamAppend` (`apps/api/src/appEvents/streamAppend.ts`)
+Stream handoffs are never built by hand. `streamAppendHandoff` (`apps/api/src/appEvents/streamAppendHandoff.ts`)
 takes a shared stream definition, its params, an op and a payload. The op must be one the
 definition's kind defines (`list`: `upsert`, `remove`; `log`: `append`), the payload is typed by
 that op, and the options argument carries `revive` (upserts only: may restore a removed row) and,
 for a `perRecipient` definition, the required recipient `userIds`. An upsert row must come from
-`routeRow(route, value)`, which parses it with the route's own `responseSchema` exactly as the
+`parseRowWithRouteResponseSchema(route, value)`, which parses it with the route's own `responseSchema` exactly as the
 route's response is. From the
 contact handlers (the scaffolding example stream):
 
@@ -135,14 +135,14 @@ contact handlers (the scaffolding example stream):
 websocket: ({ contact }) => organizationContactRemove(contact),
 
 // organizationContactRemove:
-streamAppend(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.organizationId }, 'remove', {
+streamAppendHandoff(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.organizationId }, 'remove', {
   id: contact.id,
 });
 ```
 
 A `shared` stream's append goes to every connection holding the stream, so it has to match the
 shape of the route's response for every caller. `appendToStream` publishes each stream's appends
-through a per-stream `createSerializedQueue`, so one instance emits them in order. See
+through a per-stream `makeSerializedQueue`, so one instance emits them in order. See
 [WEBSOCKETS.md](WEBSOCKETS.md#data-streams).
 
 Revoking access (membership, role or token removal) does not yet emit an app event that closes
@@ -163,7 +163,7 @@ retry queue. The event ID encodes emit time; observation is not a separate BullM
 
 ## Inquiry events
 
-Inquiry-specific definitions live under `apps/api/src/modules/inquiry/handlers/<type>/appEvents.ts`.
+Inquiry-specific definitions live under `apps/api/src/modules/inquiry/services/<type>/appEvents.ts`.
 The central inquiry event handlers delegate to those definitions. For example, the
 organization-invitation `sent` definition selects `inquiry-invite-organization-user` with
 `{ inquiryId }` bindings and publishes an `inquiryRead` refetch. Its `resolved` definition
@@ -177,7 +177,7 @@ publishes the refetch. Use the shared handoff contracts for both.
 - `apps/api/src/appEvents/channels/`: email and WebSocket delivery bridges.
 - `apps/api/src/appEvents/handlers/`: business-event handlers and the registry.
 - `apps/api/src/lib/observe.ts`: observation adapters.
-- `apps/api/src/jobs/handlers/sendEmail.ts`, `deliverEmail.ts`: email planner and delivery.
+- `apps/api/src/jobs/handlers/planEmailDeliveries.ts`, `deliverEmail.ts`: email planner and delivery.
 
 Feature flags and persisted in-app notifications remain future consumers. Registering an event
 handler does not prove that a business writer emits the event; the Segments documentation

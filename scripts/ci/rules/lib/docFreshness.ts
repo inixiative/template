@@ -422,7 +422,7 @@ const conceptWarnings = async (): Promise<string[]> => {
   return warnings;
 };
 
-const readList = (path: string): string[] =>
+const fetchList = (path: string): string[] =>
   existsSync(join(ROOT, path))
     ? readFileSync(join(ROOT, path), 'utf8')
         .split('\n')
@@ -453,7 +453,7 @@ const dropIgnored = (problems: Problem[]): Problem[] => {
 
 const main = async () => {
   const names = knownNames();
-  const allow = new Set(readList(ALLOW_FILE).map((l) => l.trim()));
+  const allow = new Set(fetchList(ALLOW_FILE).map((l) => l.trim()));
   const allowed = (p: Problem) => allow.has(p.value) || allow.has(`${p.doc}\t${p.value}`);
   const docs = files.filter(isDoc).sort();
   const problems = dropIgnored(
@@ -474,7 +474,7 @@ const main = async () => {
 
   for (const warning of await conceptWarnings()) console.log(`WARN doc-freshness: ${warning}`);
 
-  const baseline = new Set(readList(BASELINE_FILE));
+  const baseline = new Set(fetchList(BASELINE_FILE));
   const fresh = problems.filter((p) => !baseline.has(keyOf(p)));
   const current = new Set(keys);
   const fixed = [...baseline].filter((k) => !current.has(k));

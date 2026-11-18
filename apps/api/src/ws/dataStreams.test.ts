@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { db, getRedisClient, redisNamespace } from '@template/db';
+import { db, redisClient, redisNamespace } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
@@ -11,18 +11,18 @@ import {
 import { waitFor } from '@template/shared/test/waitFor';
 import {
   STREAM_DEFINITIONS,
+  streamAppendFrame,
   WS_CHANNELS,
   WS_MAX_PENDING_FRAMES,
   WS_MAX_STREAM_NAME_LENGTH,
 } from '@template/shared/ws';
 import { app } from '#/app';
-import { streamAppendFrame } from '#/ws/dataFrame';
 import { sendToStreamLocal } from '#/ws/delivery';
 import { websocketHandler } from '#/ws/handler';
 import { appendToStream, initWebSocketPubSub } from '#/ws/pubsub';
-import { readStreamSeq } from '#/ws/queries/readStreamSeq';
-import { byId, byStream, clearRegistry } from '#/ws/registry';
-import { reauthorizeOpenStreams } from '#/ws/streamReauthorizeSweep';
+import { fetchStreamSeq } from '#/ws/queries/fetchStreamSeq';
+import { reauthorizeOpenStreams } from '#/ws/reauthorizeOpenStreams';
+import { clearRegistry, connectionIdsByStream, connectionsById } from '#/ws/registry';
 import { streamSeqKey } from '#/ws/streamSeq';
 import { createTestSocket, type SentFrame, sentFrames } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
@@ -103,7 +103,7 @@ describe('data streams (real app)', () => {
     expect(snapshot.seq).toBeNumber();
     expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toEqual([contact.id]);
     expect(snapshot.payload.pagination.total).toBe(1);
-    expect([...(byStream.get(stream) ?? [])]).toEqual([socket.data.connectionId]);
+    expect([...(connectionIdsByStream.get(stream) ?? [])]).toEqual([socket.data.connectionId]);
   });
 
   it('rejects an open from a connection without a credential', async () => {
@@ -111,7 +111,7 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, openFrame(stream));
 
     expect(sentFrames(sent)).toEqual([{ type: 'openRejected', stream }]);
-    expect(byStream.has(stream)).toBe(false);
+    expect(connectionIdsByStream.has(stream)).toBe(false);
     expect(socket.data.streams.size).toBe(0);
   });
 
@@ -121,7 +121,7 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, openFrame(stream));
 
     expect(sentFrames(sent)).toEqual([{ type: 'openRejected', stream }]);
-    expect(byStream.has(stream)).toBe(false);
+    expect(connectionIdsByStream.has(stream)).toBe(false);
   });
 
   it('answers a 5xx or 429 snapshot with a retryable error, not a rejection', async () => {
@@ -134,7 +134,7 @@ describe('data streams (real app)', () => {
       expect(sentFrames(sent)).toEqual([
         { type: 'error', action: 'open', stream, retryable: true },
       ]);
-      expect(byStream.has(stream)).toBe(false);
+      expect(connectionIdsByStream.has(stream)).toBe(false);
       clearRegistry();
     }
   });
@@ -145,7 +145,7 @@ describe('data streams (real app)', () => {
     for (const name of junk) await websocketHandler.message(socket, openFrame(name));
 
     expect(sentFrames(sent)).toEqual(junk.map((name) => ({ type: 'openRejected', stream: name })));
-    expect(byStream.size).toBe(0);
+    expect(connectionIdsByStream.size).toBe(0);
   });
 
   it('rejects dot-segment params that would resolve to a different route', async () => {
@@ -156,7 +156,7 @@ describe('data streams (real app)', () => {
     expect(sentFrames(sent)).toEqual(
       dotted.map((name) => ({ type: 'openRejected', stream: name })),
     );
-    expect(byStream.size).toBe(0);
+    expect(connectionIdsByStream.size).toBe(0);
   });
 
   it('answers every open past the pending-frame cap with a retryable error', async () => {
@@ -218,7 +218,7 @@ describe('data streams (real app)', () => {
       { type: 'opened', stream },
       { type: 'closed', stream },
     ]);
-    expect(byStream.has(stream)).toBe(false);
+    expect(connectionIdsByStream.has(stream)).toBe(false);
   });
 
   it('an open dequeued after the socket closed leaves nothing indexed', async () => {
@@ -228,7 +228,7 @@ describe('data streams (real app)', () => {
     websocketHandler.close(socket);
     await Promise.all([first, second]);
 
-    expect(byStream.size).toBe(0);
+    expect(connectionIdsByStream.size).toBe(0);
     expect(socket.data.streams.size).toBe(0);
   });
 
@@ -244,13 +244,13 @@ describe('data streams (real app)', () => {
       { type: 'openRejected', stream: queryChannel },
       { type: 'openRejected', stream: 'organizationReadManyContacts' },
     ]);
-    expect(byStream.size).toBe(0);
+    expect(connectionIdsByStream.size).toBe(0);
   });
 
   it('holds appends published while the snapshot is in flight and sends them after it', async () => {
     const { socket, sent } = connect(memberBearer);
     const pending = websocketHandler.message(socket, openFrame(stream));
-    await waitWithinMicrotasks(() => byStream.has(stream));
+    await waitWithinMicrotasks(() => connectionIdsByStream.has(stream));
 
     const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'in-flight' } });
     sendToStreamLocal(stream, () => JSON.stringify(append));
@@ -280,7 +280,7 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, JSON.stringify({ action: 'close', stream }));
 
     expect(sentFrames(sent).at(-1)).toEqual({ type: 'closed', stream });
-    expect(byStream.has(stream)).toBe(false);
+    expect(connectionIdsByStream.has(stream)).toBe(false);
     expect(socket.data.streams.has(stream)).toBe(false);
   });
 
@@ -289,7 +289,7 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, openFrame(stream));
     websocketHandler.close(socket);
 
-    expect(byStream.has(stream)).toBe(false);
+    expect(connectionIdsByStream.has(stream)).toBe(false);
   });
 
   it('an identity change closes open streams so they must be re-authorized', async () => {
@@ -298,7 +298,7 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, openFrame(stream));
     await websocketHandler.message(socket, JSON.stringify({ action: 'logout' }));
 
-    expect(byStream.has(stream)).toBe(false);
+    expect(connectionIdsByStream.has(stream)).toBe(false);
     expect(socket.data.streams.size).toBe(0);
   });
 
@@ -317,11 +317,11 @@ describe('data streams (real app)', () => {
 
     await authenticate(memberBearer);
     await websocketHandler.message(socket, openFrame(stream));
-    expect(byStream.has(stream)).toBe(true);
+    expect(connectionIdsByStream.has(stream)).toBe(true);
 
     await authenticate(`Bearer ${rawKey}`);
     expect(socket.data.userId).toBeNull();
-    expect(byStream.has(stream)).toBe(false);
+    expect(connectionIdsByStream.has(stream)).toBe(false);
 
     sent.length = 0;
     await websocketHandler.message(socket, openFrame(stream));
@@ -339,17 +339,17 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, openFrame(stream));
     await authenticate();
 
-    expect(byStream.has(stream)).toBe(true);
+    expect(connectionIdsByStream.has(stream)).toBe(true);
   });
 
   it('an open resolving after the socket closed neither indexes nor sends', async () => {
     const { socket, sent } = connect(memberBearer);
     const pending = websocketHandler.message(socket, openFrame(stream));
-    await waitWithinMicrotasks(() => byStream.has(stream));
+    await waitWithinMicrotasks(() => connectionIdsByStream.has(stream));
     websocketHandler.close(socket);
     await pending;
 
-    expect(byStream.has(stream)).toBe(false);
+    expect(connectionIdsByStream.has(stream)).toBe(false);
     expect(sent).toEqual([]);
   });
 
@@ -367,7 +367,7 @@ describe('data streams (real app)', () => {
 
     it('stamps the snapshot with the seq of the last append before its read', async () => {
       await appendToStream(stream, { type: 'remove', payload: { id: 'before' } });
-      const { seq: counter } = await readStreamSeq(getRedisClient(), streamSeqKey(stream));
+      const { seq: counter } = await fetchStreamSeq(redisClient(), streamSeqKey(stream));
       const { socket, sent } = connect(bearer);
       await websocketHandler.message(socket, openFrame(stream));
 
@@ -425,13 +425,15 @@ describe('data streams (real app)', () => {
       await waitFor(() => dropped.closeInfo() !== null);
 
       expect(dropped.closeInfo()).toEqual({ code: 1013, reason: 'frame dropped' });
-      expect(byId.has(dropped.socket.data.connectionId)).toBe(false);
-      expect(byStream.get(stream)?.has(dropped.socket.data.connectionId) ?? false).toBe(false);
+      expect(connectionsById.has(dropped.socket.data.connectionId)).toBe(false);
+      expect(
+        connectionIdsByStream.get(stream)?.has(dropped.socket.data.connectionId) ?? false,
+      ).toBe(false);
 
       const reconnected = connect(bearer);
       await websocketHandler.message(reconnected.socket, openFrame(stream));
       const snapshot = sentFrames<SnapshotFrame>(reconnected.sent)[1];
-      expect(snapshot.seq).toBe((await readStreamSeq(getRedisClient(), streamSeqKey(stream))).seq);
+      expect(snapshot.seq).toBe((await fetchStreamSeq(redisClient(), streamSeqKey(stream))).seq);
       expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toContain(created.id);
 
       await appendToStream(stream, { type: 'remove', payload: { id: created.id } });
@@ -448,7 +450,7 @@ describe('data streams (real app)', () => {
     };
 
     it('an unauthorized open creates no Redis key, and junk names never reach Redis', async () => {
-      const redis = getRedisClient();
+      const redis = redisClient();
       const { socket, sent } = connect();
       const knownFamily = STREAM_DEFINITIONS.organizationReadManyContacts.name({
         id: Bun.randomUUIDv7(),
@@ -474,17 +476,17 @@ describe('data streams (real app)', () => {
       expect(answers).toHaveLength(7);
       expect(await redis.exists(streamSeqKey(knownFamily))).toBe(0);
       expect(await wsKeys()).toEqual(wsKeysBefore);
-      expect(byStream.size).toBe(0);
+      expect(connectionIdsByStream.size).toBe(0);
     });
 
     it('an authorized open seeds an absent counter with its stamp, so the next append is one past it', async () => {
       const fresh = await freshStream();
-      expect(await getRedisClient().exists(streamSeqKey(fresh.name))).toBe(0);
+      expect(await redisClient().exists(streamSeqKey(fresh.name))).toBe(0);
       const { socket, sent } = connect(fresh.authorization);
       await websocketHandler.message(socket, openFrame(fresh.name));
 
       const snapshot = sentFrames<SnapshotFrame>(sent)[1];
-      expect(await getRedisClient().get(streamSeqKey(fresh.name))).toBe(String(snapshot.seq));
+      expect(await redisClient().get(streamSeqKey(fresh.name))).toBe(String(snapshot.seq));
       await appendToStream(fresh.name, { type: 'remove', payload: { id: 'next' } });
       await waitFor(() => appendsOf(sent).length === 1);
       expect(appendsOf(sent)[0].seq).toBe(snapshot.seq + 1);
@@ -514,7 +516,7 @@ describe('data streams (real app)', () => {
       const snapshot = sentFrames<SnapshotFrame>(sent)[1];
       expect(reads).toBe(2);
       expect(opened).toEqual({ type: 'opened', stream: fresh.name });
-      expect(snapshot.seq).toBe(Number(await getRedisClient().get(streamSeqKey(fresh.name))));
+      expect(snapshot.seq).toBe(Number(await redisClient().get(streamSeqKey(fresh.name))));
       expect(rest.map((frame) => frame.seq)).toEqual([snapshot.seq]);
     });
 
@@ -524,7 +526,7 @@ describe('data streams (real app)', () => {
       await websocketHandler.message(socket, openFrame(stream));
 
       expect(closeInfo()?.code).toBe(1013);
-      expect(byStream.has(stream)).toBe(false);
+      expect(connectionIdsByStream.has(stream)).toBe(false);
     });
   });
 
@@ -537,7 +539,7 @@ describe('data streams (real app)', () => {
       await reauthorizeOpenStreams();
 
       expect(sent).toEqual([]);
-      expect(byStream.has(stream)).toBe(true);
+      expect(connectionIdsByStream.has(stream)).toBe(true);
     });
 
     it('closes a stream whose route now answers 403, and stops its appends', async () => {
@@ -578,7 +580,7 @@ describe('data streams (real app)', () => {
       expect(sentFrames(sent)).toEqual([
         { type: 'error', action: 'open', stream, retryable: true },
       ]);
-      expect(byStream.has(stream)).toBe(false);
+      expect(connectionIdsByStream.has(stream)).toBe(false);
     });
 
     it('does not pile up a second recheck while one is still queued', async () => {
@@ -606,8 +608,8 @@ describe('data streams (real app)', () => {
       }
 
       expect(closeInfo()?.code).toBe(1011);
-      expect(byId.has(socket.data.connectionId)).toBe(false);
-      expect(byStream.has(stream)).toBe(false);
+      expect(connectionsById.has(socket.data.connectionId)).toBe(false);
+      expect(connectionIdsByStream.has(stream)).toBe(false);
     });
   });
   describe('adversarial review', () => {
@@ -647,7 +649,7 @@ describe('data streams (real app)', () => {
         { type: 'error', action: 'authenticate', retryable: true },
       ]);
       expect(socket.data.headers.authorization).toBe(authorization);
-      expect(byStream.has(stream)).toBe(true);
+      expect(connectionIdsByStream.has(stream)).toBe(true);
     });
 
     it('a transient /identify failure during a spoof is not a spoof rejection', async () => {

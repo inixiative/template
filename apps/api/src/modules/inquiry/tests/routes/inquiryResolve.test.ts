@@ -14,7 +14,7 @@ import {
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
@@ -58,7 +58,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
         status: 'approved',
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.approved);
@@ -83,7 +83,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
         status: 'approved',
       }),
     );
-    const { data } = await json<Record<string, unknown>>(response);
+    const { data } = await parseSuccessBody<Record<string, unknown>>(response);
 
     expect(response.status).toBe(200);
     expect(data.sourceOrganization).toBeDefined();
@@ -136,7 +136,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
         status: 'denied',
       }),
     );
-    const { data } = await json<Inquiry>(response);
+    const { data } = await parseSuccessBody<Inquiry>(response);
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.denied);

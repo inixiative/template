@@ -6,13 +6,13 @@
  */
 import { db } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
-import { lookupCascade, type OwnerScope } from '@template/email/render';
+import { fetchComponentsThroughOwnerCascade, type OwnerScope } from '@template/email/render';
 
 export type VersionedRecord = Pick<
   EmailTemplate | EmailComponent,
   | 'id'
   | 'slug'
-  | 'componentRefs'
+  | 'componentSlugs'
   | 'ownerModel'
   | 'organizationId'
   | 'spaceId'
@@ -32,10 +32,10 @@ const ownerScopeOf = (record: VersionedRecord): OwnerScope => ({
 export const resolveComponentVersions = async (
   record: VersionedRecord,
 ): Promise<Record<string, string | null>> => {
-  const refs = [...new Set(record.componentRefs ?? [])];
+  const refs = [...new Set(record.componentSlugs ?? [])];
   if (!refs.length) return {};
 
-  const children = await lookupCascade(refs, ownerScopeOf(record));
+  const children = await fetchComponentsThroughOwnerCascade(refs, ownerScopeOf(record));
   const componentIds = refs
     .map((slug) => children[slug]?.id)
     .filter((id): id is string => Boolean(id));

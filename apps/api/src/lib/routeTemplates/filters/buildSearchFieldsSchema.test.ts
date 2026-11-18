@@ -20,7 +20,7 @@ describe('buildSearchFieldsSchema', () => {
   const ok = (v: unknown) => expect(schema.safeParse(v).success).toBe(true);
   const bad = (v: unknown) => expect(schema.safeParse(v).success).toBe(false);
 
-  it('String: allows contains, rejects gt (operators from getValidOperators)', () => {
+  it('String: allows contains, rejects gt (operators from validOperatorsForField)', () => {
     ok({ name: { contains: 'a' } });
     bad({ name: { gt: 'a' } });
   });

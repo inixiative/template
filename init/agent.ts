@@ -15,7 +15,7 @@ import { setupPlanetScale } from './tasks/planetscaleSetup';
 import { renameProject, updateProjectConfig } from './tasks/projectConfig';
 import { setupRailway } from './tasks/railwaySetup';
 import { updateConfigField } from './utils/configHelpers';
-import { getProjectConfig } from './utils/getProjectConfig';
+import { fetchProjectConfig } from './utils/fetchProjectConfig';
 import { isComplete, markComplete } from './utils/progressTracking';
 
 const SECTIONS = ['project', 'infisical', 'planetscale', 'railway', 'monitoring'] as const;
@@ -48,7 +48,7 @@ const runProject = async (): Promise<void> => {
   const organizationName = requireEnv('ORGANIZATION_NAME');
   log('project', 'Configuring project name and organization');
 
-  const projectConfig = await getProjectConfig();
+  const projectConfig = await fetchProjectConfig();
   // Persist name + org before rename so downstream steps read correct values.
   await updateProjectConfig({ name: projectName, organization: organizationName });
 
@@ -81,7 +81,7 @@ const runPlanetscale = async (): Promise<void> => {
   // the corresponding planetscale progress flags so the setup function skips
   // the manual-prompt steps.
   if (tokenId && token) {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     if (!config.infisical.projectId) {
       throw new Error('Infisical projectId missing from config — run --section=infisical first.');
     }
@@ -109,7 +109,7 @@ const runRailway = async (): Promise<void> => {
   log('railway', 'Setting up Railway hosting');
 
   if (apiToken) {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     if (!config.infisical.projectId) {
       throw new Error('Infisical projectId missing from config — run --section=infisical first.');
     }

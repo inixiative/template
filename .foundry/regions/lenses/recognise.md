@@ -4,7 +4,7 @@
 
 ## What this region is
 
-The lenses the template builds on json-rules and where it wires them in: base lenses per Prisma model, route filter lenses and per-request scope, redaction and foreign-key wrappers, the fetch and option-source helpers, frontend filter lenses derived from the OpenAPI spec, and the segment (customerRelationship) lens. The email lens members listed here are the region's.
+The lenses the template builds on json-rules and where it wires them in: base lenses per Prisma model, route filter lenses and per-request scope, sensitive-field and foreign-key wrappers, the fetch and option-source helpers, frontend filter lenses derived from the OpenAPI spec, and the segment (customerRelationship) lens. The email lens members listed here are the region's.
 
 ## What it exists for
 
@@ -112,7 +112,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - no raw ids in the email variables
 - options the lens wouldn't allow
 - null out the relations the lens hides
-- redact password hashes and tokens from the lens
+- omit password hashes and tokens from the lens
 - a relation listed as a field gives wrong kind
 - tokens read fields the lens hides
 - reference rows by id, never the fk
@@ -186,7 +186,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - don't clone the lens by spreading it
 - drop the id columns from the lens output
 - options never offer a disallowed value
-- redacted fields hidden on every visit
+- sensitive fields hidden on every visit
 - the brand where never reaches the client
 - evaluators don't take the stored shape
 - supply the values the lens layers need

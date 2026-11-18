@@ -7,16 +7,16 @@
  */
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import type { Flow } from '@template/sdk';
-import { flowReadQueryKeyFor } from '@template/ui/lib/flows/flowReadQuery';
-import { handleApiError, shouldSkipToast } from '@template/ui/lib/handleApiError';
+import { flowReadQueryKeyFor } from '@template/ui/lib/flows/flowReadQueryOptions';
+import { doesQueryMetaSkipErrorToast, showApiErrorToast } from '@template/ui/lib/showApiErrorToast';
 import { useAppStore } from '@template/ui/store';
 
 export const createAppQueryClient = (): QueryClient => {
   const queryClient = new QueryClient({
     queryCache: new QueryCache({
       onError: (error, query) => {
-        if (shouldSkipToast(query.meta)) return;
-        handleApiError(error);
+        if (doesQueryMetaSkipErrorToast(query.meta)) return;
+        showApiErrorToast(error);
       },
     }),
     mutationCache: new MutationCache({
@@ -29,8 +29,8 @@ export const createAppQueryClient = (): QueryClient => {
         void queryClient.invalidateQueries({ queryKey });
       },
       onError: (error, _variables, _context, mutation) => {
-        if (shouldSkipToast(mutation.meta)) return;
-        handleApiError(error);
+        if (doesQueryMetaSkipErrorToast(mutation.meta)) return;
+        showApiErrorToast(error);
       },
     }),
     defaultOptions: {
@@ -44,6 +44,6 @@ export const createAppQueryClient = (): QueryClient => {
       },
     },
   });
-  useAppStore.getState().setClient(queryClient);
+  useAppStore.getState().connectQueryClientToWebsocket(queryClient);
   return queryClient;
 };

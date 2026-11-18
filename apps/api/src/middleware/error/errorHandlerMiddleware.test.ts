@@ -3,7 +3,7 @@ import { FindForUpdateLockTimeoutError, LockLostError, Prisma } from '@template/
 import { HTTPException } from 'hono/http-exception';
 import { makeError } from '#/lib/errors';
 import { createTestApp } from '#tests/createTestApp';
-import { get, jsonError } from '#tests/utils/request';
+import { get, parseErrorBody } from '#tests/utils/request';
 
 const { fetch } = createTestApp({
   mount: [
@@ -54,7 +54,7 @@ const { fetch } = createTestApp({
 const expectEnvelope = async (response: Response, expected: Record<string, unknown>) => {
   expect(response.headers.get('content-type')).toContain('application/json');
   expect(response.headers.get('cache-control')).toBe('no-store');
-  const body = await jsonError(response);
+  const body = await parseErrorBody(response);
   expect(body).toMatchObject(expected);
   expect(body.requestId).toEqual(expect.any(String));
   expect(response.headers.get('request-id')).toBe(body.requestId);
@@ -148,7 +148,7 @@ describe('errorHandlerMiddleware', () => {
     const response = await fetch(get('/nowhere'));
 
     expect(response.status).toBe(404);
-    const body = await jsonError(response);
+    const body = await parseErrorBody(response);
     expect(body).toMatchObject({ error: 'RESOURCE_NOT_FOUND' });
     expect(body.requestId).toEqual(expect.any(String));
   });

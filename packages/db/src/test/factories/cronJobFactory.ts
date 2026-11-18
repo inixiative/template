@@ -5,16 +5,16 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory, getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const cronJobFactory = createFactory('CronJob', {
+const cronJobFactory = registerFactory('CronJob', {
   defaults: () => ({
-    name: `cron-job-${getNextSeq()}`,
+    name: `cron-job-${nextFactorySequenceNumber()}`,
     jobId: `job-${faker.string.uuid()}`,
     description: faker.lorem.sentence(),
     pattern: '0 0 * * *', // Daily at midnight
     enabled: true,
-    handler: 'cleanStaleData',
+    handler: 'hardDeleteRecordsPastRetention',
     payload: { model: 'WebhookEvent', retentionDays: 90 },
     maxAttempts: 3,
     backoffMs: 5000,

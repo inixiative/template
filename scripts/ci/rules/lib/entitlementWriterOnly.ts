@@ -18,18 +18,18 @@
  * Reads are free. An exception goes in scripts/ci/entitlement-writer-only/exempt.txt as
  * `<file>:<key>\t<reason>`: a write the system makes from the schema, never one a caller asks for.
  * Not seen: a model name that arrives at run time (the cascade's parent/child registry, a
- * cleanStaleData cron payload) and raw SQL; PERMISSIONS.md names them.
+ * hardDeleteRecordsPastRetention cron payload) and raw SQL; PERMISSIONS.md names them.
  */
 import ts from 'typescript';
 import {
-  finishFence,
+  applyExemptionsAndBaselineThenExit,
+  fetchExemptions,
+  fetchSource,
   isTestFile,
   lineAt,
   listFiles,
-  readExemptions,
-  readSource,
   type Violation,
-} from './fence';
+} from './ciRuleRunner';
 
 const WRITER = 'apps/api/src/lib/permissions/changeEntitlements.ts';
 const WRITE_METHODS = new Set([
@@ -53,7 +53,7 @@ const NESTED_WRITES = new Set([
 const RELATION = /Entitlements?$/;
 const MODEL = 'Entitlement';
 
-const exemptions = readExemptions('entitlement-writer-only');
+const exemptions = fetchExemptions('entitlement-writer-only');
 const usedExemptions = new Set<string>();
 const violations: Violation[] = [];
 
@@ -79,7 +79,7 @@ const isRelationName = (name: string): boolean => name !== 'entitlement' && RELA
 
 for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   if (file === WRITER || isTestFile(file) || file.endsWith('.d.ts')) continue;
-  const source = readSource(file);
+  const source = fetchSource(file);
   if (!/[Ee]ntitlement/.test(source)) continue;
   const sourceFile = ts.createSourceFile(
     file,
@@ -204,15 +204,15 @@ for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   }
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'entitlement-writer-only',
   violations,
   usedExemptions,
-  explain: [
+  failureExplanationLines: [
     'Entitlement rows written outside the one writer. Go through it, so the grant check runs:',
     "  import { changeEntitlements } from '#/lib/permissions/changeEntitlements';",
     "  await changeEntitlements(c.get('permix'), { model, id }, { add, remove });",
     'A gap in the check is fixed inside the writer, never beside it.',
   ],
-  clean: 'Entitlement rows are written only by changeEntitlements.',
+  passMessage: 'Entitlement rows are written only by changeEntitlements.',
 });

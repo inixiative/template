@@ -4,13 +4,13 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+import { useQuery } from '@tanstack/react-query';
 import {
   type OrganizationReadManySpacesResponse,
   organizationReadManySpaces,
   organizationReadManySpacesQueryKey,
 } from '@template/sdk';
 import { Page, Table } from '@template/ui/components';
-import { useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
 
@@ -65,7 +65,7 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
           columns={columns}
           data={spaces}
           keyExtractor={(space) => space.id}
-          onRowClick={(space: Space) => tenant.setSpace(space.id)}
+          onRowClick={(space: Space) => tenant.switchToSpaceContext(space.id)}
           emptyMessage="No spaces in this organization yet"
           empty={{
             icon: 'lucide:layout-grid',

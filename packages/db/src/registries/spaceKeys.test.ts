@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { toModelName } from '@template/db/utils/modelNames';
-import { getModelRelations } from '@template/db/utils/prismaMapRelations';
+import { relationsOfModel } from '@template/db/utils/prismaMapRelations';
 
 const SPACE_PARENTS = ['Space', 'SpaceUser'] as const;
 
@@ -12,7 +12,7 @@ describe('a row keyed to a space carries its organization through a composite ke
   it('every Space or SpaceUser owner that holds an organization column has a relation on all its keys', () => {
     const missing = Object.entries(PolymorphismRegistry).flatMap(([name, config]) => {
       const model = toModelName(name);
-      const relations = getModelRelations(model);
+      const relations = relationsOfModel(model);
       return config.axes.flatMap((axis) =>
         SPACE_PARENTS.flatMap((parent) => {
           const fields = (axis.fkMap as Partial<Record<string, readonly string[]>>)[parent] ?? [];

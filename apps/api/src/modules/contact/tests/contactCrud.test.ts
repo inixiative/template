@@ -12,7 +12,7 @@ import {
   createSpace,
   createSpaceUser,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
   upsertContact,
 } from '@template/db/test';
 import { contactRouter } from '#/modules/contact';
@@ -20,7 +20,7 @@ import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { del, get, json, patch, post } from '#tests/utils/request';
+import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
 describe('Contact CRUD', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -51,7 +51,7 @@ describe('Contact CRUD', () => {
     await cleanupTouchedTables(db);
   });
 
-  const e164 = () => `+1555${String(getNextSeq()).padStart(7, '0').slice(-7)}`;
+  const e164 = () => `+1555${String(nextFactorySequenceNumber()).padStart(7, '0').slice(-7)}`;
 
   describe('POST /me/contacts', () => {
     it('creates a phone contact owned by the current user', async () => {
@@ -61,7 +61,7 @@ describe('Contact CRUD', () => {
           value: { e164: e164(), country: 'US' },
         }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(201);
       expect(data.userId).toBe(user.id);
       expect(data.ownerModel).toBe('User');
@@ -69,14 +69,14 @@ describe('Contact CRUD', () => {
     });
 
     it('creates a linkedin contact, normalizing a pasted URL', async () => {
-      const handle = `aron${getNextSeq()}`;
+      const handle = `aron${nextFactorySequenceNumber()}`;
       const response = await fetch(
         post('/api/v1/me/contacts', {
           type: 'linkedin',
           value: { url: `https://linkedin.com/in/${handle}` },
         }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(201);
       expect(data.value).toEqual({ classifier: 'personal', handle });
       expect(data.valueKey).toBe(`personal:${handle.toLowerCase()}`);
@@ -93,7 +93,7 @@ describe('Contact CRUD', () => {
     });
 
     it('allows two users to claim the same linkedin handle (per-owner uniqueness)', async () => {
-      const handle = `coowned${getNextSeq()}`;
+      const handle = `coowned${nextFactorySequenceNumber()}`;
       const first = await fetch(
         post('/api/v1/me/contacts', {
           type: 'linkedin',
@@ -120,11 +120,11 @@ describe('Contact CRUD', () => {
       const response = await fetch(
         post('/api/v1/me/contacts', {
           type: 'email',
-          value: { address: `share${getNextSeq()}@example.com` },
+          value: { address: `share${nextFactorySequenceNumber()}@example.com` },
           permissionRules: { read: { all: [] } },
         }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(201);
       expect(data.permissionRules).toEqual({ read: { all: [] } });
     });
@@ -133,7 +133,7 @@ describe('Contact CRUD', () => {
       const response = await fetch(
         post('/api/v1/me/contacts', {
           type: 'email',
-          value: { address: `nodel${getNextSeq()}@example.com` },
+          value: { address: `nodel${nextFactorySequenceNumber()}@example.com` },
           // delete is not in CONTACT_ROW_OVERRIDABLE_ACTIONS — rejected by Zod at the boundary
           permissionRules: { delete: { all: [] } },
         }),
@@ -145,7 +145,7 @@ describe('Contact CRUD', () => {
       const response = await fetch(
         post('/api/v1/me/contacts', {
           type: 'email',
-          value: { address: `bad${getNextSeq()}@example.com` },
+          value: { address: `bad${nextFactorySequenceNumber()}@example.com` },
           // garbage rule shape — rejected by the recursive ActionRule schema
           permissionRules: { read: { foo: 'bar' } },
         }),
@@ -157,7 +157,7 @@ describe('Contact CRUD', () => {
       const response = await fetch(
         post('/api/v1/me/contacts', {
           type: 'email',
-          value: { address: `cycle${getNextSeq()}@example.com` },
+          value: { address: `cycle${nextFactorySequenceNumber()}@example.com` },
           permissionRules: { read: 'read' },
         }),
       );
@@ -175,10 +175,10 @@ describe('Contact CRUD', () => {
         userId: user.id,
         ownerModel: 'User',
         type: 'email',
-        value: { address: `read${getNextSeq()}@example.com` },
+        value: { address: `read${nextFactorySequenceNumber()}@example.com` },
       });
       const response = await fetch(get(`/api/v1/contact/${contact.id}`));
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(200);
       expect(data.id).toBe(contact.id);
     });
@@ -189,7 +189,7 @@ describe('Contact CRUD', () => {
         userId: otherUser.id,
         ownerModel: 'User',
         type: 'email',
-        value: { address: `priv${getNextSeq()}@example.com` },
+        value: { address: `priv${nextFactorySequenceNumber()}@example.com` },
       });
       const response = await fetch(get(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(403);
@@ -201,7 +201,7 @@ describe('Contact CRUD', () => {
         userId: otherUser.id,
         ownerModel: 'User',
         type: 'website',
-        value: { url: `https://pub${getNextSeq()}.example.com` },
+        value: { url: `https://pub${nextFactorySequenceNumber()}.example.com` },
         // Vacuously-true rule = open to any authenticated requester (server-authored only)
         permissionRules: { read: { all: [] } as never },
       });
@@ -214,7 +214,7 @@ describe('Contact CRUD', () => {
         organizationId: org.id,
         ownerModel: 'Organization',
         type: 'email',
-        value: { address: `orgmail${getNextSeq()}@example.com` },
+        value: { address: `orgmail${nextFactorySequenceNumber()}@example.com` },
       });
       const response = await fetch(get(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(200);
@@ -227,12 +227,12 @@ describe('Contact CRUD', () => {
         userId: user.id,
         ownerModel: 'User',
         type: 'email',
-        value: { address: `upd${getNextSeq()}@example.com` },
+        value: { address: `upd${nextFactorySequenceNumber()}@example.com` },
       });
       const response = await fetch(
         patch(`/api/v1/contact/${contact.id}`, { label: 'Work', position: 1 }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(200);
       expect(data.label).toBe('Work');
       expect(data.position).toBe(1);
@@ -243,7 +243,7 @@ describe('Contact CRUD', () => {
         userId: user.id,
         ownerModel: 'User',
         type: 'email',
-        value: { address: `mirror${getNextSeq()}@example.com` },
+        value: { address: `mirror${nextFactorySequenceNumber()}@example.com` },
         source: 'userCreation',
       });
       const response = await fetch(patch(`/api/v1/contact/${contact.id}`, { label: 'Changed' }));
@@ -255,7 +255,7 @@ describe('Contact CRUD', () => {
         userId: user.id,
         ownerModel: 'User',
         type: 'website',
-        value: { url: `https://rules${getNextSeq()}.example.com` },
+        value: { url: `https://rules${nextFactorySequenceNumber()}.example.com` },
       });
       const response = await fetch(
         patch(`/api/v1/contact/${contact.id}`, {
@@ -271,7 +271,7 @@ describe('Contact CRUD', () => {
         userId: otherUser.id,
         ownerModel: 'User',
         type: 'email',
-        value: { address: `noupd${getNextSeq()}@example.com` },
+        value: { address: `noupd${nextFactorySequenceNumber()}@example.com` },
       });
       const response = await fetch(patch(`/api/v1/contact/${contact.id}`, { label: 'Hacked' }));
       expect(response.status).toBe(403);
@@ -283,7 +283,7 @@ describe('Contact CRUD', () => {
         userId: otherUser.id,
         ownerModel: 'User',
         type: 'website',
-        value: { url: `https://wpub${getNextSeq()}.example.com` },
+        value: { url: `https://wpub${nextFactorySequenceNumber()}.example.com` },
         permissionRules: { read: { all: [] } as never },
       });
       // Read passes (per the rule), but PATCH (manage) requires owner — denied.
@@ -298,7 +298,7 @@ describe('Contact CRUD', () => {
         userId: user.id,
         ownerModel: 'User',
         type: 'email',
-        value: { address: `del${getNextSeq()}@example.com` },
+        value: { address: `del${nextFactorySequenceNumber()}@example.com` },
       });
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(204);
@@ -334,7 +334,7 @@ describe('Contact CRUD', () => {
         userId: otherUser.id,
         ownerModel: 'User',
         type: 'email',
-        value: { address: `nodel${getNextSeq()}@example.com` },
+        value: { address: `nodel${nextFactorySequenceNumber()}@example.com` },
       });
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(403);
@@ -343,8 +343,8 @@ describe('Contact CRUD', () => {
 
   describe('re-adding a deleted contact', () => {
     const readd = async (fetchFor: typeof fetch, createPath: string) => {
-      const address = `readd${getNextSeq()}@example.com`;
-      const first = await json<Contact>(
+      const address = `readd${nextFactorySequenceNumber()}@example.com`;
+      const first = await parseSuccessBody<Contact>(
         await fetchFor(post(createPath, { type: 'email', value: { address }, label: 'Old' })),
       );
       await db.contact.update({
@@ -356,7 +356,7 @@ describe('Contact CRUD', () => {
       const response = await fetchFor(
         post(createPath, { type: 'email', value: { address }, label: 'New' }),
       );
-      const { data } = await json<Contact>(response);
+      const { data } = await parseSuccessBody<Contact>(response);
       expect(response.status).toBe(201);
       expect(data.id).toBe(first.data.id);
       expect(data.label).toBe('New');

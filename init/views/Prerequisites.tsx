@@ -10,7 +10,7 @@ import {
   checkPlanetScaleSessionAsync,
   checkRailwaySessionAsync,
   checkVercelSessionAsync,
-  getInstallCommand,
+  installCommandFor,
 } from '../utils/checkPrerequisites';
 
 const LOGIN_COMMANDS: Record<string, string> = {
@@ -397,7 +397,7 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
             {failures.map((f) => {
               const cmd =
                 f.reason === 'not-installed'
-                  ? getInstallCommand(f.cliCommand)
+                  ? installCommandFor(f.cliCommand)
                   : (LOGIN_COMMANDS[f.cliCommand] ?? `# fix ${f.cliCommand} manually`);
               const heading =
                 f.reason === 'not-installed'

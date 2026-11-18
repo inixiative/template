@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { clearHookRegistry, DbAction, db, HookTiming, registerDbHook } from '@template/db';
-import { readPrismaTransaction } from '@template/db/extensions/prismaTransaction';
+import { prismaTransactionOf } from '@template/db/extensions/prismaTransaction';
 import { Prisma } from '@template/db/generated/client/client';
-import { getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber } from '@template/db/test/factory';
 import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
-const nextEmail = (label: string) => `${label}-${getNextSeq()}-${Date.now()}@test.com`;
+const nextEmail = (label: string) =>
+  `${label}-${nextFactorySequenceNumber()}-${Date.now()}@test.com`;
 
 describe('managed transactions', () => {
   beforeEach(() => {
@@ -106,7 +107,12 @@ describe('managed transactions', () => {
             email: nextEmail('hookless-nested'),
             name: 'Hookless Nested',
             sessions: {
-              create: [{ token: `hookless-${getNextSeq()}-${Date.now()}`, expiresAt: new Date() }],
+              create: [
+                {
+                  token: `hookless-${nextFactorySequenceNumber()}-${Date.now()}`,
+                  expiresAt: new Date(),
+                },
+              ],
             },
           },
         }),
@@ -125,7 +131,12 @@ describe('managed transactions', () => {
           email: nextEmail('raw-nested'),
           name: 'Raw Nested',
           sessions: {
-            create: [{ token: `raw-nested-${getNextSeq()}-${Date.now()}`, expiresAt: new Date() }],
+            create: [
+              {
+                token: `raw-nested-${nextFactorySequenceNumber()}-${Date.now()}`,
+                expiresAt: new Date(),
+              },
+            ],
           },
         },
       });
@@ -151,7 +162,7 @@ describe('managed transactions', () => {
           await db.session.create({
             data: {
               userId: (result as { id: string }).id,
-              token: `atomic-${getNextSeq()}-${Date.now()}`,
+              token: `atomic-${nextFactorySequenceNumber()}-${Date.now()}`,
               expiresAt: new Date(Date.now() + 60_000),
             },
           });
@@ -183,7 +194,7 @@ describe('managed transactions', () => {
           await db.session.create({
             data: {
               userId: (result as { id: string }).id,
-              token: `visible-${getNextSeq()}-${Date.now()}`,
+              token: `visible-${nextFactorySequenceNumber()}-${Date.now()}`,
               expiresAt: new Date(Date.now() + 60_000),
             },
           });
@@ -243,7 +254,7 @@ describe('managed transactions', () => {
 
 // If this fails, Prisma moved or renamed the executing-transaction marker that db.txn()'s
 // registration handshake and the mutation extension both read. Re-point
-// readPrismaTransaction() in extensions/prismaTransaction.ts at the new location; do not
+// prismaTransactionOf() in extensions/prismaTransaction.ts at the new location; do not
 // fall back to db.isInTxn(), which is what this replaced.
 describe('Prisma internal transaction marker (db.txn registration depends on it)', () => {
   it('exposes the interactive transaction id on __internalParams, with a distinct id per transaction', async () => {
@@ -255,7 +266,7 @@ describe('Prisma internal transaction marker (db.txn registration depends on it)
         query: {
           $allModels: {
             async findFirst(params) {
-              observedTransactions.push(readPrismaTransaction(params));
+              observedTransactions.push(prismaTransactionOf(params));
               return params.query(params.args);
             },
           },

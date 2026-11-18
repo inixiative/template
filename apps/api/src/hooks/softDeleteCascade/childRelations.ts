@@ -5,12 +5,12 @@
  * @uses none
  */
 import {
-  getPolymorphismConfig,
   hasDeletedAt,
   isArmColumns,
   type ModelName,
   modelFields,
   modelNames,
+  polymorphismConfigForModel,
 } from '@template/db';
 import { CASCADE_EXEMPT } from '#/hooks/softDeleteCascade/cascadeExempt';
 
@@ -28,7 +28,7 @@ const armOf = (
   parent: string,
   fromFields: readonly string[],
 ): Record<string, string> => {
-  const axis = getPolymorphismConfig(child)?.axes.find(
+  const axis = polymorphismConfigForModel(child)?.axes.find(
     (candidate) =>
       parent in candidate.fkMap && isArmColumns(child, candidate.field, parent, fromFields),
   );

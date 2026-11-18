@@ -7,10 +7,10 @@ import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
 import { useAsyncAction } from '../components/useAsyncAction';
 import { setupVercel } from '../tasks/vercelSetup';
-import { getVercelProgressItems } from '../tasks/vercelSteps';
+import { vercelProgressItems } from '../tasks/vercelSteps';
 import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import { clearError, clearProgress } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
@@ -59,7 +59,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
 
   // Progress items
-  const progressItems = useMemo(() => (config ? getVercelProgressItems(config) : []), [config]);
+  const progressItems = useMemo(() => (config ? vercelProgressItems(config) : []), [config]);
 
   // Load teams on mount
   useEffect(() => {
@@ -150,8 +150,8 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
       await syncConfig();
 
       // Read fresh config from disk (React state may be stale)
-      const { getProjectConfig } = await import('../utils/getProjectConfig');
-      const freshConfig = await getProjectConfig();
+      const { fetchProjectConfig } = await import('../utils/fetchProjectConfig');
+      const freshConfig = await fetchProjectConfig();
       const existingTeamId = freshConfig.vercel?.teamId;
       const existingTeamName = freshConfig.vercel?.teamName || '';
 
@@ -217,8 +217,8 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
       await syncConfig();
 
       // Read fresh config from disk (React state may be stale)
-      const { getProjectConfig } = await import('../utils/getProjectConfig');
-      const freshConfig = await getProjectConfig();
+      const { fetchProjectConfig } = await import('../utils/fetchProjectConfig');
+      const freshConfig = await fetchProjectConfig();
       const existingTeamId = freshConfig.vercel?.teamId;
       const existingTeamName = freshConfig.vercel?.teamName || '';
       if (existingTeamId) {

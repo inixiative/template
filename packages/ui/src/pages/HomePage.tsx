@@ -9,10 +9,10 @@ import { useAppStore } from '@template/ui/store';
 
 type HomePageProps = {
   subtitle?: string;
-  showSignup?: boolean;
+  showSignUp?: boolean;
 };
 
-export const HomePage = ({ subtitle, showSignup = true }: HomePageProps) => {
+export const HomePage = ({ subtitle, showSignUp = true }: HomePageProps) => {
   const projectName = useAppStore((state) => state.ui.projectName);
   const appName = useAppStore((state) => state.ui.appName);
 
@@ -27,7 +27,7 @@ export const HomePage = ({ subtitle, showSignup = true }: HomePageProps) => {
           <a href="/login" className={buttonVariants()}>
             Log In
           </a>
-          {showSignup ? (
+          {showSignUp ? (
             <a href="/signup" className={buttonVariants({ variant: 'outline' })}>
               Sign Up
             </a>

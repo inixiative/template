@@ -25,9 +25,9 @@
 import {
   cacheKey,
   createRedisConnection,
-  getRedisClient,
   listRollingCaches,
   makeRollingCache,
+  redisClient,
 } from '@template/db';
 import { type Job, Worker } from 'bullmq';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
@@ -39,7 +39,7 @@ import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
-import { createSlowSlotPool } from '#/jobs/slowSlotPool';
+import { makeSlowSlotPool } from '#/jobs/slowSlotPool';
 import { JobLane, JobType, type StageContext } from '#/jobs/types';
 
 type LeafPayload = { key: string; ms: number; fail?: boolean };
@@ -153,7 +153,7 @@ const main = async (): Promise<void> => {
   });
   const worker = new Worker(
     queue.name,
-    (job: Job) => processJob(job, { slowSlots: createSlowSlotPool(10) }),
+    (job: Job) => processJob(job, { slowSlots: makeSlowSlotPool(10) }),
     { connection: workerRedis, concurrency: 10 },
   );
   worker.on('failed', (job, err) => record('jobFailed', `${job?.name}:${err.message}`));
@@ -306,13 +306,13 @@ const main = async (): Promise<void> => {
       'rolling cache leaf starts',
       () => count('rollingCacheCompute', rollingCacheName) > 0,
     );
-    const timerMsWhileLeafRuns = await getRedisClient().pttl(timer);
+    const timerMsWhileLeafRuns = await redisClient().pttl(timer);
     check(
       'rolling cache: the timer runs from the pass start, while its leaf is still out',
       timerMsWhileLeafRuns > 290_000 && (await branchState()) === 'waiting-children',
       timerMsWhileLeafRuns,
     );
-    await getRedisClient().del(timer);
+    await redisClient().del(timer);
     await coordinateOnce();
     check(
       'rolling cache: a tick after the timer ran out, with the pass still open, starts nothing',

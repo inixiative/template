@@ -9,9 +9,9 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { organizationUserReadResponseSchema } from '#/modules/organizationUser/schemas/organizationUserSchemas';
 import { spaceUserReadResponseSchema } from '#/modules/spaceUser/schemas/spaceUserSchemas';
-import { Tags } from '#/modules/tags';
 
 const responseSchema = SpaceScalarSchema.extend({
   organization: OrganizationScalarSchema,
@@ -28,5 +28,11 @@ export const meReadManySpacesRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('Space') },
   responseSchema,
-  tags: [Tags.me, Tags.space, Tags.spaceUser, Tags.organization, Tags.organizationUser],
+  tags: [
+    OpenApiTags.me,
+    OpenApiTags.space,
+    OpenApiTags.spaceUser,
+    OpenApiTags.organization,
+    OpenApiTags.organizationUser,
+  ],
 });

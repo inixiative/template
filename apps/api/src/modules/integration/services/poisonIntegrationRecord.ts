@@ -7,7 +7,7 @@
 import { db } from '@template/db';
 import type { IntegrationRecord } from '@template/db/generated/client/client';
 import type { WebhookModel } from '@template/db/generated/client/enums';
-import { integrationRecordColumn } from '#/modules/integration/services/integrationRecordColumn';
+import { integrationRecordForeignKeyForModel } from '#/modules/integration/services/integrationRecordForeignKeyForModel';
 
 export const poisonIntegrationRecord = (input: {
   integrationId: string;
@@ -18,7 +18,7 @@ export const poisonIntegrationRecord = (input: {
   db.txn(async () => {
     const recordKey = {
       integrationId: input.integrationId,
-      [integrationRecordColumn(input.model)]: input.resourceId,
+      [integrationRecordForeignKeyForModel(input.model)]: input.resourceId,
     };
     const poison = { poisonedAt: new Date(), poisonedReason: input.reason };
 

@@ -15,7 +15,7 @@ export const buildNestedPath = (path: string, value: unknown): Record<string, un
   return { [first]: buildNestedPath(rest.join('.'), value) };
 };
 
-export const validatePathNotation = (path: string, maxDepth = 5): boolean => {
+export const isValidPathNotation = (path: string, maxDepth = 5): boolean => {
   // Allow camelCase and Prisma meta-fields (_count, _max, etc.)
   // Rejects snake_case (underscores in middle of field names)
   // Examples: ✓ user.name ✓ organization._count ✗ user_name ✗ created_at

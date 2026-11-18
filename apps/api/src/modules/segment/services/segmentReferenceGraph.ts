@@ -11,7 +11,7 @@ import { customerRelationshipLens } from '#/modules/customerRelationship/lib/len
 
 export type ReferenceMap = Map<string, Set<string>>;
 
-export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
+export const targetSegmentIdsBySegmentId = (segments: Segment[]): ReferenceMap => {
   const map: ReferenceMap = new Map();
   for (const segment of segments) {
     if (!segment.conditions) {
@@ -31,15 +31,15 @@ export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
 };
 
 export const findReferenceCycle = (references: ReferenceMap, start: string): string[] | null => {
-  const settled = new Set<string>();
+  const fullyExploredIds = new Set<string>();
   const walk = (id: string, path: string[]): string[] | null => {
-    if (settled.has(id) || path.includes(id)) return null;
+    if (fullyExploredIds.has(id) || path.includes(id)) return null;
     for (const next of references.get(id) ?? []) {
       if (next === start) return [...path, id, start];
       const found = walk(next, [...path, id]);
       if (found) return found;
     }
-    settled.add(id);
+    fullyExploredIds.add(id);
     return null;
   };
   return walk(start, []);
@@ -68,5 +68,5 @@ export const sortByDependency = <T extends { id: string }>(
   return ordered;
 };
 
-export const referencedBy = (references: ReferenceMap, id: string): string[] =>
+export const segmentIdsReferencingSegment = (references: ReferenceMap, id: string): string[] =>
   [...references.entries()].filter(([, targets]) => targets.has(id)).map(([owner]) => owner);

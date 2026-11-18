@@ -115,7 +115,7 @@ export type RollingCacheRefreshOptions = { signal?: AbortSignal };
 
 // The type-erased handle the registry holds and the jobs work with. A typed RollingCache is not
 // assignable to it, because its functions take a narrower target. Code that walks every cache goes
-// through getRollingCache / listRollingCaches. `targetKey` is the target's identity (cache name plus
+// through rollingCacheByNameOrThrow / listRollingCaches. `targetKey` is the target's identity (cache name plus
 // its sorted fields): the leaf job's supersede key and the lock every result reports `computing` from.
 // `targetOf` recovers the target from a result's params.
 export type RegisteredRollingCache = {
@@ -129,7 +129,7 @@ export type RegisteredRollingCache = {
   targetOf: (params: unknown) => unknown;
   results: RollingCacheResults<unknown>;
   channel?: (target: unknown) => string;
-  read: (result: string, params: unknown) => Promise<CacheCheck<RollingCacheValue>>;
+  fetchResult: (result: string, params: unknown) => Promise<CacheCheck<RollingCacheValue>>;
   markQueued: (target: unknown) => Promise<boolean>;
   clearQueued: (target: unknown) => Promise<void>;
   refresh: (target: unknown, options?: RollingCacheRefreshOptions) => Promise<boolean>;
@@ -142,7 +142,7 @@ export type RollingCache<TTarget, TResults extends RollingCacheResults<TTarget>>
   | 'targetOf'
   | 'results'
   | 'channel'
-  | 'read'
+  | 'fetchResult'
   | 'markQueued'
   | 'clearQueued'
   | 'refresh'
@@ -154,7 +154,7 @@ export type RollingCache<TTarget, TResults extends RollingCacheResults<TTarget>>
   ) => TTarget;
   results: TResults;
   channel?: (target: TTarget) => string;
-  read: <
+  fetchResult: <
     TValue extends RollingCacheValue,
     R extends keyof TResults & string = keyof TResults & string,
   >(

@@ -96,7 +96,7 @@ model AuditLog {
 
 ---
 
-**File**: `packages/db/src/lib/hooks/ignoreFields.ts` (NEW - migrated from webhooks)
+**File**: `packages/db/src/lib/hooks/noopFields.ts` (NEW - migrated from webhooks)
 
 **PURPOSE: No-Op Detection** - Metadata/tracking fields that don't represent meaningful changes
 
@@ -137,7 +137,7 @@ export const filterIgnoredFields = <T extends Record<string, unknown>>(
 };
 ```
 
-**File**: `packages/db/src/lib/hooks/redactFields.ts` (NEW - shared utility)
+**File**: `packages/db/src/lib/hooks/sensitiveFields.ts` (NEW - shared utility)
 
 **PURPOSE: Security/Privacy** - Sensitive fields that should be hidden in logs/webhooks
 
@@ -163,7 +163,7 @@ export const HOOK_REDACT_FIELDS: Record<string, string[]> = {
   // Add more SENSITIVE fields as needed
 };
 
-export const getRedactFields = (model: string): string[] => {
+export const sensitiveFieldsOf = (model: string): string[] => {
   return HOOK_REDACT_FIELDS[model] ?? [];
 };
 
@@ -171,13 +171,13 @@ export const getRedactFields = (model: string): string[] => {
  * Redact sensitive fields - used to sanitize webhook payloads and audit logs
  * Used by webhooks and audit logs ONLY (NOT cache)
  */
-export const redactSensitiveFields = <T extends Record<string, unknown>>(
+export const maskSensitiveFields = <T extends Record<string, unknown>>(
   model: string,
   data: T,
   redactValue: string = '[REDACTED]'
 ): T => {
   const redacted = { ...data };
-  const sensitiveFields = getRedactFields(model);
+  const sensitiveFields = sensitiveFieldsOf(model);
   for (const field of sensitiveFields) {
     if (field in redacted) {
       redacted[field] = redactValue;
@@ -190,8 +190,8 @@ export const redactSensitiveFields = <T extends Record<string, unknown>>(
 **File**: `packages/db/src/lib/hooks/index.ts` (NEW)
 
 ```typescript
-export * from './ignoreFields';
-export * from './redactFields';
+export * from './noopFields';
+export * from './sensitiveFields';
 ```
 
 **File**: `apps/api/src/hooks/auditLog/constants/enabledModels.ts`
@@ -216,13 +216,13 @@ export const isAuditEnabled = (model: string): boolean => {
 ```
 
 **Tasks:**
-- [x] `packages/db/src/registries/ignoreFields.ts` (shared — used by webhooks, cache, audit)
-- [x] `packages/db/src/registries/redactFields.ts` (shared — Token field corrected to `keyHash` only)
+- [x] `packages/db/src/registries/noopFields.ts` (shared — used by webhooks, cache, audit)
+- [x] `packages/db/src/registries/sensitiveFields.ts` (shared — Token field corrected to `keyHash` only)
 - [x] Exported from `packages/db/src/index.ts`
 - [x] `packages/db/src/registries/auditEnabledModels.ts` — includes User, Organization, OrganizationUser, Space, SpaceUser, Token, AuthProvider, Account, EmailTemplate, EmailComponent
 - [ ] Update webhooks to use shared utilities (still using own copy)
-- [ ] Write tests for utilities: `packages/db/src/registries/ignoreFields.test.ts`
-- [x] Write tests for utilities: `packages/db/src/registries/redactFields.test.ts`
+- [ ] Write tests for utilities: `packages/db/src/registries/noopFields.test.ts`
+- [x] Write tests for utilities: `packages/db/src/registries/sensitiveFields.test.ts`
 
 ---
 
@@ -236,7 +236,7 @@ export const isAuditEnabled = (model: string): boolean => {
 - Hook into `HookTiming.after` for all actions
 - Only log models in `AUDIT_ENABLED_MODELS` registry
 - Filter ignored fields using `filterIgnoredFields()` from shared hooks utils
-- Redact sensitive fields using `redactSensitiveFields()` from shared hooks utils
+- Redact sensitive fields using `maskSensitiveFields()` from shared hooks utils
 - Compute diff for updates (only changed fields, after filtering/redacting)
 - Extract actor info from context (userId, spoofUserId, tokenId, IP, userAgent)
 - Write async using `db.onCommit()` for non-blocking
@@ -245,7 +245,7 @@ export const isAuditEnabled = (model: string): boolean => {
 **Implementation Checklist:**
 - [x] `apps/api/src/hooks/auditLog/hook.ts` — `registerAuditLogHook()`
 - [x] `isAuditEnabled(model)` guard
-- [x] Field processing pipeline: filterIgnoredFields → redactSensitiveFields → computeDiff
+- [x] Field processing pipeline: filterIgnoredFields → maskSensitiveFields → computeDiff
 - [x] processAuditData called once per record; computeDiff receives pre-processed data (no double-processing)
 - [x] Actor extracted from `auditActorContext` ALS
 - [x] AuditLog model excluded from hook (no recursion)
@@ -259,7 +259,7 @@ export const isAuditEnabled = (model: string): boolean => {
 
 Helper functions:
 ```typescript
-import { filterIgnoredFields, redactSensitiveFields } from '@template/db/lib/hooks';
+import { filterIgnoredFields, maskSensitiveFields } from '@template/db/lib/hooks';
 
 /**
  * Process data through filtering and redaction pipeline
@@ -271,7 +271,7 @@ export const processAuditData = (
   // Step 1: Filter ignored fields (updatedAt, lastLoginAt, etc.)
   const filtered = filterIgnoredFields(model, data);
   // Step 2: Redact sensitive fields (passwords, tokens, etc.)
-  const redacted = redactSensitiveFields(model, filtered);
+  const redacted = maskSensitiveFields(model, filtered);
   return redacted;
 };
 
@@ -420,7 +420,7 @@ export const cleanStaleAuditLogs: JobHandler<void> = makeSingletonJob(async (ctx
 **Backend Tests:**
 - [ ] Shared hook utils work correctly:
   - [ ] `filterIgnoredFields()` removes noise fields
-  - [ ] `redactSensitiveFields()` redacts passwords/tokens
+  - [ ] `maskSensitiveFields()` redacts passwords/tokens
 - [ ] Hook fires on create/update/delete for enabled models
 - [ ] Hook does NOT fire for disabled models
 - [ ] Ignored fields are filtered before storing
@@ -445,10 +445,10 @@ export const cleanStaleAuditLogs: JobHandler<void> = makeSingletonJob(async (ctx
 ### Database
 - `packages/db/prisma/schema/auditLog.prisma` (NEW)
 - `packages/db/src/typedModelIds.ts` (MODIFY)
-- `packages/db/src/lib/hooks/ignoreFields.ts` (NEW - shared utility)
-- `packages/db/src/lib/hooks/redactFields.ts` (NEW - shared utility)
-- `packages/db/src/lib/hooks/ignoreFields.test.ts` (NEW)
-- `packages/db/src/lib/hooks/redactFields.test.ts` (NEW)
+- `packages/db/src/lib/hooks/noopFields.ts` (NEW - shared utility)
+- `packages/db/src/lib/hooks/sensitiveFields.ts` (NEW - shared utility)
+- `packages/db/src/lib/hooks/noopFields.test.ts` (NEW)
+- `packages/db/src/lib/hooks/sensitiveFields.test.ts` (NEW)
 - `packages/db/src/lib/hooks/index.ts` (NEW)
 - `packages/db/src/index.ts` (MODIFY - export hooks utils)
 - `packages/db/src/test/factories/auditLogFactory.ts` (NEW)
@@ -494,7 +494,7 @@ export const cleanStaleAuditLogs: JobHandler<void> = makeSingletonJob(async (ctx
 - ✅ Expandable rows show before/after/changes
 - ✅ Spoofed actions are visually highlighted
 - ✅ Comprehensive test coverage
-- ✅ Shared hook utilities (`ignoreFields`, `redactFields`) can be reused by webhooks and other hooks
+- ✅ Shared hook utilities (`noopFields`, `sensitiveFields`) can be reused by webhooks and other hooks
 
 **Future (not in scope):**
 - ❌ Org/space-level access (wait for data lake/retention strategy)

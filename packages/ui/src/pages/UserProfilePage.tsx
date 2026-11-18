@@ -4,10 +4,10 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+import { useQuery } from '@tanstack/react-query';
 import { meRead, meReadQueryKey } from '@template/sdk';
 import { Page } from '@template/ui/components';
 import { ChangePasswordCard, ProfileFormCard } from '@template/ui/components/settings';
-import { useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 
 export const UserProfilePage = () => {
@@ -28,7 +28,7 @@ export const UserProfilePage = () => {
             name={profile?.name ?? ''}
             canEditName={false}
             readOnlyMessage="User profile editing coming soon"
-            showThemeToggle
+            showThemeSelector
           />
           <ChangePasswordCard />
         </div>

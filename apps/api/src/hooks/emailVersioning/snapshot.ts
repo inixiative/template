@@ -11,7 +11,7 @@ import {
   auditActorColumns,
   buildContextFkFields,
   buildSubjectFkFields,
-  processAuditData,
+  maskSensitiveAndOmitNoopFieldsForAudit,
 } from '#/hooks/auditLog/utils';
 
 export const createVersionBumpSnapshot = async (
@@ -19,8 +19,8 @@ export const createVersionBumpSnapshot = async (
   record: Record<string, unknown>,
   componentVersions: Record<string, string | null>,
 ): Promise<string> => {
-  const actor = auditActorContext.getScope();
-  const processed = processAuditData(model, record) as Prisma.InputJsonValue;
+  const actor = auditActorContext.currentActor();
+  const processed = maskSensitiveAndOmitNoopFieldsForAudit(model, record) as Prisma.InputJsonValue;
 
   const entry: Prisma.AuditLogCreateManyInput = {
     action: AuditAction.update,

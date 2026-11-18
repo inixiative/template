@@ -4,10 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import { toModelName } from '@template/db/utils/modelNames';
 
-const targetAxis = getPolymorphismConfig('RuleReference')?.axes.find(
+const targetAxis = polymorphismConfigForModel('RuleReference')?.axes.find(
   (axis) => axis.field === 'targetModel',
 );
 

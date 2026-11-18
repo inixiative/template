@@ -47,8 +47,8 @@ AES-256-GCM field-level encryption with automatic key rotation. Encryption infra
 ```
 encryption/
 ├── types.ts            # EncryptedFieldData, EncryptionKeyring
-├── registry.ts         # ENCRYPTED_MODELS - model → { keyName: config } map, getFieldNames()
-├── helpers.ts          # encryptField(), decryptField()
+├── registry.ts         # ENCRYPTED_MODELS - model → { keyName: config } map, encryptedColumnNamesForKey()
+├── fieldEncryption.ts  # encryptField(), decryptField()
 ├── encryptionService.ts # Low-level crypto operations
 ├── validation.ts       # validateEncryptionVersions() — deploy-time version check (not wired, see below)
 └── envValidation.ts    # Environment schema validation
@@ -83,7 +83,7 @@ model AuthProvider {
 }
 ```
 
-**Convention**: `encrypted{Key}`, `encrypted{Key}Metadata`, `encrypted{Key}KeyVersion`, where `{Key}` is the registry key name upper-first (`secrets` → `encryptedSecrets`). `getFieldNames(keyName)` derives all three; the registry never lists column names.
+**Convention**: `encrypted{Key}`, `encrypted{Key}Metadata`, `encrypted{Key}KeyVersion`, where `{Key}` is the registry key name upper-first (`secrets` → `encryptedSecrets`). `encryptedColumnNamesForKey(keyName)` derives all three; the registry never lists column names.
 
 ### Registry Structure
 
@@ -166,7 +166,7 @@ export const ENCRYPTED_MODELS = {
 ### 4. Use in Controllers
 
 ```typescript
-import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
+import { encryptField, decryptField } from '@template/db/lib/encryption/fieldEncryption';
 import { ENCRYPTED_MODELS } from '@template/db/lib/encryption/registry';
 
 // Encrypt before create
@@ -210,7 +210,7 @@ const decrypted = await decryptField(
    - Re-encrypts with version 2
 
 3. **Job processes in parallel**:
-   - Uses `resolveAll()` with db concurrency limits
+   - Uses `runAllWithConcurrencyLimit()` with db concurrency limits
    - Idempotent updates (version in where clause)
    - Logs progress to BullBoard
 
@@ -372,8 +372,8 @@ export const makeSingletonJob = <T>(handler: JobHandler<T>) => {
     const identifier = (ctx.job.data as { id?: string })?.id ?? ctx.job.name;
     if (!identifier) throw new Error('Singleton job missing id and name');
 
-    // Cross-process Redis lock (heartbeated TTL + fenced release) — see createLock.
-    const lock = createLock({ service: 'job-singleton', identifier, ttlMs: 300_000, heartbeatMs: 60_000 });
+    // Cross-process Redis lock (heartbeated TTL + fenced release) — see makeLock.
+    const lock = makeLock({ service: 'job-singleton', identifier, ttlMs: 300_000, heartbeatMs: 60_000 });
     if (!(await lock.acquire())) return; // another worker already running
 
     try {
@@ -393,7 +393,7 @@ export const makeSingletonJob = <T>(handler: JobHandler<T>) => {
 // 1. Auto-discovery
 for (modelName in ENCRYPTED_MODELS) {
   for ([keyName, keyConfig] of Object.entries(modelConfig.keys)) {
-    const { versionField } = getFieldNames(keyName);
+    const { versionField } = encryptedColumnNamesForKey(keyName);
 
     // 2. Read target version from env
     const targetVersion = parseInt(process.env[`${envPrefix}_ENCRYPTION_VERSION`]);
@@ -419,7 +419,7 @@ for (modelName in ENCRYPTED_MODELS) {
 }
 
 // 5. Parallel execution with concurrency control
-const results = await resolveAll(allRotations, getConcurrency([ConcurrencyType.db]));
+const results = await runAllWithConcurrencyLimit(allRotations, minimumConcurrencyLimitFor([ConcurrencyType.db]));
 ```
 
 ---

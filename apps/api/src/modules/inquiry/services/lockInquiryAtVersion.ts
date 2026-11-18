@@ -6,7 +6,7 @@
  */
 import { db } from '@template/db';
 import { makeError } from '#/lib/errors';
-import type { Inquiry } from '#/modules/inquiry/handlers/types';
+import type { Inquiry } from '#/modules/inquiry/services/types';
 
 export const lockInquiryAtVersion = async (
   inquiryId: string,

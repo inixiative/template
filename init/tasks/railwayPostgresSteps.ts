@@ -1,11 +1,11 @@
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import type { RailwayPostgresAction } from '../utils/progressTracking';
 
 type RailwayPostgresProgress = ProjectConfig['railwayPostgres']['progress'];
 
 type RailwayPostgresProgressGroup = {
   actions: readonly RailwayPostgresAction[];
-  getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
+  labelFor: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
   // Marks the group as staging-only. We still emit it when staging is disabled,
   // but flagged as "skipped" so users see what WOULD run with staging on.
   requiresStaging?: boolean;
@@ -27,7 +27,7 @@ const railwayPostgresProgressGroups: readonly RailwayPostgresProgressGroup[] = [
       'renameProdPostgresVolume',
       'storeProdPostgresUrl',
     ],
-    getLabel: (config, completedCount, totalCount) =>
+    labelFor: (config, completedCount, totalCount) =>
       config.railwayPostgres.prodServiceId
         ? `Prod Postgres ready (${completedCount}/${totalCount}): ${config.railwayPostgres.prodServiceId}`
         : `Prod Postgres ready (${completedCount}/${totalCount})`,
@@ -41,7 +41,7 @@ const railwayPostgresProgressGroups: readonly RailwayPostgresProgressGroup[] = [
       'storeStagingPostgresUrl',
     ],
     requiresStaging: true,
-    getLabel: (config, completedCount, totalCount) =>
+    labelFor: (config, completedCount, totalCount) =>
       config.railwayPostgres.stagingServiceId
         ? `Staging Postgres ready (${completedCount}/${totalCount}): ${config.railwayPostgres.stagingServiceId}`
         : `Staging Postgres ready (${completedCount}/${totalCount})`,
@@ -56,7 +56,7 @@ export type RailwayPostgresProgressSummary = {
   skipped: boolean;
 };
 
-export const getRailwayPostgresProgressSummaries = (
+export const railwayPostgresProgressSummaries = (
   config: ProjectConfig,
 ): RailwayPostgresProgressSummary[] => {
   const stagingEnabled = config.features.staging.enabled;
@@ -65,7 +65,7 @@ export const getRailwayPostgresProgressSummaries = (
     const completedCount = countCompletedActions(config.railwayPostgres.progress, group.actions);
     const totalCount = group.actions.length;
     return {
-      label: group.getLabel(config, completedCount, totalCount),
+      label: group.labelFor(config, completedCount, totalCount),
       completed: completedCount === totalCount,
       completedCount,
       totalCount,
@@ -74,10 +74,10 @@ export const getRailwayPostgresProgressSummaries = (
   });
 };
 
-export const getRailwayPostgresProgressItems = (
+export const railwayPostgresProgressItems = (
   config: ProjectConfig,
 ): Array<{ label: string; completed: boolean; skipped: boolean }> => {
-  return getRailwayPostgresProgressSummaries(config).map((summary) => ({
+  return railwayPostgresProgressSummaries(config).map((summary) => ({
     label: summary.label,
     completed: summary.completed,
     skipped: summary.skipped,

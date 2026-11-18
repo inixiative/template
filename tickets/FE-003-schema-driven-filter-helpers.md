@@ -7,9 +7,9 @@
 **Updated**: 2026-06-13
 
 > **Built (verified 2026-06-13):** the schema-derived helper layer is done —
-> `getQueryMetadata.ts` (`getQueryMetadataByOperation`) reads per-operation
+> `fieldsFromOpenApiOperation.ts` (`fieldsFromOpenApiOperationId`) reads per-operation
 > searchable/orderable fields + enum filters from the generated query metadata;
-> `makeDataConfig(operationId)` turns that into a `DataConfig`; `useDataFilters` +
+> `queryCapabilitiesFromOpenApi(operationId)` turns that into a `ListQueryCapabilities`; `useListSearchFilterAndOrderState` +
 > `buildFilterQuery` + the `Table` primitive consume it. Backend capability is
 > exposed in the OpenAPI spec (lens-driven filter/order). **Remaining:** the
 > optional filter-builder UI component — overlaps INFRA-002's `FieldSelector`;
@@ -19,7 +19,7 @@
 
 ## Overview
 
-The data hooks (`usePaginatedData`, `useInfiniteData`, `useDataFilters`) support arbitrary filters via `setFilter(path, { operator, values })`. But consumers must manually know which fields are filterable, what operators apply, and how to construct relation paths. The backend has all this information in the Prisma schema and OpenAPI spec. The frontend should have matching helpers.
+The data hooks (`usePaginatedData`, `useInfiniteData`, `useListSearchFilterAndOrderState`) support arbitrary filters via `setFilter(path, { operator, values })`. But consumers must manually know which fields are filterable, what operators apply, and how to construct relation paths. The backend has all this information in the Prisma schema and OpenAPI spec. The frontend should have matching helpers.
 
 ## Objectives
 
@@ -34,14 +34,14 @@ The data hooks (`usePaginatedData`, `useInfiniteData`, `useDataFilters`) support
 
 ### Backend (`apps/api`)
 
-- `searchable()` in `lib/prisma/searchable.ts` reads the Prisma runtime data model to validate field paths and detect relations
+- `searchable()` (`lib/prisma/searchable.ts`) was deleted on 2026-11-17 because nothing called it; the sections below that build on it need a field-path validator written again when this ticket is taken
 - `buildWhereClause()` in `lib/prisma/buildWhereClause.ts` accepts `searchFields` (validated) or `filters` (admin, direct Prisma)
 - Shared operators in `@template/shared/bracketQuery`: scalar (`contains`, `equals`, `lt`, `lte`, `gt`, `gte`, `startsWith`, `endsWith`, `not`), array (`in`, `notIn`), relation (`some`, `every`, `none`, `is`, `isNot`)
 
 ### Frontend (`packages/ui`)
 
-- `makeDataConfig()` reads OpenAPI spec and extracts `searchableFields`, `orderableFields`, `enumFilters`
-- `useDataFilters` manages search/filter/sort state with `buildFilterQuery` serialization
+- `queryCapabilitiesFromOpenApi()` reads OpenAPI spec and extracts `searchableFields`, `orderableFields`, `enumFilters`
+- `useListSearchFilterAndOrderState` manages search/filter/sort state with `buildFilterQuery` serialization
 - `FilterState.operator` only accepts a subset: `ArrayFieldOperator | 'equals' | 'contains' | 'startsWith' | 'endsWith'` — missing `lt`, `lte`, `gt`, `gte`, `not`
 
 ### Gap
@@ -54,7 +54,7 @@ The frontend knows field names and enum values but not field types. A consumer c
 
 ### Step 1: Fix FilterState operator type
 
-**File:** `packages/ui/src/hooks/useDataFilters.ts`
+**File:** `packages/ui/src/hooks/useListSearchFilterAndOrderState.ts`
 
 Change `FilterState.operator` to use `FieldOperator` from `@template/shared/bracketQuery`:
 
@@ -73,7 +73,7 @@ This accepts all operators the backend supports. No behavior change — `buildFi
 
 **File:** New `packages/ui/src/lib/getFieldMetadata.ts`
 
-Extend the existing `getQueryMetadata` pattern to produce per-field info:
+Extend the existing `fieldsFromOpenApiOperation` pattern to produce per-field info:
 
 ```ts
 export type FieldType = 'string' | 'number' | 'integer' | 'date' | 'boolean' | 'enum' | 'relation';
@@ -148,25 +148,25 @@ export function buildRelationPath(
 One file, one function:
 
 ```ts
-/** Check if a field path is filterable against a DataConfig. */
-export function isFieldFilterable(config: DataConfig, path: string): boolean;
+/** Check if a field path is filterable against a ListQueryCapabilities. */
+export function isFieldFilterable(config: ListQueryCapabilities, path: string): boolean;
 ```
 
 Returns true if the path is in `searchableFields` (non-admin) or if `adminMode` is true (admin can filter anything).
 
-### Step 5: Extend DataConfig with field metadata
+### Step 5: Extend ListQueryCapabilities with field metadata
 
-**File:** `packages/ui/src/lib/makeDataConfig.ts`
+**File:** `packages/ui/src/lib/queryCapabilitiesFromOpenApi.ts`
 
 ```ts
-export type DataConfig = {
+export type ListQueryCapabilities = {
   // ... existing fields ...
   /** Per-field metadata for building filter UI. */
   fields: FieldMetadata[];
 };
 ```
 
-`makeDataConfig` calls `getFieldMetadata` and includes the result.
+`queryCapabilitiesFromOpenApi` calls `getFieldMetadata` and includes the result.
 
 ---
 
@@ -226,7 +226,7 @@ Admin mode uses `filters[...]` which bypasses the whitelist entirely — every f
 | Create | `packages/ui/src/lib/operatorsForFieldType.ts` | Type → valid operators mapping |
 | Create | `packages/ui/src/lib/buildRelationPath.ts` | Dot-notation path builder for Prisma relations |
 | Create | `packages/ui/src/lib/isFieldFilterable.ts` | Check field filterability against config |
-| Modify | `packages/ui/src/lib/makeDataConfig.ts` | Add `fields: FieldMetadata[]` |
+| Modify | `packages/ui/src/lib/queryCapabilitiesFromOpenApi.ts` | Add `fields: FieldMetadata[]` |
 | Create | Tests for each new file (one test file per source file) |
 
 ## Non-goals

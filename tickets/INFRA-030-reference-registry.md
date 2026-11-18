@@ -11,7 +11,7 @@
 > guard covered two referencing surfaces and missed two more, and a `none` rule over a deleted target
 > is vacuously true for the whole tenant. This is the template's version — same primitive,
 > Postgres-shaped — with email conditionals as the first surface, and the ruling that email's
-> `componentRefs` does **not** ride it.
+> `componentSlugs` does **not** ride it.
 
 ---
 
@@ -29,8 +29,8 @@ were each answered by scanning every rule-bearing column:
   evaluated: `any` degrades to false, `none` becomes everyone. Detecting that at evaluation time is
   another tree walk, on the hot path.
 
-Email already solved the first two for one edge type in one domain: `componentRefs String[]` with a
-GIN index, derived on save, `degradedComponentRefs` as the broken-refs projection, and the
+Email already solved the first two for one edge type in one domain: `componentSlugs String[]` with a
+GIN index, derived on save, `missingComponentSlugs` as the broken-refs projection, and the
 `emailVersioning` hook walking the reverse edges on every save/soft-delete. That works because the
 edge is homogeneous (component → component) and Postgres arrays index. Rules reference rows across
 models, and a Json column's contents aren't indexable — so the edges become rows.
@@ -66,7 +66,7 @@ named first consumer that API was waiting for.
 Which models are referenceable is the registry's answer, not a surface's:
 `RULE_REFERENCEABLE_MODELS` (`packages/db/src/utils/ruleReferenceable.ts`) is the `targetModel`
 axis of `PolymorphismRegistry.RuleReference`. A rule-tracked lens never exposes an FK column:
-`omitForeignKeys(lens)` (`packages/db/src/lens`, the `redactLens` shape) omits every FK column
+`omitForeignKeys(lens)` (`packages/db/src/lens`, the `omitSensitiveFieldsFromLens` shape) omits every FK column
 `prismaMap` knows, on every model, wherever it appears. Sources are the surface's own:
 email has one rule lens per template — `emailLens` (`packages/email/src/rules/emailProjection.ts`)
 wraps in `omitForeignKeys` and declares `sources: { id: { label: 'name' } }` as a `mapDefaults`
@@ -118,14 +118,14 @@ That is also what makes the *read* flat. `ruleReferenceIssues(edges)` — a pure
 `@template/db`, no relations — answers "which of these no longer resolve" from the edge rows
 alone, so a consumer writes `include: { sourceRuleReferences: true }` and never has to grow that include
 when a model becomes referenceable. `composeTemplate` reads the template's edges and those of the
-components the cascade actually resolved (`expand` now returns their ids), and hands
+components the cascade actually resolved (`expandComponentTagsFromOwnerCascade` now returns their ids), and hands
 `interpolate({ liveRefs })` the keys that survive. What the renderer does with that set is the next
 section's — it is the one fork, not the email package's own.
 
-### `withRule` — the one fork a stored rule is evaluated through
+### `branchOnRuleHealth` — the one fork a stored rule is evaluated through
 
-`packages/shared/src/rules/withRule.ts`, in `shared` because it is pure: json-rules plus a live set
-the caller hands in. `withRule({ lens, rule, references, live, bindings }, { degraded, sound })`
+`packages/shared/src/rules/ruleHealth.ts`, in `shared` because it is pure: json-rules plus a live set
+the caller hands in. `branchOnRuleHealth({ lens, rule, references, live, bindings }, { degraded, sound })`
 asks, at evaluation and against the *current* lens, whether the rule can be evaluated correctly.
 Two questions, one answer (ruling 2026-09-10):
 
@@ -166,7 +166,7 @@ set-diff keeps survivors, clear, components, refused on missing /
 soft-deleted, a `path` or describing operator saves with no edge, a soft-delete stamps every edge
 naming the target and a restore clears them, a purge nulls the FK and leaves the edge naming the
 row, the client refuses a hard delete, the registry refuses a contradicting FK.
-`packages/shared/src/rules/withRule.test.ts` (8): sound, reference issue, no live set, no
+`packages/shared/src/rules/ruleHealth.test.ts` (8): sound, reference issue, no live set, no
 references, missing binding, supplied binding (null included), lens drift, every issue reported.
 `apps/api/src/modules/segment/tests/segmentRuleHealth.test.ts` (4): a segment's edge written and
 set-diffed, sound rule, a gone segment degrades evaluation and the read says why until restore, a
@@ -232,7 +232,7 @@ Known limitations, deliberately not papered over:
    staleness trigger, never on the edge.
 4. Legacy rows outside the id'd rule system (Zealot's ~10.8k `workflowJSON.autoApproveConfig`)
    are not backfilled; the one scanner protecting them survives with a KNOWN-BROKEN block on it.
-5. Email `componentRefs` stays as it is. A component reference resolves by **slug through the
+5. Email `componentSlugs` stays as it is. A component reference resolves by **slug through the
    owner cascade** at read time — an org adding an override `header` changes what every template in
    that org resolves without touching either row. An id edge persisted at save would be wrong the
    moment the cascade changes. Only id-addressed references ride this table.
@@ -253,7 +253,7 @@ Known limitations, deliberately not papered over:
 
 ## Ruling (Aron, 2026-09-10) — two failure paths, nothing else
 
-Zealot's `withRule` (ZLT-4444 / #2252) asked three questions: vocabulary, dynamic, missing. The
+Zealot's `branchOnRuleHealth` (ZLT-4444 / #2252) asked three questions: vocabulary, dynamic, missing. The
 template keeps two:
 
 1. **Bindings.** A `{ bind }` leaf carries an optional flag (`bindOptional`, json-rules 2.22.0).
@@ -293,7 +293,7 @@ wrote. Zealot has the same shape (ZLT-5163).
 
 #2116 (registry) and #2142 (backfill) merged 2026-09-08 — the same primitive on MySQL. The
 consumer PRs, #2201 (frozen segments), #2216 (stale match filters) and #2217 (stale
-auto-approval), each hand-roll the fork; the ruling on #2201 is to port all three onto `withRule`,
+auto-approval), each hand-roll the fork; the ruling on #2201 is to port all three onto `branchOnRuleHealth`,
 drop the `reconcilePausedAt` / `matchFiltersStaleAt` columns and their thaw logic, and let the
 reconcile sweep, the admin read and the approval path ask the same function. Zealot's degraded
 set gains one reason the template has no use for yet — "names a segment whose own rule is
@@ -325,7 +325,7 @@ Revive had its own copy of the edge writer (`regenerateRuleReferenceEdges`, plus
 `regenerateRuleReferences`). There is now one: `syncRuleReferenceEdges(owner, references, gate)`.
 `gate` is `{ sources }` on a save (newly named rows must be live and in view) or `'rebuild'` on a
 revive (no gate; dead targets are stamped, not refused). Both paths restamp kept edges and read
-targets once, through `lockedTargetStates` (which replaced `lockedLiveReferences` and the private
+targets once, through `fetchRuleReferenceTargetsDeletedAtForUpdate` (which replaced `lockedLiveReferences` and the private
 `targetStates`, the same locked query written twice).
 
 ## Hardening from Zealot ZLT-5169 / #2531 (2026-10-02)
@@ -337,13 +337,13 @@ Zealot's review of the same primitive found four holes the template shared; this
   against its target's current `deletedAt`: ids are stable and a second rebuild is a no-op.
 - **Target stamps are read under `FOR UPDATE`.** A plain read races the target's own soft delete:
   the save sees the target live, the delete's referenced-side hook finds no edge to stamp, and the
-  edge is written live against a dead row. `lockedTargetStates` locks them.
+  edge is written live against a dead row. `fetchRuleReferenceTargetsDeletedAtForUpdate` locks them.
 - **Targets are locked in model-name order**, not the order the rule lists them, so two saves that
   name a Segment and a Tag the other way round cannot deadlock on each other.
 - **Owner lock on rule saves.** The cycle check reads the owner's graph unlocked, so two saves that
   name each other each see a graph without the other's edge and both commit. `withOwnerLock(owner,
   'rules', save)` (`apps/api/src/lib/locks/withOwnerLock.ts`) serializes a segment's conditions
-  save per owner: a Redis `createLock` taken before the transaction, so it precedes every row lock;
+  save per owner: a Redis `makeLock` taken before the transaction, so it precedes every row lock;
   3s wait then 409. It rides INFRA-035's `acquire({ waitMs, onTimeout })`.
 - **The soft-delete cascade is batched by stamp.** One write's rows are grouped by tombstone stamp
   and each child table is walked once per group; `REGENERATE_ON_REVIVE` takes the revived rows and

@@ -28,5 +28,7 @@ export type MessageProviderAdapter = (
 
 export const messageProviderRegistry = makeBroadcastRegistry<MessageProviderAdapter>();
 
-export const getMessageProviderAdapter = (type: ContactType): MessageProviderAdapter | undefined =>
+export const messageProviderAdapterForContactType = (
+  type: ContactType,
+): MessageProviderAdapter | undefined =>
   messageProviderRegistry.has(type) ? messageProviderRegistry.get(type) : undefined;

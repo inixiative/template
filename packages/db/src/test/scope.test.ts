@@ -14,7 +14,7 @@ describe('scope', () => {
       let capturedScopeId: string | null = null;
 
       await db.scope('my-request-123', async () => {
-        capturedScopeId = db.getScopeId();
+        capturedScopeId = db.currentScopeId();
       });
 
       expect(capturedScopeId!).toBe('my-request-123');
@@ -32,7 +32,7 @@ describe('scope', () => {
       let capturedScopeId: string | null | undefined = 'unchanged';
 
       await db.scope(undefined, async () => {
-        capturedScopeId = db.getScopeId();
+        capturedScopeId = db.currentScopeId();
       });
 
       expect(capturedScopeId).toBeNull();
@@ -43,10 +43,10 @@ describe('scope', () => {
       let innerScopeId: string | null = null;
 
       await db.scope('outer-scope', async () => {
-        outerScopeId = db.getScopeId();
+        outerScopeId = db.currentScopeId();
 
         await db.scope('inner-scope', async () => {
-          innerScopeId = db.getScopeId();
+          innerScopeId = db.currentScopeId();
         });
       });
 
@@ -60,10 +60,10 @@ describe('scope', () => {
       await Promise.all([
         db.scope('scope-1', async () => {
           await new Promise((r) => setTimeout(r, 10));
-          scopeIds.push(db.getScopeId());
+          scopeIds.push(db.currentScopeId());
         }),
         db.scope('scope-2', async () => {
-          scopeIds.push(db.getScopeId());
+          scopeIds.push(db.currentScopeId());
         }),
       ]);
 
@@ -75,7 +75,7 @@ describe('scope', () => {
       const capturedScopeIds: (string | null)[] = [];
 
       await db.scope('db-ops-scope', async () => {
-        capturedScopeIds.push(db.getScopeId());
+        capturedScopeIds.push(db.currentScopeId());
 
         await db.user.create({
           data: {
@@ -84,7 +84,7 @@ describe('scope', () => {
           },
         });
 
-        capturedScopeIds.push(db.getScopeId());
+        capturedScopeIds.push(db.currentScopeId());
       });
 
       expect(capturedScopeIds).toEqual(['db-ops-scope', 'db-ops-scope']);
@@ -95,7 +95,7 @@ describe('scope', () => {
 
       await db.scope('txn-scope', async () => {
         await db.txn(async () => {
-          scopeInTxn = db.getScopeId();
+          scopeInTxn = db.currentScopeId();
         });
       });
 
@@ -107,7 +107,7 @@ describe('scope', () => {
 
       try {
         await db.scope('error-scope', async () => {
-          scopeBeforeError = db.getScopeId();
+          scopeBeforeError = db.currentScopeId();
           throw new Error('Test error');
         });
       } catch {}
@@ -116,20 +116,20 @@ describe('scope', () => {
     });
   });
 
-  describe('db.getScopeId', () => {
+  describe('db.currentScopeId', () => {
     it('returns null when not in a scope', () => {
-      expect(db.getScopeId()).toBeNull();
+      expect(db.currentScopeId()).toBeNull();
     });
 
     it('returns the current scope ID when in a scope', async () => {
       await db.scope('active-scope', async () => {
-        expect(db.getScopeId()!).toBe('active-scope');
+        expect(db.currentScopeId()!).toBe('active-scope');
       });
     });
 
     it('returns null after scope completes', async () => {
       await db.scope('completed-scope', async () => {});
-      expect(db.getScopeId()).toBeNull();
+      expect(db.currentScopeId()).toBeNull();
     });
 
     it('returns null after scope fails', async () => {
@@ -139,14 +139,14 @@ describe('scope', () => {
         });
       } catch {}
 
-      expect(db.getScopeId()).toBeNull();
+      expect(db.currentScopeId()).toBeNull();
     });
 
     it('returns scope ID from txn when started without explicit scope', async () => {
       let txnScopeId: string | null = null;
 
       await db.txn(async () => {
-        txnScopeId = db.getScopeId();
+        txnScopeId = db.currentScopeId();
       });
 
       expect(txnScopeId).not.toBeNull();
@@ -160,10 +160,10 @@ describe('scope', () => {
       let scopeIdInTxn: string | null = null;
 
       await db.scope('parent-scope', async () => {
-        scopeIdInScope = db.getScopeId();
+        scopeIdInScope = db.currentScopeId();
 
         await db.txn(async () => {
-          scopeIdInTxn = db.getScopeId();
+          scopeIdInTxn = db.currentScopeId();
         });
       });
 
@@ -175,7 +175,7 @@ describe('scope', () => {
       let scopeIdInTxn: string | null = null;
 
       await db.txn(async () => {
-        scopeIdInTxn = db.getScopeId();
+        scopeIdInTxn = db.currentScopeId();
       });
 
       expect(scopeIdInTxn).not.toBeNull();
@@ -234,14 +234,14 @@ describe('scope', () => {
         db.scope('concurrent-1', async () => {
           await new Promise((r) => setTimeout(r, 5));
           results.push({
-            scopeId: db.getScopeId(),
+            scopeId: db.currentScopeId(),
             isInTxn: db.isInTxn(),
           });
         }),
         db.scope('concurrent-2', async () => {
           await db.txn(async () => {
             results.push({
-              scopeId: db.getScopeId(),
+              scopeId: db.currentScopeId(),
               isInTxn: db.isInTxn(),
             });
           });
@@ -263,7 +263,7 @@ describe('scope', () => {
         Array.from({ length: numScopes }, (_, i) =>
           db.scope(`scope-${i}`, async () => {
             await new Promise((r) => setTimeout(r, Math.random() * 20));
-            const scopeId = db.getScopeId();
+            const scopeId = db.currentScopeId();
             if (scopeId) results.push(scopeId);
           }),
         ),

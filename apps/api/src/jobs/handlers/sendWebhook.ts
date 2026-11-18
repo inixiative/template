@@ -90,12 +90,12 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     status = 'unreachable';
   }
 
-  const settled =
+  const isFinalOutcome =
     status === 'success' || !isRetryable({ status, httpStatus }) || isFinalAttempt(ctx.job);
 
   await db.webhookEvent.create({
     data: {
-      status: settled ? status : 'retrying',
+      status: isFinalOutcome ? status : 'retrying',
       action,
       resourceId,
       error,
@@ -110,7 +110,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     return;
   }
 
-  if (!settled) {
+  if (!isFinalOutcome) {
     throw new Error(
       `Webhook delivery to subscription ${subscriptionId} failed on attempt ${ctx.job.attemptsMade + 1}, retrying: ${error}`,
       { cause },

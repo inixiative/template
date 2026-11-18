@@ -23,10 +23,10 @@ import {
   createTagCategory,
   createUser,
   createWebhookSubscription,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 
-const seq = (prefix: string) => `${prefix}-${getNextSeq()}`;
+const seq = (prefix: string) => `${prefix}-${nextFactorySequenceNumber()}`;
 
 describe('partial unique constraints', () => {
   afterEach(async () => {

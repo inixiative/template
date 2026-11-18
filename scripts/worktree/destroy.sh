@@ -100,7 +100,7 @@ if [ -z "$SLOT" ]; then
   warn "Warning: No WORKTREE_SLOT found in $WORKTREE_DIR/.env.local"
   warn "Proceeding with worktree removal only (no DB / bucket / Redis / port cleanup)"
 else
-  valid_slot "$SLOT" || die "Error: WORKTREE_SLOT='$SLOT' in $WORKTREE_DIR/.env.local is not a slot number (1-9). Fix the file, then re-run."
+  is_valid_slot "$SLOT" || die "Error: WORKTREE_SLOT='$SLOT' in $WORKTREE_DIR/.env.local is not a slot number (1-9). Fix the file, then re-run."
   slot_resources "$SLOT"
 
   if CLAIMANT="$(slot_claimant "$SLOT" "$WORKTREE_DIR")"; then

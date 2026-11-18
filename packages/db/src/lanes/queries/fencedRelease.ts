@@ -7,15 +7,15 @@
 import type { RedisEval } from '@template/db/redis/types';
 
 // Fenced release: drop the baton only if WE still hold it (atomic, so a concurrent claim isn't
-// clobbered). If our failed claim superseded a previous holder, also clear that tombstone only when
-// it still points at us; a later claimant's tombstone is never clobbered.
+// clobbered). If our failed claim superseded a previous holder, also clear that superseded mark only when
+// it still points at us; a later claimant's superseded mark is never clobbered.
 const FENCED_RELEASE = `
 if redis.call('get', KEYS[1]) == ARGV[1] then
   redis.call('del', KEYS[1])
   if ARGV[2] ~= '' then
-    local tombstone = ARGV[3] .. ARGV[2]
-    if redis.call('get', tombstone) == ARGV[1] then
-      redis.call('del', tombstone)
+    local supersededMarkKey = ARGV[3] .. ARGV[2]
+    if redis.call('get', supersededMarkKey) == ARGV[1] then
+      redis.call('del', supersededMarkKey)
     end
   end
 end

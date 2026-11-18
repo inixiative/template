@@ -28,13 +28,13 @@ could only stand for one scalar-equality key. A batch writer had no way in short
   same key. Any other field may be the listed one. Two or more listed fields are refused before any
   lock is taken. An empty list names no row and takes no lock, as non-upserting `{ in: [] }` already
   selects nothing.
-> **Superseded by INFRA-048 (2026-11-05).** The keys are now one lock set (`createLock({ service,
+> **Superseded by INFRA-048 (2026-11-05).** The keys are now one lock set (`makeLock({ service,
 > identifiers })` through `holdLockSetUntilSettled`): one token, one heartbeat, one release, one Lua
 > call per poll, beat and release over the whole set. Acquisition still goes key by key in sorted
 > order and keeps the keys it has won while it waits on the next. The bullet below and the first
 > known cost describe the per-key locks this ticket shipped.
 
-- **A wrapper, not a second lock.** `acquireFindForUpdateLock` takes one ordinary `createLock` per key,
+- **A wrapper, not a second lock.** `acquireFindForUpdateLock` takes one ordinary `makeLock` per key,
   the same lock a single-row fence takes, one at a time in sorted order, holding each while it waits
   on the next. Two batches that share keys meet on the lowest shared key first and the loser waits
   behind the winner, so overlapping batches finish in turn. (A first cut took the keys in parallel

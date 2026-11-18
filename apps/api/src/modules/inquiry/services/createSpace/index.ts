@@ -1,0 +1,35 @@
+import { db } from '@template/db';
+import {
+  baseResolutionInputSchema,
+  type CreateSpaceResolution,
+  createSpaceResolutionSchema,
+  type SpaceContent,
+  spaceContentSchema,
+} from '@template/shared/inquiry';
+import type { Inquiry, InquiryService } from '#/modules/inquiry/services/types';
+import { validateSpaceSlugFree } from '#/modules/inquiry/validations/validateSpaceSlugFree';
+
+type CreateSpaceContent = SpaceContent;
+
+const validate = (inquiry: Partial<Inquiry>, content: CreateSpaceContent): Promise<void> =>
+  validateSpaceSlugFree({
+    organizationId: inquiry.sourceOrganizationId!,
+    slug: content.slug,
+    inquiryId: inquiry.id,
+  });
+
+export const createSpaceService: InquiryService<CreateSpaceContent, CreateSpaceResolution> = {
+  contentSchema: spaceContentSchema,
+  resolutionInputSchema: baseResolutionInputSchema,
+  resolutionSchema: createSpaceResolutionSchema,
+  defaultExpirationDays: 90,
+  validate,
+  autoApprove: async () => false,
+
+  handleApprove: async (_c, inquiry, content) => {
+    const space = await db.space.create({
+      data: { ...content, organizationId: inquiry.sourceOrganizationId! },
+    });
+    return { spaceId: space.id };
+  },
+};

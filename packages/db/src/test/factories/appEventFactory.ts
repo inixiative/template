@@ -5,9 +5,9 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const appEventFactory = createFactory('AppEvent', {
+const appEventFactory = registerFactory('AppEvent', {
   defaults: () => ({
     name: faker.word.noun(),
   }),

@@ -13,8 +13,8 @@ import {
   withDualPolymorphismIds,
 } from '@template/db';
 import { castArray, without } from 'lodash-es';
-import { getRule, RulesRegistry } from '#/hooks/rules/registry';
-import { shadowMerge } from '#/hooks/rules/shadowMerge';
+import { applyWriteDataOverPreviousRow } from '#/hooks/rules/applyWriteDataOverPreviousRow';
+import { RulesRegistry, ruleForModel } from '#/hooks/rules/registry';
 import { makeError } from '#/lib/errors';
 
 const evaluate = (rule: Condition, row: Record<string, unknown>): boolean | string => {
@@ -27,7 +27,7 @@ const evaluate = (rule: Condition, row: Record<string, unknown>): boolean | stri
 
 const validateRules = (data: Record<string, unknown>, model: ModelName): void => {
   const result = evaluate(
-    getRule(model),
+    ruleForModel(model),
     Object.fromEntries(
       Object.entries(data).map(([field, value]) => [field, isPrismaNull(value) ? null : value]),
     ),
@@ -61,7 +61,7 @@ const processUpdateArgs = (
   const data = ((args as Record<string, unknown>)?.data ??
     (args as Record<string, unknown>)?.update) as Record<string, unknown> | undefined;
   if (data && typeof data === 'object' && !Array.isArray(data))
-    validateRules(shadowMerge(previous, data), model);
+    validateRules(applyWriteDataOverPreviousRow(previous, data), model);
 };
 
 export const registerRulesHook = () => {
@@ -96,7 +96,7 @@ export const registerRulesHook = () => {
     HookTiming.after,
     [DbAction.updateManyAndReturn],
     async ({ model, result }) => {
-      const rule = getRule(model);
+      const rule = ruleForModel(model);
       if (rule === true) return;
 
       for (const record of result as Record<string, unknown>[]) {

@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createContact, createUser, getNextSeq } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createContact,
+  createUser,
+  nextFactorySequenceNumber,
+} from '@template/db/test';
 
 afterEach(async () => {
   await cleanupTouchedTables(db);
@@ -9,12 +14,12 @@ afterEach(async () => {
 
 // Pad to a 7-digit national number for E.164 (caller supplies a 4-digit "local" piece)
 const e164 = (local: string) => `+1555${local.padStart(7, '0').slice(-7)}`;
-const seqHandle = (prefix: string) => `${prefix}${getNextSeq()}`;
+const seqHandle = (prefix: string) => `${prefix}${nextFactorySequenceNumber()}`;
 
 describe('contactRules hook — phone (per-owner unique)', () => {
   it('computes valueKey from e164 on create', async () => {
     const { entity: user } = await createUser();
-    const phone = e164(String(getNextSeq()));
+    const phone = e164(String(nextFactorySequenceNumber()));
     const { entity: contact } = await createContact({
       ownerModel: ContactOwnerModel.User,
       userId: user.id,
@@ -31,7 +36,7 @@ describe('contactRules hook — phone (per-owner unique)', () => {
         ownerModel: ContactOwnerModel.User,
         userId: user.id,
         type: ContactType.phone,
-        value: { e164: e164(String(getNextSeq())), country: 'ZZ' },
+        value: { e164: e164(String(nextFactorySequenceNumber())), country: 'ZZ' },
       });
     await expect(create()).rejects.toThrow();
   });
@@ -51,7 +56,7 @@ describe('contactRules hook — phone (per-owner unique)', () => {
   it('allows the same number on two different users (per-owner uniqueness)', async () => {
     const { entity: a } = await createUser();
     const { entity: b } = await createUser();
-    const phone = e164(String(getNextSeq()));
+    const phone = e164(String(nextFactorySequenceNumber()));
     await createContact({
       ownerModel: ContactOwnerModel.User,
       userId: a.id,
@@ -71,7 +76,7 @@ describe('contactRules hook — phone (per-owner unique)', () => {
 describe('contactRules hook — email (lowercase normalization)', () => {
   it('lowercases the address into the canonical value', async () => {
     const { entity: user } = await createUser();
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
     const upper = `Mixed.Case${seq}@Example.COM`;
     const { entity: contact } = await createContact({
       ownerModel: ContactOwnerModel.User,
@@ -139,7 +144,7 @@ describe('contactRules hook — subtype enforcement', () => {
       userId: user.id,
       type: ContactType.phone,
       subtype: 'mobile',
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
+      value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
     });
     expect(contact.subtype).toBe('mobile');
   });
@@ -152,7 +157,7 @@ describe('contactRules hook — subtype enforcement', () => {
         userId: user.id,
         type: ContactType.phone,
         subtype: 'pager',
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
+        value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
       });
     await expect(create()).rejects.toThrow();
   });
@@ -165,7 +170,7 @@ describe('contactRules hook — position auto-assign', () => {
       ownerModel: ContactOwnerModel.User,
       userId: user.id,
       type: ContactType.phone,
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
+      value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
     });
     expect(first.position).toBe(1);
 
@@ -173,7 +178,7 @@ describe('contactRules hook — position auto-assign', () => {
       ownerModel: ContactOwnerModel.User,
       userId: user.id,
       type: ContactType.phone,
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
+      value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
     });
     expect(second.position).toBe(2);
   });
@@ -185,7 +190,7 @@ describe('contactRules hook — position auto-assign', () => {
       userId: user.id,
       type: ContactType.phone,
       position: 42,
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
+      value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
     });
     expect(first.position).toBe(1);
 
@@ -194,7 +199,7 @@ describe('contactRules hook — position auto-assign', () => {
       userId: user.id,
       type: ContactType.phone,
       position: 99,
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
+      value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
     });
     expect(second.position).toBe(2);
   });
@@ -205,20 +210,20 @@ describe('contactRules hook — position auto-assign', () => {
       ownerModel: ContactOwnerModel.User,
       userId: user.id,
       type: ContactType.phone,
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
+      value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
     });
     const { entity: b } = await createContact({
       ownerModel: ContactOwnerModel.User,
       userId: user.id,
       type: ContactType.phone,
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
+      value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
     });
     const { entity: c } = await createContact({
       ownerModel: ContactOwnerModel.User,
       userId: user.id,
       type: ContactType.phone,
       position: 1,
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
+      value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
     });
     expect(c.position).toBe(1);
     const aAfter = await db.contact.findUniqueOrThrow({ where: { id: a.id } });
@@ -238,7 +243,7 @@ describe('contactRules hook — position auto-assign', () => {
         userId: user.id,
         type: ContactType.phone,
         position: 42,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
+        value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
       },
       update: {},
     });
@@ -253,20 +258,20 @@ describe('contactRules hook — position auto-assign', () => {
           ownerModel: ContactOwnerModel.User,
           userId: user.id,
           type: ContactType.phone,
-          value: { e164: e164(String(getNextSeq())), country: 'US' },
+          value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
         },
         {
           ownerModel: ContactOwnerModel.User,
           userId: user.id,
           type: ContactType.phone,
           position: 1,
-          value: { e164: e164(String(getNextSeq())), country: 'US' },
+          value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
         },
         {
           ownerModel: ContactOwnerModel.User,
           userId: user.id,
           type: ContactType.phone,
-          value: { e164: e164(String(getNextSeq())), country: 'US' },
+          value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
         },
       ],
     });
@@ -284,14 +289,14 @@ describe('contactRules hook — position auto-assign', () => {
           userId: user.id,
           type: ContactType.phone,
           position: 99,
-          value: { e164: e164(String(getNextSeq())), country: 'US' },
+          value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
         },
         {
           ownerModel: ContactOwnerModel.User,
           userId: user.id,
           type: ContactType.phone,
           position: 50,
-          value: { e164: e164(String(getNextSeq())), country: 'US' },
+          value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
         },
       ],
     });
@@ -305,13 +310,13 @@ describe('contactRules hook — position auto-assign', () => {
       ownerModel: ContactOwnerModel.User,
       userId: user.id,
       type: ContactType.phone,
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
+      value: { e164: e164(String(nextFactorySequenceNumber())), country: 'US' },
     });
     const { entity: whatsapp } = await createContact({
       ownerModel: ContactOwnerModel.User,
       userId: user.id,
       type: ContactType.whatsapp,
-      value: { jid: `${getNextSeq()}@s.whatsapp.net` },
+      value: { jid: `${nextFactorySequenceNumber()}@s.whatsapp.net` },
     });
     expect(phone.position).toBe(1);
     expect(whatsapp.position).toBe(1);

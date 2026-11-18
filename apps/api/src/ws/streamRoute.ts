@@ -4,7 +4,7 @@
  * @partOf primitive:websockets
  * @uses none
  */
-import { type RegisteredStream, streamDefinitionFor } from '@template/shared/ws';
+import { type RegisteredStream, streamDefinitionForFamily } from '@template/shared/ws';
 import type { ResolvedOperation } from '#/lib/openapi/resolveOperation';
 import { resolveOperationRoute } from '#/ws/operationRoute';
 
@@ -12,7 +12,7 @@ export type StreamRoute = { definition: RegisteredStream; route: ResolvedOperati
 
 export const resolveStreamRoute = async (stream: string): Promise<StreamRoute | null> => {
   const route = await resolveOperationRoute(stream);
-  const definition = route ? streamDefinitionFor(route.operationId) : null;
+  const definition = route ? streamDefinitionForFamily(route.operationId) : null;
   if (!route || !definition || route.method !== 'GET') return null;
   return { definition, route };
 };

@@ -27,7 +27,7 @@ describe('composeTemplate', () => {
       subject: 'Hello {{recipient.name}}',
       kind: 'system',
       mjml: '<mjml><mj-body><mj-text>Hello</mj-text></mj-body></mjml>',
-      componentRefs: [],
+      componentSlugs: [],
       ownerModel: 'default',
     });
 
@@ -55,7 +55,7 @@ describe('composeTemplate', () => {
       subject: 'Test',
       kind: 'system',
       mjml: '<mjml><mj-body>{{#component:header}}{{/component:header}}<mj-text>Body</mj-text></mj-body></mjml>',
-      componentRefs: ['header'],
+      componentSlugs: ['header'],
       ownerModel: 'default',
     });
 
@@ -73,14 +73,14 @@ describe('composeTemplate', () => {
     await createEmailComponent({
       slug: 'logo',
       mjml: '<mj-image src="logo.png" />',
-      componentRefs: [],
+      componentSlugs: [],
       ownerModel: 'default',
     });
 
     await createEmailComponent({
       slug: 'header',
       mjml: '<mj-section>{{#component:logo}}{{/component:logo}}<mj-text>Nav</mj-text></mj-section>',
-      componentRefs: ['logo'],
+      componentSlugs: ['logo'],
       ownerModel: 'default',
     });
 
@@ -90,7 +90,7 @@ describe('composeTemplate', () => {
       subject: 'Test',
       kind: 'system',
       mjml: '<mjml><mj-body>{{#component:header}}{{/component:header}}</mj-body></mjml>',
-      componentRefs: ['header'],
+      componentSlugs: ['header'],
       ownerModel: 'default',
     });
 
@@ -124,7 +124,7 @@ describe('composeTemplate', () => {
       subject: 'Test',
       kind: 'system',
       mjml: '<mjml><mj-body>{{#component:missing}}{{/component:missing}}</mj-body></mjml>',
-      componentRefs: ['missing'],
+      componentSlugs: ['missing'],
       ownerModel: 'default',
     });
 
@@ -162,7 +162,7 @@ describe('composeTemplate', () => {
       subject: 'Test',
       kind: 'system',
       mjml: '<mjml><mj-body>{{#component:header}}{{/component:header}}</mj-body></mjml>',
-      componentRefs: ['header'],
+      componentSlugs: ['header'],
       ownerModel: 'Organization',
       organizationId: org.id,
     });
@@ -192,7 +192,7 @@ describe('composeTemplate', () => {
       subject: 'Test',
       kind: 'system',
       mjml: '<mjml><mj-body>{{#component:footer}}{{/component:footer}}</mj-body></mjml>',
-      componentRefs: ['footer'],
+      componentSlugs: ['footer'],
       ownerModel: 'Organization',
       organizationId: org.id,
     });
@@ -215,7 +215,7 @@ describe('composeTemplate', () => {
       subject: 'Test',
       kind: 'system',
       mjml: '<mjml><mj-body><mj-text>Org Only</mj-text></mj-body></mjml>',
-      componentRefs: [],
+      componentSlugs: [],
       ownerModel: 'Organization',
       organizationId: org.id,
     });
@@ -288,7 +288,7 @@ describe('composeComponent', () => {
     await createEmailComponent({
       slug: 'cta',
       mjml: '<mj-button href="#">Click</mj-button>',
-      componentRefs: [],
+      componentSlugs: [],
       ownerModel: 'default',
     });
 
@@ -304,14 +304,14 @@ describe('composeComponent', () => {
     await createEmailComponent({
       slug: 'icon',
       mjml: '<mj-image src="icon.png" />',
-      componentRefs: [],
+      componentSlugs: [],
       ownerModel: 'default',
     });
 
     await createEmailComponent({
       slug: 'button-with-icon',
       mjml: '<mj-section>{{#component:icon}}{{/component:icon}}<mj-button>Go</mj-button></mj-section>',
-      componentRefs: ['icon'],
+      componentSlugs: ['icon'],
       ownerModel: 'default',
     });
 

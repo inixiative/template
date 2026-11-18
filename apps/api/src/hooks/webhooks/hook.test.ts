@@ -14,7 +14,7 @@ import {
 import * as enqueueModule from '#/jobs/enqueue';
 import { processJob } from '#/jobs/processJob';
 import { JobType } from '#/jobs/types';
-import { createMockJob } from '#tests/createTestWorker';
+import { mockJob } from '#tests/makeTestWorker';
 
 type Enqueued = {
   subscriptionId: string;
@@ -517,7 +517,7 @@ describe('webhook hook — origin suppression', () => {
       },
     };
     await processJob(
-      createMockJob({
+      mockJob({
         id: 'sync-sf',
         name: 'sendWebhook',
         data: { type: JobType.adhoc, payload: { integrationId: sfIntegrationId } },

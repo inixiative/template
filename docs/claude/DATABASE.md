@@ -228,7 +228,7 @@ export const userSeeds: SeedFile = {
 
 **Features:**
 - **ID-based upsert** - Always upserts by `id` field (create or update)
-- **Concurrent processing** - Uses `resolveAll` with concurrency: 10
+- **Concurrent processing** - Uses `runAllWithConcurrencyLimit` with concurrency: 10
 - **UUIDv7 validation** - Validates all IDs are valid UUIDv7 format
 - **UUID uniqueness check** - Ensures no duplicate IDs across all seed files
 - **FK-safe ordering** - Tables seeded sequentially, records concurrently
@@ -498,7 +498,7 @@ db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or roll
 db.findForUpdate(model, where, opts?) // SELECT ... FOR NO KEY UPDATE; { upserting: true } fences a missing row
 db.withLockUntilSettled(lockOptions, fn, acquireOptions?) // Redis lock held until the txn ends
 db.cacheOverlay()       // The open transaction's cache overlay, or null outside one
-db.getScopeId()         // Get current scope ID
+db.currentScopeId()         // Get current scope ID
 db.isInTxn()            // Check if in transaction
 ```
 
@@ -532,7 +532,7 @@ The outermost `db.txn` runs its end-of-transaction work in this order:
 
 1. Prisma commits or rolls back the transaction.
 2. On commit, the cache keys the transaction wrote are cleared through `db.parallel(..., { resolution: 'allSettled' })`, so every key runs (see
-   [REDIS.md § cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)). A failure is
+   [REDIS.md § fetchThroughCache() inside a transaction](./REDIS.md#fetchthroughcache-inside-a-transaction)). A failure is
    kept, not thrown yet.
 3. The transaction is marked settled and its finally queue drains, commit or rollback. This releases
    every lock held until the transaction settles.
@@ -554,7 +554,7 @@ throws outside `db.txn()`, and a nested `db.txn()` registers on the outermost tr
 
 A lock taken inside a transaction must outlive the code that took it: the writes made under it are
 invisible to everyone else until the commit, so releasing when `fn` returns lets the next holder read
-the state before them. `db.withLockUntilSettled(lockOptions, fn, acquireOptions?)` takes a `createLock`
+the state before them. `db.withLockUntilSettled(lockOptions, fn, acquireOptions?)` takes a `makeLock`
 lock (same options; `acquireOptions` is `{ waitMs, pollMs, onTimeout }`), runs `fn`, and releases the
 lock on the transaction's finally queue (the one `db.onFinally` feeds) once the transaction settles,
 commit or rollback. The release is queued before the wait starts, so an acquisition that finishes
@@ -567,7 +567,7 @@ or throws (`isTransactionOpen`), so a take that starts after that throws at once
   waiting for, joins it instead of waiting on itself: a nested `db.txn()`, later rounds of a
   `transactionAll` batch, parallel sub-requests of one round.
 - **Holders inside the transaction still run one at a time**, in call order (a per-key
-  `createSerializedQueue` on the transaction), so parallel branches each see what the one before
+  `makeSerializedQueue` on the transaction), so parallel branches each see what the one before
   wrote. A take from inside a holder's own `fn` runs straight through. A holder whose turn comes
   after the transaction settled throws instead of running `fn`, so its writes cannot escape the
   rolled-back transaction and the released lock. The queue wait has no
@@ -578,13 +578,13 @@ or throws (`isTransactionOpen`), so a take that starts after that throws at once
   heartbeat-renewed, so a long transaction keeps it.
 
 `withOwnerLock` (`apps/api/src/lib/locks/withOwnerLock.ts`) uses it whenever it is called inside a
-transaction; outside one it takes and releases a plain `createLock` lock around `fn`. Upserting
+transaction; outside one it takes and releases a plain `makeLock` lock around `fn`. Upserting
 `findForUpdate` holds its keys the same way, through `holdLockSetUntilSettled`: one lock set over
 the keys the transaction does not hold yet, every key registered against that one acquisition and
 released once when the transaction settles. The keys are the ones `withLockUntilSettled` computes,
 so either one joins a key the other already holds in the same transaction.
 
-A lock set is `createLock({ service, identifiers: [...] })`: one token, one heartbeat and one release
+A lock set is `makeLock({ service, identifiers: [...] })`: one token, one heartbeat and one release
 over `lock:<service>:<identifier>` per identifier, deduplicated and sorted, so a set and a
 single-identifier lock contend on the same key and two sets take their shared keys in the same
 order. Each step is one Lua call over the whole set (`fencedSetPrefix` per poll, `fencedRefreshAll`
@@ -609,7 +609,7 @@ await db.txn(async () => {
 });
 ```
 
-`upserting: true` takes a Redis lock (`createLock`, service `find-for-update`, keyed on the model
+`upserting: true` takes a Redis lock (`makeLock`, service `find-for-update`, keyed on the model
 plus the where entries sorted by key, hashed) **before** the `SELECT`, and holds it until the
 transaction ends, the same way `db.withLockUntilSettled` does. The where must be scalar
 equalities (no arrays, operator objects, `null` or `undefined`), except that one field may list
@@ -622,7 +622,7 @@ error carries `model`, `waitMs` and `identifier` (`Model:hash`, or `Model:hash (
 naming the first pending key and the count of the rest); the API answers it with a 409, *Another
 request is writing this record; please retry*. Fencing the same key twice in one transaction does
 not wait on itself. Keys taken by separate `findForUpdate` calls in one transaction are separate
-lock sets, ordered by call order, so writers that fence several keys fence them in one fixed order. The `no-create-race-machinery` CI rule fails a change that
+lock sets, ordered by call order, so writers that fence several keys fence them in one fixed order. The `find-or-create-uses-find-for-update-upserting` CI rule fails a change that
 adds a bare `.upsert(` or a unique-violation catch to a file.
 
 ---
@@ -656,7 +656,7 @@ const users = await db.user.findMany({ where });
 5. Merges with `filters` object
 6. Returns combined `where` clause
 
-**Security:** Uses `validatePathNotation()` to prevent injection attacks on nested field paths.
+**Security:** Uses `isValidPathNotation()` to prevent injection attacks on nested field paths.
 
 **Example output:**
 ```typescript
@@ -694,7 +694,7 @@ Write `where`s are scoped too, so a soft-deleted row can't be mutated without a 
 Support for dot-notation field access in queries:
 
 ```typescript
-import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
+import { buildNestedPath, isValidPathNotation } from '#/lib/prisma/pathNotation';
 
 // Build nested query structure
 buildNestedPath('user.email', { contains: 'example.com' });
@@ -704,11 +704,11 @@ buildNestedPath('organization.user.email', { contains: 'test' });
 // Returns: { organization: { user: { email: { contains: 'test' } } } }
 
 // Validate path safety
-validatePathNotation('user.email');        // true
-validatePathNotation('user..email');       // false (double dots)
-validatePathNotation('user;email');        // false (invalid chars)
-validatePathNotation('a.b.c.d.e.f');       // false (exceeds max depth of 5)
-validatePathNotation('_private.field');    // false (starts with underscore)
+isValidPathNotation('user.email');        // true
+isValidPathNotation('user..email');       // false (double dots)
+isValidPathNotation('user;email');        // false (invalid chars)
+isValidPathNotation('a.b.c.d.e.f');       // false (exceeds max depth of 5)
+isValidPathNotation('_private.field');    // false (starts with underscore)
 ```
 
 **Use cases:**
@@ -832,7 +832,7 @@ A row is a directed edge in the standard names ([NAMING.md](NAMING.md)):
 | `deletedAt` | the row's tombstone |
 
 - **No grantor column.** The grantor is the target's owner, re-walked live by the permissions library.
-- **Both ends are dual-polymorphic** (`dualPolymorphismId`) (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names, and the API reads and writes the rows as stored: a writer gives `EntitlementInput` (`resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`, `lens?`) and `toEntitlementCreateData(inputs, holder, anchors)` (`packages/db/src/entitlements`) fills in each arm's keys off rows the writer already holds: the holder as read, and the anchors from `loadEntitlementAnchors` (one read per anchor model, tombstones included). It copies each anchor's `deletedAt` into `sourceDeletedAt`, so a row written on a tombstoned anchor (a factory, a hook; the grant check refuses one on the route) is born stamped. The writer refuses an anchor that does not exist with a 422 (`missingAnchors`). Arm keys come from `polymorphicArmKeys` (`packages/db/src/utils/polymorphicArmKeys.ts`). The library's entry shape (`resource: 'db:integration'`, `anchor: { resource, id, path? }`, actions as a map) exists only at the permissions boundary: `toEntitlementEntry`, `toEntitlementInput` and `entitlementsOf` in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`).
+- **Both ends are dual-polymorphic** (`dualPolymorphismId`) (`sourceId`, `targetId`, from the typed FK on create), as on `RuleReference`. The enums store model names, and the API reads and writes the rows as stored: a writer gives `EntitlementInput` (`resource`, `actions: string[]`, `where?`, `sourceModel`, `sourceId`, `sourcePath?`, `lens?`) and `toEntitlementCreateData(inputs, holder, anchors)` (`packages/db/src/entitlements`) fills in each arm's keys off rows the writer already holds: the holder as read, and the anchors from `fetchEntitlementAnchors` (one read per anchor model, tombstones included). It copies each anchor's `deletedAt` into `sourceDeletedAt`, so a row written on a tombstoned anchor (a factory, a hook; the grant check refuses one on the route) is born stamped. The writer refuses an anchor that does not exist with a 422 (`missingAnchors`). Arm keys come from `polymorphicArmKeys` (`packages/db/src/utils/polymorphicArmKeys.ts`). The library's entry shape (`resource: 'db:integration'`, `anchor: { resource, id, path? }`, actions as a map) exists only at the permissions boundary: `toEntitlementEntry`, `toEntitlementInput` and `entitlementEntriesOfHolder` in `@template/permissions` (`packages/permissions/src/entitlementRows.ts`).
 - **A member arm carries the member's whole owner chain** (Aron, 2026-11-11), as `Inquiry`'s and the owner axes' do. Why: the row then carries its tenant, so tenant filters and the audit hook read it, and a space transfer re-keys a moved member's rows by `ON UPDATE CASCADE` with the member ([Foreign Keys](#foreign-keys), the `spaceKeyColumns` test). A composite arm holds no single id, so its `sourceId` / `targetId` is the member's id as the writer gives it, and `dualPolymorphismIdConflicts` requires every key beside it. The keys of an `OrganizationUser` arm are a prefix of a `SpaceUser` arm's, so the relation `OrganizationUser.targetEntitlements` also reaches the member's `SpaceUser` rows: a holder read names its model (`includeTargetEntitlements(model)`), and the soft-delete cascade keeps each relation to its own arm (`childRelations`, the `arm` discriminator).
 - **The target owns the row.** Target FKs cascade at the database; `softDeleteCascade` tombstones a target's rows with it and revives them with it. A target that never revives (a `Token`, `SKIP_REVIVE`) keeps its rows dead.
 - **The source only names the row.** Source FKs are `onDelete: SetNull`, and every source relation is in `CASCADE_EXEMPT`: an anchor's tombstone lands in `sourceDeletedAt`, and a hard-deleted anchor (a `SegmentMember`, `Flow` or `WebhookSubscription`, which have no `deletedAt`) nulls the typed FK and leaves `sourceId` naming what went. The polymorphism rule on a dual-polymorphic axis accepts that state (FK null, plain id set), so the row can still be tombstoned with its target; a create must set the FK, never the plain id alone (`dualPolymorphismIdConflicts`).
@@ -865,17 +865,17 @@ Schema-level configuration in `packages/db/src/registries/`:
 | `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
 | `modelWhoseOwnerKeysAreCarried(axis, value)` / `carriedOwnerKeyColumns(model, axis, value)` / `carriedOwnerKeyPairs` / `keysHeldOnAxis(model, axis, value)` / `carryOwnerKeys(model, row)` | The record a value carries owner keys from; the columns it carries, paired with that record's keys through the arm relations; every key column a row holds for a value (its arm's and those it carries: the write rule, the factory and the carry all read it); copy them from that record (the hook and the test factory both call it) |
 | `polymorphicKeyColumn(model, axisField, value)` / `axisTargetIdColumn(model, axis, value)` / `whereAxisCarriesOwnerKeys(model, axisField, owner)` | The column holding the id of the row a value points at (a composite arm answers through its relation; a member arm has none); that, or the axis's `dualPolymorphismId`; an owner's rows and those of what it holds, as one flat filter |
-| `polymorphicKeyColumns` / `polymorphicTarget` / `isArmColumns` | Every key column for a value (a member arm has two or three); the `{ kind, id }` a row points at (a dual axis by its dual polymorphism id, else the typed FK); whether a relation's columns are exactly an arm's |
+| `polymorphicKeyColumns` / `rowPolymorphicAxisPointsAt` / `isArmColumns` | Every key column for a value (a member arm has two or three); the `{ kind, id }` a row points at (a dual axis by its dual polymorphism id, else the typed FK); whether a relation's columns are exactly an arm's |
 | `polymorphicArmRelation` / `polymorphicArmKeys` | The relation an arm's key columns form (matched by `isArmColumns`, as `childRelations` matches); the columns an arm sets to point at a row (its id, or a composite arm's owner chain off the row) |
-| `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
-| `polymorphicBindings(ownerModel, ownerId)` | The bind map `polymorphicIs` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`POLYMORPHIC_BINDS`, `isOwnerKind`) |
+| `conditionPolymorphicAxisPointsAtBoundRow(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
+| `polymorphicBindings(ownerModel, ownerId)` | The bind map `conditionPolymorphicAxisPointsAtBoundRow` reads for a `User`, `Organization` or `Space` owner: `{ userId \| organizationId \| spaceId: ownerId }` (`BIND_NAME_BY_OWNER_MODEL`, `isBindableOwnerModel`) |
 | `isFalsePolymorphismRef(ref)` | A `FlexibleRef` is a model name or a `FalsePolymorphismRef` `{ model, axis, value }`; the guard tells them apart (its column is `polymorphicKeyColumn(ref.model, ref.axis, ref.value)`) |
 | `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |
 
 ```typescript
-import { PolymorphismRegistry, getPolymorphismConfig } from '@template/db';
+import { PolymorphismRegistry, polymorphismConfigForModel } from '@template/db';
 
-const config = getPolymorphismConfig('Token');
+const config = polymorphismConfigForModel('Token');
 // { axes: [{ field: 'ownerModel', fkMap: { User: ['userId'], ... } }] } | null
 ```
 
@@ -887,8 +887,8 @@ See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.
 
 | Consumer | Reads |
 |---|---|
-| Cache hook (`apps/api/src/hooks/cache/hook.ts`) | `loadParentRows`: a child's write clears its parent's keys ([HOOKS.md](HOOKS.md#parent-edges)) |
-| Audit hook (`contextRows`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
+| Cache hook (`apps/api/src/hooks/cache/hook.ts`) | `fetchParentRows`: a child's write clears its parent's keys ([HOOKS.md](HOOKS.md#parent-edges)) |
+| Audit hook (`fetchRowsCarryingTenantColumns`) | a child with no `organizationId` / `spaceId` / `userId` of its own takes its parent's tenancy for `context*Id` ([HOOKS.md](HOOKS.md#data-captured)) |
 | Audit history read (`auditHistoryWhere`) | `childrenOf(record)`: a record's entries and its children's in one stream ([HOOKS.md](HOOKS.md#reading-the-log)) |
 
 Why one registry: the cache traversal, the audit tenancy and the history read are the same fact ("this row's change is a change to that row"), and stating it once keeps them from drifting. Register a child only when a consumer would otherwise special-case it; a model with its own tenant columns and its own cache keys needs no edge.

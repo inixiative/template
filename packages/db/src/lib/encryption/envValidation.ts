@@ -19,7 +19,10 @@ export const encryptionKeySchema = z.string().refine(
   { message: 'Encryption key must be valid base64-encoded 32-byte key' },
 );
 
-export const createEncryptionEnvRefinement = (versionField: string, previousKeyField: string) => {
+export const makePreviousEncryptionKeyRequiredRefinement = (
+  versionField: string,
+  previousKeyField: string,
+) => {
   return (data: unknown, ctx: z.RefinementCtx) => {
     const obj = data as Record<string, unknown>;
     const version = obj[versionField];
@@ -72,7 +75,7 @@ export const encryptionEnv = (opts: { envPrefixes?: string[] } = {}) => {
     return prefixes.reduce<z.ZodTypeAny>(
       (acc, prefix) =>
         acc.superRefine(
-          createEncryptionEnvRefinement(
+          makePreviousEncryptionKeyRequiredRefinement(
             `${prefix}_ENCRYPTION_VERSION`,
             `${prefix}_ENCRYPTION_KEY_PREVIOUS`,
           ),

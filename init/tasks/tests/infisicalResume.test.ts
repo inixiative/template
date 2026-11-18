@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { infisicalApi } from '../../api/infisical';
 import { createMockConfig, defaultConfig } from '../../tests/mocks';
-import type { ProjectConfig } from '../../utils/getProjectConfig';
+import type { ProjectConfig } from '../../utils/fetchProjectConfig';
 
 const config = createMockConfig();
 
@@ -91,8 +91,8 @@ describe('Infisical Resume Scenario', () => {
       'ensureStagingWebhookSigningKeys',
     ]);
 
-    // renameEnv not complete → getProject (dev already renamed to root in recorded fixture)
-    infisicalApi.vcr.queue('getProject', 'withDevEnv');
+    // renameEnv not complete → fetchProject (dev already renamed to root in recorded fixture)
+    infisicalApi.vcr.queue('fetchProject', 'withDevEnv');
     // createStagingAdminEnvImport not complete → createSecretImport
     infisicalApi.vcr.queue('createSecretImport', 'stagingAdmin');
     // 3 always-run setSecretAsync calls (NODE_ENV, ENVIRONMENT×2)
@@ -102,8 +102,8 @@ describe('Infisical Resume Scenario', () => {
     // Encryption-keys step always iterates (no isComplete guard) so we can
     // detect newly-added ENCRYPTED_MODELS prefixes. Template has 1 prefix
     // (AUTH_PROVIDER_SECRETS) × 2 envs × 2 keys (VERSION, KEY_CURRENT) = 4
-    // getSecret probes; existing values short-circuit the writes.
-    for (let i = 0; i < 4; i++) infisicalApi.vcr.queue('getSecret', 'prodApiUrl');
+    // fetchSecret probes; existing values short-circuit the writes.
+    for (let i = 0; i < 4; i++) infisicalApi.vcr.queue('fetchSecret', 'prodApiUrl');
   });
 
   afterEach(() => {
@@ -138,7 +138,7 @@ describe('Infisical Resume Scenario', () => {
       'ensureStagingEncryptionKeys',
     );
 
-    // All VCR cassettes consumed — no extra setSecret/getSecret calls happened
+    // All VCR cassettes consumed — no extra setSecret/fetchSecret calls happened
     expect(infisicalApi.vcr.isEmpty()).toBe(true);
   }, 60_000);
 });

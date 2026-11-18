@@ -14,24 +14,24 @@ describe('makeBroadcastRegistry', () => {
     expect(() => registry.get('missing')).toThrow('Adapter not found: missing');
   });
 
-  it('getOrDefault returns named adapter if it exists', () => {
+  it('resolveOrThrow returns named adapter if it exists', () => {
     const registry = makeBroadcastRegistry<{ value: number }>();
     registry.register('primary', { value: 1 });
     registry.register('fallback', { value: 2 });
 
-    expect(registry.getOrDefault('primary', 'fallback')).toEqual({ value: 1 });
+    expect(registry.resolveOrThrow('primary', 'fallback')).toEqual({ value: 1 });
   });
 
-  it('getOrDefault returns fallback when name is undefined', () => {
+  it('resolveOrThrow returns fallback when name is undefined', () => {
     const registry = makeBroadcastRegistry<{ value: number }>();
     registry.register('fallback', { value: 2 });
 
-    expect(registry.getOrDefault(undefined, 'fallback')).toEqual({ value: 2 });
+    expect(registry.resolveOrThrow(undefined, 'fallback')).toEqual({ value: 2 });
   });
 
-  it('getOrDefault throws when fallback is missing', () => {
+  it('resolveOrThrow throws when fallback is missing', () => {
     const registry = makeBroadcastRegistry<{ value: number }>();
-    expect(() => registry.getOrDefault(undefined, 'missing')).toThrow(
+    expect(() => registry.resolveOrThrow(undefined, 'missing')).toThrow(
       'Default adapter not found: missing',
     );
   });

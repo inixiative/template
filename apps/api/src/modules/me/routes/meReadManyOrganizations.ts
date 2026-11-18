@@ -9,8 +9,8 @@ import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
+import { OpenApiTags } from '#/modules/openApiTags';
 import { organizationUserReadResponseSchema } from '#/modules/organizationUser/schemas/organizationUserSchemas';
-import { Tags } from '#/modules/tags';
 
 const responseSchema = OrganizationScalarSchema.extend({
   organizationUser: organizationUserReadResponseSchema,
@@ -25,5 +25,5 @@ export const meReadManyOrganizationsRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('Organization') },
   responseSchema,
-  tags: [Tags.me, Tags.organization, Tags.organizationUser],
+  tags: [OpenApiTags.me, OpenApiTags.organization, OpenApiTags.organizationUser],
 });

@@ -94,7 +94,7 @@ export const registerContactRulesHook = () => {
   // Upsert: args is `{ where, create, update }`. Both create and update paths
   // need normalization — only one fires depending on row existence, but we
   // can't know until Prisma runs, so treat both: validate `create` as a fresh
-  // row, validate `update` shadow-merged with previous (if available).
+  // row, validate `update` applied over the previous row (if available).
   registerDbHook(
     'contactRules:upsert',
     'Contact',

@@ -63,7 +63,7 @@
 
 ### Controllers
 - **Pass body directly to Prisma** - don't destructure unless needed
-- Use `getResource(c)` for routes with `:id` - don't refetch
+- Use `contextResource(c)` for routes with `:id` - don't refetch
 - Use `paginate()` utility for list endpoints
 - Single-line throws: `if (!x) throw makeError({ status: 404, message: '...' })` (`#/lib/errors`); never `new HTTPException`
 

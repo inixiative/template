@@ -34,10 +34,10 @@ Components are organized by **domain** (not technical type):
 
 ```
 packages/ui/src/components/
-├── auth/              # LoginForm, SignupForm, AuthDivider, SocialAuthButton
+├── auth/              # LoginForm, SignUpForm, AuthDivider, SocialAuthButton
 ├── flows/             # FlowBanner (see FLOWS.md)
 ├── inquiries/         # InquirySourceControls, InquiryTargetControls
-├── layout/            # AppShell, Sidebar, ContextSelector, Header, Breadcrumbs, Modal, drawers
+├── layout/            # AppShell, Sidebar, TenantContextSelector, Header, Breadcrumbs, Modal, drawers
 ├── organizations/     # CreateOrganizationModal
 ├── primitives/        # Base UI (Button, Input, Card, Table, Select, …)
 ├── settings/          # Settings modals and cards
@@ -210,7 +210,7 @@ const { data, isFetching } = useQuery({
 
 ### Others
 
-`Badge`, `Breadcrumb`, `CopyButton` (`value`, `label?`), `Pagination`, `ThemeToggle` (see [THEME_LAYOUT.md](THEME_LAYOUT.md#themetoggle)).
+`Badge`, `Breadcrumb`, `CopyButton` (`value`, `label?`), `Pagination`, `ThemeSelector` (see [THEME_LAYOUT.md](THEME_LAYOUT.md#themeselector)).
 
 ## Settings
 
@@ -235,12 +235,12 @@ export const ProfilePage = () => {
 
 **Components** (`packages/ui/src/components/settings/`):
 
-- `ProfileFormCard` - Name / slug form shared by the three profile pages; `showThemeToggle` adds the theme picker
+- `ProfileFormCard` - Name / slug form shared by the three profile pages; `showThemeSelector` adds the theme picker
 - `CreateTokenModal` - Token creation modal (API tokens are managed by `TokensPage`, which shows a new key once in `SecretRevealModal`)
 - `CreateWebhookModal` - Webhook subscription creation (managed by `WebhooksPage`)
-- `CreateIntegrationModal` - Connect flow for one provider, or a custom integration when `provider` is `null` (`undefined` = closed). Integrations are managed by `IntegrationsPage`: one bucket per provider in `lib/integrationProviders.ts` plus a Custom bucket (provider `null`), each its own `searchFields[provider]` query of 100 that infinite-scrolls on overflow (`useInfiniteDataQuery` + `useInfiniteScrollTrigger`); a provider's status comes from its bucket's total
+- `CreateIntegrationModal` - Connect flow for one provider, or a custom integration when `provider` is `null` (`undefined` = closed). Integrations are managed by `IntegrationsPage`: one section per provider in `lib/integrationProviders.ts` plus a Custom section (provider `null`), each its own `searchFields[provider]` query of 100 that infinite-scrolls on overflow (`useInfiniteDataQuery` + `useInfiniteScrollTrigger`); a provider's status comes from its section's total
 - `AuthProviderModal` - Auth provider configuration modal (managed by `OrganizationAuthProvidersPage`)
-- `SettingsLayout`, `UserProfileTab`, `UserWebhooksTab` - tabbed settings container and tabs; exported, not mounted by any app route
+- `SettingsLayout` - tabbed settings container; exported, not mounted by any app route
 
 ## Modals and Pages
 
@@ -248,9 +248,9 @@ export const ProfilePage = () => {
 - `InviteUserModal` (`components/users/`) - `isOpen`, `onClose`, `onSubmit(email, role)`, optional `title` and `roles`.
 - `SecretRevealModal` (`components/utility/`) - shows a secret once with a copy button.
 
-**Pages** (`packages/ui/src/pages/`): `LoginPage`, `SignupPage`, `AuthCallbackPage`, `HomePage`, `OrganizationsPage`, `OrganizationUsersPage`, `OrganizationSpacesPage`, `OrganizationProfilePage`, `SpaceProfilePage`, `UserProfilePage`, `ProfilePage`, `TokensPage`, `WebhooksPage`, `IntegrationsPage`, `OrganizationAuthProvidersPage`, `SegmentsPage`, inquiry pages (`InquiriesPage`, `AdminInquiriesPage`, `SpaceTransferInquiryPage`, `SpaceUpdateInquiryPage`, invitation / application / transfer list pages).
+**Pages** (`packages/ui/src/pages/`): `LoginPage`, `SignUpPage`, `AuthCallbackPage`, `HomePage`, `OrganizationsPage`, `OrganizationUsersPage`, `OrganizationSpacesPage`, `OrganizationProfilePage`, `SpaceProfilePage`, `UserProfilePage`, `ProfilePage`, `TokensPage`, `WebhooksPage`, `IntegrationsPage`, `OrganizationAuthProvidersPage`, `SegmentsPage`, inquiry pages (`InquiriesPage`, `AdminInquiriesPage`, `SpaceTransferInquiryPage`, `SpaceUpdateInquiryPage`, invitation / application / transfer list pages).
 
-A page that offers an inquiry action gates it with `useInquiryPermission`, or, when it checks per option (the invite form's roles), with `checkPermission` on the record `inquiryCheckRecord` builds (`packages/ui/src/lib/inquiries/inquiryCheckRecord.ts`). Never hand-roll the inquiry record: `db:inquiry` gates on `sourceModel` and `targetModel`, and a record without them shows the action to superadmins only. See `docs/claude/INQUIRIES.md#useinquirypermission`.
+A page that offers an inquiry action gates it with `useCanActOnInquiry`, or, when it checks per option (the invite form's roles), with `canActOnRecordIfPresent` on the record `inquiryRecordForPermissionCheck` builds (`packages/ui/src/lib/inquiries/inquiryRecordForPermissionCheck.ts`). Never hand-roll the inquiry record: `db:inquiry` gates on `sourceModel` and `targetModel`, and a record without them shows the action to superadmins only. See `docs/claude/INQUIRIES.md#usecanactoninquiry`.
 
 List pages share one shape: a `Page` with a create action, a `Table`, and `useOptimisticMutation` for create / delete:
 
@@ -270,7 +270,7 @@ export const OrganizationsPage = () => {
 };
 ```
 
-**Utility** (`components/utility/`): `ErrorBoundary`, `NotFound`, `RootNotFound`, `Unauthorized`, `ComingSoon`, `ShareButton`, `Toaster`.
+**Utility** (`components/utility/`): `ErrorBoundary`, `NotFound`, `RootNotFound`, `Unauthorized`, `ComingSoon`, `CopyPageLinkButton`, `Toaster`.
 
 ## Key Files
 

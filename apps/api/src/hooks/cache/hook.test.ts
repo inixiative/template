@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { createHash } from 'node:crypto';
 import {
-  cache,
   cacheKey,
   checkCache,
-  clearKey,
+  clearCacheKeysMatchingPattern,
   db,
-  fetchOne,
-  getRedisClient,
+  fetchCachedRecordWithTargetEntitlements,
+  fetchThroughCache,
   markCacheWritten,
+  redisClient,
 } from '@template/db';
 import type { Organization, OrganizationUser } from '@template/db/generated/client/client';
 import {
@@ -18,7 +18,7 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
-import { loadTokenContext } from '#/lib/context/loadTokenContext';
+import { fetchTokenContext } from '#/lib/context/fetchTokenContext';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
@@ -45,14 +45,16 @@ describe('a read through the cache inside a transaction', () => {
 
   it('sees the transaction’s own write on a key that was cached before it', async () => {
     const { entity: organization } = await createOrganization();
-    await fetchOne('organization', organization.id);
+    await fetchCachedRecordWithTargetEntitlements('organization', organization.id);
     let inside: string | undefined;
     await db.txn(async () => {
       await db.organization.update({
         where: { id: organization.id },
         data: { name: 'written-in-txn' },
       });
-      inside = (await fetchOne<Organization>('organization', organization.id))?.name;
+      inside = (
+        await fetchCachedRecordWithTargetEntitlements<Organization>('organization', organization.id)
+      )?.name;
     });
     expect(inside).toBe('written-in-txn');
   });
@@ -64,12 +66,13 @@ describe('a read through the cache inside a transaction', () => {
         where: { id: organization.id },
         data: { name: 'uncommitted' },
       });
-      await clearKey(cacheKey('organization', organization.id));
-      await fetchOne('organization', organization.id);
+      await clearCacheKeysMatchingPattern(cacheKey('organization', organization.id));
+      await fetchCachedRecordWithTargetEntitlements('organization', organization.id);
     });
-    expect((await fetchOne<Organization>('organization', organization.id))?.name).toBe(
-      organization.name,
-    );
+    expect(
+      (await fetchCachedRecordWithTargetEntitlements<Organization>('organization', organization.id))
+        ?.name,
+    ).toBe(organization.name);
   });
 
   it('leaves no uncommitted membership in a user’s relations after a rollback', async () => {
@@ -81,14 +84,14 @@ describe('a read through the cache inside a transaction', () => {
         where: { id: member.entity.id },
         data: { role: 'owner' },
       });
-      await clearKey(cacheKey('user', user.id, ['organizationUsers']));
-      await clearKey(memberKeyOf(member.entity));
+      await clearCacheKeysMatchingPattern(cacheKey('user', user.id, ['organizationUsers']));
+      await clearCacheKeysMatchingPattern(memberKeyOf(member.entity));
       await findUserWithRelations(user.id);
     });
     expect((await findUserWithRelations(user.id))?.organizationUsers[0]?.role).toBe('viewer');
     expect(
       (
-        await fetchOne<OrganizationUser>('organizationUser', {
+        await fetchCachedRecordWithTargetEntitlements<OrganizationUser>('organizationUser', {
           organizationId: member.entity.organizationId,
           userId: member.entity.userId,
         })
@@ -103,16 +106,16 @@ describe('a read through the cache inside a transaction', () => {
       { organizationUser: member.entity },
     );
     const keyHash = createHash('sha256').update(token.rawKey).digest('hex');
-    await loadTokenContext(keyHash);
+    await fetchTokenContext(keyHash);
     await rollingBack(async () => {
       await db.organizationUser.update({
         where: { id: member.entity.id },
         data: { role: 'owner' },
       });
-      await clearKey(memberKeyOf(member.entity));
-      await loadTokenContext(keyHash);
+      await clearCacheKeysMatchingPattern(memberKeyOf(member.entity));
+      await fetchTokenContext(keyHash);
     });
-    const after = await loadTokenContext(keyHash);
+    const after = await fetchTokenContext(keyHash);
     const role = (after?.context.token as unknown as { organizationUser: { role: string } })
       .organizationUser.role;
     expect(role).toBe('viewer');
@@ -123,7 +126,7 @@ describe('a read through the cache inside a transaction', () => {
     const { promise: released, resolve: release } = Promise.withResolvers<void>();
     let after: string | undefined;
     await db.txn(async () => {
-      const sibling = cache(key, async () => {
+      const sibling = fetchThroughCache(key, async () => {
         const read = await db.organization.findUnique({ where: { id: organization.id } });
         await released;
         return read;
@@ -134,7 +137,9 @@ describe('a read through the cache inside a transaction', () => {
       });
       setTimeout(release, 50);
       await Promise.all([sibling, write]);
-      after = (await fetchOne<Organization>('organization', organization.id))?.name;
+      after = (
+        await fetchCachedRecordWithTargetEntitlements<Organization>('organization', organization.id)
+      )?.name;
     });
     expect(after).toBe('written-by-sibling');
   });
@@ -142,7 +147,7 @@ describe('a read through the cache inside a transaction', () => {
     const { entity: organization } = await createOrganization();
     const key = cacheKey('organization', organization.id);
     await db.txn(async () => {
-      await fetchOne('organization', organization.id);
+      await fetchCachedRecordWithTargetEntitlements('organization', organization.id);
       expect(await cachedName(key)).toBeUndefined();
     });
     expect(await cachedName(key)).toBe(organization.name);
@@ -151,10 +156,10 @@ describe('a read through the cache inside a transaction', () => {
   it('publishes the value it recomputed after its own write when it commits', async () => {
     const { entity: organization } = await createOrganization();
     const key = cacheKey('organization', organization.id);
-    await fetchOne('organization', organization.id);
+    await fetchCachedRecordWithTargetEntitlements('organization', organization.id);
     await db.txn(async () => {
       await db.organization.update({ where: { id: organization.id }, data: { name: 'renamed' } });
-      await fetchOne('organization', organization.id);
+      await fetchCachedRecordWithTargetEntitlements('organization', organization.id);
     });
     expect(await cachedName(key)).toBe('renamed');
   });
@@ -162,7 +167,7 @@ describe('a read through the cache inside a transaction', () => {
   it('clears a key it wrote and did not read again when it commits', async () => {
     const { entity: organization } = await createOrganization();
     const key = cacheKey('organization', organization.id);
-    await fetchOne('organization', organization.id);
+    await fetchCachedRecordWithTargetEntitlements('organization', organization.id);
     await db.txn(async () => {
       await db.organization.update({ where: { id: organization.id }, data: { name: 'renamed' } });
     });
@@ -173,8 +178,8 @@ describe('a read through the cache inside a transaction', () => {
     const { entity: organization } = await createOrganization();
     const key = cacheKey('organization', organization.id);
     await db.txn(async () => {
-      await fetchOne('organization', organization.id);
-      await clearKey(key);
+      await fetchCachedRecordWithTargetEntitlements('organization', organization.id);
+      await clearCacheKeysMatchingPattern(key);
     });
     expect(await cachedName(key)).toBeUndefined();
   });
@@ -187,9 +192,9 @@ describe('a read through the cache inside a transaction', () => {
   it('publishes a key whose data holds a star as itself, clearing no other key', async () => {
     const mine = cacheKey('User', 'a*b@example.com', ['email']);
     const other = cacheKey('User', 'aXb@example.com', ['email']);
-    await cache(other, async () => 'other');
+    await fetchThroughCache(other, async () => 'other');
     await db.txn(async () => {
-      await cache(mine, async () => 'mine');
+      await fetchThroughCache(mine, async () => 'mine');
     });
     const read = async (key: string) => {
       const check = await checkCache<string>(key);
@@ -205,16 +210,20 @@ describe('a read through the cache inside a transaction', () => {
       await db.withDeleted(() => db.user.findFirst({ where: { id: user.id } })),
     ).not.toBeNull();
 
-    expect(await db.withDeleted(() => fetchOne('user', user.id))).toBeNull();
+    expect(
+      await db.withDeleted(() => fetchCachedRecordWithTargetEntitlements('user', user.id)),
+    ).toBeNull();
     const check = await checkCache<unknown>(cacheKey('user', user.id));
     expect('value' in check ? check.value : 'miss').toBeNull();
 
     const shared = cacheKey('organization', 'withDeleted-shared');
-    await cache(shared, async () => 'live');
-    expect(await db.withDeleted(() => cache(shared, async () => 'recomputed'))).toBe('live');
-    expect(await db.txn(() => db.withDeleted(() => cache(shared, async () => 'in-txn')))).toBe(
+    await fetchThroughCache(shared, async () => 'live');
+    expect(await db.withDeleted(() => fetchThroughCache(shared, async () => 'recomputed'))).toBe(
       'live',
     );
+    expect(
+      await db.txn(() => db.withDeleted(() => fetchThroughCache(shared, async () => 'in-txn'))),
+    ).toBe('live');
   });
 
   it('drops a member’s cached relations when their organization is soft-deleted', async () => {
@@ -231,7 +240,7 @@ describe('a read through the cache inside a transaction', () => {
   it('throws a failed clear at commit only after the onCommit batches ran', async () => {
     const { entity: organization } = await createOrganization();
     let batchRan = false;
-    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
+    const evalSpy = spyOn(redisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
     try {
       await expect(
         db.txn(async () => {
@@ -252,11 +261,11 @@ describe('a read through the cache inside a transaction', () => {
     const { entity: read } = await createOrganization();
     const writtenKey = cacheKey('organization', written.id);
     const readKey = cacheKey('organization', read.id);
-    await fetchOne('organization', written.id);
+    await fetchCachedRecordWithTargetEntitlements('organization', written.id);
     let atLockRelease: { written?: string; read?: string } = {};
     await db.txn(async () => {
       await db.organization.update({ where: { id: written.id }, data: { name: 'renamed' } });
-      await fetchOne('organization', read.id);
+      await fetchCachedRecordWithTargetEntitlements('organization', read.id);
       db.onFinally(async () => {
         atLockRelease = { written: await cachedName(writtenKey), read: await cachedName(readKey) };
       });
@@ -271,9 +280,9 @@ describe('a read through the cache inside a transaction', () => {
     let evalSpy: ReturnType<typeof spyOn> | undefined;
     try {
       await db.txn(async () => {
-        await fetchOne('organization', organization.id);
+        await fetchCachedRecordWithTargetEntitlements('organization', organization.id);
         db.onFinally(() => {
-          evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
+          evalSpy = spyOn(redisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
         });
       });
     } finally {

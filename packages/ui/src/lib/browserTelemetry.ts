@@ -5,7 +5,7 @@
  * @uses none
  */
 import { SpanKind, SpanStatusCode, type Tracer } from '@opentelemetry/api';
-import { redactLogValue } from '@template/shared/logger/redact';
+import { maskLogValue } from '@template/shared/logger/maskLogValue';
 import type { BrowserTelemetry } from '@template/shared/telemetry/browserSchema';
 
 let tracer: Tracer | undefined;
@@ -13,9 +13,7 @@ let apiOrigin: string | undefined;
 let initialized = false;
 const reportedErrors = new WeakSet<Error>();
 const safeError = (error: unknown) => {
-  const value = redactLogValue(
-    error instanceof Error ? error : new Error('Unhandled rejection'),
-  ) as {
+  const value = maskLogValue(error instanceof Error ? error : new Error('Unhandled rejection')) as {
     name: string;
     message: string;
     stack?: string;

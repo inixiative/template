@@ -65,7 +65,8 @@ export const syncRuleReferences = async (model: string, rows: HookRow[]): Promis
   if (!isRuleReferenceSourceModel(model)) return;
   const surface = RULE_REFERENCE_SURFACES[model];
   for (const row of rowsOf(rows)) {
-    const { references } = row.deletedAt == null ? await surface.read(row, []) : UNREFERENCED;
+    const { references } =
+      row.deletedAt == null ? await surface.fetchRuleReferencesOfRow(row, []) : UNREFERENCED;
     await syncRuleReferenceEdges({ model, id: row.id }, references);
   }
 };
@@ -79,7 +80,7 @@ const assertChangedRuleReferencesExist = async (
   const before = keyBy(previous, 'id');
   for (const row of rows) {
     if (row.deletedAt != null) continue;
-    const { judged } = await surface.read(
+    const { judged } = await surface.fetchRuleReferencesOfRow(
       row,
       changedColumns(row, before[row.id], surface.columns),
     );

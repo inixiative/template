@@ -4,7 +4,7 @@
  * @partOf primitive:websockets
  * @uses feature:auth
  */
-import { byId } from '#/ws/registry';
+import { connectionsById } from '#/ws/registry';
 import { rejectDataStream } from '#/ws/rejectDataStream';
 import type { RouteAccess } from '#/ws/routeAccess';
 import { reprobeStreamAccess } from '#/ws/streamProbe';
@@ -16,7 +16,7 @@ const streamAccess = (ws: WSSocket, stream: string): Promise<RouteAccess> =>
 export const reauthorizeStreams = async (ws: WSSocket): Promise<void> => {
   for (const stream of [...ws.data.streams]) {
     const access = await streamAccess(ws, stream);
-    if (!byId.has(ws.data.connectionId)) return;
+    if (!connectionsById.has(ws.data.connectionId)) return;
     if (access !== 'granted' && ws.data.streams.has(stream)) rejectDataStream(ws, stream, access);
   }
 };

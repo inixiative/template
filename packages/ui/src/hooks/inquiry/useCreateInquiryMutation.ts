@@ -6,7 +6,7 @@
  */
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
-import { sourceMutations } from '@template/ui/lib/inquiries/queryKeys';
+import { queryKeysToInvalidateWhenSourceMutates } from '@template/ui/lib/inquiries/queryKeys';
 
 type CreateVars = {
   inquiry: Omit<InquiryMeta, 'id' | 'updatedAt'>;
@@ -19,7 +19,7 @@ export const useCreateInquiryMutation = () => {
     mutationFn: ({ call }) => call(),
     targets: ({ inquiry, optimisticItem }) => {
       const meta: InquiryMeta = { ...inquiry, id: '__optimistic__', updatedAt: '' };
-      return sourceMutations[inquiry.type](meta).map((queryKey) => ({
+      return queryKeysToInvalidateWhenSourceMutates[inquiry.type](meta).map((queryKey) => ({
         queryKey,
         optimisticUpdate: (old: unknown) => {
           const cached = old as { data?: unknown[] } | undefined;

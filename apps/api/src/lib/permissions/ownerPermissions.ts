@@ -14,7 +14,7 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   delegate,
-  entitlementsOf,
+  entitlementEntriesOfHolder,
   organizationOwnerPermissions,
   type Permissions,
   permissionsOfUser,
@@ -42,14 +42,19 @@ type Delegated = {
 
 const nobody: Permissions = [];
 
-export const delegatedPermissions = (delegated: PermissionsRow, owner: Permissions): Permissions =>
+export const narrowOwnerPermissionsToDelegate = (
+  delegated: PermissionsRow,
+  owner: Permissions,
+): Permissions =>
   delegate(rebacSchema, owner, {
     full: delegated.full,
     ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
-    entitlements: entitlementsOf(delegated),
+    entitlements: entitlementEntriesOfHolder(delegated),
   });
 
-export const ownerPermissions = async (delegated: Delegated): Promise<Permissions> => {
+export const fetchPermissionsOfDelegateOwner = async (
+  delegated: Delegated,
+): Promise<Permissions> => {
   const { organizationId, spaceId, userId, organizationUser, spaceUser, integration } = delegated;
   switch (delegated.ownerModel) {
     case 'User': {
@@ -66,7 +71,10 @@ export const ownerPermissions = async (delegated: Delegated): Promise<Permission
       return spaceId ? spaceOwnerPermissions(spaceId) : nobody;
     case 'Integration':
       return integration
-        ? delegatedPermissions(integration, await ownerPermissions(integration))
+        ? narrowOwnerPermissionsToDelegate(
+            integration,
+            await fetchPermissionsOfDelegateOwner(integration),
+          )
         : nobody;
   }
 };

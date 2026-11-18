@@ -6,14 +6,14 @@
 
 **Template today:** lens source option sets are not cached server-side. `sourceQueryValues`
 (`packages/db/src/utils/sourceQueryValues.ts`) queries the database on every call, the rolling-cache
-registry (`apps/api/src/lib/rollingCaches.ts`) is empty, and `cacheReference` has no lens-source keys.
+registry (`apps/api/src/lib/rollingCaches.ts`) is empty, and `cacheKeysByModel` has no lens-source keys.
 The only cache is client-side (`staleTime: Infinity` in `useEmailRuleSurface`). So this ticket is the
 design for when the template adds a server cache, built here first, then mirrored by Zealot.
 
 **Zealot today:** option sets are cached per brand for 10 minutes (`readLensSource`). Zealot #3025
 (ZLT-6030) clears them on write: writes to the tables rules name by uuid clear
 `cacheKey('lensSourceValues', { brandUuid, field: 'uuid' }, [], true)` through the existing
-`registerClearCacheHook` + `cacheReference`, and the save gate reads through the cached reader.
+`registerClearCacheHook` + `cacheKeysByModel`, and the save gate reads through the cached reader.
 Zealot follow-up: ZLT-6047.
 
 ## Shape
@@ -22,7 +22,7 @@ Zealot follow-up: ZLT-6047.
    steps below.
 1. **Key lens source caches so a row can name them:** `(tenant, model, query hash)`, cleared by the
    `(tenant, model)` prefix.
-2. **Register source models in `cacheReference`.** A write to a model any lens sources (segments,
+2. **Register source models in `cacheKeysByModel`.** A write to a model any lens sources (segments,
    missions, tags, maps, …) clears that tenant's entries for that model. This is the existing hook,
    with no new registry.
 3. **Cancel in-flight rebuilds on pattern clears.** Done in the template by INFRA-046: an exact
@@ -43,7 +43,7 @@ follow-up, and so is building all of it here first.
 
 ## Definition of done
 
-- Lens source caches keyed and cleared by `(tenant, model)` through `cacheReference`.
+- Lens source caches keyed and cleared by `(tenant, model)` through `cacheKeysByModel`.
 - The `onWrite` declaration, with `rebuild` riding the rolling-cache refresh job.
 - A test: create a sourced row; the next `resolveSourceValues` offers it.
 - Zealot port ticket linked here.

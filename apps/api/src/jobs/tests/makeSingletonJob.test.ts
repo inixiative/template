@@ -4,7 +4,7 @@ import { log } from '@template/shared/logger';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import { singletonDeduplicationId } from '#/jobs/singletonDeduplicationId';
 import type { WorkerContext } from '#/jobs/types';
-import { createTestWorker } from '#tests/createTestWorker';
+import { makeTestWorker } from '#tests/makeTestWorker';
 
 const SINGLETON_ID = 'singleton-test';
 const LOCK_KEY = `${redisNamespace.lock}:job-singleton:${SINGLETON_ID}`;
@@ -18,7 +18,7 @@ const deferred = () => {
 };
 
 const singletonContext = (jobId: string): WorkerContext =>
-  createTestWorker({ id: jobId, name: 'singleton-job', data: { id: SINGLETON_ID } });
+  makeTestWorker({ id: jobId, name: 'singleton-job', data: { id: SINGLETON_ID } });
 
 describe('makeSingletonJob', () => {
   let ctx: WorkerContext;
@@ -281,6 +281,8 @@ describe('makeSingletonJob', () => {
     expect(keyed.singletonKey?.({ recordId: 'record-1' }, { id: 'cron-row' })).toBe('record-1');
     expect(unkeyed.singletonKey?.(undefined, { id: 'cron-row' })).toBe('cron-row');
     expect(unkeyed.singletonKey?.(undefined, {})).toBeUndefined();
-    expect(singletonDeduplicationId('sweepSegments', 'cron-row')).toBe('sweepSegments-cron-row');
+    expect(singletonDeduplicationId('reconcileEveryHealthyDynamicSegment', 'cron-row')).toBe(
+      'reconcileEveryHealthyDynamicSegment-cron-row',
+    );
   });
 });

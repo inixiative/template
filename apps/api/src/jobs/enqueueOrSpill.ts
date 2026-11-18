@@ -11,7 +11,7 @@ import { withLanePriority } from '#/jobs/lanePriority';
 import {
   isLaneOverflowing,
   outboxLaneOf,
-  recordAddAndTripIfFull,
+  recordEnqueueAndSetOverflowFlagForLanesAtCap,
   shouldSpill,
   spillToOutbox,
 } from '#/jobs/outbox';
@@ -107,7 +107,8 @@ export const enqueueOrSpill = async ({
   }
   if (jobOptions.delay && isSlowJobData(data))
     await recordDelayedSlowAdd(queue, jobId, jobOptions.delay);
-  if (data.type === JobType.adhoc) await recordAddAndTripIfFull(isSlowJobData(data));
+  if (data.type === JobType.adhoc)
+    await recordEnqueueAndSetOverflowFlagForLanesAtCap(isSlowJobData(data));
 
   log.info(`Enqueued job ${handlerName} (${jobId})`);
   return { jobId };

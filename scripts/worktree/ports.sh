@@ -31,7 +31,7 @@ if [ "$CHECKOUT" = "$(real_dir "$ROOT_DIR")" ]; then
   SLOT=0
 else
   SLOT="$(worktree_marker_slot "$CHECKOUT")"
-  valid_slot "$SLOT" || die "Error: $CHECKOUT has no WORKTREE_SLOT marker (1-9) in .env.local — it was not made by worktree:create."
+  is_valid_slot "$SLOT" || die "Error: $CHECKOUT has no WORKTREE_SLOT marker (1-9) in .env.local — it was not made by worktree:create."
 fi
 
 apply_slot_ports "$CHECKOUT" "$SLOT"

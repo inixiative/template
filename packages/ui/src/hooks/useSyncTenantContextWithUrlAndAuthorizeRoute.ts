@@ -1,0 +1,142 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ * @uses none
+ */
+import { useLocation } from '@tanstack/react-router';
+import { useActiveFlow } from '@template/ui/hooks/flow/useActiveFlow';
+import {
+  parseRoutingSearchParams,
+  syncStoreFromSearchParams,
+} from '@template/ui/hooks/useSyncTenantContextWithUrlAndAuthorizeRoute/querySync';
+import {
+  hasContextChanged,
+  setTenantContextInStore,
+} from '@template/ui/hooks/useSyncTenantContextWithUrlAndAuthorizeRoute/tenantContextChange';
+import {
+  applySearchParamUpdates,
+  buildSearchParamUpdates,
+} from '@template/ui/hooks/useSyncTenantContextWithUrlAndAuthorizeRoute/urlSync';
+import { findFirstTenantContextThatCanOpenPath } from '@template/ui/lib/findFirstTenantContextThatCanOpenPath';
+import { findRoute } from '@template/ui/lib/findRoute';
+import { endActiveFlow } from '@template/ui/lib/flows/endActiveFlow';
+import { isOnFlowPath } from '@template/ui/lib/flows/isOnFlowPath';
+import { useAppStore } from '@template/ui/store';
+import { useEffect, useRef, useState } from 'react';
+
+export const useSyncTenantContextWithUrlAndAuthorizeRoute = (): { isAuthorized: boolean } => {
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const { pathname, search, hash } = useLocation();
+  const navigateKeepingSearchParams = useAppStore(
+    (state) => state.navigation.navigateKeepingSearchParams,
+  );
+  const navConfig = useAppStore((state) => state.navigation.navConfig);
+  const setCurrentRouteMatch = useAppStore((state) => state.navigation.setCurrentRouteMatch);
+  const tenant = useAppStore((state) => state.tenant);
+  const permissions = useAppStore((state) => state.permissions);
+  const auth = useAppStore((state) => state.auth);
+  const flowId = useAppStore((state) => state.navigation.flowId);
+  const flow = useActiveFlow();
+  const urlFlowId = parseRoutingSearchParams(search).flowId;
+
+  useEffect(() => {
+    (async () => {
+      const searchParams = parseRoutingSearchParams(search);
+      syncStoreFromSearchParams({ searchParams, tenant: useAppStore.getState().tenant, auth });
+
+      if (searchParams.spoofEmail !== auth.spoofUserEmail) {
+        useAppStore.getState().navigation.setFlowId(null);
+        await auth.setSpoof(searchParams.spoofEmail);
+      }
+    })();
+  }, [search, auth]);
+
+  useEffect(() => {
+    const { navigation } = useAppStore.getState();
+    if (urlFlowId && urlFlowId !== navigation.flowId) navigation.setFlowId(urlFlowId);
+  }, [urlFlowId]);
+
+  // Update URL when context or spoof changes
+  useEffect(() => {
+    const searchParams = parseRoutingSearchParams(search);
+    const updates = buildSearchParamUpdates({
+      searchParams,
+      context: tenant.context,
+      spoofUserEmail: auth.spoofUserEmail,
+      flowId,
+      isKnownOrganization: (organizationId) => Boolean(auth.organizations?.[organizationId]),
+      isKnownSpace: (spaceId) => Boolean(auth.spaces?.[spaceId]),
+    });
+
+    const navigate = useAppStore.getState().navigation.navigate;
+    if (!updates || !navigate) return;
+    navigate({
+      to: pathname,
+      search: applySearchParamUpdates(search, updates),
+      hash,
+      replace: true,
+    });
+  }, [
+    tenant.context.type,
+    tenant.context.organization?.id,
+    tenant.context.space?.id,
+    auth.spoofUserEmail,
+    flowId,
+    search,
+    pathname,
+    hash,
+    auth.organizations,
+    auth.spaces,
+    tenant.context,
+  ]);
+
+  useEffect(() => {
+    if (isAuthorized && flow && !isOnFlowPath(pathname, flow)) endActiveFlow();
+  }, [isAuthorized, flow, pathname]);
+
+  // Check permissions and fallback to valid context
+  useEffect(() => {
+    if (!navConfig) return;
+
+    const authorizedContext = findFirstTenantContextThatCanOpenPath({
+      path: pathname,
+      navConfig,
+      permissions,
+      context: tenant.context,
+      viewedRecords: tenant.viewedRecords,
+      organizations: auth.organizations,
+    });
+
+    if (!authorizedContext) {
+      setCurrentRouteMatch(null);
+      return setIsAuthorized(false);
+    }
+    setIsAuthorized(true);
+    setCurrentRouteMatch(findRoute(pathname, navConfig, authorizedContext.type));
+
+    if (hasContextChanged(tenant.context, authorizedContext))
+      setTenantContextInStore({ tenant, context: authorizedContext });
+  }, [navConfig, pathname, tenant, auth.organizations, permissions, setCurrentRouteMatch]);
+
+  // Auto-navigate to dashboard when context changes on same page
+  const previousPathname = useRef('');
+  const previousContextType = useRef('');
+  useEffect(() => {
+    const prevContextType = previousContextType.current;
+    previousContextType.current = tenant.context.type;
+
+    if (!previousPathname.current) {
+      previousPathname.current = pathname;
+      return;
+    }
+
+    // Skip redirect when context is being initialized from URL params (public → org/space)
+    if (prevContextType === 'public' || prevContextType === '') return;
+
+    if (pathname === previousPathname.current) navigateKeepingSearchParams('/dashboard', 'context');
+    previousPathname.current = pathname;
+  }, [tenant.context.type, navigateKeepingSearchParams, pathname]);
+
+  return { isAuthorized };
+};

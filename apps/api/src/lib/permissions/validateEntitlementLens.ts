@@ -13,7 +13,7 @@ import {
 import { isCleared } from '@template/db';
 import type { EntitlementResourceModel } from '@template/db/generated/client/enums';
 import { lensFor } from '@template/db/lens';
-import { visitsDroppingId } from '@template/permissions/lens/visitsDroppingId';
+import { lensPathsThatDropId } from '@template/permissions/lens/lensPathsThatDropId';
 import { isPlainObject } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
@@ -50,7 +50,7 @@ export const validateEntitlementLens = (
   };
   const { ok, errors } = validated(narrowing);
   if (!ok) throw malformed(errors.map(({ path, message }) => `${path}: ${message}`).join('; '));
-  const dropping = visitsDroppingId(narrowing);
+  const dropping = lensPathsThatDropId(narrowing);
   if (dropping.length)
     throw makeError({
       status: 422,

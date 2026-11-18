@@ -36,7 +36,7 @@ static rule over customer-relationship IDs. There is no direct member add/remove
 - `reconcileCustomerRelationshipSegments` accepts `{ customerModel, customerId }`, finds that customer's
   references, hydrates each through `fetchLens`, and evaluates dynamic segments with `check()`
   in dependency order. Its superseding key is the customer model and ID.
-- `sweepSegments`, seeded for 04:00 UTC, queues sound dynamic segments in dependency order.
+- `reconcileEveryHealthyDynamicSegment`, seeded for 04:00 UTC, queues healthy dynamic segments in dependency order.
   It is the backstop for writes that do not emit business events.
 
 Controllers emit business events; event handlers enqueue reconciliation jobs. Reconciliation
@@ -52,7 +52,7 @@ a live segment can be degraded because a segment it depends on is degraded.
 
 Owner reads include `ruleIssues`. Customer-facing membership reads expose segment identity,
 name, owner, type and creation date, without the rule or its issues. Degraded segments retain
-their existing membership and are skipped by continuous reconciliation and sweep/fan-out
+their existing membership and are skipped by continuous reconciliation, the nightly reconcile and fan-out
 selection. Evaluation errors still fail jobs and use normal retries.
 
 ## API
@@ -65,7 +65,7 @@ Paths below are relative to `/api/v1`:
 | List members | `/segment/:id/segmentMembers` |
 | List owned segments or memberships | `/me`, `/user/:id`, `/organization/:id`, `/space/:id`, each with `/segments` or `/segmentMemberships` |
 | Create a segment | `/me/segments`, `/organization/:id/segments`, `/space/:id/segments` |
-| Estimate rule reach without saving | `POST /me/segments/reach`, `/organization/:id/segments/reach`, `/space/:id/segments/reach` |
+| Estimate rule reach without saving | `POST /me/segments/estimateReach`, `/organization/:id/segments/estimateReach`, `/space/:id/segments/estimateReach` |
 
 `GET /segment/info` (public) describes what `conditions` may read: every field `customerRelationshipLens`
 exposes (dotted path from `CustomerRelationship`, kind, enum values, list relations, and `sourced` fields that
@@ -117,7 +117,7 @@ can inspect. See [COMMUNICATIONS.md](COMMUNICATIONS.md#the-email-lens).
 - `apps/api/src/modules/customerRelationship/lib/lenses/`: the static lenses, `customerRelationshipLens` (vocabulary
   and ownership scope) and `customerRelationshipsByIdLens` (the rows a reconcile hydrates).
 - `apps/api/src/modules/segment/`: routes, services, trigger registry and tests.
-- `apps/api/src/jobs/handlers/`: reconciliation and sweep jobs.
+- `apps/api/src/jobs/handlers/`: segment reconciliation jobs.
 - `apps/web/app/config/nav/features/segments.ts`, `apps/web/app/routes/_authenticated/segments/`:
   sidebar and child routes.
 - `packages/ui/src/pages/SegmentsPage.tsx`: owned and membership views.

@@ -17,8 +17,8 @@ type DefaultPaginatedResponse<T> = {
 export type FetchAllPagesCap = { reason: 'maxPages' | 'maxRows'; returned: number };
 
 type FetchAllPagesOptions<R, T> = {
-  getItems?: (response: R) => T[];
-  getNextCursor?: (response: R) => string | null;
+  itemsOfResponse?: (response: R) => T[];
+  nextCursorOfResponse?: (response: R) => string | null;
   hasMore?: (response: R, request: PageRequest, items: T[]) => boolean;
   maxPages?: number;
   maxRows?: number;
@@ -33,9 +33,10 @@ const defaultIsError = (response: unknown): unknown =>
     ? (response as { error?: unknown }).error
     : undefined;
 
-const defaultGetItems = <T>(response: DefaultPaginatedResponse<T>): T[] => response.data ?? [];
+const defaultItemsOfResponse = <T>(response: DefaultPaginatedResponse<T>): T[] =>
+  response.data ?? [];
 
-const defaultGetNextCursor = <T>(response: DefaultPaginatedResponse<T>): string | null =>
+const defaultNextCursorOfResponse = <T>(response: DefaultPaginatedResponse<T>): string | null =>
   response.pagination?.nextCursor ?? null;
 
 const defaultHasMore = <T>(
@@ -52,9 +53,11 @@ export const fetchAllPages = async <T, R = DefaultPaginatedResponse<T>>(
   fetchPage: (request: PageRequest) => Promise<R>,
   options?: FetchAllPagesOptions<R, T>,
 ): Promise<T[]> => {
-  const getItems = options?.getItems ?? (defaultGetItems as (response: R) => T[]);
-  const getNextCursor =
-    options?.getNextCursor ?? (defaultGetNextCursor as (response: R) => string | null);
+  const itemsOfResponse =
+    options?.itemsOfResponse ?? (defaultItemsOfResponse as (response: R) => T[]);
+  const nextCursorOfResponse =
+    options?.nextCursorOfResponse ??
+    (defaultNextCursorOfResponse as (response: R) => string | null);
   const hasMore =
     options?.hasMore ??
     (defaultHasMore as (response: R, request: PageRequest, items: T[]) => boolean);
@@ -79,10 +82,10 @@ export const fetchAllPages = async <T, R = DefaultPaginatedResponse<T>>(
 
     options?.onResponse?.(response, request);
 
-    const batch = getItems(response);
+    const batch = itemsOfResponse(response);
     items.push(...batch);
 
-    const next: PageRequest = { page: request.page + 1, cursor: getNextCursor(response) };
+    const next: PageRequest = { page: request.page + 1, cursor: nextCursorOfResponse(response) };
     const another = hasMore(response, { page: request.page, cursor: next.cursor }, batch);
     if (items.length >= maxRows) {
       const truncated = items.length > maxRows || another;

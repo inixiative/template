@@ -34,9 +34,11 @@ const signInAs = async (role: Role) => {
     organizations: [],
     spaceUsers: [],
     spaces: [],
-  } as unknown as Parameters<ReturnType<typeof useAppStore.getState>['permissions']['setup']>[0];
+  } as unknown as Parameters<
+    ReturnType<typeof useAppStore.getState>['permissions']['installPermissionsForUser']
+  >[0];
   useAppStore.getState().permissions.clear();
-  await useAppStore.getState().permissions.setup(me);
+  await useAppStore.getState().permissions.installPermissionsForUser(me);
 };
 
 beforeEach(async () => {

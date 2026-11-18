@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma, feature:tenancy, feature:users
  */
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
-import { getValidatedBody, type ValidatedContext } from '#/lib/context/getValidatedData';
+import { type ValidatedContext, validatedBody } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
@@ -59,7 +59,7 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
   c: C,
 ): Promise<InquiryTargetFields> => {
   const db = c.get('db');
-  const body = getValidatedBody(c);
+  const body = validatedBody(c);
   const targetModel: InquiryResourceModel = body.targetModel;
 
   if (targetModel === InquiryResourceModel.User) {

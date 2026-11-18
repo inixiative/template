@@ -4,7 +4,7 @@
  * @partOf primitive:appEvents
  * @uses primitive:caching, primitive:websockets
  */
-import { parseChannelKey } from '@template/shared/ws';
+import { parseChannelKey, refetchQueryEvent } from '@template/shared/ws';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
 export type RollingCacheRefreshedPayload = {
@@ -24,7 +24,7 @@ export const rollingCacheRefreshed = makeAppEvent<RollingCacheRefreshedPayload>(
       {
         kind: 'channels',
         target: { channels: [channel] },
-        message: { data: { category: 'query', action: 'refetch', key: parseChannelKey(channel) } },
+        message: { data: refetchQueryEvent(parseChannelKey(channel)) },
       },
     ];
   },

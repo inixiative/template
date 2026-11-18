@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'bun:test';
-import { redactChangeDiff } from '@template/db';
+import { maskSensitiveFieldsInChangeDiff } from '@template/db';
 import {
   buildContextFkFields,
   buildSubjectFkFields,
   computeDiff,
-  processAuditData,
+  maskSensitiveAndOmitNoopFieldsForAudit,
 } from '#/hooks/auditLog/utils';
 
 describe('auditLog/utils', () => {
-  describe('processAuditData', () => {
+  describe('maskSensitiveAndOmitNoopFieldsForAudit', () => {
     it('removes updatedAt from all models', () => {
       const data = { id: '1', name: 'test', updatedAt: new Date() };
-      const result = processAuditData('Organization', data);
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('Organization', data);
       expect(result).not.toHaveProperty('updatedAt');
       expect(result).toHaveProperty('id', '1');
     });
@@ -23,33 +23,33 @@ describe('auditLog/utils', () => {
         lastLoginAt: new Date(),
         updatedAt: new Date(),
       };
-      const result = processAuditData('User', data);
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('User', data);
       expect(result).not.toHaveProperty('lastLoginAt');
       expect(result).not.toHaveProperty('updatedAt');
       expect(result).toHaveProperty('email', 'test@example.com');
     });
 
-    it('redacts sensitive Account fields', () => {
+    it('masks sensitive Account fields', () => {
       const data = { id: '1', accountId: 'acc-1', password: 'secret', providerId: 'email' };
-      const result = processAuditData('Account', data);
-      expect(result.password).toBe('[REDACTED]');
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('Account', data);
+      expect(result.password).toBe('[MASKED]');
       expect(result.providerId).toBe('email');
     });
 
-    it('redacts keyHash on Token', () => {
+    it('masks keyHash on Token', () => {
       const data = { id: '1', name: 'tok', keyHash: 'sha256-hash' };
-      const result = processAuditData('Token', data);
-      expect(result.keyHash).toBe('[REDACTED]');
+      const result = maskSensitiveAndOmitNoopFieldsForAudit('Token', data);
+      expect(result.keyHash).toBe('[MASKED]');
       expect(result.name).toBe('tok');
     });
 
     it('strips orderedList position field for Contact so ordering-only updates produce no diff', () => {
-      const before = processAuditData('Contact', {
+      const before = maskSensitiveAndOmitNoopFieldsForAudit('Contact', {
         id: '1',
         value: { e164: '+15551234567' },
         position: 3,
       });
-      const after = processAuditData('Contact', {
+      const after = maskSensitiveAndOmitNoopFieldsForAudit('Contact', {
         id: '1',
         value: { e164: '+15551234567' },
         position: 1,
@@ -60,23 +60,23 @@ describe('auditLog/utils', () => {
     });
   });
 
-  // The audit diff is computed on unredacted data, so a changed sensitive field IS in the diff;
-  // redactChangeDiff then masks both sides so the row records THAT it changed without the value.
+  // The audit diff is computed on unmasked data, so a changed sensitive field IS in the diff;
+  // maskSensitiveFieldsInChangeDiff then masks both sides so the row records THAT it changed without the value.
   // This is what keeps a sensitive-only change from vanishing under the empty-diff guard.
-  describe('redactChangeDiff', () => {
+  describe('maskSensitiveFieldsInChangeDiff', () => {
     it('masks both sides of a changed sensitive field, leaving other changes intact', () => {
       const changes = {
         password: { before: 'old', after: 'new' },
         providerId: { before: 'email', after: 'oauth' },
       };
-      const masked = redactChangeDiff('Account', changes);
-      expect(masked.password).toEqual({ before: '[REDACTED]', after: '[REDACTED]' });
+      const masked = maskSensitiveFieldsInChangeDiff('Account', changes);
+      expect(masked.password).toEqual({ before: '[MASKED]', after: '[MASKED]' });
       expect(masked.providerId).toEqual({ before: 'email', after: 'oauth' });
     });
 
     it('returns the diff untouched for a model with no sensitive fields', () => {
       const changes = { name: { before: 'A', after: 'B' } };
-      expect(redactChangeDiff('Organization', changes)).toBe(changes);
+      expect(maskSensitiveFieldsInChangeDiff('Organization', changes)).toBe(changes);
     });
   });
 
@@ -201,7 +201,7 @@ describe('auditLog/utils', () => {
       // computeDiff is a pure diff — caller should pass pre-processed (filtered) data
       const diff = computeDiff(before, after);
       expect(diff).toHaveProperty('updatedAt');
-      // the caller (buildAuditEntry) passes processAuditData output which strips updatedAt first
+      // the caller (buildAuditEntry) passes maskSensitiveAndOmitNoopFieldsForAudit output which strips updatedAt first
     });
 
     it('handles multiple changed fields', () => {

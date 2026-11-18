@@ -33,7 +33,7 @@ A leaf whose subject is a binding rather than a field, named `conditionalBind` (
 
 - It compiles to a constant once bound (`matchAll` / `matchNothing`), so a branch whose kind does not
   apply disappears from the compiled where instead of becoming `IS NULL`.
-- Branching on the owner kind then reads like `polymorphicIs` does on a row's discriminator:
+- Branching on the owner kind then reads like `conditionPolymorphicAxisPointsAtBoundRow` does on a row's discriminator:
 
   ```ts
   any: [

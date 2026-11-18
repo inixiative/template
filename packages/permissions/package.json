@@ -10,10 +10,10 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
-    "./actorOf": "./src/actorOf.ts",
+    "./actorFromRecordOmittingSensitiveFields": "./src/actorFromRecordOmittingSensitiveFields.ts",
     "./entitlementRows": "./src/entitlementRows.ts",
     "./lens/mergeProjections": "./src/lens/mergeProjections.ts",
-    "./lens/visitsDroppingId": "./src/lens/visitsDroppingId.ts",
+    "./lens/lensPathsThatDropId": "./src/lens/lensPathsThatDropId.ts",
     "./types": "./src/types.ts",
     "./rebac/*": "./src/rebac/*",
     "./roles/*": "./src/roles/*"

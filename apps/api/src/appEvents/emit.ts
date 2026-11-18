@@ -14,7 +14,7 @@ export const emitAppEvent = async <K extends keyof AppEventPayloads>(
   name: K,
   data: AppEventPayloads[K] & Record<string, unknown>,
 ): Promise<void> => {
-  const actor = auditActorContext.getScope() ?? nullAuditActor;
+  const actor = auditActorContext.currentActor() ?? nullAuditActor;
 
   const event: AppEventPayload = {
     id: Bun.randomUUIDv7(),

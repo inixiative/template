@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { createContact, createUser } from '@template/db/test/factories';
-import { getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber } from '@template/db/test/factory';
 import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 const HELD_MS = 300;
@@ -34,7 +34,7 @@ const contactOf = (userId: string) =>
     userId,
     ownerModel: 'User',
     type: 'email',
-    value: { address: `lock-strength-${getNextSeq()}@test.com` },
+    value: { address: `lock-strength-${nextFactorySequenceNumber()}@test.com` },
   });
 
 describe('db.findForUpdate lock strength', () => {

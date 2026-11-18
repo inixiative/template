@@ -1,16 +1,18 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses none
  */
 import { getLensRoot, type LensNarrowing, projectLens } from '@inixiative/json-rules';
-import { redactLens } from '@template/db/lens/redactLens';
+import { omitSensitiveFieldsFromLens } from '@template/db/lens/omitSensitiveFieldsFromLens';
 
 export const searchablePaths = (filterLens: LensNarrowing): string[] => {
   const rootKey = getLensRoot(filterLens).model;
   const paths: string[] = [];
-  for (const [dottedPath, visit] of Object.entries(projectLens(redactLens(filterLens)))) {
+  for (const [dottedPath, visit] of Object.entries(
+    projectLens(omitSensitiveFieldsFromLens(filterLens)),
+  )) {
     const prefix = dottedPath === rootKey ? '' : dottedPath.slice(rootKey.length + 1);
     for (const [fieldName, entry] of Object.entries(visit.fields)) {
       if (entry.kind === 'scalar' || entry.kind === 'enum') {

@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:ui
  * @uses none
  */
@@ -12,7 +12,7 @@
 const TOKEN_KEY = 'auth_token';
 const EXPIRY_KEY = 'auth_token_expiry';
 
-export const getToken = (): string | null => {
+export const fetchStoredTokenAndClearIfExpired = (): string | null => {
   if (typeof window === 'undefined') return null;
   const token = localStorage.getItem(TOKEN_KEY);
   const expiry = localStorage.getItem(EXPIRY_KEY);
@@ -44,7 +44,7 @@ export const isTokenValid = (): boolean => {
   return new Date(expiry) > new Date();
 };
 
-export const getTokenExpiry = (): Date | null => {
+export const storedTokenExpiry = (): Date | null => {
   if (typeof window === 'undefined') return null;
   const expiry = localStorage.getItem(EXPIRY_KEY);
   if (!expiry) return null;

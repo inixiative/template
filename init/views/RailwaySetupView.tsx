@@ -7,12 +7,12 @@ import { ActionSpinner } from '../components/ActionSpinner';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
 import { useAsyncAction } from '../components/useAsyncAction';
-import { getSecretAsync, setSecretAsync } from '../tasks/infisicalSetup';
+import { fetchSecretOrThrow, setSecretAsync } from '../tasks/infisicalSetup';
 import { setupRailway } from '../tasks/railwaySetup';
-import { getRailwayProgressItems } from '../tasks/railwaySteps';
+import { railwayProgressItems } from '../tasks/railwaySteps';
 import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import { clearError, clearProgress, setError } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
@@ -68,7 +68,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
 
   // Progress items
-  const progressItems = useMemo(() => (config ? getRailwayProgressItems(config) : []), [config]);
+  const progressItems = useMemo(() => (config ? railwayProgressItems(config) : []), [config]);
 
   // Load workspaces on mount
   useEffect(() => {
@@ -156,8 +156,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
       await syncConfig();
 
       // Read fresh config from disk (React state may be stale)
-      const { getProjectConfig } = await import('../utils/getProjectConfig');
-      const freshConfig = await getProjectConfig();
+      const { fetchProjectConfig } = await import('../utils/fetchProjectConfig');
+      const freshConfig = await fetchProjectConfig();
       let existingTeam = freshConfig.railway?.workspaceId;
 
       // If workspaceId was lost but workspace step is already complete,
@@ -182,15 +182,15 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 
   const runSetup = async (workspaceId: string) => {
     // Read fresh config from disk (React state may be stale after syncConfig)
-    const { getProjectConfig } = await import('../utils/getProjectConfig');
-    const freshConfig = await getProjectConfig();
+    const { fetchProjectConfig } = await import('../utils/fetchProjectConfig');
+    const freshConfig = await fetchProjectConfig();
 
     // Check if workspace token exists in Infisical
     const infisicalProjectId = freshConfig.infisical.projectId;
     let hasToken = false;
 
     try {
-      const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
+      const token = await fetchSecretOrThrow('RAILWAY_WORKSPACE_TOKEN', {
         projectId: infisicalProjectId,
         environment: 'root',
       });
@@ -240,8 +240,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
       // If GitHub connection fails, the setup task will clear this flag
       // Fetch fresh config to avoid using stale progress from React state
       await syncConfig();
-      const { getProjectConfig } = await import('../utils/getProjectConfig');
-      const freshConfig = await getProjectConfig();
+      const { fetchProjectConfig } = await import('../utils/fetchProjectConfig');
+      const freshConfig = await fetchProjectConfig();
       const { markComplete: markStepComplete } = await import('../utils/progressTracking');
       await markStepComplete('railway', 'promptedForGithub');
       await syncConfig();

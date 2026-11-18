@@ -9,7 +9,7 @@ A socket receives two kinds of traffic today:
 - **Channels and streams** it subscribed to, named by content (`inquiryRead:id:X`). Each is
   authorized by replaying its GET route with the socket's own credential (`canSubscribe`,
   `streamProbe`), so a token sees exactly what its claim reads. Streams are re-probed every 45s
-  (`streamReauthorizeSweep.ts`); channels are not re-checked after subscribe.
+  (`reauthorizeOpenStreams.ts`); channels are not re-checked after subscribe.
 - **Pushes addressed to a user**: an app event's websocket handoff targets `userIds`
   (`appEvents/channels/websocket.ts`), delivered through `sendToUser` → the `byUser` index of sockets
   keyed by `ws.data.userId` (`ws/identity.ts`, `ws/pubsub.ts`). `perRecipient` streams key their seq
@@ -61,7 +61,7 @@ A user's own content is still published under the user's id, but the client subs
   socket's user (`meChannel(channel, userId)`, for a `WS_CHANNELS` entry marked `me`). A socket
   with no user (a member, organization, space or integration token) cannot subscribe.
 - **publish**: the event sends to that user-keyed channel (`meChannel(…, customerId)`).
-- the socket's user is what `me(c)` is over HTTP: the user for a JWT or spoof, the token's user for
+- the socket's user is what `actingUser(c)` is over HTTP: the user for a JWT or spoof, the token's user for
   a User-owned token, none otherwise. So `ws.data.userId` stays, as the proxy's key.
 
 Subscribing to another user's content directly (`/user/:id/…`) is a separate subscription, not
@@ -79,8 +79,8 @@ built; ideally it becomes the same channel, later.
   route authorizes them like any stream, and the seq key no longer needs a user.
 - Channels are re-probed on a sweep like streams (one sweep for both, a single interval), so a
   revoked token or demoted seat loses channels as it loses streams.
-- Abstract the customer → channel mapping. `customerSegmentsChanged`
-  (`apps/api/src/appEvents/handlers/customerRelationship/customerSegmentsChanged.ts`, #220) builds each
+- Abstract the customer → channel mapping. `customerRelationshipSegmentMembershipRefetchHandoffs`
+  (`apps/api/src/appEvents/handlers/customerRelationship/customerRelationshipSegmentMembershipRefetchHandoffs.ts`, #220) builds each
   channel by hand: a User customer through `meChannel`, an Organization or Space customer through a
   `${lowerFirst(customerModel)}ReadManySegmentMemberships` key. Aron, 2026-10-27: "very manual…
   definitely not well abstracted… we can abstract that out later"; the `me` channel "looks a lot

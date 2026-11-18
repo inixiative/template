@@ -18,13 +18,16 @@ import {
   createTag,
   createTagAttachment,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName } from '#/appEvents/handlers';
 import { customerRelationshipReachedModels } from '#/modules/customerRelationship/lib/customerRelationshipReachedModels';
 import { RECONCILE_TRIGGERS } from '#/modules/segment/lib/reconcileTriggers';
-import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
+import {
+  acmeEmailDomainRule,
+  segmentMemberCustomerRelationshipIds,
+} from '#/modules/segment/tests/fixtures';
 
 const taggedRule = (tagId: string) => ({
   field: 'customerUser.tagAttachments',
@@ -80,7 +83,8 @@ describe('reconcile triggers — membership follows the events', () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
     tag = (await createTag()).entity;
-    member = (await createUser({ email: `member-${getNextSeq()}@example.test` })).entity;
+    member = (await createUser({ email: `member-${nextFactorySequenceNumber()}@example.test` }))
+      .entity;
     memberRef = await customerOf(member);
   });
 
@@ -90,21 +94,21 @@ describe('reconcile triggers — membership follows the events', () => {
 
   it('a tag attachment created or deleted moves the customer in and out of a tag segment', async () => {
     const segment = await liveSegment(taggedRule(tag.id));
-    expect(await memberIds(segment.id)).toEqual([]);
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
 
     const { entity: attachment } = await createTagAttachment(
       { resourceModel: 'User' },
       { user: member, tag },
     );
     await emitAppEvent('tagAttachment.created', { tagAttachment: attachment });
-    expect(await memberIds(segment.id)).toEqual([memberRef.id]);
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([memberRef.id]);
 
     const detached = await db.tagAttachment.update({
       where: { id: attachment.id },
       data: { deletedAt: new Date() },
     });
     await emitAppEvent('tagAttachment.deleted', { tagAttachment: detached });
-    expect(await memberIds(segment.id)).toEqual([]);
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
   });
 
   it('deleting a tag reconciles every resource it was attached to', async () => {
@@ -115,7 +119,7 @@ describe('reconcile triggers — membership follows the events', () => {
       { user: member, tag: doomed },
     );
     await emitAppEvent('tagAttachment.created', { tagAttachment: attachment });
-    expect(await memberIds(segment.id)).toEqual([memberRef.id]);
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([memberRef.id]);
 
     const tagAttachments = await db.tagAttachment.findMany({ where: { tagId: doomed.id } });
     const deleted = await db.tag.update({
@@ -123,26 +127,31 @@ describe('reconcile triggers — membership follows the events', () => {
       data: { deletedAt: new Date() },
     });
     await emitAppEvent('tag.deleted', { tag: deleted, tagAttachments });
-    expect(await memberIds(segment.id)).toEqual([]);
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
   });
 
   it('a user update and a new customer relationship reconcile that customer', async () => {
-    const segment = await liveSegment(acmeRule);
-    const newcomer = (await createUser({ email: `newcomer-${getNextSeq()}@example.test` })).entity;
+    const segment = await liveSegment(acmeEmailDomainRule);
+    const newcomer = (
+      await createUser({ email: `newcomer-${nextFactorySequenceNumber()}@example.test` })
+    ).entity;
     const newcomerRef = await customerOf(newcomer);
     await emitAppEvent('customerRelationship.created', { customerRelationship: newcomerRef });
-    expect(await memberIds(segment.id)).toEqual([]);
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
 
     const renamed = await db.user.update({
       where: { id: newcomer.id },
-      data: { email: `newcomer-${getNextSeq()}@acme.test` },
+      data: { email: `newcomer-${nextFactorySequenceNumber()}@acme.test` },
     });
     await emitAppEvent('user.updated', { user: renamed });
-    expect(await memberIds(segment.id)).toEqual([newcomerRef.id]);
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([newcomerRef.id]);
 
-    const joiner = (await createUser({ email: `joiner-${getNextSeq()}@acme.test` })).entity;
+    const joiner = (await createUser({ email: `joiner-${nextFactorySequenceNumber()}@acme.test` }))
+      .entity;
     const joinerRef = await customerOf(joiner);
     await emitAppEvent('customerRelationship.created', { customerRelationship: joinerRef });
-    expect(await memberIds(segment.id)).toEqual([newcomerRef.id, joinerRef.id].sort());
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual(
+      [newcomerRef.id, joinerRef.id].sort(),
+    );
   });
 });

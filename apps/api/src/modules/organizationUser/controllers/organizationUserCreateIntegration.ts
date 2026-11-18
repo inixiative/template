@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses feature:integrations
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { createIntegration } from '#/modules/integration/services/createIntegration';
 import { organizationUserCreateIntegrationRoute } from '#/modules/organizationUser/routes/organizationUserCreateIntegration';
@@ -12,7 +12,7 @@ import { organizationUserCreateIntegrationRoute } from '#/modules/organizationUs
 export const organizationUserCreateIntegrationController = makeController(
   organizationUserCreateIntegrationRoute,
   async (c, respond) => {
-    const member = getResource<'organizationUser'>(c);
+    const member = contextResource<'organizationUser'>(c);
     const row = {
       ...c.req.valid('json'),
       ownerModel: 'OrganizationUser' as const,

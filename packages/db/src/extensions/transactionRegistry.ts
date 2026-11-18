@@ -6,7 +6,7 @@
  */
 
 import type { OpenTransaction } from '@template/db/clientTypes';
-import { readPrismaTransaction } from '@template/db/extensions/prismaTransaction';
+import { prismaTransactionOf } from '@template/db/extensions/prismaTransaction';
 import { uuidv7 } from 'uuidv7';
 
 // Prisma never hands the caller the id of the interactive transaction it just opened, but every
@@ -50,7 +50,7 @@ export const claimPendingRegistration = (params: { args: unknown }): void => {
   const registrationToken = registrationTokenFrom(params.args);
   if (!registrationToken) return;
 
-  const prismaTransaction = readPrismaTransaction(params);
+  const prismaTransaction = prismaTransactionOf(params);
   if (prismaTransaction?.kind !== 'itx') return;
 
   const openTransaction = pendingRegistrations.get(registrationToken);
@@ -62,12 +62,12 @@ export const claimPendingRegistration = (params: { args: unknown }): void => {
 };
 
 // Null = no transaction: the mutation came in on db.raw, which opts out of the life cycle.
-export const getCurrentTransaction = (
+export const openTransactionForPrismaQueryOrThrow = (
   model: string,
   operation: string,
   params: unknown,
 ): OpenTransaction | null => {
-  const prismaTransaction = readPrismaTransaction(params);
+  const prismaTransaction = prismaTransactionOf(params);
   if (!prismaTransaction) return null;
 
   if (prismaTransaction.kind === 'itx') {

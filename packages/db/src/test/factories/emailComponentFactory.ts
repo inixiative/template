@@ -4,14 +4,14 @@
  * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import { createFactory, getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const emailComponentFactory = createFactory('EmailComponent', {
+const emailComponentFactory = registerFactory('EmailComponent', {
   defaults: () => ({
-    slug: `component-${getNextSeq()}`,
+    slug: `component-${nextFactorySequenceNumber()}`,
     locale: 'en',
     mjml: '<mj-text>Default content</mj-text>',
-    componentRefs: [],
+    componentSlugs: [],
     inheritToSpaces: true,
   }),
 });

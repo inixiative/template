@@ -54,9 +54,9 @@ of forking the inaccessible children down to an owned level (copy-on-restore) so
 
 Intended semantic: `degrade` drops only a failing **component** block and sends the rest; a failure in
 the **main template's own** content is a hard error (the send fails, recorded in the log's `error`).
-Today, after `expand` inlines components into one mjml, the evaluator can't tell a template-native
+Today, after `expandComponentTagsFromOwnerCascade` inlines components into one mjml, the evaluator can't tell a template-native
 block from a component block, so it degrades any throwing block uniformly — it can't enforce
 "components only." The same gap blocks observability: capture degraded errors as
 `{ emailComponentId: errors[] }` (which component produced what), logged and/or stored on the
-`CommunicationLog`. Both need component **provenance** carried through `expand`/`interpolate` so a block
+`CommunicationLog`. Both need component **provenance** carried through `expandComponentTagsFromOwnerCascade`/`interpolate` so a block
 (and its errors) knows its source component.

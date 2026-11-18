@@ -6,8 +6,11 @@
  */
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
-import { polymorphicKeyColumn } from '@template/db/registries/polymorphicIs';
-import { lockedTargetStates, type TargetState } from '@template/db/utils/lockedTargetStates';
+import { polymorphicKeyColumn } from '@template/db/registries/polymorphicAxisPointsAt';
+import {
+  fetchRuleReferenceTargetsDeletedAtForUpdate,
+  type RuleReferenceTargetDeletedState,
+} from '@template/db/utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 import { groupBy } from 'lodash-es';
@@ -34,7 +37,11 @@ const fkColumn = (axis: 'sourceModel' | 'targetModel', model: string): string =>
 const edgeKey = (edge: Edge): string =>
   referenceKey({ model: edge.targetModel, id: edge.targetId });
 
-const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: TargetState) => ({
+const edgeData = (
+  source: RuleReferenceSource,
+  ref: RuleReference,
+  state: RuleReferenceTargetDeletedState,
+) => ({
   sourceModel: source.model,
   [fkColumn('sourceModel', source.model)]: source.id,
   targetModel: ref.model,
@@ -42,7 +49,7 @@ const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: Target
   targetDeletedAt: state.deletedAt,
 });
 
-const stampOf = (state: TargetState | undefined): number | null =>
+const stampOf = (state: RuleReferenceTargetDeletedState | undefined): number | null =>
   state?.deletedAt ? state.deletedAt.getTime() : null;
 
 // Targets are locked before the edges are written, so one is never written unstamped against an uncommitted delete.
@@ -59,7 +66,9 @@ export const syncRuleReferenceEdges = async (
     existing.filter((edge) => referenced.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
   );
   const added = [...referenced.values()].filter((ref) => !held.has(referenceKey(ref)));
-  const states = referenced.size ? await lockedTargetStates([...referenced.values()]) : new Map();
+  const states = referenced.size
+    ? await fetchRuleReferenceTargetsDeletedAtForUpdate([...referenced.values()])
+    : new Map();
 
   const toDelete = existing.filter((edge) => !referenced.has(edgeKey(edge)));
   if (toDelete.length)

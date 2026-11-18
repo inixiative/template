@@ -8,7 +8,7 @@ import { andWhere, type Condition, executePrismaPlan, toPrisma } from '@inixiati
 import { db, Prisma } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { RuleDegradedError, RuleEvaluationError, withRule } from '@template/shared/rules';
+import { branchOnRuleHealth, RuleDegradedError, RuleEvaluationError } from '@template/shared/rules';
 import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
 import { customerRelationshipProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentRuleState } from '#/modules/segment/services/segmentRuleHealth';
@@ -32,7 +32,7 @@ export const compileSegmentWhere = async (
 
 const segmentWhere = async (segment: Segment): Promise<Record<string, unknown>> => {
   const { health, issues } = await segmentRuleState(segment);
-  return withRule(health, {
+  return branchOnRuleHealth(health, {
     degraded: () =>
       Promise.reject(new RuleDegradedError({ model: 'Segment', id: segment.id }, issues)),
     sound: (rule) => compileSegmentWhere(segment.ownerModel, segmentOwnerId(segment), rule),

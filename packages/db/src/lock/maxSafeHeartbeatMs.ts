@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma, infrastructure:redis
  * @uses none
  */
@@ -26,7 +26,7 @@ export const maxSafeHeartbeatMs = ({
     Math.ceil((ttlMs - commandTimeoutMs) / (TOLERATED_REFRESH_FAILURES + 1) - commandTimeoutMs) - 1;
   if (heartbeatMs <= 0) {
     throw new Error(
-      `createLock: ttlMs ${ttlMs} leaves no room for a heartbeat with a ${commandTimeoutMs} ms command timeout`,
+      `makeLock: ttlMs ${ttlMs} leaves no room for a heartbeat with a ${commandTimeoutMs} ms command timeout`,
     );
   }
   return heartbeatMs;

@@ -11,10 +11,10 @@ import {
   withRemoteTrace,
   withSpan,
 } from '../../packages/shared/src/telemetry';
-import { readTelemetryConfig } from '../../packages/shared/src/telemetry/config';
+import { telemetryConfigFromEnv } from '../../packages/shared/src/telemetry/config';
 import { initializeTelemetry } from '../../packages/shared/src/telemetry/initialize';
 
-const config = readTelemetryConfig('api');
+const config = telemetryConfigFromEnv('api');
 if (!config)
   throw new Error('Set OTEL_ENABLED=true and OTEL_EXPORTER_OTLP_ENDPOINT to your collector');
 const sdk = initializeTelemetry(config);

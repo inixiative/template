@@ -13,8 +13,8 @@ import {
   emailSurface,
   emailSurfaceSourceValues,
 } from '@template/email/rules';
-import { emailLensAt } from '#/lib/email/emailLensFor';
-import { emailSourceValues } from '#/lib/email/emailSourceValues';
+import { fetchStoredLensAndBuildEmailLens } from '#/lib/email/emailLensFor';
+import { fetchSourceValuesOfEmailLens } from '#/lib/email/fetchSourceValuesOfEmailLens';
 
 export type EmailTemplateRuleSurface = {
   source: EmailSurface;
@@ -26,10 +26,10 @@ export const emailTemplateRuleSurface = async (
   slug: string,
   owner: OwnerScope,
 ): Promise<EmailTemplateRuleSurface> => {
-  const lens = await emailLensAt(slug, owner);
+  const lens = await fetchStoredLensAndBuildEmailLens(slug, owner);
   return {
     source: emailSurface(lens),
-    sourceValues: emailSurfaceSourceValues(await emailSourceValues(lens)),
+    sourceValues: emailSurfaceSourceValues(await fetchSourceValuesOfEmailLens(lens)),
     decoration: emailRuleDecoration(lens),
   };
 };

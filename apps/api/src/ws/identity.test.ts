@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { setIdentity } from '#/ws/identity';
+import { setSocketIdentityAndDropSubscriptionsOnChange } from '#/ws/identity';
 import { addConnection, clearRegistry } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
@@ -7,11 +7,11 @@ import { createTestSocket } from '#tests/createTestSocket';
 
 afterEach(() => clearRegistry());
 
-describe('setIdentity', () => {
+describe('setSocketIdentityAndDropSubscriptionsOnChange', () => {
   it('sets the userId of an anonymous connection (authenticate)', () => {
     const { socket } = createTestSocket({ connectionId: 'c1', userId: null });
     addConnection(socket);
-    setIdentity(socket, 'u1', {});
+    setSocketIdentityAndDropSubscriptionsOnChange(socket, 'u1', {});
     expect(socket.data.userId).toBe('u1');
   });
 
@@ -19,7 +19,7 @@ describe('setIdentity', () => {
     const { socket } = createTestSocket({ connectionId: 'c1', userId: 'real' });
     addConnection(socket);
     subscribeToChannel(socket, 'ch1');
-    setIdentity(socket, 'spoofed', {});
+    setSocketIdentityAndDropSubscriptionsOnChange(socket, 'spoofed', {});
     expect(socket.data.userId).toBe('spoofed');
     expect(socket.data.channels.size).toBe(0);
   });
@@ -27,7 +27,7 @@ describe('setIdentity', () => {
   it('clears identity to anonymous (logout)', () => {
     const { socket } = createTestSocket({ connectionId: 'c1', userId: 'u1' });
     addConnection(socket);
-    setIdentity(socket, null, {});
+    setSocketIdentityAndDropSubscriptionsOnChange(socket, null, {});
     expect(socket.data.userId).toBeNull();
   });
 
@@ -35,7 +35,7 @@ describe('setIdentity', () => {
     const { socket } = createTestSocket({ connectionId: 'c1', userId: 'u1' });
     addConnection(socket);
     subscribeToChannel(socket, 'ch1');
-    setIdentity(socket, 'u1', {});
+    setSocketIdentityAndDropSubscriptionsOnChange(socket, 'u1', {});
     expect(socket.data.channels.has('ch1')).toBe(true);
   });
 
@@ -49,7 +49,7 @@ describe('setIdentity', () => {
     subscribeToChannel(socket, 'ch1');
     subscribeToStream(socket, 'st1');
 
-    setIdentity(socket, 'u1', { authorization: 'Bearer narrow' });
+    setSocketIdentityAndDropSubscriptionsOnChange(socket, 'u1', { authorization: 'Bearer narrow' });
 
     expect(socket.data.headers).toEqual({ authorization: 'Bearer narrow' });
     expect(socket.data.channels.size).toBe(0);
@@ -65,7 +65,7 @@ describe('setIdentity', () => {
     addConnection(socket);
     subscribeToStream(socket, 'st1');
 
-    setIdentity(socket, 'u1', { authorization: 'Bearer same' });
+    setSocketIdentityAndDropSubscriptionsOnChange(socket, 'u1', { authorization: 'Bearer same' });
 
     expect(socket.data.streams.has('st1')).toBe(true);
   });

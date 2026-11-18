@@ -4,7 +4,7 @@
  * @partOf primitive:jobs
  * @uses infrastructure:redis
  */
-import { createLock } from '@template/db';
+import { makeLock } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain/pass';
 import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
@@ -17,9 +17,9 @@ const DRAIN_LOCK = {
   heartbeatMs: 60_000,
 };
 
-// No re-entrancy guard: createLock's NX acquire already skips a tick whose predecessor is still draining.
+// No re-entrancy guard: makeLock's NX acquire already skips a tick whose predecessor is still draining.
 const drainTick = async (): Promise<void> => {
-  const lock = createLock(DRAIN_LOCK);
+  const lock = makeLock(DRAIN_LOCK);
   try {
     if (!(await lock.acquire())) return;
     try {

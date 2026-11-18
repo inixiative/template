@@ -9,12 +9,12 @@ import {
   type EntitlementsOverride,
   storeEntitlements,
 } from '@template/db/test/factories/entitlementFactory';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 import type { BuildContext, CreateInputOf, TypedBuildResult } from '@template/db/test/factoryTypes';
 
 type Result = TypedBuildResult<'SpaceUser', ['User', 'Organization', 'Space', 'OrganizationUser']>;
 
-const spaceUserFactory = createFactory('SpaceUser', {
+const spaceUserFactory = registerFactory('SpaceUser', {
   defaults: () => ({
     role: Role.member,
   }),

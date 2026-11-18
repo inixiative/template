@@ -9,7 +9,7 @@ import { useInquiryResolutionEffects } from '@template/ui/hooks/inquiry/useInqui
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import type { InquiryMeta, InquiryResolutionStatus } from '@template/ui/lib/inquiries/queryKeys';
-import { targetMutations } from '@template/ui/lib/inquiries/queryKeys';
+import { queryKeysToInvalidateWhenTargetMutates } from '@template/ui/lib/inquiries/queryKeys';
 
 type ResolveVars = {
   inquiry: InquiryMeta;
@@ -28,7 +28,7 @@ export const useResolveInquiryMutation = () => {
       }),
     ),
     targets: ({ inquiry, status }) =>
-      targetMutations[inquiry.type](inquiry).map((queryKey) => ({
+      queryKeysToInvalidateWhenTargetMutates[inquiry.type](inquiry).map((queryKey) => ({
         queryKey,
         optimisticUpdate: (old: unknown) => {
           const cached = old as { data?: { id: string }[] } | undefined;

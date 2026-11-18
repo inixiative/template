@@ -18,7 +18,7 @@ import type {
   Segment,
 } from '@template/db/generated/client/client';
 import type { RuleReferenceSourceModel } from '@template/db/generated/client/enums';
-import { rowOwner, templateLens } from '@template/email/render';
+import { fetchTemplateLens, ownerScopeOfRow } from '@template/email/render';
 import {
   componentRuleContents,
   contentDynamicRuleReferences,
@@ -56,7 +56,7 @@ type RuleReferenceDeclaration<Lens> = {
 };
 
 export type RuleReferenceSurface = Pick<RuleReferenceDeclaration<unknown>, 'columns' | 'label'> & {
-  read: (
+  fetchRuleReferencesOfRow: (
     row: Row,
     judged: readonly string[],
   ) => Promise<{ references: RuleReference[]; judged: RuleReferenceReading }>;
@@ -90,7 +90,7 @@ const storedAsCondition =
 const declare = <Lens>(declaration: RuleReferenceDeclaration<Lens>): RuleReferenceSurface => ({
   columns: declaration.columns,
   label: declaration.label,
-  read: async (row, judged) => {
+  fetchRuleReferencesOfRow: async (row, judged) => {
     const lens = await declaration.lens(row);
     return {
       references: declaration.storage(row, lens, declaration.columns).references,
@@ -107,8 +107,8 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
       const template = row as EmailTemplate;
       return emailLensFor(
         template.slug,
-        rowOwner(template),
-        await templateLens(template.slug, template),
+        ownerScopeOfRow(template),
+        await fetchTemplateLens(template.slug, template),
       );
     },
     storage: storedAsMjml(templateRuleContents),
@@ -116,7 +116,7 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
   EmailComponent: declare({
     columns: ['mjml'],
     label: (row) => `email component '${row.slug}'`,
-    lens: (row) => emailLensFor(undefined, rowOwner(row as EmailComponent)),
+    lens: (row) => emailLensFor(undefined, ownerScopeOfRow(row as EmailComponent)),
     storage: storedAsMjml(componentRuleContents),
   }),
   Segment: declare({

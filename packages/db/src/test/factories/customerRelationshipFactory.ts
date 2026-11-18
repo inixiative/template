@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const customerRelationshipFactory = createFactory('CustomerRelationship', {
+const customerRelationshipFactory = registerFactory('CustomerRelationship', {
   defaults: () => ({}),
   dependencies: {
     customerUser: {

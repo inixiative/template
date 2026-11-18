@@ -93,7 +93,7 @@ Always include real usage:
 ```typescript
 // Good - shows actual pattern
 import { cache, cacheKey } from '@template/db';
-const user = await cache(cacheKey('user', userId), () => db.user.findUnique(...));
+const user = await fetchThroughCache(cacheKey('user', userId), () => db.user.findUnique(...));
 
 // Not just signatures
 cache<T>(key: string, fn: () => Promise<T>, ttl?: number | ((value: T) => number)): Promise<T>

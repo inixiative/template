@@ -1,11 +1,11 @@
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import type { RailwayBucketsAction } from '../utils/progressTracking';
 
 type RailwayBucketsProgress = ProjectConfig['railwayBuckets']['progress'];
 
 type RailwayBucketsProgressGroup = {
   actions: readonly RailwayBucketsAction[];
-  getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
+  labelFor: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
   requiresStaging?: boolean;
 };
 
@@ -19,7 +19,7 @@ const countCompletedActions = (
 const railwayBucketsProgressGroups: readonly RailwayBucketsProgressGroup[] = [
   {
     actions: ['ensureProdSystemBucket', 'ensureProdUserBucket', 'storeProdCredentials'],
-    getLabel: (config, completedCount, totalCount) =>
+    labelFor: (config, completedCount, totalCount) =>
       config.railwayBuckets.prodSystemServiceId
         ? `Prod buckets ready (${completedCount}/${totalCount}): system=${config.railwayBuckets.prodSystemServiceId}`
         : `Prod buckets ready (${completedCount}/${totalCount})`,
@@ -27,7 +27,7 @@ const railwayBucketsProgressGroups: readonly RailwayBucketsProgressGroup[] = [
   {
     actions: ['ensureStagingSystemBucket', 'ensureStagingUserBucket', 'storeStagingCredentials'],
     requiresStaging: true,
-    getLabel: (config, completedCount, totalCount) =>
+    labelFor: (config, completedCount, totalCount) =>
       config.railwayBuckets.stagingSystemServiceId
         ? `Staging buckets ready (${completedCount}/${totalCount}): system=${config.railwayBuckets.stagingSystemServiceId}`
         : `Staging buckets ready (${completedCount}/${totalCount})`,
@@ -42,7 +42,7 @@ export type RailwayBucketsProgressSummary = {
   skipped: boolean;
 };
 
-export const getRailwayBucketsProgressSummaries = (
+export const railwayBucketsProgressSummaries = (
   config: ProjectConfig,
 ): RailwayBucketsProgressSummary[] => {
   const stagingEnabled = config.features.staging.enabled;
@@ -51,7 +51,7 @@ export const getRailwayBucketsProgressSummaries = (
     const completedCount = countCompletedActions(config.railwayBuckets.progress, group.actions);
     const totalCount = group.actions.length;
     return {
-      label: group.getLabel(config, completedCount, totalCount),
+      label: group.labelFor(config, completedCount, totalCount),
       completed: completedCount === totalCount,
       completedCount,
       totalCount,
@@ -60,10 +60,10 @@ export const getRailwayBucketsProgressSummaries = (
   });
 };
 
-export const getRailwayBucketsProgressItems = (
+export const railwayBucketsProgressItems = (
   config: ProjectConfig,
 ): Array<{ label: string; completed: boolean; skipped: boolean }> => {
-  return getRailwayBucketsProgressSummaries(config).map((summary) => ({
+  return railwayBucketsProgressSummaries(config).map((summary) => ({
     label: summary.label,
     completed: summary.completed,
     skipped: summary.skipped,

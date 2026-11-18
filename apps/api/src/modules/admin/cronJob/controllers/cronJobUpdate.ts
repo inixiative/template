@@ -4,13 +4,13 @@
  * @partOf feature:cronJob, superadmin
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { cronJobUpdateRoute } from '#/modules/admin/cronJob/routes/cronJobUpdate';
 
 export const cronJobUpdateController = makeController(cronJobUpdateRoute, async (c, respond) => {
   const db = c.get('db');
-  const cronJob = getResource<'cronJob'>(c);
+  const cronJob = contextResource<'cronJob'>(c);
   const body = c.req.valid('json');
 
   const updated = await db.cronJob.update({

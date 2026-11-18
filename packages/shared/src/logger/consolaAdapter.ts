@@ -24,6 +24,6 @@ export const consolaAdapter: LoggerAdapter = {
   success: (fields, msg) => consola.success(`${msg} ${JSON.stringify(fields)}`),
   box: (fields, msg) => consola.box(`${msg} ${JSON.stringify(fields)}`),
   child: () => {
-    throw new Error('child() not supported — use logScope(id, fn) for ALS-bound scoping');
+    throw new Error('child() not supported — use withLogScope(id, fn) for ALS-bound scoping');
   },
 };

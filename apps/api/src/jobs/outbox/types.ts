@@ -23,7 +23,9 @@ export type SpillOptions = {
 export const outboxLaneOf = (row: Pick<OutboxRow, 'data'>): JobLane =>
   isSlowJobData(row.data) ? JobLane.slow : JobLane.fast;
 
-export const toCreateInput = (row: OutboxRow): Prisma.JobOutboxCreateManyInput => ({
+export const outboxRowToJobOutboxCreateInput = (
+  row: OutboxRow,
+): Prisma.JobOutboxCreateManyInput => ({
   handlerName: row.handlerName,
   jobId: row.jobId,
   dedupeKey: row.dedupeKey,

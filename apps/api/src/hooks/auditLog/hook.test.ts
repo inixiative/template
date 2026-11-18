@@ -288,7 +288,7 @@ describe('auditLog hook', () => {
       'test-worker:test',
       () =>
         auditActorContext.scope(
-          { ...nullAuditActor, actorJobName: 'cleanStaleAuditLogs' },
+          { ...nullAuditActor, actorJobName: 'hardDeleteAuditLogsPastRetention' },
           async () => {
             const user = (await createUser({ email: `audit-job-${ts}@example.com` })).entity;
             userId = user.id;
@@ -302,7 +302,7 @@ describe('auditLog hook', () => {
       orderBy: { id: 'desc' },
     });
 
-    expect(log?.actorJobName).toBe('cleanStaleAuditLogs');
+    expect(log?.actorJobName).toBe('hardDeleteAuditLogsPastRetention');
   });
 
   it('records sourceInquiryId when set in context', async () => {

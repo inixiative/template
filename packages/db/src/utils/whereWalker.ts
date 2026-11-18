@@ -6,7 +6,7 @@
  */
 import { andWhere, orWhere } from '@inixiative/json-rules';
 import type { ModelField } from '@inixiative/prisma-map';
-import { lookupField } from '@template/db/utils/fieldMetadata';
+import { modelFieldAtPath } from '@template/db/utils/fieldMetadata';
 import { isRelationOperator } from '@template/shared/bracketQuery';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
@@ -68,7 +68,7 @@ const walkEntries = (
           : value;
       continue;
     }
-    const field = lookupField(ctx.model, key);
+    const field = modelFieldAtPath(ctx.model, key);
     out[key] =
       field?.kind === 'object' && isPlainObject(value)
         ? hop(

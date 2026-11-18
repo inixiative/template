@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { addConnection, byChannel, clearRegistry } from '#/ws/registry';
+import { addConnection, clearRegistry, connectionIdsByChannel } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
 import { createTestSocket } from '#tests/createTestSocket';
 
@@ -11,7 +11,7 @@ describe('subscriptions', () => {
     addConnection(socket);
     subscribeToChannel(socket, 'ch1');
     expect(socket.data.channels.has('ch1')).toBe(true);
-    expect([...(byChannel.get('ch1') ?? [])]).toEqual(['c1']);
+    expect([...(connectionIdsByChannel.get('ch1') ?? [])]).toEqual(['c1']);
   });
 
   it('unsubscribe removes from both', () => {
@@ -20,7 +20,7 @@ describe('subscriptions', () => {
     subscribeToChannel(socket, 'ch1');
     unsubscribeFromChannel(socket, 'ch1');
     expect(socket.data.channels.has('ch1')).toBe(false);
-    expect(byChannel.has('ch1')).toBe(false);
+    expect(connectionIdsByChannel.has('ch1')).toBe(false);
   });
 
   it('multiple connections share a channel; removing one leaves the other', () => {
@@ -30,9 +30,9 @@ describe('subscriptions', () => {
     addConnection(b.socket);
     subscribeToChannel(a.socket, 'ch1');
     subscribeToChannel(b.socket, 'ch1');
-    expect([...(byChannel.get('ch1') ?? [])].sort()).toEqual(['a', 'b']);
+    expect([...(connectionIdsByChannel.get('ch1') ?? [])].sort()).toEqual(['a', 'b']);
 
     unsubscribeFromChannel(a.socket, 'ch1');
-    expect([...(byChannel.get('ch1') ?? [])]).toEqual(['b']);
+    expect([...(connectionIdsByChannel.get('ch1') ?? [])]).toEqual(['b']);
   });
 });

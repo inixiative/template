@@ -5,7 +5,7 @@
  * @uses primitive:authz, infrastructure:prisma
  */
 
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { changeEntitlements } from '#/lib/permissions/changeEntitlements';
 import { validateEntitlementWriter } from '#/lib/permissions/validateEntitlementWriter';
 import { makeController } from '#/lib/utils/makeController';
@@ -15,7 +15,7 @@ export const organizationUserCreateManyEntitlementsController = makeController(
   organizationUserCreateManyEntitlementsRoute,
   async (c, respond) => {
     const permix = c.get('permix');
-    const organizationUser = getResource<'organizationUser'>(c);
+    const organizationUser = contextResource<'organizationUser'>(c);
     const changes = { add: c.req.valid('json') };
     await validateEntitlementWriter(permix, 'OrganizationUser', organizationUser, changes);
     const entitlements = await changeEntitlements(

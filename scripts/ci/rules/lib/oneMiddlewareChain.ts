@@ -4,7 +4,7 @@
  *   bun scripts/ci/rules/lib/oneMiddlewareChain.ts [--write-baseline]
  *
  * Every router is served from inside the standard chain in apps/api/src/routes/api.ts:
- *   corsMiddleware → prepareRequest → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware
+ *   corsMiddleware → prepareRequestMiddleware → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware
  *   → auditActorMiddleware → apiRateLimit
  * so every route gets the scoped db, a resolved actor, permissions and the rate limit. Fails on
  * - a chain middleware missing from api.ts, or out of order;
@@ -18,22 +18,22 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  finishFence,
+  applyExemptionsAndBaselineThenExit,
+  fetchExemptions,
+  fetchSource,
   isTestFile,
   lineAt,
   listFiles,
   ROOT,
-  readExemptions,
-  readSource,
   type Violation,
-} from './fence';
+} from './ciRuleRunner';
 
 const APP = 'apps/api/src/app.ts';
 const ROUTES = 'apps/api/src/routes/index.ts';
 const API = 'apps/api/src/routes/api.ts';
 const CHAIN = [
   'corsMiddleware',
-  'prepareRequest',
+  'prepareRequestMiddleware',
   'jwtAuthMiddleware',
   'tokenAuthMiddleware',
   'spoofMiddleware',
@@ -99,7 +99,7 @@ const isMount = (call: Call): boolean => {
   return path !== '*' && /=>|\bfunction\b/.test(call.args);
 };
 
-const exemptions = readExemptions('one-middleware-chain');
+const exemptions = fetchExemptions('one-middleware-chain');
 const usedExemptions = new Set<string>();
 const violations: Violation[] = [];
 
@@ -109,7 +109,7 @@ const code = (source: string): string =>
     .replace(/\/\/.*$/gm, (c) => ' '.repeat(c.length));
 
 const mountsIn = (file: string) => {
-  const source = readSource(file);
+  const source = fetchSource(file);
   const text = code(source);
   return [...text.matchAll(RECEIVER)].flatMap((m) =>
     chainedCalls(text, (m.index ?? 0) + m[0].length)
@@ -130,7 +130,7 @@ const outside = (file: string, line: number, key: string, detail: string) => {
 };
 
 if (existsSync(join(ROOT, API))) {
-  const source = readSource(API);
+  const source = fetchSource(API);
   const text = code(source);
   let chainEnd = 0;
   let previous = -1;
@@ -191,15 +191,15 @@ for (const file of listFiles(['apps/api/src'], /\.tsx?$/)) {
   }
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'one-middleware-chain',
   violations,
   usedExemptions,
-  explain: [
+  failureExplanationLines: [
     `Routers served outside the standard middleware chain (${API}):`,
     `  ${CHAIN.join(' → ')}`,
     'Mount routers after apiRateLimit. A deliberate exception is named, with a one-line reason, in',
     'scripts/ci/one-middleware-chain/exempt.txt.',
   ],
-  clean: 'Every router is mounted inside the standard middleware chain.',
+  passMessage: 'Every router is mounted inside the standard middleware chain.',
 });

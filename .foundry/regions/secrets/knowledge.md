@@ -72,11 +72,11 @@ Not here: the encryption engine, the keyring schema and rotation are `encryption
 
 ## 3. Everything that exists here, by class
 
-Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: makeLock, packages/db/src/lock/makeLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `secrets`: Secrets around the app: Infisical storage, secret env vars and keyrings per environment (CI included), provider credentials, how keys rotate
 
-**Job: store or read a cloud secret** (Where a secret lives: Infisical for cloud secrets vs No committed env files vs getSecret vs setSecret vs encryptionEnv) — docs/claude/ENVIRONMENTS.md § Infisical; INIT_SCRIPT_PATTERNS.md §8, §12; catalog encryptionEnv
+**Job: store or read a cloud secret** (Where a secret lives: Infisical for cloud secrets vs No committed env files vs fetchSecret vs setSecret vs encryptionEnv) — docs/claude/ENVIRONMENTS.md § Infisical; INIT_SCRIPT_PATTERNS.md §8, §12; catalog encryptionEnv
 
 *Said as:* "store or read a cloud secret", "where do secrets go for staging and prod", "env vars for secrets"
 
@@ -96,10 +96,10 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | declare the env vars for the encryption keys; hand-write zod string entries for the key env vars; validate the keyring env at startup; key env plus version with its refinement | **encryptionEnv** · primitive `packages/db/src/lib/encryption/envValidation.ts#encryptionEnv` — Prefer over hand-declaring key env vars; wraps encryptionKeySchema and the version refinement. | — | hand-declared z.string() env entries for encryption keys and versions (catalog: encryptionEnv (prefer over hand-declaring key env vars)) |
 | show the new API token once; a custom modal with a copy button for the secret; reveal the webhook secret one time; display a secret the user can't see again | **SecretRevealModal** · primitive `packages/ui/src/components/utility/SecretRevealModal.tsx#SecretRevealModal` — Any one-time secret display (API tokens, webhook secrets) instead of a custom modal. | docs/claude/FRONTEND/COMPONENTS.md § Package Organization; docs/claude/FRONTEND/COMPONENTS.md § Settings | a custom modal that displays a new API token or webhook secret with its own copy logic (docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages; catalog entry SecretRevealModal) |
 | create the row then encrypt the secret after; pull the secrets out of the body and encrypt first; the create route takes a client secret; store the provider credentials on create | **Encrypt secrets before storage** · pattern docs/claude/API_ROUTES.md — Example: Create Organization Provider — Extract secrets from the body, encrypt them with encryptField, then create the row. | part 4 | creating the row with the secret from the request body and encrypting afterwards, or not at all (docs/claude/API_ROUTES.md — Example: Create Organization Provider) |
-| internal probes shouldn't count against the rate limit; the server's own health probe gets throttled; exempt system probes from limits | **System probe secret rate-limit exemption** · pattern docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization › Authorization and re-authorization — server-initiated rechecks only; client opens and subscribes still count | code `openDataStream`, `fetchStreamSnapshot`, `routeAccessOf`, `startStreamReauthorizeSweep` | — |
+| internal probes shouldn't count against the rate limit; the server's own health probe gets throttled; exempt system probes from limits | **System probe secret rate-limit exemption** · pattern docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization › Authorization and re-authorization — server-initiated rechecks only; client opens and subscribes still count | code `openDataStream`, `fetchStreamSnapshot`, `routeAccessOf`, `startReauthorizeOpenStreamsInterval` | — |
 | authenticate users by JWT and programs by API token, both populating identical context | **Two credentials, one context** · pattern docs/claude/AUTH.md > Overview — Users: user JWT; programs (MCP, integrations, CI): API token. | part 4 | — |
 | the current and previous key plus version; which env vars hold the encryption keys; dual-key decryption during a rotation | **Encryption keyring env vars** · primitive ENCRYPTION_KEY_CURRENT / ENCRYPTION_KEY_PREVIOUS / ENCRYPTION_KEY_VERSION — supply current and previous keys plus version for dual-key decryption | part 4 | — |
-| read the credential from the secret store in an init step; pass the connection string from the previous step; fetch the password from the vault at this step; an init step needs an API key | **getSecret** · primitive getSecretAsync — Secrets inside init steps; use getProjectConfig for non-secret metadata. | part 4 | passing a connection string, password or API key from one init step to the next instead of re-fetching it from Infisical (docs/claude/INIT_SCRIPT_PATTERNS.md § 8. Always Fetch from Source, Never Trust Props) |
+| read the credential from the secret store in an init step; pass the connection string from the previous step; fetch the password from the vault at this step; an init step needs an API key | **fetchSecret** · primitive fetchSecretOrThrow — Secrets inside init steps; use fetchProjectConfig for non-secret metadata. | part 4 | passing a connection string, password or API key from one init step to the next instead of re-fetching it from Infisical (docs/claude/INIT_SCRIPT_PATTERNS.md § 8. Always Fetch from Source, Never Trust Props) |
 | store the credential in the secret store from init; save the generated key for the environment; hand the secret to the next step as a prop; write a secret under the project's environment path | **setSecret** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md § Core Patterns › 12. Token Input Flow with Proper State Management › 12. Token Input Flow with Proper State Management — store a credential in Infisical under a project environment path | code `Token`, `Input`, `Flow`, `setToken` | — |
 | Changing user or credential drops all channels and streams; identical credential keeps them. | **Credential change drops subscriptions** · rule docs/claude/WEBSOCKETS.md — Connection and recovery — Any re-authenticate on a live socket | part 4 | — |
 | where do OAuth client secrets go; store the provider's client secret; a stored provider credential | **Encrypt OAuth client secrets** · rule FEATURES.md › Encrypted Secrets — Any AuthProvider secret storage or response. | part 4 | — |
@@ -107,16 +107,16 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | where do staging and prod secrets live; set the env var directly on the host; copy the env file to the server; inject secrets into the cloud environment; secrets for pr, staging and prod | **Infisical for cloud secrets** · rule docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments) — Cloud environments; local/test use .env files. | code `Token` | a hand-copied env file or a secret set directly on a pr/staging/prod host instead of Infisical injected via with-env (docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments); § with-env Composition) |
 | how do I rotate the encryption key; swap the current key in place; move the old key to previous and bump the version; changing a key; generate a new key and update the env | **Key rotation procedure** · rule FEATURES.md > Field-Level Encryption Engine > 3 Env Vars Per Keyring — whenever an encryption key is rotated | part 4 | replacing _KEY_CURRENT in place without moving the old key to _KEY_PREVIOUS and bumping _VERSION (FEATURES.md § Field-Level Encryption Engine › 3 Env Vars Per Keyring; docs/claude/ENCRYPTION.md § Deployment Checklist) |
 | Every registered keyring must define integer _ENCRYPTION_VERSION, base64 32-byte _KEY_CURRENT and _KEY_PREVIOUS or API won't start. | **Keyring env variables** · rule docs/claude/ENCRYPTION.md › Environment Variables — Adding any encrypted keyring; previous version is derived as current-1, write versions as integers not "v2". | part 4 | — |
-| the log line includes the token; print the decrypted credential in the error message; a password in plaintext anywhere; redact secrets from logs | **Never store or log plaintext secrets** · rule FEATURES.md > General Security > Password Hashing / Token Hashing — credentials and tokens; reversible secrets use field encryption instead | part 4 | a log line or error message that includes a token, password or decrypted credential (FEATURES.md § General Security › Password Hashing / Token Hashing) |
+| the log line includes the token; print the decrypted credential in the error message; a password in plaintext anywhere; mask secrets in logs | **Never store or log plaintext secrets** · rule FEATURES.md > General Security > Password Hashing / Token Hashing — credentials and tokens; reversible secrets use field encryption instead | part 4 | a log line or error message that includes a token, password or decrypted credential (FEATURES.md § General Security › Password Hashing / Token Hashing) |
 | commit the staging env file; real secret values in the repo; which env files are okay to check in; example env files only | **No committed env files** · rule FEATURES.md › Environment & Secrets — all apps and environments (pr, staging, prod) | part 4 | committing a .env.staging / .env.prod or real secret values instead of the .env.*.example files plus Infisical (FEATURES.md § Infrastructure & DevOps › Infisical Secrets Management) |
 | Secrets never go in command arguments, where process listings and error messages expose them. | **No secrets in command arguments** · rule init/utils/exec.ts — Any init CLI or HTTP call that carries a token, password or connection string. | part 4 | — |
 | Only withThrowawaySession may import cookie signers or reference createSession; elsewhere fails CI. | **Only withThrowawaySession builds session credentials** · rule scripts/ci/rules/lib/bearerOnlyAuth.ts (bearer-only-auth fence) — Any code touching BetterAuth session credentials. | part 4 | — |
-| hash the provider secret like a password; the server must replay this secret to a third party; reversible storage for a credential we send onward; hash or encrypt this token | **Provider credentials encrypted, never hashed** · rule docs/claude/AUTH.md § Multi-Provider Authentication (AuthProvider) › Encryption — Storing any credential the server must later use to call a provider | code `AuthProvider`, `encryptField`, `decryptField`, `getPlatformProviders` | hashing a provider secret that must be replayed to a third party (docs/claude/AUTH.md › Encryption) |
+| hash the provider secret like a password; the server must replay this secret to a third party; reversible storage for a credential we send onward; hash or encrypt this token | **Provider credentials encrypted, never hashed** · rule docs/claude/AUTH.md § Multi-Provider Authentication (AuthProvider) › Encryption — Storing any credential the server must later use to call a provider | code `AuthProvider`, `encryptField`, `decryptField`, `configuredPlatformProviders` | hashing a provider secret that must be replayed to a third party (docs/claude/AUTH.md › Encryption) |
 | telemetry key in the browser build; which secrets can the frontend see; the logging token belongs on the API only | **Provider credentials only in /api secrets** · rule docs/claude/LOGGING.md § Setup — Any telemetry secret or browser build variable. | part 4 | — |
 | return 404 so non-members can't tell it exists; the lookup runs before the permission check; hide whether the resource exists | **Resource existence is non-secret** · rule docs/claude/PERMISSIONS.md § Validation Middleware › validatePermission — Any route loading a resource by id | code `validateSubmodelPermission`, `rebacSchema`, `resourceContextMiddleware`, `schemaMap` | — |
 | the response includes the encrypted columns; return the decrypted secret in the API; strip the secret from the response schema; secrets at rest, omitted from responses | **Secrets encrypted, never returned** · rule CLAUDE.md §7 Core Engineering Standards — Any credential or secret field. | part 4 | a response schema or select that returns encryptedSecrets / metadata / version columns or the decrypted secret (CLAUDE.md §7 Core Engineering Standards; docs/claude/AUTH.md Operations (secrets omitted)) |
 
-- *Also here, by name:* AUTH_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); SYSTEM_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); createEncryptionEnvRefinement (`packages/db/src/lib/encryption/envValidation.ts`)
+- *Also here, by name:* AUTH_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); SYSTEM_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); makePreviousEncryptionKeyRequiredRefinement (`packages/db/src/lib/encryption/envValidation.ts`)
 
 ## 4. The specifics, in full
 
@@ -133,7 +133,7 @@ Each unit is the doc section verbatim, with its headings shifted down two levels
 
 Two sources of providers:
 
-1. **Platform providers** — not rows. `getPlatformProviders()` (`apps/api/src/lib/auth/platformProviders.ts`) lists Google and GitHub when their `*_CLIENT_ID` / `*_CLIENT_SECRET` env vars are set. Only Google is wired into BetterAuth `socialProviders` today.
+1. **Platform providers** — not rows. `configuredPlatformProviders()` (`apps/api/src/lib/auth/platformProviders.ts`) lists Google and GitHub when their `*_CLIENT_ID` / `*_CLIENT_SECRET` env vars are set. Only Google is wired into BetterAuth `socialProviders` today.
 2. **Organization providers** — `AuthProvider` rows, one org each, secrets encrypted.
 
 ##### Database Schema
@@ -165,7 +165,7 @@ model AuthProvider {
 ##### Encryption
 
 ```typescript
-import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
+import { encryptField, decryptField } from '@template/db/lib/encryption/fieldEncryption';
 
 const encrypted = await encryptField('authProvider', 'secrets', { ...data, secrets });
 const secrets = await decryptField('authProvider', 'secrets', authProvider);
@@ -436,7 +436,7 @@ if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
 
 // ✅ Good: Fetch from Infisical (where step 8 stored it)
 if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
-  const prodConnectionString = await getSecretAsync('DATABASE_URL', {
+  const prodConnectionString = await fetchSecretOrThrow('DATABASE_URL', {
     projectId: infisicalProjectId,
     environment: 'prod',
     path: '/api',
@@ -446,7 +446,7 @@ if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
 
 // ✅ Good: Re-read from config (don't trust local variables)
 if (!(await isComplete('planetscale', 'configureDB'))) {
-  const latestConfig = await getProjectConfig();
+  const latestConfig = await fetchProjectConfig();
   const orgName = latestConfig.planetscale.organization;
   const dbName = latestConfig.planetscale.database;
   await updateDatabaseSettings(orgName, dbName, { ... });
@@ -454,8 +454,8 @@ if (!(await isComplete('planetscale', 'configureDB'))) {
 ```
 
 **Rule of thumb:**
-- Secrets → Always fetch from Infisical with `getSecretAsync()`
-- Config metadata → Always re-read from config with `getProjectConfig()`
+- Secrets → Always fetch from Infisical with `fetchSecretOrThrow()`
+- Config metadata → Always re-read from config with `fetchProjectConfig()`
 - Never pass connection strings, passwords, or API keys between steps
 
 <!-- unit doc:docs/claude/SETUP.md#environment-variables -->
@@ -493,7 +493,7 @@ See [ENVIRONMENTS.md](ENVIRONMENTS.md) for full environment configuration.
 
 - ✅ **OpenTelemetry Integration** - OTLP-compatible distributed tracing and metrics ready to use. Auto-instruments HTTP requests (excluding `/health`) and Prisma queries when `OTEL_EXPORTER_OTLP_ENDPOINT` configured. Sends to any OTLP backend (BetterStack, Datadog, Honeycomb, etc.). Skipped in local/test to avoid performance overhead. Dynamic imports ensure zero cost when disabled
 
-- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`makeAdapterRouter`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
+- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`resolveAdapterForEnvironmentOrThrow`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
 
 ##### Environment & Secrets
 
@@ -509,7 +509,7 @@ See [ENVIRONMENTS.md](ENVIRONMENTS.md) for full environment configuration.
 
 - ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ job schedulers) opens its own connection
 
-- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
+- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `fetchThroughCache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
 - ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
 
@@ -525,7 +525,7 @@ See [ENVIRONMENTS.md](ENVIRONMENTS.md) for full environment configuration.
 
 ##### Coming Soon
 
-- 🟡 **Adapter Primitives** (ticket INFRA-009) - `makeAdapterRouter` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
+- 🟡 **Adapter Primitives** (ticket INFRA-009) - `resolveAdapterForEnvironmentOrThrow` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
 
 - 🟣 **Product Analytics** (ticket INFRA-010) - User behavior tracking for product decisions. Evaluating OpenPanel, Mixpanel, or internal solution. Track page views, feature usage, funnels, retention
 

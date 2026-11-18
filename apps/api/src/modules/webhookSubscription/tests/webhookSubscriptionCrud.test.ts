@@ -13,7 +13,7 @@ import {
 } from '@template/db/test';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { createTestApp } from '#tests/createTestApp';
-import { del, get, json, patch } from '#tests/utils/request';
+import { del, get, parseSuccessBody, patch } from '#tests/utils/request';
 
 describe('WebhookSubscription CRUD', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -65,7 +65,7 @@ describe('WebhookSubscription CRUD', () => {
       });
 
       const response = await fetch(get(`/api/v1/webhookSubscription/${sub.id}`));
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
       expect(data.id).toBe(sub.id);
@@ -107,7 +107,7 @@ describe('WebhookSubscription CRUD', () => {
       const response = await fetch(
         patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
       expect(data.isActive).toBe(false);
@@ -124,7 +124,7 @@ describe('WebhookSubscription CRUD', () => {
       const response = await fetch(
         patch(`/api/v1/webhookSubscription/${sub.id}`, { url: 'https://new-url.com/webhook' }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
       expect(data.isActive).toBe(true);
@@ -157,7 +157,7 @@ describe('WebhookSubscription CRUD', () => {
       const response = await fetch(
         patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }),
       );
-      const { data } = await json<WebhookSubscription>(response);
+      const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
       expect(data.isActive).toBe(false);

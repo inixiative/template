@@ -15,7 +15,10 @@ import {
   cursorPaginateRequestSchema,
   paginateRequestSchema,
 } from '#/lib/routeTemplates/paginationSchemas';
-import { createAdvancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
+import {
+  advancedSearchSchemaForFields,
+  simpleSearchSchema,
+} from '#/lib/routeTemplates/searchSchema';
 import type { RouteArgs, ZodSchema } from '#/lib/routeTemplates/types';
 import { hasIdParam } from '#/lib/routeTemplates/utils/hasIdParam';
 import { sanitizeRequestSchema } from '#/lib/routeTemplates/utils/sanitizeRequestSchema';
@@ -159,7 +162,7 @@ export const buildRequest = <const T extends RouteArgs>(
   if (admin || searchableFields?.length) {
     const searchFields =
       (filterLens && buildSearchFieldsSchema(filterLens)) ||
-      createAdvancedSearchSchema(searchableFields ?? []);
+      advancedSearchSchemaForFields(searchableFields ?? []);
     querySchema = querySchema.merge(z.object({ search: simpleSearchSchema, searchFields }));
   }
 

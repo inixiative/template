@@ -4,7 +4,7 @@
 
 ## Problem
 
-Upserting `findForUpdate` took one `createLock` lock per identifier, each with its own heartbeat
+Upserting `findForUpdate` took one `makeLock` lock per identifier, each with its own heartbeat
 timer and its own release. In Zealot a 1000-contact bulk create held about 5000 of them in one
 transaction: every 3s beat cost 5000 evals, and on a loaded CI runner the beats consumed the event
 loop until the transaction expired. Separately, `verify()` kept a local loss latch, so a lock whose
@@ -12,7 +12,7 @@ key came back to its token after an observed loss still answered false.
 
 ## Design (ported from Zealot)
 
-- `createLock({ service, identifiers: [...] })` is one lock over `lock:<service>:<identifier>` per
+- `makeLock({ service, identifiers: [...] })` is one lock over `lock:<service>:<identifier>` per
   identifier, deduplicated and sorted (`lockKeysOf`); an empty list is refused. One identifier is the
   plain single-key lock. Claims stay single-key.
 - One token, one heartbeat, one release. Each step is one Lua call over the set: `fencedSetPrefix`
@@ -31,6 +31,6 @@ key came back to its token after an observed loss still answered false.
 
 Docs: `docs/claude/DATABASE.md#redis-locks-held-until-the-transaction-ends`,
 `docs/claude/DATABASE.md#row-locks-and-create-if-missing`. Tests:
-`packages/db/src/lock/createLock.test.ts`, `packages/db/src/test/findForUpdateUpserting.test.ts`,
+`packages/db/src/lock/makeLock.test.ts`, `packages/db/src/test/findForUpdateUpserting.test.ts`,
 `packages/db/src/test/withLockUntilSettled.test.ts`,
 `apps/api/src/middleware/error/errorHandlerMiddleware.test.ts`.

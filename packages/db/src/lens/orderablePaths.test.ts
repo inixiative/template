@@ -7,8 +7,8 @@ const userLens = lensFor('User');
 const accountLens = lensFor('Account');
 
 describe('orderablePaths', () => {
-  describe('redaction (registry-driven)', () => {
-    it('omits redacted fields from the sortable surface', () => {
+  describe('sensitive fields (registry-driven)', () => {
+    it('omits sensitive fields from the sortable surface', () => {
       const paths = orderablePaths({ parent: accountLens });
       expect(paths).not.toContain('password');
       expect(paths).toContain('accountId');

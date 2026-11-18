@@ -4,7 +4,13 @@
  * @partOf primitive:websockets
  * @uses none
  */
-import { byChannel, byId, byStream, clearRegistry, removeConnection } from '#/ws/registry';
+import {
+  clearRegistry,
+  connectionIdsByChannel,
+  connectionIdsByStream,
+  connectionsById,
+  removeConnection,
+} from '#/ws/registry';
 import type { WSSocket } from '#/ws/types';
 
 const STALE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -14,11 +20,11 @@ export const updateLastPing = (ws: WSSocket): void => {
 };
 
 // Closes + removes connections that haven't pinged within the window. Snapshots
-// the values first (removeConnection mutates byId).
+// the values first (removeConnection mutates connectionsById).
 export const cleanupStaleConnections = (): number => {
   const now = Date.now();
   let cleaned = 0;
-  for (const ws of [...byId.values()]) {
+  for (const ws of [...connectionsById.values()]) {
     if (now - ws.data.lastPing > STALE_TIMEOUT_MS) {
       if (ws.readyState === WebSocket.OPEN) ws.close(1001, 'Connection stale');
       removeConnection(ws);
@@ -28,20 +34,20 @@ export const cleanupStaleConnections = (): number => {
   return cleaned;
 };
 
-export const getConnectionStats = (): {
+export const connectionStats = (): {
   connections: number;
   channels: number;
   streams: number;
 } => ({
-  connections: byId.size,
-  channels: byChannel.size,
-  streams: byStream.size,
+  connections: connectionsById.size,
+  channels: connectionIdsByChannel.size,
+  streams: connectionIdsByStream.size,
 });
 
 // Graceful shutdown: tell clients to reconnect, close sockets, clear the registry.
 export const drainConnections = (): void => {
   const message = JSON.stringify({ type: 'reconnect', reason: 'server_shutdown' });
-  for (const ws of [...byId.values()]) {
+  for (const ws of [...connectionsById.values()]) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(message);
       ws.close(1001, 'Server shutting down');

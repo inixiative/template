@@ -5,7 +5,7 @@
  */
 import { castArray } from 'lodash-es';
 
-export const extractRows = (args: unknown): Record<string, unknown>[] => {
+export const rowsFromArgsData = (args: unknown): Record<string, unknown>[] => {
   if (!args || typeof args !== 'object') return [];
   const a = args as Record<string, unknown>;
   if (a.data === undefined) return [];

@@ -16,13 +16,17 @@ import { batchRouter } from '#/modules/batch';
 import type { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';
 import { segmentRouter } from '#/modules/segment';
 import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { parseSuccessBody, post } from '#tests/utils/request';
 
 type BatchExecuteResponse = z.infer<typeof batchExecuteRoute.responseSchema>;
 type Strategy = 'transactionAll' | 'transactionPerRound' | 'allowFailures' | 'failOnRound';
 type SubRequest = { method: string; path: string; body?: unknown };
 
-const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+const acmeEmailDomainRule = {
+  field: 'customerUser.email',
+  operator: Operator.endsWith,
+  value: '@acme.test',
+};
 
 const membersOf = (segmentId: string) => ({
   field: 'segmentMembers',
@@ -58,7 +62,7 @@ describe('batch sub-requests under the owner lock', () => {
 
   const runBatch = async (strategy: Strategy, requests: SubRequest[][]) => {
     const response = await fetch(post('/api/v1/batch/execute', { strategy, requests }));
-    return (await json<BatchExecuteResponse>(response)).data;
+    return (await parseSuccessBody<BatchExecuteResponse>(response)).data;
   };
 
   const conditionsOf = async (segment: Segment) =>
@@ -98,8 +102,12 @@ describe('batch sub-requests under the owner lock', () => {
   beforeEach(async () => {
     reached = gate();
     release = gate();
-    first = (await createSegment({ ownerModel: 'Space', conditions: acmeRule }, { space })).entity;
-    second = (await createSegment({ ownerModel: 'Space', conditions: acmeRule }, { space })).entity;
+    first = (
+      await createSegment({ ownerModel: 'Space', conditions: acmeEmailDomainRule }, { space })
+    ).entity;
+    second = (
+      await createSegment({ ownerModel: 'Space', conditions: acmeEmailDomainRule }, { space })
+    ).entity;
   });
 
   afterEach(async () => {
@@ -122,7 +130,7 @@ describe('batch sub-requests under the owner lock', () => {
       expect(raced.summary.status).toBe('failed');
       expect(raced.batch[0]?.[0]?.status).toBe(422);
       expect(await conditionsOf(first)).toEqual(membersOf(second.id));
-      expect(await conditionsOf(second)).toEqual(acmeRule);
+      expect(await conditionsOf(second)).toEqual(acmeEmailDomainRule);
     });
 
     it('releases the lock when the batch rolls back', async () => {
@@ -131,7 +139,7 @@ describe('batch sub-requests under the owner lock', () => {
         [{ method: 'GET', path: '/api/v1/segment/not-a-segment' }],
       ]);
       expect(failed.summary.status).toBe('failed');
-      expect(await conditionsOf(first)).toEqual(acmeRule);
+      expect(await conditionsOf(first)).toEqual(acmeEmailDomainRule);
 
       const next = withOwnerLock(
         { ownerModel: 'Space', ownerId: space.id },
@@ -146,8 +154,8 @@ describe('batch sub-requests under the owner lock', () => {
       const started = Date.now();
       const result = await runBatch('transactionAll', [
         [save(first, membersOf(second.id))],
-        [save(second, acmeRule)],
-        [save(first, acmeRule)],
+        [save(second, acmeEmailDomainRule)],
+        [save(first, acmeEmailDomainRule)],
       ]);
 
       expect(result.summary.status).toBe('success');
@@ -157,7 +165,10 @@ describe('batch sub-requests under the owner lock', () => {
     it('takes the same owner lock from parallel sub-requests of one round without waiting on itself', async () => {
       const started = Date.now();
       const result = await runBatch('transactionAll', [
-        [save(first, membersOf(second.id)), save(second, { ...acmeRule, value: '@beta.test' })],
+        [
+          save(first, membersOf(second.id)),
+          save(second, { ...acmeEmailDomainRule, value: '@beta.test' }),
+        ],
       ]);
 
       expect(result.summary.status).toBe('success');
@@ -170,8 +181,8 @@ describe('batch sub-requests under the owner lock', () => {
       ]);
 
       expect(result.summary.status).toBe('failed');
-      expect(await conditionsOf(first)).toEqual(acmeRule);
-      expect(await conditionsOf(second)).toEqual(acmeRule);
+      expect(await conditionsOf(first)).toEqual(acmeEmailDomainRule);
+      expect(await conditionsOf(second)).toEqual(acmeEmailDomainRule);
     });
   });
 
@@ -197,7 +208,7 @@ describe('batch sub-requests under the owner lock', () => {
       await sleep(500);
 
       expect(result.summary.status).toBe('failed');
-      expect(await conditionsOf(second)).toEqual(acmeRule);
+      expect(await conditionsOf(second)).toEqual(acmeEmailDomainRule);
     });
   });
 
@@ -219,7 +230,7 @@ describe('batch sub-requests under the owner lock', () => {
       expect(held.summary.status).toBe('success');
       expect(raced.summary.status).toBe('failed');
       expect(raced.batch[0]?.[0]?.status).toBe(422);
-      expect(await conditionsOf(second)).toEqual(acmeRule);
+      expect(await conditionsOf(second)).toEqual(acmeEmailDomainRule);
     });
   });
 

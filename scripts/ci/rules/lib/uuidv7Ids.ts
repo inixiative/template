@@ -15,13 +15,13 @@
  */
 import ts from 'typescript';
 import {
-  finishFence,
+  applyExemptionsAndBaselineThenExit,
+  fetchExemptions,
+  fetchSource,
   lineAt,
   listFiles,
-  readExemptions,
-  readSource,
   type Violation,
-} from './fence';
+} from './ciRuleRunner';
 
 const REQUIRED = ['@id', '@default(dbgenerated("uuidv7()"))', '@db.VarChar(36)'];
 const MODEL = /^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm;
@@ -52,12 +52,12 @@ const attributesOf = (rest: string): string[] => {
   return attributes;
 };
 
-const exemptions = readExemptions('uuidv7-ids');
+const exemptions = fetchExemptions('uuidv7-ids');
 const usedExemptions = new Set<string>();
 const violations: Violation[] = [];
 
 for (const file of listFiles(['apps', 'packages'], /\.prisma$/)) {
-  const source = readSource(file);
+  const source = fetchSource(file);
   MODEL.lastIndex = 0;
   for (let m = MODEL.exec(source); m !== null; m = MODEL.exec(source)) {
     const [, model, body] = m;
@@ -98,7 +98,7 @@ for (const file of listFiles(['apps', 'packages'], /\.prisma$/)) {
 
 for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   if (file.endsWith('.d.ts')) continue;
-  const source = readSource(file);
+  const source = fetchSource(file);
   if (!source.includes('randomUUID')) continue;
   const sourceFile = ts.createSourceFile(
     file,
@@ -132,14 +132,14 @@ for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   else violations.push(...fileViolations);
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'uuidv7-ids',
   violations,
   usedExemptions,
-  explain: [
+  failureExplanationLines: [
     'Prisma models without a uuidv7 primary key (every model id is:',
     '  id String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)',
     ') and code that mints ids with randomUUID(): use Bun.randomUUIDv7().',
   ],
-  clean: 'Every Prisma model id is a uuidv7 VarChar(36), and no code mints a v4.',
+  passMessage: 'Every Prisma model id is a uuidv7 VarChar(36), and no code mints a v4.',
 });

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { projectLens } from '@inixiative/json-rules';
-import { getPolymorphismConfig, RULE_REFERENCEABLE_MODELS } from '@template/db';
+import { polymorphismConfigForModel, RULE_REFERENCEABLE_MODELS } from '@template/db';
 import type { EmailOwnerModel } from '@template/db/generated/client/enums';
 import {
   EntitlementResourceModel,
@@ -12,7 +12,7 @@ import { emailSlotLenses } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
 import type { RULE_REFERENCE_SURFACES } from '#/hooks/ruleReference/surfaces';
 import { emailLensFor } from '#/lib/email/emailLensFor';
-import { registry } from '#/lib/email/registry';
+import { emailTemplateRegistry } from '#/lib/email/emailTemplateRegistry';
 import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
 import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 
@@ -34,7 +34,7 @@ const emailLenses = (slugs: (string | undefined)[]): RuleLens[] =>
   );
 
 const AUTHORED_UNDER = {
-  EmailTemplate: emailLenses(Object.keys(registry)),
+  EmailTemplate: emailLenses(Object.keys(emailTemplateRegistry)),
   EmailComponent: emailLenses([undefined]),
   Segment: [customerRelationshipLens],
   Entitlement: Object.values(EntitlementResourceModel).map(entitlementWhereLens),
@@ -76,7 +76,7 @@ describe('lens and registry agree on what a rule can reference', () => {
   });
 
   test('the targetModel enum and the registry carry the same models, one column each', () => {
-    const targetAxis = getPolymorphismConfig('RuleReference')?.axes.find(
+    const targetAxis = polymorphismConfigForModel('RuleReference')?.axes.find(
       (axis) => axis.field === 'targetModel',
     );
     expect(Object.keys(targetAxis?.fkMap ?? {}).sort()).toEqual(

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db/client';
 import { discriminatorRequiresValue } from '@template/db/registries/discriminatorDefaults';
-import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import { cleanupTouchedTables } from '@template/db/test';
 import * as factories from '@template/db/test/factories';
 import { registeredDependencies } from '@template/db/test/factory';
@@ -20,7 +20,7 @@ const requiresDiscriminator = (modelName: ModelName, seen = new Set<ModelName>()
   if (seen.has(modelName)) return false;
   seen.add(modelName);
   if (
-    getPolymorphismConfig(modelName)?.axes.some((axis) =>
+    polymorphismConfigForModel(modelName)?.axes.some((axis) =>
       discriminatorRequiresValue(modelName, axis.field),
     )
   )

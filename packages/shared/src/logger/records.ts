@@ -22,7 +22,7 @@ const context = new AsyncLocalStorage<Record<string, unknown>>();
 
 export const withLogContext = <T>(fields: Record<string, unknown>, fn: () => T): T =>
   context.run({ ...context.getStore(), ...fields }, fn);
-export const getLogContext = (): Record<string, unknown> => ({
+export const logContextFields = (): Record<string, unknown> => ({
   'service.name': process.env.OTEL_SERVICE_NAME ?? 'template',
   'deployment.environment.name': process.env.ENVIRONMENT ?? 'local',
   ...serviceFields,

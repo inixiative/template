@@ -4,16 +4,14 @@
  * @partOf primitive:ui
  * @uses none
  */
-import type { AuthStrategy as StoreAuthStrategy } from '@template/ui/store/types/auth';
-
-export type AuthStrategy = StoreAuthStrategy;
+import type { AuthStrategy } from '@template/ui/store/types/auth';
 
 export type PendingAuthCallback = () => void;
 
 export type AuthStrategyContextType = {
   strategy: AuthStrategy;
   isAuthenticated: boolean;
-  requireAuth: (onSuccess?: PendingAuthCallback) => void;
+  runAfterAuthentication: (onSuccess?: PendingAuthCallback) => void;
   setEmbedToken: (token: string) => Promise<void> | void;
 };
 

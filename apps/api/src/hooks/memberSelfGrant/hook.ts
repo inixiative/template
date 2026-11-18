@@ -7,9 +7,9 @@
 import {
   DbAction,
   db,
+  fetchEntitlementAnchors,
   type HookOptions,
   HookTiming,
-  loadEntitlementAnchors,
   registerDbHook,
   toEntitlementCreateData,
 } from '@template/db';
@@ -48,7 +48,7 @@ const writeSelfGrants = async (model: MemberModel, members: Member[]) => {
     member,
     input: toEntitlementInput(memberSelfGrant(resourceOf[model], member)),
   }));
-  const anchors = await loadEntitlementAnchors(grants.map(({ input }) => input));
+  const anchors = await fetchEntitlementAnchors(grants.map(({ input }) => input));
   await db.entitlement.createManyAndReturn({
     data: grants.flatMap(({ member, input }) =>
       toEntitlementCreateData([input], { model, row: member }, anchors).map((row) => ({

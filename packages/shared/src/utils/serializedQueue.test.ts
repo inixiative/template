@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { createSerializedQueue } from '@template/shared/utils/serializedQueue';
+import { makeSerializedQueue } from '@template/shared/utils/serializedQueue';
 
-describe('createSerializedQueue', () => {
+describe('makeSerializedQueue', () => {
   it('runs operations in submission order even when later ones resolve faster', async () => {
-    const queue = createSerializedQueue();
+    const queue = makeSerializedQueue();
     const completed: number[] = [];
 
     const slow = queue.run(async () => {
@@ -19,7 +19,7 @@ describe('createSerializedQueue', () => {
   });
 
   it('passes through the resolved value of each operation', async () => {
-    const queue = createSerializedQueue();
+    const queue = makeSerializedQueue();
     const a = queue.run(async () => 'a');
     const b = queue.run(async () => 'b');
     expect(await a).toBe('a');
@@ -27,7 +27,7 @@ describe('createSerializedQueue', () => {
   });
 
   it('rejects only the failing op; the next one still runs', async () => {
-    const queue = createSerializedQueue();
+    const queue = makeSerializedQueue();
     const completed: string[] = [];
 
     const failing = queue.run(async () => {
@@ -43,7 +43,7 @@ describe('createSerializedQueue', () => {
   });
 
   it('does not start the next op until the previous settles', async () => {
-    const queue = createSerializedQueue();
+    const queue = makeSerializedQueue();
     let firstResolve!: () => void;
     const firstStarted = new Promise<void>((r) => {
       firstResolve = r;

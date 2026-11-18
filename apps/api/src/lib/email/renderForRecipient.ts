@@ -14,8 +14,8 @@ import {
   type Variables,
 } from '@template/email/render';
 import { declaredFields, type EmailLens, OPAQUE_SLOT } from '@template/email/rules';
-import { slotRowsLens } from '#/lib/email/registry';
-import { resolveSender } from '#/lib/email/resolveSender';
+import { narrowSlotLensToRowsMatchingOrThrow } from '#/lib/email/emailTemplateRegistry';
+import { fetchSenderRowThroughLens } from '#/lib/email/fetchSenderRowThroughLens';
 import type { Sender } from '#/lib/email/sender';
 
 export type RecipientRef = {
@@ -39,7 +39,7 @@ const dataVariables = async (
     throw new EmailRenderError(label, 'render_failed', [
       'the data slot is a model lens and its payload carries no id',
     ]);
-  const [row] = await fetchLens(slotRowsLens(slot, byId(data.id)));
+  const [row] = await fetchLens(narrowSlotLensToRowsMatchingOrThrow(slot, byId(data.id)));
   if (!row) throw new EmailRenderError(label, 'data_missing');
   return row;
 };
@@ -49,21 +49,23 @@ export const recipientVariables = async (
   { recipientId, sender, targeting, data = {}, label = 'message' }: RecipientRef,
 ): Promise<Variables> => {
   const where = targeting ? { all: [byId(recipientId), targeting] } : byId(recipientId);
-  const [recipient] = await fetchLens(slotRowsLens(lens.recipient, where));
+  const [recipient] = await fetchLens(narrowSlotLensToRowsMatchingOrThrow(lens.recipient, where));
   if (!recipient) throw new EmailRenderError(label, 'recipient_missing');
   return {
-    sender: await resolveSender(sender),
+    sender: await fetchSenderRowThroughLens(sender),
     recipient,
     data: await dataVariables(lens, data, label),
   };
 };
 
-export const addressesThrough = async (
+export const fetchRecipientEmailAddressesMatching = async (
   lens: EmailLens,
   where: Condition | undefined,
 ): Promise<string[] | undefined> => {
   if (!where) return undefined;
-  const rows = await fetchLens<{ email: string }>(slotRowsLens(lens.recipient, where));
+  const rows = await fetchLens<{ email: string }>(
+    narrowSlotLensToRowsMatchingOrThrow(lens.recipient, where),
+  );
   return rows.length ? rows.map((row) => row.email) : undefined;
 };
 

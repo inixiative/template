@@ -3,37 +3,37 @@ import { db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
 import {
-  liveOrders,
-  mkEmail,
-  phone,
+  createEmailContact,
+  createPhoneContact,
+  fetchLiveContactPositions,
+  positionOfContact,
   positions,
-  posOf,
-  restore,
-  softDelete,
+  restoreContact,
+  softDeleteContact,
 } from '#/hooks/orderedList/tests/setup';
 
 describe('restore', () => {
   it('appends to end of live list', async () => {
     const { entity: u } = await createUser();
-    await phone(u.id); // 1
-    const b = await phone(u.id); // 2
-    await phone(u.id); // 3
-    await softDelete(b.id); // live: a=1, c=2
-    await restore(b.id);
+    await createPhoneContact(u.id); // 1
+    const b = await createPhoneContact(u.id); // 2
+    await createPhoneContact(u.id); // 3
+    await softDeleteContact(b.id); // live: a=1, c=2
+    await restoreContact(b.id);
 
-    const rows = await liveOrders(u.id);
+    const rows = await fetchLiveContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
-    expect(posOf(rows, b.id)).toBe(3);
+    expect(positionOfContact(rows, b.id)).toBe(3);
   });
 });
 
 describe('bulk restore', () => {
   it('ignores rows that were already live (no clobber)', async () => {
     const { entity: u } = await createUser();
-    const a = await phone(u.id); // 1
-    const b = await phone(u.id); // 2 — will be soft-deleted then restored alongside live rows
-    const c = await phone(u.id); // 3
-    await softDelete(b.id); // live: a=1, c=2; deleted: b
+    const a = await createPhoneContact(u.id); // 1
+    const b = await createPhoneContact(u.id); // 2 — will be soft-deleted then restored alongside live rows
+    const c = await createPhoneContact(u.id); // 3
+    await softDeleteContact(b.id); // live: a=1, c=2; deleted: b
     // Bulk-set deletedAt=null over a where-clause that matches BOTH live and deleted rows.
     // Only b should be re-slotted; a and c must keep their positions.
     await db.withDeleted(() =>
@@ -42,21 +42,21 @@ describe('bulk restore', () => {
         data: { deletedAt: null },
       }),
     );
-    const rows = await liveOrders(u.id);
+    const rows = await fetchLiveContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
-    expect(posOf(rows, a.id)).toBe(1);
-    expect(posOf(rows, c.id)).toBe(2);
-    expect(posOf(rows, b.id)).toBe(3); // restored to end, didn't clobber a/c
+    expect(positionOfContact(rows, a.id)).toBe(1);
+    expect(positionOfContact(rows, c.id)).toBe(2);
+    expect(positionOfContact(rows, b.id)).toBe(3); // restored to end, didn't clobber a/c
   });
 
   it('assigns sequential end positions', async () => {
     const { entity: u } = await createUser();
-    await phone(u.id); // 1
-    const b = await phone(u.id); // 2
-    const c = await phone(u.id); // 3
-    await phone(u.id); // 4
-    await softDelete(b.id);
-    await softDelete(c.id);
+    await createPhoneContact(u.id); // 1
+    const b = await createPhoneContact(u.id); // 2
+    const c = await createPhoneContact(u.id); // 3
+    await createPhoneContact(u.id); // 4
+    await softDeleteContact(b.id);
+    await softDeleteContact(c.id);
 
     await db.withDeleted(() =>
       db.contact.updateManyAndReturn({
@@ -65,7 +65,7 @@ describe('bulk restore', () => {
       }),
     );
 
-    const rows = await liveOrders(u.id);
+    const rows = await fetchLiveContactPositions(u.id);
     expect(positions(rows)).toEqual([1, 2, 3, 4]);
     const restored = rows.filter((r) => r.id === b.id || r.id === c.id);
     expect(restored.map((r) => r.position).sort()).toEqual([3, 4]);
@@ -76,12 +76,12 @@ describe('multi-scope isolation — bulk restore', () => {
   it('restoring across two owners appends to each list independently', async () => {
     const { entity: u1 } = await createUser();
     const { entity: u2 } = await createUser();
-    const a1 = await phone(u1.id);
-    await phone(u1.id); // u1: [1,2]
-    const a2 = await phone(u2.id);
-    await phone(u2.id); // u2: [1,2]
-    await softDelete(a1.id); // u1: [1]
-    await softDelete(a2.id); // u2: [1]
+    const a1 = await createPhoneContact(u1.id);
+    await createPhoneContact(u1.id); // u1: [1,2]
+    const a2 = await createPhoneContact(u2.id);
+    await createPhoneContact(u2.id); // u2: [1,2]
+    await softDeleteContact(a1.id); // u1: [1]
+    await softDeleteContact(a2.id); // u2: [1]
 
     await db.withDeleted(() =>
       db.contact.updateManyAndReturn({
@@ -90,18 +90,18 @@ describe('multi-scope isolation — bulk restore', () => {
       }),
     );
 
-    expect(positions(await liveOrders(u1.id))).toEqual([1, 2]);
-    expect(positions(await liveOrders(u2.id))).toEqual([1, 2]);
+    expect(positions(await fetchLiveContactPositions(u1.id))).toEqual([1, 2]);
+    expect(positions(await fetchLiveContactPositions(u2.id))).toEqual([1, 2]);
   });
 
   it('restoring across two types (same owner) appends to each list independently', async () => {
     const { entity: u } = await createUser();
-    const pa = await phone(u.id);
-    await phone(u.id); // phone: [1,2]
-    const ea = await mkEmail(u.id);
-    await mkEmail(u.id); // email: [1,2,3] with the user's own
-    await softDelete(pa.id); // phone: [1]
-    await softDelete(ea.id); // email: [1,2]
+    const pa = await createPhoneContact(u.id);
+    await createPhoneContact(u.id); // phone: [1,2]
+    const ea = await createEmailContact(u.id);
+    await createEmailContact(u.id); // email: [1,2,3] with the user's own
+    await softDeleteContact(pa.id); // phone: [1]
+    await softDeleteContact(ea.id); // email: [1,2]
 
     await db.withDeleted(() =>
       db.contact.updateManyAndReturn({
@@ -110,7 +110,7 @@ describe('multi-scope isolation — bulk restore', () => {
       }),
     );
 
-    expect(positions(await liveOrders(u.id, ContactType.phone))).toEqual([1, 2]);
-    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2, 3]);
+    expect(positions(await fetchLiveContactPositions(u.id, ContactType.phone))).toEqual([1, 2]);
+    expect(positions(await fetchLiveContactPositions(u.id, ContactType.email))).toEqual([1, 2, 3]);
   });
 });

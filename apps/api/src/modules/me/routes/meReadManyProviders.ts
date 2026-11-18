@@ -13,7 +13,7 @@ import {
   customerRelationshipTags,
 } from '#/modules/customerRelationship/schemas/customerRelationshipSchemas';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
+import { OpenApiTags } from '#/modules/openApiTags';
 
 export const meReadManyProvidersRoute = readRoute({
   model: Modules.me,
@@ -25,5 +25,5 @@ export const meReadManyProvidersRoute = readRoute({
   filterLens: { parent: lensFor('CustomerRelationship') },
   query: providerFilterSchema,
   responseSchema: customerRelationshipAsCustomerSchema,
-  tags: [Tags.me, Tags.provider, ...customerRelationshipTags],
+  tags: [OpenApiTags.me, OpenApiTags.provider, ...customerRelationshipTags],
 });

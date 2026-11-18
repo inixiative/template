@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceCreateWebhookSubscriptionRoute } from '#/modules/space/routes/spaceCreateWebhookSubscription';
 
@@ -12,7 +12,7 @@ export const spaceCreateWebhookSubscriptionController = makeController(
   spaceCreateWebhookSubscriptionRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const space = getResource<'space'>(c);
+    const space = contextResource<'space'>(c);
     const body = c.req.valid('json');
 
     const subscription = await db.webhookSubscription.create({

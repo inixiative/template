@@ -4,14 +4,14 @@ import { bindLens, type LensNarrowing, Operator, validateNarrowing } from '@inix
 import { polymorphicBindings } from '@template/db';
 import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 import { customerRelationshipsByIdLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipsByIdLens';
-import { lensOutput } from '#tests/utils/lensOutput';
+import { lensProjectionSourcesAndSelect } from '#tests/utils/lensProjectionSourcesAndSelect';
 
 const OWNER = '00000000-0000-7000-8000-0000000000aa';
 const IDS = ['00000000-0000-7000-8000-0000000000b1', '00000000-0000-7000-8000-0000000000b2'];
 const OWNER_MODELS = ['Organization', 'Space', 'User'] as const;
 
 const DECLARED_BY_THE_DELETED_CUSTOMER_BUILDER =
-  'b411b1b12ea0cced9c6cee95a41bfa1d8ff9f2c8572ceb12aa7f238dc4278053';
+  '0db117a351980990de285cc1039c30132f371996cb7d14b9ed35c30b24f9f19e';
 
 const sortedKeys = (value: unknown): unknown =>
   Array.isArray(value)
@@ -56,7 +56,9 @@ describe('the customer relationship lenses', () => {
         ...owner,
         customerRelationshipIds: IDS,
       });
-      expect(lensOutput(bound)).toEqual(lensOutput(perCall));
+      expect(lensProjectionSourcesAndSelect(bound)).toEqual(
+        lensProjectionSourcesAndSelect(perCall),
+      );
     }
   });
 });

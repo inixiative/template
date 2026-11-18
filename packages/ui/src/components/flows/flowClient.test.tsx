@@ -19,8 +19,8 @@ import { Modal } from '@template/ui/components/layout/Modal';
 import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
 import { Button } from '@template/ui/components/primitives/Button';
 import { type StartedFlow, useStartFlow } from '@template/ui/hooks/flow/useStartFlow';
-import { useAuthenticatedRouting } from '@template/ui/hooks/useAuthenticatedRouting';
 import { useRegisterNavigation } from '@template/ui/hooks/useRegisterNavigation';
+import { useSyncTenantContextWithUrlAndAuthorizeRoute } from '@template/ui/hooks/useSyncTenantContextWithUrlAndAuthorizeRoute';
 import { createAppQueryClient } from '@template/ui/lib/createAppQueryClient';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
@@ -121,7 +121,7 @@ const Starter = () => {
 
 const Root = () => {
   useRegisterNavigation(navConfig);
-  useAuthenticatedRouting();
+  useSyncTenantContextWithUrlAndAuthorizeRoute();
   return (
     <>
       <FlowBanner />
@@ -197,11 +197,13 @@ afterEach(() => {
 });
 
 describe('flow client', () => {
-  it('is seeded from ?flow= and kept across navigatePreserving', async () => {
+  it('is seeded from ?flow= and kept across navigateKeepingSearchParams', async () => {
     const router = await renderInFlow();
     expect(useAppStore.getState().navigation.flowId).toBe(FLOW_ID);
 
-    act(() => useAppStore.getState().navigation.navigatePreserving('/settings/tokens', 'context'));
+    act(() =>
+      useAppStore.getState().navigation.navigateKeepingSearchParams('/settings/tokens', 'context'),
+    );
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/settings/tokens'));
     expect(router.state.location.search).toMatchObject({ flow: FLOW_ID });
@@ -284,7 +286,9 @@ describe('flow client', () => {
   it('drops the flow when the user leaves its pages', async () => {
     await renderInFlow();
 
-    act(() => useAppStore.getState().navigation.navigatePreserving('/elsewhere', 'context'));
+    act(() =>
+      useAppStore.getState().navigation.navigateKeepingSearchParams('/elsewhere', 'context'),
+    );
 
     await waitFor(() => expect(useAppStore.getState().navigation.flowId).toBeNull());
     await waitFor(() =>

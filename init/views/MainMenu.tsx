@@ -2,20 +2,20 @@ import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { getBouncerProgressSummaries } from '../tasks/bouncerSteps';
+import { bouncerProgressSummaries } from '../tasks/bouncerSteps';
 import {
-  getCloudflarePagesLiveActions,
-  getCloudflarePagesProgressSummaries,
+  cloudflarePagesLiveActions,
+  cloudflarePagesProgressSummaries,
 } from '../tasks/cloudflarePagesSteps';
-import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
-import { getPlanetScaleProgressSummaries } from '../tasks/planetscaleSteps';
-import { getRailwayBucketsProgressSummaries } from '../tasks/railwayBucketsSteps';
-import { getRailwayPostgresProgressSummaries } from '../tasks/railwayPostgresSteps';
-import { getRailwayProgressSummaries } from '../tasks/railwaySteps';
-import { getResendProgressSummaries } from '../tasks/resendSteps';
-import { getVercelProgressSummaries } from '../tasks/vercelSteps';
+import { infisicalProgressSummaries } from '../tasks/infisicalSteps';
+import { planetScaleProgressSummaries } from '../tasks/planetscaleSteps';
+import { railwayBucketsProgressSummaries } from '../tasks/railwayBucketsSteps';
+import { railwayPostgresProgressSummaries } from '../tasks/railwayPostgresSteps';
+import { railwayProgressSummaries } from '../tasks/railwaySteps';
+import { resendProgressSummaries } from '../tasks/resendSteps';
+import { vercelProgressSummaries } from '../tasks/vercelSteps';
 import { useConfig } from '../utils/configState';
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import { prompt } from '../utils/prompts';
 
 type MenuItem = {
@@ -35,14 +35,14 @@ type ProgressSummary = {
   totalCount: number;
 };
 
-const getProjectConfigStatus = (config: ProjectConfig): MenuItem['status'] => {
+const projectConfigMenuStatus = (config: ProjectConfig): MenuItem['status'] => {
   // Check if all project config steps are complete
   const { progress } = config.project;
   const allComplete = Object.values(progress).every((v) => v === true);
   return allComplete ? 'completed' : 'pending';
 };
 
-const getStatusFromSummaries = (
+const statusFromSummaries = (
   progress: Record<string, boolean>,
   summaries: readonly ProgressSummary[],
   error?: string,
@@ -62,42 +62,42 @@ const getStatusFromSummaries = (
   return { status: 'completed', details };
 };
 
-const getInfisicalStatus = (
+const infisicalMenuStatus = (
   config: ProjectConfig,
 ): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(
+  return statusFromSummaries(
     config.infisical.progress,
-    getInfisicalProgressSummaries(config),
+    infisicalProgressSummaries(config),
     config.infisical.error,
   );
 };
 
-const getPlanetScaleStatus = (
+const planetScaleMenuStatus = (
   config: ProjectConfig,
 ): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(
+  return statusFromSummaries(
     config.planetscale.progress,
-    getPlanetScaleProgressSummaries(config),
+    planetScaleProgressSummaries(config),
     config.planetscale.error,
   );
 };
 
-const getRailwayStatus = (
+const railwayMenuStatus = (
   config: ProjectConfig,
 ): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(
+  return statusFromSummaries(
     config.railway.progress,
-    getRailwayProgressSummaries(config),
+    railwayProgressSummaries(config),
     config.railway.error,
   );
 };
 
-const getRailwayPostgresStatus = (
+const railwayPostgresMenuStatus = (
   config: ProjectConfig,
 ): { status: MenuItem['status']; details: string[] } => {
   // Skipped groups don't count toward "is the section complete?" — derive a
   // synthetic progress map containing only the actions in non-skipped groups.
-  const summaries = getRailwayPostgresProgressSummaries(config);
+  const summaries = railwayPostgresProgressSummaries(config);
   const _liveActions = new Set<string>();
   for (const summary of summaries) {
     if (summary.skipped) continue;
@@ -117,13 +117,13 @@ const getRailwayPostgresStatus = (
   }
   // Only count summaries that are NOT skipped against completion total.
   const liveSummaries = summaries.filter((s) => !s.skipped);
-  return getStatusFromSummaries(filteredProgress, liveSummaries, config.railwayPostgres.error);
+  return statusFromSummaries(filteredProgress, liveSummaries, config.railwayPostgres.error);
 };
 
-const getRailwayBucketsStatus = (
+const railwayBucketsMenuStatus = (
   config: ProjectConfig,
 ): { status: MenuItem['status']; details: string[] } => {
-  const summaries = getRailwayBucketsProgressSummaries(config);
+  const summaries = railwayBucketsProgressSummaries(config);
   const stagingEnabled = config.features.staging.enabled;
   const filteredProgress: Record<string, boolean> = {};
   filteredProgress.ensureProdSystemBucket = config.railwayBuckets.progress.ensureProdSystemBucket;
@@ -138,39 +138,39 @@ const getRailwayBucketsStatus = (
       config.railwayBuckets.progress.storeStagingCredentials;
   }
   const liveSummaries = summaries.filter((s) => !s.skipped);
-  return getStatusFromSummaries(filteredProgress, liveSummaries, config.railwayBuckets.error);
+  return statusFromSummaries(filteredProgress, liveSummaries, config.railwayBuckets.error);
 };
 
-const getVercelStatus = (
+const vercelMenuStatus = (
   config: ProjectConfig,
 ): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(
+  return statusFromSummaries(
     config.vercel.progress,
-    getVercelProgressSummaries(config),
+    vercelProgressSummaries(config),
     config.vercel.error,
   );
 };
 
-const getLaunchStatus = (config: ProjectConfig): MenuItem['status'] => {
+const launchMenuStatus = (config: ProjectConfig): MenuItem['status'] => {
   return config.launched ? 'completed' : 'pending';
 };
 
-const getResendStatus = (
+const resendMenuStatus = (
   config: ProjectConfig,
 ): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(
+  return statusFromSummaries(
     config.resend.progress,
-    getResendProgressSummaries(config),
+    resendProgressSummaries(config),
     config.resend.error,
   );
 };
 
-const getBouncerStatus = (
+const bouncerMenuStatus = (
   config: ProjectConfig,
 ): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(
+  return statusFromSummaries(
     config.bouncer.progress,
-    getBouncerProgressSummaries(config),
+    bouncerProgressSummaries(config),
     config.bouncer.error,
   );
 };
@@ -209,14 +209,14 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       const cfg = config;
 
       // Derive status from config
-      const projectConfigStatus = getProjectConfigStatus(cfg);
-      const infisicalStatus = getInfisicalStatus(cfg);
-      const planetscaleStatus = getPlanetScaleStatus(cfg);
-      const railwayStatus = getRailwayStatus(cfg);
-      const vercelStatus = getVercelStatus(cfg);
-      const resendStatus = getResendStatus(cfg);
-      const bouncerStatus = getBouncerStatus(cfg);
-      const launchStatus = getLaunchStatus(cfg);
+      const projectConfigStatus = projectConfigMenuStatus(cfg);
+      const infisicalStatus = infisicalMenuStatus(cfg);
+      const planetscaleStatus = planetScaleMenuStatus(cfg);
+      const railwayStatus = railwayMenuStatus(cfg);
+      const vercelStatus = vercelMenuStatus(cfg);
+      const resendStatus = resendMenuStatus(cfg);
+      const bouncerStatus = bouncerMenuStatus(cfg);
+      const launchStatus = launchMenuStatus(cfg);
 
       // Provider/feature-aware menu — only show steps for providers actually selected.
       // Settings menu lets the user switch providers + toggle staging; choices marked
@@ -228,19 +228,19 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       const useCloudflarePages = cfg.providers.frontend === 'cloudflare-pages';
       const useResend = cfg.providers.email === 'resend';
 
-      const railwayPostgresStatus = getRailwayPostgresStatus(cfg);
-      const railwayBucketsStatus = getRailwayBucketsStatus(cfg);
+      const railwayPostgresStatus = railwayPostgresMenuStatus(cfg);
+      const railwayBucketsStatus = railwayBucketsMenuStatus(cfg);
 
-      const cloudflarePagesSummaries = getCloudflarePagesProgressSummaries(cfg);
+      const cloudflarePagesSummaries = cloudflarePagesProgressSummaries(cfg);
       const cloudflarePagesLive = cloudflarePagesSummaries.filter((s) => !s.skipped);
       // Filter the progress map down to actions in non-skipped groups so
       // disabled web/admin/staging steps don't drag the section's
       // completion total up forever.
-      const cloudflarePagesLiveActions = getCloudflarePagesLiveActions(cfg);
+      const liveCloudflarePagesActions = cloudflarePagesLiveActions(cfg);
       const cloudflarePagesProgress: Record<string, boolean> = Object.fromEntries(
-        cloudflarePagesLiveActions.map((a) => [a, cfg.cloudflarePages.progress[a] === true]),
+        liveCloudflarePagesActions.map((a) => [a, cfg.cloudflarePages.progress[a] === true]),
       );
-      const cloudflarePagesStatus = getStatusFromSummaries(
+      const cloudflarePagesStatus = statusFromSummaries(
         cloudflarePagesProgress,
         cloudflarePagesLive,
         cfg.cloudflarePages.error,

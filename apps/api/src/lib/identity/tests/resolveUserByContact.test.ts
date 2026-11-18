@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createContact, createUser, getNextSeq } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createContact,
+  createUser,
+  nextFactorySequenceNumber,
+} from '@template/db/test';
 import { resolveUserByContact } from '#/lib/identity/resolveUserByContact';
 
 describe('resolveUserByContact', () => {
@@ -13,7 +18,7 @@ describe('resolveUserByContact', () => {
     `1555${String(phoneSuffix).padStart(7, '0').slice(-7)}@s.whatsapp.net`;
 
   it('returns the existing userId when a Contact is already registered for the JID', async () => {
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
     const targetJid = jid(seq);
     const { entity: user } = await createUser();
     await createContact(
@@ -37,12 +42,12 @@ describe('resolveUserByContact', () => {
   });
 
   // Stub-create paths exercise the auditLog hook, which uses `db` from the
-  // request scope set up by prepareRequest middleware. Calling the helper
+  // request scope set up by prepareRequestMiddleware. Calling the helper
   // directly here would FK-violate against AuditLog.subjectUserId. Cover
   // those paths via integration tests in createTestApp instead.
 
   it('throws when the contact type has no toStubEmail (e.g. linkedin)', async () => {
-    const handle = `nonstub-${getNextSeq()}`;
+    const handle = `nonstub-${nextFactorySequenceNumber()}`;
     await expect(
       resolveUserByContact({
         type: ContactType.linkedin,

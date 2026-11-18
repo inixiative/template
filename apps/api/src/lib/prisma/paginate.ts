@@ -13,11 +13,12 @@ import {
   type RuleValue,
 } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
-import { isScalarField, lookupField, modelFields } from '@template/db';
+import { isScalarField, modelFieldAtPath, modelFields } from '@template/db';
 import { stableHash } from '@template/shared/utils';
-import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
+import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
+import { applyFilterLensWheresToPrismaWhere } from '#/lib/prisma/applyFilterLensWheresToPrismaWhere';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import {
@@ -29,7 +30,6 @@ import {
   hydrateCursorValues,
   type SortKey,
 } from '#/lib/prisma/keysetCursor';
-import { lensWhere } from '#/lib/prisma/lensWhere';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 const DEFAULT_CURSOR_PAGE_SIZE = 100;
@@ -97,7 +97,7 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
   c: ValidatedContext<'query', PaginationQuery>,
   options?: PaginateOptions<T>,
 ) => {
-  const query = getValidatedQuery(c);
+  const query = validatedQuery(c);
   const { search } = query;
   const {
     orderBy: callerOrderByOption,
@@ -142,7 +142,7 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
   });
 
   // Lens relation wheres are authorization scope — they apply on superadmin endpoints too.
-  const composed = await lensWhere(
+  const composed = await applyFilterLensWheresToPrismaWhere(
     filterLens,
     andWhere([baseWhere, searchWhere as Record<string, unknown>]),
   );
@@ -160,7 +160,7 @@ export const paginate = async <
   delegate: T,
   options?: PaginateOptions<T>,
 ): Promise<PaginatedResult<TItem>> => {
-  const { page = 1, pageSize = 20, orderBy: rawOrderBy } = getValidatedQuery(c);
+  const { page = 1, pageSize = 20, orderBy: rawOrderBy } = validatedQuery(c);
   const { where, findManyOptions, callerOrderByOption } = await composeScopedFindMany(c, options);
 
   const orderBy = buildOrderBy({
@@ -202,7 +202,7 @@ const primaryKeysOf = (model: string): string[] =>
 
 export const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
   const lastKey = chain[chain.length - 1]?.[0];
-  const lastField = lastKey ? lookupField(model, lastKey) : undefined;
+  const lastField = lastKey ? modelFieldAtPath(model, lastKey) : undefined;
   if (lastField && isScalarField(lastField) && lastField.isId && lastField.isRequired) return chain;
 
   const [primaryKey, ...rest] = primaryKeysOf(model);
@@ -251,7 +251,7 @@ export const cursorPaginate = async <
   delegate: T,
   options?: PaginateOptions<T>,
 ): Promise<CursorPaginatedResult<TItem>> => {
-  const { pageSize = DEFAULT_CURSOR_PAGE_SIZE, cursor } = getValidatedQuery(c);
+  const { pageSize = DEFAULT_CURSOR_PAGE_SIZE, cursor } = validatedQuery(c);
   const { where, model, findManyOptions, callerOrderByOption } = await composeScopedFindMany(
     c as unknown as ValidatedContext<'query', PaginationQuery>,
     options,

@@ -4,10 +4,10 @@ import type React from 'react';
 import { useMemo, useState } from 'react';
 import { StepProgress } from '../components/StepProgress';
 import { storeBouncerApiKey } from '../tasks/bouncerSetup';
-import { getBouncerProgressItems } from '../tasks/bouncerSteps';
+import { bouncerProgressItems } from '../tasks/bouncerSteps';
 import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import { clearError, clearProgress, setError } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
@@ -48,7 +48,7 @@ export const BouncerSetupView: React.FC<BouncerSetupViewProps> = ({ onComplete, 
   const [activeAction, setActiveAction] = useState<string | undefined>(undefined);
 
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
-  const progressItems = useMemo(() => (config ? getBouncerProgressItems(config) : []), [config]);
+  const progressItems = useMemo(() => (config ? bouncerProgressItems(config) : []), [config]);
   const error = config?.bouncer.error ?? '';
 
   const restartSetup = async () => {
