@@ -98,7 +98,7 @@ describe('webhook hook — tenancy', () => {
     return { customerUserId: customer.id, sub: await subscribeUser(customer.id) };
   };
 
-  const createRef = async (customerUserId: string) =>
+  const createUserCustomerRelationship = async (customerUserId: string) =>
     (
       await createCustomerRelationship({
         customerModel: 'User',
@@ -109,24 +109,24 @@ describe('webhook hook — tenancy', () => {
     ).entity;
 
   it('delivers a CustomerRelationship create to its two parties only, once each', async () => {
-    const ref = await createRef(customerId);
+    const customerRelationship = await createUserCustomerRelationship(customerId);
 
     expect(deliveredTo(customerSub.id)).toEqual([
-      expect.objectContaining({ action: 'create', resourceId: ref.id }),
+      expect.objectContaining({ action: 'create', resourceId: customerRelationship.id }),
     ]);
     expect(deliveredTo(providerSub.id)).toEqual([
-      expect.objectContaining({ action: 'create', resourceId: ref.id }),
+      expect.objectContaining({ action: 'create', resourceId: customerRelationship.id }),
     ]);
     expect(deliveredTo(outsiderSub.id)).toEqual([]);
   });
 
   it('delivers updates to the parties and skips no-op updates', async () => {
     const { customerUserId, sub } = await subscribedCustomer();
-    const ref = await createRef(customerUserId);
+    const customerRelationship = await createUserCustomerRelationship(customerUserId);
     enqueueSpy.mockClear();
 
     await db.customerRelationship.update({
-      where: { id: ref.id },
+      where: { id: customerRelationship.id },
       data: { acceptedKinds: ['platform'] },
     });
     expect(
@@ -138,7 +138,7 @@ describe('webhook hook — tenancy', () => {
 
     enqueueSpy.mockClear();
     await db.customerRelationship.update({
-      where: { id: ref.id },
+      where: { id: customerRelationship.id },
       data: { acceptedKinds: ['platform'] },
     });
     expect(enqueued()).toEqual([]);
@@ -146,19 +146,19 @@ describe('webhook hook — tenancy', () => {
 
   it('delivers a CustomerRelationship soft delete to its parties as a delete', async () => {
     const { customerUserId, sub } = await subscribedCustomer();
-    const ref = await createRef(customerUserId);
+    const customerRelationship = await createUserCustomerRelationship(customerUserId);
     enqueueSpy.mockClear();
 
     await db.customerRelationship.update({
-      where: { id: ref.id },
+      where: { id: customerRelationship.id },
       data: { deletedAt: new Date() },
     });
 
     expect(deliveredTo(sub.id)).toEqual([
-      expect.objectContaining({ action: 'delete', resourceId: ref.id }),
+      expect.objectContaining({ action: 'delete', resourceId: customerRelationship.id }),
     ]);
     expect(deliveredTo(providerSub.id)).toEqual([
-      expect.objectContaining({ action: 'delete', resourceId: ref.id }),
+      expect.objectContaining({ action: 'delete', resourceId: customerRelationship.id }),
     ]);
     expect(deliveredTo(outsiderSub.id)).toEqual([]);
   });
@@ -235,7 +235,7 @@ describe('webhook hook — tenancy', () => {
   });
 
   it('skips inactive subscriptions of a party', async () => {
-    await createRef(inactiveCustomerId);
+    await createUserCustomerRelationship(inactiveCustomerId);
 
     expect(deliveredTo(inactiveCustomerSub.id)).toEqual([]);
     expect(deliveredTo(providerSub.id).length).toBe(1);
@@ -248,14 +248,16 @@ describe('webhook hook — tenancy', () => {
     const organizationSub = await subscribeOrganization(organization.id);
     enqueueSpy.mockClear();
 
-    const { entity: ref } = await createCustomerRelationship({
+    const { entity: customerRelationship } = await createCustomerRelationship({
       customerModel: 'User',
       providerModel: 'Space',
       customerUserId: customerId,
       providerSpaceId: space.id,
     });
 
-    expect(deliveredTo(spaceSub.id)).toEqual([expect.objectContaining({ resourceId: ref.id })]);
+    expect(deliveredTo(spaceSub.id)).toEqual([
+      expect.objectContaining({ resourceId: customerRelationship.id }),
+    ]);
     expect(deliveredTo(organizationSub.id)).toEqual([]);
   });
 
@@ -387,7 +389,7 @@ describe('webhook hook — tenancy', () => {
   it('a customer hears its vendor soft delete, though the cascade tombstones their CustomerRelationship', async () => {
     const { customerUserId, sub } = await subscribedCustomer();
     const { entity: vendor } = await createOrganization();
-    const { entity: ref } = await relate(
+    const { entity: customerRelationship } = await relate(
       { model: 'User', id: customerUserId },
       { model: 'Organization', id: vendor.id },
     );
@@ -402,7 +404,7 @@ describe('webhook hook — tenancy', () => {
     ).toEqual(
       [
         { action: 'delete', resourceId: vendor.id },
-        { action: 'delete', resourceId: ref.id },
+        { action: 'delete', resourceId: customerRelationship.id },
       ].sort((a, b) => a.resourceId.localeCompare(b.resourceId)),
     );
   });
@@ -411,12 +413,12 @@ describe('webhook hook — tenancy', () => {
     const { customerUserId } = await subscribedCustomer();
     const { entity: vendor } = await createOrganization();
     const vendorSub = await subscribeOrganization(vendor.id);
-    const { entity: ref } = await relate(
+    const { entity: customerRelationship } = await relate(
       { model: 'User', id: customerUserId },
       { model: 'Organization', id: vendor.id },
     );
     await db.customerRelationship.update({
-      where: { id: ref.id },
+      where: { id: customerRelationship.id },
       data: { deletedAt: new Date() },
     });
     enqueueSpy.mockClear();
@@ -428,7 +430,7 @@ describe('webhook hook — tenancy', () => {
 
   it('sends a customer email change to the vendor and never sends platformRole', async () => {
     const { customerUserId } = await subscribedCustomer();
-    await createRef(customerUserId);
+    await createUserCustomerRelationship(customerUserId);
     enqueueSpy.mockClear();
 
     const email = `changed-${Bun.randomUUIDv7()}@example.com`;
@@ -476,17 +478,17 @@ describe('webhook hook — origin suppression', () => {
     hsSub = await subscribe(hsIntegration.id);
     plainSub = await subscribe();
 
-    const { entity: ref } = await createCustomerRelationship({
+    const { entity: customerRelationship } = await createCustomerRelationship({
       customerModel: 'User',
       providerModel: 'User',
       customerUserId: customer.id,
       providerUserId: user.id,
     });
-    customerRelationshipId = ref.id;
+    customerRelationshipId = customerRelationship.id;
     enqueueSpy.mockClear();
   });
 
-  const touchRef = (kinds: ('platform' | 'activity' | 'marketing')[]) =>
+  const touchCustomerRelationship = (kinds: ('platform' | 'activity' | 'marketing')[]) =>
     db.customerRelationship.update({
       where: { id: customerRelationshipId },
       data: { acceptedKinds: kinds },
@@ -498,7 +500,7 @@ describe('webhook hook — origin suppression', () => {
     await auditActorContext.scope(
       { ...nullAuditActor, integrationId: sfIntegrationId },
       async () => {
-        await touchRef(['marketing']);
+        await touchCustomerRelationship(['marketing']);
       },
     );
 
@@ -511,7 +513,7 @@ describe('webhook hook — origin suppression', () => {
   it('skips the subscription of the integration a job writes for', async () => {
     const handlers = {
       sendWebhook: async () => {
-        await touchRef(['activity']);
+        await touchCustomerRelationship(['activity']);
       },
     };
     await processJob(
@@ -530,7 +532,7 @@ describe('webhook hook — origin suppression', () => {
   });
 
   it('delivers to every party subscription when the write has no origin', async () => {
-    await touchRef(['platform', 'marketing']);
+    await touchCustomerRelationship(['platform', 'marketing']);
 
     const delivered = deliveredSubIds();
     expect(delivered).toContain(sfSub.id);

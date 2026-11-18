@@ -52,7 +52,7 @@ describe('segment routes', () => {
   let customer: User;
   let customerRelationship: CustomerRelationship;
   let outsider: User;
-  let outsiderRef: CustomerRelationship;
+  let outsiderRelationship: CustomerRelationship;
 
   beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'admin' });
@@ -71,7 +71,7 @@ describe('segment routes', () => {
         providerSpaceId: space.id,
       })
     ).entity;
-    outsiderRef = (
+    outsiderRelationship = (
       await createCustomerRelationship({
         customerModel: 'User',
         providerModel: 'Space',
@@ -209,7 +209,11 @@ describe('segment routes', () => {
       post(`/api/v1/space/${space.id}/segments`, {
         name: `picked-${getNextSeq()}`,
         type: 'static',
-        conditions: { field: 'id', operator: Operator.in, value: [outsiderRef.id, foreign.id] },
+        conditions: {
+          field: 'id',
+          operator: Operator.in,
+          value: [outsiderRelationship.id, foreign.id],
+        },
       }),
     );
     expect(response.status).toBe(201);
@@ -217,7 +221,7 @@ describe('segment routes', () => {
 
     const members = await ownerFetch(get(`/api/v1/segment/${picked.id}/segmentMembers`));
     const { data } = await json<SegmentMember[]>(members);
-    expect(data.map((member) => member.customerRelationshipId)).toEqual([outsiderRef.id]);
+    expect(data.map((member) => member.customerRelationshipId)).toEqual([outsiderRelationship.id]);
   });
 
   it('rejects conditions outside the lens with a 422', async () => {

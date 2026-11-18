@@ -469,7 +469,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Customer Management
 
-- ✅ `CustomerRelationship` models a customer/provider pair, with User, Organization and Space branches on both axes. Segments operate on these references.
+- ✅ `CustomerRelationship` models a customer/provider pair, with User, Organization and Space branches on both axes. Segments operate on these relationships.
 - ✅ Provider list (`/me/providers`) and Space customer list (`/space/:id/customers`) routes exist.
 - 🟡 Provider-side User/Organization customer lists and broader relationship-management UI remain work in progress.
 

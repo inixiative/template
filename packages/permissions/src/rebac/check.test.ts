@@ -379,7 +379,7 @@ describe('rebac check', () => {
 
   describe('polymorphic CustomerRelationship - full example', () => {
     // CustomerRelationship has customer side (user/org/space) and provider side (space)
-    // Customer can read their refs, provider can manage them
+    // Customer can read their relationships, provider can manage them
     const schema: RebacSchema = {
       permissions: {
         'db:user': {
@@ -403,7 +403,7 @@ describe('rebac check', () => {
         },
         'db:customerRelationship': {
           actions: {
-            // Provider owns the ref
+            // Provider owns the relationship
             own: { rel: 'providerSpace', action: 'own' },
             manage: 'own',
             // Both customer and provider can read
@@ -462,7 +462,7 @@ describe('rebac check', () => {
       expect(check(permix, schema, 'customerRelationship', record, 'read')).toBe(false);
     });
 
-    it('customer user can read their own ref', async () => {
+    it('customer user can read their own relationship', async () => {
       await permix.setup({ resource: 'db:user', id: 'user-1', actions: { own: true } });
       const record = {
         id: 'ref-1',

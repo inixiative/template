@@ -22,12 +22,14 @@ export type ReconcileCustomerRelationshipSegmentsPayload = {
 export const reconcileCustomerRelationshipSegments =
   makeSupersedingJob<ReconcileCustomerRelationshipSegmentsPayload>(
     async (_ctx, { customerModel, customerId }) => {
-      const refs = await db.customerRelationship.findMany({
+      const customerRelationships = await db.customerRelationship.findMany({
         where: { customerModel, [customerRelationshipCustomerFk(customerModel)]: customerId },
       });
       const changes: MembershipChange[] = [];
-      for (const ref of refs) {
-        for (const { segmentId, diff } of await reconcileCustomerRelationship(ref.id)) {
+      for (const customerRelationship of customerRelationships) {
+        for (const { segmentId, diff } of await reconcileCustomerRelationship(
+          customerRelationship.id,
+        )) {
           const segment = await db.segment.findUnique({ where: { id: segmentId } });
           if (segment) changes.push({ segment, diff });
         }

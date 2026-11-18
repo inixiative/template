@@ -38,7 +38,7 @@ const fixture = async () => {
       { organization, tagCategory },
     );
     await createTagAttachment({ resourceModel: 'User' }, { user, tag });
-    const { entity: ref } = await createCustomerRelationship({
+    const { entity: customerRelationship } = await createCustomerRelationship({
       customerModel: 'User',
       providerModel: 'Organization',
       customerUserId: user.id,
@@ -49,7 +49,7 @@ const fixture = async () => {
       ownerModel: 'Organization',
       organizationId: organization.id,
     });
-    await createSegmentMember({}, { segment, customerRelationship: ref });
+    await createSegmentMember({}, { segment, customerRelationship });
   }
   return { mine, user };
 };

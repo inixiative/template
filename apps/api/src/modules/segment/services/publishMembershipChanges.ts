@@ -51,12 +51,12 @@ export const publishMembershipChanges = async (changes: MembershipChange[]): Pro
 
   for (const change of moved) await bySegment(change);
 
-  const perRef = byCustomerRelationship(moved);
-  const refs = await db.customerRelationship.findMany({
-    where: { id: { in: [...perRef.keys()] } },
+  const changesByCustomerRelationship = byCustomerRelationship(moved);
+  const customerRelationships = await db.customerRelationship.findMany({
+    where: { id: { in: [...changesByCustomerRelationship.keys()] } },
   });
-  for (const customerRelationship of refs) {
-    const { added, removed } = perRef.get(customerRelationship.id)!;
+  for (const customerRelationship of customerRelationships) {
+    const { added, removed } = changesByCustomerRelationship.get(customerRelationship.id)!;
     const subject = {
       customerRelationshipId: customerRelationship.id,
       customerModel: customerRelationship.customerModel,
