@@ -4,7 +4,7 @@
  * @partOf primitive:jobs, primitive:caching
  * @uses infrastructure:redis
  */
-import { getRedisClient, getRollingCache } from '@template/db';
+import { redisClient, rollingCacheByNameOrThrow } from '@template/db';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
 
@@ -28,19 +28,19 @@ export type RefreshRollingCachePayload = { name: string };
 // each tick's enqueue is a no-op, and the next pass starts on the first tick after it closes. A leaf
 // that fails all its retries keeps its last good value and still lets the branch close
 // (enqueueChildJob sets `ignoreDependencyOnFailure`); the next pass tries it again. An unregistered
-// name throws (getRollingCache).
+// name throws (rollingCacheByNameOrThrow).
 export const refreshRollingCache = makeSingletonJob<RefreshRollingCachePayload>(
   {
     stages: [
       async (ctx, { name }) => {
-        const rollingCache = getRollingCache(name);
+        const rollingCache = rollingCacheByNameOrThrow(name);
         const targets = await rollingCache.targets();
         await ctx.enqueueChildJobs(
           'refreshRollingCacheTarget',
           targets.map((target) => ({ name, key: rollingCache.targetKey(target), target })),
           { spreadSeconds: rollingCache.spreadSeconds },
         );
-        await getRedisClient().set(
+        await redisClient().set(
           rollingCacheTimerKey(name),
           new Date().toISOString(),
           'EX',

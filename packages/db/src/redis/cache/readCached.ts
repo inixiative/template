@@ -4,14 +4,14 @@
  * @partOf primitive:caching, infrastructure:redis
  * @uses none
  */
-import type { getRedisClient } from '@template/db/redis/client';
+import type { redisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import superjson from 'superjson';
 
 type CacheRead<T> = { result: 'hit'; value: T } | { result: 'miss' | 'error' };
 
 export const readCached = async <T>(
-  redis: ReturnType<typeof getRedisClient>,
+  redis: ReturnType<typeof redisClient>,
   key: string,
 ): Promise<CacheRead<T>> => {
   try {

@@ -4,7 +4,7 @@ import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { fetchCachedRecordWithTargetEntitlements } from '@template/db/hydrate/fetchCachedRecordWithTargetEntitlements';
 import { hydrate } from '@template/db/hydrate/hydrate';
 import { cacheKey } from '@template/db/redis/cache/cacheKey';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import {
   cleanupTouchedTables,
   createOrganizationUser,
@@ -139,7 +139,7 @@ describe('fetchCachedRecordWithTargetEntitlements', () => {
     expect(
       await db.withDeleted(() => fetchCachedRecordWithTargetEntitlements('user', user.id)),
     ).toBeNull();
-    expect(await getRedisClient().exists(cacheKey('user', user.id))).toBe(1);
+    expect(await redisClient().exists(cacheKey('user', user.id))).toBe(1);
     expect(await fetchCachedRecordWithTargetEntitlements('user', user.id)).toBeNull();
   });
 

@@ -87,7 +87,7 @@ array form. It is decided by Prisma at request time and is unaffected by continu
 
    ```ts
    registerDbHook('auditLog', '*', HookTiming.after, actions, async (options) => {
-     const actor = auditActorContext.getScope();
+     const actor = auditActorContext.currentActor();
      ...
    }, [auditActorStore]);
    ```

@@ -1,5 +1,5 @@
 import '#/config/env';
-import { getRedisClient } from '@template/db';
+import { redisClient } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { app } from '#/app';
 import { initializeOpenTelemetry, shutdownOpenTelemetry } from '#/config/otel';
@@ -65,7 +65,7 @@ onShutdown(async () => {
 onShutdown(async () => {
   // 3. Close Redis connections
   try {
-    const redis = getRedisClient();
+    const redis = redisClient();
     await redis.quit();
     log.success('Redis connections closed', LogScope.api);
   } catch {

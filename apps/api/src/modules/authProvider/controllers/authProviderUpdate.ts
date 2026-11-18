@@ -6,7 +6,7 @@
  */
 import { encryptField } from '@template/db/lib/encryption/fieldEncryption';
 import { isEmpty } from 'lodash-es';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { authProviderUpdateRoute } from '#/modules/authProvider/routes/authProviderUpdate';
 
@@ -14,7 +14,7 @@ export const authProviderUpdateController = makeController(
   authProviderUpdateRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const authProvider = getResource<'authProvider'>(c);
+    const authProvider = contextResource<'authProvider'>(c);
     const { secrets, ...body } = c.req.valid('json');
 
     let encryptedData = {};

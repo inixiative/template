@@ -8,7 +8,7 @@ import { hydrate, includeTargetEntitlements, Prisma } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { memberRoleWrite } from '@template/permissions/rebac/rebacSchemaRules';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { validateNotLastOwner } from '#/modules/organization/validations/validateNotLastOwner';
@@ -18,7 +18,7 @@ export const organizationUserUpdateController = makeController(
   organizationUserUpdateRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const orgUser = getResource<'organizationUser'>(c);
+    const orgUser = contextResource<'organizationUser'>(c);
     const body = c.req.valid('json');
     const permix = c.get('permix');
 

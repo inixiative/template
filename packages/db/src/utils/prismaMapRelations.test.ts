@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'bun:test';
-import { getModelRelations } from '@template/db/utils/prismaMapRelations';
+import { relationsOfModel } from '@template/db/utils/prismaMapRelations';
 
-describe('getModelRelations', () => {
+describe('relationsOfModel', () => {
   it('returns relations for a model', () => {
-    const relations = getModelRelations('Token');
+    const relations = relationsOfModel('Token');
 
     expect(relations).toBeArray();
     expect(relations.length).toBeGreaterThan(0);
   });
 
   it('includes simple FK relations', () => {
-    const relations = getModelRelations('Session');
+    const relations = relationsOfModel('Session');
 
     const userRel = relations.find((r) => r.relationName === 'user');
     expect(userRel).toBeDefined();
@@ -21,7 +21,7 @@ describe('getModelRelations', () => {
   });
 
   it('includes composite FK relations', () => {
-    const relations = getModelRelations('Token');
+    const relations = relationsOfModel('Token');
 
     const orgUserRel = relations.find((r) => r.relationName === 'organizationUser');
     expect(orgUserRel).toBeDefined();
@@ -33,7 +33,7 @@ describe('getModelRelations', () => {
   });
 
   it('handles renamed FK references', () => {
-    const relations = getModelRelations('Token');
+    const relations = relationsOfModel('Token');
 
     // space: fields: [organizationId, spaceId], references: [organizationId, id]
     const spaceRel = relations.find((r) => r.relationName === 'space');
@@ -45,7 +45,7 @@ describe('getModelRelations', () => {
   });
 
   it('returns null FK for reverse relations', () => {
-    const relations = getModelRelations('OrganizationUser');
+    const relations = relationsOfModel('OrganizationUser');
 
     // tokens is a reverse relation (Token[] on OrganizationUser)
     const tokensRel = relations.find((r) => r.relationName === 'tokens');
@@ -54,7 +54,7 @@ describe('getModelRelations', () => {
   });
 
   it('resolves named relations (e.g. @relation("InquirySource", fields: [...]))', () => {
-    const relations = getModelRelations('Inquiry');
+    const relations = relationsOfModel('Inquiry');
 
     const sourceOrgRel = relations.find((r) => r.relationName === 'sourceOrganization');
     expect(sourceOrgRel).toBeDefined();
@@ -67,6 +67,6 @@ describe('getModelRelations', () => {
   });
 
   it('throws for unknown model', () => {
-    expect(() => getModelRelations('NonExistentModel' as never)).toThrow();
+    expect(() => relationsOfModel('NonExistentModel' as never)).toThrow();
   });
 });

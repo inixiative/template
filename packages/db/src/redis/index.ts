@@ -5,8 +5,8 @@ export { clearCacheKeysMatchingPattern } from './cache/clearCacheKeysMatchingPat
 export { fetchThroughCache } from './cache/fetchThroughCache';
 export { makeRollingCache } from './cache/rollingCache/makeRollingCache';
 export {
-  getRollingCache,
   listRollingCaches,
+  rollingCacheByNameOrThrow,
   unregisterRollingCache,
 } from './cache/rollingCache/rollingCacheRegistry';
 export {
@@ -33,9 +33,9 @@ export {
   COMMAND_TIMEOUT_MS,
   createRedisConnection,
   flushRedis,
-  getRedisClient,
-  getRedisPub,
-  getRedisSub,
+  redisClient,
+  redisPublisher,
+  redisSubscriber,
 } from './client';
 export { type RedisNamespace, redisNamespace } from './namespaces';
 export type { RedisEval } from './types';

@@ -139,13 +139,13 @@ describe('fetchAllPages', () => {
     });
   });
 
-  describe('custom getItems + hasMore', () => {
+  describe('custom itemsOfResponse + hasMore', () => {
     it('terminates when a page returns fewer rows than the page size', async () => {
       const pages = [['a', 'b'], ['c']];
       const items = await fetchAllPages<string, { rows: string[] }>(
         async ({ page }) => ({ rows: pages[page - 1] ?? [] }),
         {
-          getItems: (response) => response.rows,
+          itemsOfResponse: (response) => response.rows,
           hasMore: (_response, _request, rows) => rows.length === 2,
         },
       );

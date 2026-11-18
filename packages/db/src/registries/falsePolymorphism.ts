@@ -421,11 +421,11 @@ export const PolymorphismRegistry = {
 const polymorphicConfigs: Partial<Record<ModelName, PolymorphicConfig>> = PolymorphismRegistry;
 
 // Helper to get config for a model
-export const getPolymorphismConfig = (model: ModelName): PolymorphicConfig | null =>
+export const polymorphismConfigForModel = (model: ModelName): PolymorphicConfig | null =>
   polymorphicConfigs[model] ?? null;
 
 export const polymorphicAxis = (model: ModelName, axisField: string): PolymorphicAxis => {
-  const axis = getPolymorphismConfig(model)?.axes.find(
+  const axis = polymorphismConfigForModel(model)?.axes.find(
     (candidate) => candidate.field === axisField,
   );
   if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);

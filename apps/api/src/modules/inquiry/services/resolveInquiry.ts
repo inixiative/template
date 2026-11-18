@@ -29,7 +29,7 @@ export const resolveInquiry = async (
 
   // why: the resolving inquiry is known to every write below (audit attribution, the request hooks), with or without a request scope
   return auditActorContext.scope(
-    { ...(auditActorContext.getScope() ?? nullAuditActor), sourceInquiryId: inquiry.id },
+    { ...(auditActorContext.currentActor() ?? nullAuditActor), sourceInquiryId: inquiry.id },
     () =>
       db.txn(async () => {
         const fresh = await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt);

@@ -8,7 +8,7 @@ import type { HydratedRecord, Prisma } from '@template/db';
 import { hydrate } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
@@ -21,7 +21,7 @@ import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validat
 export const inquiryUpdateController = makeController(inquiryUpdateRoute, async (c, respond) => {
   const db = c.get('db');
   const permix = c.get('permix');
-  const inquiry = getResource<'inquiry'>(c);
+  const inquiry = contextResource<'inquiry'>(c);
   const { content, status, expectedUpdatedAt } = c.req.valid('json');
 
   const handler = inquiryServices[inquiry.type];

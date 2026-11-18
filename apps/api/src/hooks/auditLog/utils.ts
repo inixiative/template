@@ -25,7 +25,11 @@ export const auditActorColumns = (actor: AuditActor | null) => ({
   sourceInquiryId: actor?.sourceInquiryId ?? null,
 });
 
-const getSubjectFieldValue = (model: string, field: string, record: Record<string, unknown>) => {
+const subjectFieldValueOfRecord = (
+  model: string,
+  field: string,
+  record: Record<string, unknown>,
+) => {
   switch (field) {
     case 'subjectOrganizationId':
       return model === 'Organization' ? record.id : record.organizationId;
@@ -70,7 +74,7 @@ export const buildSubjectFkFields = (
 
   const subjectFields: Record<string, unknown> = {};
   for (const field of fkFields) {
-    const value = getSubjectFieldValue(model, field, record);
+    const value = subjectFieldValueOfRecord(model, field, record);
     if (value !== undefined) subjectFields[field] = value;
   }
   return subjectFields;

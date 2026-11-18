@@ -44,7 +44,7 @@ export const encryptedColumnNamesForKey = (keyName: string) => {
 // from ENCRYPTED_MODELS so downstream registries (noopFields, sensitiveFields)
 // don't need to re-list the same column triplets. Keys are Prisma model names
 // (PascalCase) to match the registry consumers' lookup convention.
-export const getEncryptedFieldsByModel = (): Record<string, string[]> => {
+export const encryptedFieldsByModel = (): Record<string, string[]> => {
   const result: Record<string, string[]> = {};
   for (const [accessorName, modelConfig] of Object.entries(ENCRYPTED_MODELS)) {
     const modelName = upperFirst(accessorName);

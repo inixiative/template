@@ -1,5 +1,5 @@
 import { describe, expect, it, spyOn } from 'bun:test';
-import { getRedisClient } from '@template/db';
+import { redisClient } from '@template/db';
 import { type RateLimitRule, rateLimit } from '#/middleware/rateLimit/rateLimit';
 import { globalRateLimitKey, ipRateLimitKey } from '#/middleware/rateLimit/rateLimitKeys';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
@@ -114,7 +114,7 @@ describe('rateLimit', () => {
 
   it('fails open when Redis is unavailable', async () => {
     const { fetch } = createTestApp({ mount: [mount([ipRule({ max: 1 })])] });
-    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValue(new Error('redis down'));
+    const evalSpy = spyOn(redisClient(), 'eval').mockRejectedValue(new Error('redis down'));
 
     try {
       expect((await hit(fetch, '10.10.10.10')).status).toBe(200);

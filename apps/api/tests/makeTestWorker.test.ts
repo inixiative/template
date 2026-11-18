@@ -7,7 +7,7 @@ describe('makeTestWorker', () => {
   it('runs the handler as the same job actor processJob builds', async () => {
     const actors: (AuditActor | null)[] = [];
     const handlerSpy = spyOn(jobHandlers, 'sendWebhook').mockImplementation(async () => {
-      actors.push(auditActorContext.getScope());
+      actors.push(auditActorContext.currentActor());
     });
 
     try {

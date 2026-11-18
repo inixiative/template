@@ -4,12 +4,13 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { getPolymorphismConfig } from '@template/db';
+import { polymorphismConfigForModel } from '@template/db';
 
 // The relation names of a false-polymorphic axis, one per model it can point at.
 const axisRelations = (model: 'Entitlement' | 'RuleReference', side: string) =>
   Object.keys(
-    getPolymorphismConfig(model)?.axes.find((axis) => axis.field === `${side}Model`)?.fkMap ?? {},
+    polymorphismConfigForModel(model)?.axes.find((axis) => axis.field === `${side}Model`)?.fkMap ??
+      {},
   )
     .filter((value) => value !== 'admin')
     .map((value) => `${side}${value}`);

@@ -6,10 +6,10 @@
  */
 import {
   db,
-  getPolymorphismConfig,
   type PolymorphicValue,
   type Prisma,
   polymorphicKeyColumns,
+  polymorphismConfigForModel,
 } from '@template/db';
 import type { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
@@ -30,7 +30,7 @@ export const validateUniqueInquiry = async (
   inquiry: InquiryShape,
   mode: UniqueMode,
 ): Promise<void> => {
-  const config = getPolymorphismConfig('Inquiry');
+  const config = polymorphismConfigForModel('Inquiry');
   if (!config) throw new Error('Inquiry polymorphism config missing from registry');
 
   const fkFieldsFor = (axisField: 'sourceModel' | 'targetModel'): readonly string[] => {

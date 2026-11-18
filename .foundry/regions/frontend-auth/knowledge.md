@@ -98,7 +98,7 @@ The browser authenticates with a user JWT and never holds a session (FRONTEND/AU
 
 Pages are thin; LoginForm and SignUpForm own their state, list providers with useAuthProviders (platform providers, or platform plus the org's when ?org= is present) and render a button per enabled provider above the email form. redirectToLoginUnlessAuthenticated guards protected routes and redirects to /login?redirectTo=… carrying org, space and spoof; redirectAuthenticatedUserAwayFromPublicPage bounces authenticated users off login and signup. navigateToLogin / navigateToSignUp with preserveSearch keep redirectTo across the login ↔ signup switch; navigateKeepingSearchParams keeps context on imperative navigation and redirectPreservingContext does it inside beforeLoad. The JWT lives in localStorage, readable by any script on the origin; trusted origins come from the API's CORS allow-list; spoof controls show only to superadmins. Only the auth slice has tests.
 
-Related regions: `authentication` owns the server side (the BetterAuth handshake, jwtHandoffPlugin, the OAuth handoff) and holds the client helpers this region uses (getToken, setToken, storeJwtHandoff, signIn, signUp, completeOAuthSignIn, AuthCallbackPage, LoginPage, useAuthStrategy); `isTokenValid` sits in `tokens-providers` and the `redirectToLoginUnlessAuthenticated` / `redirectAuthenticatedUserAwayFromPublicPage` entries in `auth-middleware-users`; `permissions-roles / permissions-rebac` owns permissions.installPermissionsForUser and the frontend permission gates; `frontend-store / api-client` owns the store and slice patterns; `frontend-apps-routing / navigation` owns the apps' file routes, layouts and context switching; `auth-middleware-users` owns spoofing on the API.
+Related regions: `authentication` owns the server side (the BetterAuth handshake, jwtHandoffPlugin, the OAuth handoff) and holds the client helpers this region uses (storedToken, setToken, storeJwtHandoff, signIn, signUp, completeOAuthSignIn, AuthCallbackPage, LoginPage, useAuthStrategy); `isTokenValid` sits in `tokens-providers` and the `redirectToLoginUnlessAuthenticated` / `redirectAuthenticatedUserAwayFromPublicPage` entries in `auth-middleware-users`; `permissions-roles / permissions-rebac` owns permissions.installPermissionsForUser and the frontend permission gates; `frontend-store / api-client` owns the store and slice patterns; `frontend-apps-routing / navigation` owns the apps' file routes, layouts and context switching; `auth-middleware-users` owns spoofing on the API.
 
 ## 2b. Under construction
 
@@ -141,7 +141,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | keep the session on the client and send it as a header; where the frontend keeps the login between page loads; I'll write the user id straight to local storage after login; attach the saved credential on every API call | **Bearer token in localStorage** · pattern docs/claude/FRONTEND/AUTH.md › Architecture — persist user JWT client-side and send it as Authorization Bearer on API calls and websocket authenticate | part 4 | — |
 | come back to the page I was on after social login; remember the destination across the provider round trip; I'll stash the return path in local storage before redirecting; the deep link survives the OAuth redirect | **OAuth redirect persistence** · pattern docs/claude/FRONTEND/AUTH.md › OAuth Callback — OAuth only; email sign-in uses search.redirectTo directly. | part 4 | — |
 | send the user back where they were after login; switching from login to signup loses the return url; the guard should remember the page they tried to open; I'll hardcode a redirect to the dashboard after sign in | **Preserve redirectTo across login/signup** · pattern packages/ui/src/lib/routeRedirect.ts — guard sets redirectTo; login↔signup links preserve search so post-auth returns there | part 4 | — |
-| which env vars turn on a social login button; the GitHub button only shows when its vars are set | **Auth environment variables** · primitive docs/claude/FRONTEND/AUTH.md § Security — configure BetterAuth secret, OAuth client credentials and API URL | code `getAllowedOrigins`, `UserMenu`, `Token`, `registry` | — |
+| which env vars turn on a social login button; the GitHub button only shows when its vars are set | **Auth environment variables** · primitive docs/claude/FRONTEND/AUTH.md § Security — configure BetterAuth secret, OAuth client credentials and API URL | code `allowedCorsOrigins`, `UserMenu`, `Token`, `registry` | — |
 | the shared login pieces: forms, divider, social buttons; a continue-with-provider button; I'll build a social login button for this app; where the sign-in widgets live | **Auth UI components** · primitive packages/ui/src/components/auth/ — render login, signup forms, divider and social provider buttons | part 4 | — |
 | change password, store the new JWT and re-authenticate websocket, revoking older JWTs | **auth.changePassword** · primitive packages/ui/src/store/slices/auth.ts — Use instead of calling lib/auth/changePassword; while spoofing stores nothing. Throws API error on wrong current password. | part 4 | — |
 | load the session once when the app boots; the first hydrate on startup, called by the guards; I'll call the profile endpoint in the root layout effect; boot time only, not later refreshes | **auth.initialize** · primitive packages/ui/src/store/slices/auth.ts — App boot only; later re-fetches use auth.refreshMe. Failed hydrate logs out and rethrows. | part 4 | — |
@@ -160,9 +160,9 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | did sign-up log them in, or is it waiting on email; the outcome of registration: logged in, pending, redirecting; I'll return a boolean from sign-up | **SignUpResult** · primitive packages/ui/src/lib/auth/types.ts — report whether sign-up authenticated, awaits email verification, or is redirecting | part 4 | — |
 | don't put the session in the redirect query string; the one-time code goes in the fragment, not the query; I'll pass the token as a query param to the callback | **Session token never in URL** · rule docs/claude/FRONTEND/AUTH.md › Architecture — Any auth redirect or handoff between API and frontend. | part 4 | putting a session token or JWT in a redirect query string or callback URL instead of the one-time token in the fragment (docs/claude/AUTH.md § OAuth + One-Time Token › One-Time Token Handoff) |
 | the callback effect must not fire twice; a single-use code gets consumed once; I'll let the effect re-run on every render | **Single-run OAuth exchange guard** · rule packages/ui/src/pages/AuthCallbackPage.tsx — Any effect consuming a single-use token. | part 4 | — |
-| only superadmins should see the impersonate button; hide spoofing from normal users | **Spoof controls superadmin-only** · rule docs/claude/FRONTEND/AUTH.md § Security — Any UI exposing impersonation. | code `getAllowedOrigins`, `UserMenu`, `Token`, `registry` | — |
+| only superadmins should see the impersonate button; hide spoofing from normal users | **Spoof controls superadmin-only** · rule docs/claude/FRONTEND/AUTH.md § Security — Any UI exposing impersonation. | code `allowedCorsOrigins`, `UserMenu`, `Token`, `registry` | — |
 | login behavior belongs in the store, not the page; keep the page a wrapper and let the form do the work; I'll put the redirect logic in the page component | **Thin auth pages, forms read store** · rule docs/claude/FRONTEND/AUTH.md › Pages and Forms — Adding or changing auth pages, forms or app auth routes. | part 4 | — |
-| the login library's trusted origins come from the same allow-list; I'll list the frontend URLs again for auth origins | **Trusted origins from CORS allow-list** · rule docs/claude/FRONTEND/AUTH.md § Security — Configuring BetterAuth origins. | code `getAllowedOrigins`, `UserMenu`, `Token`, `registry` | — |
+| the login library's trusted origins come from the same allow-list; I'll list the frontend URLs again for auth origins | **Trusted origins from CORS allow-list** · rule docs/claude/FRONTEND/AUTH.md § Security — Configuring BetterAuth origins. | code `allowedCorsOrigins`, `UserMenu`, `Token`, `registry` | — |
 
 - *Also here, by name:* AuthDivider (`packages/ui/src/components/auth/AuthDivider.tsx`); SocialAuthButton (`packages/ui/src/components/auth/SocialAuthButton.tsx`)
 
@@ -247,8 +247,8 @@ Pages are thin; the forms own their state and read the store directly (no prop d
 
 | File | Role |
 |------|------|
-| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignUp? })` renders `LoginForm`, links to signup with `navigateToSignUp(getStore, true)` |
-| `packages/ui/src/pages/SignUpPage.tsx` | `SignUpPage` renders `SignUpForm`, links to login with `navigateToLogin(getStore, true)` |
+| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignUp? })` renders `LoginForm`, links to signup with `navigateToSignUp(currentAppStore, true)` |
+| `packages/ui/src/pages/SignUpPage.tsx` | `SignUpPage` renders `SignUpForm`, links to login with `navigateToLogin(currentAppStore, true)` |
 | `packages/ui/src/pages/AuthCallbackPage.tsx` | OAuth callback (`/auth/callback` in all three apps) |
 | `packages/ui/src/components/auth/LoginForm.tsx` | `LoginFormProps = { hideSignUp?, onSignUpClick? }` |
 | `packages/ui/src/components/auth/SignUpForm.tsx` | `SignUpFormProps = { onLoginClick? }` |
@@ -387,8 +387,8 @@ navigateKeepingSearchParams(to, 'context');  // keep org/space (+ spoof, flow)
 navigateKeepingSearchParams(to, 'spoof');    // keep spoof (+ flow) only
 navigateKeepingSearchParams(to, 'all');      // keep every current search param
 
-navigateToLogin(getStore, preserveSearch?);
-navigateToSignUp(getStore, preserveSearch?);
+navigateToLogin(currentAppStore, preserveSearch?);
+navigateToSignUp(currentAppStore, preserveSearch?);
 redirectPreservingContext(beforeLoadCtx, to);  // throw a redirect keeping org/space/spoof
 ```
 
@@ -405,7 +405,7 @@ redirectPreservingContext(beforeLoadCtx, to);  // throw a redirect keeping org/s
 
 #### Security
 
-- **CSRF / OAuth state:** BetterAuth validates state and nonce; trusted origins come from the API's CORS allow-list (`getAllowedOrigins`).
+- **CSRF / OAuth state:** BetterAuth validates state and nonce; trusted origins come from the API's CORS allow-list (`allowedCorsOrigins`).
 - **Spoofing** is superadmin-only on the API; the UserMenu hides spoof controls unless the user is superadmin or already spoofing, and the superadmin app hides them entirely.
 - **Token storage** is localStorage (readable by any script on the origin), not an HTTP-only cookie.
 
@@ -457,5 +457,5 @@ cd packages/ui && bun run test
 From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Each line: **name** `where` [kind] the job it does. Use: canonical usage.
 
 #### Class `frontend-auth`
-- **LoginForm** `packages/ui/src/components/auth/LoginForm.tsx#LoginForm` [primitive] render the email login form, surfacing ?error= from the auth callback Use: <LoginForm onSignUpClick={() => navigateToSignUp(getStore, true)} />
-- **SignUpForm** `packages/ui/src/components/auth/SignUpForm.tsx#SignUpForm` [primitive] render the account signup form with verification-pending message Use: <SignUpForm onLoginClick={() => navigateToLogin(getStore, true)} />
+- **LoginForm** `packages/ui/src/components/auth/LoginForm.tsx#LoginForm` [primitive] render the email login form, surfacing ?error= from the auth callback Use: <LoginForm onSignUpClick={() => navigateToSignUp(currentAppStore, true)} />
+- **SignUpForm** `packages/ui/src/components/auth/SignUpForm.tsx#SignUpForm` [primitive] render the account signup form with verification-pending message Use: <SignUpForm onLoginClick={() => navigateToLogin(currentAppStore, true)} />

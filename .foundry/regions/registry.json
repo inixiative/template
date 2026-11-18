@@ -105,7 +105,7 @@
     {
       "tag": "adapters",
       "atlas": "primitive:adapter",
-      "description": "Provider adapter modules: one interface over provider implementations (makeAdapterRouter/Registry)",
+      "description": "Provider adapter modules: one interface over provider implementations (resolveAdapterForEnvironmentOrThrow and makeAdapterRegistry)",
       "region": "adapters-integrations"
     },
     {

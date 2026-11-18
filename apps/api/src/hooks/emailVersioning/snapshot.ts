@@ -19,7 +19,7 @@ export const createVersionBumpSnapshot = async (
   record: Record<string, unknown>,
   componentVersions: Record<string, string | null>,
 ): Promise<string> => {
-  const actor = auditActorContext.getScope();
+  const actor = auditActorContext.currentActor();
   const processed = maskSensitiveAndOmitNoopFieldsForAudit(model, record) as Prisma.InputJsonValue;
 
   const entry: Prisma.AuditLogCreateManyInput = {

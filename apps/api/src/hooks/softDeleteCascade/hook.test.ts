@@ -18,7 +18,7 @@ import {
 const spaceById = (id: string) => db.withDeleted(() => db.space.findUnique({ where: { id } }));
 const contactById = (id: string) => db.withDeleted(() => db.contact.findUnique({ where: { id } }));
 
-const makeTree = async () => {
+const createOrganizationWithSpaceAndContact = async () => {
   const { entity: org } = await createOrganization();
   const { entity: space } = await createSpace({}, { organization: org });
   const { entity: contact } = await createContact(
@@ -38,7 +38,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('tombstones column-bearing descendants recursively with the parent timestamp', async () => {
-    const { org, space, contact } = await makeTree();
+    const { org, space, contact } = await createOrganizationWithSpaceAndContact();
 
     const deleted = await tombstoneOrg(org.id);
 
@@ -47,7 +47,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('revive restores exactly the subtree that died with the parent', async () => {
-    const { org, space, contact } = await makeTree();
+    const { org, space, contact } = await createOrganizationWithSpaceAndContact();
 
     await tombstoneOrg(org.id);
     await reviveOrg(org.id);
@@ -57,7 +57,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('a revive written as a set operation restores the subtree too', async () => {
-    const { org, space, contact } = await makeTree();
+    const { org, space, contact } = await createOrganizationWithSpaceAndContact();
 
     await tombstoneOrg(org.id);
     await db.organization.updateManyAndReturn({
@@ -70,7 +70,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('a child deleted independently keeps its own timestamp and stays dead through revive', async () => {
-    const { org, space, contact } = await makeTree();
+    const { org, space, contact } = await createOrganizationWithSpaceAndContact();
     const { entity: survivor } = await createContact(
       { ownerModel: ContactOwnerModel.Space },
       { space },
@@ -90,7 +90,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('re-tombstoning an already-deleted row does not re-cascade', async () => {
-    const { org, space } = await makeTree();
+    const { org, space } = await createOrganizationWithSpaceAndContact();
 
     await tombstoneOrg(org.id);
     const spaceDeletedAt = (await spaceById(space.id))?.deletedAt;
@@ -106,7 +106,7 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('an ordinary update that never touches deletedAt does not cascade', async () => {
-    const { org, space } = await makeTree();
+    const { org, space } = await createOrganizationWithSpaceAndContact();
 
     await db.organization.update({ where: { id: org.id }, data: { name: 'renamed' } });
 

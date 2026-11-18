@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { getRedisPub, getRedisSub } from '@template/db';
+import { redisPublisher, redisSubscriber } from '@template/db';
 import { waitFor } from '@template/shared/test/waitFor';
 import { appendToStream, initWebSocketPubSub, isPubSubEnabled, sendToChannel } from '#/ws/pubsub';
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
@@ -81,7 +81,7 @@ describe('ws pubsub (redis round trip)', () => {
     subscribeToStream(handle.socket, 'pubsub:shared');
     // Each instance has its own per-stream queue, so their publishes interleave freely at Redis.
     const instance = (name: string) => (n: number) =>
-      publishStreamAppend(getRedisPub(), 'ws:broadcast', [streamSeqKey('pubsub:shared')], {
+      publishStreamAppend(redisPublisher(), 'ws:broadcast', [streamSeqKey('pubsub:shared')], {
         type: 'stream',
         target: 'pubsub:shared',
         append: { type: 'upsert', payload: { name, n } },
@@ -100,7 +100,7 @@ describe('ws pubsub (redis round trip)', () => {
     const handle = createTestSocket({ connectionId: 'pubsub-down' });
     addConnection(handle.socket);
     subscribeToStream(handle.socket, 'pubsub:down');
-    const redis = getRedisPub();
+    const redis = redisPublisher();
     const spy = spyOn(redis, 'eval').mockImplementation((() =>
       Promise.reject(new Error('redis down'))) as never);
     try {
@@ -116,7 +116,7 @@ describe('ws pubsub (redis round trip)', () => {
   });
 
   it('an append Redis cannot sequence is re-published as a resync until Redis takes it', async () => {
-    const redis = getRedisPub();
+    const redis = redisPublisher();
     const evalSpy = spyOn(redis, 'eval').mockImplementation((() =>
       Promise.reject(new Error('redis down'))) as never);
     const realPublish = redis.publish.bind(redis);
@@ -146,7 +146,7 @@ describe('ws pubsub (redis round trip)', () => {
   });
 
   it('a resync queued while another is publishing goes out in the same run', async () => {
-    const redis = getRedisPub();
+    const redis = redisPublisher();
     const evalSpy = spyOn(redis, 'eval').mockImplementation((() =>
       Promise.reject(new Error('redis down'))) as never);
     const realPublish = redis.publish.bind(redis);
@@ -185,7 +185,7 @@ describe('ws pubsub (redis round trip)', () => {
     addConnection(handle.socket);
     subscribeToStream(handle.socket, 'pubsub:foreign');
 
-    await getRedisPub().publish(
+    await redisPublisher().publish(
       'ws:broadcast',
       JSON.stringify({ type: 'streamResync', target: 'pubsub:foreign', origin: 'other-instance' }),
     );
@@ -201,7 +201,7 @@ describe('ws pubsub (redis round trip)', () => {
     subscribeToStream(quiet.socket, 'pubsub:reconnect-quiet');
     subscribeToStream(busy.socket, 'pubsub:reconnect-busy');
     subscribeToStream(busy.socket, 'pubsub:reconnect-quiet');
-    const sub = getRedisSub();
+    const sub = redisSubscriber();
     const resubscribe = spyOn(sub, 'subscribe');
     try {
       sub.emit('close');
@@ -228,7 +228,7 @@ describe('ws pubsub (redis round trip)', () => {
     addConnection(handle.socket);
     subscribeToStream(handle.socket, 'pubsub:ready-only');
 
-    getRedisSub().emit('ready');
+    redisSubscriber().emit('ready');
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(handle.sent).toEqual([]);

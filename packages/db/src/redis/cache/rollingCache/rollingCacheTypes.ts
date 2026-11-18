@@ -115,7 +115,7 @@ export type RollingCacheRefreshOptions = { signal?: AbortSignal };
 
 // The type-erased handle the registry holds and the jobs work with. A typed RollingCache is not
 // assignable to it, because its functions take a narrower target. Code that walks every cache goes
-// through getRollingCache / listRollingCaches. `targetKey` is the target's identity (cache name plus
+// through rollingCacheByNameOrThrow / listRollingCaches. `targetKey` is the target's identity (cache name plus
 // its sorted fields): the leaf job's supersede key and the lock every result reports `computing` from.
 // `targetOf` recovers the target from a result's params.
 export type RegisteredRollingCache = {

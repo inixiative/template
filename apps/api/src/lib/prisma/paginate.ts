@@ -15,8 +15,8 @@ import {
 import type { AnyDelegate, Args, Result } from '@template/db';
 import { isScalarField, lookupField, modelFields } from '@template/db';
 import { stableHash } from '@template/shared/utils';
-import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
+import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { applyFilterLensWheresToPrismaWhere } from '#/lib/prisma/applyFilterLensWheresToPrismaWhere';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
@@ -97,7 +97,7 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
   c: ValidatedContext<'query', PaginationQuery>,
   options?: PaginateOptions<T>,
 ) => {
-  const query = getValidatedQuery(c);
+  const query = validatedQuery(c);
   const { search } = query;
   const {
     orderBy: callerOrderByOption,
@@ -160,7 +160,7 @@ export const paginate = async <
   delegate: T,
   options?: PaginateOptions<T>,
 ): Promise<PaginatedResult<TItem>> => {
-  const { page = 1, pageSize = 20, orderBy: rawOrderBy } = getValidatedQuery(c);
+  const { page = 1, pageSize = 20, orderBy: rawOrderBy } = validatedQuery(c);
   const { where, findManyOptions, callerOrderByOption } = await composeScopedFindMany(c, options);
 
   const orderBy = buildOrderBy({
@@ -251,7 +251,7 @@ export const cursorPaginate = async <
   delegate: T,
   options?: PaginateOptions<T>,
 ): Promise<CursorPaginatedResult<TItem>> => {
-  const { pageSize = DEFAULT_CURSOR_PAGE_SIZE, cursor } = getValidatedQuery(c);
+  const { pageSize = DEFAULT_CURSOR_PAGE_SIZE, cursor } = validatedQuery(c);
   const { where, model, findManyOptions, callerOrderByOption } = await composeScopedFindMany(
     c as unknown as ValidatedContext<'query', PaginationQuery>,
     options,

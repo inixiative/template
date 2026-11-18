@@ -22,14 +22,14 @@ export const Unauthorized = ({
   const navigateKeepingSearchParams = useAppStore(
     (state) => state.navigation.navigateKeepingSearchParams,
   );
-  const getStore = useAppStore.getState;
+  const currentAppStore = useAppStore.getState;
 
   const goToPrimary = () => {
     if (isAuthenticated) {
       navigateKeepingSearchParams('/dashboard', 'spoof');
       return;
     }
-    navigateToLogin(getStore);
+    navigateToLogin(currentAppStore);
   };
 
   const handleGoBack = () => {

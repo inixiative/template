@@ -5,13 +5,13 @@
  * @uses primitive:routeTemplates
  */
 import { emitAppEvent } from '#/appEvents/emit';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { contactDeleteRoute } from '#/modules/contact/routes/contactDelete';
 
 export const contactDeleteController = makeController(contactDeleteRoute, async (c, respond) => {
   const db = c.get('db');
-  const contact = getResource<'contact'>(c);
+  const contact = contextResource<'contact'>(c);
   const deleted = await db.contact.update({
     where: { id: contact.id },
     data: { deletedAt: new Date() },

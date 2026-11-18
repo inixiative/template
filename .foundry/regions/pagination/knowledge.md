@@ -261,7 +261,7 @@ const inquiryReceivedNarrowing: LensNarrowing = {
 };
 
 const { data, pagination } = await paginate(c, db.inquiry, {
-  bindings: { organizationId: getResource<'organization'>(c).id },
+  bindings: { organizationId: contextResource<'organization'>(c).id },
 });
 ```
 

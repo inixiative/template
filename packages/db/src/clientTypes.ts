@@ -50,8 +50,8 @@ export type DbMethods = {
   };
   withDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
   withoutDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
-  getScopeId: () => string | null;
-  getScope: () => ScopeContext | null;
+  currentScopeId: () => string | null;
+  currentScopeContext: () => ScopeContext | null;
   isInTxn: () => boolean;
   cacheOverlay: () => CacheOverlay | null;
   findForUpdate: <T = unknown>(

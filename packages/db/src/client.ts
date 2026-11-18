@@ -296,9 +296,9 @@ const dbMethods = {
   withoutDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
     auditActorContext.withoutDeleted(fn),
 
-  getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
+  currentScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 
-  getScope: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
+  currentScopeContext: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
 
   isInTxn: (): boolean => !!store.getStore()?.openTransaction,
 

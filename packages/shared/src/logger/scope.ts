@@ -22,7 +22,7 @@ export enum LogScope {
 
 const store = new AsyncLocalStorage<string[]>();
 
-export const getLogScopes = (): string[] => store.getStore() ?? [];
+export const currentLogScopes = (): string[] => store.getStore() ?? [];
 
 // --- Log broadcasting ---
 
@@ -42,4 +42,4 @@ export const addLogBroadcast = (target: LogBroadcastFn): void => {
   if (broadcasts) broadcasts.push(target);
 };
 
-export const getLogBroadcasts = (): LogBroadcastFn[] => broadcastStore.getStore() ?? [];
+export const currentLogBroadcasts = (): LogBroadcastFn[] => broadcastStore.getStore() ?? [];

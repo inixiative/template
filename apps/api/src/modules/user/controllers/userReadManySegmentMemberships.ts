@@ -4,7 +4,7 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, feature:segment
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { includeSegmentForCustomer } from '#/modules/segment/queries/segmentIncludes';
@@ -14,7 +14,7 @@ export const userReadManySegmentMembershipsController = makeController(
   userReadManySegmentMembershipsRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const user = getResource<'user'>(c);
+    const user = contextResource<'user'>(c);
 
     const { data, pagination } = await paginate(c, db.segmentMember, {
       where: { customerRef: { customerUserId: user.id }, segment: { deletedAt: null } },

@@ -16,7 +16,7 @@ import { writeThrough } from '@template/db/redis/cache/queries/writeThrough';
 import { meterLargeWrite } from '@template/db/redis/cache/telemetry/meterLargeWrite';
 import { withCacheSpan } from '@template/db/redis/cache/telemetry/withCacheSpan';
 import { validateCacheKeyHasNoUndefined } from '@template/db/redis/cache/validateCacheKeyHasNoUndefined';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import superjson from 'superjson';
 
 export const upsertCache = async <T>(
@@ -31,7 +31,7 @@ export const upsertCache = async <T>(
     try {
       const payload = superjson.stringify(value);
       const written = await writeThrough(
-        getRedisClient(),
+        redisClient(),
         { key, generationKey: generationKey(key), writtenKey: cacheWrittenMarkerKeyFor(key) },
         { value: newGeneration(), ttlSeconds: GENERATION_TTL_SECONDS },
         ttl,

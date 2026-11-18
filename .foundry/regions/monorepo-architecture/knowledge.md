@@ -506,7 +506,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getResource } from '#/lib/context/getResource'` |
+| Within an app | `#/` | `import { contextResource } from '#/lib/context/contextResource'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -515,7 +515,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 ```typescript
 // In apps/api - use #/ for internal imports
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 ```
 
@@ -688,11 +688,11 @@ bun add -d <package>
 
 ```typescript
 // Good - direct imports
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { emailRegistry } from '#/lib/email';
 
 // Bad - intermediate barrel
-import { getResource, emailRegistry } from '#/lib';
+import { contextResource, emailRegistry } from '#/lib';
 ```
 
 Direct imports:

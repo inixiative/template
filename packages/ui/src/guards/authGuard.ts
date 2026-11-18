@@ -20,15 +20,15 @@ type BeforeLoadContext = {
   };
 };
 
-export const createAuthGuards = (getStore: () => AppStore) => ({
+export const createAuthGuards = (currentAppStore: () => AppStore) => ({
   redirectToLoginUnlessAuthenticated: async (context?: BeforeLoadContext) => {
     try {
-      await getStore().auth.initialize();
+      await currentAppStore().auth.initialize();
     } catch {
       // Ignore initialization errors - redirect handles unauthenticated state
     }
 
-    if (!getStore().auth.isAuthenticated) {
+    if (!currentAppStore().auth.isAuthenticated) {
       const { pathname = '/dashboard', search, hash } = context?.location ?? {};
       const redirectTo = buildPathWithSearch(pathname, search, hash);
       const loginParams = pickSearchParams(search, ['org', 'space', 'spoof']);
@@ -42,12 +42,12 @@ export const createAuthGuards = (getStore: () => AppStore) => ({
 
   redirectAuthenticatedUserAwayFromPublicPage: async (context?: BeforeLoadContext) => {
     try {
-      await getStore().auth.initialize();
+      await currentAppStore().auth.initialize();
     } catch {
       // Ignore initialization errors - unauthenticated users pass
     }
 
-    if (getStore().auth.isAuthenticated) {
+    if (currentAppStore().auth.isAuthenticated) {
       const search = context?.location.search;
       const redirectTo = readSearchParam(search, 'redirectTo') || '/dashboard';
 

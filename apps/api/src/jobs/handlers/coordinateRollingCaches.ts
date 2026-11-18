@@ -4,7 +4,7 @@
  * @partOf primitive:jobs, primitive:caching
  * @uses infrastructure:redis
  */
-import { getRedisClient, listRollingCaches, ROLLING_CACHE_TICK_SECONDS } from '@template/db';
+import { listRollingCaches, ROLLING_CACHE_TICK_SECONDS, redisClient } from '@template/db';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
@@ -21,7 +21,7 @@ import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
 // tick runs every cache again.
 export const coordinateRollingCaches = makeSingletonJob(async () => {
   for (const { name } of listRollingCaches()) {
-    const msLeft = await getRedisClient().pttl(rollingCacheTimerKey(name));
+    const msLeft = await redisClient().pttl(rollingCacheTimerKey(name));
     if (msLeft > ROLLING_CACHE_TICK_SECONDS * 1000) continue;
     await enqueueJob('refreshRollingCache', { name }, { bypass: true });
   }

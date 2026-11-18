@@ -7,8 +7,8 @@ import {
   db,
   fetchCachedRecordWithTargetEntitlements,
   fetchThroughCache,
-  getRedisClient,
   markCacheWritten,
+  redisClient,
 } from '@template/db';
 import type { Organization, OrganizationUser } from '@template/db/generated/client/client';
 import {
@@ -240,7 +240,7 @@ describe('a read through the cache inside a transaction', () => {
   it('throws a failed clear at commit only after the onCommit batches ran', async () => {
     const { entity: organization } = await createOrganization();
     let batchRan = false;
-    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
+    const evalSpy = spyOn(redisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
     try {
       await expect(
         db.txn(async () => {
@@ -282,7 +282,7 @@ describe('a read through the cache inside a transaction', () => {
       await db.txn(async () => {
         await fetchCachedRecordWithTargetEntitlements('organization', organization.id);
         db.onFinally(() => {
-          evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
+          evalSpy = spyOn(redisClient(), 'eval').mockRejectedValueOnce(new Error('redis down'));
         });
       });
     } finally {

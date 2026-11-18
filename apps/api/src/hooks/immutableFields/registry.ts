@@ -3,7 +3,7 @@
  * @kind registry
  * @uses infrastructure:prisma
  */
-import { getModelRelations, type ModelName } from '@template/db';
+import { type ModelName, relationsOfModel } from '@template/db';
 import { polymorphismImmutableFields } from '#/hooks/falsePolymorphism/toImmutableFields';
 
 // Fields that should never be modified on any model
@@ -41,7 +41,7 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {
-  const relations = getModelRelations(modelName);
+  const relations = relationsOfModel(modelName);
   const fields: string[] = [];
 
   for (const r of relations) {
@@ -69,7 +69,7 @@ export const setImmutableFieldsCache = (model: ModelName, fields: readonly strin
   immutableFieldsCache.set(model, fields);
 };
 
-export const getImmutableFields = (model: ModelName): readonly string[] => {
+export const immutableFieldsForModel = (model: ModelName): readonly string[] => {
   if (immutableFieldsCache.has(model)) return immutableFieldsCache.get(model)!;
 
   const inferred = inferForeignKeyFields(model);

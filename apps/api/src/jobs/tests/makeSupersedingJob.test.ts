@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import {
   claimLane,
-  getJobSupersededBy,
+  fetchJobSupersededBy,
   laneKey,
   markJobSupersededBy,
   reclaimLane,
@@ -80,7 +80,7 @@ describe('makeSupersedingJob', () => {
     await handler(ctx, {});
 
     expect(innerHandler).toHaveBeenCalledTimes(0);
-    expect(await getJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
+    expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
   });
 
   test('a running child aborts when its parent is superseded, and passes the tombstone down', async () => {
@@ -102,7 +102,7 @@ describe('makeSupersedingJob', () => {
 
     expect(Date.now() - startTime).toBeLessThan(1000);
     expect(handlerFinished).toBe(false);
-    expect(await getJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
+    expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
   });
 
   test('should abort when superseded during execution', async () => {
@@ -217,7 +217,7 @@ describe('makeSupersedingJob', () => {
     stopOlder();
 
     expect(holdersDuringRun).toEqual([ctx.job.id!]);
-    expect(await getJobSupersededBy('0-older')).toBe(ctx.job.id!);
+    expect(await fetchJobSupersededBy('0-older')).toBe(ctx.job.id!);
     expect(olderUsurped).toBe(true);
   });
 

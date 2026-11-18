@@ -4,7 +4,7 @@ import {
   cacheKey,
   db,
   fetchCachedRecordWithTargetEntitlements,
-  getRedisClient,
+  redisClient,
   unregisterDbHook,
 } from '@template/db';
 import type {
@@ -240,7 +240,7 @@ describe('the cache hook clears the keys member records are read under', () => {
       (await fetchCachedRecordWithTargetEntitlements<SpaceUser>('spaceUser', identifier))?.role,
     ).toBe('owner');
     await db.spaceUser.update({ where: { id: spaceUser.id }, data: { role: 'viewer' } });
-    expect(await getRedisClient().exists(cacheKey('spaceUser', identifier))).toBe(0);
+    expect(await redisClient().exists(cacheKey('spaceUser', identifier))).toBe(0);
     expect(
       (await fetchCachedRecordWithTargetEntitlements<SpaceUser>('spaceUser', identifier))?.role,
     ).toBe('viewer');
@@ -252,9 +252,9 @@ describe('the cache hook clears the keys member records are read under', () => {
     const identifier = { organizationId: organization.id, id: space.id };
 
     await fetchCachedRecordWithTargetEntitlements<Space>('space', identifier);
-    expect(await getRedisClient().exists(cacheKey('space', identifier))).toBe(1);
+    expect(await redisClient().exists(cacheKey('space', identifier))).toBe(1);
     await db.space.update({ where: { id: space.id }, data: { name: 'renamed space' } });
-    expect(await getRedisClient().exists(cacheKey('space', identifier))).toBe(0);
+    expect(await redisClient().exists(cacheKey('space', identifier))).toBe(0);
   });
 });
 

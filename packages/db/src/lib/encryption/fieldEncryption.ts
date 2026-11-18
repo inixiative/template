@@ -23,7 +23,7 @@ type EncryptedFieldPayload<K extends string> = {
   [P in `encrypted${Capitalize<K>}KeyVersion`]: number;
 };
 
-const getKeyringFromEnv = (envPrefix: string): EncryptionKeyring => {
+const encryptionKeyringFromEnvironment = (envPrefix: string): EncryptionKeyring => {
   const currentVersion = parseInt(process.env[`${envPrefix}_ENCRYPTION_VERSION`]!, 10);
   if (Number.isNaN(currentVersion)) {
     throw new Error(`Invalid ${envPrefix}_ENCRYPTION_VERSION: must be a valid integer`);
@@ -51,7 +51,7 @@ export const encryptField = async <M extends ModelName, K extends KeyName<M>>(
   const fields = encryptedColumnNamesForKey(String(keyName));
 
   const data = record[keyName];
-  const keyring = getKeyringFromEnv(keyConfig.envPrefix);
+  const keyring = encryptionKeyringFromEnvironment(keyConfig.envPrefix);
   const { encrypt } = makeEncryptionService(keyring);
   const aad = keyConfig.buildAAD(record as unknown as Parameters<typeof keyConfig.buildAAD>[0]);
 
@@ -75,7 +75,7 @@ export const decryptField = async <M extends ModelName, K extends KeyName<M>>(
   ] as EncryptedFieldConfig<ModelNameFromAccessor<M> & PrismaModelName>;
   const fields = encryptedColumnNamesForKey(String(keyName));
 
-  const keyring = getKeyringFromEnv(keyConfig.envPrefix);
+  const keyring = encryptionKeyringFromEnvironment(keyConfig.envPrefix);
   const { decrypt } = makeEncryptionService(keyring);
   const aad = keyConfig.buildAAD(record as unknown as Parameters<typeof keyConfig.buildAAD>[0]);
 

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import {
   cleanupStaleConnections,
+  connectionStats,
   drainConnections,
-  getConnectionStats,
   updateLastPing,
 } from '#/ws/lifecycle';
 import { addConnection, clearRegistry, connectionsById } from '#/ws/registry';
@@ -37,12 +37,12 @@ describe('lifecycle', () => {
     expect(stale.closeInfo()?.reason).toBe('Connection stale');
   });
 
-  it('getConnectionStats counts connections, channels, and streams', () => {
+  it('connectionStats counts connections, channels, and streams', () => {
     const a = createTestSocket({ connectionId: 'a', userId: 'u1' });
     addConnection(a.socket);
     subscribeToChannel(a.socket, 'ch1');
     subscribeToStream(a.socket, 'st1');
-    expect(getConnectionStats()).toEqual({ connections: 1, channels: 1, streams: 1 });
+    expect(connectionStats()).toEqual({ connections: 1, channels: 1, streams: 1 });
   });
 
   it('drainConnections notifies clients, closes them, and clears the registry', () => {
@@ -53,6 +53,6 @@ describe('lifecycle', () => {
 
     expect(sentFrames(a.sent)[0]).toEqual({ type: 'reconnect', reason: 'server_shutdown' });
     expect(a.closeInfo()?.reason).toBe('Server shutting down');
-    expect(getConnectionStats().connections).toBe(0);
+    expect(connectionStats().connections).toBe(0);
   });
 });

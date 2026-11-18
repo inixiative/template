@@ -33,7 +33,7 @@ export const createQueryClientAndWebsocketSlice: StateCreator<
     queryClient: null,
     // On reconnect, refetch live queries to recover any invalidations missed while disconnected.
     websocket: createApiWebsocket(wsUrl, {
-      getClient: () => get().queryClient,
+      currentQueryClient: () => get().queryClient,
       onReconnect: () => {
         get().queryClient?.invalidateQueries({
           predicate: (query) => liveChannel(query.queryKey) !== null,

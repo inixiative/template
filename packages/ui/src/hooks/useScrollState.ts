@@ -53,7 +53,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
 
   // A ref with .current === null (e.g. no maxHeight on Table) falls through
   // to window scroll, same as no ref at all.
-  const getScrollElement = React.useCallback((): HTMLElement | null => {
+  const scrollContainerElement = React.useCallback((): HTMLElement | null => {
     if (scrollRef?.current) return scrollRef.current;
     return typeof document !== 'undefined' ? document.documentElement : null;
   }, [scrollRef]);
@@ -69,7 +69,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
       return;
     }
 
-    const el = getScrollElement();
+    const el = scrollContainerElement();
     if (!el) return;
 
     // Mark restored inside the rAF so it only happens after the scroll
@@ -84,7 +84,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
       }
       restoredRef.current = true;
     });
-  }, [enabled, ready, getScrollElement, scrollRef]);
+  }, [enabled, ready, scrollContainerElement, scrollRef]);
 
   // Persist scroll position on scroll (debounced). Reads the position when the timer fires, not on
   // the event, so the entry is where the scroll came to rest.
@@ -104,7 +104,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
 
   React.useEffect(() => {
     if (!enabled) return;
-    const el = getScrollElement();
+    const el = scrollContainerElement();
     if (!el) return;
 
     const isElement = scrollRef?.current != null;
@@ -116,7 +116,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
       persistScrollTop.cancel();
       target.removeEventListener('scroll', onScroll);
     };
-  }, [getScrollElement, scrollRef, enabled, persistScrollTop]);
+  }, [scrollContainerElement, scrollRef, enabled, persistScrollTop]);
 
   return { hasSavedPosition };
 }

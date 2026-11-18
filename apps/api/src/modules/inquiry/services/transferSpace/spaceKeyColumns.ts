@@ -5,14 +5,14 @@
  * @uses infrastructure:prisma
  */
 import type { Prisma } from '@template/db';
-import { getModelRelations } from '@template/db/utils/prismaMapRelations';
+import { relationsOfModel } from '@template/db/utils/prismaMapRelations';
 import { uniqBy } from 'lodash-es';
 
 export type SpaceKeyColumns = { spaceField: string; organizationField: string };
 
 export const spaceKeyColumns = (model: Prisma.ModelName): SpaceKeyColumns[] =>
   uniqBy(
-    getModelRelations(model).flatMap(({ targetModel, foreignKey }) => {
+    relationsOfModel(model).flatMap(({ targetModel, foreignKey }) => {
       if (typeof foreignKey !== 'object' || !foreignKey?.organizationId) return [];
       const spaceField =
         targetModel === 'Space'

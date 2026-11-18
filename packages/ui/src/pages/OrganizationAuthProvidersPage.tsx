@@ -80,7 +80,7 @@ export const OrganizationAuthProvidersPage = () => {
     ],
   });
 
-  const getTypeLabel = (type: string) => {
+  const authProviderTypeLabel = (type: string) => {
     switch (type) {
       case 'EMAIL':
         return 'Email/Password';
@@ -103,7 +103,7 @@ export const OrganizationAuthProvidersPage = () => {
       key: 'type',
       label: 'Type',
       render: (item: AuthProvider) => (
-        <span className="text-muted-foreground">{getTypeLabel(item.type)}</span>
+        <span className="text-muted-foreground">{authProviderTypeLabel(item.type)}</span>
       ),
     },
     {

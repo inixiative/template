@@ -7,7 +7,7 @@
 import { db, hydrate, includeTargetEntitlements, Prisma } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { memberRoleWrite } from '@template/permissions/rebac/rebacSchemaRules';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceUserUpdateRoute } from '#/modules/spaceUser/routes/spaceUserUpdate';
@@ -15,7 +15,7 @@ import { spaceUserUpdateRoute } from '#/modules/spaceUser/routes/spaceUserUpdate
 export const spaceUserUpdateController = makeController(
   spaceUserUpdateRoute,
   async (c, respond) => {
-    const spaceUser = getResource<'spaceUser'>(c);
+    const spaceUser = contextResource<'spaceUser'>(c);
     const body = c.req.valid('json');
     const permix = c.get('permix');
 

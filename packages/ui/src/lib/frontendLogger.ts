@@ -24,7 +24,7 @@ export enum FrontendScope {
   ui = 'ui',
 }
 
-const getLogLevel = (): number => {
+const configuredLogLevel = (): number => {
   const level = (
     typeof globalThis !== 'undefined' && 'window' in globalThis
       ? (globalThis as { LOG_LEVEL?: unknown }).LOG_LEVEL
@@ -36,7 +36,7 @@ const getLogLevel = (): number => {
 
 export const createFrontendLogger = (scope: FrontendScope | string): ConsolaInstance => {
   const base = createConsola({
-    level: getLogLevel(),
+    level: configuredLogLevel(),
     formatOptions: {
       date: false,
       colors: true,

@@ -6,7 +6,7 @@
  */
 import type { Prisma } from '@template/db';
 import { emitAppEvent } from '#/appEvents/emit';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { makeController } from '#/lib/utils/makeController';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
@@ -15,7 +15,7 @@ import { attachRuleHealthToSegment } from '#/modules/segment/services/attachRule
 
 export const segmentUpdateController = makeController(segmentUpdateRoute, async (c, respond) => {
   const db = c.get('db');
-  const segment = getResource<'segment'>(c);
+  const segment = contextResource<'segment'>(c);
   const body = c.req.valid('json');
 
   const save = () =>

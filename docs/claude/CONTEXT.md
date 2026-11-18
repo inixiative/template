@@ -19,8 +19,8 @@
   - [Context Types](#context-types)
     - [TokenWithRelations](#tokenwithrelations)
   - [Complex Getters](#complex-getters)
-    - [getResource / getResourceType](#getresource--getresourcetype)
-    - [getValidatedBody / getValidatedQuery](#getvalidatedbody--getvalidatedquery)
+    - [contextResource / contextResourceType](#contextresource--contextresourcetype)
+    - [validatedBody / validatedQuery](#validatedbody--validatedquery)
     - [isSuperadmin](#issuperadmin)
 - [Refreshing Context](#refreshing-context)
   - [refreshUserContext](#refreshusercontext)
@@ -194,7 +194,7 @@ export const prepareRequestMiddleware = async (c: Context<AppEnv>, next: Next) =
 1. **Creates request ID** - UUID for correlating logs and responses
 2. **Initializes permix** - Fresh permission instance (no permissions until auth runs)
 3. **Nulls all auth vars** - Ensures clean slate for auth middleware (user, token, spoofedBy, organizationUsers, organizations, spaceUsers, spaces)
-4. **Wraps in scopes** - Enables `db.getScopeId()` and log correlation throughout request
+4. **Wraps in scopes** - Enables `db.currentScopeId()` and log correlation throughout request
 
 ---
 
@@ -312,7 +312,7 @@ export const usersReadMany = readRoute({
 
 // Controller — supplies the lens's bind tokens; paginate() refuses a missing one
 const { data, pagination } = await paginate(c, db.user, {
-  bindings: { organizationId: getResource<'organization'>(c).id },
+  bindings: { organizationId: contextResource<'organization'>(c).id },
 });
 ```
 
@@ -353,24 +353,24 @@ Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 
 Some getters have logic and remain as functions in `apps/api/src/lib/context/`.
 
-#### getResource / getResourceType
+#### contextResource / contextResourceType
 
 ```typescript
-import { getResource, getResourceType } from '#/lib/context/getResource';
+import { contextResource, contextResourceType } from '#/lib/context/contextResource';
 
-const org = getResource<'organization'>(c);  // Typed based on generic
-const modelName = getResourceType(c);        // AccessorName | null
+const org = contextResource<'organization'>(c);  // Typed based on generic
+const modelName = contextResourceType(c);        // AccessorName | null
 ```
 
 Accesses resources loaded by middleware for routes with `:id` parameter.
 
-#### getValidatedBody / getValidatedQuery
+#### validatedBody / validatedQuery
 
 ```typescript
-import { getValidatedBody, getValidatedQuery } from '#/lib/context/getValidatedData';
+import { validatedBody, validatedQuery } from '#/lib/context/validatedRequestData';
 
-const body = getValidatedBody<MyBodyType>(c);   // typed validated JSON body
-const query = getValidatedQuery<MyQueryType>(c); // typed validated query params
+const body = validatedBody<MyBodyType>(c);   // typed validated JSON body
+const query = validatedQuery<MyQueryType>(c); // typed validated query params
 ```
 
 Use in services and middleware that receive a generic `Context<AppEnv>` rather than the fully-typed route context from `makeController`. Avoids repeating the `(c.req as unknown as { valid: ... }).valid('json')` cast.
@@ -524,7 +524,7 @@ export const resourceContextArgs: Partial<Record<AccessorName, object>> = {
   },
 };
 
-// Type the payload for getResource<T>
+// Type the payload for contextResource<T>
 export type ResourcePayloadMap = {
   webhookSubscription: Prisma.WebhookSubscriptionGetPayload<{
     include: { webhookEvents: { take: 10; orderBy: { createdAt: 'desc' } } };
@@ -546,10 +546,10 @@ The database uses AsyncLocalStorage for request-scoped context.
 import { db } from '@template/db';
 
 // Get current scope ID (request UUID or job ID)
-const scopeId = db.getScopeId();
+const scopeId = db.currentScopeId();
 
 // Get context type
-const context = db.getScopeContext();  // 'api' | 'worker' | undefined
+const context = db.currentScopeContext();  // 'api' | 'worker' | undefined
 
 // Check if inside a transaction
 const inTxn = db.isInTxn();

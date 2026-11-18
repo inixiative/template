@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
+import { encryptedFieldsByModel } from '@template/db/lib/encryption/registry';
 import { type FieldRegistry, unionRegistries } from '@template/db/registries/noopFields';
 
 const SENSITIVE_FIELDS_BASE: FieldRegistry = {
@@ -16,7 +16,7 @@ const SENSITIVE_FIELDS_BASE: FieldRegistry = {
 // encryption is all it takes). Audit MASKS these (records that they changed); webhook DROPS them.
 export const SENSITIVE_FIELDS: FieldRegistry = unionRegistries(
   SENSITIVE_FIELDS_BASE,
-  getEncryptedFieldsByModel(),
+  encryptedFieldsByModel(),
 );
 
 export const sensitiveFieldsOf = (model: string): string[] => SENSITIVE_FIELDS[model] ?? [];

@@ -10,15 +10,15 @@ import { withLogContext, withLogScope } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { installPermissionsFromRequestContext } from '#/lib/context/installPermissionsFromRequestContext';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
-import type { getBatchContext as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
+import type { batchContextById as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
 import type { AppEnv } from '#/types/appEnv';
 
 export const prepareRequestMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const batchId = c.req.header('x-batch-id');
   let batchContext: ReturnType<typeof getBatchContextFn>;
   if (batchId) {
-    const { getBatchContext } = await import('#/modules/batch/services/batchRegistry');
-    batchContext = getBatchContext(batchId);
+    const { batchContextById } = await import('#/modules/batch/services/batchRegistry');
+    batchContext = batchContextById(batchId);
   }
 
   const requestId = batchContext?.baseContext.get('requestId') ?? Bun.randomUUIDv7();

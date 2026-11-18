@@ -3,9 +3,9 @@ export { signIn } from '@template/ui/lib/auth/signIn';
 export { signUp } from '@template/ui/lib/auth/signUp';
 export {
   clearToken,
-  getToken,
-  getTokenExpiry,
   isTokenValid,
   setToken,
+  storedToken,
+  storedTokenExpiry,
 } from '@template/ui/lib/auth/token';
 export * from '@template/ui/lib/auth/types';

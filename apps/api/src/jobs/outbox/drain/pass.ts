@@ -4,7 +4,7 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma, infrastructure:redis
  */
-import { claimLane, db, getJobSupersededBy, laneKey, releaseLane } from '@template/db';
+import { claimLane, db, fetchJobSupersededBy, laneKey, releaseLane } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import type { JobsOptions } from 'bullmq';
 import { withLanePriority } from '#/jobs/lanePriority';
@@ -53,7 +53,7 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
       try {
         // A row tombstoned while buffered was displaced by a newer direct enqueue. Re-claiming it
         // would tombstone the usurper right back (mutual tombstones → neither runs), so drop it.
-        if (baton && (await getJobSupersededBy(row.jobId))) {
+        if (baton && (await fetchJobSupersededBy(row.jobId))) {
           displaced.push(row.id);
           continue;
         }

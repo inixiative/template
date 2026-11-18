@@ -45,7 +45,7 @@ export const registerEntitlementChangeRequestsHook = () => {
     async (options: HookOptions) => {
       const removed = removedNow(options);
       if (!removed.length) return;
-      const resolving = auditActorContext.getScope()?.sourceInquiryId ?? null;
+      const resolving = auditActorContext.currentActor()?.sourceInquiryId ?? null;
       for (const rows of Object.values(
         groupBy(removed, (row) => `${row.targetModel}:${row.targetId}`),
       )) {

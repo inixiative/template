@@ -7,7 +7,7 @@ import { fetchThroughCache } from '@template/db/redis/cache/fetchThroughCache';
 import { clearCacheQueued } from '@template/db/redis/cache/queued/clearCacheQueued';
 import { markCacheQueued } from '@template/db/redis/cache/queued/markCacheQueued';
 import { upsertCache } from '@template/db/redis/cache/upsertCache';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { type LogRecord, observeLogRecords } from '@template/shared/logger/records';
@@ -16,7 +16,7 @@ import type { Redis } from 'ioredis';
 import superjson from 'superjson';
 
 beforeEach(async () => {
-  await getRedisClient().flushall();
+  await redisClient().flushall();
 });
 
 describe('cacheKey', () => {
@@ -94,7 +94,7 @@ describe('fetchThroughCache', () => {
 
   it('treats a legacy plain-JSON entry as a miss and recomputes', async () => {
     const key = cacheKey('user', 'legacy');
-    await getRedisClient().set(key, JSON.stringify({ n: 1 }));
+    await redisClient().set(key, JSON.stringify({ n: 1 }));
     let recomputed = false;
     const hit = await fetchThroughCache(key, async () => {
       recomputed = true;
@@ -210,13 +210,13 @@ describe('fetchThroughCache single-flight failure modes', () => {
     const produce = async () => {
       // Stand in for a producer that outran the lease: the lock is gone and a newer caller owns
       // one under the same name. makeLock's fenced release must not delete theirs.
-      await getRedisClient().set(lockKey, 'someone-elses-token');
+      await redisClient().set(lockKey, 'someone-elses-token');
       return 'done';
     };
 
     await fetchThroughCache(key, produce);
 
-    expect(await getRedisClient().get(lockKey)).toBe('someone-elses-token');
+    expect(await redisClient().get(lockKey)).toBe('someone-elses-token');
   });
 
   it('holds the lock on a short lease, so a holder that dies mid-compute frees its waiters within seconds', async () => {
@@ -235,7 +235,7 @@ describe('fetchThroughCache single-flight failure modes', () => {
 
     // The lease is what bounds an orphan: a process killed by a redeploy never runs its release,
     // and every waiter sits behind the lock until it expires.
-    const lease = await getRedisClient().pttl(lockKey);
+    const lease = await redisClient().pttl(lockKey);
     expect(lease).toBeGreaterThan(0);
     expect(lease).toBeLessThanOrEqual(2_000);
 
@@ -265,7 +265,7 @@ describe('fetchThroughCache single-flight failure modes', () => {
     const key = cacheKey('user', 'orphaned');
     const lockKey = `lock:cache-singleflight:${key}`;
     // Stand in for a dead holder: a lease that will lapse with no value ever written.
-    await getRedisClient().set(lockKey, 'dead-holders-token', 'PX', 300);
+    await redisClient().set(lockKey, 'dead-holders-token', 'PX', 300);
 
     const started = Date.now();
     expect(await fetchThroughCache(key, async () => 'computed-ourselves')).toBe(
@@ -278,7 +278,7 @@ describe('fetchThroughCache single-flight failure modes', () => {
     const key = cacheKey('user', 'stampede-reelect');
     const lockKey = `lock:cache-singleflight:${key}`;
     // A dead holder: a short lease that lapses with no value ever written.
-    await getRedisClient().set(lockKey, 'dead-holders-token', 'PX', 200);
+    await redisClient().set(lockKey, 'dead-holders-token', 'PX', 200);
 
     let calls = 0;
     const produce = async () => {
@@ -315,7 +315,7 @@ describe('fetchThroughCache single-flight failure modes', () => {
     const waited = Date.now() - started;
     expect(waited).toBeGreaterThanOrEqual(10_000);
     expect(waited).toBeLessThan(12_000);
-    expect(await getRedisClient().get(key)).toBeNull();
+    expect(await redisClient().get(key)).toBeNull();
 
     release();
     expect(await holder).toBe('holder');
@@ -328,7 +328,7 @@ describe('fetchThroughCache single-flight failure modes', () => {
       async () => ({ keep: true }),
       (value) => (value.keep ? 60 : 0),
     );
-    const ttl = await getRedisClient().ttl(key);
+    const ttl = await redisClient().ttl(key);
     expect(ttl).toBeGreaterThan(0);
     expect(ttl).toBeLessThanOrEqual(60);
   });
@@ -409,7 +409,7 @@ describe('large cache writes', () => {
       writer: 'cache',
     });
     expect(record?.fields.bytes as number).toBeGreaterThan(256 * 1024);
-    expect(await getRedisClient().exists(key)).toBe(1);
+    expect(await redisClient().exists(key)).toBe(1);
   });
 
   it('reports upsertCache writes too', async () => {
@@ -455,7 +455,7 @@ describe('checkCache', () => {
   it('reports stale once the value is older than the freshness window, and fresh without one', async () => {
     const key = cacheKey('check', 'stale');
     await upsertCache(key, 'value');
-    await getRedisClient().set(writtenKeyOf(key), String(Date.now() - 120_000));
+    await redisClient().set(writtenKeyOf(key), String(Date.now() - 120_000));
 
     expect(await checkCache(key, { freshForSeconds: 60 })).toMatchObject({
       state: 'stale',
@@ -475,7 +475,7 @@ describe('checkCache', () => {
 
     const check = await checkCache(key);
     expect(check.state === 'fresh' && check.writtenAt?.getTime()).toBeGreaterThanOrEqual(before);
-    expect(await getRedisClient().ttl(writtenKeyOf(key))).toBe(await getRedisClient().ttl(key));
+    expect(await redisClient().ttl(writtenKeyOf(key))).toBe(await redisClient().ttl(key));
   });
 
   it('a cleared key goes back to empty, its write time with it', async () => {
@@ -484,11 +484,11 @@ describe('checkCache', () => {
     await clearCacheKeysMatchingPattern(key);
 
     expect(await checkCache(key, { freshForSeconds: 60 })).toEqual({ state: 'empty' });
-    expect(await getRedisClient().exists(writtenKeyOf(key))).toBe(0);
+    expect(await redisClient().exists(writtenKeyOf(key))).toBe(0);
   });
 
   it('throws when Redis cannot answer, instead of reporting a miss', async () => {
-    const mget = spyOn(getRedisClient(), 'mget').mockRejectedValueOnce(new Error('down'));
+    const mget = spyOn(redisClient(), 'mget').mockRejectedValueOnce(new Error('down'));
     try {
       await expect(checkCache(cacheKey('check', 'down'))).rejects.toThrow('down');
     } finally {
@@ -517,7 +517,7 @@ describe('fetchThroughCache invalidation during a read', () => {
   };
 
   const readRaw = async (key: string): Promise<unknown> => {
-    const raw = await getRedisClient().get(key);
+    const raw = await redisClient().get(key);
     return raw === null ? null : superjson.parse(raw);
   };
 
@@ -531,7 +531,7 @@ describe('fetchThroughCache invalidation during a read', () => {
     paused.resume();
 
     expect(await inFlight).toBe('old');
-    expect(await getRedisClient().get(key)).toBeNull();
+    expect(await redisClient().get(key)).toBeNull();
 
     let runs = 0;
     const next = await fetchThroughCache(
@@ -557,7 +557,7 @@ describe('fetchThroughCache invalidation during a read', () => {
     paused.resume();
 
     expect(await inFlight).toBe('old');
-    expect(await getRedisClient().get(key)).toBeNull();
+    expect(await redisClient().get(key)).toBeNull();
 
     expect(await fetchThroughCache(key, async () => 'new', 60)).toBe('new');
     expect(await readRaw(key)).toBe('new');
@@ -569,12 +569,12 @@ describe('fetchThroughCache invalidation during a read', () => {
 
     const inFlight = fetchThroughCache(key, paused.produce, 60);
     await paused.hasRead;
-    await getRedisClient().del(`lock:cache-singleflight:${key}`);
+    await redisClient().del(`lock:cache-singleflight:${key}`);
     await clearCacheKeysMatchingPattern(cacheKey('race', 'lapsed', [], true));
     paused.resume();
 
     expect(await inFlight).toBe('old');
-    expect(await getRedisClient().get(key)).toBeNull();
+    expect(await redisClient().get(key)).toBeNull();
   });
 
   it('keeps a value upserted while a producer was still reading', async () => {
@@ -597,12 +597,12 @@ describe('fetchThroughCache invalidation during a read', () => {
 
     const inFlight = fetchThroughCache(key, paused.produce, 60);
     await paused.hasRead;
-    await getRedisClient().del(`${redisNamespace.cacheGeneration}:${key}`);
+    await redisClient().del(`${redisNamespace.cacheGeneration}:${key}`);
     await clearCacheKeysMatchingPattern(key);
     paused.resume();
 
     expect(await inFlight).toBe('old');
-    expect(await getRedisClient().get(key)).toBeNull();
+    expect(await redisClient().get(key)).toBeNull();
   });
 
   it('a pattern clear leaves a compute outside its pattern alone', async () => {
@@ -621,12 +621,12 @@ describe('fetchThroughCache invalidation during a read', () => {
   it('throws and deletes nothing when the pattern clear cannot cancel a compute in flight', async () => {
     const cached = cacheKey('race', 'cancel-fails', ['v1']);
     const computing = cacheKey('race', 'cancel-fails', ['v2']);
-    await getRedisClient().setex(cached, 60, superjson.stringify('cached'));
+    await redisClient().setex(cached, 60, superjson.stringify('cached'));
     const paused = pausedProducer('old');
 
     const inFlight = fetchThroughCache(computing, paused.produce, 60);
     await paused.hasRead;
-    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('down'));
+    const evalSpy = spyOn(redisClient(), 'eval').mockRejectedValueOnce(new Error('down'));
     try {
       await expect(
         clearCacheKeysMatchingPattern(cacheKey('race', 'cancel-fails', [], true)),
@@ -642,8 +642,8 @@ describe('fetchThroughCache invalidation during a read', () => {
 
   it('throws when the pattern clear cannot scan', async () => {
     const key = cacheKey('race', 'scan-fails', ['v1']);
-    await getRedisClient().setex(key, 60, superjson.stringify('cached'));
-    const scan = spyOn(getRedisClient(), 'scanStream').mockImplementationOnce(
+    await redisClient().setex(key, 60, superjson.stringify('cached'));
+    const scan = spyOn(redisClient(), 'scanStream').mockImplementationOnce(
       () =>
         new Readable({
           objectMode: true,
@@ -666,8 +666,8 @@ describe('fetchThroughCache invalidation during a read', () => {
 
   it('throws when the pattern clear cannot delete what it scanned', async () => {
     const key = cacheKey('race', 'del-fails', ['v1']);
-    await getRedisClient().setex(key, 60, superjson.stringify('cached'));
-    const del = spyOn(getRedisClient(), 'del').mockRejectedValueOnce(new Error('del down'));
+    await redisClient().setex(key, 60, superjson.stringify('cached'));
+    const del = spyOn(redisClient(), 'del').mockRejectedValueOnce(new Error('del down'));
 
     try {
       await expect(
@@ -682,8 +682,8 @@ describe('fetchThroughCache invalidation during a read', () => {
 
   it('logs and returns 0 when an exact clear fails', async () => {
     const key = cacheKey('race', 'exact-fails');
-    await getRedisClient().setex(key, 60, superjson.stringify('cached'));
-    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('down'));
+    await redisClient().setex(key, 60, superjson.stringify('cached'));
+    const evalSpy = spyOn(redisClient(), 'eval').mockRejectedValueOnce(new Error('down'));
 
     try {
       expect(await clearCacheKeysMatchingPattern(key)).toBe(0);
@@ -700,7 +700,7 @@ describe('fetchThroughCache invalidation during a read', () => {
 
     const inFlight = fetchThroughCache(key, paused.produce, 60);
     await paused.hasRead;
-    const evalSpy = spyOn(getRedisClient(), 'eval').mockRejectedValueOnce(new Error('down'));
+    const evalSpy = spyOn(redisClient(), 'eval').mockRejectedValueOnce(new Error('down'));
     try {
       await expect(
         clearCacheKeysMatchingPattern(cacheKey('race', 'cancel-fails-in-flight', [], true)),
@@ -714,12 +714,12 @@ describe('fetchThroughCache invalidation during a read', () => {
     paused.resume();
 
     expect(await inFlight).toBe('old');
-    expect(await getRedisClient().get(key)).toBeNull();
+    expect(await redisClient().get(key)).toBeNull();
   });
 
   it('returns the value without publishing it when the single-flight lock is unavailable', async () => {
     const key = cacheKey('race', 'lock-unavailable');
-    const set = spyOn(getRedisClient(), 'set').mockRejectedValueOnce(new Error('down'));
+    const set = spyOn(redisClient(), 'set').mockRejectedValueOnce(new Error('down'));
 
     try {
       expect(await fetchThroughCache(key, async () => 'computed', 60)).toBe('computed');
@@ -727,12 +727,12 @@ describe('fetchThroughCache invalidation during a read', () => {
       set.mockRestore();
     }
 
-    expect(await getRedisClient().get(key)).toBeNull();
+    expect(await redisClient().get(key)).toBeNull();
   });
 
   it('returns the value without publishing it when the generation read fails', async () => {
     const key = cacheKey('race', 'generation-read-fails');
-    const redis = getRedisClient();
+    const redis = redisClient();
     const get = redis.get.bind(redis);
     const generationRead = spyOn(redis, 'get').mockImplementation(((name: string) =>
       name.startsWith(`${redisNamespace.cacheGeneration}:`)
@@ -745,7 +745,7 @@ describe('fetchThroughCache invalidation during a read', () => {
       generationRead.mockRestore();
     }
 
-    expect(await getRedisClient().get(key)).toBeNull();
+    expect(await redisClient().get(key)).toBeNull();
   });
 });
 
@@ -787,7 +787,7 @@ describe('queued marker', () => {
     const key = cacheKey('check', 'queuedTtl');
     await markCacheQueued(key, 90);
 
-    const ttl = await getRedisClient().ttl(`${redisNamespace.cacheQueued}:${key}`);
+    const ttl = await redisClient().ttl(`${redisNamespace.cacheQueued}:${key}`);
     expect(ttl).toBeGreaterThan(80);
     expect(ttl).toBeLessThanOrEqual(90);
   });

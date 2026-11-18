@@ -66,7 +66,7 @@ describe('processJob', () => {
     const actors: (AuditActor | null)[] = [];
     const handlers = {
       sendWebhook: async () => {
-        actors.push(auditActorContext.getScope());
+        actors.push(auditActorContext.currentActor());
       },
     };
 

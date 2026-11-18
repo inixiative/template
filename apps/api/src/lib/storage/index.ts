@@ -1,4 +1,4 @@
-import { makeAdapterRouter } from '@template/shared/adapter';
+import { resolveAdapterForEnvironmentOrThrow } from '@template/shared/adapter';
 import { createS3Client } from '#/lib/storage/client/s3';
 import type { StorageClient } from '#/lib/storage/types';
 
@@ -20,7 +20,7 @@ const s3 = createS3Client({
   },
 });
 
-export const storage = makeAdapterRouter<StorageClient>({
+export const storage = resolveAdapterForEnvironmentOrThrow<StorageClient>({
   default: s3,
 });
 

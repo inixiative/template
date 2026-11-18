@@ -25,7 +25,7 @@ const MAX_BATCH_SIZE = 100;
 
 const resendClients = new Map<string, Resend>();
 
-const getResendClient = (apiKey: string): Resend => {
+const resendClientForApiKey = (apiKey: string): Resend => {
   const existingClient = resendClients.get(apiKey);
   if (existingClient) {
     return existingClient;
@@ -75,7 +75,7 @@ class ResendEmailClient implements EmailClient {
   private readonly resend: Resend;
 
   constructor(apiKey: string) {
-    this.resend = getResendClient(apiKey);
+    this.resend = resendClientForApiKey(apiKey);
   }
 
   async send(options: SendEmailOptions): Promise<SendEmailResult> {

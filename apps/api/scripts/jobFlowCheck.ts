@@ -25,9 +25,9 @@
 import {
   cacheKey,
   createRedisConnection,
-  getRedisClient,
   listRollingCaches,
   makeRollingCache,
+  redisClient,
 } from '@template/db';
 import { type Job, Worker } from 'bullmq';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
@@ -306,13 +306,13 @@ const main = async (): Promise<void> => {
       'rolling cache leaf starts',
       () => count('rollingCacheCompute', rollingCacheName) > 0,
     );
-    const timerMsWhileLeafRuns = await getRedisClient().pttl(timer);
+    const timerMsWhileLeafRuns = await redisClient().pttl(timer);
     check(
       'rolling cache: the timer runs from the pass start, while its leaf is still out',
       timerMsWhileLeafRuns > 290_000 && (await branchState()) === 'waiting-children',
       timerMsWhileLeafRuns,
     );
-    await getRedisClient().del(timer);
+    await redisClient().del(timer);
     await coordinateOnce();
     check(
       'rolling cache: a tick after the timer ran out, with the pass still open, starts nothing',

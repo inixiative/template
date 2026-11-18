@@ -92,7 +92,7 @@ export const auth = betterAuth({
 
   plugins: authPlugins(),                   // jwt(), oneTimeToken, oauthCallbackToken, jwtHandoffPlugin
   disabledPaths: [/* every endpoint that acts on a live session, see below */],
-  trustedOrigins: getAllowedOrigins(),
+  trustedOrigins: allowedCorsOrigins(),
   secondaryStorage: { get, set, delete, getAndDelete },  // Redis, `redisNamespace.session`
 });
 ```
@@ -271,7 +271,7 @@ See [FRONTEND/AUTH.md](./FRONTEND/AUTH.md) for the client side.
 
 Two sources of providers:
 
-1. **Platform providers** — not rows. `getPlatformProviders()` (`apps/api/src/lib/auth/platformProviders.ts`) lists Google and GitHub when their `*_CLIENT_ID` / `*_CLIENT_SECRET` env vars are set. Only Google is wired into BetterAuth `socialProviders` today.
+1. **Platform providers** — not rows. `configuredPlatformProviders()` (`apps/api/src/lib/auth/platformProviders.ts`) lists Google and GitHub when their `*_CLIENT_ID` / `*_CLIENT_SECRET` env vars are set. Only Google is wired into BetterAuth `socialProviders` today.
 2. **Organization providers** — `AuthProvider` rows, one org each, secrets encrypted.
 
 ### Database Schema

@@ -236,7 +236,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | how long a lane claim lives in redis; the claim expiry on a supersede lane | **LANE_TTL_SEC** · primitive packages/db/src/lanes/lanes.ts — set how long a lane claim persists in Redis | part 4 | — |
 | don't use a bare interval for an async recurring task; a slow run overlapped the next tick of the interval; I'll set up an interval that calls the async function | **Use heartbeat over setInterval** · rule docs/claude/CONCURRENCY.md § Recurring Beat — Any in-process recurring async task. | part 4 | — |
 
-- *Also here, by name:* ageGatedReclaim (`packages/db/src/lanes/queries/ageGatedReclaim.ts`); evictingClaim (`packages/db/src/lanes/queries/evictingClaim.ts`); fencedRelease (`packages/db/src/lanes/queries/fencedRelease.ts`); getJobSupersededBy (`packages/db/src/lanes/lanes.ts`); holdLaneWhileParked (`packages/db/src/lanes/lanes.ts`); laneKey (`packages/db/src/lanes/lanes.ts`); supersededKey (`packages/db/src/lanes/lanes.ts`); markJobSupersededBy (`packages/db/src/lanes/lanes.ts`)
+- *Also here, by name:* ageGatedReclaim (`packages/db/src/lanes/queries/ageGatedReclaim.ts`); evictingClaim (`packages/db/src/lanes/queries/evictingClaim.ts`); fencedRelease (`packages/db/src/lanes/queries/fencedRelease.ts`); fetchJobSupersededBy (`packages/db/src/lanes/lanes.ts`); holdLaneWhileParked (`packages/db/src/lanes/lanes.ts`); laneKey (`packages/db/src/lanes/lanes.ts`); supersededKey (`packages/db/src/lanes/lanes.ts`); markJobSupersededBy (`packages/db/src/lanes/lanes.ts`)
 
 ### Class `recurring-timers`: Non-overlapping in-process recurring work: heartbeat, unref intervals
 

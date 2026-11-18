@@ -11,7 +11,10 @@ import { createContact, createUser } from '@template/db/test/factories';
 
 describe('db.parallel', () => {
   it('runs each branch in its own scope', async () => {
-    const [a, b] = await db.parallel([async () => db.getScopeId(), async () => db.getScopeId()]);
+    const [a, b] = await db.parallel([
+      async () => db.currentScopeId(),
+      async () => db.currentScopeId(),
+    ]);
     expect(a).not.toBeNull();
     expect(a).not.toBe(b);
   });

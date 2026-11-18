@@ -1,7 +1,7 @@
 {
   "id": "request-context-errors",
   "title": "Request context",
-  "routing": "Is this about what a live API request carries: reading identity, tenant, resource or validated input from the Hono context (AppEnv, c.get('user' | 'token' | 'organizationUsers' | 'db' | 'requestId' | 'bracketQuery' | 'filterLens')), actingUser(c), getResource / getResourceType, getValidatedBody / getValidatedQuery, setUserContext, refreshUserContext, resourceContextMiddleware and resourceContextArgs (?lookup=), prepareRequestMiddleware, db.scope / db.getScopeId / db.getScopeContext, trustedClientAddress, TokenWithRelations, or GET /api/v1/identify? Throwing and mapping errors is `errors`.",
+  "routing": "Is this about what a live API request carries: reading identity, tenant, resource or validated input from the Hono context (AppEnv, c.get('user' | 'token' | 'organizationUsers' | 'db' | 'requestId' | 'bracketQuery' | 'filterLens')), actingUser(c), contextResource / contextResourceType, validatedBody / validatedQuery, setUserContext, refreshUserContext, resourceContextMiddleware and resourceContextArgs (?lookup=), prepareRequestMiddleware, db.scope / db.currentScopeId / db.currentScopeContext, trustedClientAddress, TokenWithRelations, or GET /api/v1/identify? Throwing and mapping errors is `errors`.",
   "concepts": ["request-context"],
   "tokens": 12273,
   "tokenMethod": "chars/4",

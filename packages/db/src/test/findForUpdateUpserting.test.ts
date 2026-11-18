@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db, FindForUpdateLockTimeoutError } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { createUser } from '@template/db/test/factories';
 import { nextFactorySequenceNumber } from '@template/db/test/factory';
 import { cleanupTouchedTables } from '@template/db/test/testTracker';
@@ -197,7 +197,7 @@ describe('db.findForUpdate upserting mode', () => {
       return { open, opened };
     };
 
-    const lockKeys = () => getRedisClient().keys('*find-for-update:User:*');
+    const lockKeys = () => redisClient().keys('*find-for-update:User:*');
 
     const holdWhile = (where: Record<string, unknown>) => {
       const held = gate();

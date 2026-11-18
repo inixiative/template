@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { getOrderedListFieldsByModel } from '@template/db/registries/orderedList';
+import { orderedListFieldsByModel } from '@template/db/registries/orderedList';
 import { isEqual, omit } from 'lodash-es';
 
 export type FieldRegistry = Record<string, string[]>;
@@ -36,7 +36,7 @@ const NOOP_FIELDS_BASE: FieldRegistry = {
 // audit masks them, webhook drops them via WEBHOOK_EXCLUDED_FIELDS).
 export const NOOP_FIELDS: FieldRegistry = unionRegistries(
   NOOP_FIELDS_BASE,
-  getOrderedListFieldsByModel(),
+  orderedListFieldsByModel(),
 );
 
 export const omitRegisteredFields = <T extends Record<string, unknown>>(

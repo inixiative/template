@@ -311,7 +311,7 @@ navigateKeepingSearchParams('/users', 'spoof');      // keep spoof (+ flow) only
 navigateKeepingSearchParams('/login?x=1', 'all');    // keep every current search param
 ```
 
-Search params in `to` merge over the preserved ones; the current hash is kept unless `to` has one. `navigateToLogin(getStore)` / `navigateToSignUp(getStore)` (`@template/ui/lib/routeRedirect`) carry `redirectTo`.
+Search params in `to` merge over the preserved ones; the current hash is kept unless `to` has one. `navigateToLogin(currentAppStore)` / `navigateToSignUp(currentAppStore)` (`@template/ui/lib/routeRedirect`) carry `redirectTo`.
 
 Switch context through the tenant slice: `tenant.switchToOrganizationContext(id)`, `tenant.switchToSpaceContext(id)`, `tenant.switchToUserContext()`, `tenant.switchToPublicContext()`. See [ZUSTAND.md](../ZUSTAND.md).
 

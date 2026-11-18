@@ -4,7 +4,7 @@
  * @partOf infrastructure:redis
  * @uses primitive:errors, primitive:requestContext, infrastructure:observability
  */
-import { getRedisClient, redisNamespace } from '@template/db';
+import { redisClient, redisNamespace } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { errorReporter } from '#/lib/errorReporter';
@@ -42,7 +42,7 @@ export const rateLimit =
     let retryAfterSeconds: number | null = null;
     try {
       const states = await incrementFixedWindows(
-        getRedisClient(),
+        redisClient(),
         active.map((entry) => ({ key: windowKey(entry), windowMs: entry.rule.windowMs })),
       );
 

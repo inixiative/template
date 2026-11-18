@@ -832,7 +832,7 @@ template/cascade/versioning system, messaging is a thin dispatch primitive: rend
 ### Provider Registry
 
 `messageProviderRegistry` (`apps/api/src/lib/messaging/providers.ts`) is a `makeBroadcastRegistry` keyed
-by `ContactType`; `getMessageProviderAdapter(type)` returns its channel sender or `undefined`. A
+by `ContactType`; `messageProviderAdapterForContactType(type)` returns its channel sender or `undefined`. A
 `MessageProviderAdapter` is `(contact, content, kind, options) => Promise<void>` — the per-channel send.
 
 ```typescript

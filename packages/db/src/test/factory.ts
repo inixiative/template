@@ -9,7 +9,7 @@ import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { withDiscriminatorDefaults } from '@template/db/registries/discriminatorDefaults';
 import { withDualPolymorphismIds } from '@template/db/registries/dualPolymorphismIds';
-import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import { polymorphicKeyColumns } from '@template/db/registries/polymorphicAxisPointsAt';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import {
@@ -191,7 +191,7 @@ export const registerFactory = <K extends ModelName>(
         //    from incidental ctx if the discriminator forbids it (e.g.
         //    Inquiry { targetModel: 'admin' } must not gain a
         //    targetOrganizationId just because orgCtx carries one).
-        const polyConfig = getPolymorphismConfig(modelName);
+        const polyConfig = polymorphismConfigForModel(modelName);
         const fkAllowed = (fkField: string): boolean => {
           if (!polyConfig) return true;
           const axis = polyConfig.axes.find((a) => Object.values(a.fkMap).flat().includes(fkField));

@@ -21,7 +21,7 @@ export const registerRollingCache = (rollingCache: RegisteredRollingCache): void
 
 // Throws for a name nothing registered. Every name in a job payload was put there by this system, so a
 // missing one is a bug to surface, not a case to skip.
-export const getRollingCache = (name: string): RegisteredRollingCache => {
+export const rollingCacheByNameOrThrow = (name: string): RegisteredRollingCache => {
   const rollingCache = rollingCacheRegistry.get(name);
   if (!rollingCache) throw new Error(`Rolling cache "${name}" is not registered`);
   return rollingCache;

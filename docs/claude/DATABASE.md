@@ -498,7 +498,7 @@ db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or roll
 db.findForUpdate(model, where, opts?) // SELECT ... FOR NO KEY UPDATE; { upserting: true } fences a missing row
 db.withLockUntilSettled(lockOptions, fn, acquireOptions?) // Redis lock held until the txn ends
 db.cacheOverlay()       // The open transaction's cache overlay, or null outside one
-db.getScopeId()         // Get current scope ID
+db.currentScopeId()         // Get current scope ID
 db.isInTxn()            // Check if in transaction
 ```
 
@@ -873,9 +873,9 @@ Schema-level configuration in `packages/db/src/registries/`:
 | `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |
 
 ```typescript
-import { PolymorphismRegistry, getPolymorphismConfig } from '@template/db';
+import { PolymorphismRegistry, polymorphismConfigForModel } from '@template/db';
 
-const config = getPolymorphismConfig('Token');
+const config = polymorphismConfigForModel('Token');
 // { axes: [{ field: 'ownerModel', fkMap: { User: ['userId'], ... } }] } | null
 ```
 

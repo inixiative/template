@@ -4,13 +4,13 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 
 type Row = Record<string, unknown>;
 
 const dualPolymorphicAxes = (model: ModelName) =>
-  (getPolymorphismConfig(model)?.axes ?? []).flatMap((axis) =>
+  (polymorphismConfigForModel(model)?.axes ?? []).flatMap((axis) =>
     axis.dualPolymorphismId ? [{ ...axis, dualPolymorphismId: axis.dualPolymorphismId }] : [],
   );
 

@@ -4,7 +4,7 @@
  * @partOf primitive:websockets
  * @uses none
  */
-import { getRedisClient } from '@template/db';
+import { redisClient } from '@template/db';
 import {
   streamDefinitionForChannelKey,
   streamSnapshotFrame,
@@ -33,7 +33,7 @@ const readSnapshot = async (
   stream: string,
   attempt = 1,
 ): Promise<{ seq: number; read: StreamRead }> => {
-  const redis = getRedisClient();
+  const redis = redisClient();
   const seqKey = streamSeqKeyFor(stream, ws.data.userId);
   const counter = await readStreamSeq(redis, seqKey);
   const read = await fetchStreamSnapshot(ws.data.headers, stream);

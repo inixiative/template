@@ -71,7 +71,7 @@ export class VCR {
   async capture<T>(method: string, realFn: () => Promise<T>): Promise<T> {
     if (!isTest) return realFn();
     const fixturePath = this.__popFixturePath(method);
-    const current = await this.getVersion();
+    const current = await this.fetchServiceVersion();
 
     if (existsSync(fixturePath)) {
       const saved = JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
@@ -103,7 +103,7 @@ export class VCR {
   async captureResponse<T>(method: string, realFn: () => Promise<Fixture<T>>): Promise<Fixture<T>> {
     if (!isTest) return realFn();
     const fixturePath = this.__popFixturePath(method);
-    const current = await this.getVersion();
+    const current = await this.fetchServiceVersion();
 
     if (existsSync(fixturePath)) {
       const saved = JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
@@ -137,7 +137,7 @@ export class VCR {
 
   // Public — capture/captureResponse drive through this internally; backfill
   // scripts and one-shot probes get the same cached resolution.
-  async getVersion(): Promise<string> {
+  async fetchServiceVersion(): Promise<string> {
     const cached = VCR.versionCache.get(this.service);
     if (cached !== undefined) return cached;
     const resolved = await this.versionFn();

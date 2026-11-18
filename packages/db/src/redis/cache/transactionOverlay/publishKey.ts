@@ -15,7 +15,7 @@ import { publishAtCommit } from '@template/db/redis/cache/queries/publishAtCommi
 import { cacheAccessor } from '@template/db/redis/cache/telemetry/cacheAccessor';
 import { meterLargeWrite } from '@template/db/redis/cache/telemetry/meterLargeWrite';
 import type { CacheOverlay } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { incrementCounter } from '@template/shared/telemetry';
 
 export const publishKey = async (overlay: CacheOverlay, key: string): Promise<void> => {
@@ -26,7 +26,7 @@ export const publishKey = async (overlay: CacheOverlay, key: string): Promise<vo
   const payload = shouldPublish ? entry.payload : '';
 
   const published = await publishAtCommit(
-    getRedisClient(),
+    redisClient(),
     { key, generationKey: generationKey(key), writtenKey: cacheWrittenMarkerKeyFor(key) },
     {
       captured: entry?.generation ?? '',

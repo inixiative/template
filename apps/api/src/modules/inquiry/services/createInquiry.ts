@@ -9,7 +9,7 @@ import type { HydratedRecord, Prisma } from '@template/db';
 import { hydrate } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import type { ValidatedContext } from '#/lib/context/getValidatedData';
+import type { ValidatedContext } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import type {

@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { estimateSegmentReach } from '#/modules/segment/services/estimateSegmentReach';
 import { spaceEstimateReachSegmentRoute } from '#/modules/space/routes/spaceEstimateReachSegment';
@@ -12,7 +12,7 @@ import { spaceEstimateReachSegmentRoute } from '#/modules/space/routes/spaceEsti
 export const spaceEstimateReachSegmentController = makeController(
   spaceEstimateReachSegmentRoute,
   async (c, respond) => {
-    const space = getResource<'space'>(c);
+    const space = contextResource<'space'>(c);
     const { conditions } = c.req.valid('json');
     return respond.ok({ count: await estimateSegmentReach('Space', space.id, conditions) });
   },

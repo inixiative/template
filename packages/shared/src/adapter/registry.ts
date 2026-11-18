@@ -8,7 +8,7 @@
 export type AdapterRegistry<A> = {
   register: (name: string, adapter: A) => void;
   get: (name: string) => A;
-  getOrDefault: (name: string | undefined, fallback: string) => A;
+  resolveOrThrow: (name: string | undefined, fallback: string) => A;
   has: (name: string) => boolean;
   names: () => string[];
 };
@@ -24,7 +24,7 @@ export const makeAdapterRegistry = <A>(): AdapterRegistry<A> => {
       if (!adapter) throw new Error(`Adapter not found: ${name}`);
       return adapter;
     },
-    getOrDefault: (name, fallback) => {
+    resolveOrThrow: (name, fallback) => {
       const adapter = name !== undefined ? map.get(name) : undefined;
       if (adapter) return adapter;
       const defaultAdapter = map.get(fallback);

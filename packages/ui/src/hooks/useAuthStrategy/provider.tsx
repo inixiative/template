@@ -32,7 +32,7 @@ export const AuthStrategyProvider = ({
   onTokenReceived,
 }: AuthStrategyProviderProps) => {
   const pendingCallbackRef = useRef<PendingAuthCallback | null>(null);
-  const getStore = useAppStore.getState;
+  const currentAppStore = useAppStore.getState;
 
   // Embed: Listen for token from parent
   useEffect(() => {
@@ -90,7 +90,7 @@ export const AuthStrategyProvider = ({
 
       switch (strategy.type) {
         case 'login': {
-          navigateToLogin(getStore);
+          navigateToLogin(currentAppStore);
           break;
         }
         case 'embed': {

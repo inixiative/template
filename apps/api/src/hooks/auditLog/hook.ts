@@ -65,7 +65,7 @@ const buildAuditEntry = (
   contextFkFields: Record<string, unknown>,
   withSubjectFkFields = true,
 ): Prisma.AuditLogCreateManyInput | null => {
-  const actor = auditActorContext.getScope();
+  const actor = auditActorContext.currentActor();
 
   // Filter noop fields, then diff on the UNMASKED result so a change to a sensitive field is still
   // detected — masking first would mask both sides to the same token and the change would vanish

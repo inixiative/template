@@ -56,13 +56,13 @@ type InboundFrame = {
 
 // The client is handed the query cache it writes to; it never reaches into the store that owns it.
 export type ApiWebsocketOptions = {
-  getClient: () => QueryClient | null;
+  currentQueryClient: () => QueryClient | null;
   onReconnect?: () => void;
 };
 
 export const createApiWebsocket = (
   url: string,
-  { getClient, onReconnect }: ApiWebsocketOptions,
+  { currentQueryClient, onReconnect }: ApiWebsocketOptions,
   timingOverrides: Partial<ApiWebsocketTiming> = {},
 ): ApiWebsocket => {
   const timing = { ...DEFAULT_TIMING, ...timingOverrides };
@@ -127,7 +127,7 @@ export const createApiWebsocket = (
     sentOpens.delete(stream);
     lastSeqs.delete(stream);
     if (!isLive(stream)) return;
-    failDataStream(getClient(), stream, 'failed');
+    failDataStream(currentQueryClient(), stream, 'failed');
     scheduleRetry(stream);
   };
 
@@ -200,14 +200,14 @@ export const createApiWebsocket = (
     lastSeqs.delete(stream);
     if (!streams.has(stream)) return;
     if (retryable) {
-      failDataStream(getClient(), stream, 'failed');
+      failDataStream(currentQueryClient(), stream, 'failed');
       scheduleRetry(stream);
       return;
     }
     console.error(`ws stream open rejected: ${stream}`);
     rejectedStreams.add(stream);
     clearTimers(retryTimers, stream);
-    failDataStream(getClient(), stream, 'rejected');
+    failDataStream(currentQueryClient(), stream, 'rejected');
   };
 
   // Until the next snapshot, appends on the wire are already in it.
@@ -216,7 +216,7 @@ export const createApiWebsocket = (
     if (isLive(stream) && !pendingOpens.has(stream)) sendOpen(stream);
   };
 
-  const context = (): MessageContext => ({ client: getClient(), resync: resyncStream });
+  const context = (): MessageContext => ({ client: currentQueryClient(), resync: resyncStream });
 
   const admitDataFrame = (event: WSDataEvent): boolean => {
     if (event.action === 'snapshot') {

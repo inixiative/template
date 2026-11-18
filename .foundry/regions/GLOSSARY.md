@@ -68,7 +68,7 @@ Builds the actor { model, record } (User for a JWT or spoof, Token for an API to
 types.ts interface + client/<provider>.ts factories + index.ts wiring; app code imports only the exported adapter. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
 
 **adapters**  
-Class: provider adapter modules exposing one interface over provider implementations, wired with makeAdapterRouter/Registry. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
+Class: provider adapter modules exposing one interface over provider implementations, wired with resolveAdapterForEnvironmentOrThrow and makeAdapterRegistry. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
 
 **addUniqueWhereNotNull / addCheckConstraint / addGistIndex**  
 Helpers for partial unique indexes, CHECK constraints and GIST indexes, which Prisma can't express. *Region:* [Database client and transactions](database-client/knowledge.md)
@@ -1064,7 +1064,7 @@ Client that bypasses transactions and hooks; only for deliberate hook skipping. 
 Opens an AsyncLocalStorage scope (request id or `job:name:id`) carrying transaction state. *Region:* [Database client and transactions](database-client/knowledge.md)
 
 **db.scope**  
-AsyncLocalStorage scope keyed by request UUID or job id; read with db.getScopeId() and db.getScopeContext(). *Region:* [Request context](request-context-errors/knowledge.md)
+AsyncLocalStorage scope keyed by request UUID or job id; read with db.currentScopeId() and db.currentScopeContext(). *Region:* [Request context](request-context-errors/knowledge.md)
 
 **db.txn**  
 Opens a transaction, or merges into the outermost one already open in this scope. *Region:* [Database client and transactions](database-client/knowledge.md)
@@ -1690,37 +1690,37 @@ Turns tenant context into [model, record] for permissions.check in access rules.
 **permissionCheckTargetForTenantContext**  
 Returns [model, record] for the current organization, space or user context. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
-**getEncryptedFieldsByModel**  
+**encryptedFieldsByModel**  
 Lists every encrypted column per model from the registry, for redaction and ignore lists. *Region:* [Field encryption and key rotation](encryption/knowledge.md)
 
 **encryptedColumnNamesForKey**  
 Derives a key's column triplet: encrypted{Key}, encrypted{Key}Metadata, encrypted{Key}KeyVersion. *Region:* [Field encryption and key rotation](encryption/knowledge.md)
 
-**getModelRelations / getAccessorRelations**  
+**relationsOfModel / getAccessorRelations**  
 A model's relations with relation name and target, keyed by model name or by accessor. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
 **nextFactorySequenceNumber**  
 Incrementing number for unique test values. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 
-**getPlatformProviders**  
+**configuredPlatformProviders**  
 Lists Google and GitHub when their *_CLIENT_ID / *_CLIENT_SECRET env vars are set. *Region:* [API tokens and login providers](tokens-providers/knowledge.md)
 
-**getPolymorphismConfig**  
+**polymorphismConfigForModel**  
 Returns a model's `{ typeField, fkMap }` from PolymorphismRegistry, or null if it isn't polymorphic. *Region:* [Schema conventions and reference data](data-modeling/knowledge.md)
 
 **getProjectConfig**  
 Reads project.config.ts via a timestamp-busted dynamic import so repeat reads are fresh. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
 
-**getRedisClient**  
+**redisClient**  
 The shared main connection for all non-blocking commands. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
-**getRedisSub / getRedisPub**  
+**redisSubscriber / redisPublisher**  
 The dedicated subscriber connection (SUBSCRIBE blocks) and the publisher client. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 **getRelations**  
 Lists a model's relations with targetModel, isList, collapsed foreignKey and annotations. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
-**getResource**  
+**contextResource**  
 Reads the record resourceContextMiddleware loaded for the route's :id, typed by generic. *Region:* [Request context](request-context-errors/knowledge.md)
 
 **getSecretAsync / setSecretAsync**  
@@ -1729,10 +1729,10 @@ Read or store a secret in Infisical by project, environment and path (the doc's 
 **getState()**  
 useAppStore.getState(): reads state or calls actions outside React components and in handlers. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
-**getValidatedBody / getValidatedQuery**  
+**validatedBody / validatedQuery**  
 Typed validated body or query for code that only has a generic Context<AppEnv>. *Region:* [Request context](request-context-errors/knowledge.md)
 
-**getValidOperators / isValidOperatorForField**  
+**validOperatorsForField / isValidOperatorForField**  
 Which filter operators a model field's type allows; the SDK schema is generated from the same list. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
 **GLOBAL_IMMUTABLE_FIELDS**  
@@ -2285,7 +2285,7 @@ Prefixes for factories and currying (makeController) and for middleware guards (
 **makeAdapterRegistry**  
 Select one adapter implementation by key, as opposed to by environment (router) or all at once (broadcast). *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
 
-**makeAdapterRouter**  
+**resolveAdapterForEnvironmentOrThrow**  
 Picks the provider for process.env.ENVIRONMENT with a default; the standard adapter wrapper. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
 
 **makeAppEvent**  
@@ -2400,7 +2400,7 @@ Messaging job: pre-rendered content to one Contact after canDeliver. *Region:* [
 (contact, content, kind, options) => Promise<void>: the per-ContactType channel sender. *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
 
 **messageProviderRegistry**  
-Broadcast registry of adapters keyed by ContactType; getMessageProviderAdapter reads it. *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
+Broadcast registry of adapters keyed by ContactType; messageProviderAdapterForContactType reads it. *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
 
 **messageUser**  
 Messaging job: users matched by a json-rules rule through the sender's recipient lens, rendered and sent to each accepting contact. *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
@@ -2808,7 +2808,7 @@ Native Pino instance for third-party SDKs only; bypasses the OTLP/broadcast pipe
 turbo task suffix that runs a task for one package (local#api, local:worker#api). *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
 
 **Platform providers**  
-Social providers enabled by env vars and listed by getPlatformProviders; not rows. *Region:* [API tokens and login providers](tokens-providers/knowledge.md)
+Social providers enabled by env vars and listed by configuredPlatformProviders; not rows. *Region:* [API tokens and login providers](tokens-providers/knowledge.md)
 
 **PlatformRole**  
 System-wide role on User: user or superadmin; superadmin passes every check on any credential. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
@@ -2835,7 +2835,7 @@ Rule-condition helper matching a polymorphic owner kind and FK; values bound by 
 Read which kind and id a row's polymorphic axis points at, or the key column for one kind. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
 **PolymorphismRegistry**  
-Single declaration of each model's polymorphic axes (typeField → fkMap); read via getPolymorphismConfig. *Region:* [Schema conventions and reference data](data-modeling/knowledge.md)
+Single declaration of each model's polymorphic axes (typeField → fkMap); read via polymorphismConfigForModel. *Region:* [Schema conventions and reference data](data-modeling/knowledge.md)
 
 **ports**  
 CLI command printing a project's local ports from ports.json. *Region:* [Config package (toolchain, train)](lib-config/knowledge.md)

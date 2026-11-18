@@ -243,12 +243,12 @@ authProvider/
 ```typescript
 // controllers/authProviderReadMany.ts
 import { makeController } from '#/lib/utils/makeController';
-import { getPlatformProviders } from '#/lib/auth/platformProviders';
+import { configuredPlatformProviders } from '#/lib/auth/platformProviders';
 
 export const authProviderReadManyController = makeController(
   authProviderReadManyRoute,
   async (_c, respond) => {
-    const platformProviders = getPlatformProviders();
+    const platformProviders = configuredPlatformProviders();
     return respond.ok(platformProviders);
   },
 );
@@ -262,13 +262,13 @@ export const authProviderReadManyController = makeController(
 // organization/controllers/organizationCreateAuthProvider.ts
 import { db, organizationId, userId } from '@template/db';
 import { encryptField } from '@template/db/lib/encryption/fieldEncryption';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 
 export const organizationCreateAuthProviderController = makeController(
   organizationCreateAuthProviderRoute,
   async (c, respond) => {
-    const org = getResource<'organization'>(c);
+    const org = contextResource<'organization'>(c);
     const user = c.get('user')!;
     const { secrets, ...body } = c.req.valid('json');
 
@@ -304,22 +304,22 @@ export const organizationCreateAuthProviderController = makeController(
 
 ```typescript
 // organization/controllers/organizationReadAuthProvider.ts
-import { getResource } from '#/lib/context/getResource';
-import { getPlatformProviders } from '#/lib/auth/platformProviders';
+import { contextResource } from '#/lib/context/contextResource';
+import { configuredPlatformProviders } from '#/lib/auth/platformProviders';
 import { check, rebacSchema } from '@template/permissions/rebac';
 
 export const organizationReadAuthProviderController = makeController(
   organizationReadAuthProviderRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const organization = getResource(c);
+    const organization = contextResource(c);
     const user = c.get('user');
     const permix = c.get('permix');
 
     // Owners see all providers (enabled + disabled), others see only enabled
     const isOwner = user && check(permix, rebacSchema, 'organization', organization, 'own');
 
-    const platformProviders = getPlatformProviders();
+    const platformProviders = configuredPlatformProviders();
 
     const orgProviders = await db.authProvider.findMany({
       where: {
@@ -552,7 +552,7 @@ GET /api/v1/orgs?searchFields[deletedAt][equals][:]=null   # is-null
 GET /api/v1/users?searchFields[emailVerified][:]=true
 ```
 
-**Typed SDK surface:** the `searchFields` schema is generated from the route's `filterLens` — shared `<Type>Filter` components (`StringFilter`/`IntFilter`/`DateTimeFilter`/`BooleanFilter`) plus a `JsonFilter`, with operators sourced from the server's own `getValidOperators` so the schema can never advertise an operator the server rejects. Enum fields inline their lens-narrowed value set. The FE reads this back via `listFieldsFromOpenApiOperation` (no `x-*` vendor extensions).
+**Typed SDK surface:** the `searchFields` schema is generated from the route's `filterLens` — shared `<Type>Filter` components (`StringFilter`/`IntFilter`/`DateTimeFilter`/`BooleanFilter`) plus a `JsonFilter`, with operators sourced from the server's own `validOperatorsForField` so the schema can never advertise an operator the server rejects. Enum fields inline their lens-narrowed value set. The FE reads this back via `listFieldsFromOpenApiOperation` (no `x-*` vendor extensions).
 
 ### Route declaration (lens narrowing)
 
@@ -623,7 +623,7 @@ const inquiryReceivedNarrowing: LensNarrowing = {
 };
 
 const { data, pagination } = await paginate(c, db.inquiry, {
-  bindings: { organizationId: getResource<'organization'>(c).id },
+  bindings: { organizationId: contextResource<'organization'>(c).id },
 });
 ```
 

@@ -4,13 +4,13 @@
  * @partOf feature:inquiry
  * @uses primitive:routeTemplates
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryResolveRoute } from '#/modules/inquiry/routes/inquiryResolve';
 import { resolveInquiry } from '#/modules/inquiry/services/resolveInquiry';
 
 export const inquiryResolveController = makeController(inquiryResolveRoute, async (c, respond) => {
-  const inquiry = getResource<'inquiry'>(c);
+  const inquiry = contextResource<'inquiry'>(c);
   const { status, expectedUpdatedAt, ...resolutionData } = c.req.valid('json');
 
   const resolved = await resolveInquiry(c, inquiry, status, resolutionData, expectedUpdatedAt);

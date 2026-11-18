@@ -7,7 +7,7 @@
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { actingUser } from '#/lib/context/actingUser';
-import { getResource, getResourceType } from '#/lib/context/getResource';
+import { contextResource, contextResourceType } from '#/lib/context/contextResource';
 import type { AppEnv } from '#/types/appEnv';
 
 const nullSourceFields = {
@@ -33,10 +33,10 @@ export type InquirySourceFields =
   | { sourceModel: (typeof InquiryResourceModel)['admin'] };
 
 export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields => {
-  const resourceType = getResourceType(c);
+  const resourceType = contextResourceType(c);
 
   if (resourceType === 'organization') {
-    const org = getResource<'organization'>(c);
+    const org = contextResource<'organization'>(c);
     return {
       ...nullSourceFields,
       sourceModel: InquiryResourceModel.Organization,
@@ -45,7 +45,7 @@ export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields =>
   }
 
   if (resourceType === 'space') {
-    const space = getResource<'space'>(c);
+    const space = contextResource<'space'>(c);
     return {
       ...nullSourceFields,
       sourceModel: InquiryResourceModel.Space,

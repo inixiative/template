@@ -34,7 +34,7 @@ export const cleanupStaleConnections = (): number => {
   return cleaned;
 };
 
-export const getConnectionStats = (): {
+export const connectionStats = (): {
   connections: number;
   channels: number;
   streams: number;

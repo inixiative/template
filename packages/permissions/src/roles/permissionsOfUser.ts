@@ -15,8 +15,8 @@ import {
   type MemberResource,
 } from '@template/permissions/roles/memberSelfGrant';
 import { permissionEntryForOrganizationRole } from '@template/permissions/roles/organization';
-import { getSpacePermissions } from '@template/permissions/roles/space';
-import { getUserPermissions } from '@template/permissions/roles/user';
+import { spacePermissionsForRole } from '@template/permissions/roles/space';
+import { userPermissionsForUser } from '@template/permissions/roles/user';
 import { partition } from 'lodash-es';
 
 type Member = {
@@ -33,7 +33,7 @@ export const organizationOwnerPermissions = (organizationId: string): Permission
 ];
 
 export const spaceOwnerPermissions = (spaceId: string): Permissions => [
-  { entries: [getSpacePermissions('owner', spaceId)] },
+  { entries: [spacePermissionsForRole('owner', spaceId)] },
 ];
 
 const ownedBy = (entries: EntitlementEntry[], owner: Permissions): Permissions =>
@@ -50,7 +50,7 @@ const memberPermissions = (
   );
   return [
     ...(member.userId
-      ? ownedBy(usersSide, [{ entries: [getUserPermissions(member.userId)] }])
+      ? ownedBy(usersSide, [{ entries: [userPermissionsForUser(member.userId)] }])
       : []),
     ...ownedBy(tenantsSide, tenantOwner),
   ];
@@ -63,11 +63,11 @@ export const permissionsOfUser = (
 ): Permissions => [
   {
     entries: [
-      ...(userId ? [getUserPermissions(userId)] : []),
+      ...(userId ? [userPermissionsForUser(userId)] : []),
       ...members.map((member) =>
         permissionEntryForOrganizationRole(member.role, member.organizationId),
       ),
-      ...spaceMembers.map((member) => getSpacePermissions(member.role, member.spaceId)),
+      ...spaceMembers.map((member) => spacePermissionsForRole(member.role, member.spaceId)),
     ],
   },
   ...members.flatMap((member) =>

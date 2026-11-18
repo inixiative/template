@@ -15,7 +15,7 @@ import type {
 } from '@template/ui/lib/auth/types';
 import { createAuthClient } from 'better-auth/client';
 
-const getAuthClient = () => {
+const betterAuthClient = () => {
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   return createAuthClient({ baseURL });
 };
@@ -25,7 +25,7 @@ const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> =
     throw new Error('Name is required for signup');
   }
 
-  const client = getAuthClient();
+  const client = betterAuthClient();
 
   const { data, error } = await client.signUp.email({
     email: method.email,
@@ -50,7 +50,7 @@ const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> =
 };
 
 const signUpWithOAuth = async (method: OAuthAuthMethod): Promise<SignUpResult> => {
-  const client = getAuthClient();
+  const client = betterAuthClient();
 
   const callbackURL = method.callbackURL || `${window.location.origin}/auth/callback`;
 

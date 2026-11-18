@@ -5,7 +5,7 @@
  * @uses primitive:authz, infrastructure:prisma
  */
 import { type HydratedRecord, hydrate, includeTargetEntitlements } from '@template/db';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { validateDelegateRole } from '#/lib/permissions/validateDelegateRole';
 import { makeController } from '#/lib/utils/makeController';
 import { tokenUpdateRoute } from '#/modules/token/routes/tokenUpdate';
@@ -14,7 +14,7 @@ import { validateTokenWrite } from '#/modules/token/validations/validateTokenWri
 export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, respond) => {
   const db = c.get('db');
   const permix = c.get('permix');
-  const token = getResource<'token'>(c);
+  const token = contextResource<'token'>(c);
   const body = c.req.valid('json');
   await validateTokenWrite(permix, token);
   await validateTokenWrite(permix, { ...token, ...body });

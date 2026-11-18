@@ -4,9 +4,9 @@ import {
   claimLane,
   db,
   flushRedis,
-  getRedisClient,
   laneKey,
   makeRollingCache,
+  redisClient,
   unregisterRollingCache,
 } from '@template/db';
 import { cleanupTouchedTables, createOrganization } from '@template/db/test';
@@ -127,7 +127,7 @@ describe('refreshRollingCacheTarget', () => {
       timeoutSeconds: 1,
       attempt: 1,
     });
-    expect(await getRedisClient().exists(rollingCache.results.value())).toBe(0);
+    expect(await redisClient().exists(rollingCache.results.value())).toBe(0);
   });
 
   it('a leaf that fails its last attempt clears the queued marker, so the next reader can queue again', async () => {
@@ -161,7 +161,7 @@ describe('refreshRollingCacheTarget', () => {
     await expect(
       enqueueJob('refreshRollingCacheTarget', { name, key, target: { id: 'organization' } }),
     ).rejects.toThrow('is not registered');
-    expect(await getRedisClient().exists(key)).toBe(0);
+    expect(await redisClient().exists(key)).toBe(0);
   });
 
   it('a superseded last attempt leaves the queued marker for the run that replaced it', async () => {
@@ -188,7 +188,7 @@ describe('refreshRollingCacheTarget', () => {
     const lane = laneKey(ctx.job.name, key);
 
     const superseded = refreshRollingCacheTarget(ctx, { name, key, target: null });
-    while ((await getRedisClient().get(lane)) !== ctx.job.id) await Bun.sleep(10);
+    while ((await redisClient().get(lane)) !== ctx.job.id) await Bun.sleep(10);
     await claimLane(lane, 'newer-job');
     await superseded.catch(() => {});
     await aborted;

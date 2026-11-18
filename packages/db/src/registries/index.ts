@@ -5,13 +5,13 @@ export * from './dualPolymorphismIds';
 export {
   type FalsePolymorphismRef,
   type FlexibleRef,
-  getPolymorphismConfig,
   isFalsePolymorphismRef,
   type PolymorphicAxis,
   type PolymorphicConfig,
   type PolymorphicValue,
   PolymorphismRegistry,
   polymorphicAxis,
+  polymorphismConfigForModel,
 } from './falsePolymorphism';
 export * from './hardDeleteOnTombstone';
 export * from './internalFields';

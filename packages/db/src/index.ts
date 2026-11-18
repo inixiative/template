@@ -29,7 +29,7 @@ export { fetchCachedRecordWithTargetEntitlements, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
 export {
   claimLane,
-  getJobSupersededBy,
+  fetchJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
   markJobSupersededBy,
@@ -64,10 +64,6 @@ export {
   createRedisConnection,
   fetchThroughCache,
   flushRedis,
-  getRedisClient,
-  getRedisPub,
-  getRedisSub,
-  getRollingCache,
   listRollingCaches,
   MAX_ROLLING_CACHE_TARGETS,
   MIN_ROLLING_CACHE_INTERVAL_SECONDS,
@@ -89,7 +85,11 @@ export {
   type RollingCacheTargets,
   type RollingCacheValue,
   type RollingCacheWrite,
+  redisClient,
   redisNamespace,
+  redisPublisher,
+  redisSubscriber,
+  rollingCacheByNameOrThrow,
   unregisterRollingCache,
   upsertCache,
 } from './redis';
@@ -176,7 +176,7 @@ export {
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { polymorphicArmRelation } from './utils/polymorphicArmKeys';
-export { getModelRelations } from './utils/prismaMapRelations';
+export { relationsOfModel } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';
 export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';

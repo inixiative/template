@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { claimLane, db, getJobSupersededBy, laneKey, watchLane } from '@template/db';
+import { claimLane, db, fetchJobSupersededBy, laneKey, watchLane } from '@template/db';
 import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
@@ -288,7 +288,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect(await db.jobOutbox.count()).toBe(0);
     expect(await ctx.queue.getJob('older')).toBeUndefined();
     expect(await ctx.queue.redis.get(lane)).toBe('newer');
-    expect(await getJobSupersededBy('newer')).toBeNull();
+    expect(await fetchJobSupersededBy('newer')).toBeNull();
   });
 
   it('keeps the spill-time baton when re-enqueue fails (self-claim is not rolled back)', async () => {

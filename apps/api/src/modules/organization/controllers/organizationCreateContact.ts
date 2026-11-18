@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
 import { emitAppEvent } from '#/appEvents/emit';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { reviveOrCreateContact } from '#/modules/contact/services/reviveOrCreateContact';
 import { organizationCreateContactRoute } from '#/modules/organization/routes/organizationCreateContact';
@@ -13,7 +13,7 @@ import { organizationCreateContactRoute } from '#/modules/organization/routes/or
 export const organizationCreateContactController = makeController(
   organizationCreateContactRoute,
   async (c, respond) => {
-    const organization = getResource<'organization'>(c);
+    const organization = contextResource<'organization'>(c);
     const body = c.req.valid('json');
 
     const contact = await reviveOrCreateContact(

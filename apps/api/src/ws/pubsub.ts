@@ -4,7 +4,7 @@
  * @partOf primitive:websockets
  * @uses infrastructure:redis
  */
-import { getRedisPub, getRedisSub } from '@template/db';
+import { redisPublisher, redisSubscriber } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { type StreamAppend, streamAppendFrame } from '@template/shared/ws';
 import { broadcastLocal, sendToChannelLocal, sendToStreamLocal } from '#/ws/delivery';
@@ -45,7 +45,7 @@ const resyncEveryLocalStream = (): void => {
 
 // Appends published while the subscriber was down never reached this instance, and a quiet stream
 // would never show the gap. The subscribe reply proves the channel is live before the resync.
-const resyncAfterSubscriberReconnect = (sub: ReturnType<typeof getRedisSub>): void => {
+const resyncAfterSubscriberReconnect = (sub: ReturnType<typeof redisSubscriber>): void => {
   let dropped = false;
   sub.on('close', () => {
     dropped = true;
@@ -101,7 +101,7 @@ export const initWebSocketPubSub = async (): Promise<void> => {
   if (initialized) return;
 
   try {
-    const sub = getRedisSub();
+    const sub = redisSubscriber();
     await sub.subscribe(WS_CHANNEL);
 
     sub.on('message', (channel, message) => {
@@ -129,7 +129,7 @@ const publish = async (
   message: Exclude<PubSubMessage, { type: 'stream' | 'streamResync' }>,
 ): Promise<void> => {
   try {
-    await getRedisPub().publish(WS_CHANNEL, JSON.stringify(message));
+    await redisPublisher().publish(WS_CHANNEL, JSON.stringify(message));
   } catch (err) {
     log.error('Failed to publish to Redis:', err);
     deliverLocal(message);
@@ -155,7 +155,7 @@ const publishPendingResyncs = async (): Promise<void> => {
     while (pendingResyncs.size > 0) {
       const [stream] = pendingResyncs;
       const message = { type: 'streamResync', target: stream, origin: INSTANCE_ID };
-      await getRedisPub().publish(WS_CHANNEL, JSON.stringify(message));
+      await redisPublisher().publish(WS_CHANNEL, JSON.stringify(message));
       pendingResyncs.delete(stream);
     }
   } catch {
@@ -183,7 +183,7 @@ export const appendToStream = (
       ? recipients.map((userId) => streamSeqKey(stream, userId))
       : [streamSeqKey(stream)];
     try {
-      await publishStreamAppend(getRedisPub(), WS_CHANNEL, seqKeys, {
+      await publishStreamAppend(redisPublisher(), WS_CHANNEL, seqKeys, {
         type: 'stream',
         target: stream,
         ...(recipients ? { userIds: recipients } : {}),

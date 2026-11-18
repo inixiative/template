@@ -48,21 +48,21 @@ Located in `packages/db/src/redis/`.
 
 | Connection | Purpose | Notes |
 |------------|---------|-------|
-| Main (`getRedisClient`) | All regular operations | Cache, rate limits, sign-in handshake sessions, OTP |
-| Subscriber (`getRedisSub`) | Pub/sub subscriptions | `SUBSCRIBE` is blocking, needs own connection |
-| Publisher (`getRedisPub`) | Pub/sub publishing | Shares main client (publish doesn't block) |
+| Main (`redisClient`) | All regular operations | Cache, rate limits, sign-in handshake sessions, OTP |
+| Subscriber (`redisSubscriber`) | Pub/sub subscriptions | `SUBSCRIBE` is blocking, needs own connection |
+| Publisher (`redisPublisher`) | Pub/sub publishing | Shares main client (publish doesn't block) |
 | BullMQ | Job queues | Manages own connections via `createRedisConnection` |
 
 ```typescript
-import { getRedisClient, getRedisPub, getRedisSub, createRedisConnection } from '@template/db';
+import { redisClient, redisPublisher, redisSubscriber, createRedisConnection } from '@template/db';
 
 // Regular operations
-const redis = getRedisClient();
+const redis = redisClient();
 await redis.get('key');
 
 // WebSocket pub/sub
-const pub = getRedisPub();
-const sub = getRedisSub();
+const pub = redisPublisher();
+const sub = redisSubscriber();
 
 // BullMQ creates its own
 const bullConnection = createRedisConnection('Redis:BullMQ:Worker');
@@ -492,7 +492,7 @@ const check = await fetchRollingCacheAndQueueRefreshWhenMissing(spaceStats, 'tot
   the next interval.
 - **A written value is never null or undefined**: `fetchThroughCache()` keeps null for only a minute and reads
   undefined as a miss. Write an empty value of the shape instead.
-- `getRollingCache(name)` throws for a name nothing registered; tests that define their own cache
+- `rollingCacheByNameOrThrow(name)` throws for a name nothing registered; tests that define their own cache
   remove it with `unregisterRollingCache`.
 
 Scheduling (root, branch and leaf jobs) is in [JOBS.md](JOBS.md#rolling-caches-root-branch-leaf).
@@ -514,7 +514,7 @@ if (isTest) {
 }
 ```
 
-All connections (`getRedisClient`, `getRedisSub`, `createRedisConnection`) return the same mock instance.
+All connections (`redisClient`, `redisSubscriber`, `createRedisConnection`) return the same mock instance.
 
 ### Test Isolation
 
@@ -538,7 +538,7 @@ mock.module('#/jobs/queue', () => ({
   queue: {
     add: async (name: string) => ({ id: `mock-${++jobCounter}`, name }),
     getJobs: async () => [],
-    redis: getRedisClient(),  // Uses same mock
+    redis: redisClient(),  // Uses same mock
   },
 }));
 ```

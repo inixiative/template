@@ -8,10 +8,10 @@ import { context, isSpanContextValid, trace } from '@opentelemetry/api';
 import { consolaAdapter } from '@template/shared/logger/consolaAdapter';
 import { maskLogValue, stringifyLogValue } from '@template/shared/logger/maskLogValue';
 import { pinoAdapter } from '@template/shared/logger/pinoAdapter';
-import { getLogContext, publishLogRecord } from '@template/shared/logger/records';
+import { logContextFields, publishLogRecord } from '@template/shared/logger/records';
 import {
-  getLogBroadcasts,
-  getLogScopes,
+  currentLogBroadcasts,
+  currentLogScopes,
   LogScope,
   withLogScope,
 } from '@template/shared/logger/scope';
@@ -42,7 +42,7 @@ const emit = (level: LogLevel, rawArgs: unknown[], bindings: Record<string, unkn
   const last = rawArgs.at(-1);
   const manualScope = typeof last === 'string' && scopeValues.has(last);
   const args = manualScope ? rawArgs.slice(0, -1) : rawArgs;
-  const fields: Record<string, unknown> = { ...getLogContext(), ...bindings };
+  const fields: Record<string, unknown> = { ...logContextFields(), ...bindings };
   const messages: string[] = [];
   for (const arg of args) {
     if (arg instanceof Error) {
@@ -51,7 +51,7 @@ const emit = (level: LogLevel, rawArgs: unknown[], bindings: Record<string, unkn
     } else if (arg && typeof arg === 'object' && !Array.isArray(arg)) Object.assign(fields, arg);
     else messages.push(typeof arg === 'string' ? arg : stringifyLogValue(arg));
   }
-  fields.scopes = manualScope ? [...getLogScopes(), last] : getLogScopes();
+  fields.scopes = manualScope ? [...currentLogScopes(), last] : currentLogScopes();
   const activeSpan = trace.getSpan(context.active())?.spanContext();
   const span = activeSpan && isSpanContextValid(activeSpan) ? activeSpan : undefined;
   if (span) {
@@ -76,7 +76,7 @@ const emit = (level: LogLevel, rawArgs: unknown[], bindings: Record<string, unkn
   publishLogRecord(record);
   const scopes = (safeFields.scopes as string[]).map((scope) => `[${scope}]`).join(' ');
   const formatted = `${scopes} ${message} ${JSON.stringify(safeFields)}`.trim();
-  for (const broadcast of getLogBroadcasts()) {
+  for (const broadcast of currentLogBroadcasts()) {
     try {
       Promise.resolve(broadcast(level, formatted)).catch(() => {});
     } catch {}

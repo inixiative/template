@@ -7,7 +7,7 @@
 import { ageGatedReclaim } from '@template/db/lanes/queries/ageGatedReclaim';
 import { evictingClaim } from '@template/db/lanes/queries/evictingClaim';
 import { fencedRelease } from '@template/db/lanes/queries/fencedRelease';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { startHeartbeat } from '@template/shared/utils';
@@ -26,7 +26,7 @@ export const supersededKey = (jobId: string): string => `${SUPERSEDED_PREFIX}${j
 // Last claim wins; the TTL covers any scheduled delay plus the queue-wait buffer (see evictingClaim).
 export const claimLane = (lane: string, jobId: string, delayMs = 0): Promise<string | null> =>
   evictingClaim(
-    getRedisClient(),
+    redisClient(),
     lane,
     jobId,
     LANE_TTL_SEC + Math.ceil(delayMs / 1000),
@@ -34,13 +34,13 @@ export const claimLane = (lane: string, jobId: string, delayMs = 0): Promise<str
     SUPERSEDED_TTL_SEC,
   );
 
-export const getJobSupersededBy = async (jobId: string): Promise<string | null> =>
-  getRedisClient().get(supersededKey(jobId));
+export const fetchJobSupersededBy = async (jobId: string): Promise<string | null> =>
+  redisClient().get(supersededKey(jobId));
 
 // Marks one job superseded by id, without touching any lane. A superseding child writes its own when
 // it finds its parent superseded, so the tombstone reaches its children in turn.
 export const markJobSupersededBy = async (jobId: string, supersededBy: string): Promise<void> => {
-  await getRedisClient().set(supersededKey(jobId), supersededBy, 'EX', SUPERSEDED_TTL_SEC);
+  await redisClient().set(supersededKey(jobId), supersededBy, 'EX', SUPERSEDED_TTL_SEC);
 };
 
 // A superseding staged job parked in `waiting-children` is not running, so nothing refreshes its lane
@@ -50,21 +50,14 @@ export const markJobSupersededBy = async (jobId: string, supersededBy: string): 
 // tombstone's lifetime. Only the current holder does; a job already replaced leaves the lane alone.
 // When it resumes, watchLane puts the normal TTL back.
 export const holdLaneWhileParked = async (lane: string, jobId: string): Promise<boolean> => {
-  if ((await getRedisClient().get(lane)) !== jobId) return false;
-  await getRedisClient().expire(lane, SUPERSEDED_TTL_SEC);
+  if ((await redisClient().get(lane)) !== jobId) return false;
+  await redisClient().expire(lane, SUPERSEDED_TTL_SEC);
   return true;
 };
 
 // Re-assert a lapsed baton at job start, never displacing a newer holder (see ageGatedReclaim).
 export const reclaimLane = (lane: string, jobId: string): Promise<void> =>
-  ageGatedReclaim(
-    getRedisClient(),
-    lane,
-    jobId,
-    LANE_TTL_SEC,
-    SUPERSEDED_PREFIX,
-    SUPERSEDED_TTL_SEC,
-  );
+  ageGatedReclaim(redisClient(), lane, jobId, LANE_TTL_SEC, SUPERSEDED_PREFIX, SUPERSEDED_TTL_SEC);
 
 // Roll back a claim when the subsequent queue.add/outbox spill fails. Best-effort, but never silent:
 // if this fenced cleanup fails (transient redis/script error) the phantom jobId lingers in the lane key
@@ -75,7 +68,7 @@ export const releaseLane = (
   jobId: string,
   previousHolder?: string | null,
 ): Promise<void> =>
-  fencedRelease(getRedisClient(), lane, jobId, previousHolder ?? '', SUPERSEDED_PREFIX).catch(
+  fencedRelease(redisClient(), lane, jobId, previousHolder ?? '', SUPERSEDED_PREFIX).catch(
     (err) => {
       log.error(`releaseLane: fenced delete failed; lane key will linger until TTL: ${lane}`, err);
     },
@@ -94,13 +87,13 @@ export const watchLane = (
   parentId?: string,
 ): (() => void) =>
   startHeartbeat(async () => {
-    const parentSupersededBy = parentId ? await getJobSupersededBy(parentId) : null;
+    const parentSupersededBy = parentId ? await fetchJobSupersededBy(parentId) : null;
     if (parentSupersededBy) {
       await markJobSupersededBy(jobId, parentSupersededBy);
       onUsurped();
       return;
     }
-    const holder = await getRedisClient().get(lane);
-    if (holder === jobId) await getRedisClient().pexpire(lane, LANE_TTL_SEC * 1000);
+    const holder = await redisClient().get(lane);
+    if (holder === jobId) await redisClient().pexpire(lane, LANE_TTL_SEC * 1000);
     else if (holder !== null) onUsurped();
   }, LANE_POLL_MS);

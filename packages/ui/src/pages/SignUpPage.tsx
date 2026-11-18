@@ -9,7 +9,7 @@ import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
 
 export const SignUpPage = () => {
-  const getStore = useAppStore.getState;
+  const currentAppStore = useAppStore.getState;
   const projectName = useAppStore((state) => state.ui.projectName);
   const appName = useAppStore((state) => state.ui.appName);
 
@@ -22,7 +22,7 @@ export const SignUpPage = () => {
           </h1>
           <p className="mt-2 text-muted-foreground">Create your account to get started</p>
         </div>
-        <SignUpForm onLoginClick={() => navigateToLogin(getStore, true)} />
+        <SignUpForm onLoginClick={() => navigateToLogin(currentAppStore, true)} />
       </div>
     </div>
   );

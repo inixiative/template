@@ -17,7 +17,7 @@ const createDenyAllPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
   set,
   _get,
 ) => {
-  const makeMockPermix = (): Permix => ({
+  const denyAllPermix = (): Permix => ({
     check: () => false,
     setup: async () => {},
     setSuperadmin: () => {},
@@ -28,14 +28,14 @@ const createDenyAllPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
     getJSON: () => null,
   });
 
-  let mockPermix = makeMockPermix();
+  let mockPermix = denyAllPermix();
 
   return {
     permissions: {
       permix: mockPermix,
       check: () => false,
       clear: () => {
-        mockPermix = makeMockPermix();
+        mockPermix = denyAllPermix();
         set((state) => ({
           permissions: {
             ...state.permissions,

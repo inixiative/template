@@ -14,10 +14,10 @@ type ResourceType<T extends AccessorName> = T extends keyof ResourcePayloadMap
     ? ModelTypeMap[Capitalize<T>]
     : never;
 
-export const getResource = <T extends AccessorName>(c: Context): ResourceType<T> => {
+export const contextResource = <T extends AccessorName>(c: Context): ResourceType<T> => {
   return c.get('resource') as ResourceType<T>;
 };
 
-export const getResourceType = (c: Context): AccessorName | null => {
+export const contextResourceType = (c: Context): AccessorName | null => {
   return c.get('resourceType');
 };

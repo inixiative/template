@@ -3,7 +3,7 @@ import { LockLostError } from '@template/db/lock/lockLostError';
 import { makeLock } from '@template/db/lock/makeLock';
 import { maxSafeHeartbeatMs } from '@template/db/lock/maxSafeHeartbeatMs';
 import type { LockRedis } from '@template/db/lock/types';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { waitFor } from '@template/shared/test/waitFor';
 
@@ -223,7 +223,7 @@ describe('makeLock', () => {
       const id = newId();
       const lock = makeLock({ service: 's', identifier: id, ...fastOpts });
       await lock.acquire();
-      await getRedisClient().set(keyFor(id), 'someone-else');
+      await redisClient().set(keyFor(id), 'someone-else');
       expect(await lock.verify()).toBe(false);
       await lock.release();
     });
@@ -320,16 +320,16 @@ describe('makeLock', () => {
       const lock = makeLock({ service: 's', identifier: id, ...fastOpts });
       await lock.acquire();
       expect(await lock.release()).toBe('released');
-      expect(await getRedisClient().get(keyFor(id))).toBeNull();
+      expect(await redisClient().get(keyFor(id))).toBeNull();
     });
 
     it('is fenced: preserves a new holder and reports notHeld', async () => {
       const id = newId();
       const lock = makeLock({ service: 's', identifier: id, ...fastOpts });
       await lock.acquire();
-      await getRedisClient().set(keyFor(id), 'someone-else');
+      await redisClient().set(keyFor(id), 'someone-else');
       expect(await lock.release()).toBe('notHeld');
-      expect(await getRedisClient().get(keyFor(id))).toBe('someone-else');
+      expect(await redisClient().get(keyFor(id))).toBe('someone-else');
     });
 
     it('without acquire is a safe no-op', async () => {
@@ -394,7 +394,7 @@ describe('makeLock', () => {
 
     it('declares a stolen lock lost on the first tick without extending the new holder', async () => {
       const id = newId();
-      const redis = getRedisClient();
+      const redis = redisClient();
       let lostCount = 0;
       const lock = makeLock({
         service: 's',
@@ -421,7 +421,7 @@ describe('makeLock', () => {
 
     it('verify answers from Redis after an observed loss: a key holding our token again reads true', async () => {
       const id = newId();
-      const redis = getRedisClient();
+      const redis = redisClient();
       let lostCount = 0;
       const lock = makeLock({
         service: 's',
@@ -546,7 +546,7 @@ describe('makeLock', () => {
       await lock.acquire();
       await lock.release();
       await sleep(fastOpts.ttlMs + 50);
-      expect(await getRedisClient().get(keyFor(id))).toBeNull();
+      expect(await redisClient().get(keyFor(id))).toBeNull();
     });
   });
   describe('release', () => {
@@ -623,13 +623,13 @@ describe('makeLock', () => {
       const successor = makeLock({ service: 's', identifier });
       expect(await successor.acquire()).toBe(true);
       expect(await first.release()).toBe('released');
-      expect(await getRedisClient().exists(keyFor(identifier))).toBe(1);
+      expect(await redisClient().exists(keyFor(identifier))).toBe(1);
       await successor.release();
     });
   });
   describe('a lock on several identifiers', () => {
     const run = newId();
-    const redis = getRedisClient();
+    const redis = redisClient();
     const id = (name: string) => `${run}-${name}`;
     const key = (name: string) => keyFor(id(name));
     const opts = (name: string) => ({

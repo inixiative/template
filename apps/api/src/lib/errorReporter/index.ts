@@ -1,4 +1,4 @@
-import { makeAdapterRouter } from '@template/shared/adapter';
+import { resolveAdapterForEnvironmentOrThrow } from '@template/shared/adapter';
 import { createConsoleReporter } from '#/lib/errorReporter/client/console';
 import { createSentryReporter } from '#/lib/errorReporter/client/sentry';
 
@@ -9,7 +9,7 @@ const reporter =
     ? createSentryReporter(process.env.SENTRY_DSN)
     : createConsoleReporter();
 
-export const errorReporter = makeAdapterRouter({
+export const errorReporter = resolveAdapterForEnvironmentOrThrow({
   prod: reporter,
   staging: reporter,
   pr: reporter,

@@ -24,7 +24,7 @@ Sign-in, sign-up, OAuth callback, guards and the auth slice in `@template/ui`. B
 ## Architecture
 
 - **BetterAuth client** (`better-auth/client`) talks to the API's `/api/auth/*` routes.
-- **User JWT in localStorage.** Email sign-in, sign-up without verification and the OAuth callback all answer with `{ token, expiresAt, user }`; `storeJwtHandoff` (`packages/ui/src/lib/auth/storeJwtHandoff.ts`) checks that shape and calls `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). The stored JWT is read only through `packages/ui/src/lib/auth/token.ts`: `getToken` (the raw value), `isTokenValid` (present and unexpired), `getTokenExpiry` and `clearToken`; never read `localStorage` or compare the expiry by hand. Every API call and the websocket `authenticate` frame send `Authorization: Bearer <jwt>`. The client never holds a session.
+- **User JWT in localStorage.** Email sign-in, sign-up without verification and the OAuth callback all answer with `{ token, expiresAt, user }`; `storeJwtHandoff` (`packages/ui/src/lib/auth/storeJwtHandoff.ts`) checks that shape and calls `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). The stored JWT is read only through `packages/ui/src/lib/auth/token.ts`: `storedToken` (the raw value), `isTokenValid` (present and unexpired), `storedTokenExpiry` and `clearToken`; never read `localStorage` or compare the expiry by hand. Every API call and the websocket `authenticate` frame send `Authorization: Bearer <jwt>`. The client never holds a session.
 - **`/me` hydrates the store.** `fetchAndHydrateMe` loads the user, organizations, spaces and space memberships, then runs `permissions.installPermissionsForUser(me)`.
 
 **Email/password:**
@@ -87,8 +87,8 @@ Pages are thin; the forms own their state and read the store directly (no prop d
 
 | File | Role |
 |------|------|
-| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignUp? })` renders `LoginForm`, links to signup with `navigateToSignUp(getStore, true)` |
-| `packages/ui/src/pages/SignUpPage.tsx` | `SignUpPage` renders `SignUpForm`, links to login with `navigateToLogin(getStore, true)` |
+| `packages/ui/src/pages/LoginPage.tsx` | `LoginPage({ hideSignUp? })` renders `LoginForm`, links to signup with `navigateToSignUp(currentAppStore, true)` |
+| `packages/ui/src/pages/SignUpPage.tsx` | `SignUpPage` renders `SignUpForm`, links to login with `navigateToLogin(currentAppStore, true)` |
 | `packages/ui/src/pages/AuthCallbackPage.tsx` | OAuth callback (`/auth/callback` in all three apps) |
 | `packages/ui/src/components/auth/LoginForm.tsx` | `LoginFormProps = { hideSignUp?, onSignUpClick? }` |
 | `packages/ui/src/components/auth/SignUpForm.tsx` | `SignUpFormProps = { onLoginClick? }` |
@@ -209,8 +209,8 @@ navigateKeepingSearchParams(to, 'context');  // keep org/space (+ spoof, flow)
 navigateKeepingSearchParams(to, 'spoof');    // keep spoof (+ flow) only
 navigateKeepingSearchParams(to, 'all');      // keep every current search param
 
-navigateToLogin(getStore, preserveSearch?);
-navigateToSignUp(getStore, preserveSearch?);
+navigateToLogin(currentAppStore, preserveSearch?);
+navigateToSignUp(currentAppStore, preserveSearch?);
 redirectPreservingContext(beforeLoadCtx, to);  // throw a redirect keeping org/space/spoof
 ```
 
@@ -224,7 +224,7 @@ redirectPreservingContext(beforeLoadCtx, to);  // throw a redirect keeping org/s
 
 ## Security
 
-- **CSRF / OAuth state:** BetterAuth validates state and nonce; trusted origins come from the API's CORS allow-list (`getAllowedOrigins`).
+- **CSRF / OAuth state:** BetterAuth validates state and nonce; trusted origins come from the API's CORS allow-list (`allowedCorsOrigins`).
 - **Spoofing** is superadmin-only on the API; the UserMenu hides spoof controls unless the user is superadmin or already spoofing, and the superadmin app hides them entirely.
 - **Token storage** is localStorage (readable by any script on the origin), not an HTTP-only cookie.
 

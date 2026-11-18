@@ -31,7 +31,7 @@ describe('sendWebhook handler', () => {
   let user: User;
   let testCounter = 0;
 
-  const getUniqueUrl = (suffix = '') => `https://test-webhook.local/${++testCounter}${suffix}`;
+  const uniqueWebhookUrl = (suffix = '') => `https://test-webhook.local/${++testCounter}${suffix}`;
   const worker = makeTestWorker();
 
   beforeEach(async () => {
@@ -70,7 +70,7 @@ describe('sendWebhook handler', () => {
 
   describe('successful delivery', () => {
     it('delivers webhook and creates success event', async () => {
-      const testUrl = getUniqueUrl();
+      const testUrl = uniqueWebhookUrl();
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -108,7 +108,7 @@ describe('sendWebhook handler', () => {
     });
 
     it('signature can be verified with public key', async () => {
-      const testUrl = getUniqueUrl();
+      const testUrl = uniqueWebhookUrl();
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -149,7 +149,7 @@ describe('sendWebhook handler', () => {
         ),
       );
 
-      const testUrl = getUniqueUrl('/error');
+      const testUrl = uniqueWebhookUrl('/error');
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -183,7 +183,7 @@ describe('sendWebhook handler', () => {
         ),
       );
 
-      const testUrl = getUniqueUrl('/redirect');
+      const testUrl = uniqueWebhookUrl('/redirect');
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -214,7 +214,7 @@ describe('sendWebhook handler', () => {
         }),
       );
 
-      const testUrl = getUniqueUrl('/unreachable');
+      const testUrl = uniqueWebhookUrl('/unreachable');
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -239,7 +239,7 @@ describe('sendWebhook handler', () => {
     });
 
     it('skips inactive subscription', async () => {
-      const testUrl = getUniqueUrl('/inactive');
+      const testUrl = uniqueWebhookUrl('/inactive');
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -298,7 +298,7 @@ describe('sendWebhook handler', () => {
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
-        url: getUniqueUrl('/retries'),
+        url: uniqueWebhookUrl('/retries'),
         model: 'CustomerRef',
       });
       return sub;
@@ -434,7 +434,7 @@ describe('sendWebhook handler', () => {
         }),
       );
 
-      const testUrl = getUniqueUrl('/circuit-break');
+      const testUrl = uniqueWebhookUrl('/circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -474,7 +474,7 @@ describe('sendWebhook handler', () => {
         }),
       );
 
-      const testUrl = getUniqueUrl('/no-circuit-break');
+      const testUrl = uniqueWebhookUrl('/no-circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -522,7 +522,7 @@ describe('sendWebhook handler', () => {
         }),
       );
 
-      const testUrl = getUniqueUrl('/few-events');
+      const testUrl = uniqueWebhookUrl('/few-events');
       const { entity: sub, context } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -583,7 +583,7 @@ describe('sendWebhook handler', () => {
       const { entity: sub, context } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
-        url: getUniqueUrl('/integration'),
+        url: uniqueWebhookUrl('/integration'),
         model: 'CustomerRef',
         integrationId: withIntegration ? integration.id : null,
       });

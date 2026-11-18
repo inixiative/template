@@ -13,7 +13,7 @@ type LoginPageProps = {
 };
 
 export const LoginPage = ({ hideSignUp }: LoginPageProps) => {
-  const getStore = useAppStore.getState;
+  const currentAppStore = useAppStore.getState;
   const projectName = useAppStore((state) => state.ui.projectName);
   const appName = useAppStore((state) => state.ui.appName);
 
@@ -28,7 +28,7 @@ export const LoginPage = ({ hideSignUp }: LoginPageProps) => {
         </div>
         <LoginForm
           hideSignUp={hideSignUp}
-          onSignUpClick={hideSignUp ? undefined : () => navigateToSignUp(getStore, true)}
+          onSignUpClick={hideSignUp ? undefined : () => navigateToSignUp(currentAppStore, true)}
         />
       </div>
     </div>

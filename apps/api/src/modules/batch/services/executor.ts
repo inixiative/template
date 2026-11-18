@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { Context } from 'hono';
-import { getValidatedBody } from '#/lib/context/getValidatedData';
+import { validatedBody } from '#/lib/context/validatedRequestData';
 import { assertBatchable } from '#/modules/batch/services/assertBatchable';
 import { allowFailures } from '#/modules/batch/services/strategies/allowFailures';
 import { failOnRound } from '#/modules/batch/services/strategies/failOnRound';
@@ -34,7 +34,7 @@ export const executeBatch = async (c: Context<AppEnv>): Promise<BatchResult> => 
     requests: rounds,
     strategy,
     headers: sharedHeaders = {},
-  } = getValidatedBody<{
+  } = validatedBody<{
     requests: BatchRequest[][];
     strategy: string;
     headers?: Record<string, string>;

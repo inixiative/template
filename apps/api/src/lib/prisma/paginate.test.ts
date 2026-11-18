@@ -7,7 +7,7 @@ import { cursorPaginate, paginate } from '#/lib/prisma/paginate';
 
 type Captured = { findManyArgs?: Record<string, unknown> };
 
-const makeDelegate = (captured: Captured): AnyDelegate =>
+const capturingDelegate = (captured: Captured): AnyDelegate =>
   ({
     findMany: async (args: Record<string, unknown>) => {
       captured.findManyArgs = args;
@@ -16,7 +16,7 @@ const makeDelegate = (captured: Captured): AnyDelegate =>
     count: async () => 0,
   }) as unknown as AnyDelegate;
 
-const makeContext = (filterLens: LensNarrowing, query: Record<string, unknown> = {}) => {
+const paginateContext = (filterLens: LensNarrowing, query: Record<string, unknown> = {}) => {
   const vars: Record<string, unknown> = {
     filterLens,
     bracketQuery: {},
@@ -36,7 +36,9 @@ describe('paginate — lens bindings', () => {
       root: { picks: [], where: { field: 'name', operator: 'equals', bind: 'who' } },
     };
 
-    await paginate(makeContext(lens), makeDelegate(captured), { bindings: { who: 'aron' } });
+    await paginate(paginateContext(lens), capturingDelegate(captured), {
+      bindings: { who: 'aron' },
+    });
 
     expect(captured.findManyArgs?.where).toEqual({ name: { equals: 'aron' } });
   });
@@ -47,7 +49,7 @@ describe('paginate — lens bindings', () => {
       root: { picks: [], where: { field: 'name', operator: 'equals', bind: 'who' } },
     };
 
-    expect(paginate(makeContext(lens), makeDelegate({}))).rejects.toThrow(
+    expect(paginate(paginateContext(lens), capturingDelegate({}))).rejects.toThrow(
       /lens requires bindings not provided: who/,
     );
   });
@@ -56,7 +58,7 @@ describe('paginate — lens bindings', () => {
     const captured: Captured = {};
     const lens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name'] } };
 
-    const result = await paginate(makeContext(lens), makeDelegate(captured));
+    const result = await paginate(paginateContext(lens), capturingDelegate(captured));
 
     expect(captured.findManyArgs?.where).toEqual({});
     expect(result.pagination).toEqual({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
@@ -67,7 +69,7 @@ type Row = { id: string };
 
 // A delegate that honours the keyset: it reads the `id > cursor` seek out of the composed where
 // and returns rows strictly after it, so a walk observes real page boundaries.
-const makeSeekDelegate = (rows: Row[]): AnyDelegate =>
+const keysetSeekDelegate = (rows: Row[]): AnyDelegate =>
   ({
     findMany: async (args: Record<string, unknown>) => {
       type Seek = { OR?: { id?: { gt?: string } }[] };
@@ -80,7 +82,7 @@ const makeSeekDelegate = (rows: Row[]): AnyDelegate =>
   }) as unknown as AnyDelegate;
 
 const cursorContext = (filterLens: LensNarrowing, query: Record<string, unknown>) =>
-  makeContext(filterLens, query) as unknown as Parameters<typeof cursorPaginate>[0];
+  paginateContext(filterLens, query) as unknown as Parameters<typeof cursorPaginate>[0];
 
 describe('cursorPaginate — filter binding', () => {
   const userLens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name'] } };
@@ -89,7 +91,7 @@ describe('cursorPaginate — filter binding', () => {
   it('walks page two with a cursor minted under the same filter', async () => {
     const first = await cursorPaginate<AnyDelegate, Row>(
       cursorContext(userLens, { pageSize: 2 }),
-      makeSeekDelegate(rows),
+      keysetSeekDelegate(rows),
       {
         where: { name: 'aron' },
       },
@@ -99,7 +101,7 @@ describe('cursorPaginate — filter binding', () => {
 
     const second = await cursorPaginate<AnyDelegate, Row>(
       cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
-      makeSeekDelegate(rows),
+      keysetSeekDelegate(rows),
       { where: { name: 'aron' } },
     );
     expect(second.data).toEqual([{ id: 'u-3' }, { id: 'u-4' }]);
@@ -108,13 +110,13 @@ describe('cursorPaginate — filter binding', () => {
   it('a where that matches nothing still matches nothing on page two', async () => {
     const first = await cursorPaginate<AnyDelegate, Row>(
       cursorContext(userLens, { pageSize: 2 }),
-      makeSeekDelegate(rows),
+      keysetSeekDelegate(rows),
       { where: matchNothing() },
     );
     const captured: Captured = {};
     await cursorPaginate(
       cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
-      makeDelegate(captured),
+      capturingDelegate(captured),
       { where: matchNothing() },
     );
     expect(captured.findManyArgs?.where).toEqual(matchNothing());
@@ -125,7 +127,7 @@ describe('cursorPaginate — filter binding', () => {
   it('rejects a cursor minted under a different filter with a 400', async () => {
     const first = await cursorPaginate<AnyDelegate, Row>(
       cursorContext(userLens, { pageSize: 2 }),
-      makeSeekDelegate(rows),
+      keysetSeekDelegate(rows),
       {
         where: { name: 'aron' },
       },
@@ -133,7 +135,7 @@ describe('cursorPaginate — filter binding', () => {
 
     const replay = cursorPaginate(
       cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
-      makeSeekDelegate(rows),
+      keysetSeekDelegate(rows),
       { where: { name: 'sam' } },
     );
     await expect(replay).rejects.toThrow(AppError);
@@ -143,13 +145,13 @@ describe('cursorPaginate — filter binding', () => {
   it('a search term is part of the filter the cursor is bound to', async () => {
     const first = await cursorPaginate(
       cursorContext(userLens, { pageSize: 2, search: 'acme' }),
-      makeSeekDelegate(rows),
+      keysetSeekDelegate(rows),
     );
 
     await expect(
       cursorPaginate(
         cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
-        makeSeekDelegate(rows),
+        keysetSeekDelegate(rows),
       ),
     ).rejects.toThrow('Pagination cursor does not match the requested filter');
   });
@@ -163,7 +165,7 @@ describe('paginate — searchPaths', () => {
 
   it('narrows the global search fan-out to the route-authored subset', async () => {
     const captured: Captured = {};
-    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), {
+    await paginate(paginateContext(lens, { search: 'acme' }), capturingDelegate(captured), {
       searchPaths: ['name'],
     });
 
@@ -175,7 +177,7 @@ describe('paginate — searchPaths', () => {
 
   it('does not leak searchPaths into the Prisma findMany args', async () => {
     const captured: Captured = {};
-    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), {
+    await paginate(paginateContext(lens, { search: 'acme' }), capturingDelegate(captured), {
       searchPaths: ['name'],
     });
 

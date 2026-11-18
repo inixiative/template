@@ -7,13 +7,13 @@
 
 import { map } from 'lodash-es';
 import { emitAppEvent } from '#/appEvents/emit';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { segmentDeleteRoute } from '#/modules/segment/routes/segmentDelete';
 
 export const segmentDeleteController = makeController(segmentDeleteRoute, async (c, respond) => {
   const db = c.get('db');
-  const segment = getResource<'segment'>(c);
+  const segment = contextResource<'segment'>(c);
   const members = await db.segmentMember.findMany({ where: { segmentId: segment.id } });
   const deleted = await db.segment.update({
     where: { id: segment.id },

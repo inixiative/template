@@ -4,7 +4,7 @@
  * @partOf feature:auth
  * @uses none
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { authProviderDeleteRoute } from '#/modules/authProvider/routes/authProviderDelete';
 
@@ -12,7 +12,7 @@ export const authProviderDeleteController = makeController(
   authProviderDeleteRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const authProvider = getResource<'authProvider'>(c);
+    const authProvider = contextResource<'authProvider'>(c);
 
     await db.authProvider.update({
       where: { id: authProvider.id },

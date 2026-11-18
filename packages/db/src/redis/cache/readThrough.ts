@@ -11,7 +11,7 @@ import { publishComputed } from '@template/db/redis/cache/publishComputed';
 import { readCached } from '@template/db/redis/cache/readCached';
 import { resolveTtl } from '@template/db/redis/cache/resolveTtl';
 import type { CacheResult } from '@template/db/redis/cache/telemetry/withCacheSpan';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import superjson from 'superjson';
 
@@ -21,7 +21,7 @@ export const readThrough = async <T>(
   ttl: number | ((value: T) => number),
   setResult: (result: CacheResult) => void,
 ): Promise<T> => {
-  const redis = getRedisClient();
+  const redis = redisClient();
 
   const cached = await readCached<T>(redis, key);
   setResult(cached.result);

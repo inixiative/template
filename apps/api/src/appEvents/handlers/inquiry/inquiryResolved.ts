@@ -11,7 +11,7 @@ import type { InquiryWithIncludes } from '#/modules/inquiry/services/types';
 
 export type InquiryResolvedPayload = InquiryWithIncludes;
 
-const getLifecycleHandlers = (data: InquiryResolvedPayload) => {
+const lifecycleAppEventsForInquiryStatus = (data: InquiryResolvedPayload) => {
   const handler = inquiryServices[data.type];
   if (!handler?.appEvents) return null;
 
@@ -22,6 +22,6 @@ const getLifecycleHandlers = (data: InquiryResolvedPayload) => {
 };
 
 export const inquiryResolved = makeAppEvent<InquiryResolvedPayload>({
-  email: (data) => getLifecycleHandlers(data)?.email?.(data) ?? null,
+  email: (data) => lifecycleAppEventsForInquiryStatus(data)?.email?.(data) ?? null,
   websocket: (data) => inquiryServices[data.type]?.appEvents?.resolved?.websocket?.(data) ?? null,
 });

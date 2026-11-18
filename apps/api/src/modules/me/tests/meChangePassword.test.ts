@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   DbAction,
   db,
-  getRedisClient,
   HookTiming,
+  redisClient,
   redisNamespace,
   registerDbHook,
   unregisterDbHook,
@@ -24,10 +24,10 @@ afterEach(async () => {
 
 beforeEach(async () => {
   const keys = [
-    ...(await getRedisClient().keys(`${redisNamespace.limit}:auth:*`)),
-    ...(await getRedisClient().keys(`${redisNamespace.limit}:credentialChange:*`)),
+    ...(await redisClient().keys(`${redisNamespace.limit}:auth:*`)),
+    ...(await redisClient().keys(`${redisNamespace.limit}:credentialChange:*`)),
   ];
-  if (keys.length) await getRedisClient().del(...keys);
+  if (keys.length) await redisClient().del(...keys);
 });
 
 const json = { 'content-type': 'application/json' };

@@ -752,7 +752,7 @@ Supports dot notation for JSON paths: `'payload.canInvite'` on a `CronJob` locks
 
 `Entitlement` rows are immutable: an update naming `resource`, `actions`, `where`, `lens`, `sourcePath` or either axis is a 422; only `deletedAt` and `sourceDeletedAt` move.
 
-`getImmutableFields(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with dual polymorphism ids, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`fieldsRefusedAfterCreate`).
+`immutableFieldsForModel(model)` (`apps/api/src/hooks/immutableFields/registry.ts`) is the one list the hook strips: the global fields, the inferred FKs and the overrides, cached per model. Read it there rather than listing a model's fixed columns again. Every false-polymorphic axis field is added to it from `PolymorphismRegistry` (`polymorphismImmutableFields`, `apps/api/src/hooks/falsePolymorphism/toImmutableFields.ts`). On a model with dual polymorphism ids, the axis's FK columns and the materialized ones are also `refuse`d: an update that names one of them is a 422 "`<Model>.<field>` cannot change after create" instead of a silent strip (`fieldsRefusedAfterCreate`).
 
 ### Why Strip Instead of Throw?
 

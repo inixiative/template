@@ -12,7 +12,7 @@ const refetchHandoff = (id: string): WSChannelsHandoff => {
   };
 };
 
-const makeInquiry = (overrides = {}) => ({
+const sentInviteInquiry = (overrides = {}) => ({
   id: 'inq-1',
   type: 'inviteOrganizationUser' as const,
   status: 'sent' as const,
@@ -44,7 +44,7 @@ const makeInquiry = (overrides = {}) => ({
 describe('inviteOrganizationUserAppEvents', () => {
   describe('sent.email', () => {
     it('returns invitation email handoff', () => {
-      const inquiry = makeInquiry();
+      const inquiry = sentInviteInquiry();
       const handoffs = inviteOrganizationUserAppEvents.sent!.email!(inquiry as never);
 
       expect(handoffs).toHaveLength(1);
@@ -53,7 +53,7 @@ describe('inviteOrganizationUserAppEvents', () => {
     });
 
     it('returns null when no targetUserId', () => {
-      const inquiry = makeInquiry({ targetUserId: null });
+      const inquiry = sentInviteInquiry({ targetUserId: null });
       const handoffs = inviteOrganizationUserAppEvents.sent!.email!(inquiry as never);
       expect(handoffs).toBeNull();
     });
@@ -61,14 +61,16 @@ describe('inviteOrganizationUserAppEvents', () => {
 
   describe('sent.websocket', () => {
     it('refetches the inquiry the send touched', () => {
-      const events = inviteOrganizationUserAppEvents.sent!.websocket!(makeInquiry() as never);
+      const events = inviteOrganizationUserAppEvents.sent!.websocket!(sentInviteInquiry() as never);
       expect(events).toEqual([refetchHandoff('inq-1')]);
     });
   });
 
   describe('resolved.websocket', () => {
     it('refetches the inquiry the resolution touched', () => {
-      const events = inviteOrganizationUserAppEvents.resolved!.websocket!(makeInquiry() as never);
+      const events = inviteOrganizationUserAppEvents.resolved!.websocket!(
+        sentInviteInquiry() as never,
+      );
       expect(events).toEqual([refetchHandoff('inq-1')]);
     });
   });

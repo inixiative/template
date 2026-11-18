@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { makeLock } from '@template/db/lock/makeLock';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 
 const newId = () => `claim-${Bun.randomUUIDv7()}`;
@@ -36,7 +36,7 @@ describe('makeLock with heartbeat: false — one-shot claim', () => {
     const id = newId();
     await claim(id, 'first', 60).acquire();
     await sleep(140);
-    expect(await getRedisClient().get(keyFor(id))).toBeNull();
+    expect(await redisClient().get(keyFor(id))).toBeNull();
     expect(await claim(id, 'later', 60).acquire()).toEqual({ claimed: true, holder: 'later' });
   });
 

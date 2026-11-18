@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { createIntegration } from '#/modules/integration/services/createIntegration';
 import { spaceCreateIntegrationRoute } from '#/modules/space/routes/spaceCreateIntegration';
@@ -12,7 +12,7 @@ import { spaceCreateIntegrationRoute } from '#/modules/space/routes/spaceCreateI
 export const spaceCreateIntegrationController = makeController(
   spaceCreateIntegrationRoute,
   async (c, respond) => {
-    const space = getResource<'space'>(c);
+    const space = contextResource<'space'>(c);
     const body = c.req.valid('json');
 
     const row = {

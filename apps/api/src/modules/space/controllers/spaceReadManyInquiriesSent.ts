@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  */
 import { whereAxisCarriesOwnerKeys } from '@template/db';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
@@ -14,7 +14,7 @@ export const spaceReadManyInquiriesSentController = makeController(
   spaceReadManyInquiriesSentRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const space = getResource<'space'>(c);
+    const space = contextResource<'space'>(c);
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
         ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', {

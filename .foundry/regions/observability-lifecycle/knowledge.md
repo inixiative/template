@@ -182,7 +182,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | I'll nest the ids under a meta object; put the user id at the top level so it's searchable; nested objects flatten to JSON strings | **Top-level searchable identifiers** · rule docs/claude/LOGGING.md § Structured logging — Any log field queried in the backend, since OTLP serializes nested objects to JSON. | code `withLogContext`, `sendWebhook`, `serialize`, `withLogScope` | ids buried in nested objects (`{ meta: { userId } }`) that OTLP flattens to a JSON string (docs/claude/LOGGING.md § Structured logging) |
 | console.log in the API; I'll console.error this failure; use the logger, not console; all backend logging goes through one place | **Use the shared logger facade** · rule docs/claude/LOGGING.md § Structured logging — All application logging in API, worker and shared code. | code `withLogContext`, `sendWebhook`, `serialize`, `withLogScope` | `console.log` / `console.error` in API, worker or shared code (docs/claude/LOGGING.md § Structured logging; catalog log (packages/shared)) |
 
-- *Also here, by name:* FrontendScope (`packages/ui/src/lib/frontendLogger.ts`); LogScope (`packages/shared/src/logger/scope.ts`); consolaAdapter (`packages/shared/src/logger/consolaAdapter.ts`); getLogBroadcasts (`packages/shared/src/logger/scope.ts`); getLogContext (`packages/shared/src/logger/records.ts`); getLogScopes (`packages/shared/src/logger/scope.ts`); pinoAdapter (`packages/shared/src/logger/pinoAdapter.ts`); publishLogRecord (`packages/shared/src/logger/records.ts`)
+- *Also here, by name:* FrontendScope (`packages/ui/src/lib/frontendLogger.ts`); LogScope (`packages/shared/src/logger/scope.ts`); consolaAdapter (`packages/shared/src/logger/consolaAdapter.ts`); currentLogBroadcasts (`packages/shared/src/logger/scope.ts`); logContextFields (`packages/shared/src/logger/records.ts`); currentLogScopes (`packages/shared/src/logger/scope.ts`); pinoAdapter (`packages/shared/src/logger/pinoAdapter.ts`); publishLogRecord (`packages/shared/src/logger/records.ts`)
 
 ### Class `telemetry`: OpenTelemetry spans/metrics, browser telemetry, error reporter
 
@@ -421,7 +421,7 @@ The existing Sentry error-reporter adapter remains available independently; enab
 
 - ✅ **OpenTelemetry Integration** - OTLP-compatible distributed tracing and metrics ready to use. Auto-instruments HTTP requests (excluding `/health`) and Prisma queries when `OTEL_EXPORTER_OTLP_ENDPOINT` configured. Sends to any OTLP backend (BetterStack, Datadog, Honeycomb, etc.). Skipped in local/test to avoid performance overhead. Dynamic imports ensure zero cost when disabled
 
-- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`makeAdapterRouter`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
+- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`resolveAdapterForEnvironmentOrThrow`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
 
 ##### Environment & Secrets
 
@@ -453,7 +453,7 @@ The existing Sentry error-reporter adapter remains available independently; enab
 
 ##### Coming Soon
 
-- 🟡 **Adapter Primitives** (ticket INFRA-009) - `makeAdapterRouter` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
+- 🟡 **Adapter Primitives** (ticket INFRA-009) - `resolveAdapterForEnvironmentOrThrow` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
 
 - 🟣 **Product Analytics** (ticket INFRA-010) - User behavior tracking for product decisions. Evaluating OpenPanel, Mixpanel, or internal solution. Track page views, feature usage, funnels, retention
 

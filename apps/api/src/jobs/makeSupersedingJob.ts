@@ -6,7 +6,7 @@
  * @constructs jobHandler
  */
 import {
-  getJobSupersededBy,
+  fetchJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
   markJobSupersededBy,
@@ -58,8 +58,8 @@ export const makeSupersedingJob = <TPayload = void>(
     try {
       const supersededBy =
         job.id &&
-        ((await getJobSupersededBy(job.id)) ??
-          (parentId ? await getJobSupersededBy(parentId) : null));
+        ((await fetchJobSupersededBy(job.id)) ??
+          (parentId ? await fetchJobSupersededBy(parentId) : null));
       if (job.id && supersededBy) {
         await markJobSupersededBy(job.id, supersededBy);
         log.info(`Job ${job.id} already superseded before start`, LogScope.job);

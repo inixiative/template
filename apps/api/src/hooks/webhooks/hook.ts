@@ -33,7 +33,7 @@ export type WebhookPayload = {
   timestamp: string;
 };
 
-const getWebhookCallbacks = (subscriptions: WebhookSubscription[], payload: WebhookPayload) => {
+const webhookEnqueueCallbacks = (subscriptions: WebhookSubscription[], payload: WebhookPayload) => {
   return subscriptions.map((sub: WebhookSubscription) => async () => {
     await enqueueJob('sendWebhook', {
       subscriptionId: sub.id,
@@ -73,7 +73,7 @@ const processSingleRecord = (
     return [];
   }
 
-  const origin = auditActorContext.getScope()?.integrationId ?? null;
+  const origin = auditActorContext.currentActor()?.integrationId ?? null;
   const targets = origin
     ? subscriptions.filter((sub) => sub.integrationId !== origin)
     : subscriptions;
@@ -90,7 +90,7 @@ const processSingleRecord = (
     timestamp: new Date().toISOString(),
   };
 
-  return getWebhookCallbacks(targets, payload);
+  return webhookEnqueueCallbacks(targets, payload);
 };
 
 export const registerWebhookHook = () => {

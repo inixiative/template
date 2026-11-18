@@ -15,11 +15,11 @@ import {
 import { isCacheKeyPattern } from '@template/db/redis/cache/isCacheKeyPattern';
 import { clearExact } from '@template/db/redis/cache/queries/clearExact';
 import { validateCacheKeyHasNoUndefined } from '@template/db/redis/cache/validateCacheKeyHasNoUndefined';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import { sum } from 'lodash-es';
 
-const clearOne = (redis: ReturnType<typeof getRedisClient>, key: string): Promise<number> =>
+const clearOne = (redis: ReturnType<typeof redisClient>, key: string): Promise<number> =>
   clearExact(
     redis,
     { key, generationKey: generationKey(key), writtenKey: cacheWrittenMarkerKeyFor(key) },
@@ -32,7 +32,7 @@ export const clearCacheKeysMatchingPattern = async (pattern: string): Promise<nu
   const isPatternClear = isCacheKeyPattern(pattern);
 
   try {
-    const redis = getRedisClient();
+    const redis = redisClient();
 
     if (!isPatternClear) {
       const deleted = await clearOne(redis, pattern);

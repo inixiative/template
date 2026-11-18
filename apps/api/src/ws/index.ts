@@ -1,7 +1,7 @@
 // @wip — barrel for the in-flight ws/ rewrite (see pubsub.ts / handler.ts).
 
 export { acceptWebSocket, startStaleSweep, websocketHandler } from '#/ws/handler';
-export { drainConnections, getConnectionStats } from '#/ws/lifecycle';
+export { connectionStats, drainConnections } from '#/ws/lifecycle';
 export { canSubscribe } from '#/ws/probe';
 export {
   broadcast,

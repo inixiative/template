@@ -1805,7 +1805,7 @@ transfer) with a per-dependent disposition chosen by the **receiving** owner:
 - Storage client now exists as an adapter (`apps/api/src/lib/storage/`, see ADAPTERS.md) with
   `system`/`user` buckets, `presignPost` (content-length-range conditions), `presignGet`,
   `headObject`, `copyObject`, `deleteObject`, `tagObject` — section 11's s3Client/presign
-  services are partially built; NoopStorageClient should slot into `makeAdapterRouter` env
+  services are partially built; NoopStorageClient should slot into `resolveAdapterForEnvironmentOrThrow` env
   routing rather than being bespoke.
 - ReBAC step (section 6, step 2a) can be expressed as a rebac `file` entry delegating to the
   owner (Contact pattern), with per-row `permissionRules` JSON available for row-level

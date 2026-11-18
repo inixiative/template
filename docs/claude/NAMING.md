@@ -146,7 +146,7 @@ Two distinct meanings — **don't mix them**:
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getResource } from '#/lib/context/getResource'` |
+| Within an app | `#/` | `import { contextResource } from '#/lib/context/contextResource'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -155,14 +155,14 @@ Two distinct meanings — **don't mix them**:
 // apps/api/src/modules/user/routes/userCreate.ts
 import { db } from '@template/db';                    // Shared package
 import { log } from '@template/shared/logger';        // Shared package
-import { getResource } from '#/lib/context/getResource';    // Internal to app
+import { contextResource } from '#/lib/context/contextResource';    // Internal to app
 
 // packages/shared/src/logger/index.ts (top-level barrel)
 export { log } from './logger';                       // Relative OK here
 export { logScope } from './scope';
 
 // packages/shared/src/logger/logger.ts (NOT a barrel)
-import { getLogScopes } from '@template/shared/logger/scope';  // Use alias, not relative
+import { currentLogScopes } from '@template/shared/logger/scope';  // Use alias, not relative
 ```
 
 **Why `@template/` inside shared packages?** Ensures imports work the same whether you're inside or outside the package. Avoids confusing mixed conventions.

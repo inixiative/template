@@ -29,7 +29,7 @@ foreign-org record.
 - **Column projection** — `integrationRecordForeignKeyForModel(model: WebhookModel)` reads the registry axis.
   `PolymorphismRegistry` is now declared with `satisfies` instead of a type annotation, so its
   literal keys survive: a `WebhookModel` value with no FK in the axis is a compile error there.
-  Indexing by a runtime `ModelName` goes through `getPolymorphismConfig` (used by the factory and
+  Indexing by a runtime `ModelName` goes through `polymorphismConfigForModel` (used by the factory and
   `resolveFalsePolymorphismRef`).
 - **Only integration-owned subscriptions take part** (`subscription.integrationId != null`).
   Subscriptions without an integration keep the current circuit unchanged.

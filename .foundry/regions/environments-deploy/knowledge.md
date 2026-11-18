@@ -554,7 +554,7 @@ export const env = envSchema.parse(process.env);
 
 - ✅ **OpenTelemetry Integration** - OTLP-compatible distributed tracing and metrics ready to use. Auto-instruments HTTP requests (excluding `/health`) and Prisma queries when `OTEL_EXPORTER_OTLP_ENDPOINT` configured. Sends to any OTLP backend (BetterStack, Datadog, Honeycomb, etc.). Skipped in local/test to avoid performance overhead. Dynamic imports ensure zero cost when disabled
 
-- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`makeAdapterRouter`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
+- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`resolveAdapterForEnvironmentOrThrow`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
 
 ##### Environment & Secrets
 
@@ -586,7 +586,7 @@ export const env = envSchema.parse(process.env);
 
 ##### Coming Soon
 
-- 🟡 **Adapter Primitives** (ticket INFRA-009) - `makeAdapterRouter` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
+- 🟡 **Adapter Primitives** (ticket INFRA-009) - `resolveAdapterForEnvironmentOrThrow` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
 
 - 🟣 **Product Analytics** (ticket INFRA-010) - User behavior tracking for product decisions. Evaluating OpenPanel, Mixpanel, or internal solution. Track page views, feature usage, funnels, retention
 

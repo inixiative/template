@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { projectLens } from '@inixiative/json-rules';
-import { getPolymorphismConfig, RULE_REFERENCEABLE_MODELS } from '@template/db';
+import { polymorphismConfigForModel, RULE_REFERENCEABLE_MODELS } from '@template/db';
 import type { EmailOwnerModel } from '@template/db/generated/client/enums';
 import {
   EntitlementResourceModel,
@@ -76,7 +76,7 @@ describe('lens and registry agree on what a rule can reference', () => {
   });
 
   test('the targetModel enum and the registry carry the same models, one column each', () => {
-    const targetAxis = getPolymorphismConfig('RuleReference')?.axes.find(
+    const targetAxis = polymorphismConfigForModel('RuleReference')?.axes.find(
       (axis) => axis.field === 'targetModel',
     );
     expect(Object.keys(targetAxis?.fkMap ?? {}).sort()).toEqual(

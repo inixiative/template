@@ -52,7 +52,7 @@ The FE has ONE upload hook (`useFileUpload`) that implements the presign → upl
 
 Follows the **Option β pattern** used by `email/client/` and (after refactor) `errorReporter/`:
 
-- Root file (`storage/index.ts`) is the **adapter** — uses `makeAdapterRouter` from `@template/shared/adapter` for env-keyed selection.
+- Root file (`storage/index.ts`) is the **adapter** — uses `resolveAdapterForEnvironmentOrThrow` from `@template/shared/adapter` for env-keyed selection.
 - Providers live in a `client/` subfolder, one file per provider.
 - The interface (`StorageClient`) is in `types.ts` at the module root — provider-agnostic.
 
@@ -60,7 +60,7 @@ Follows the **Option β pattern** used by `email/client/` and (after refactor) `
 
 ```
 apps/api/src/lib/storage/
-├── index.ts              # env reads + makeAdapterRouter → exports `storage`
+├── index.ts              # env reads + resolveAdapterForEnvironmentOrThrow → exports `storage`
 ├── types.ts              # StorageClient interface, Bucket, all input/output types
 └── client/
     └── s3.ts             # createS3Client(config) — implements StorageClient via @aws-sdk/client-s3
@@ -89,7 +89,7 @@ Every input carries `bucket: Bucket` so a single adapter instance handles both `
 ### Adapter wiring (`storage/index.ts`)
 
 ```typescript
-import { makeAdapterRouter } from '@template/shared/adapter';
+import { resolveAdapterForEnvironmentOrThrow } from '@template/shared/adapter';
 import { createS3Client } from '#/lib/storage/client/s3';
 import type { StorageClient } from '#/lib/storage/types';
 
@@ -111,16 +111,16 @@ const s3 = createS3Client({
   },
 });
 
-export const storage = makeAdapterRouter<StorageClient>({
+export const storage = resolveAdapterForEnvironmentOrThrow<StorageClient>({
   default: s3,
 });
 ```
 
-All envs route to the same S3 client today (config differs per env via env vars). The `makeAdapterRouter` seam exists so env-divergent provider selection becomes a one-line change later (e.g., `test: noopStorage`) without touching application code.
+All envs route to the same S3 client today (config differs per env via env vars). The `resolveAdapterForEnvironmentOrThrow` seam exists so env-divergent provider selection becomes a one-line change later (e.g., `test: noopStorage`) without touching application code.
 
 ### Convention rule
 
-**Every adapter-pattern module in this codebase uses `makeAdapterRouter` at the root**, not a direct client export. Same shape as `errorReporter/index.ts`. Use `makeBroadcastRegistry` only when fan-out across multiple providers is needed (e.g., messaging across channels) — storage is pick-one-per-env, not fan-out.
+**Every adapter-pattern module in this codebase uses `resolveAdapterForEnvironmentOrThrow` at the root**, not a direct client export. Same shape as `errorReporter/index.ts`. Use `makeBroadcastRegistry` only when fan-out across multiple providers is needed (e.g., messaging across channels) — storage is pick-one-per-env, not fan-out.
 
 ---
 
@@ -437,7 +437,7 @@ Plus a setup step to create the CI test buckets before tests run.
 - [x] Add `STORAGE_*` vars to `.env.local.example` and `.env.test.example`
 - [x] Define `StorageClient` interface in `apps/api/src/lib/storage/types.ts`
 - [x] Implement `createS3Client(config)` in `apps/api/src/lib/storage/client/s3.ts` using `@aws-sdk/client-s3`
-- [x] Wire `storage/index.ts` with env reads + `makeAdapterRouter`
+- [x] Wire `storage/index.ts` with env reads + `resolveAdapterForEnvironmentOrThrow`
 - [x] Refactor `errorReporter/` to Option β (providers under `client/`, `create*` naming) — pattern parity
 - [x] `mc-init` auto-creates slot-0 buckets via compose (no separate `bun run setup` step needed)
 - [x] Update `scripts/worktree/create.sh` — slot-derived bucket vars + creation block
@@ -486,7 +486,7 @@ FEAT-009 imports `StorageClient` from this module and builds the application lay
 ## 13. References
 
 - INFRA-001 (Init Script) — owns the Railway provisioning wizard
-- INFRA-009 (Adapter Primitives) — provides `makeAdapterRouter`/`makeAdapterRegistry` if multi-adapter ever needed
+- INFRA-009 (Adapter Primitives) — provides `resolveAdapterForEnvironmentOrThrow`/`makeAdapterRegistry` if multi-adapter ever needed
 - FEAT-009 §11 (File Management — Infrastructure) — downstream consumer
 - `scripts/worktree/create.sh` — slot pattern this ticket mirrors
 - `scripts/worktree/destroy.sh` — teardown counterpart

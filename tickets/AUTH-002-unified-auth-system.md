@@ -281,7 +281,7 @@ const EmailInput = () => {
   - [x] `authProviderUpdate.ts` - Update org provider (with validatePermission)
   - [x] `authProviderDelete.ts` - Delete org provider (with validatePermission)
 - [x] Implement `authProviderService.ts`
-  - [x] `getPlatformProviders()` - Load from env vars
+  - [x] `configuredPlatformProviders()` - Load from env vars
   - [x] `getAuthProvidersForOrg()` - Merge platform + org
   - [x] `createAuthProvider()` - Create with encryption
   - [x] `updateAuthProvider()` - Update with encryption

@@ -102,7 +102,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Standardized Response Shape** - Route templates enforce consistent structure: `{ data, pagination, error? }`. Every endpoint returns the same shape automatically, so your frontend handles all API responses with the same code and TypeScript knows exactly what to expect. Errors include guidance text to help users fix issues. No manual response formatting needed.
 
-- ✅ **Resource Context Middleware** - Routes with `:id` params auto-load the resource into request context using `getResource()`. Supports custom lookup queries (find by email, slug, etc.) and Prisma `include` options per route. No more fetching the same record in middleware and controller. Handles 404s automatically if resource doesn't exist.
+- ✅ **Resource Context Middleware** - Routes with `:id` params auto-load the resource into request context using `contextResource()`. Supports custom lookup queries (find by email, slug, etc.) and Prisma `include` options per route. No more fetching the same record in middleware and controller. Handles 404s automatically if resource doesn't exist.
 
 - ✅ **Request Context Scoping** - Every request gets isolated context (AppEnv) containing db client, authenticated user, current org/space, and permissions. Context flows through all middleware and controllers without manual passing. Prevents cross-tenant data leaks since context is scoped per-request.
 
@@ -659,7 +659,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **OpenTelemetry Integration** - OTLP-compatible distributed tracing and metrics ready to use. Auto-instruments HTTP requests (excluding `/health`) and Prisma queries when `OTEL_EXPORTER_OTLP_ENDPOINT` configured. Sends to any OTLP backend (BetterStack, Datadog, Honeycomb, etc.). Skipped in local/test to avoid performance overhead. Dynamic imports ensure zero cost when disabled
 
-- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`makeAdapterRouter`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
+- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`resolveAdapterForEnvironmentOrThrow`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
 
 ### Environment & Secrets
 
@@ -695,7 +695,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Coming Soon
 
-- 🟡 **Adapter Primitives** (ticket INFRA-009) - `makeAdapterRouter` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
+- 🟡 **Adapter Primitives** (ticket INFRA-009) - `resolveAdapterForEnvironmentOrThrow` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
 
 - 🟣 **Product Analytics** (ticket INFRA-010) - User behavior tracking for product decisions. Evaluating OpenPanel, Mixpanel, or internal solution. Track page views, feature usage, funnels, retention
 

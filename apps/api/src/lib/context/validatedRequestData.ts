@@ -25,18 +25,18 @@ export type ValidatedContext<TTarget extends keyof ValidationTargets, TData = un
   Input & { out: Record<TTarget, TData> }
 >;
 
-export function getValidatedBody<C extends ValidatedContext<'json', unknown>>(
+export function validatedBody<C extends ValidatedContext<'json', unknown>>(
   c: C,
 ): InputToDataByTarget<ContextOut<C>, 'json'>;
-export function getValidatedBody<T = Record<string, unknown>>(c: Context<AppEnv>): T;
-export function getValidatedBody<T = Record<string, unknown>>(c: Context<AppEnv>): T {
+export function validatedBody<T = Record<string, unknown>>(c: Context<AppEnv>): T;
+export function validatedBody<T = Record<string, unknown>>(c: Context<AppEnv>): T {
   return c.req.valid('json' as never) as T;
 }
 
-export function getValidatedQuery<C extends ValidatedContext<'query', unknown>>(
+export function validatedQuery<C extends ValidatedContext<'query', unknown>>(
   c: C,
 ): InputToDataByTarget<ContextOut<C>, 'query'>;
-export function getValidatedQuery<T = Record<string, unknown>>(c: Context<AppEnv>): T;
-export function getValidatedQuery<T = Record<string, unknown>>(c: Context<AppEnv>): T {
+export function validatedQuery<T = Record<string, unknown>>(c: Context<AppEnv>): T;
+export function validatedQuery<T = Record<string, unknown>>(c: Context<AppEnv>): T {
   return c.req.valid('query' as never) as T;
 }

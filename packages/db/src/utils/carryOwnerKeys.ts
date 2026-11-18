@@ -11,9 +11,9 @@ import {
   modelWhoseOwnerKeysAreCarried,
 } from '@template/db/registries/carriedOwnerKeys';
 import {
-  getPolymorphismConfig,
   type PolymorphicValue,
   polymorphicAxis,
+  polymorphismConfigForModel,
 } from '@template/db/registries/falsePolymorphism';
 import { polymorphicKeyColumn } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
@@ -21,7 +21,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 type Row = Record<string, unknown>;
 
 export const carryOwnerKeys = async (model: ModelName, row: Row): Promise<void> => {
-  for (const axis of getPolymorphismConfig(model)?.axes ?? []) {
+  for (const axis of polymorphismConfigForModel(model)?.axes ?? []) {
     const value = row[axis.field] as PolymorphicValue;
     const carriedFrom = modelWhoseOwnerKeysAreCarried(axis, value);
     if (!carriedFrom) continue;

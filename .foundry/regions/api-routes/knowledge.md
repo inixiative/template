@@ -418,12 +418,12 @@ authProvider/
 ```typescript
 // controllers/authProviderReadMany.ts
 import { makeController } from '#/lib/utils/makeController';
-import { getPlatformProviders } from '#/lib/auth/platformProviders';
+import { configuredPlatformProviders } from '#/lib/auth/platformProviders';
 
 export const authProviderReadManyController = makeController(
   authProviderReadManyRoute,
   async (_c, respond) => {
-    const platformProviders = getPlatformProviders();
+    const platformProviders = configuredPlatformProviders();
     return respond.ok(platformProviders);
   },
 );
@@ -437,13 +437,13 @@ export const authProviderReadManyController = makeController(
 // organization/controllers/organizationCreateAuthProvider.ts
 import { db, organizationId, userId } from '@template/db';
 import { encryptField } from '@template/db/lib/encryption/fieldEncryption';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 
 export const organizationCreateAuthProviderController = makeController(
   organizationCreateAuthProviderRoute,
   async (c, respond) => {
-    const org = getResource<'organization'>(c);
+    const org = contextResource<'organization'>(c);
     const user = c.get('user')!;
     const { secrets, ...body } = c.req.valid('json');
 
@@ -479,22 +479,22 @@ export const organizationCreateAuthProviderController = makeController(
 
 ```typescript
 // organization/controllers/organizationReadAuthProvider.ts
-import { getResource } from '#/lib/context/getResource';
-import { getPlatformProviders } from '#/lib/auth/platformProviders';
+import { contextResource } from '#/lib/context/contextResource';
+import { configuredPlatformProviders } from '#/lib/auth/platformProviders';
 import { check, rebacSchema } from '@template/permissions/rebac';
 
 export const organizationReadAuthProviderController = makeController(
   organizationReadAuthProviderRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const organization = getResource(c);
+    const organization = contextResource(c);
     const user = c.get('user');
     const permix = c.get('permix');
 
     // Owners see all providers (enabled + disabled), others see only enabled
     const isOwner = user && check(permix, rebacSchema, 'organization', organization, 'own');
 
-    const platformProviders = getPlatformProviders();
+    const platformProviders = configuredPlatformProviders();
 
     const orgProviders = await db.authProvider.findMany({
       where: {
@@ -696,7 +696,7 @@ An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand
 
 - ✅ **Standardized Response Shape** - Route templates enforce consistent structure: `{ data, pagination, error? }`. Every endpoint returns the same shape automatically, so your frontend handles all API responses with the same code and TypeScript knows exactly what to expect. Errors include guidance text to help users fix issues. No manual response formatting needed.
 
-- ✅ **Resource Context Middleware** - Routes with `:id` params auto-load the resource into request context using `getResource()`. Supports custom lookup queries (find by email, slug, etc.) and Prisma `include` options per route. No more fetching the same record in middleware and controller. Handles 404s automatically if resource doesn't exist.
+- ✅ **Resource Context Middleware** - Routes with `:id` params auto-load the resource into request context using `contextResource()`. Supports custom lookup queries (find by email, slug, etc.) and Prisma `include` options per route. No more fetching the same record in middleware and controller. Handles 404s automatically if resource doesn't exist.
 
 - ✅ **Request Context Scoping** - Every request gets isolated context (AppEnv) containing db client, authenticated user, current org/space, and permissions. Context flows through all middleware and controllers without manual passing. Prevents cross-tenant data leaks since context is scoped per-request.
 

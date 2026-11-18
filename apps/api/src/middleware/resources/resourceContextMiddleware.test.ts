@@ -7,7 +7,7 @@ import {
   createOrganization,
   createUser,
 } from '@template/db/test';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { readRoute, updateRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
@@ -27,7 +27,7 @@ const orgReadRoute = readRoute({
 });
 
 const orgReadController = makeController(orgReadRoute, async (c, respond) => {
-  const resource = getResource<'organization'>(c);
+  const resource = contextResource<'organization'>(c);
   return respond.ok(resource);
 });
 
@@ -39,7 +39,7 @@ const cronJobReadRoute = readRoute({
 });
 
 const cronJobReadController = makeController(cronJobReadRoute, async (c, respond) => {
-  const resource = getResource<'cronJob'>(c);
+  const resource = contextResource<'cronJob'>(c);
   return respond.ok(resource);
 });
 
@@ -52,7 +52,7 @@ const orgHistoryRoute = readRoute({
 });
 
 const orgHistoryController = makeController(orgHistoryRoute, async (c, respond) => {
-  const resource = getResource<'organization'>(c);
+  const resource = contextResource<'organization'>(c);
   return respond.ok(resource);
 });
 
@@ -66,7 +66,7 @@ const orgReviveRoute = updateRoute({
 });
 
 const orgReviveController = makeController(orgReviveRoute, async (c, respond) => {
-  const resource = getResource<'organization'>(c);
+  const resource = contextResource<'organization'>(c);
   const revived = await c
     .get('db')
     .organization.update({ where: { id: resource.id }, data: { deletedAt: null } });

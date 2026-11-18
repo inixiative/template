@@ -11,21 +11,21 @@ import { prismaMap } from '@template/db/generated/prismaMap';
 // structural PrismaMap shape, as prismaMapRelations does.
 const MAP = prismaMap.models as unknown as PrismaMap;
 
-const getField = (modelName: string, fieldName: string): ModelField | undefined =>
+const fieldOfModel = (modelName: string, fieldName: string): ModelField | undefined =>
   MAP[modelName]?.fields?.[fieldName];
 
 export const modelFields = (modelName: string): Record<string, ModelField> | undefined =>
   MAP[modelName]?.fields;
 
 export const hasDeletedAt = (modelName: string): boolean =>
-  getField(modelName, 'deletedAt') !== undefined;
+  fieldOfModel(modelName, 'deletedAt') !== undefined;
 
 export const lookupField = (modelName: string, path: string): ModelField | undefined => {
   const segments = path.split('.');
   let currentModel: string | undefined = modelName;
   for (let i = 0; i < segments.length; i += 1) {
     if (!currentModel) return undefined;
-    const field = getField(currentModel, segments[i]);
+    const field = fieldOfModel(currentModel, segments[i]);
     if (!field) return undefined;
     if (i === segments.length - 1) return field;
     if (field.kind !== 'object') return undefined;

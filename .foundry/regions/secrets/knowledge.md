@@ -111,7 +111,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | commit the staging env file; real secret values in the repo; which env files are okay to check in; example env files only | **No committed env files** · rule FEATURES.md › Environment & Secrets — all apps and environments (pr, staging, prod) | part 4 | committing a .env.staging / .env.prod or real secret values instead of the .env.*.example files plus Infisical (FEATURES.md § Infrastructure & DevOps › Infisical Secrets Management) |
 | Secrets never go in command arguments, where process listings and error messages expose them. | **No secrets in command arguments** · rule init/utils/exec.ts — Any init CLI or HTTP call that carries a token, password or connection string. | part 4 | — |
 | Only withThrowawaySession may import cookie signers or reference createSession; elsewhere fails CI. | **Only withThrowawaySession builds session credentials** · rule scripts/ci/rules/lib/bearerOnlyAuth.ts (bearer-only-auth fence) — Any code touching BetterAuth session credentials. | part 4 | — |
-| hash the provider secret like a password; the server must replay this secret to a third party; reversible storage for a credential we send onward; hash or encrypt this token | **Provider credentials encrypted, never hashed** · rule docs/claude/AUTH.md § Multi-Provider Authentication (AuthProvider) › Encryption — Storing any credential the server must later use to call a provider | code `AuthProvider`, `encryptField`, `decryptField`, `getPlatformProviders` | hashing a provider secret that must be replayed to a third party (docs/claude/AUTH.md › Encryption) |
+| hash the provider secret like a password; the server must replay this secret to a third party; reversible storage for a credential we send onward; hash or encrypt this token | **Provider credentials encrypted, never hashed** · rule docs/claude/AUTH.md § Multi-Provider Authentication (AuthProvider) › Encryption — Storing any credential the server must later use to call a provider | code `AuthProvider`, `encryptField`, `decryptField`, `configuredPlatformProviders` | hashing a provider secret that must be replayed to a third party (docs/claude/AUTH.md › Encryption) |
 | telemetry key in the browser build; which secrets can the frontend see; the logging token belongs on the API only | **Provider credentials only in /api secrets** · rule docs/claude/LOGGING.md § Setup — Any telemetry secret or browser build variable. | part 4 | — |
 | return 404 so non-members can't tell it exists; the lookup runs before the permission check; hide whether the resource exists | **Resource existence is non-secret** · rule docs/claude/PERMISSIONS.md § Validation Middleware › validatePermission — Any route loading a resource by id | code `validateSubmodelPermission`, `rebacSchema`, `resourceContextMiddleware`, `schemaMap` | — |
 | the response includes the encrypted columns; return the decrypted secret in the API; strip the secret from the response schema; secrets at rest, omitted from responses | **Secrets encrypted, never returned** · rule CLAUDE.md §7 Core Engineering Standards — Any credential or secret field. | part 4 | a response schema or select that returns encryptedSecrets / metadata / version columns or the decrypted secret (CLAUDE.md §7 Core Engineering Standards; docs/claude/AUTH.md Operations (secrets omitted)) |
@@ -133,7 +133,7 @@ Each unit is the doc section verbatim, with its headings shifted down two levels
 
 Two sources of providers:
 
-1. **Platform providers** — not rows. `getPlatformProviders()` (`apps/api/src/lib/auth/platformProviders.ts`) lists Google and GitHub when their `*_CLIENT_ID` / `*_CLIENT_SECRET` env vars are set. Only Google is wired into BetterAuth `socialProviders` today.
+1. **Platform providers** — not rows. `configuredPlatformProviders()` (`apps/api/src/lib/auth/platformProviders.ts`) lists Google and GitHub when their `*_CLIENT_ID` / `*_CLIENT_SECRET` env vars are set. Only Google is wired into BetterAuth `socialProviders` today.
 2. **Organization providers** — `AuthProvider` rows, one org each, secrets encrypted.
 
 ##### Database Schema
@@ -493,7 +493,7 @@ See [ENVIRONMENTS.md](ENVIRONMENTS.md) for full environment configuration.
 
 - ✅ **OpenTelemetry Integration** - OTLP-compatible distributed tracing and metrics ready to use. Auto-instruments HTTP requests (excluding `/health`) and Prisma queries when `OTEL_EXPORTER_OTLP_ENDPOINT` configured. Sends to any OTLP backend (BetterStack, Datadog, Honeycomb, etc.). Skipped in local/test to avoid performance overhead. Dynamic imports ensure zero cost when disabled
 
-- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`makeAdapterRouter`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
+- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`resolveAdapterForEnvironmentOrThrow`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
 
 ##### Environment & Secrets
 
@@ -525,7 +525,7 @@ See [ENVIRONMENTS.md](ENVIRONMENTS.md) for full environment configuration.
 
 ##### Coming Soon
 
-- 🟡 **Adapter Primitives** (ticket INFRA-009) - `makeAdapterRouter` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
+- 🟡 **Adapter Primitives** (ticket INFRA-009) - `resolveAdapterForEnvironmentOrThrow` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
 
 - 🟣 **Product Analytics** (ticket INFRA-010) - User behavior tracking for product decisions. Evaluating OpenPanel, Mixpanel, or internal solution. Track page views, feature usage, funnels, retention
 

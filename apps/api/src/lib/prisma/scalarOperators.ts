@@ -29,14 +29,14 @@ const DEFAULT_OP_BY_TYPE: Record<string, string> = {
   String: 'contains',
 };
 
-export const getValidOperators = (field: ModelField): readonly string[] => {
+export const validOperatorsForField = (field: ModelField): readonly string[] => {
   if (field.kind === 'enum') return ENUM_OPS;
   if (field.kind !== 'scalar') return [];
   return OPERATORS_BY_TYPE[field.type] ?? [];
 };
 
-export const getDefaultOperator = (field: ModelField): string =>
+export const defaultOperatorForField = (field: ModelField): string =>
   field.kind === 'scalar' ? (DEFAULT_OP_BY_TYPE[field.type] ?? 'equals') : 'equals';
 
 export const isValidOperatorForField = (field: ModelField, operator: string): boolean =>
-  getValidOperators(field).includes(operator);
+  validOperatorsForField(field).includes(operator);

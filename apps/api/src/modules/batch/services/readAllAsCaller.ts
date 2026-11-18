@@ -38,7 +38,7 @@ export const readAllAsCaller = async (
       return body as ReadBody;
     },
     {
-      getItems: (body) => castArray(body.data),
+      itemsOfResponse: (body) => castArray(body.data),
       maxPages,
       onResponse: (body) => {
         paginated ||= body.pagination !== undefined;

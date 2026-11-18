@@ -1,6 +1,6 @@
 export {
   claimLane,
-  getJobSupersededBy,
+  fetchJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
   markJobSupersededBy,

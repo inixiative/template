@@ -4,7 +4,7 @@
  * @partOf feature:integrations
  * @uses primitive:routeTemplates
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationDeleteRoute } from '#/modules/integration/routes/integrationDelete';
 
@@ -12,7 +12,7 @@ export const integrationDeleteController = makeController(
   integrationDeleteRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const integration = getResource<'integration'>(c);
+    const integration = contextResource<'integration'>(c);
     await db.integration.update({ where: { id: integration.id }, data: { deletedAt: new Date() } });
     return respond.noContent();
   },

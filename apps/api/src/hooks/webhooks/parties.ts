@@ -7,10 +7,10 @@ import {
   type BindableOwnerModel,
   db,
   type FalsePolymorphismRef,
-  getPolymorphismConfig,
   isBindableOwnerModel,
   isFalsePolymorphismRef,
   polymorphicKeyColumn,
+  polymorphismConfigForModel,
   rowPolymorphicAxisPointsAt,
   webhookEnabledModels,
   webhookRelatedModels,
@@ -27,7 +27,7 @@ const axisParty = (model: WebhookModel, row: Record<string, unknown>, axis: stri
 };
 
 const partyAxes = (model: WebhookModel) =>
-  (getPolymorphismConfig(model)?.axes ?? []).map(({ field }) => field);
+  (polymorphismConfigForModel(model)?.axes ?? []).map(({ field }) => field);
 
 export const webhookPartiesOfRow = (model: WebhookModel, row: Record<string, unknown>): Party[] =>
   partyAxes(model).flatMap((axis) => axisParty(model, row, axis));

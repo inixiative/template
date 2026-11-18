@@ -445,7 +445,7 @@ component that could swallow the children. Both routes render `SegmentsPage` wit
 
 **Location:** `packages/ui/src/guards/`
 
-`createAuthGuards(getStore)` (`authGuard.ts`) returns two `beforeLoad` guards. Both run `auth.initialize()` first.
+`createAuthGuards(currentAppStore)` (`authGuard.ts`) returns two `beforeLoad` guards. Both run `auth.initialize()` first.
 
 - `redirectToLoginUnlessAuthenticated` — unauthenticated → redirect to `/login` with `redirectTo` (path + search + hash) and the `org` / `space` / `spoof` params carried over.
 - `redirectAuthenticatedUserAwayFromPublicPage` — authenticated → redirect to `redirectTo` or `/dashboard`.
@@ -516,8 +516,8 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **currentPath** `packages/ui/src/lib/currentLocation.ts#currentPath` [primitive] return the current pathname plus search and hash as one string Use: const path = currentPath();
 - **FullscreenLayout** `packages/ui/src/components/layout/FullscreenLayout.tsx#FullscreenLayout` [primitive] render a full-page view whose back button keeps org, space and spoof context Use: <FullscreenLayout>{children}</FullscreenLayout>
 - **HomePage** `packages/ui/src/pages/HomePage.tsx#HomePage` [primitive] render the landing page with project name, optional subtitle and signup link Use: <HomePage subtitle="..." showSignUp={false} />
-- **navigateToLogin** `packages/ui/src/lib/routeRedirect.ts#navigateToLogin` [primitive] send user to login, keeping redirectTo or current search and hash Use: navigateToLogin(getStore, true)
-- **navigateToSignUp** `packages/ui/src/lib/routeRedirect.ts#navigateToSignUp` [primitive] send user to signup, keeping redirectTo or current search and hash Use: navigateToSignUp(getStore, true)
+- **navigateToLogin** `packages/ui/src/lib/routeRedirect.ts#navigateToLogin` [primitive] send user to login, keeping redirectTo or current search and hash Use: navigateToLogin(currentAppStore, true)
+- **navigateToSignUp** `packages/ui/src/lib/routeRedirect.ts#navigateToSignUp` [primitive] send user to signup, keeping redirectTo or current search and hash Use: navigateToSignUp(currentAppStore, true)
 - **OrganizationsPage** `packages/ui/src/pages/OrganizationsPage.tsx#OrganizationsPage` [primitive] list organizations the current user can access, gated by store permissions Use: <OrganizationsPage />
 - **OrganizationUsersPage** `packages/ui/src/pages/OrganizationUsersPage.tsx#OrganizationUsersPage` [primitive] list an organization's users and open the invite modal Use: <OrganizationUsersPage organizationId={organizationId} />
 - **ProfilePage** `packages/ui/src/pages/ProfilePage.tsx#ProfilePage` [primitive] render the profile view matching the current tenant context type Use: <ProfilePage />

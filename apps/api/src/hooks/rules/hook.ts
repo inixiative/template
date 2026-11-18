@@ -14,7 +14,7 @@ import {
 } from '@template/db';
 import { castArray, without } from 'lodash-es';
 import { applyWriteDataOverPreviousRow } from '#/hooks/rules/applyWriteDataOverPreviousRow';
-import { getRule, RulesRegistry } from '#/hooks/rules/registry';
+import { RulesRegistry, ruleForModel } from '#/hooks/rules/registry';
 import { makeError } from '#/lib/errors';
 
 const evaluate = (rule: Condition, row: Record<string, unknown>): boolean | string => {
@@ -27,7 +27,7 @@ const evaluate = (rule: Condition, row: Record<string, unknown>): boolean | stri
 
 const validateRules = (data: Record<string, unknown>, model: ModelName): void => {
   const result = evaluate(
-    getRule(model),
+    ruleForModel(model),
     Object.fromEntries(
       Object.entries(data).map(([field, value]) => [field, isPrismaNull(value) ? null : value]),
     ),
@@ -96,7 +96,7 @@ export const registerRulesHook = () => {
     HookTiming.after,
     [DbAction.updateManyAndReturn],
     async ({ model, result }) => {
-      const rule = getRule(model);
+      const rule = ruleForModel(model);
       if (rule === true) return;
 
       for (const record of result as Record<string, unknown>[]) {

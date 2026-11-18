@@ -7,7 +7,7 @@
 - [What an adapter module is](#what-an-adapter-module-is)
 - [Module layout](#module-layout)
 - [Adapter primitives](#adapter-primitives)
-  - [makeAdapterRouter — pick-one per environment](#makeadapterrouter--pick-one-per-environment)
+  - [resolveAdapterForEnvironmentOrThrow — pick-one per environment](#resolveadapterforenvironmentorthrow--pick-one-per-environment)
   - [makeBroadcastRegistry — fan-out across providers](#makebroadcastregistry--fan-out-across-providers)
   - [makeAdapterRegistry — named map](#makeadapterregistry--named-map)
 - [Naming conventions](#naming-conventions)
@@ -43,7 +43,7 @@ This is the canonical structure. All new adapter modules follow it.
 
 ```
 <moduleName>/
-├── index.ts              # env reads + makeAdapterRouter → exports the adapter
+├── index.ts              # env reads + resolveAdapterForEnvironmentOrThrow → exports the adapter
 ├── types.ts              # The interface (role-based name: ErrorReporter, StorageClient, EmailClient)
 └── client/
     ├── <provider1>.ts    # createXClient(config) — implements the interface
@@ -61,18 +61,18 @@ Why `client/` as a subfolder:
 
 All in `@template/shared/adapter`. Pick based on selection semantics.
 
-### makeAdapterRouter — pick-one per environment
+### resolveAdapterForEnvironmentOrThrow — pick-one per environment
 
 Use when: **one provider runs per environment**. The router selects by `process.env.ENVIRONMENT`. This is the default — most adapter modules.
 
 ```typescript
-import { makeAdapterRouter } from '@template/shared/adapter';
+import { resolveAdapterForEnvironmentOrThrow } from '@template/shared/adapter';
 import { createS3Client } from '#/lib/storage/client/s3';
 import type { StorageClient } from '#/lib/storage/types';
 
 const s3 = createS3Client({ /* env-derived config */ });
 
-export const storage = makeAdapterRouter<StorageClient>({
+export const storage = resolveAdapterForEnvironmentOrThrow<StorageClient>({
   prod: s3,
   staging: s3,
   pr: s3,
@@ -80,7 +80,7 @@ export const storage = makeAdapterRouter<StorageClient>({
 });
 ```
 
-Even with a single provider, route through `makeAdapterRouter`. The seam exists for future env-divergent behavior (e.g., `test: noopStorage` later) without touching application code.
+Even with a single provider, route through `resolveAdapterForEnvironmentOrThrow`. The seam exists for future env-divergent behavior (e.g., `test: noopStorage` later) without touching application code.
 
 ### makeBroadcastRegistry — fan-out across providers
 
@@ -122,12 +122,12 @@ The `__` prefix is the template-wide convention for **internal/private** items (
 
 | Module | Path | Primitive | Providers |
 |---|---|---|---|
-| Error reporting | `apps/api/src/lib/errorReporter/` | `makeAdapterRouter` | console, sentry |
-| Storage | `apps/api/src/lib/storage/` | `makeAdapterRouter` | s3 (only) |
+| Error reporting | `apps/api/src/lib/errorReporter/` | `resolveAdapterForEnvironmentOrThrow` | console, sentry |
+| Storage | `apps/api/src/lib/storage/` | `resolveAdapterForEnvironmentOrThrow` | s3 (only) |
 | Email | `packages/email/src/client/` | direct factory | console, resend |
 | Messaging providers | `apps/api/src/lib/messaging/providers.ts` | `makeBroadcastRegistry` | per-channel |
 
-Email uses a direct factory (`createConsoleClient`/`createResendClient`) instead of `makeAdapterRouter` because consumers pick the provider explicitly per email (different tenant orgs can have different API keys). Storage and errorReporter pick once per environment — hence the router.
+Email uses a direct factory (`createConsoleClient`/`createResendClient`) instead of `resolveAdapterForEnvironmentOrThrow` because consumers pick the provider explicitly per email (different tenant orgs can have different API keys). Storage and errorReporter pick once per environment — hence the router.
 
 ---
 
@@ -146,7 +146,7 @@ If none apply, skip the abstraction — just import the library directly. Adapte
 ## What NOT to do
 
 - **Don't bake env reads into provider files.** Env vars belong in the module's `index.ts` only. Providers receive a typed config object.
-- **Don't return a direct provider from `index.ts`.** Wrap through `makeAdapterRouter` for env-keyed selection, even if all envs map to the same provider today. The seam is the point.
+- **Don't return a direct provider from `index.ts`.** Wrap through `resolveAdapterForEnvironmentOrThrow` for env-keyed selection, even if all envs map to the same provider today. The seam is the point.
 - **Don't add a `noop` adapter as a registered provider.** Mocks belong at the interface level via `vi.mock()`. A `noop` adapter in the production registry is dishonest — production code could accidentally select it.
 - **Don't include auth/permission logic in adapters.** Adapters are mechanical — they sign URLs, send bytes, talk to APIs. Policy (who can call what) lives at the route/middleware layer where permix is wired.
 - **Don't use a `Map<config, client>` singleton when there's only one config.** That pattern (see `packages/email/src/client/resend.ts`) exists because email supports per-tenant API keys. For single-config adapters (storage, errorReporter), a plain `let __client = null` module-level singleton is correct.

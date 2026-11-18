@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   cacheKey,
   flushRedis,
-  getRedisClient,
   makeRollingCache,
+  redisClient,
   redisNamespace,
   unregisterRollingCache,
 } from '@template/db';
@@ -67,7 +67,7 @@ describe('fetchRollingCacheAndQueueRefreshWhenMissing', () => {
   it('a stale cache queues a refresh behind the value it serves', async () => {
     const { rollingCache, runs } = makeCountingCache();
     await rollingCache.refresh();
-    await getRedisClient().set(
+    await redisClient().set(
       `${redisNamespace.cacheWritten}:${rollingCache.results.value()}`,
       String(Date.now() - 86_400_000),
     );

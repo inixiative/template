@@ -6,7 +6,7 @@
  */
 import type { Prisma } from '@template/db';
 import { emitAppEvent } from '#/appEvents/emit';
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { attachRuleHealthToSegment } from '#/modules/segment/services/attachRuleHealthToSegments';
 import { spaceCreateSegmentRoute } from '#/modules/space/routes/spaceCreateSegment';
@@ -15,7 +15,7 @@ export const spaceCreateSegmentController = makeController(
   spaceCreateSegmentRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const space = getResource<'space'>(c);
+    const space = contextResource<'space'>(c);
     const body = c.req.valid('json');
 
     const segment = await db.segment.create({

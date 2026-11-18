@@ -15,7 +15,10 @@ import type { Sender } from '#/lib/email/sender';
 import { senderToOwnerScope } from '#/lib/emailTemplate';
 import { canDeliver } from '#/lib/messaging/canDeliver';
 import { fetchUsersMatchingRuleWithContacts } from '#/lib/messaging/fetchUsersMatchingRuleWithContacts';
-import { getMessageProviderAdapter, type MessageContent } from '#/lib/messaging/providers';
+import {
+  type MessageContent,
+  messageProviderAdapterForContactType,
+} from '#/lib/messaging/providers';
 import { restrictRuleToSenderMembers } from '#/lib/messaging/senderTargeting';
 
 export type MessageUserPayload = {
@@ -57,7 +60,7 @@ export const messageUser = makeJob<MessageUserPayload>(async (_ctx, payload) => 
     for (const contact of user.contacts) {
       if (!canDeliver(kind, contact)) continue;
 
-      const adapter = getMessageProviderAdapter(contact.type);
+      const adapter = messageProviderAdapterForContactType(contact.type);
       if (!adapter) throw new Error(`No message provider adapter for contact.type=${contact.type}`);
 
       await adapter(contact, rendered, kind, {});

@@ -13,7 +13,7 @@ import {
   isWrittenInTransaction,
   onOverlayKey,
 } from '@template/db/redis/cache/transactionOverlay/cacheOverlay';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import superjson from 'superjson';
 
 export const readInTransaction = <T>(
@@ -30,7 +30,7 @@ export const readInTransaction = <T>(
       return superjson.parse<T>(held.payload);
     }
 
-    const redis = getRedisClient();
+    const redis = redisClient();
     if (!isWrittenInTransaction(overlay, key)) {
       const cached = await readCached<T>(redis, key);
       setResult(cached.result);

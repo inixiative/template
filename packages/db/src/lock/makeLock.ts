@@ -30,7 +30,7 @@ import type {
   LockRedis,
   LockReleaseResult,
 } from '@template/db/lock/types';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import { startHeartbeat } from '@template/shared/utils';
 import { uuidv7 } from 'uuidv7';
@@ -42,9 +42,9 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 export function makeLock(opts: ClaimOptions): Claim;
 export function makeLock(opts: LockOptions): Lock;
 export function makeLock(opts: LockOptions | ClaimOptions): Lock | Claim {
-  const redisClient = opts.redis ?? getRedisClient();
-  if (opts.heartbeat === false) return makeClaim(opts, redisClient, lockKeyOf(opts));
-  return createRenewingLock(opts, redisClient, lockKeysOf(opts));
+  const redis = opts.redis ?? redisClient();
+  if (opts.heartbeat === false) return makeClaim(opts, redis, lockKeyOf(opts));
+  return createRenewingLock(opts, redis, lockKeysOf(opts));
 }
 
 // A lock on one key runs SET NX PX to acquire, fencedRefresh to beat and fencedDelete to release.

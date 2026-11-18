@@ -10,7 +10,7 @@ import { cacheWrittenMarkerKeyFor } from '@template/db/redis/cache/cacheWrittenM
 import { cacheQueuedMarkerKeyFor } from '@template/db/redis/cache/queued/cacheQueuedMarkerKeyFor';
 import { withCacheSpan } from '@template/db/redis/cache/telemetry/withCacheSpan';
 import { validateCacheKeyHasNoUndefined } from '@template/db/redis/cache/validateCacheKeyHasNoUndefined';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 import superjson from 'superjson';
 
 export const checkCache = async <T>(
@@ -23,7 +23,7 @@ export const checkCache = async <T>(
   validateCacheKeyHasNoUndefined(key);
   return withCacheSpan(key, true, async (setResult) => {
     try {
-      const [payload, written, lock, queued] = await getRedisClient().mget(
+      const [payload, written, lock, queued] = await redisClient().mget(
         key,
         cacheWrittenMarkerKeyFor(key),
         singleFlightLockKey(computedUnder),

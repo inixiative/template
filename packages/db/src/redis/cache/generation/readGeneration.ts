@@ -5,13 +5,13 @@
  * @uses none
  */
 import { generationKey } from '@template/db/redis/cache/generation/generationKey';
-import type { getRedisClient } from '@template/db/redis/client';
+import type { redisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 
 export type Generation = string;
 
 export const readGeneration = async (
-  redis: ReturnType<typeof getRedisClient>,
+  redis: ReturnType<typeof redisClient>,
   key: string,
 ): Promise<Generation | null> => {
   try {

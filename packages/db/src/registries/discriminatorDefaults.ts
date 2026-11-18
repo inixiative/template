@@ -5,7 +5,7 @@
  * @uses none
  */
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
+import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 
 type MappedField = { isRequired: boolean; default?: { kind: string; value?: unknown } };
@@ -27,7 +27,7 @@ export const withDiscriminatorDefaults = <T extends Record<string, unknown>>(
   fields: T,
 ): T & Record<string, unknown> => {
   const filled: Record<string, unknown> = { ...fields };
-  for (const axis of getPolymorphismConfig(modelName)?.axes ?? [])
+  for (const axis of polymorphismConfigForModel(modelName)?.axes ?? [])
     if (filled[axis.field] === undefined)
       filled[axis.field] = discriminatorDefault(modelName, axis.field);
   return filled as T & Record<string, unknown>;

@@ -68,7 +68,11 @@ const createClient = (
   onReconnect?: () => void,
   timing?: Partial<ApiWebsocketTiming>,
 ): ApiWebsocket => {
-  const client = createApiWebsocket(url, { getClient: () => queryClient, onReconnect }, timing);
+  const client = createApiWebsocket(
+    url,
+    { currentQueryClient: () => queryClient, onReconnect },
+    timing,
+  );
   clients.push(client);
   return client;
 };

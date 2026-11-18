@@ -22,7 +22,7 @@ import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
 import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { validatePathNotation } from '#/lib/prisma/pathNotation';
-import { getDefaultOperator, getValidOperators } from '#/lib/prisma/scalarOperators';
+import { defaultOperatorForField, validOperatorsForField } from '#/lib/prisma/scalarOperators';
 import type {
   BracketQueryPrimitive,
   BracketQueryRecord,
@@ -128,7 +128,7 @@ const wrapBareValue = (
   if (value === null) {
     return { equals: null };
   }
-  const op = getDefaultOperator(field);
+  const op = defaultOperatorForField(field);
   return { [op]: matchesLiterally(field, op, coerceValueForField(field, value), false) };
 };
 
@@ -137,7 +137,7 @@ const transformOperatorValue = (
   value: BracketQueryRecord,
   fieldPath: string,
 ): Record<string, unknown> => {
-  const validOps = getValidOperators(field);
+  const validOps = validOperatorsForField(field);
   const out: Record<string, unknown> = {};
 
   for (const [op, opValue] of Object.entries(value)) {

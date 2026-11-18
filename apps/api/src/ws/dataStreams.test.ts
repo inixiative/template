@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { db, getRedisClient, redisNamespace } from '@template/db';
+import { db, redisClient, redisNamespace } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
@@ -367,7 +367,7 @@ describe('data streams (real app)', () => {
 
     it('stamps the snapshot with the seq of the last append before its read', async () => {
       await appendToStream(stream, { type: 'remove', payload: { id: 'before' } });
-      const { seq: counter } = await readStreamSeq(getRedisClient(), streamSeqKey(stream));
+      const { seq: counter } = await readStreamSeq(redisClient(), streamSeqKey(stream));
       const { socket, sent } = connect(bearer);
       await websocketHandler.message(socket, openFrame(stream));
 
@@ -433,7 +433,7 @@ describe('data streams (real app)', () => {
       const reconnected = connect(bearer);
       await websocketHandler.message(reconnected.socket, openFrame(stream));
       const snapshot = sentFrames<SnapshotFrame>(reconnected.sent)[1];
-      expect(snapshot.seq).toBe((await readStreamSeq(getRedisClient(), streamSeqKey(stream))).seq);
+      expect(snapshot.seq).toBe((await readStreamSeq(redisClient(), streamSeqKey(stream))).seq);
       expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toContain(created.id);
 
       await appendToStream(stream, { type: 'remove', payload: { id: created.id } });
@@ -450,7 +450,7 @@ describe('data streams (real app)', () => {
     };
 
     it('an unauthorized open creates no Redis key, and junk names never reach Redis', async () => {
-      const redis = getRedisClient();
+      const redis = redisClient();
       const { socket, sent } = connect();
       const knownFamily = STREAM_DEFINITIONS.organizationReadManyContacts.name({
         id: Bun.randomUUIDv7(),
@@ -481,12 +481,12 @@ describe('data streams (real app)', () => {
 
     it('an authorized open seeds an absent counter with its stamp, so the next append is one past it', async () => {
       const fresh = await freshStream();
-      expect(await getRedisClient().exists(streamSeqKey(fresh.name))).toBe(0);
+      expect(await redisClient().exists(streamSeqKey(fresh.name))).toBe(0);
       const { socket, sent } = connect(fresh.authorization);
       await websocketHandler.message(socket, openFrame(fresh.name));
 
       const snapshot = sentFrames<SnapshotFrame>(sent)[1];
-      expect(await getRedisClient().get(streamSeqKey(fresh.name))).toBe(String(snapshot.seq));
+      expect(await redisClient().get(streamSeqKey(fresh.name))).toBe(String(snapshot.seq));
       await appendToStream(fresh.name, { type: 'remove', payload: { id: 'next' } });
       await waitFor(() => appendsOf(sent).length === 1);
       expect(appendsOf(sent)[0].seq).toBe(snapshot.seq + 1);
@@ -516,7 +516,7 @@ describe('data streams (real app)', () => {
       const snapshot = sentFrames<SnapshotFrame>(sent)[1];
       expect(reads).toBe(2);
       expect(opened).toEqual({ type: 'opened', stream: fresh.name });
-      expect(snapshot.seq).toBe(Number(await getRedisClient().get(streamSeqKey(fresh.name))));
+      expect(snapshot.seq).toBe(Number(await redisClient().get(streamSeqKey(fresh.name))));
       expect(rest.map((frame) => frame.seq)).toEqual([snapshot.seq]);
     });
 

@@ -14,13 +14,13 @@ import type {
 import { createAuthClient } from 'better-auth/client';
 import { oneTimeTokenClient } from 'better-auth/client/plugins';
 
-const getAuthClient = () => {
+const betterAuthClient = () => {
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   return createAuthClient({ baseURL, plugins: [oneTimeTokenClient()] });
 };
 
 const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
-  const client = getAuthClient();
+  const client = betterAuthClient();
 
   const { data, error } = await client.signIn.email({
     email: method.email,
@@ -35,7 +35,7 @@ const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
 };
 
 const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
-  const client = getAuthClient();
+  const client = betterAuthClient();
 
   const callbackURL = method.callbackURL || `${window.location.origin}/auth/callback`;
 
@@ -47,7 +47,7 @@ const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
 };
 
 export const completeOAuthSignIn = async (oneTimeToken: string): Promise<void> => {
-  const client = getAuthClient();
+  const client = betterAuthClient();
 
   const { data, error } = await client.oneTimeToken.verify({ token: oneTimeToken });
 

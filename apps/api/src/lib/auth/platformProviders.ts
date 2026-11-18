@@ -11,7 +11,7 @@ export interface PlatformProvider {
   enabled: boolean;
 }
 
-export function getPlatformProviders(): PlatformProvider[] {
+export function configuredPlatformProviders(): PlatformProvider[] {
   const providers: PlatformProvider[] = [];
 
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {

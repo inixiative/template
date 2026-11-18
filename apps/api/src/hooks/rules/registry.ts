@@ -30,7 +30,7 @@ export const setRulesCache = (model: ModelName, rule: Condition): void => {
   rulesCache.set(model, rule);
 };
 
-export const getRule = (model: ModelName): Condition => {
+export const ruleForModel = (model: ModelName): Condition => {
   if (rulesCache.has(model)) return rulesCache.get(model)!;
   const rule = RulesRegistry[model] ?? true;
   rulesCache.set(model, rule);

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   claimLane,
-  getJobSupersededBy,
+  fetchJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
   markJobSupersededBy,
@@ -9,12 +9,12 @@ import {
   releaseLane,
   watchLane,
 } from '@template/db/lanes/lanes';
-import { getRedisClient } from '@template/db/redis/client';
+import { redisClient } from '@template/db/redis/client';
 
 // The supersede lane "baton": one Redis key per lane = its current holder (a jobId). Latest claim wins
 // and tombstones the displaced job; a running job watchLanes its lane and is usurped the moment a
 // different jobId holds it. SET/GET plus small Lua evals, so it runs on ioredis-mock.
-const redis = getRedisClient();
+const redis = redisClient();
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 const wipe = async (): Promise<void> => {
@@ -37,7 +37,7 @@ describe('supersede lane baton', () => {
     expect(await redis.get(lane)).toBe('job-a');
     expect(await claimLane(lane, 'job-b')).toBe('job-a');
     expect(await redis.get(lane)).toBe('job-b'); // last-claim-wins
-    expect(await getJobSupersededBy('job-a')).toBe('job-b');
+    expect(await fetchJobSupersededBy('job-a')).toBe('job-b');
   });
 
   test('claimLane stretches the TTL by the job delay (the baton must outlive a scheduled delay)', async () => {
@@ -83,7 +83,7 @@ describe('supersede lane baton', () => {
     stop();
 
     expect(usurped).toBe(true);
-    expect(await getJobSupersededBy('child-job')).toBe('newer-parent');
+    expect(await fetchJobSupersededBy('child-job')).toBe('newer-parent');
     expect(await redis.get(lane)).toBe('child-job');
   });
 
@@ -96,7 +96,7 @@ describe('supersede lane baton', () => {
     // claimant keeps the baton, so it still usurps the reclaimer via its watch.
     await reclaimLane(lane, 'job-a');
     expect(await redis.get(lane)).toBe('job-b');
-    expect(await getJobSupersededBy('job-b')).toBeNull();
+    expect(await fetchJobSupersededBy('job-b')).toBeNull();
   });
 
   test('reclaimLane displaces an OLDER holder and tombstones it (no stale-wins inversion)', async () => {
@@ -106,7 +106,7 @@ describe('supersede lane baton', () => {
     await reclaimLane(lane, 'job-a');
     await reclaimLane(lane, 'job-b');
     expect(await redis.get(lane)).toBe('job-b');
-    expect(await getJobSupersededBy('job-a')).toBe('job-b');
+    expect(await fetchJobSupersededBy('job-a')).toBe('job-b');
   });
 
   test('watchLane fires onUsurped once a different job claims the lane', async () => {
@@ -153,7 +153,7 @@ describe('supersede lane baton', () => {
     await releaseLane(lane, 'job-b', previousHolder);
 
     expect(await redis.get(lane)).toBeNull();
-    expect(await getJobSupersededBy('job-a')).toBeNull();
+    expect(await fetchJobSupersededBy('job-a')).toBeNull();
   });
 
   test('releaseLane does not clear a newer claimant or its tombstone', async () => {
@@ -165,8 +165,8 @@ describe('supersede lane baton', () => {
     await releaseLane(lane, 'job-b', previousHolder);
 
     expect(await redis.get(lane)).toBe('job-c');
-    expect(await getJobSupersededBy('job-a')).toBe('job-b');
-    expect(await getJobSupersededBy('job-b')).toBe('job-c');
+    expect(await fetchJobSupersededBy('job-a')).toBe('job-b');
+    expect(await fetchJobSupersededBy('job-b')).toBe('job-c');
   });
 
   test('watchLane refreshes the TTL while this job still holds the lane', async () => {

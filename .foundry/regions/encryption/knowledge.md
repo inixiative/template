@@ -56,7 +56,7 @@ Env schema builder for every registered prefix; validates integer versions and 2
 **envPrefix**  
 A registry key's env var prefix, e.g. AUTH_PROVIDER_SECRETS or JWKS_PRIVATE_KEY.
 
-**getEncryptedFieldsByModel**  
+**encryptedFieldsByModel**  
 Lists every encrypted column per model from the registry, for redaction and ignore lists.
 
 **encryptedColumnNamesForKey**  
@@ -86,7 +86,7 @@ The single field-level encryption engine: AES-256-GCM per field, declared once i
 
 ## 2. The domain
 
-The engine lives in `@template/db/lib/encryption` (ENCRYPTION.md § Field-Scoped Encryption). A model lists its encrypted keys in `ENCRYPTED_MODELS` (`packages/db/src/lib/encryption/registry.ts`); each key carries an `envPrefix` and a `buildAAD` over immutable fields only (id, organizationId), so a ciphertext cannot move to another row. `encryptedColumnNamesForKey(key)` derives the three columns `encrypted{Key}`, `encrypted{Key}Metadata` and `encrypted{Key}KeyVersion`. Controllers call `encryptField(model, key, record)` before create and spread the result into the data, and `decryptField(model, key, record)` on read; `makeEncryptionService` / `encryptionService` is the low-level crypto underneath. Registering the key is the whole integration: rotation, the boot-time env check and audit-log redaction (`getEncryptedFieldsByModel`) all discover it. Users today are `AuthProvider` secrets and the user-JWT signing keys (`Jwks.privateKey`).
+The engine lives in `@template/db/lib/encryption` (ENCRYPTION.md § Field-Scoped Encryption). A model lists its encrypted keys in `ENCRYPTED_MODELS` (`packages/db/src/lib/encryption/registry.ts`); each key carries an `envPrefix` and a `buildAAD` over immutable fields only (id, organizationId), so a ciphertext cannot move to another row. `encryptedColumnNamesForKey(key)` derives the three columns `encrypted{Key}`, `encrypted{Key}Metadata` and `encrypted{Key}KeyVersion`. Controllers call `encryptField(model, key, record)` before create and spread the result into the data, and `decryptField(model, key, record)` on read; `makeEncryptionService` / `encryptionService` is the low-level crypto underneath. Registering the key is the whole integration: rotation, the boot-time env check and audit-log redaction (`encryptedFieldsByModel`) all discover it. Users today are `AuthProvider` secrets and the user-JWT signing keys (`Jwks.privateKey`).
 
 Each `envPrefix` is a keyring of three env vars: `{PREFIX}_ENCRYPTION_VERSION` (an integer), `{PREFIX}_ENCRYPTION_KEY_CURRENT` (base64, 32 bytes) and `{PREFIX}_ENCRYPTION_KEY_PREVIOUS`, required above version 1; `encryptionEnv` validates them at boot. To rotate: bump the version by exactly one, move the current key to `_KEY_PREVIOUS`, set a new current key, deploy. Worker startup enqueues the singleton `rotateEncryptionKeys` job, which walks the registry and re-encrypts rows still on the previous version with an idempotent `updateManyAndReturn` (old version in the where clause) under `runAllWithConcurrencyLimit` + `minimumConcurrencyLimitFor([ConcurrencyType.db])`; decryption accepts both keys meanwhile, so there is no downtime. `validateEncryptionVersions` (`packages/db/src/lib/encryption/validation.ts`) returns `{ valid, errors }` for a downgrade, a jump of more than one, a bump over mixed versions, more than two versions or a bad keyring, but no script or CI runs it yet (§ Deploy-Time Validation): run it yourself before a rotation deploy.
 
@@ -164,7 +164,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | encrypted columns in the schema but no registry entry; rotation never sees my new field; a sensitive field stored at rest | **Register encrypted fields in ENCRYPTED_MODELS** · rule FEATURES.md > Encryption & Security > Field-Level Encryption Engine — any sensitive field stored at rest, e.g. OAuth client secrets | part 4 | encrypted columns added to the schema with no registry entry, so rotation, validation and audit redaction never see them (FEATURES.md § Encryption & Security › Registry Pattern) |
 | model ids should be branded types; an id as a plain string | **Typed IDs** · rule FEATURES.md > User Management > User CRUD — all model identifiers | part 4 | — |
 
-- *Also here, by name:* makePreviousEncryptionKeyRequiredRefinement (`packages/db/src/lib/encryption/envValidation.ts`); encryptionKeySchema (`packages/db/src/lib/encryption/envValidation.ts`); getEncryptedFieldsByModel (`packages/db/src/lib/encryption/registry.ts`); encryptedColumnNamesForKey (`packages/db/src/lib/encryption/registry.ts`)
+- *Also here, by name:* makePreviousEncryptionKeyRequiredRefinement (`packages/db/src/lib/encryption/envValidation.ts`); encryptionKeySchema (`packages/db/src/lib/encryption/envValidation.ts`); encryptedFieldsByModel (`packages/db/src/lib/encryption/registry.ts`); encryptedColumnNamesForKey (`packages/db/src/lib/encryption/registry.ts`)
 
 ## 4. The specifics, in full
 

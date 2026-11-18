@@ -8,7 +8,7 @@ import type { singleFlightLock } from '@template/db/lock/singleFlight/singleFlig
 import { readCached } from '@template/db/redis/cache/readCached';
 import { cacheAccessor } from '@template/db/redis/cache/telemetry/cacheAccessor';
 import type { CacheResult } from '@template/db/redis/cache/telemetry/withCacheSpan';
-import type { getRedisClient } from '@template/db/redis/client';
+import type { redisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import { recordDuration } from '@template/shared/telemetry';
 
@@ -20,7 +20,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 type SingleFlight<T> = { result: 'hit'; value: T } | { result: 'settled'; holdsLock: boolean };
 
 export const acquireSingleFlight = async <T>(
-  redis: ReturnType<typeof getRedisClient>,
+  redis: ReturnType<typeof redisClient>,
   key: string,
   lock: ReturnType<typeof singleFlightLock>,
   setResult: (result: CacheResult) => void,

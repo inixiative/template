@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
-import { getResource } from '#/lib/context/getResource';
+import { contextResource } from '#/lib/context/contextResource';
 import { makeController } from '#/lib/utils/makeController';
 import { createIntegration } from '#/modules/integration/services/createIntegration';
 import { organizationCreateIntegrationRoute } from '#/modules/organization/routes/organizationCreateIntegration';
@@ -12,7 +12,7 @@ import { organizationCreateIntegrationRoute } from '#/modules/organization/route
 export const organizationCreateIntegrationController = makeController(
   organizationCreateIntegrationRoute,
   async (c, respond) => {
-    const organization = getResource<'organization'>(c);
+    const organization = contextResource<'organization'>(c);
     const body = c.req.valid('json');
 
     const row = {

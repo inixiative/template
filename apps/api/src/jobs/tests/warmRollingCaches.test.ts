@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   cacheKey,
   flushRedis,
-  getRedisClient,
   makeRollingCache,
+  redisClient,
   unregisterRollingCache,
 } from '@template/db';
 import { rollingCacheTimerKey } from '#/jobs/rollingCacheTimerKey';
@@ -32,11 +32,11 @@ describe('warmRollingCaches', () => {
         await write(results.value(), runs);
       },
     });
-    await getRedisClient().set(rollingCacheTimerKey(name), String(Date.now()), 'EX', 300);
+    await redisClient().set(rollingCacheTimerKey(name), String(Date.now()), 'EX', 300);
 
     await warmRollingCaches();
 
     expect(runs).toBe(1);
-    expect(await getRedisClient().pttl(rollingCacheTimerKey(name))).toBeGreaterThan(0);
+    expect(await redisClient().pttl(rollingCacheTimerKey(name))).toBeGreaterThan(0);
   });
 });

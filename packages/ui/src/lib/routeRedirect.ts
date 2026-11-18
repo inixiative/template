@@ -23,18 +23,18 @@ export const redirectPreservingContext = (context: BeforeLoadContext, to: string
 
 const navigateToAuth = (
   path: '/login' | '/signup',
-  getStore: () => AppStore,
+  currentAppStore: () => AppStore,
   preserveSearch?: boolean,
 ) => {
   const redirectTo = currentPath();
   const { search, hash } = currentLocation();
   const searchAndHash = `${search}${hash}`;
   const query = preserveSearch ? searchAndHash : `?redirectTo=${encodeURIComponent(redirectTo)}`;
-  getStore().navigation.navigateKeepingSearchParams(`${path}${query}`, 'all');
+  currentAppStore().navigation.navigateKeepingSearchParams(`${path}${query}`, 'all');
 };
 
-export const navigateToLogin = (getStore: () => AppStore, preserveSearch?: boolean) =>
-  navigateToAuth('/login', getStore, preserveSearch);
+export const navigateToLogin = (currentAppStore: () => AppStore, preserveSearch?: boolean) =>
+  navigateToAuth('/login', currentAppStore, preserveSearch);
 
-export const navigateToSignUp = (getStore: () => AppStore, preserveSearch?: boolean) =>
-  navigateToAuth('/signup', getStore, preserveSearch);
+export const navigateToSignUp = (currentAppStore: () => AppStore, preserveSearch?: boolean) =>
+  navigateToAuth('/signup', currentAppStore, preserveSearch);

@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { cacheKey } from '@template/db/redis/cache/cacheKey';
 import { makeRollingCache } from '@template/db/redis/cache/rollingCache/makeRollingCache';
 import {
-  getRollingCache,
   listRollingCaches,
+  rollingCacheByNameOrThrow,
   unregisterRollingCache,
 } from '@template/db/redis/cache/rollingCache/rollingCacheRegistry';
 import {
@@ -13,7 +13,7 @@ import {
   ROLLING_CACHE_TICK_SECONDS,
   type RollingCacheComputeContext,
 } from '@template/db/redis/cache/rollingCache/rollingCacheTypes';
-import { flushRedis, getRedisClient } from '@template/db/redis/client';
+import { flushRedis, redisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 
 const registered: string[] = [];
@@ -69,8 +69,8 @@ describe('makeRollingCache', () => {
         ...single(fractional, async () => 1),
       }),
     ).toThrow('whole number of seconds');
-    expect(() => getRollingCache(short)).toThrow('is not registered');
-    expect(() => getRollingCache(fractional)).toThrow('is not registered');
+    expect(() => rollingCacheByNameOrThrow(short)).toThrow('is not registered');
+    expect(() => rollingCacheByNameOrThrow(fractional)).toThrow('is not registered');
   });
 
   it('spreads its leaves over half the interval unless told otherwise, and refuses a spread as long as the interval', () => {
@@ -145,9 +145,9 @@ describe('makeRollingCache', () => {
   });
 
   it('throws when asked for a cache nobody registered', () => {
-    expect(() => getRollingCache(`rollingCacheTest-missing-${Bun.randomUUIDv7()}`)).toThrow(
-      'is not registered',
-    );
+    expect(() =>
+      rollingCacheByNameOrThrow(`rollingCacheTest-missing-${Bun.randomUUIDv7()}`),
+    ).toThrow('is not registered');
   });
 
   it('registers the cache so the coordinator can find it by name', () => {
@@ -158,7 +158,7 @@ describe('makeRollingCache', () => {
       ...single(name, async () => 1),
     });
 
-    expect(getRollingCache(name).name).toBe(name);
+    expect(rollingCacheByNameOrThrow(name).name).toBe(name);
     expect(listRollingCaches().map((entry) => entry.name)).toContain(name);
     expect(rollingCache.timeoutSeconds).toBe(300);
   });
@@ -172,7 +172,7 @@ describe('makeRollingCache', () => {
     });
 
     await rollingCache.refresh();
-    const ttl = await getRedisClient().ttl(cacheKey(name, 'all'));
+    const ttl = await redisClient().ttl(cacheKey(name, 'all'));
 
     expect(rollingCache.ttlSeconds).toBe(600 * (2 * ROLLING_CACHE_LEAF_ATTEMPTS + 2));
     expect(ttl).toBeGreaterThan(600 * (2 * ROLLING_CACHE_LEAF_ATTEMPTS + 1));
@@ -253,7 +253,7 @@ describe('makeRollingCache', () => {
     await rollingCache.refresh();
 
     const longAgo = Date.now() - 24 * 60 * 60 * 1000;
-    await getRedisClient().set(
+    await redisClient().set(
       `${redisNamespace.cacheWritten}:${cacheKey(name, 'all')}`,
       String(longAgo),
     );
@@ -278,7 +278,7 @@ describe('makeRollingCache', () => {
     });
 
     expect(await rollingCache.refresh(undefined, { signal: controller.signal })).toBe(false);
-    expect(await getRedisClient().exists(cacheKey(name, 'all'))).toBe(0);
+    expect(await redisClient().exists(cacheKey(name, 'all'))).toBe(0);
   });
 
   it('a cache with no target selector has the single whole-system target', async () => {

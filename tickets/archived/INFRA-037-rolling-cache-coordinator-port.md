@@ -36,7 +36,7 @@ onUsurped, parentId)` does the same while it runs. A parked superseding parent h
 tombstone's lifetime (`holdLaneWhileParked`). No eviction step.
 
 **Rolling caches.** `makeRollingCache` in `packages/db/src/redis/` (next to `fetchThroughCache()`), registry
-(`getRollingCache` throws for an unknown name), targets as `{ model, args }` with Prisma's own
+(`rollingCacheByNameOrThrow` throws for an unknown name), targets as `{ model, args }` with Prisma's own
 `findMany` args resolved through `db.delegate` (Postgres `DISTINCT`, fail-closed ceiling), three times
 (`intervalSeconds`, `timeoutSeconds`, `ttlSeconds`, validated at registration), `refresh` throws when the
 write fails. Root `coordinateRollingCaches` (seeded cron row, every minute, singleton) → branch
