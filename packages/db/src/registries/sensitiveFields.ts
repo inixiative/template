@@ -28,7 +28,7 @@ export const SENSITIVE_FIELD_NAMES: ReadonlySet<string> = new Set([
   'verificationUrl',
 ]);
 
-export const MASKED_VALUE = '[REDACTED]';
+export const MASKED_VALUE = '[MASKED]';
 
 export const maskSensitiveFields = <T extends Record<string, unknown>>(
   model: string,

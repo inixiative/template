@@ -169,7 +169,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 | `actorTokenId` | The acting token (nulled when the token is deleted) |
 | `actorJobName` | Background job name (if triggered by a job) |
 | `actorIntegrationId` | The integration the actor acted through (its token's owner key, or a job's payload) |
-| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorFromRedactedRecord` sanitized (sensitive fields removed); survives the token's deletion |
+| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorFromRecordOmittingSensitiveFields` sanitized (sensitive fields removed); survives the token's deletion |
 | `ipAddress` / `userAgent` | Request metadata |
 | `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
 | `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's tenancy, for filtering the log: its own `organizationId` / `spaceId` / `userId`, or, for a child with none ([parent edges](DATABASE.md#parent-edges)), its parent's (`contextRows`, `apps/api/src/hooks/auditLog/contextRows.ts`). An entitlement row is filed under its holder's tenancy, so an organization's audit view shows the entitlements its members' tokens gained and lost |
@@ -182,7 +182,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 1. **Filter** (`filterForAudit` → `omitRegisteredFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
 2. **Diff** — for updates, `computeDiff` compares the filtered, **unmasked** before/after, so a change to a sensitive column is still detected.
 3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
-4. **Mask** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
+4. **Mask** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[MASKED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
 `processAuditData` (filter + mask) builds the same column-only snapshot for the email-versioning hook.
 

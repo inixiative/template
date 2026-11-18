@@ -95,7 +95,7 @@ docker compose -f scripts/monitoring/compose.yaml logs collector
 docker compose -f scripts/monitoring/compose.yaml down
 ```
 
-The pinned Collector validates real OTLP requests and prints all three signal types. The smoke command prints a trace ID: search for it in both logs and spans. The password sample must appear as `[REDACTED]`. Clear any hosted signal overrides when testing locally. For a running local API/worker use the same settings in `apps/api/.env.local`; enable browser capture separately if desired. Nothing leaves your computer in this configuration.
+The pinned Collector validates real OTLP requests and prints all three signal types. The smoke command prints a trace ID: search for it in both logs and spans. The password sample must appear as `[MASKED]`. Clear any hosted signal overrides when testing locally. For a running local API/worker use the same settings in `apps/api/.env.local`; enable browser capture separately if desired. Nothing leaves your computer in this configuration.
 
 ## Coverage and limits
 

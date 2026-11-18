@@ -88,8 +88,8 @@ describe('makeAppEvent', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].data).toEqual({
         userId: 'u1',
-        keyHash: '[REDACTED]',
-        nested: { password: '[REDACTED]' },
+        keyHash: '[MASKED]',
+        nested: { password: '[MASKED]' },
       });
     });
   });

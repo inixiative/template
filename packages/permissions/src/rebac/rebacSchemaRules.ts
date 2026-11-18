@@ -9,8 +9,8 @@ import type { ActionRule, ResourcePermission } from '@template/permissions/rebac
 import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
 import { omit } from 'lodash-es';
 
-export const ownerAndAdminRoles = ['owner', 'admin'];
-export const rolesBelowAdmin = roleHierarchy.filter((role) => !ownerAndAdminRoles.includes(role));
+export const privilegedRoles = ['owner', 'admin'];
+export const unprivilegedRoles = roleHierarchy.filter((role) => !privilegedRoles.includes(role));
 export const actorIsUser: ActionRule = {
   rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
 };

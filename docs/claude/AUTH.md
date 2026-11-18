@@ -357,7 +357,7 @@ const authenticateToken = async (c: Context<AppEnv>) => {
   const signIn = await loadTokenContext(keyHash);  // cached row → isActive/expiresAt → hydrate → owner present
   if (!signIn) return;
   if (signIn.fetched) await db.token.update({ where: { id: signIn.context.token.id }, data: { lastUsedAt: new Date() } });
-  await setTokenContext(c, signIn.context);  // the actor is actorFromRedactedRecord(Token, the token's scalar columns)
+  await setTokenContext(c, signIn.context);  // the actor is actorFromRecordOmittingSensitiveFields(Token, the token's scalar columns)
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {

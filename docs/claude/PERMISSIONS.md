@@ -233,7 +233,7 @@ Some actions are for a person, not a token: minting and updating a token (`creat
 
 ### The Actor
 
-The table says what a principal holds. The actor says only who is acting: `permix.setActor(actorFromRedactedRecord(model, record))` (`packages/permissions/src/actorFromRedactedRecord.ts`) gives `{ model, record }`, with `model` `User` for a JWT or spoof and `Token` for any API token, and `record` the row's columns with its redacted fields left out. Rules read it as `__actor` in a json-rules condition. Actor rules only gate person-only actions; who is related to what is decided by walking relations. With nobody acting, an actor rule denies and the table still answers everything else.
+The table says what a principal holds. The actor says only who is acting: `permix.setActor(actorFromRecordOmittingSensitiveFields(model, record))` (`packages/permissions/src/actorFromRecordOmittingSensitiveFields.ts`) gives `{ model, record }`, with `model` `User` for a JWT or spoof and `Token` for any API token, and `record` the row's columns with its redacted fields left out. Rules read it as `__actor` in a json-rules condition. Actor rules only gate person-only actions; who is related to what is decided by walking relations. With nobody acting, an actor rule denies and the table still answers everything else.
 
 ---
 

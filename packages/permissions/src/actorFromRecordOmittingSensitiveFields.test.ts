@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { actorFromRedactedRecord } from '@template/permissions/actorFromRedactedRecord';
+import { actorFromRecordOmittingSensitiveFields } from '@template/permissions/actorFromRecordOmittingSensitiveFields';
 import { ActorModel } from '@template/permissions/client';
 
-describe('actorFromRedactedRecord', () => {
+describe('actorFromRecordOmittingSensitiveFields', () => {
   it("keeps the actor row's columns and drops its relations and redacted fields", () => {
     const token = {
       id: 't1',
@@ -12,7 +12,7 @@ describe('actorFromRedactedRecord', () => {
       integration: { id: 'i1' },
       user: { id: 'u1', email: 'a@b.c' },
     };
-    expect(actorFromRedactedRecord(ActorModel.Token, token)).toEqual({
+    expect(actorFromRecordOmittingSensitiveFields(ActorModel.Token, token)).toEqual({
       model: ActorModel.Token,
       record: { id: 't1', ownerModel: 'Integration', userId: 'u1' },
     });
@@ -20,7 +20,7 @@ describe('actorFromRedactedRecord', () => {
 
   it('a user keeps its columns and drops its memberships', () => {
     const user = { id: 'u1', email: 'a@b.c', organizationUsers: [{ id: 'm1' }] };
-    expect(actorFromRedactedRecord(ActorModel.User, user).record).toEqual({
+    expect(actorFromRecordOmittingSensitiveFields(ActorModel.User, user).record).toEqual({
       id: 'u1',
       email: 'a@b.c',
     });

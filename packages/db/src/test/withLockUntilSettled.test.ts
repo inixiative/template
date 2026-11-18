@@ -5,7 +5,7 @@ import { FIND_FOR_UPDATE_LOCK_SERVICE } from '@template/db/lock/acquireFindForUp
 import { findForUpdateLockIdentifier } from '@template/db/lock/findForUpdateLockIdentifier';
 import { holdLockUntilSettled } from '@template/db/lock/holdLockUntilSettled';
 import { nextFactorySequenceNumber } from '@template/db/test/factory';
-import { makeTestGate } from '@template/db/test/makeTestGate';
+import { gate } from '@template/db/test/gate';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -43,8 +43,8 @@ describe('db.withLockUntilSettled', () => {
 
   it('holds the lock after fn returns, until the transaction commits', async () => {
     const options = lockOptions();
-    const fnReturned = makeTestGate();
-    const commit = makeTestGate();
+    const fnReturned = gate();
+    const commit = gate();
 
     const holding = db.txn(async () => {
       await db.withLockUntilSettled(options, async () => 'ran');
@@ -72,8 +72,8 @@ describe('db.withLockUntilSettled', () => {
 
   it('makes another transaction wait until the holder commits', async () => {
     const options = lockOptions();
-    const fnReturned = makeTestGate();
-    const commit = makeTestGate();
+    const fnReturned = gate();
+    const commit = gate();
     const order: string[] = [];
 
     const holding = db.txn(async () => {
@@ -97,8 +97,8 @@ describe('db.withLockUntilSettled', () => {
 
   it('throws the onTimeout error when the holder outlasts the wait, and holds nothing after', async () => {
     const options = lockOptions();
-    const fnReturned = makeTestGate();
-    const commit = makeTestGate();
+    const fnReturned = gate();
+    const commit = gate();
 
     const holding = db.txn(async () => {
       await db.withLockUntilSettled(options, async () => 'ran');
@@ -211,8 +211,8 @@ describe('db.withLockUntilSettled', () => {
 
   it('a queued holder does not run once a sibling has rolled the transaction back', async () => {
     const options = lockOptions();
-    const firstRunning = makeTestGate();
-    const firstDone = makeTestGate();
+    const firstRunning = gate();
+    const firstDone = gate();
     let queuedRan = false;
     let first: Promise<unknown> = Promise.resolve();
     let queued: Promise<unknown> = Promise.resolve();
@@ -267,8 +267,8 @@ describe('db.withLockUntilSettled', () => {
 
     it('a findForUpdate set joins a key withLockUntilSettled already holds and takes only the rest', async () => {
       const [a, b] = emails();
-      const held = makeTestGate();
-      const commit = makeTestGate();
+      const held = gate();
+      const commit = gate();
 
       const holding = db.txn(async () => {
         await db.withLockUntilSettled(fenceOptions(a), async () => {

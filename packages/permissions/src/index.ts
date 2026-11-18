@@ -1,5 +1,5 @@
 export { Role } from '@template/db/generated/client/enums';
-export { actorFromRedactedRecord } from './actorFromRedactedRecord';
+export { actorFromRecordOmittingSensitiveFields } from './actorFromRecordOmittingSensitiveFields';
 // Client
 export {
   type Action,

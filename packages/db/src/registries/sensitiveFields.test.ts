@@ -52,13 +52,13 @@ describe('maskSensitiveFields', () => {
       password: 'secret',
       providerId: 'google',
     });
-    expect(result.password).toBe('[REDACTED]');
+    expect(result.password).toBe('[MASKED]');
     expect(result.providerId).toBe('google');
   });
 
   it('masks AuthProvider encrypted columns', () => {
     const result = maskSensitiveFields('AuthProvider', { id: '1', encryptedSecrets: 'cipher' });
-    expect(result.encryptedSecrets).toBe('[REDACTED]');
+    expect(result.encryptedSecrets).toBe('[MASKED]');
   });
 
   it('leaves a non-sensitive model untouched', () => {
@@ -71,7 +71,7 @@ describe('maskSensitiveFieldsInChangeDiff', () => {
   it('masks both sides of a sensitive change but keeps the key (records THAT it changed)', () => {
     const changes = { keyHash: { before: 'a', after: 'b' }, name: { before: 'x', after: 'y' } };
     const result = maskSensitiveFieldsInChangeDiff('Token', changes);
-    expect(result.keyHash).toEqual({ before: '[REDACTED]', after: '[REDACTED]' });
+    expect(result.keyHash).toEqual({ before: '[MASKED]', after: '[MASKED]' });
     expect(result.name).toEqual({ before: 'x', after: 'y' });
   });
 });
@@ -84,9 +84,9 @@ describe('maskSensitiveFieldsInPayload', () => {
       items: [{ keyHash: 'h' }],
     };
     const result = maskSensitiveFieldsInPayload(payload);
-    expect(result.account.password).toBe('[REDACTED]');
+    expect(result.account.password).toBe('[MASKED]');
     expect(result.account.email).toBe('a@b.c');
-    expect(result.items[0].keyHash).toBe('[REDACTED]');
+    expect(result.items[0].keyHash).toBe('[MASKED]');
     expect(result.userId).toBe('1');
   });
 });

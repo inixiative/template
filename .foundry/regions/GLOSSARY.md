@@ -61,7 +61,7 @@ State changes and their side effects are slice actions; components never set sta
 **actorIsDelegateOfUser**  
 Rule part: the acting token is owned by a user (used to let such a token create an organization). *Region:* [Member rows and delegates](permissions-members/knowledge.md)
 
-**actorFromRedactedRecord**  
+**actorFromRecordOmittingSensitiveFields**  
 Builds the actor { model, record } (User for a JWT or spoof, Token for an API token) that permix.setActor stores. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **adapter module**  
@@ -3049,7 +3049,7 @@ Histogram duration and counter metrics without hand-made meters. *Region:* [Logg
 Class tag: non-overlapping in-process recurring work such as heartbeat and unref intervals. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **sensitiveFields / noopFields**  
-Registries for sensitive values (shown as [REDACTED]) versus noise fields (dropped before diffing). *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
+Registries for sensitive values (shown as [MASKED]) versus noise fields (dropped before diffing). *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
 
 **omitSensitiveFieldsFromLens**  
 mapDefaults wrapper that strips redacted fields wherever a model appears. *Region:* [Template lenses](lenses/knowledge.md)

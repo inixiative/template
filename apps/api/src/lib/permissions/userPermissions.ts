@@ -8,7 +8,7 @@ import type { UserWithRelations } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import {
   ActorModel,
-  actorFromRedactedRecord,
+  actorFromRecordOmittingSensitiveFields,
   installPermissions,
   isSuperadmin,
   permissionsOfUser,
@@ -28,8 +28,8 @@ export const installPermissionsFor = async (
   { user, token, organizationUsers, spaceUsers }: Acting,
 ) => {
   await permix.setup([], { replace: true });
-  if (token) permix.setActor(actorFromRedactedRecord(ActorModel.Token, token));
-  else if (user) permix.setActor(actorFromRedactedRecord(ActorModel.User, user));
+  if (token) permix.setActor(actorFromRecordOmittingSensitiveFields(ActorModel.Token, token));
+  else if (user) permix.setActor(actorFromRecordOmittingSensitiveFields(ActorModel.User, user));
   permix.setSuperadmin(isSuperadmin(user));
 
   const usersPermissions = permissionsOfUser(user?.id ?? null, organizationUsers, spaceUsers);

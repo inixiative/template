@@ -10,7 +10,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
-    "./actorFromRedactedRecord": "./src/actorFromRedactedRecord.ts",
+    "./actorFromRecordOmittingSensitiveFields": "./src/actorFromRecordOmittingSensitiveFields.ts",
     "./entitlementRows": "./src/entitlementRows.ts",
     "./lens/mergeProjections": "./src/lens/mergeProjections.ts",
     "./lens/listLensPathsThatDropId": "./src/lens/listLensPathsThatDropId.ts",

@@ -10,12 +10,12 @@ const sensitiveKey =
   /password|passwd|secret|token|authorization|cookie|api.?key|private.?key|credential|encrypted|(^|[._-])(email|phone|body|payload)($|[._-])/i;
 const sanitizeString = (value: string): string =>
   value
-    .replace(/(Bearer|Basic)\s+[^\s,;]+/gi, '$1 [REDACTED]')
-    .replace(/(https?:\/\/|postgres(?:ql)?:\/\/|rediss?:\/\/)[^\s/@]+:[^\s/@]+@/gi, '$1[REDACTED]@')
+    .replace(/(Bearer|Basic)\s+[^\s,;]+/gi, '$1 [MASKED]')
+    .replace(/(https?:\/\/|postgres(?:ql)?:\/\/|rediss?:\/\/)[^\s/@]+:[^\s/@]+@/gi, '$1[MASKED]@')
     .replace(/https?:\/\/[^\s)]+/gi, (url) => url.split(/[?#]/)[0] ?? '[URL]')
     .replace(
       /((?:password|secret|token|api[_-]?key|authorization)[\w_-]*\s*[=:]\s*)[^\s,;&]+/gi,
-      '$1[REDACTED]',
+      '$1[MASKED]',
     )
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[EMAIL]')
     .slice(0, 4096);
@@ -53,7 +53,7 @@ export const maskLogValue = (value: unknown, seen = new WeakSet<object>(), depth
       .slice(0, 100)
       .map(([key, item]) => [
         key,
-        sensitiveKey.test(key) ? '[REDACTED]' : maskLogValue(item, seen, depth + 1),
+        sensitiveKey.test(key) ? '[MASKED]' : maskLogValue(item, seen, depth + 1),
       ]),
   );
 };

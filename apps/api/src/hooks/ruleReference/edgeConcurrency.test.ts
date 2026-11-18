@@ -8,7 +8,7 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { makeTestGate } from '@template/db/test/makeTestGate';
+import { gate } from '@template/db/test/gate';
 import { waitFor } from '@template/shared/test/waitFor';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
@@ -79,8 +79,8 @@ describe('ruleReference — edges under concurrency and repair', () => {
         { ownerModel: 'Space', conditions: acmeRule },
         { space },
       );
-      const held = makeTestGate();
-      const release = makeTestGate();
+      const held = gate();
+      const release = gate();
 
       const holder = db.txn(
         async () => {
@@ -167,8 +167,8 @@ describe('ruleReference — edges under concurrency and repair', () => {
 
   describe('the owner lock', () => {
     const holdOwner = async (held: { ownerModel: string; ownerId: string }) => {
-      const taken = makeTestGate();
-      const release = makeTestGate();
+      const taken = gate();
+      const release = gate();
       const holder = withOwnerLock(held, 'rules', async () => {
         taken.open();
         await release.opened;

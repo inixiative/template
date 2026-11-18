@@ -32,14 +32,14 @@ describe('auditLog/utils', () => {
     it('redacts sensitive Account fields', () => {
       const data = { id: '1', accountId: 'acc-1', password: 'secret', providerId: 'email' };
       const result = processAuditData('Account', data);
-      expect(result.password).toBe('[REDACTED]');
+      expect(result.password).toBe('[MASKED]');
       expect(result.providerId).toBe('email');
     });
 
     it('redacts keyHash on Token', () => {
       const data = { id: '1', name: 'tok', keyHash: 'sha256-hash' };
       const result = processAuditData('Token', data);
-      expect(result.keyHash).toBe('[REDACTED]');
+      expect(result.keyHash).toBe('[MASKED]');
       expect(result.name).toBe('tok');
     });
 
@@ -70,7 +70,7 @@ describe('auditLog/utils', () => {
         providerId: { before: 'email', after: 'oauth' },
       };
       const masked = maskSensitiveFieldsInChangeDiff('Account', changes);
-      expect(masked.password).toEqual({ before: '[REDACTED]', after: '[REDACTED]' });
+      expect(masked.password).toEqual({ before: '[MASKED]', after: '[MASKED]' });
       expect(masked.providerId).toEqual({ before: 'email', after: 'oauth' });
     });
 

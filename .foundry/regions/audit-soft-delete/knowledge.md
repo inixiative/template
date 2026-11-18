@@ -55,7 +55,7 @@ Helpers that add the deletedAt: null scope to a where or include built by hand.
 Hook blocking delete/deleteMany on models that may only be soft-deleted.
 
 **sensitiveFields / noopFields**  
-Registries for sensitive values (shown as [REDACTED]) versus noise fields (dropped before diffing).
+Registries for sensitive values (shown as [MASKED]) versus noise fields (dropped before diffing).
 
 **REGENERATE_ON_REVIVE**  
 Columns recomputed when a tombstoned row is revived.
@@ -230,7 +230,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 | `actorTokenId` | The acting token (nulled when the token is deleted) |
 | `actorJobName` | Background job name (if triggered by a job) |
 | `actorIntegrationId` | The integration the actor acted through (its token's owner key, or a job's payload) |
-| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorFromRedactedRecord` sanitized (redact fields removed); survives the token's deletion |
+| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorFromRecordOmittingSensitiveFields` sanitized (redact fields removed); survives the token's deletion |
 | `ipAddress` / `userAgent` | Request metadata |
 | `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
 | `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's own tenancy, for filtering the log |
@@ -243,7 +243,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 1. **Filter** (`filterForAudit` → `omitRegisteredFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
 2. **Diff** — for updates, `computeDiff` compares the filtered, **unredacted** before/after, so a change to a sensitive column is still detected.
 3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
-4. **Redact** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
+4. **Redact** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[MASKED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
 `processAuditData` (filter + redact) builds the same column-only snapshot for the email-versioning hook.
 

@@ -8,8 +8,8 @@ import { Operator } from '@inixiative/json-rules';
 import type { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import {
   actorIsUser,
-  ownerAndAdminRoles,
-  rolesBelowAdmin,
+  privilegedRoles,
+  unprivilegedRoles,
 } from '@template/permissions/rebac/rebacSchemaRules';
 import type { ActionRule } from '@template/permissions/rebac/types';
 
@@ -59,13 +59,13 @@ export const INQUIRY_TYPES = {
           any: [
             {
               all: [
-                role(Operator.in, ownerAndAdminRoles),
+                role(Operator.in, privilegedRoles),
                 { rel: 'sourceOrganization', action: 'own' },
               ],
             },
             {
               all: [
-                { any: [role(Operator.in, rolesBelowAdmin), role(Operator.equals, null)] },
+                { any: [role(Operator.in, unprivilegedRoles), role(Operator.equals, null)] },
                 { rel: 'sourceOrganization', action: 'manage' },
               ],
             },

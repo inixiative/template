@@ -10,7 +10,7 @@ import {
   createSpace,
   createSpaceUser,
 } from '@template/db/test';
-import { makeTestGate } from '@template/db/test/makeTestGate';
+import { gate } from '@template/db/test/gate';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { batchRouter } from '#/modules/batch';
 import type { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';
@@ -46,8 +46,8 @@ describe('batch sub-requests under the owner lock', () => {
   let space: Space;
   let first: Segment;
   let second: Segment;
-  let reached = makeTestGate();
-  let release = makeTestGate();
+  let reached = gate();
+  let release = gate();
 
   const save = (segment: Segment, conditions: unknown): SubRequest => ({
     method: 'PATCH',
@@ -96,8 +96,8 @@ describe('batch sub-requests under the owner lock', () => {
   });
 
   beforeEach(async () => {
-    reached = makeTestGate();
-    release = makeTestGate();
+    reached = gate();
+    release = gate();
     first = (await createSegment({ ownerModel: 'Space', conditions: acmeRule }, { space })).entity;
     second = (await createSegment({ ownerModel: 'Space', conditions: acmeRule }, { space })).entity;
   });
@@ -177,8 +177,8 @@ describe('batch sub-requests under the owner lock', () => {
 
   describe.each(['transactionAll', 'transactionPerRound'] as const)('%s', (strategy) => {
     it('rolls back only after every sub-request of the failing round has settled', async () => {
-      const ownerLockHeld = makeTestGate();
-      const releaseOwnerLock = makeTestGate();
+      const ownerLockHeld = gate();
+      const releaseOwnerLock = gate();
       const outsideHolder = withOwnerLock(
         { ownerModel: 'Space', ownerId: space.id },
         'rules',

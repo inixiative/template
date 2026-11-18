@@ -9,7 +9,7 @@ import { pickColumns } from '@template/db/utils/pickColumns';
 import type { Actor, ActorModel } from '@template/permissions/client';
 import { omit } from 'lodash-es';
 
-export const actorFromRedactedRecord = (
+export const actorFromRecordOmittingSensitiveFields = (
   model: ActorModel,
   record: Record<string, unknown>,
 ): Actor => ({
