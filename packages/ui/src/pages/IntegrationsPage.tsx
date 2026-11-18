@@ -6,6 +6,7 @@
  */
 import { Icon } from '@iconify/react';
 import { useQueryClient } from '@tanstack/react-query';
+import type { IntegrationOwnerModel } from '@template/db';
 import type {
   MeCreateIntegrationData,
   MeReadManyIntegrationsResponse,
@@ -28,7 +29,9 @@ import {
   useInfiniteDataQuery,
   useInfiniteScrollTrigger,
   useOptimisticMutation,
+  useSectionOpen,
 } from '@template/ui/hooks';
+import { invalidateUnfinishedActiveFlow } from '@template/ui/lib/flows/invalidateUnfinishedActiveFlow';
 import {
   type IntegrationListQuery,
   integrationContextQueries,
@@ -43,7 +46,7 @@ import type { MyMembershipOwnership } from '@template/ui/lib/myMembership';
 import { permissionCheckTargetForTenantContext } from '@template/ui/lib/permissionCheckTargetForTenantContext';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
 
 type Integration =
   | MeReadManyIntegrationsResponse['data'][number]
@@ -81,8 +84,16 @@ export type IntegrationConnectFlows = Partial<
   Record<IntegrationProvider, (props: IntegrationConnectFlowProps) => ReactNode>
 >;
 
+export type ProviderFitsOwner = (
+  provider: IntegrationProvider,
+  ownerModel: IntegrationOwnerModel,
+) => boolean;
+
+const everyProviderFitsEveryOwner: ProviderFitsOwner = () => true;
+
 type IntegrationsPageProps = {
   connectFlows?: IntegrationConnectFlows;
+  providerFitsOwner?: ProviderFitsOwner;
 };
 
 type IntegrationProviderSectionProps = {
@@ -96,7 +107,8 @@ type IntegrationProviderSectionProps = {
   canConnect: boolean;
   showStatus: boolean;
   canManage: boolean;
-  onConnect: () => void;
+  sectionId: string;
+  renderConnect: (close: () => void) => ReactNode;
   onDelete: (integration: Integration) => void;
 };
 
@@ -111,9 +123,11 @@ const IntegrationProviderSection = ({
   canConnect,
   showStatus,
   canManage,
-  onConnect,
+  sectionId,
+  renderConnect,
   onDelete,
 }: IntegrationProviderSectionProps) => {
+  const [isConnectOpen, setConnectOpen] = useSectionOpen(sectionId);
   const integrationQueries = integrationContextQueries(context, ownership);
   const providerListQuery = integrationListQueryForProvider(provider);
 
@@ -160,7 +174,7 @@ const IntegrationProviderSection = ({
           size="sm"
           disabled={!enabled}
           aria-label={actionAriaLabel}
-          onClick={onConnect}
+          onClick={() => setConnectOpen(true)}
         >
           <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
           {actionLabel}
@@ -204,6 +218,7 @@ const IntegrationProviderSection = ({
           )}
         </div>
       )}
+      {isConnectOpen && enabled && renderConnect(() => setConnectOpen(false))}
     </Card>
   );
 };
@@ -212,6 +227,7 @@ type IntegrationOwnerSectionProps = {
   context: AuthenticatedContext;
   ownership?: MyMembershipOwnership;
   connectFlows: IntegrationConnectFlows;
+  providerFitsOwner: ProviderFitsOwner;
   sectionKey: string;
   title?: string;
   description?: string;
@@ -221,13 +237,11 @@ const IntegrationOwnerSection = ({
   context,
   ownership,
   connectFlows,
+  providerFitsOwner,
   sectionKey,
   title,
   description,
 }: IntegrationOwnerSectionProps) => {
-  const [connectingProvider, setConnectingProvider] = useState<
-    IntegrationProvider | null | undefined
-  >(undefined);
   const queryClient = useQueryClient();
   const permissions = useAppStore((state) => state.permissions);
   const integrationQueries = integrationContextQueries(context, ownership);
@@ -271,31 +285,50 @@ const IntegrationOwnerSection = ({
   const canConnectProvider = (provider: IntegrationProvider) =>
     canManage && (Boolean(connectFlows[provider]) || integrationProviders[provider].directConnect);
 
-  const closeConnect = () => setConnectingProvider(undefined);
-  const connectFlow = connectingProvider ? connectFlows[connectingProvider] : undefined;
+  const sectionIdPrefix = sectionKey === 'tenant' || sectionKey === 'user' ? '' : `${sectionKey}-`;
+
+  const renderConnect = (provider: IntegrationProvider | null) => (close: () => void) => {
+    const connectFlow = provider ? connectFlows[provider] : undefined;
+    if (!connectFlow) {
+      return <CreateIntegrationModal provider={provider} onClose={close} onSubmit={handleCreate} />;
+    }
+    return connectFlow({
+      context,
+      ownership,
+      onClose: close,
+      onConnected: () => {
+        close();
+        void refreshIntegrations();
+        invalidateUnfinishedActiveFlow(queryClient);
+      },
+    });
+  };
 
   const providerSections = (
     <div className="space-y-3">
-      {integrationProviderValues.map((provider) => {
-        const { label, icon } = integrationProviders[provider];
-        return (
-          <IntegrationProviderSection
-            key={provider}
-            context={context}
-            ownership={ownership}
-            provider={provider}
-            label={label}
-            icon={icon}
-            actionLabel="Connect"
-            actionAriaLabel={`Connect ${label}`}
-            canConnect={canConnectProvider(provider)}
-            showStatus
-            canManage={canManage}
-            onConnect={() => setConnectingProvider(provider)}
-            onDelete={handleDelete}
-          />
-        );
-      })}
+      {integrationProviderValues
+        .filter((provider) => providerFitsOwner(provider, integrationQueries.owner.ownerModel))
+        .map((provider) => {
+          const { label, icon } = integrationProviders[provider];
+          return (
+            <IntegrationProviderSection
+              key={provider}
+              context={context}
+              ownership={ownership}
+              provider={provider}
+              label={label}
+              icon={icon}
+              actionLabel="Connect"
+              actionAriaLabel={`Connect ${label}`}
+              canConnect={canConnectProvider(provider)}
+              showStatus
+              canManage={canManage}
+              sectionId={`${sectionIdPrefix}connect-${provider}`}
+              renderConnect={renderConnect(provider)}
+              onDelete={handleDelete}
+            />
+          );
+        })}
       <IntegrationProviderSection
         context={context}
         ownership={ownership}
@@ -307,50 +340,34 @@ const IntegrationOwnerSection = ({
         canConnect={canManage}
         showStatus={false}
         canManage={canManage}
-        onConnect={() => setConnectingProvider(null)}
+        sectionId={`${sectionIdPrefix}add-custom`}
+        renderConnect={renderConnect(null)}
         onDelete={handleDelete}
       />
     </div>
   );
 
-  return (
-    <>
-      {title ? (
-        <section className="space-y-3" data-testid={`integrations-section-${sectionKey}`}>
-          <Card>
-            <CardHeader>
-              <CardTitle>{title}</CardTitle>
-              {description ? <CardDescription>{description}</CardDescription> : null}
-            </CardHeader>
-            <CardContent>{providerSections}</CardContent>
-          </Card>
-        </section>
-      ) : (
-        providerSections
-      )}
-
-      {connectFlow ? (
-        connectFlow({
-          context,
-          ownership,
-          onClose: closeConnect,
-          onConnected: () => {
-            closeConnect();
-            void refreshIntegrations();
-          },
-        })
-      ) : (
-        <CreateIntegrationModal
-          provider={connectingProvider}
-          onClose={closeConnect}
-          onSubmit={handleCreate}
-        />
-      )}
-    </>
+  return title ? (
+    <section className="space-y-3" data-testid={`integrations-section-${sectionKey}`}>
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          {description ? <CardDescription>{description}</CardDescription> : null}
+        </CardHeader>
+        <CardContent>{providerSections}</CardContent>
+      </Card>
+    </section>
+  ) : (
+    providerSections
   );
 };
 
-export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) => {
+const personalContext: AuthenticatedContext = { type: 'user' };
+
+export const IntegrationsPage = ({
+  connectFlows = {},
+  providerFitsOwner = everyProviderFitsEveryOwner,
+}: IntegrationsPageProps) => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const tenant = context.space ?? context.organization;
   const hasMembership = useAppStore((state) =>
@@ -365,11 +382,20 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
     <Page title="Integrations" description="Connect the services this workspace works with">
       {tenant ? (
         <div className="space-y-6">
+          <IntegrationOwnerSection
+            context={personalContext}
+            connectFlows={connectFlows}
+            providerFitsOwner={providerFitsOwner}
+            sectionKey="personal"
+            title="Personal"
+            description="Services connected to your own account."
+          />
           {hasMembership ? (
             <IntegrationOwnerSection
               context={context}
               ownership={{ ownedByMyMembership: true }}
               connectFlows={connectFlows}
+              providerFitsOwner={providerFitsOwner}
               sectionKey="member"
               title={`Yours in ${tenant.name}`}
               description={`Services connected as you within ${tenant.name}. Only you and its owners see them.`}
@@ -378,13 +404,19 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
           <IntegrationOwnerSection
             context={context}
             connectFlows={connectFlows}
+            providerFitsOwner={providerFitsOwner}
             sectionKey="tenant"
             title={`${tenant.name}'s integrations`}
             description={`Services connected for all of ${tenant.name}.`}
           />
         </div>
       ) : (
-        <IntegrationOwnerSection context={context} connectFlows={connectFlows} sectionKey="user" />
+        <IntegrationOwnerSection
+          context={context}
+          connectFlows={connectFlows}
+          providerFitsOwner={providerFitsOwner}
+          sectionKey="user"
+        />
       )}
     </Page>
   );

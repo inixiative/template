@@ -269,7 +269,7 @@ Deep linking with dot notation:
 - `#usersTable.usr_abc123` → scrolls to `[data-key="usr_abc123"]` within that section
 - `#usersTable.3` → scrolls to the 4th `[data-key]` child (0-indexed fallback)
 
-Use camelCase for section IDs (they become URL hash fragments). `useSectionOpen(sectionId)` returns `[open, setOpen]` for a collapsible section tied to the hash.
+Use kebab-case for section IDs (they become URL hash fragments, e.g. `create-token`, `member-connect-slack`). `useSectionOpen(sectionId)` returns `[open, setOpen]` for a collapsible section tied to the hash.
 
 ### Infinite Scroll Trigger — useInfiniteScrollTrigger
 

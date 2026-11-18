@@ -5,6 +5,7 @@
  * @uses primitive:sdk
  */
 import type { QueryKey } from '@tanstack/react-query';
+import type { IntegrationOwnerModel } from '@template/db';
 import {
   integrationDelete,
   type MeReadManyIntegrationsData,
@@ -43,10 +44,12 @@ const deleteIntegration = mutation({
 });
 
 const ownerQueries = (
+  ownerModel: IntegrationOwnerModel,
   readManyQueryKey: (query?: IntegrationListQuery) => QueryKey,
   readMany: (opts: ReadManyOptions) => ReturnType<typeof meReadManyIntegrations<true>>,
   create: (opts: CreateOptions) => ReturnType<typeof meCreateIntegration>,
 ) => ({
+  owner: { ownerModel },
   readManyQueryKey,
   readMany: apiMutation(readMany),
   create: mutation({ mutationFn: apiMutation(create) }),
@@ -56,6 +59,7 @@ const ownerQueries = (
 export const integrationContextQueries = makeContextQueries<MyMembershipOwnership>()({
   user: () =>
     ownerQueries(
+      'User',
       (query) => meReadManyIntegrationsInfiniteQueryKey({ query }),
       (opts) => meReadManyIntegrations({ ...opts, throwOnError: true }),
       (opts) => meCreateIntegration(opts),
@@ -64,6 +68,7 @@ export const integrationContextQueries = makeContextQueries<MyMembershipOwnershi
     if (!ownership?.ownedByMyMembership) {
       const path = { id: organization.id };
       return ownerQueries(
+        'Organization',
         (query) => organizationReadManyIntegrationsInfiniteQueryKey({ path, query }),
         (opts) => organizationReadManyIntegrations({ ...opts, path, throwOnError: true }),
         (opts) => organizationCreateIntegration({ ...opts, path }),
@@ -71,6 +76,7 @@ export const integrationContextQueries = makeContextQueries<MyMembershipOwnershi
     }
     const path = { id: myOrganizationUserOrThrow(organization.id).id };
     return ownerQueries(
+      'OrganizationUser',
       (query) => organizationUserReadManyIntegrationsInfiniteQueryKey({ path, query }),
       (opts) => organizationUserReadManyIntegrations({ ...opts, path, throwOnError: true }),
       (opts) => organizationUserCreateIntegration({ ...opts, path }),
@@ -80,6 +86,7 @@ export const integrationContextQueries = makeContextQueries<MyMembershipOwnershi
     if (!ownership?.ownedByMyMembership) {
       const path = { id: space.id };
       return ownerQueries(
+        'Space',
         (query) => spaceReadManyIntegrationsInfiniteQueryKey({ path, query }),
         (opts) => spaceReadManyIntegrations({ ...opts, path, throwOnError: true }),
         (opts) => spaceCreateIntegration({ ...opts, path }),
@@ -87,6 +94,7 @@ export const integrationContextQueries = makeContextQueries<MyMembershipOwnershi
     }
     const path = { id: mySpaceUserOrThrow(space.id).id };
     return ownerQueries(
+      'SpaceUser',
       (query) => spaceUserReadManyIntegrationsInfiniteQueryKey({ path, query }),
       (opts) => spaceUserReadManyIntegrations({ ...opts, path, throwOnError: true }),
       (opts) => spaceUserCreateIntegration({ ...opts, path }),
