@@ -10,7 +10,7 @@
 - [Optimistic Mutations](#optimistic-mutations)
 - [Data Hooks](#data-hooks)
   - [Architecture](#architecture)
-  - [queryCapabilitiesFromOpenApi](#listquerycapabilitiesfromopenapi)
+  - [queryCapabilitiesFromOpenApi](#querycapabilitiesfromopenapi)
   - [usePaginatedData — Page-Number Pagination](#usepaginateddata--page-number-pagination)
   - [useInfiniteData — Infinite Scroll](#useinfinitedata--infinite-scroll)
   - [Table and Pagination](#table-and-pagination)

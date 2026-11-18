@@ -69,7 +69,7 @@ business logic is `services`; `handlers` are jobs and frontend event handlers. Z
 - uses a metaphor only its author reads (`settle`, `shadow`, `trip`, `sweep`);
 - says something the code does not do (a clientIp that returns a rate-limit bucket address, now `clientRateLimitBucketAddress`);
 - is a bare verb, a bare noun or a past participle (`collect`, `registry`, `built`);
-- abbreviates a model or concept (`CustomerRef`, `orgId`). `Nav` is accepted.
+- abbreviates a model or concept (Ref for Relationship, `orgId`). `Nav` is accepted.
 
 ### Field vocabulary
 
