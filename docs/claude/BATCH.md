@@ -15,6 +15,8 @@
   - [Syntax](#syntax)
   - [Examples](#examples)
   - [Security Validations](#security-validations)
+  - [Escapes](#escapes)
+  - [References in SDK-built paths](#references-in-sdk-built-paths)
 - [Status Tracking](#status-tracking)
   - [Status Values](#status-values)
   - [Strategy-Specific Behavior](#strategy-specific-behavior)
@@ -281,6 +283,23 @@ Interpolation syntax is validated to prevent:
 - Nested interpolation: `<<0.0.body.data.<<1.0.id>>>>` ❌
 - Current/future round references: `<<1.0.id>>` from round 1 ❌
 - Malformed syntax: `<<invalid>>` ❌
+- An unescaped stray `<<` or `>>` (text like `a << b`) ❌: escape it
+
+### Escapes
+
+Every string the batch interpolates (path, body values, headers) reads a backslash run directly before `<<` or `>>` as escapes: each `\\` is one literal backslash, and an odd backslash makes the bracket literal. Backslashes anywhere else are left as they are.
+
+| Sent | Arrives as |
+|---|---|
+| `a \<< b \>> c` | `a << b >> c` |
+| `x \\<<0.0.body.data.id>>` | `x \` followed by the resolved id |
+| `C:\\dir\file` | unchanged |
+
+A client that sends text it does not mean as references escapes it with `escapeBatchInterpolation` (`@template/shared/batchInterpolation`); the server parses with `tokenizeBatchInterpolation` from the same module, so the two never disagree.
+
+### References in SDK-built paths
+
+The SDK percent-encodes path and query values, so a reference written into a path param arrives as `%3C%3C0.0.body.data.id%3E%3E`. Before interpolating a path, the server decodes exactly that shape (`decodePercentEncodedReferences`) and no other encoding, so `%2F`, `%20` and the rest keep their meaning.
 
 ---
 

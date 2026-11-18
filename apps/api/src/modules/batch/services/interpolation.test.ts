@@ -292,4 +292,30 @@ describe('interpolation', () => {
       });
     });
   });
+
+  describe('escapes and encoded paths', () => {
+    const context = { results: [[{ id: 'org-1' }]], currentRound: 1 };
+
+    it('keeps an escaped bracket literal beside a live reference', () => {
+      expect(interpolateValue('id <<0.0.id>> and \\<<literal\\>>', context)).toBe(
+        'id org-1 and <<literal>>',
+      );
+    });
+
+    it('lets an escaped backslash precede a live reference', () => {
+      expect(interpolateValue('x \\\\<<0.0.id>>', context)).toBe('x \\org-1');
+    });
+
+    it('still refuses an unescaped stray bracket', () => {
+      expect(() => interpolateValue('a << b', context)).toThrow('unclosed <<');
+    });
+
+    it('resolves a percent-encoded reference in a path and leaves other encodings alone', () => {
+      const request = interpolateRequest(
+        { method: 'GET', path: '/api/v1/organization/%3C%3C0.0.id%3E%3E/users?q=a%2Fb%20c' },
+        context,
+      );
+      expect(request.path).toBe('/api/v1/organization/org-1/users?q=a%2Fb%20c');
+    });
+  });
 });

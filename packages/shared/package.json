@@ -17,6 +17,7 @@
     "./test/*": "./src/test/*.ts",
     "./bracketQuery": "./src/lib/bracketQuery/index.ts",
     "./bracketQuery/*": "./src/lib/bracketQuery/*.ts",
+    "./batchInterpolation": "./src/lib/batchInterpolation/index.ts",
     "./errors": "./src/errors/index.ts",
     "./auth/*": "./src/auth/*.ts",
     "./flows": "./src/flows/index.ts",
