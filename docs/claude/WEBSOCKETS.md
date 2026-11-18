@@ -270,7 +270,7 @@ frame (`{ type: 'upsert', payload, revive: true }`), outside the route-shaped ro
 reconnect) keeps the removed ids, dropping only those whose row the snapshot shows alive. Among
 upserts of a live row, the definition's `ordering` decides: by default an update older than the
 held row (by `updatedAt`) is ignored, so the folded state only moves forward. Action listeners
-(`useStreamAction`) still hear every append, stale ones included.
+(`useDataStreamMessageListener`) still hear every append, stale ones included.
 
 ### Sequence numbers
 
@@ -362,13 +362,13 @@ Redis; each instance wraps it in the append frame on delivery.
 
 ```typescript
 const contacts = useOrganizationContactsStream(organizationId);
-// = useStream<OrganizationContactsStream>(STREAM_DEFINITIONS.organizationReadManyContacts.name({ id }))
-useStreamAction<{ id: string }>(stream, 'remove', (removal) => toast(removal.id));
+// = useDataStreamSnapshot<OrganizationContactsStream>(STREAM_DEFINITIONS.organizationReadManyContacts.name({ id }))
+useDataStreamMessageListener<{ id: string }>(stream, 'remove', (removal) => toast(removal.id));
 ```
 
-- `useStream<TSnapshot>(stream)` returns a TanStack query result holding the folded snapshot. A
+- `useDataStreamSnapshot<TSnapshot>(stream)` returns a TanStack query result holding the folded snapshot. A
   typed per-stream hook names the SDK response type, as `useOrganizationContactsStream` does.
-- `useStreamAction<TPayload>(stream, op, listener)` registers a side-effect listener for one op;
+- `useDataStreamMessageListener<TPayload>(stream, op, listener)` registers a side-effect listener for one op;
   any number may be mounted.
 - Folding is by kind, not per caller: `STREAM_FOLDS` (`packages/ui/src/lib/ws/streamFolds.ts`) maps
   each kind to its `snapshot` and `ops` folds, typed so every op of a kind has one. Custom
@@ -398,9 +398,9 @@ stream the client has not opened, has closed, or that was rejected, are ignored.
 
 ## Frontend and horizontal scaling
 
-`useApiWebsocket()` is mounted at each app root. The client slice's query-cache listener subscribes
+`useApiWebsocket()` is mounted at each app root. The query client and websocket slice's query-cache listener subscribes
 and unsubscribes mounted queries gated by the keys of `WS_CHANNELS`, and opens and closes streams for
-mounted stream queries; `setClient` wires the QueryClient and reconnect recovery.
+mounted stream queries; `connectQueryClientToWebsocket` wires the QueryClient and reconnect recovery.
 
 `sendToChannel`, `appendToStream` and `broadcast` publish through Redis
 `ws:broadcast`. Each API instance delivers to its local registry. Stream snapshots are served by
@@ -414,7 +414,7 @@ is unavailable during the outage; stream appends cannot be sequenced, so local h
   ops, frame limits and browser transport.
 - `packages/ui/src/lib/ws/`: API socket, acknowledgement/retry and settle handling, dispatch,
   kind folds (`listStream`, `logStream`) and the listener registry.
-- `packages/ui/src/hooks/useStream.ts`, `useStreamAction.ts`: consumer hooks.
+- `packages/ui/src/hooks/useDataStreamSnapshot.ts`, `useDataStreamMessageListener.ts`: consumer hooks.
 - `apps/api/src/ws/`: handler, identity, route resolution, stream access and re-authorization,
   registries, delivery, ordering and Redis pub/sub.
 - `apps/api/src/ws/probe.test.ts`: real-route authorization, unknown channels, dot segments,
@@ -434,7 +434,7 @@ is unavailable during the outage; stream appends cannot be sequenced, so local h
 - `apps/api/src/appEvents/handlers/contact/organizationContactsStream.test.ts`: app event →
   Redis → open socket, with append rows matching the route snapshot.
 - `packages/ui/src/lib/ws/createApiWebsocket.test.ts`,
-  `listStream.test.ts`, `dispatch.test.ts`, `packages/ui/src/hooks/useStream.test.tsx`:
+  `listStream.test.ts`, `dispatch.test.ts`, `packages/ui/src/hooks/useDataStreamSnapshot.test.tsx`:
   client protocol, retries, settling, seq gaps and resync, folds and hooks.
 
 See [APP_EVENTS.md](APP_EVENTS.md) and [Segments](SEGMENTS.md#events-and-email-integration).

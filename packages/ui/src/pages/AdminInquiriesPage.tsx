@@ -4,25 +4,29 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+import { useQuery } from '@tanstack/react-query';
 import {
   type AdminInquiryReadManyResponses,
   adminInquiryReadMany,
   adminInquiryReadManyQueryKey,
   type InquiryItem,
 } from '@template/sdk';
-import { Badge, EmptyState, Page, Table } from '@template/ui/components';
-import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
-import { useQuery } from '@template/ui/hooks';
-import { apiQuery } from '@template/ui/lib/apiQuery';
+import { EmptyState, Page, Table } from '@template/ui/components';
 import {
-  INQUIRY_STATUS_COLORS,
+  InquirySourceControls,
+  InquiryStatusBadge,
+  InquiryTargetControls,
+} from '@template/ui/components/inquiries';
+import { apiQuery } from '@template/ui/lib/apiQuery';
+import { inquiryPartyDisplayName } from '@template/ui/lib/inquiries/inquiryPartyDisplayName';
+import {
   INQUIRY_TYPE_LABELS,
   type InquiryFilters,
   type InquiryStatus,
   inquiryFiltersToSearchFields,
-  mergeInquiryFilters,
+  narrowInquiryFiltersWithinPageBounds,
 } from '@template/ui/lib/inquiries/queryKeys';
-import { getInquiryInterface } from '@template/ui/lib/inquiries/registry';
+import { inquiryTypeComponentsFor } from '@template/ui/lib/inquiries/registry';
 import { useMemo, useState } from 'react';
 
 type Inquiry = AdminInquiryReadManyResponses[200]['data'][number];
@@ -35,7 +39,7 @@ type AdminInquiriesPageProps = {
 export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) => {
   const [statusFilter, setStatusFilter] = useState<InquiryStatus | ''>('');
 
-  const merged = mergeInquiryFilters(filters, {
+  const merged = narrowInquiryFiltersWithinPageBounds(filters, {
     statuses: statusFilter ? [statusFilter] : undefined,
   });
   // Recompute when the include-expired toggle changes so the cutoff stays in sync with the filter state.
@@ -99,17 +103,17 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
             {
               key: 'status',
               label: 'Status',
-              render: (inq: Inquiry) => <StatusBadge inq={inq} />,
+              render: (inq: Inquiry) => <InquiryStatusBadge inquiry={inq} />,
             },
             {
               key: 'source',
               label: 'Source',
-              render: (inq: Inquiry) => actorLabel(inq, 'source'),
+              render: (inq: Inquiry) => inquiryPartyDisplayName(inq, 'source'),
             },
             {
               key: 'target',
               label: 'Target',
-              render: (inq: Inquiry) => actorLabel(inq, 'target'),
+              render: (inq: Inquiry) => inquiryPartyDisplayName(inq, 'target'),
             },
             {
               key: 'sentAt',
@@ -134,30 +138,6 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
         />
       )}
     </Page>
-  );
-};
-
-const actorLabel = (inq: Inquiry, side: 'source' | 'target'): string => {
-  if (side === 'source') {
-    if (inq.sourceUser) return inq.sourceUser.name || inq.sourceUser.email;
-    if (inq.sourceOrganization) return inq.sourceOrganization.name;
-    if (inq.sourceSpace) return inq.sourceSpace.name;
-    return inq.sourceModel;
-  }
-  if (inq.targetUser) return inq.targetUser.name || inq.targetUser.email;
-  if (inq.targetOrganization) return inq.targetOrganization.name;
-  if (inq.targetSpace) return inq.targetSpace.name;
-  return inq.targetModel;
-};
-
-const StatusBadge = ({ inq }: { inq: Inquiry }) => {
-  const isExpired = inq.expiresAt && new Date(inq.expiresAt) < new Date();
-  const label = isExpired ? 'expired' : inq.status;
-  const color = isExpired ? INQUIRY_STATUS_COLORS.expired : INQUIRY_STATUS_COLORS[inq.status];
-  return (
-    <Badge className={color}>
-      <span className="capitalize">{label}</span>
-    </Badge>
   );
 };
 
@@ -189,7 +169,7 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
           </tr>
         </thead>
         {inquiries.map((inq) => {
-          const entry = getInquiryInterface(inq.type);
+          const entry = inquiryTypeComponentsFor(inq.type);
           const SourceSummary = entry?.source?.summary;
           const TargetSummary = entry?.target?.summary;
 
@@ -197,12 +177,12 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
           const sourceNode = SourceSummary ? (
             <SourceSummary inquiry={inq as unknown as InquiryItem} />
           ) : (
-            actorLabel(inq, 'source')
+            inquiryPartyDisplayName(inq, 'source')
           );
           const targetNode = TargetSummary ? (
             <TargetSummary inquiry={inq as unknown as InquiryItem} />
           ) : (
-            actorLabel(inq, 'target')
+            inquiryPartyDisplayName(inq, 'target')
           );
 
           return (
@@ -213,7 +193,7 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
                   {INQUIRY_TYPE_LABELS[inq.type] ?? inq.type}
                 </td>
                 <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-                  <StatusBadge inq={inq} />
+                  <InquiryStatusBadge inquiry={inq} />
                 </td>
                 <td className="px-4 pt-3 pb-1 text-sm">
                   <span className="text-xs text-muted-foreground mr-1">↑</span>

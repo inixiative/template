@@ -91,7 +91,7 @@ export const attachRuleHealthToSegment = async (
   segment: SegmentWithEdges,
 ): Promise<SegmentWithRuleHealth> => (await attachRuleHealthToSegments([segment]))[0]!;
 
-export const fetchSegmentsWithoutRuleIssues = async (
+export const filterSegmentsWithoutRuleIssues = async (
   segments: SegmentWithEdges[],
 ): Promise<SegmentWithRuleIssues[]> =>
   (await ruleIssuesOf(segments)).filter((segment) => !segment.ruleIssues.length);

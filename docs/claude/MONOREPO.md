@@ -132,7 +132,7 @@ Originally, `@template/shared` was meant for code shared between frontend and ba
 
 ```
 ui/src/components/
-├── auth/              # LoginForm, SignupForm
+├── auth/              # LoginForm, SignUpForm
 ├── layout/            # AppShell, Sidebar, Header
 ├── organizations/     # CreateOrganizationModal
 ├── primitives/        # Button, Input, Card (shadcn/ui)

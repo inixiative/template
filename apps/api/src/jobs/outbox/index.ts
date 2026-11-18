@@ -23,7 +23,7 @@ export {
   isOverflowFlagSet,
   makeDepthEstimator,
   probeDepthsAndSetOverflowFlagForLanesAtCap,
-  recordAddAndTripIfFull,
+  recordEnqueueAndSetOverflowFlagForLanesAtCap,
   renewOverflowFlagTtl,
   setOverflowFlagForLanesAtCap,
   warnIfOverflowStuck,

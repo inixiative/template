@@ -10,7 +10,7 @@
 - [Optimistic Mutations](#optimistic-mutations)
 - [Data Hooks](#data-hooks)
   - [Architecture](#architecture)
-  - [makeDataConfig](#makedataconfig)
+  - [listQueryCapabilitiesFromOpenApi](#listquerycapabilitiesfromopenapi)
   - [usePaginatedData — Page-Number Pagination](#usepaginateddata--page-number-pagination)
   - [useInfiniteData — Infinite Scroll](#useinfinitedata--infinite-scroll)
   - [Table and Pagination](#table-and-pagination)
@@ -44,9 +44,9 @@ It lives outside `@template/ui` so non-UI consumers can call apps/api without im
 
 ## apiQuery and apiMutation
 
-**Location:** `packages/ui/src/lib/apiQuery.ts`, `apiMutation.ts`, `apiFetchInternal.ts`
+**Location:** `packages/ui/src/lib/apiQuery.ts`, `apiMutation.ts`, `makeAuthenticatedApiFetch.ts`
 
-Both wrap an SDK call in `apiFetchInternal`, which:
+Both wrap an SDK call in `makeAuthenticatedApiFetch`, which:
 
 - adds `Authorization: Bearer <token>` and `x-spoof-user-email` when spoofing;
 - points the client at `VITE_API_URL`, fills `:id` path params, and bracket-encodes nested query params (`serializeBracketQuery`);
@@ -57,7 +57,7 @@ Both wrap an SDK call in `apiFetchInternal`, which:
 
 ```typescript
 import { organizationRead, organizationReadQueryKey } from '@template/sdk';
-import { useQuery } from '@template/ui/hooks';
+import { useQuery } from '@tanstack/react-query';
 import { apiQuery } from '@template/ui/lib';
 
 const { data } = useQuery({
@@ -129,9 +129,9 @@ Server data primitives for search, filter, sort, pagination, infinite scroll, sc
 ### Architecture
 
 ```
-makeDataConfig(operationId)     → DataConfig (searchable fields, orderable fields, enums)
+listQueryCapabilitiesFromOpenApi(operationId)     → ListQueryCapabilities (searchable fields, orderable fields, enums)
     ↓
-useDataFilters(config)          → shared search/filter/sort state + filterQuery
+useListSearchFilterAndOrderState(config)          → shared search/filter/sort state + filterQuery
     ↓
 usePaginatedData({ config })    → filters + page/pageSize + scroll restore + URL sync
 useInfiniteData({ config })     → filters + TanStack infinite query + scroll restore
@@ -145,19 +145,19 @@ Supporting hooks (used internally or standalone):
 - `useInfiniteScrollTrigger` — IntersectionObserver sentinel for load-more
 - `useInfiniteDataQuery` — low-level TanStack Query infinite wrapper
 
-### makeDataConfig
+### listQueryCapabilitiesFromOpenApi
 
 Builds the data configuration from the OpenAPI spec's query metadata.
 
-**Location:** `packages/ui/src/lib/makeDataConfig.ts`
+**Location:** `packages/ui/src/lib/listQueryCapabilitiesFromOpenApi.ts`
 
 ```typescript
-import { makeDataConfig } from '@template/ui/lib/makeDataConfig';
+import { listQueryCapabilitiesFromOpenApi } from '@template/ui/lib/listQueryCapabilitiesFromOpenApi';
 
-const config = makeDataConfig('adminOrganizationReadMany');
+const config = listQueryCapabilitiesFromOpenApi('adminOrganizationReadMany');
 // { searchableFields, orderableFields, enumFilters, defaultOrderBy, canSearch, canOrder }
 
-makeDataConfig('operationId', {
+listQueryCapabilitiesFromOpenApi('operationId', {
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
   canSearch: false, // default: true when the operation has searchable fields
   canOrder: true,
@@ -170,7 +170,7 @@ makeDataConfig('operationId', {
 import { usePaginatedData } from '@template/ui/hooks';
 
 const data = usePaginatedData({
-  config: makeDataConfig('adminOrganizationReadMany'),
+  config: listQueryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
   sectionId: 'orgs',          // scroll restore + section hash
   shareableUrl: true,          // ?page=3&search=acme in URL
 });
@@ -192,7 +192,7 @@ Options: `config`, `sectionId?`, `shareableUrl?`, `scrollRestore?`, `defaultPage
 import { useInfiniteData } from '@template/ui/hooks';
 
 const feed = useInfiniteData({
-  config: makeDataConfig('adminOrganizationReadMany'),
+  config: listQueryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
   queryKey: ['orgs'],
   queryFn: (page, filterQuery) => fetchOrgPage({ ...filterQuery, page }), // returns one page
   sectionId: 'orgFeed',
@@ -339,13 +339,13 @@ Run from `packages/ui` (requires `bunfig.toml` for happy-dom preload):
 cd packages/ui && bun run test
 ```
 
-Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `makeDataConfig.test.ts`, `useDataFilters.test.ts`, `usePaginatedData.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `apiFetchInternal.test.ts`; bracket encoding in `@template/shared/bracketQuery`.
+Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `listQueryCapabilitiesFromOpenApi.test.ts`, `buildFilterQuery.test.ts`, `dataStatePersistence.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `makeAuthenticatedApiFetch.test.ts`; bracket encoding in `@template/shared/bracketQuery`.
 
 ## Key Files
 
 - `packages/sdk/src/` — generated client
-- `packages/ui/src/lib/{apiQuery,apiMutation,apiFetchInternal,makeContextQueries,makeDataConfig}.ts`
+- `packages/ui/src/lib/{apiQuery,apiMutation,makeAuthenticatedApiFetch,makeContextQueries,listQueryCapabilitiesFromOpenApi}.ts`
 - `packages/ui/src/hooks/useOptimisticMutation.ts`
-- `packages/ui/src/hooks/{useDataFilters,usePaginatedData,useInfiniteData,useInfiniteDataQuery,useInfiniteScrollTrigger,useScrollState,useSectionHash}.ts`
+- `packages/ui/src/hooks/{useListSearchFilterAndOrderState,usePaginatedData,useInfiniteData,useInfiniteDataQuery,useInfiniteScrollTrigger,useScrollState,useSectionHash}.ts`
 - `packages/ui/src/hooks/{useDebounce,useValidateUniqueness}.ts`
 - `packages/ui/src/components/primitives/{Table,Pagination}.tsx`

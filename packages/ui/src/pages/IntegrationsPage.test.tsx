@@ -26,7 +26,7 @@ import {
 } from '@testing-library/react';
 
 const initialState = useAppStore.getState();
-const bucketCount = integrationProviderValues.length + 1;
+const providerSectionCount = integrationProviderValues.length + 1;
 
 type StoredIntegration = Record<string, unknown> & {
   id: string;
@@ -70,7 +70,7 @@ const scrollToEnd = (container: HTMLElement) => {
   }
 };
 
-const serverIntegration = async (
+const buildStoredIntegrationRow = async (
   name: string,
   provider: StoredIntegration['provider'],
 ): Promise<StoredIntegration> => {
@@ -83,7 +83,7 @@ const serverIntegration = async (
   return entity.__serialize() as StoredIntegration;
 };
 
-const setContext = (context: TenantContext, canManage: boolean) =>
+const setTenantContextAndStubManagePermission = (context: TenantContext, canManage: boolean) =>
   useAppStore.setState((state) => ({
     tenant: { ...state.tenant, context },
     permissions: {
@@ -107,8 +107,8 @@ const providerCard = (provider: string) => screen.getByTestId(`provider-${provid
 const listRequests = () =>
   requests.filter((request): request is ListRequest => request.method === 'GET');
 
-const waitForBuckets = () =>
-  waitFor(() => expect(listRequests().length).toBeGreaterThanOrEqual(bucketCount));
+const waitForEveryProviderListRequest = () =>
+  waitFor(() => expect(listRequests().length).toBeGreaterThanOrEqual(providerSectionCount));
 
 const readProviderFilter = (url: URL) =>
   url.searchParams.get('searchFields[provider][equals][:]') === 'null'
@@ -153,7 +153,7 @@ beforeEach(async () => {
         provider: IntegrationProvider | null;
       };
       requests.push({ method: 'POST', path, body });
-      const integration = await serverIntegration(body.name, body.provider);
+      const integration = await buildStoredIntegrationRow(body.name, body.provider);
       stored[path] = [...(stored[path] ?? []), integration];
       return Response.json({ data: integration }, { status: 201 });
     }
@@ -173,7 +173,7 @@ beforeEach(async () => {
   useAppStore.setState((state) => ({
     auth: { ...state.auth, user: owner.__serialize(), isAuthenticated: true },
   }));
-  setContext({ type: 'user' }, true);
+  setTenantContextAndStubManagePermission({ type: 'user' }, true);
 });
 
 afterEach(() => {
@@ -185,8 +185,8 @@ afterEach(() => {
 });
 
 describe('IntegrationsPage', () => {
-  it('renders every catalog provider with the status of its own bucket', async () => {
-    stored['/api/v1/me/integrations'] = [await serverIntegration('Engineering', 'github')];
+  it('renders every catalog provider with the status of its own section', async () => {
+    stored['/api/v1/me/integrations'] = [await buildStoredIntegrationRow('Engineering', 'github')];
     renderPage();
     await screen.findByText('Engineering');
 
@@ -197,9 +197,9 @@ describe('IntegrationsPage', () => {
     expect(await within(providerCard('slack')).findByText('Not connected')).toBeTruthy();
   });
 
-  it('queries one bucket per provider plus a null-provider bucket for custom integrations', async () => {
+  it('queries one list per provider plus a null-provider list for custom integrations', async () => {
     renderPage();
-    await waitForBuckets();
+    await waitForEveryProviderListRequest();
 
     expect(
       listRequests()
@@ -209,8 +209,8 @@ describe('IntegrationsPage', () => {
   });
 
   it('marks providers disabled when the actor cannot manage the owner', async () => {
-    setContext({ type: 'user' }, false);
-    stored['/api/v1/me/integrations'] = [await serverIntegration('Engineering', 'github')];
+    setTenantContextAndStubManagePermission({ type: 'user' }, false);
+    stored['/api/v1/me/integrations'] = [await buildStoredIntegrationRow('Engineering', 'github')];
     renderPage();
     await screen.findByText('Engineering');
 
@@ -227,10 +227,10 @@ describe('IntegrationsPage', () => {
 
   it('groups each integration under its provider', async () => {
     stored['/api/v1/me/integrations'] = [
-      await serverIntegration('Frontend repo', 'github'),
-      await serverIntegration('Backend repo', 'github'),
-      await serverIntegration('Team chat', 'slack'),
-      await serverIntegration('Legacy', null),
+      await buildStoredIntegrationRow('Frontend repo', 'github'),
+      await buildStoredIntegrationRow('Backend repo', 'github'),
+      await buildStoredIntegrationRow('Team chat', 'slack'),
+      await buildStoredIntegrationRow('Legacy', null),
     ];
     renderPage();
     await screen.findByText('Team chat');
@@ -245,12 +245,17 @@ describe('IntegrationsPage', () => {
     expect(within(providerCard('linear')).queryByRole('listitem')).toBeNull();
   });
 
-  it('shows a hundred integrations per bucket and scrolls inside the bucket for more', async () => {
+  it('shows a hundred integrations per provider section and scrolls inside the section for more', async () => {
     const repos: StoredIntegration[] = [];
     for (let index = 1; index <= 102; index++) {
-      repos.push(await serverIntegration(`Repo ${String(index).padStart(3, '0')}`, 'github'));
+      repos.push(
+        await buildStoredIntegrationRow(`Repo ${String(index).padStart(3, '0')}`, 'github'),
+      );
     }
-    stored['/api/v1/me/integrations'] = [...repos, await serverIntegration('Team chat', 'slack')];
+    stored['/api/v1/me/integrations'] = [
+      ...repos,
+      await buildStoredIntegrationRow('Team chat', 'slack'),
+    ];
     renderPage();
     await screen.findByText('Repo 100', {}, { timeout: 5_000 });
 
@@ -275,18 +280,21 @@ describe('IntegrationsPage', () => {
   it('lists the integrations of the current context: me, organization or space', async () => {
     const organization = (await buildOrganization()).entity.__serialize();
     const space = (await buildSpace({ organizationId: organization.id })).entity.__serialize();
-    stored['/api/v1/me/integrations'] = [await serverIntegration('Personal', 'notion')];
+    stored['/api/v1/me/integrations'] = [await buildStoredIntegrationRow('Personal', 'notion')];
     stored[`/api/v1/organization/${organization.id}/integrations`] = [
-      await serverIntegration('Company', 'notion'),
+      await buildStoredIntegrationRow('Company', 'notion'),
     ];
     stored[`/api/v1/space/${space.id}/integrations`] = [
-      await serverIntegration('Workspace', 'notion'),
+      await buildStoredIntegrationRow('Workspace', 'notion'),
     ];
 
     const view = renderPage();
     await screen.findByText('Personal');
 
-    setContext({ type: 'organization', organization } as unknown as TenantContext, true);
+    setTenantContextAndStubManagePermission(
+      { type: 'organization', organization } as unknown as TenantContext,
+      true,
+    );
     view.rerender(
       <QueryClientProvider client={client}>
         <IntegrationsPage />
@@ -295,7 +303,10 @@ describe('IntegrationsPage', () => {
     await screen.findByText('Company');
     expect(screen.queryByText('Personal')).toBeNull();
 
-    setContext({ type: 'space', organization, space } as unknown as TenantContext, true);
+    setTenantContextAndStubManagePermission(
+      { type: 'space', organization, space } as unknown as TenantContext,
+      true,
+    );
     view.rerender(
       <QueryClientProvider client={client}>
         <IntegrationsPage />
@@ -321,7 +332,7 @@ describe('IntegrationsPage', () => {
 
   it("connect opens the provider's create flow and lists the new integration under it", async () => {
     renderPage();
-    await waitForBuckets();
+    await waitForEveryProviderListRequest();
 
     fireEvent.click(screen.getByRole('button', { name: 'Connect Slack' }));
     await screen.findByText('Connect Slack');
@@ -343,7 +354,7 @@ describe('IntegrationsPage', () => {
 
   it('always shows the Custom card, and Add custom creates an integration without a provider', async () => {
     renderPage();
-    await waitForBuckets();
+    await waitForEveryProviderListRequest();
 
     const custom = within(providerCard('custom'));
     expect(custom.getByText('Custom')).toBeTruthy();
@@ -380,11 +391,11 @@ describe('IntegrationsPage', () => {
         />
       </QueryClientProvider>,
     );
-    await waitForBuckets();
+    await waitForEveryProviderListRequest();
 
     fireEvent.click(screen.getByRole('button', { name: 'Connect GitHub' }));
     expect(screen.queryByLabelText('Integration name')).toBeNull();
-    stored['/api/v1/me/integrations'] = [await serverIntegration('Platform', 'github')];
+    stored['/api/v1/me/integrations'] = [await buildStoredIntegrationRow('Platform', 'github')];
     fireEvent.click(screen.getByRole('button', { name: 'Finish GitHub' }));
 
     await waitFor(() => expect(within(providerCard('github')).getByText('Platform')).toBeTruthy());
@@ -393,9 +404,12 @@ describe('IntegrationsPage', () => {
 
   it('connects through the organization when the context is an organization', async () => {
     const organization = (await buildOrganization()).entity.__serialize();
-    setContext({ type: 'organization', organization } as unknown as TenantContext, true);
+    setTenantContextAndStubManagePermission(
+      { type: 'organization', organization } as unknown as TenantContext,
+      true,
+    );
     renderPage();
-    await waitForBuckets();
+    await waitForEveryProviderListRequest();
 
     fireEvent.click(screen.getByRole('button', { name: 'Connect Linear' }));
     fireEvent.change(screen.getByLabelText('Integration name'), {
@@ -410,7 +424,7 @@ describe('IntegrationsPage', () => {
   });
 
   it('deletes an integration from under its provider', async () => {
-    stored['/api/v1/me/integrations'] = [await serverIntegration('Old chat', 'slack')];
+    stored['/api/v1/me/integrations'] = [await buildStoredIntegrationRow('Old chat', 'slack')];
     renderPage();
     await screen.findByText('Old chat');
 

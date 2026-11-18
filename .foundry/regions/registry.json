@@ -135,13 +135,13 @@
     {
       "tag": "ws-data-streams",
       "atlas": "primitive:websockets",
-      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useStream / useStreamAction and the stream folds",
+      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useDataStreamSnapshot / useDataStreamMessageListener and the stream folds",
       "region": "ws-data-streams"
     },
     {
       "tag": "ws-data-streams",
       "atlas": "primitive:websockets",
-      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useStream / useStreamAction and the stream folds",
+      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useDataStreamSnapshot / useDataStreamMessageListener and the stream folds",
       "region": "ws-data-streams"
     },
     {
@@ -273,7 +273,7 @@
     {
       "tag": "permissions-roles",
       "atlas": "primitive:authz",
-      "description": "Roles, actions and checks: PlatformRole / Role, the standard actions, actions per model and person-only actions, entitlements, installing a request's permissions (installPermissions), validatePermission / validateSubmodelPermission, frontend checks (usePermission, permissions.check, NavItem.access)",
+      "description": "Roles, actions and checks: PlatformRole / Role, the standard actions, actions per model and person-only actions, entitlements, installing a request's permissions (installPermissions), validatePermission / validateSubmodelPermission, frontend checks (canActOnRecordIfPresent, permissions.check, NavItem.access)",
       "region": "permissions-roles"
     },
     {

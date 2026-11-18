@@ -7,8 +7,8 @@
 import { Icon } from '@iconify/react';
 import { useActiveFlow } from '@template/ui/hooks/flow/useActiveFlow';
 import { currentLocation } from '@template/ui/lib/currentLocation';
-import { flowNext } from '@template/ui/lib/flows/flowNext';
-import { followFlow } from '@template/ui/lib/flows/followFlow';
+import { navigateToNextFlowStep } from '@template/ui/lib/flows/navigateToNextFlowStep';
+import { nextFlowStepLink } from '@template/ui/lib/flows/nextFlowStepLink';
 import { cn } from '@template/ui/lib/utils';
 
 export type ModalSize = 'small' | 'large';
@@ -36,11 +36,11 @@ export const Modal = ({
 }: ModalProps) => {
   const isModalOpen = open ?? isOpen ?? false;
   const flow = useActiveFlow();
-  const next = flow && flowNext(flow, currentLocation().pathname);
+  const next = flow && nextFlowStepLink(flow, currentLocation().pathname);
   const continueLabel = next?.label ?? null;
   const close = () => {
     onClose();
-    if (next) followFlow(next);
+    if (next) navigateToNextFlowStep(next);
   };
 
   if (!isModalOpen) return null;

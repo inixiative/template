@@ -4,25 +4,18 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+import { useQuery } from '@tanstack/react-query';
 import {
   spaceCreateInquiry,
   spaceSentManyInquiries,
   spaceSentManyInquiriesQueryKey,
 } from '@template/sdk';
 import type { UpdateSpaceContent } from '@template/shared/inquiry';
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Page,
-} from '@template/ui/components';
-import { InquirySourceControls } from '@template/ui/components/inquiries';
-import { useCreateInquiryMutation, useInquiryPermission, useQuery } from '@template/ui/hooks';
+import { Button, Card, CardContent, CardHeader, CardTitle, Page } from '@template/ui/components';
+import { InquirySourceControls, InquiryStatusBadge } from '@template/ui/components/inquiries';
+import { useCanActOnInquiry, useCreateInquiryMutation } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { INQUIRY_STATUS_COLORS, isTerminalInquiry } from '@template/ui/lib/inquiries/queryKeys';
+import { isInquiryClosedOrExpired } from '@template/ui/lib/inquiries/queryKeys';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { useState } from 'react';
@@ -43,11 +36,11 @@ export const SpaceUpdateInquiryPage = () => {
   });
 
   const allInquiries = (data?.data ?? []).filter((inq) => inq.type === 'updateSpace');
-  const activeInquiry = allInquiries.find((inq) => !isTerminalInquiry(inq));
+  const activeInquiry = allInquiries.find((inq) => !isInquiryClosedOrExpired(inq));
 
   const createMutation = useCreateInquiryMutation();
 
-  const canRequestUpdate = useInquiryPermission(
+  const canRequestUpdate = useCanActOnInquiry(
     { type: 'updateSpace', sourceModel: 'Space', targetModel: 'admin' },
     'send',
     'source',
@@ -102,9 +95,7 @@ export const SpaceUpdateInquiryPage = () => {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">Status</span>
-              <Badge className={INQUIRY_STATUS_COLORS[activeInquiry.status]}>
-                <span className="capitalize">{activeInquiry.status}</span>
-              </Badge>
+              <InquiryStatusBadge inquiry={activeInquiry} />
             </div>
             {activeContent?.name && (
               <div>

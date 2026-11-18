@@ -8,9 +8,9 @@ import { useLocation } from '@tanstack/react-router';
 import { FlowStepAdvance } from '@template/shared/flows';
 import { Button } from '@template/ui/components/primitives/Button';
 import { useActiveFlow } from '@template/ui/hooks/flow/useActiveFlow';
-import { dropFlow } from '@template/ui/lib/flows/dropFlow';
-import { flowNext } from '@template/ui/lib/flows/flowNext';
-import { followFlow } from '@template/ui/lib/flows/followFlow';
+import { endActiveFlow } from '@template/ui/lib/flows/endActiveFlow';
+import { navigateToNextFlowStep } from '@template/ui/lib/flows/navigateToNextFlowStep';
+import { nextFlowStepLink } from '@template/ui/lib/flows/nextFlowStepLink';
 import { useEffect, useRef } from 'react';
 
 export const FlowBanner = () => {
@@ -24,15 +24,15 @@ export const FlowBanner = () => {
     seen.current = { id: flow.id, currentStep: flow.currentStep };
     if (previous === null || flow.currentStep <= previous) return;
     if (flow.steps[flow.currentStep - 1]?.advance !== FlowStepAdvance.auto) return;
-    const next = flowNext(flow, pathname);
-    if (next) followFlow(next);
+    const next = nextFlowStepLink(flow, pathname);
+    if (next) navigateToNextFlowStep(next);
   }, [flow, pathname]);
 
   if (!flow) return null;
 
   const stepCount = flow.steps.length;
   const finished = flow.currentStep >= stepCount;
-  const next = flowNext(flow, pathname);
+  const next = nextFlowStepLink(flow, pathname);
 
   return (
     <section
@@ -48,7 +48,7 @@ export const FlowBanner = () => {
             {finished ? 'Done — back to where you were' : flow.steps[flow.currentStep]?.label}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={dropFlow}>
+        <Button variant="ghost" size="sm" onClick={endActiveFlow}>
           Dismiss
         </Button>
       </div>
@@ -65,7 +65,7 @@ export const FlowBanner = () => {
         />
       </div>
       {next && (
-        <Button size="sm" className="w-full" onClick={() => followFlow(next)}>
+        <Button size="sm" className="w-full" onClick={() => navigateToNextFlowStep(next)}>
           {next.label}
         </Button>
       )}

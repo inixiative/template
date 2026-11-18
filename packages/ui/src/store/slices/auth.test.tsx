@@ -13,9 +13,9 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { buildUser } from '@template/db/test';
-import { SignupForm } from '@template/ui/components/auth/SignupForm';
+import { SignUpForm } from '@template/ui/components/auth/SignUpForm';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
-import { completeOAuthSignIn } from '@template/ui/lib/auth/signin';
+import { completeOAuthSignIn } from '@template/ui/lib/auth/signIn';
 import { clearToken, getToken, getTokenExpiry, setToken } from '@template/ui/lib/auth/token';
 import type { EmailAuthMethod } from '@template/ui/lib/auth/types';
 import type { ApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
@@ -79,7 +79,7 @@ afterEach(() => {
   fetchSpy.mockRestore();
   clearToken();
   useAppStore.setState(initialState);
-  store.getState().client?.clear();
+  store.getState().queryClient?.clear();
 });
 
 test('verification-required signup succeeds without a token, hydration or websocket authentication', async () => {
@@ -102,7 +102,7 @@ test('pending signup clears stale local identity without navigation or remote si
     auth: { ...state.auth, user: entity.__serialize(), isAuthenticated: true, spaceUsers: {} },
     navigation: { ...state.navigation, navigate },
   }));
-  store.getState().tenant.setUser();
+  store.getState().tenant.switchToUserContext();
   respond = () => Response.json({ token: null, user: { emailVerified: false } });
   await store.getState().auth.signUp(method);
   expect(store.getState().auth.user).toBeNull();
@@ -175,7 +175,7 @@ test('logout drops the JWT locally and calls no server', async () => {
   store.setState((state) => ({
     auth: { ...state.auth, isAuthenticated: true, organizations: {}, spaces: {}, spaceUsers: {} },
   }));
-  store.getState().tenant.setUser();
+  store.getState().tenant.switchToUserContext();
   await store.getState().auth.logout();
   expect(requests).toEqual([]);
   expect(getToken()).toBeNull();
@@ -194,10 +194,10 @@ test('signup form displays verification success without navigating to the dashbo
     login = mock(() => {});
   useAppStore.setState({
     ...store.getState(),
-    navigation: { ...store.getState().navigation, navigatePreserving: navigate },
+    navigation: { ...store.getState().navigation, navigateKeepingSearchParams: navigate },
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const route = createRootRoute({ component: () => <SignupForm onLoginClick={login} /> });
+  const route = createRootRoute({ component: () => <SignUpForm onLoginClick={login} /> });
   const router = createRouter({
     routeTree: route,
     history: createMemoryHistory({ initialEntries: ['/'] }),

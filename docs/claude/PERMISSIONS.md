@@ -866,7 +866,7 @@ const { data, pagination } = await paginate(c, db.token, {
 });
 ```
 
-A member's list is read by the member and by the organization's owner, never by an admin or another member (`memberOwnedLists.test.ts`). In the UI, an organization or space page shows two lists: yours there (the membership's) and the tenant's (`tokenContextQueries` / `integrationContextQueries` with `{ member: true }`).
+A member's list is read by the member and by the organization's owner, never by an admin or another member (`memberOwnedLists.test.ts`). In the UI, an organization or space page shows two lists: yours there (the membership's) and the tenant's (`tokenContextQueries` / `integrationContextQueries` with `{ ownedByMyMembership: true }`).
 
 ### The user as a resource
 
@@ -885,28 +885,28 @@ Person-only situations: `apps/api/src/middleware/validations/userOnlyActions.tes
 
 ## Frontend Checks
 
-The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/src/store/slices/permissions.ts`) loads the user's own, organization and space permissions from `/me` through `permissionsOfUser`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
+The frontend runs the same ReBAC engine. `permissions.installPermissionsForUser(me)` (`packages/ui/src/store/slices/permissions.ts`) loads the user's own, organization and space permissions from `/me` through `permissionsOfUser`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
 
 | Layer | Entry point |
 |-------|-------------|
 | Route | `validatePermission`, naming the action ([Validation Middleware](#validation-middleware)) |
-| Page | `_authenticated.tsx`, `useAuthenticatedRouting`, then `checkContextPermission`: the nav item's `access` decides "can view"; on failure it falls back to the org (from a space), then user, then public context, else renders `Unauthorized` |
+| Page | `_authenticated.tsx`, `useSyncTenantContextWithUrlAndAuthorizeRoute`, then `findFirstTenantContextThatCanOpenPath`: the nav item's `access` decides "can view"; on failure it falls back to the org (from a space), then user, then public context, else renders `Unauthorized` |
 | Nav item | `access(permissions, context, page?)` on `NavItem`; the Sidebar hides items that fail it |
-| Component | `checkPermission(permissions, model, record, action)` / `permissions.check(model, record, action)` |
+| Component | `canActOnRecordIfPresent(permissions, model, record, action)` / `permissions.check(model, record, action)` |
 
 **Check:**
 
 ```typescript
-import { checkPermission } from '@template/ui/hooks/usePermission';
+import { canActOnRecordIfPresent } from '@template/ui/lib/canActOnRecordIfPresent';
 
 const permissions = useAppStore((state) => state.permissions);
-const canDelete = checkPermission(permissions, 'organization', org, 'own');  // false when record is missing
+const canDelete = canActOnRecordIfPresent(permissions, 'organization', org, 'own');  // false when record is missing
 ```
 
 **Visibility.** `Button` takes `show?: boolean | (() => boolean)` and `disabledText` (setting it disables the button and replaces its text):
 
 ```typescript
-<Button show={checkPermission(permissions, 'organization', org, 'own')}>Delete</Button>
+<Button show={canActOnRecordIfPresent(permissions, 'organization', org, 'own')}>Delete</Button>
 ```
 
 **Nav access** (`apps/*/app/config/nav/features/*.ts`):
@@ -915,28 +915,21 @@ const canDelete = checkPermission(permissions, 'organization', org, 'own');  // 
 export const settingsItem: NavItem = {
   label: 'Settings',
   path: '/settings',
-  access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  access: (permissions, context) => permissions.check(...permissionCheckTargetForTenantContext(context), 'read'),
   items: [
     {
       label: 'Auth Providers',
       path: '/authProviders',
       access: (permissions, context) =>
-        !!context.organization && permissions.check(...getContextParams(context), 'own'),
+        !!context.organization && permissions.check(...permissionCheckTargetForTenantContext(context), 'own'),
     },
   ],
 };
 ```
 
-`getContextParams(context)` returns `[model, record]` for the current tenant context (organization, space, or the user).
+`permissionCheckTargetForTenantContext(context)` returns `[model, record]` for the current tenant context (organization, space, or the user).
 
-**usePermission** (`packages/ui/src/hooks/usePermission.ts`) wraps the check into `{ show, disable, disabledText? }`:
-
-```typescript
-const deleteAction = usePermission({ permissions, model: 'organization', record: org, action: 'own' });
-// params: disabledText? (default "You do not have permission to perform this action"), requireRecord? (default true)
-```
-
-**useInquiryPermission(inquiry, action, side)** fills the current context into the inquiry's source or target side, then checks `inquiryResourcePermission`.
+**useCanActOnInquiry(inquiry, action, side)** fills the current context into the inquiry's source or target side, then checks `inquiryResourcePermission`.
 
 ---
 

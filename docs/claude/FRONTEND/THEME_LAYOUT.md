@@ -6,7 +6,7 @@
 
 - [Layout System](#layout-system)
   - [AppShell](#appshell)
-  - [ContextSelector](#contextselector)
+  - [TenantContextSelector](#tenantcontextselector)
   - [Sidebar](#sidebar)
   - [UserMenu](#usermenu)
   - [Header and Page](#header-and-page)
@@ -14,7 +14,7 @@
 - [Theme System](#theme-system)
   - [Architecture](#architecture)
   - [Hooks](#hooks)
-  - [ThemeToggle](#themetoggle)
+  - [ThemeSelector](#themeselector)
   - [Types](#types)
   - [Usage in Root Component](#usage-in-root-component)
   - [White-Labeling](#white-labeling)
@@ -23,7 +23,7 @@
 
 <!-- toc:end -->
 
-The authenticated shell (AppShell, ContextSelector, Sidebar, UserMenu, Header), the overlay components, and the theme system. See [FRONTEND.md](../FRONTEND.md) for the index.
+The authenticated shell (AppShell, TenantContextSelector, Sidebar, UserMenu, Header), the overlay components, and the theme system. See [FRONTEND.md](../FRONTEND.md) for the index.
 
 ## Layout System
 
@@ -40,7 +40,7 @@ Layout components read the shared store themselves; apps pass almost nothing.
 │ Sidebar (w-64)     │ Header (breadcrumbs) │
 │ ─────────────────  │──────────────────────│
 │ AppIdentity        │                      │
-│ ContextSelector    │  children            │
+│ TenantContextSelector    │  children            │
 │ ─────────────────  │                      │
 │ Sidebar nav        │                      │
 │ ─────────────────  │                      │
@@ -52,7 +52,7 @@ Layout components read the shared store themselves; apps pass almost nothing.
 ```typescript
 type AppShellProps = {
   onSupport?: () => void;        // Shows a Support button
-  lockedContext?: boolean;       // ContextSelector without the dropdown
+  lockedContext?: boolean;       // TenantContextSelector without the dropdown
   showSpoofControls?: boolean;   // Default true
   children: React.ReactNode;
 };
@@ -70,7 +70,7 @@ type AppShellProps = {
 
 Below `lg` the sidebar is an off-canvas drawer opened from the Header's menu button.
 
-### ContextSelector
+### TenantContextSelector
 
 Dropdown to switch between Personal and the user's organizations and spaces (from `auth.organizations` / `auth.spaces`).
 
@@ -80,11 +80,11 @@ Dropdown to switch between Personal and the user's organizations and spaces (fro
 - Each multi-space organization's accordion has a Manage item; `onManageOrganizations` adds a "Your Organizations" item.
 - `locked` → shows the current context label with no dropdown (superadmin).
 
-Switching calls `tenant.setOrganization(id)` / `tenant.setSpace(id)`; the URL `?org=` / `?space=` follow.
+Switching calls `tenant.switchToOrganizationContext(id)` / `tenant.switchToSpaceContext(id)`; the URL `?org=` / `?space=` follow.
 
 ### Sidebar
 
-Renders `navigation.navConfig[tenant.context.type]`. Items whose `access` fails and `alias` items are skipped; children nest three levels below the top and auto-expand along the active route. Clicking navigates with `navigatePreserving(fullPath, 'context')`. Nav config format: [ROUTING_NAVIGATION.md](ROUTING_NAVIGATION.md#navigation).
+Renders `navigation.navConfig[tenant.context.type]`. Items whose `access` fails and `alias` items are skipped; children nest three levels below the top and auto-expand along the active route. Clicking navigates with `navigateKeepingSearchParams(fullPath, 'context')`. Nav config format: [ROUTING_NAVIGATION.md](ROUTING_NAVIGATION.md#navigation).
 
 ### UserMenu
 
@@ -92,7 +92,7 @@ Avatar with initials fallback, name, and email (or "Spoofing"). Actions: Setting
 
 ### Header and Page
 
-`Header` shows the mobile menu button, `Breadcrumbs` (from the matched nav chain), and `ShareButton` outside the public context.
+`Header` shows the mobile menu button, `Breadcrumbs` (from the matched nav chain), and `CopyPageLinkButton` outside the public context.
 
 `Page` is the standard page body: `title`, `description?`, `actions?`, `children`.
 
@@ -159,15 +159,15 @@ Same pattern for secondary, tertiary, quaternary and accent. **Browser support:*
 **Location:** `packages/ui/src/hooks/`
 
 - **`useThemePersistence()`** - Loads `localStorage.theme` into `ui.theme` on mount and saves changes back.
-- **`useDarkMode(theme)`** - `'light'` removes `.dark` from `<html>`, `'dark'` adds it, `'system'` reads `prefers-color-scheme` when the theme changes.
-- **`useSpaceTheme(spaceTheme)`** - Sets `--space-{key}` CSS properties for each non-empty key; wraps `logo`, `logoDark`, `favicon` in `url()`; clears the previous keys on change or `null`.
-- **`useLanguage()`** - Sets `document.documentElement.lang` from the browser language.
+- **`useApplyThemeClassToDocument(theme)`** - `'light'` removes `.dark` from `<html>`, `'dark'` adds it, `'system'` reads `prefers-color-scheme` when the theme changes.
+- **`useApplySpaceThemeCssVariables(spaceTheme)`** - Sets `--space-{key}` CSS properties for each non-empty key; wraps `logo`, `logoDark`, `favicon` in `url()`; clears the previous keys on change or `null`.
+- **`useSetDocumentLanguageFromBrowser()`** - Sets `document.documentElement.lang` from the browser language.
 
-### ThemeToggle
+### ThemeSelector
 
-**Location:** `packages/ui/src/components/primitives/ThemeToggle.tsx`
+**Location:** `packages/ui/src/components/primitives/ThemeSelector.tsx`
 
-Light / dark / system button group bound to `ui.theme`. Shown by `ProfileFormCard` when `showThemeToggle` is set.
+Light / dark / system button group bound to `ui.theme`. Shown by `ProfileFormCard` when `showThemeSelector` is set.
 
 ### Types
 
@@ -184,11 +184,11 @@ const RootComponent = () => {
   const theme = useAppStore((state) => state.ui.theme);
 
   useRegisterNavigation(navConfig);
-  usePageMeta();
-  useLanguage();
+  useDocumentTitleAndDescription();
+  useSetDocumentLanguageFromBrowser();
   useThemePersistence();
   useApiWebsocket();
-  useDarkMode(theme);
+  useApplyThemeClassToDocument(theme);
 
   return (
     <>
@@ -202,7 +202,7 @@ const RootComponent = () => {
 
 ### White-Labeling
 
-`Space` has `primaryColor` and `logoUrl` columns, and `useSpaceTheme` applies a `SpaceTheme`, but no app calls `useSpaceTheme` yet. Wiring it means passing the page space's theme in `__root.tsx`; shades 1–4 then come from `color-mix()`. Tracked in `tickets/FEAT-007-white-labeling.md`.
+`Space` has `primaryColor` and `logoUrl` columns, and `useApplySpaceThemeCssVariables` applies a `SpaceTheme`, but no app calls `useApplySpaceThemeCssVariables` yet. Wiring it means passing the page space's theme in `__root.tsx`; shades 1–4 then come from `color-mix()`. Tracked in `tickets/FEAT-007-white-labeling.md`.
 
 ### Testing
 
@@ -210,13 +210,13 @@ const RootComponent = () => {
 cd packages/ui && bun test
 ```
 
-- `useDarkMode.test.ts` - Dark class toggling for light/dark/system
-- `useSpaceTheme.test.ts` - CSS variable setting, URL wrapping, clearing
-- `ThemeToggle.test.tsx` - Theme option rendering and selection
+- `useApplyThemeClassToDocument.test.ts` - Dark class toggling for light/dark/system
+- `useApplySpaceThemeCssVariables.test.ts` - CSS variable setting, URL wrapping, clearing
+- `ThemeSelector.test.tsx` - Theme option rendering and selection
 
 ## Key Files
 
-- `packages/ui/src/components/layout/` — AppShell, AppIdentity, ContextSelector, Sidebar, UserMenu, Header, Breadcrumbs, Page, Modal, ResponsiveDrawer, DetailPanel, MasterDetailLayout, FullscreenLayout
+- `packages/ui/src/components/layout/` — AppShell, AppIdentity, TenantContextSelector, Sidebar, UserMenu, Header, Breadcrumbs, Page, Modal, ResponsiveDrawer, DetailPanel, MasterDetailLayout, FullscreenLayout
 - `packages/shared/styles/theme.css`
-- `packages/ui/src/hooks/{useThemePersistence,useDarkMode,useSpaceTheme,useLanguage}.ts`
+- `packages/ui/src/hooks/{useThemePersistence,useApplyThemeClassToDocument,useApplySpaceThemeCssVariables,useSetDocumentLanguageFromBrowser}.ts`
 - `packages/ui/src/types/{SpaceTheme,AppTheme}.ts`

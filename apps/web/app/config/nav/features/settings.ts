@@ -5,51 +5,58 @@
  * @uses none
  */
 import type { NavItem } from '@template/ui/components';
-import { getContextParams } from '@template/ui/lib';
+import { permissionCheckTargetForTenantContext } from '@template/ui/lib';
 
 export const settingsItem: NavItem = {
   label: 'Settings',
   path: '/settings',
   icon: 'lucide:settings',
-  access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  access: (permissions, context) =>
+    permissions.check(...permissionCheckTargetForTenantContext(context), 'read'),
   items: [
     {
       label: 'Profile',
       path: '/profile',
       icon: 'lucide:user',
-      access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+      access: (permissions, context) =>
+        permissions.check(...permissionCheckTargetForTenantContext(context), 'read'),
     },
     {
       label: 'Tokens',
       path: '/tokens',
       icon: 'lucide:key',
-      access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
+      access: (permissions, context) =>
+        permissions.check(...permissionCheckTargetForTenantContext(context), 'operate'),
     },
     {
       label: 'Webhooks',
       path: '/webhooks',
       icon: 'lucide:webhook',
-      access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
+      access: (permissions, context) =>
+        permissions.check(...permissionCheckTargetForTenantContext(context), 'operate'),
     },
     {
       label: 'Integrations',
       path: '/integrations',
       icon: 'lucide:plug',
-      access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+      access: (permissions, context) =>
+        permissions.check(...permissionCheckTargetForTenantContext(context), 'read'),
     },
     {
       label: 'Auth Providers',
       path: '/authProviders',
       icon: 'lucide:shield-check',
       access: (permissions, context) =>
-        !!context.organization && permissions.check(...getContextParams(context), 'own'),
+        !!context.organization &&
+        permissions.check(...permissionCheckTargetForTenantContext(context), 'own'),
     },
     {
       label: 'Update',
       path: '/update',
       icon: 'lucide:refresh-cw',
       access: (permissions, context) =>
-        !!context.space && permissions.check(...getContextParams(context), 'manage'),
+        !!context.space &&
+        permissions.check(...permissionCheckTargetForTenantContext(context), 'manage'),
     },
     {
       label: 'Transfer',
@@ -59,7 +66,10 @@ export const settingsItem: NavItem = {
         !!context.space &&
         !!context.organization &&
         permissions.check(
-          ...getContextParams({ type: 'organization', organization: context.organization }),
+          ...permissionCheckTargetForTenantContext({
+            type: 'organization',
+            organization: context.organization,
+          }),
           'own',
         ),
     },

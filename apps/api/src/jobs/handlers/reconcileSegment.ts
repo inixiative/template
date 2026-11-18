@@ -10,7 +10,7 @@ import { RuleDegradedError } from '@template/shared/rules';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
-import { fetchSegmentsWithoutRuleIssues } from '#/modules/segment/services/attachRuleHealthToSegments';
+import { filterSegmentsWithoutRuleIssues } from '#/modules/segment/services/attachRuleHealthToSegments';
 import { publishMembershipChanges } from '#/modules/segment/services/publishMembershipChanges';
 import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRef';
 import {
@@ -46,7 +46,7 @@ export const reconcileSegment = makeSupersedingJob<ReconcileSegmentPayload>(
     await publishMembershipChanges([{ segment, diff }]);
 
     const path = [...referencePath, segmentId];
-    const siblings = await fetchSegmentsWithoutRuleIssues(
+    const siblings = await filterSegmentsWithoutRuleIssues(
       await dynamicSegmentsOf(segment.ownerModel, segmentOwnerId(segment)),
     );
     const dependents = segmentIdsReferencingSegment(

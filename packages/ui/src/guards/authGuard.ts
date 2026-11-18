@@ -21,7 +21,7 @@ type BeforeLoadContext = {
 };
 
 export const createAuthGuards = (getStore: () => AppStore) => ({
-  requireAuth: async (context?: BeforeLoadContext) => {
+  redirectToLoginUnlessAuthenticated: async (context?: BeforeLoadContext) => {
     try {
       await getStore().auth.initialize();
     } catch {
@@ -40,7 +40,7 @@ export const createAuthGuards = (getStore: () => AppStore) => ({
     }
   },
 
-  requirePublic: async (context?: BeforeLoadContext) => {
+  redirectAuthenticatedUserAwayFromPublicPage: async (context?: BeforeLoadContext) => {
     try {
       await getStore().auth.initialize();
     } catch {

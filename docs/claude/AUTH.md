@@ -235,7 +235,7 @@ Not built; each is a JWT route plus one `withThrowawaySession` call, keeping Bet
 
 ## OAuth + One-Time Token
 
-Server side: `apps/api/src/lib/auth/oauthHandoffPlugins.ts` and `jwtHandoffPlugin.ts`. Client side: `packages/ui/src/lib/auth/signin.ts` and `AuthCallbackPage` ([FRONTEND/AUTH.md](./FRONTEND/AUTH.md#oauth-callback)).
+Server side: `apps/api/src/lib/auth/oauthHandoffPlugins.ts` and `jwtHandoffPlugin.ts`. Client side: `packages/ui/src/lib/auth/signIn.ts` and `AuthCallbackPage` ([FRONTEND/AUTH.md](./FRONTEND/AUTH.md#oauth-callback)).
 
 ### OAuth Flow
 

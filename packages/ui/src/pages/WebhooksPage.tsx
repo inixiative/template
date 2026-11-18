@@ -4,7 +4,9 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+
 import { Icon } from '@iconify/react';
+import { useQuery } from '@tanstack/react-query';
 import type {
   MeCreateWebhookSubscriptionData,
   MeReadManyWebhookSubscriptionsResponse,
@@ -13,7 +15,7 @@ import type {
 } from '@template/sdk';
 import { Button, Page, Table } from '@template/ui/components';
 import { CreateWebhookModal } from '@template/ui/components/settings/CreateWebhookModal';
-import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
+import { createOptimisticListTarget, useOptimisticMutation } from '@template/ui/hooks';
 import { webhookContextQueries } from '@template/ui/lib/webhookContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';

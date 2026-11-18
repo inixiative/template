@@ -20,7 +20,9 @@ const spaceId = '01a17900-0000-7000-8000-000000000012';
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
 let client: QueryClient;
 
-type Me = Parameters<ReturnType<typeof useAppStore.getState>['permissions']['setup']>[0];
+type Me = Parameters<
+  ReturnType<typeof useAppStore.getState>['permissions']['installPermissionsForUser']
+>[0];
 
 const signInAs = async (roles: { organization?: Role; space?: Role }) => {
   const { entity } = await buildUser();
@@ -36,7 +38,7 @@ const signInAs = async (roles: { organization?: Role; space?: Role }) => {
     spaces: [],
   } as unknown as Me;
   useAppStore.getState().permissions.clear();
-  await useAppStore.getState().permissions.setup(me);
+  await useAppStore.getState().permissions.installPermissionsForUser(me);
   useAppStore.setState((state) => ({
     tenant: {
       ...state.tenant,

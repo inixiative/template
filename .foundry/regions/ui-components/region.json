@@ -1,7 +1,7 @@
 {
   "id": "ui-components",
   "title": "UI components and shared pages",
-  "routing": "Is this about building a screen from the shared pieces: @template/ui primitives (Button, Input, PasswordInput, SlugInput, Select, SearchableSelect, Table, Card, Badge, Avatar, Breadcrumb, DropdownMenu, Label, EmptyState, NotFound / RootNotFound, Unauthorized, ComingSoon, CopyButton, ShareButton, ThemeToggle, toast / Toaster), the show and disabledText props, cn and buttonVariants, enumToSelectOptions / formatEnumLabel, modals (InviteUserModal, SecretRevealModal), settings (SettingsLayout, ProfileFormCard, settings as nested routes), shared pages in @template/ui/pages and the list page shape, organizing components by domain, useBreakpoint / useMediaQuery / useDarkMode / useSpaceTheme, or the no-radix rule?",
+  "routing": "Is this about building a screen from the shared pieces: @template/ui primitives (Button, Input, PasswordInput, SlugInput, Select, SearchableSelect, Table, Card, Badge, Avatar, Breadcrumb, DropdownMenu, Label, EmptyState, NotFound / RootNotFound, Unauthorized, ComingSoon, CopyButton, CopyPageLinkButton, ThemeSelector, toast / Toaster), the show and disabledText props, cn and buttonVariants, enumToSelectOptions / formatEnumLabel, modals (InviteUserModal, SecretRevealModal), settings (SettingsLayout, ProfileFormCard, settings as nested routes), shared pages in @template/ui/pages and the list page shape, organizing components by domain, useBreakpoint / useMediaQuery / useApplyThemeClassToDocument / useApplySpaceThemeCssVariables, or the no-radix rule?",
   "concepts": ["ui-components"],
   "tokens": 14788,
   "tokenMethod": "chars/4",

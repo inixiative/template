@@ -7,18 +7,16 @@
 import { currentLocation } from '@template/ui/lib/currentLocation';
 import { pickSearchParams, readSearchParam } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
-import type { NavigationSlice } from '@template/ui/store/types/navigation';
+import type { NavigationSlice, SearchParamsToKeep } from '@template/ui/store/types/navigation';
 import type { StateCreator } from 'zustand';
 
-type Policy = 'context' | 'spoof' | 'all';
-
-const resolveSearchForPolicy = (
+const searchKeptFromCurrentSearch = (
   currentSearch: string,
-  policy: Policy,
+  searchParamsToKeep: SearchParamsToKeep,
   spoofUserEmail: string | null,
   flowId: string | null,
 ): Record<string, string> | undefined => {
-  if (policy === 'all') {
+  if (searchParamsToKeep === 'all') {
     const params = new URLSearchParams(currentSearch);
     const search: Record<string, string> = {};
     params.forEach((value, key) => {
@@ -28,7 +26,9 @@ const resolveSearchForPolicy = (
   }
 
   const preservedContext =
-    policy === 'context' ? pickSearchParams(currentSearch, ['org', 'space']) : undefined;
+    searchParamsToKeep === 'context'
+      ? pickSearchParams(currentSearch, ['org', 'space'])
+      : undefined;
   const spoof = spoofUserEmail ?? readSearchParam(currentSearch, 'spoof');
 
   if (!preservedContext && !spoof && !flowId) return undefined;
@@ -95,22 +95,22 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
         navigation: { ...state.navigation, currentRouteMatch: match },
       })),
 
-    navigatePreserving: (to, policy) => {
+    navigateKeepingSearchParams: (to, searchParamsToKeep) => {
       const navigate = get().navigation.navigate;
       if (!navigate) return;
       const spoofUserEmail = get().auth.spoofUserEmail;
       const { search: currentSearch, hash } = currentLocation();
       const currentHash = hash.slice(1);
-      const preservedSearch = resolveSearchForPolicy(
+      const keptSearch = searchKeptFromCurrentSearch(
         currentSearch,
-        policy,
+        searchParamsToKeep,
         spoofUserEmail,
         get().navigation.flowId,
       );
       const target = parseNavigateTarget(to);
       navigate({
         to: target.path,
-        search: mergeSearch(target.search, preservedSearch),
+        search: mergeSearch(target.search, keptSearch),
         hash: target.hash || currentHash,
       });
     },

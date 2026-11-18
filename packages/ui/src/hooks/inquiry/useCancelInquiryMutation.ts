@@ -8,7 +8,7 @@ import { inquiryCancel } from '@template/sdk';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
-import { sourceMutations } from '@template/ui/lib/inquiries/queryKeys';
+import { queryKeysToInvalidateWhenSourceMutates } from '@template/ui/lib/inquiries/queryKeys';
 
 export const useCancelInquiryMutation = () => {
   return useOptimisticMutation<unknown, Error, InquiryMeta>({
@@ -19,7 +19,7 @@ export const useCancelInquiryMutation = () => {
       }),
     ),
     targets: (inquiry) =>
-      sourceMutations[inquiry.type](inquiry).map((queryKey) => ({
+      queryKeysToInvalidateWhenSourceMutates[inquiry.type](inquiry).map((queryKey) => ({
         queryKey,
         optimisticUpdate: (old: unknown) => {
           const cached = old as { data?: { id: string }[] } | undefined;

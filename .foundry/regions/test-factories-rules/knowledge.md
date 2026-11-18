@@ -232,7 +232,7 @@ Use it when asserting against API/SDK-shaped types (which use string timestamps)
 const { entity } = await buildOrganization({ id: 'org-1', name: 'Test Org' });
 const organization = entity.__serialize();
 
-store.getState().tenant.setPage({ organization });
+store.getState().tenant.setViewedRecords({ organization });
 ```
 
 This keeps cross-system factory usage while matching frontend/API type contracts.

@@ -113,7 +113,7 @@ export const makeDepthEstimator = (
 
 let depthEstimator: ReturnType<typeof makeDepthEstimator> | null = null;
 // The enqueue path's entry: one estimator over the jobs queue, created on first use.
-export const recordAddAndTripIfFull = (isSlow: boolean): Promise<void> => {
+export const recordEnqueueAndSetOverflowFlagForLanesAtCap = (isSlow: boolean): Promise<void> => {
   depthEstimator ??= makeDepthEstimator();
   return depthEstimator.recordAdd(isSlow);
 };

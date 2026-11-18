@@ -162,13 +162,13 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Tests must not call registerTestTracker() or delete rows by hand in after hooks. | **No manual test tracker or row deletion** · rule FEATURES.md > Automatic Test Cleanup — Every test touching the database; lint rule DB-004. | part 4 | — |
 | Only one API test run may use a database; globalSetup holds a Postgres advisory lock until exit. | **One API test run per database** · rule apps/api/tests/globalSetup.ts — Running API tests in parallel worktrees or terminals against shared databases. | part 4 | — |
 | no relative imports, use the alias; dot-dot imports across folders | **Path aliases over relative imports** · rule FEATURES.md > Development Workflow — All imports in every package; enforced by check-import-aliases.sh. | part 4 | — |
-| how do I test these hooks on the frontend; can we do tests for this stuff on the frontend; run the data hook and component tests | **Run frontend UI tests** · rule docs/claude/FRONTEND/API_CLIENT.md § Testing — Running frontend/UI hook and component tests. | code `makeDataConfig`, `useDataFilters`, `usePaginatedData`, `useInfiniteDataQuery` | — |
+| how do I test these hooks on the frontend; can we do tests for this stuff on the frontend; run the data hook and component tests | **Run frontend UI tests** · rule docs/claude/FRONTEND/API_CLIENT.md § Testing — Running frontend/UI hook and component tests. | code `listQueryCapabilitiesFromOpenApi`, `useListSearchFilterAndOrderState`, `usePaginatedData`, `useInfiniteDataQuery` | — |
 | no any, we have the model types; cast through unknown to silence the compiler | **Strict TypeScript, no any** · rule FEATURES.md > Type Safety & Code Generation — All application code across packages. | part 4 | `: any`, `as any`, or `as unknown as T` to silence the compiler (FEATURES.md › Type Safety & Code Generation; CLAUDE.md §7) |
 | the new package test script needs the test env loaded; I'll hardcode env vars in the test script; wrap the test command so it gets the right env file | **Test scripts compose env via with** · rule docs/claude/TESTING.md § Running Tests › Environment Composition — Adding or editing a package test script, especially new packages with DB-backed tests. | code `cleanupTouchedTables`, `startWsCluster` | — |
 | where do the tests for this module go; one test file per action, inside the module; I'll put the tests in a top-level tests directory | **Tests live in module tests/ folder** · rule docs/claude/TESTING.md § Test Structure — Writing any test for a module's routes or controllers. | code `createTestApp`, `createUser` | — |
 | the component test fails on Date versus string; pass the API-shaped entity to the component; cast the factory entity to any for the UI test | **UI tests use serialized factories** · rule scripts/ci/rules/ui-tests-serialize-factory-records.sh — All frontend UI tests using entity data. | part 4 | — |
 
-- *Also here, by name:* bun run pretest (`package.json`); contactStreamRow (`packages/ui/src/test/contactStreamRow.ts`); mockJob (`apps/api/tests/makeTestWorker.ts`); createTestApp (`apps/api/tests/index.ts`); del (`apps/api/tests/utils/request.ts`); enumField (`apps/api/tests/utils/modelFields.ts`); get (`apps/api/tests/utils/request.ts`); handlers (`packages/ui/src/test/mocks/handlers.ts`); installEnvOverrideProxy (`packages/shared/src/utils/envOverrides.ts`); jsonError (`apps/api/tests/utils/request.ts`); patch (`apps/api/tests/utils/request.ts`); relationField (`apps/api/tests/utils/modelFields.ts`); resetEnvOverrides (`packages/shared/src/utils/envOverrides.ts`); scalarField (`apps/api/tests/utils/modelFields.ts`); testStore (`packages/ui/src/test/testStore.ts`)
+- *Also here, by name:* bun run pretest (`package.json`); buildContactStreamRow (`packages/ui/src/test/buildContactStreamRow.ts`); mockJob (`apps/api/tests/makeTestWorker.ts`); createTestApp (`apps/api/tests/index.ts`); del (`apps/api/tests/utils/request.ts`); enumField (`apps/api/tests/utils/modelFields.ts`); get (`apps/api/tests/utils/request.ts`); handlers (`packages/ui/src/test/mocks/handlers.ts`); installEnvOverrideProxy (`packages/shared/src/utils/envOverrides.ts`); jsonError (`apps/api/tests/utils/request.ts`); patch (`apps/api/tests/utils/request.ts`); relationField (`apps/api/tests/utils/modelFields.ts`); resetEnvOverrides (`packages/shared/src/utils/envOverrides.ts`); scalarField (`apps/api/tests/utils/modelFields.ts`); testStore (`packages/ui/src/test/testStore.ts`)
 
 ### Class `vcr`: VCR record/replay of external provider calls
 
@@ -203,7 +203,7 @@ Run from `packages/ui` (requires `bunfig.toml` for happy-dom preload):
 cd packages/ui && bun run test
 ```
 
-Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `makeDataConfig.test.ts`, `useDataFilters.test.ts`, `usePaginatedData.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `apiFetchInternal.test.ts`; bracket encoding in `@template/shared/bracketQuery`.
+Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `listQueryCapabilitiesFromOpenApi.test.ts`, `buildFilterQuery.test.ts`, `dataStatePersistence.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `makeAuthenticatedApiFetch.test.ts`; bracket encoding in `@template/shared/bracketQuery`.
 
 <!-- unit doc:docs/claude/SCRIPTS.md#testing -->
 **Source:** `docs/claude/SCRIPTS.md` § Testing (in "Scripts & Commands")
@@ -447,9 +447,9 @@ CI rule runner and fixtures: `docs/claude/SCRIPTS.md`.
 
 - ✅ **Route Templates** - Pre-built patterns (readRoute, createRoute, updateRoute) reduce API definition from ~100 lines to ~20 lines. Enforces consistency while eliminating boilerplate
 
-- ✅ **Data Config Builder** - `makeDataConfig(operationId)` reads the OpenAPI spec and auto-generates searchable fields, orderable fields, and enum filters. One line of config per table/list view. `usePaginatedData` and `useInfiniteData` consume the config and produce query objects, pagination props, and scroll restoration
+- ✅ **Data Config Builder** - `listQueryCapabilitiesFromOpenApi(operationId)` reads the OpenAPI spec and auto-generates searchable fields, orderable fields, and enum filters. One line of config per table/list view. `usePaginatedData` and `useInfiniteData` consume the config and produce query objects, pagination props, and scroll restoration
 
-- ✅ **Route Guards** - Reusable auth/permission checks with automatic redirects and context preservation. Drop `beforeLoad: requireAuth()` in route definition - done
+- ✅ **Route Guards** - Reusable auth/permission checks with automatic redirects and context preservation. Drop `beforeLoad: redirectToLoginUnlessAuthenticated()` in route definition - done
 
 [Learn more: TESTING.md](docs/claude/TESTING.md) | [DEVELOPER.md](docs/claude/DEVELOPER.md)
 

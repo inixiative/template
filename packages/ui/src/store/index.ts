@@ -1,7 +1,7 @@
 import { createAuthSlice } from '@template/ui/store/slices/auth';
-import { createClientSlice } from '@template/ui/store/slices/client';
 import { createNavigationSlice } from '@template/ui/store/slices/navigation';
 import { createPermissionsSlice } from '@template/ui/store/slices/permissions';
+import { createQueryClientAndWebsocketSlice } from '@template/ui/store/slices/queryClientAndWebsocket';
 import { createTenantSlice } from '@template/ui/store/slices/tenant';
 import { createUISlice } from '@template/ui/store/slices/ui';
 import type { AppStore } from '@template/ui/store/types';
@@ -11,7 +11,7 @@ import { devtools } from 'zustand/middleware';
 export const useAppStore = create<AppStore>()(
   devtools(
     (...a) => ({
-      ...createClientSlice(...a),
+      ...createQueryClientAndWebsocketSlice(...a),
       ...createAuthSlice(...a),
       ...createNavigationSlice(...a),
       ...createPermissionsSlice(...a),

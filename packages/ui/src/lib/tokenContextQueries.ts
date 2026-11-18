@@ -25,9 +25,11 @@ import {
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { makeContextQueries, mutation, query } from '@template/ui/lib/makeContextQueries';
-import { myOrganizationUser, mySpaceUser } from '@template/ui/lib/myMembership';
-
-export type TokenOwnerScope = { member: boolean };
+import {
+  type MyMembershipOwnership,
+  myOrganizationUserOrThrow,
+  mySpaceUserOrThrow,
+} from '@template/ui/lib/myMembership';
 
 type ReadManyOptions = Parameters<typeof meReadManyTokens>[0];
 type CreateOptions = Parameters<typeof meCreateToken>[0];
@@ -46,15 +48,15 @@ const ownerQueries = <ReadManyResult extends ReturnType<typeof organizationReadM
   delete: deleteToken,
 });
 
-export const tokenContextQueries = makeContextQueries<TokenOwnerScope>()({
+export const tokenContextQueries = makeContextQueries<MyMembershipOwnership>()({
   user: () =>
     ownerQueries(
       meReadManyTokensQueryKey(),
       (opts) => meReadManyTokens(opts),
       (opts) => meCreateToken(opts),
     ),
-  organization: ({ organization }, scope) => {
-    if (!scope?.member) {
+  organization: ({ organization }, ownership) => {
+    if (!ownership?.ownedByMyMembership) {
       const path = { id: organization.id };
       return ownerQueries(
         organizationReadManyTokensQueryKey({ path }),
@@ -62,15 +64,15 @@ export const tokenContextQueries = makeContextQueries<TokenOwnerScope>()({
         (opts) => organizationCreateToken({ ...opts, path }),
       );
     }
-    const path = { id: myOrganizationUser(organization.id).id };
+    const path = { id: myOrganizationUserOrThrow(organization.id).id };
     return ownerQueries(
       organizationUserReadManyTokensQueryKey({ path }),
       (opts) => organizationUserReadManyTokens({ ...opts, path }),
       (opts) => organizationUserCreateToken({ ...opts, path }),
     );
   },
-  space: ({ space }, scope) => {
-    if (!scope?.member) {
+  space: ({ space }, ownership) => {
+    if (!ownership?.ownedByMyMembership) {
       const path = { id: space.id };
       return ownerQueries(
         spaceReadManyTokensQueryKey({ path }),
@@ -78,7 +80,7 @@ export const tokenContextQueries = makeContextQueries<TokenOwnerScope>()({
         (opts) => spaceCreateToken({ ...opts, path }),
       );
     }
-    const path = { id: mySpaceUser(space.id).id };
+    const path = { id: mySpaceUserOrThrow(space.id).id };
     return ownerQueries(
       spaceUserReadManyTokensQueryKey({ path }),
       (opts) => spaceUserReadManyTokens({ ...opts, path }),

@@ -22,8 +22,8 @@ export const cronJobSeeds: SeedFile<CronJob> = {
   records: [
     {
       id: '01900000-0000-7000-8000-000000000001',
-      name: 'cleanStaleAuditLogs',
-      jobId: 'cleanStaleAuditLogs',
+      name: 'hardDeleteAuditLogsPastRetention',
+      jobId: 'hardDeleteAuditLogsPastRetention',
       description: 'Daily cleanup of AuditLog rows older than retentionDays.',
       pattern: '0 3 * * *', // 03:00 UTC daily
       enabled: true,
@@ -34,8 +34,8 @@ export const cronJobSeeds: SeedFile<CronJob> = {
     },
     {
       id: '01900000-0000-7000-8000-000000000002',
-      name: 'cleanStaleWebhookEvents',
-      jobId: 'cleanStaleWebhookEvents',
+      name: 'hardDeleteWebhookEventsPastRetention',
+      jobId: 'hardDeleteWebhookEventsPastRetention',
       description: 'Daily cleanup of WebhookEvent rows older than retentionDays.',
       pattern: '0 3 * * *',
       enabled: true,
@@ -59,8 +59,8 @@ export const cronJobSeeds: SeedFile<CronJob> = {
     },
     {
       id: '01900000-0000-7000-8000-000000000004',
-      name: 'cleanStaleFlows',
-      jobId: 'cleanStaleFlows',
+      name: 'hardDeleteFlowsPastRetention',
+      jobId: 'hardDeleteFlowsPastRetention',
       description: 'Deletes flows nobody has advanced for 15 minutes.',
       pattern: '*/5 * * * *',
       enabled: true,

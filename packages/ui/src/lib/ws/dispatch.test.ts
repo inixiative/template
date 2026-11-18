@@ -4,7 +4,7 @@ import { type ChannelKeyInput, STREAM_DEFINITIONS, type WSEvent } from '@templat
 import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
 import { addStreamListener } from '@template/ui/lib/ws/streamListeners';
-import { contactStreamRow } from '@template/ui/test/contactStreamRow';
+import { buildContactStreamRow } from '@template/ui/test/buildContactStreamRow';
 
 const refetchEvent = (key: ChannelKeyInput): WSEvent => ({
   category: 'query',
@@ -62,7 +62,7 @@ describe('dispatchMessage', () => {
     });
     afterEach(() => consoleError.mockRestore());
 
-    const snapshot = async () => ({ data: [await contactStreamRow({ id: '0001' })] });
+    const snapshot = async () => ({ data: [await buildContactStreamRow({ id: '0001' })] });
     const append = (type: string, payload: unknown): WSEvent => ({
       category: 'data',
       action: 'append',
@@ -86,7 +86,7 @@ describe('dispatchMessage', () => {
         stream,
         payload: await snapshot(),
       });
-      const created = await contactStreamRow({ id: '0002' });
+      const created = await buildContactStreamRow({ id: '0002' });
       dispatch(append('upsert', created));
       expect(
         qc()
@@ -96,7 +96,7 @@ describe('dispatchMessage', () => {
     });
 
     it('drops an append that arrives with no snapshot to fold into', async () => {
-      dispatch(append('upsert', await contactStreamRow({ id: '0002' })));
+      dispatch(append('upsert', await buildContactStreamRow({ id: '0002' })));
       expect(qc().getQueryData<unknown>(key)).toBeUndefined();
     });
 
@@ -127,8 +127,8 @@ describe('dispatchMessage', () => {
     });
 
     it('keeps removed ids across a fresh snapshot, so a late upsert still cannot resurrect a row', async () => {
-      const removed = await contactStreamRow({ id: '0002' });
-      const kept = await contactStreamRow({ id: '0001' });
+      const removed = await buildContactStreamRow({ id: '0002' });
+      const kept = await buildContactStreamRow({ id: '0001' });
       dispatch({
         category: 'data',
         action: 'snapshot',
@@ -155,8 +155,8 @@ describe('dispatchMessage', () => {
     });
 
     it('restores a removed row only from an upsert frame flagged revive', async () => {
-      const removed = await contactStreamRow({ id: '0002' });
-      const kept = await contactStreamRow({ id: '0001' });
+      const removed = await buildContactStreamRow({ id: '0002' });
+      const kept = await buildContactStreamRow({ id: '0001' });
       const held = () =>
         qc()
           .getQueryData<{ data: Array<{ id: string }> }>(key)
@@ -186,7 +186,7 @@ describe('dispatchMessage', () => {
     });
 
     it('keeps state on the newest version while action listeners still hear a stale update', async () => {
-      const current = await contactStreamRow({ id: '0001' });
+      const current = await buildContactStreamRow({ id: '0001' });
       const stale = {
         ...current,
         label: 'stale',

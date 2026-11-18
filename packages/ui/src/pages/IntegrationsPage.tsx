@@ -29,10 +29,8 @@ import {
   useInfiniteScrollTrigger,
   useOptimisticMutation,
 } from '@template/ui/hooks';
-import { getContextParams } from '@template/ui/lib/getContextParams';
 import {
   type IntegrationListQuery,
-  type IntegrationOwnerScope,
   integrationContextQueries,
 } from '@template/ui/lib/integrationContextQueries';
 import {
@@ -41,6 +39,8 @@ import {
   integrationProviders,
   integrationProviderValues,
 } from '@template/ui/lib/integrationProviders';
+import type { MyMembershipOwnership } from '@template/ui/lib/myMembership';
+import { permissionCheckTargetForTenantContext } from '@template/ui/lib/permissionCheckTargetForTenantContext';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { type ReactNode, useState } from 'react';
@@ -61,16 +61,18 @@ const statusBadges: Record<
   disabled: { label: 'Disabled', variant: 'secondary' },
 };
 
-const BUCKET_PAGE_SIZE = 100;
+const PROVIDER_SECTION_PAGE_SIZE = 100;
 
-const bucketQueryFor = (provider: IntegrationProvider | null): IntegrationListQuery => ({
+const integrationListQueryForProvider = (
+  provider: IntegrationProvider | null,
+): IntegrationListQuery => ({
   searchFields: { provider: { equals: provider } },
-  pageSize: BUCKET_PAGE_SIZE,
+  pageSize: PROVIDER_SECTION_PAGE_SIZE,
 });
 
 export type IntegrationConnectFlowProps = {
   context: AuthenticatedContext;
-  scope?: IntegrationOwnerScope;
+  ownership?: MyMembershipOwnership;
   onClose: () => void;
   onConnected: () => void;
 };
@@ -83,44 +85,44 @@ type IntegrationsPageProps = {
   connectFlows?: IntegrationConnectFlows;
 };
 
-type IntegrationBucketProps = {
+type IntegrationProviderSectionProps = {
   context: AuthenticatedContext;
-  scope?: IntegrationOwnerScope;
+  ownership?: MyMembershipOwnership;
   provider: IntegrationProvider | null;
   label: string;
   icon: string;
   actionLabel: string;
   actionAriaLabel: string;
-  canAct: boolean;
+  canConnect: boolean;
   showStatus: boolean;
   canManage: boolean;
-  onAct: () => void;
+  onConnect: () => void;
   onDelete: (integration: Integration) => void;
 };
 
-const IntegrationBucket = ({
+const IntegrationProviderSection = ({
   context,
-  scope,
+  ownership,
   provider,
   label,
   icon,
   actionLabel,
   actionAriaLabel,
-  canAct,
+  canConnect,
   showStatus,
   canManage,
-  onAct,
+  onConnect,
   onDelete,
-}: IntegrationBucketProps) => {
-  const integrationQueries = integrationContextQueries(context, scope);
-  const bucketQuery = bucketQueryFor(provider);
+}: IntegrationProviderSectionProps) => {
+  const integrationQueries = integrationContextQueries(context, ownership);
+  const providerListQuery = integrationListQueryForProvider(provider);
 
-  const bucket = useInfiniteDataQuery<Integration>({
-    queryKey: integrationQueries.readManyQueryKey(bucketQuery),
+  const providerIntegrations = useInfiniteDataQuery<Integration>({
+    queryKey: integrationQueries.readManyQueryKey(providerListQuery),
     queryFn: async (pageParam) => {
       const page = pageParam + 1;
       const { data, pagination } = await integrationQueries.readMany({
-        query: { ...bucketQuery, page },
+        query: { ...providerListQuery, page },
       });
       return {
         data,
@@ -131,14 +133,16 @@ const IntegrationBucket = ({
   });
 
   const sentinelRef = useInfiniteScrollTrigger({
-    onLoadMore: bucket.fetchNextPage,
-    hasMore: bucket.hasNextPage,
-    isLoading: bucket.isFetchingNextPage,
+    onLoadMore: providerIntegrations.fetchNextPage,
+    hasMore: providerIntegrations.hasNextPage,
+    isLoading: providerIntegrations.isFetchingNextPage,
   });
 
-  const enabled = canAct && !bucket.isError;
+  const enabled = canConnect && !providerIntegrations.isError;
   const status =
-    statusBadges[(bucket.total ?? 0) > 0 ? 'connected' : enabled ? 'notConnected' : 'disabled'];
+    statusBadges[
+      (providerIntegrations.total ?? 0) > 0 ? 'connected' : enabled ? 'notConnected' : 'disabled'
+    ];
   const slug = provider ?? 'custom';
 
   return (
@@ -147,7 +151,7 @@ const IntegrationBucket = ({
         <div className="flex items-center gap-3">
           <Icon icon={icon} className="h-6 w-6" aria-hidden />
           <span className="font-medium">{label}</span>
-          {showStatus && !bucket.isLoading && !bucket.isError && (
+          {showStatus && !providerIntegrations.isLoading && !providerIntegrations.isError && (
             <Badge variant={status.variant}>{status.label}</Badge>
           )}
         </div>
@@ -156,22 +160,24 @@ const IntegrationBucket = ({
           size="sm"
           disabled={!enabled}
           aria-label={actionAriaLabel}
-          onClick={onAct}
+          onClick={onConnect}
         >
           <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
           {actionLabel}
         </Button>
       </div>
-      {bucket.isError && (
+      {providerIntegrations.isError && (
         <p role="alert" className="px-4 pb-3 text-sm text-destructive">
           {label} integrations could not be loaded.
         </p>
       )}
-      {bucket.isLoading && <div className="mx-4 mb-4 h-8 animate-pulse rounded-md bg-muted/50" />}
-      {bucket.data.length > 0 && (
+      {providerIntegrations.isLoading && (
+        <div className="mx-4 mb-4 h-8 animate-pulse rounded-md bg-muted/50" />
+      )}
+      {providerIntegrations.data.length > 0 && (
         <div className="max-h-80 overflow-y-auto border-t" data-testid={`integrations-${slug}`}>
           <ul className="divide-y">
-            {bucket.data.map((integration) => (
+            {providerIntegrations.data.map((integration) => (
               <li key={integration.id} className="flex items-center justify-between px-4 py-2">
                 <div>
                   <p className="text-sm font-medium">{integration.name}</p>
@@ -193,7 +199,7 @@ const IntegrationBucket = ({
             ))}
           </ul>
           <div ref={sentinelRef} aria-hidden="true" />
-          {bucket.isFetchingNextPage && (
+          {providerIntegrations.isFetchingNextPage && (
             <p className="px-4 py-2 text-xs text-muted-foreground">Loading more...</p>
           )}
         </div>
@@ -204,7 +210,7 @@ const IntegrationBucket = ({
 
 type IntegrationOwnerSectionProps = {
   context: AuthenticatedContext;
-  scope?: IntegrationOwnerScope;
+  ownership?: MyMembershipOwnership;
   connectFlows: IntegrationConnectFlows;
   sectionKey: string;
   title?: string;
@@ -213,7 +219,7 @@ type IntegrationOwnerSectionProps = {
 
 const IntegrationOwnerSection = ({
   context,
-  scope,
+  ownership,
   connectFlows,
   sectionKey,
   title,
@@ -224,20 +230,22 @@ const IntegrationOwnerSection = ({
   >(undefined);
   const queryClient = useQueryClient();
   const permissions = useAppStore((state) => state.permissions);
-  const integrationQueries = integrationContextQueries(context, scope);
-  const canManage = scope?.member || permissions.check(...getContextParams(context), 'manage');
+  const integrationQueries = integrationContextQueries(context, ownership);
+  const canManage =
+    ownership?.ownedByMyMembership ||
+    permissions.check(...permissionCheckTargetForTenantContext(context), 'manage');
 
   const refreshIntegrations = () =>
     queryClient.invalidateQueries({ queryKey: integrationQueries.readManyQueryKey() });
 
-  const bucketQueryKeyFor = (provider: IntegrationProvider | null) =>
-    integrationQueries.readManyQueryKey(bucketQueryFor(provider));
+  const integrationListQueryKeyForProvider = (provider: IntegrationProvider | null) =>
+    integrationQueries.readManyQueryKey(integrationListQueryForProvider(provider));
 
   const createMutation = useOptimisticMutation({
     mutationFn: integrationQueries.create.mutationFn,
     targets: (variables) => [
       createOptimisticListTarget<Integration>({
-        queryKey: bucketQueryKeyFor(variables?.body.provider ?? null),
+        queryKey: integrationListQueryKeyForProvider(variables?.body.provider ?? null),
         operation: 'create',
       }),
     ],
@@ -247,7 +255,7 @@ const IntegrationOwnerSection = ({
     mutationFn: integrationQueries.delete.mutationFn,
     targets: [...integrationProviderValues, null].map((provider) =>
       createOptimisticListTarget<Integration>({
-        queryKey: bucketQueryKeyFor(provider),
+        queryKey: integrationListQueryKeyForProvider(provider),
         operation: 'delete',
       }),
     ),
@@ -260,46 +268,46 @@ const IntegrationOwnerSection = ({
   const handleDelete = (integration: Integration) =>
     deleteMutation.mutate({ path: { id: integration.id } });
 
-  const canConnect = (provider: IntegrationProvider) =>
+  const canConnectProvider = (provider: IntegrationProvider) =>
     canManage && (Boolean(connectFlows[provider]) || integrationProviders[provider].directConnect);
 
   const closeConnect = () => setConnectingProvider(undefined);
   const connectFlow = connectingProvider ? connectFlows[connectingProvider] : undefined;
 
-  const buckets = (
+  const providerSections = (
     <div className="space-y-3">
       {integrationProviderValues.map((provider) => {
         const { label, icon } = integrationProviders[provider];
         return (
-          <IntegrationBucket
+          <IntegrationProviderSection
             key={provider}
             context={context}
-            scope={scope}
+            ownership={ownership}
             provider={provider}
             label={label}
             icon={icon}
             actionLabel="Connect"
             actionAriaLabel={`Connect ${label}`}
-            canAct={canConnect(provider)}
+            canConnect={canConnectProvider(provider)}
             showStatus
             canManage={canManage}
-            onAct={() => setConnectingProvider(provider)}
+            onConnect={() => setConnectingProvider(provider)}
             onDelete={handleDelete}
           />
         );
       })}
-      <IntegrationBucket
+      <IntegrationProviderSection
         context={context}
-        scope={scope}
+        ownership={ownership}
         provider={null}
         label={customIntegration.label}
         icon={customIntegration.icon}
         actionLabel="Add custom"
         actionAriaLabel="Add custom"
-        canAct={canManage}
+        canConnect={canManage}
         showStatus={false}
         canManage={canManage}
-        onAct={() => setConnectingProvider(null)}
+        onConnect={() => setConnectingProvider(null)}
         onDelete={handleDelete}
       />
     </div>
@@ -314,17 +322,17 @@ const IntegrationOwnerSection = ({
               <CardTitle>{title}</CardTitle>
               {description ? <CardDescription>{description}</CardDescription> : null}
             </CardHeader>
-            <CardContent>{buckets}</CardContent>
+            <CardContent>{providerSections}</CardContent>
           </Card>
         </section>
       ) : (
-        buckets
+        providerSections
       )}
 
       {connectFlow ? (
         connectFlow({
           context,
-          scope,
+          ownership,
           onClose: closeConnect,
           onConnected: () => {
             closeConnect();
@@ -360,7 +368,7 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
           {hasMembership ? (
             <IntegrationOwnerSection
               context={context}
-              scope={{ member: true }}
+              ownership={{ ownedByMyMembership: true }}
               connectFlows={connectFlows}
               sectionKey="member"
               title={`Yours in ${tenant.name}`}

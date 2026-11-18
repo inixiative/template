@@ -29,11 +29,11 @@ const providerIcons: Record<string, string> = {
 };
 
 export type LoginFormProps = {
-  hideSignup?: boolean;
-  onSignupClick?: () => void;
+  hideSignUp?: boolean;
+  onSignUpClick?: () => void;
 };
 
-export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormProps) => {
+export const LoginForm = ({ hideSignUp: _hideSignUp, onSignUpClick }: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const search = useSearch({ strict: false }) as { redirectTo?: string; error?: string };
@@ -43,7 +43,9 @@ export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormP
   const [isLoading, setIsLoading] = useState(false);
 
   const signIn = useAppStore((state) => state.auth.signIn);
-  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
+  const navigateKeepingSearchParams = useAppStore(
+    (state) => state.navigation.navigateKeepingSearchParams,
+  );
   const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,7 +55,7 @@ export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormP
 
     try {
       await signIn({ type: 'email', email, password });
-      navigatePreserving(search.redirectTo || '/dashboard', 'context');
+      navigateKeepingSearchParams(search.redirectTo || '/dashboard', 'context');
     } catch (err) {
       const described = describeError(err, 'Log in failed. Please try again.');
       setError(described);
@@ -177,12 +179,12 @@ export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormP
               {isLoading ? 'Logging in...' : 'Log In'}
             </Button>
 
-            {onSignupClick && (
+            {onSignUpClick && (
               <div className="text-center text-sm text-muted-foreground">
                 Don't have an account?{' '}
                 <button
                   type="button"
-                  onClick={onSignupClick}
+                  onClick={onSignUpClick}
                   className="text-primary hover:underline"
                 >
                   Sign Up

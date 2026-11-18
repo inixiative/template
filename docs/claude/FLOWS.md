@@ -65,7 +65,7 @@ advanceFlowAndDeleteWhenFinished
 - **Any read error drops the flow**: non-2xx, a thrown rule, or a `fetchAllPages` cap. The row is deleted and the route answers 404. Two tabs racing to finish the same flow end the same way: the loser's write misses the row (P2025) and answers 404.
 - **Finished**: when every step holds, the response carries `currentStep === steps.length` and the row is hard-deleted.
 - **Don't pre-check; create and see.** Create runs the same checks. A flow whose steps all hold already comes back complete and is never stored, so a caller never has to ask "does this user need the flow?" first.
-- **Cleanup**: `Flow` rows hold only `id, userId, flowKey, steps, returnUrl, createdAt, updatedAt`. The `cleanStaleFlows` cron row runs `hardDeleteRecordsPastRetention` every 5 minutes on `updatedAt` with a 15-minute retention. Flows are hard-deleted with their user.
+- **Cleanup**: `Flow` rows hold only `id, userId, flowKey, steps, returnUrl, createdAt, updatedAt`. The `hardDeleteFlowsPastRetention` cron row runs `hardDeleteRecordsPastRetention` every 5 minutes on `updatedAt` with a 15-minute retention. Flows are hard-deleted with their user.
 
 ## Routes
 
@@ -81,9 +81,9 @@ The response is the `Flow` row with `steps` parsed, plus the computed `stepState
 
 All of it is in `packages/ui`; pages need no flow code.
 
-- **State**: the store holds only `navigation.flowId` (`setFlowId(id | null)`). The flow itself lives in the React Query cache (`lib/flows/flowReadQuery.ts`, `staleTime: 0`) and is read with `useActiveFlow()`. The `flow` search param mirrors `flowId` like `spoof` (`useAuthenticatedRouting`), is seeded from `?flow=` on load, and is kept by `navigatePreserving`.
+- **State**: the store holds only `navigation.flowId` (`setFlowId(id | null)`). The flow itself lives in the React Query cache (`lib/flows/flowReadQueryOptions.ts`, `staleTime: 0`) and is read with `useActiveFlow()`. The `flow` search param mirrors `flowId` like `spoof` (`useSyncTenantContextWithUrlAndAuthorizeRoute`), is seeded from `?flow=` on load, and is kept by `navigateKeepingSearchParams`.
 - **Rechecks**: the app `MutationCache` invalidates the flow read after every successful mutation, unless the mutation has `meta: { skipFlowInvalidate: true }` or the cached flow is already finished.
-- **What's next**: `flowNext(flow, pathname)` is the one rule. Finished → `Finish` to `returnUrl ?? '/dashboard'`. Otherwise, if the current step's `to` is on another page → `Continue: <step label>`. Otherwise nothing (you are already where the step happens).
+- **What's next**: `nextFlowStepLink(flow, pathname)` is the one rule. Finished → `Finish` to `returnUrl ?? '/dashboard'`. Otherwise, if the current step's `to` is on another page → `Continue: <step label>`. Otherwise nothing (you are already where the step happens).
   - `FlowBanner`, mounted once in each app's `__root.tsx`, shows it as a button.
   - Any open `Modal` turns its close button into it, so closing a dialog continues the flow.
   - After an `auto` step completes, the banner follows it by itself. A `confirm` step waits for the button.

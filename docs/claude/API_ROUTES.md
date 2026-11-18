@@ -552,7 +552,7 @@ GET /api/v1/orgs?searchFields[deletedAt][equals][:]=null   # is-null
 GET /api/v1/users?searchFields[emailVerified][:]=true
 ```
 
-**Typed SDK surface:** the `searchFields` schema is generated from the route's `filterLens` — shared `<Type>Filter` components (`StringFilter`/`IntFilter`/`DateTimeFilter`/`BooleanFilter`) plus a `JsonFilter`, with operators sourced from the server's own `getValidOperators` so the schema can never advertise an operator the server rejects. Enum fields inline their lens-narrowed value set. The FE reads this back via `getQueryMetadata` (no `x-*` vendor extensions).
+**Typed SDK surface:** the `searchFields` schema is generated from the route's `filterLens` — shared `<Type>Filter` components (`StringFilter`/`IntFilter`/`DateTimeFilter`/`BooleanFilter`) plus a `JsonFilter`, with operators sourced from the server's own `getValidOperators` so the schema can never advertise an operator the server rejects. Enum fields inline their lens-narrowed value set. The FE reads this back via `listFieldsFromOpenApiOperation` (no `x-*` vendor extensions).
 
 ### Route declaration (lens narrowing)
 
@@ -820,7 +820,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 ## Frontend Metadata
 
-Filter surface metadata (picks, enum subsets, server-side scope) is encoded in the route's `filterLens` and flows into the OpenAPI spec via the per-route `searchFields` query schema. The SDK and frontend `useQueryMetadata` extract it from there.
+Filter surface metadata (picks, enum subsets, server-side scope) is encoded in the route's `filterLens` and flows into the OpenAPI spec via the per-route `searchFields` query schema. The SDK and the frontend `listFieldsFromOpenApiOperationId` read it from there.
 
 > **Filter shape vs response shape (recap):** narrowing controls what consumers can **filter** on. The response payload shape comes from `responseSchema`, totally separate. A field can be in the response but not searchable, or searchable but stripped from the response.
 
@@ -849,41 +849,35 @@ readRoute({
 
 ### Extracting Metadata
 
-Use `getQueryMetadata()` or `useQueryMetadata()` to extract metadata from the OpenAPI spec:
+Use `listFieldsFromOpenApiOperation(path, method)` or `listFieldsFromOpenApiOperationId(operationId)` to read the list fields from the OpenAPI spec:
 
 ```typescript
-import { getQueryMetadataByOperation, useQueryMetadata } from '@template/ui/lib';
+import { listFieldsFromOpenApiOperationId } from '@template/ui/lib/listFieldsFromOpenApi';
 
-// By operation ID (recommended)
-const meta = getQueryMetadataByOperation('meReadManyOrganizations');
-
-// In React component
-function OrganizationsTable() {
-  const meta = useQueryMetadata('meReadManyOrganizations');
-  // Use meta.searchableFields, meta.orderableFields, meta.enumFilters
-}
+const meta = listFieldsFromOpenApiOperationId('meReadManyOrganizations');
+// meta.searchableFields, meta.orderableFields, meta.enumFilters
 ```
 
 ### Data Config + Filters
 
-`makeDataConfig(operationId, options?)` builds a `DataConfig` from the operation's metadata
+`listQueryCapabilitiesFromOpenApi(operationId, options?)` builds a `ListQueryCapabilities` from the operation's metadata
 (`searchableFields`, `orderableFields`, `enumFilters`, `defaultOrderBy`, `canSearch`, `canOrder`);
-`useDataFilters(config)` drives the live filter/search/order state. See [FRONTEND/API_CLIENT.md](FRONTEND/API_CLIENT.md#data-hooks) for the full
+`useListSearchFilterAndOrderState(config)` drives the live filter/search/order state. See [FRONTEND/API_CLIENT.md](FRONTEND/API_CLIENT.md#data-hooks) for the full
 wiring (debounce, URL/history state, `buildFilterQuery`).
 
 ```typescript
-import { makeDataConfig } from '@template/ui/lib';
-import { useDataFilters } from '@template/ui/hooks';
+import { listQueryCapabilitiesFromOpenApi } from '@template/ui/lib';
+import { useListSearchFilterAndOrderState } from '@template/ui/hooks';
 
-const config = makeDataConfig('meReadManyOrganizations', {
+const config = listQueryCapabilitiesFromOpenApi('meReadManyOrganizations', {
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
 });
-const { search, setSearch, orderBy, toggleOrderBy, query } = useDataFilters(config);
+const { search, setSearch, orderBy, toggleOrderBy, query } = useListSearchFilterAndOrderState(config);
 ```
 
 **Benefits:**
 - Single source of truth — searchable/orderable fields + enum values come from the OpenAPI spec (generated from the `filterLens`), no hand-maintained field lists
-- Frontend stays in sync with the API automatically; `getQueryMetadata` reads the typed schema (no `x-*` extensions)
+- Frontend stays in sync with the API automatically; `listFieldsFromOpenApiOperation` reads the typed schema (no `x-*` extensions)
 
 ---
 

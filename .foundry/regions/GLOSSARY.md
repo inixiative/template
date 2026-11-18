@@ -32,7 +32,7 @@ CommunicationKind[] on Contact (and optionally CustomerRef) listing the kinds th
 CommunicationKind[] on Contact: the kinds this contact accepts. *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
 
 **access**  
-NavItem rule (permissions, context, pageContext) => boolean; the source of truth for page visibility. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
+NavItem rule (permissions, context, viewedRecords) => boolean; the source of truth for page visibility. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **Account**  
 A user's linked credentials for one provider (OAuth tokens or password), BetterAuth's model. *Region:* [Sign-in, user JWTs and OAuth](authentication/knowledge.md)
@@ -142,7 +142,7 @@ Origin-checked, rate-limited endpoint converting browser events to OTLP (telemet
 **/api/v1/me identity probe**  
 How a socket's identity is resolved: through the normal auth and spoof middleware, not WebSocket-specific auth. *Region:* [WebSocket connections](ws-connections/knowledge.md)
 
-**apiFetchInternal**  
+**makeAuthenticatedApiFetch**  
 Shared fetch layer: bearer and x-spoof-user-email headers, VITE_API_URL, :id path params, serializeBracketQuery, throw on error. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
 
 **apiMutation**  
@@ -191,7 +191,7 @@ The two authenticated layouts: the shell with sidebar and header, or a full-scre
 The authenticated frame: sidebar plus header; layout components read the store themselves. *Region:* [Layout system and theme](theme-layout/knowledge.md)
 
 **AppStore**  
-Type of the composed store: ClientSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
+Type of the composed store: QueryClientAndWebsocketSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
 **AppTheme / SpaceTheme**  
 Complete platform theme type; nullable, all-optional tenant override type with bare HSL colors and logo/favicon. *Region:* [Layout system and theme](theme-layout/knowledge.md)
@@ -314,7 +314,7 @@ OAuth callback at /auth/callback: exchanges #ott once, hydrates, navigates to au
 Client message that carries credentials after the anonymous upgrade; resolved through /api/v1/me and re-sent on spoof or unspoof. *Region:* [WebSocket connections](ws-connections/knowledge.md)
 
 **_authenticated**  
-Layout route: requireAuth + AppShell + nav-based access check. *Region:* [Frontend apps, routes and layouts](frontend-apps-routing/knowledge.md)
+Layout route: redirectToLoginUnlessAuthenticated + AppShell + nav-based access check. *Region:* [Frontend apps, routes and layouts](frontend-apps-routing/knowledge.md)
 
 **authentication**  
 Class: the BetterAuth sign-in handshake, user JWTs and their revocation, the OAuth one-time token, account changes through BetterAuth. *Region:* [Sign-in, user JWTs and OAuth](authentication/knowledge.md)
@@ -626,7 +626,7 @@ Fails when the Prisma client or OpenAPI SDK is out of date. *Region:* [Environme
 **check-import-aliases**  
 Fails on relative internal imports that should use #/ or @template/. *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
 
-**checkContextPermission**  
+**findFirstTenantContextThatCanOpenPath**  
 Tries current context, then the space's organization, user, public; switches to the first that allows the page. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **advanceFlowAndDeleteWhenFinished**  
@@ -635,7 +635,7 @@ Re-evaluates steps from step 0 as the caller; computes stepStates and currentSte
 **checkPath**  
 The single-edge kernel returning true or a PathReason. *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
 
-**checkPermission**  
+**canActOnRecordIfPresent**  
 Plain-function frontend check (permissions, model, record, action); false when the record is missing. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **checkTransition**  
@@ -686,7 +686,7 @@ Non-null caller IP from the trusted x-forwarded-for hop, IPv6 bucketed to /64. *
 **clientRateLimitBucketAddress / trustedClientAddress**  
 Bucketed, never-null client key for rate limits vs the exact address that may be missing. *Region:* [Request context](request-context-errors/knowledge.md)
 
-**ClientSlice**  
+**QueryClientAndWebsocketSlice**  
 Holds the TanStack QueryClient and ApiWebsocket so they are reachable outside React. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
 **cn**  
@@ -837,12 +837,12 @@ Zod schema for the type-specific payload stored in inquiry.content on create and
 Factory result map of created related entities keyed by camelCase accessor names; passed back in to reuse them. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 
 **Context fallback**  
-When the current context cannot view a route, useAuthenticatedRouting tries space → organization → user → public before Unauthorized. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
+When the current context cannot view a route, useSyncTenantContextWithUrlAndAuthorizeRoute tries space → organization → user → public before Unauthorized. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **Context queries**  
 makeContextQueries: one list query defined once for user, organization and space contexts; throws for a missing context. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
 
-**ContextSelector**  
+**TenantContextSelector**  
 AppShell control for switching Personal/Organization/Space; reads tenant and auth from the store. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **Core Engineering Standards**  
@@ -858,7 +858,7 @@ Start a flow without pre-checking; if every step already holds it returns comple
 Client socket that reconnects and replays identity, then subscribes, then stream opens, tracking last seq per stream. *Region:* [WebSocket connections](ws-connections/knowledge.md)
 
 **createAppQueryClient**  
-Builds each app's QueryClient with global error handling and registers it in the client slice. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
+Builds each app's QueryClient with global error handling and registers it in the query client and websocket slice. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
 
 **createAuthorize**  
 Adapter binding @inixiative/permissions' rebac check to the authorize seam for one resource; fails closed on cycles. *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
@@ -998,7 +998,7 @@ Class tag: CustomerRef customer/provider pairs, provider routes and the customer
 Content-free marker: // gloss above a declaration or // gloss:file at the top; trailing content is a lint error. *Region:* [Gloss (margin comments)](lib-gloss/knowledge.md)
 
 **Data hooks layering**  
-makeDataConfig → useDataFilters → usePaginatedData / useInfiniteData → Table / Pagination / any renderer. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
+listQueryCapabilitiesFromOpenApi → useListSearchFilterAndOrderState → usePaginatedData / useInfiniteData → Table / Pagination / any renderer. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
 
 **data narrowing**  
 A where clause: which rows are in scope; the field stays visible. *Region:* [The lens model](lens-model/knowledge.md)
@@ -1012,11 +1012,11 @@ Every response is wrapped in { data }; pagination and other metadata ride alongs
 **data-modeling**  
 Class: schema conventions such as split schema, UUIDv7 and typed IDs, enum naming, FK typing and false polymorphism. *Region:* [Schema conventions and reference data](data-modeling/knowledge.md)
 
-**DataConfig**  
-Frontend config from makeDataConfig(operationId): searchable/orderable fields, enum filters, default order, read from the OpenAPI spec. *Region:* [List filtering and search](filtering-search/knowledge.md)
+**ListQueryCapabilities**  
+Frontend config from listQueryCapabilitiesFromOpenApi(operationId): searchable/orderable fields, enum filters, default order, read from the OpenAPI spec. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
-**DataConfig**  
-Frontend config from makeDataConfig(operationId) fed to usePaginatedData or useInfiniteData. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
+**ListQueryCapabilities**  
+Frontend config from listQueryCapabilitiesFromOpenApi(operationId) fed to usePaginatedData or useInfiniteData. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
 
 **datasource provider**  
 prismaOptions.datasource.provider: decides whether toPrisma emits mode: 'insensitive'. *Region:* [Compiling rules to Prisma and SQL](json-rules-backends/knowledge.md)
@@ -1515,7 +1515,7 @@ Status-marked subsystem inventory and comparisons; check before concluding somet
 Walks every page of a paginated source and returns all rows, capped; the cap hit throws. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
 
 **fetchAndHydrateMe**  
-Loads /me into the store and runs permissions.setup. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
+Loads /me into the store and runs permissions.installPermissionsForUser. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
 
 **fetchLens**  
 Loads every row a lens matches (packages/db). *Region:* [Template lenses](lenses/knowledge.md)
@@ -1595,7 +1595,7 @@ The Continue/Finish button mounted once per app in __root.tsx. *Region:* [Guided
 **FlowKey**  
 Enum naming each registered flow, e.g. setUpOrganization. *Region:* [Guided flows](flows/knowledge.md)
 
-**flowNext**  
+**nextFlowStepLink**  
 The single rule deciding Finish, Continue to the step's page, or nothing. *Region:* [Guided flows](flows/knowledge.md)
 
 **flowRead / flowDelete**  
@@ -1616,8 +1616,8 @@ Shutdown drain of the accumulator, with retries, after intake stops. *Region:* [
 **flushRedis**  
 Clears the in-memory Redis mock between tests; throws outside tests. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
-**followFlow / dropFlow**  
-Act on flowNext's result vs abandon the flow without navigating. *Region:* [Guided flows](flows/knowledge.md)
+**navigateToNextFlowStep / endActiveFlow**  
+Act on nextFlowStepLink's result vs abandon the flow without navigating. *Region:* [Guided flows](flows/knowledge.md)
 
 **formatFieldErrors**  
 Frontend helper turning fieldErrors into form messages. *Region:* [API errors and status codes](errors/knowledge.md)
@@ -1650,7 +1650,7 @@ A delegate holding its owner's permissions whole, in sync; takes no role and no 
 Hook that clears role and entitlements when full is written. *Region:* [Member rows and delegates](permissions-members/knowledge.md)
 
 **_fullscreen**  
-Layout route: requireAuth + FullscreenLayout without AppShell, for invoices, previews, print, embeds, focused flows. *Region:* [Frontend apps, routes and layouts](frontend-apps-routing/knowledge.md)
+Layout route: redirectToLoginUnlessAuthenticated + FullscreenLayout without AppShell, for invoices, previews, print, embeds, focused flows. *Region:* [Frontend apps, routes and layouts](frontend-apps-routing/knowledge.md)
 
 ## G
 
@@ -1684,10 +1684,10 @@ Answers with the actor { model, record } for any credential. *Region:* [Request 
 **minimumConcurrencyLimitFor**  
 Returns the tightest predefined cap across the ConcurrencyType resources touched. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
-**getContextParams**  
+**permissionCheckTargetForTenantContext**  
 Turns tenant context into [model, record] for permissions.check in access rules. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
-**getContextParams**  
+**permissionCheckTargetForTenantContext**  
 Returns [model, record] for the current organization, space or user context. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **getEncryptedFieldsByModel**  
@@ -1782,7 +1782,7 @@ UI behaviour hint in the error body: fixInput, reauthenticate, requestPermission
 
 ## H
 
-**handleApiError / describeError**  
+**showApiErrorToast / describeError**  
 Frontend helpers turning an unknown error into a user-facing message (onError toast vs inline display). *Region:* [API errors and status codes](errors/knowledge.md)
 
 **handleApprove**  
@@ -1914,7 +1914,7 @@ Per-type definition of sources, targets, schemas, validate, handleApprove, autoA
 The party enum on both ends: admin, User, OrganizationUser, Organization, Space, SpaceUser, Integration, Token. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
 **InquirySourceControls / InquiryTargetControls**  
-The two sides' action controls, gated by useInquiryPermission. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
+The two sides' action controls, gated by useCanActOnInquiry. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
 
 **InquiryStatus**  
 draft, sent, changesRequested, approved, denied, canceled. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
@@ -1982,7 +1982,7 @@ Tells whether a transition uses only keyword merge strategies. *Region:* [Transi
 **isSuperadmin**  
 Inline check that the context user has the superadmin platform role. *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)
 
-**isTerminalInquiry**  
+**isInquiryClosedOrExpired**  
 Frontend terminal check that also treats a past expiresAt as terminal. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
 
 **isTest / isLocal / isPR / isStaging / isProd**  
@@ -2482,17 +2482,17 @@ Render-time projection: drops hidden list elements and nulls hidden relations an
 **NavConfig**  
 Per-app map of context type (user, organization, space, public) to NavItem[]. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
-**navigatePreserving**  
+**navigateKeepingSearchParams**  
 Imperative navigation keeping context ('context'), spoof ('spoof') or every param ('all'). *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
 
-**navigatePreserving**  
+**navigateKeepingSearchParams**  
 navigation slice call: navigate keeping 'context' (org/space+spoof+flow), 'spoof' (spoof+flow) or 'all' params. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **navigation**  
 Class: nav config, permission-gated items, tenant context switching and URL context. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **NavigationSlice**  
-Stored router navigate, navConfig, currentRouteMatch, flowId and navigatePreserving. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
+Stored router navigate, navConfig, currentRouteMatch, flowId and navigateKeepingSearchParams. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
 **NavItem**  
 label, path, icon, title, description, access, alias, breadcrumbLabel, items. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
@@ -2919,7 +2919,7 @@ Class: graceful shutdown handlers, health checks, connection draining, unref int
 The worker's per-job processor; never called to schedule work. *Region:* [Background jobs](jobs-cron/knowledge.md)
 
 **ProfileFormCard**  
-Name/slug form shared by the three profile pages; showThemeToggle adds the theme picker. *Region:* [UI components and shared pages](ui-components/knowledge.md)
+Name/slug form shared by the three profile pages; showThemeSelector adds the theme picker. *Region:* [UI components and shared pages](ui-components/knowledge.md)
 
 **progress flag**  
 One persisted boolean per externally verifiable provider fact; never an umbrella flag over several remote writes. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
@@ -3165,16 +3165,16 @@ Class: request/response zod schemas, mostly generated from Prisma (ScalarSchema,
 **requestId**  
 UUID per request, returned as the request-id header and stamped on every error body. *Region:* [Request context](request-context-errors/knowledge.md)
 
-**requireAuth**  
+**redirectToLoginUnlessAuthenticated**  
 Guard redirecting unauthenticated users to /login?redirectTo=…, carrying org, space and spoof. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
 
-**requireAuth / requirePublic**  
+**redirectToLoginUnlessAuthenticated / redirectAuthenticatedUserAwayFromPublicPage**  
 The apps' route guards from createAuthGuards; see frontend-auth. *Region:* [Auth middleware chain and users](auth-middleware-users/knowledge.md)
 
-**requireAuth / requirePublic**  
+**redirectToLoginUnlessAuthenticated / redirectAuthenticatedUserAwayFromPublicPage**  
 beforeLoad guards from @template/ui/guards built by createAuthGuards; both run auth.initialize() first. *Region:* [Frontend apps, routes and layouts](frontend-apps-routing/knowledge.md)
 
-**requirePublic**  
+**redirectAuthenticatedUserAwayFromPublicPage**  
 Guard redirecting authenticated users away from login and signup. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
 
 **requires**  
@@ -3650,7 +3650,7 @@ The plain-markdown gloss file: # <source path>, optional preamble, ## <symbol> s
 **Sign-in handshake**  
 BetterAuth's sign-in flow; it ends with jwtHandoffPlugin swapping the new session for a user JWT. *Region:* [Sign-in, user JWTs and OAuth](authentication/knowledge.md)
 
-**SignupForm**  
+**SignUpForm**  
 Sign-up form; shows the verification message on verification-pending. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
 
 **SignUpResult**  
@@ -3689,13 +3689,13 @@ Class: deletedAt tombstones, cascade and revive, and automatic soft-delete read 
 **softDeleteScopeExtension**  
 Client extension that auto-injects `deletedAt: null` into reads, write wheres and nested includes. *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
 
-**fetchSegmentsWithoutRuleIssues**  
+**filterSegmentsWithoutRuleIssues**  
 Filters a list to segments whose rules have no issues. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **source**  
 The party that sends an inquiry; inferred from the route context, never from the body. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
-**sourceMutations / targetMutations**  
+**queryKeysToInvalidateWhenSourceMutates / queryKeysToInvalidateWhenTargetMutates**  
 Maps of which list queries to refetch after sender-side or recipient-side mutations. *Region:* [Inquiry API and frontend](inquiry-routes-ui/knowledge.md)
 
 **SourceQuery**  
@@ -3991,11 +3991,11 @@ Class: Organizations, Spaces and memberships; Personal/Org/Space contexts. *Regi
 **tenant context**  
 tenant.context: type public | user | organization | space with the active organization/space. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
-**tenant.page**  
-The record a page is about, set with tenant.setPage and passed to nav access checks. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
+**tenant.viewedRecords**  
+The record a page is about, set with tenant.setViewedRecords and passed to nav access checks. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **TenantSlice**  
-Current context (public/user/organization/space) and the page record; setUser/setOrganization/setSpace/setPage. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
+Current context (public/user/organization/space) and the viewed records; switchToUserContext/switchToOrganizationContext/switchToSpaceContext/setViewedRecords. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
 **terminal deny**  
 null as an ActionRule: granted only via permix grants or row rules. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
@@ -4209,7 +4209,7 @@ Hook mounted once at each app root; subscriptions follow the query cache. *Regio
 **useAppStore**  
 The one shared Zustand store hook from @template/ui/store used by web, admin and superadmin. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
-**useAuthenticatedRouting**  
+**useSyncTenantContextWithUrlAndAuthorizeRoute**  
 Syncs ?org=/?space= with the tenant slice, matches the route and runs access with context fallback. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **useAuthProviders**  
@@ -4224,11 +4224,11 @@ Reads the login vs embed auth strategy from AuthStrategyProvider. *Region:* [Fro
 **useConfig**  
 Hook returning { config, syncConfig } inside init views. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
 
-**useDarkMode / useThemePersistence**  
+**useApplyThemeClassToDocument / useThemePersistence**  
 Apply .dark on <html> from ui.theme; load/save ui.theme in localStorage. *Region:* [Layout system and theme](theme-layout/knowledge.md)
 
-**useDataFilters / useQueryMetadata**  
-Frontend filter state for a list view, and the hook that reads an operation's filter metadata in a component. *Region:* [List filtering and search](filtering-search/knowledge.md)
+**useListSearchFilterAndOrderState**  
+Frontend search, filter and order state for a list view. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
 **useDebounce**  
 Debounces a value; useDebouncedCallback debounces a function; only for backend-hitting inputs. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
@@ -4269,14 +4269,11 @@ Arbitrary media query match; named Tailwind breakpoint match. *Region:* [UI comp
 **useOptimisticMutation**  
 Mutation hook that applies targets' optimisticUpdate, rolls back on error, reconciles and invalidates on settle. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
 
-**usePageMeta / useBreadcrumbs**  
+**useDocumentTitleAndDescription / useBreadcrumbs**  
 Document title/description and breadcrumb trail derived from the matched nav item chain. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
 **usePaginatedData**  
 Frontend hook for page-numbered tables: filters plus page/pageSize, paginationProps(total), scroll restore, URL sync. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
-
-**usePermission**  
-UI hook returning { show, disable, disabledText } for an action on a record. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **User**  
 A person's platform identity: email, platformRole, jwtVersion and owned relations. *Region:* [Auth middleware chain and users](auth-middleware-users/knowledge.md)
@@ -4320,13 +4317,13 @@ Keep visible section or a section's/modal's open state in the URL hash. *Region:
 **useShallow**  
 zustand v5 wrapper required for object selectors, otherwise the component re-renders forever. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)
 
-**useSpaceTheme**  
+**useApplySpaceThemeCssVariables**  
 Sets --space-* CSS properties from a SpaceTheme; not yet wired by any app. *Region:* [Layout system and theme](theme-layout/knowledge.md)
 
 **useStartFlow**  
 Client hook that starts a flow and returns { started, flow }; started is false when already complete. *Region:* [Guided flows](flows/knowledge.md)
 
-**useStream / useStreamAction**  
+**useDataStreamSnapshot / useDataStreamMessageListener**  
 Hooks for a stream's folded snapshot as a query result, and for a side-effect listener on one op. *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
 
 **useValidateUniqueness**  

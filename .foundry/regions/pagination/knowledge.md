@@ -27,10 +27,10 @@ The Prisma where that fetches rows after a keyset cursor position over a sort ch
 Keyset pagination returning items with nextCursor and hasMore, no totals; for large or live-changing lists.
 
 **Data hooks layering**  
-makeDataConfig → useDataFilters → usePaginatedData / useInfiniteData → Table / Pagination / any renderer.
+listQueryCapabilitiesFromOpenApi → useListSearchFilterAndOrderState → usePaginatedData / useInfiniteData → Table / Pagination / any renderer.
 
-**DataConfig**  
-Frontend config from makeDataConfig(operationId) fed to usePaginatedData or useInfiniteData.
+**ListQueryCapabilities**  
+Frontend config from listQueryCapabilitiesFromOpenApi(operationId) fed to usePaginatedData or useInfiniteData.
 
 **fetchAllPages**  
 Walks every page of a paginated source and returns all rows, capped; the cap hit throws.
@@ -106,9 +106,9 @@ How list endpoints page their rows: offset pages with totals through paginate(),
 
 Every list endpoint pages. paginate(c, db.model, options) is the canonical call: readRoute with paginate: true wires it, it reads page and pageSize (defaults 1 and 10, max 10000) and orderBy from the query, reads search/searchFields and the filterLens from context, calls buildWhereClause, appends { id: desc } as a stable tiebreaker when no id ordering is given (UUIDv7 ids make that chronological too), and returns data plus pagination (page, pageSize, total, totalPages) for respond.ok(data, { pagination }). Pass include for relation data before reaching for an explicit item type; an ad-hoc where in options is AND-merged with the narrowing. cursorPaginate is for large or live-changing lists and infinite scroll: no totals, items with nextCursor and hasMore, built on the keyset helpers (encodeCursor packs the sort chain, last-row values and a filter hash into an opaque cursor; decodeCursor and buildKeysetWhere turn it back into the where for rows after that position). Declare the matching query schema, paginateRequestSchema or cursorPaginateRequestSchema. fetchAllPages walks every page of a paginated source with a cap that throws, for the rare case that needs all rows.
 
-On the frontend the hooks layer: makeDataConfig(operationId) gives a DataConfig, useDataFilters holds the filter state, and on top usePaginatedData (page-numbered tables, paginationProps(total), URL sync with shareableUrl) or useInfiniteData (TanStack infinite query with filter state and scroll restore; useInfiniteDataQuery is the low-level wrapper without filter state). Table is a dumb renderer taking either pagination or infiniteScroll; Pagination renders the page buttons, ellipsis and "Showing X–Y of Z"; useInfiniteScrollTrigger is the IntersectionObserver sentinel for load-more. State persistence is built in: page, pageSize, search and orderBy live in history.state (URL params only when shareableUrl is on), scroll position per element via useScrollState, section deep links via useSectionHash mounted once at the app root with camelCase section ids.
+On the frontend the hooks layer: listQueryCapabilitiesFromOpenApi(operationId) gives a ListQueryCapabilities, useListSearchFilterAndOrderState holds the filter state, and on top usePaginatedData (page-numbered tables, paginationProps(total), URL sync with shareableUrl) or useInfiniteData (TanStack infinite query with filter state and scroll restore; useInfiniteDataQuery is the low-level wrapper without filter state). Table is a dumb renderer taking either pagination or infiniteScroll; Pagination renders the page buttons, ellipsis and "Showing X–Y of Z"; useInfiniteScrollTrigger is the IntersectionObserver sentinel for load-more. State persistence is built in: page, pageSize, search and orderBy live in history.state (URL params only when shareableUrl is on), scroll position per element via useScrollState, section deep links via useSectionHash mounted once at the app root with camelCase section ids.
 
-Not here: what a list may be filtered and sorted by. The `filtering-search` region holds the filterLens (picks, relations, root.where, enumOmits), scopeNarrowing, bracket notation and c.get('bracketQuery'), buildWhereClause / buildOrderBy, searchablePaths / orderablePaths, validatePathNotation, and the frontend filter metadata (makeDataConfig, useDataFilters, useQueryMetadata, buildFilterQuery); paginate() consumes those, but their rules live there. readAllAsCaller / readAsCaller (server-side reads of an API list as the caller) are the batch region; the respond.ok envelope beyond the pagination metadata is API routes; the Table component's props are ui-components; the lens engine is lenses.
+Not here: what a list may be filtered and sorted by. The `filtering-search` region holds the filterLens (picks, relations, root.where, enumOmits), scopeNarrowing, bracket notation and c.get('bracketQuery'), buildWhereClause / buildOrderBy, searchablePaths / orderablePaths, validatePathNotation, and the frontend filter metadata (listQueryCapabilitiesFromOpenApi, useListSearchFilterAndOrderState, buildFilterQuery); paginate() consumes those, but their rules live there. readAllAsCaller / readAsCaller (server-side reads of an API list as the caller) are the batch region; the respond.ok envelope beyond the pagination metadata is API routes; the Table component's props are ui-components; the lens engine is lenses.
 
 ## 2b. Under construction
 
@@ -158,11 +158,11 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | the low-level infinite query wrapper; infinite loading without filter state or scroll restore; just the TanStack infinite query piece; a raw infinite fetch without the list state | **useInfiniteDataQuery** · primitive `packages/ui/src/hooks/useInfiniteDataQuery.ts#useInfiniteDataQuery` — Low-level; prefer useInfiniteData when the list needs search, filter, sort or scroll restore. | docs/claude/FRONTEND/API_CLIENT.md § Data Hooks; docs/claude/FRONTEND/API_CLIENT.md § Testing | — |
 | the sentinel that loads the next page when visible; I'll add an IntersectionObserver to trigger load more; a scroll listener to fetch more; the load-more trigger at the bottom of the list | **useInfiniteScrollTrigger** · primitive `packages/ui/src/hooks/useInfiniteScrollTrigger.ts#useInfiniteScrollTrigger` — Pair with useInfiniteData for load-more lists; usePaginatedData for page-numbered tables. | docs/claude/FRONTEND/API_CLIENT.md § Data Hooks; docs/claude/FRONTEND/API_CLIENT.md § Testing | A hand-written IntersectionObserver sentinel or scroll listener to trigger loading the next page. (docs/claude/FRONTEND/API_CLIENT.md § Infinite Scroll Trigger) |
 | a table with page, search, sort and URL state; I'll keep page and pageSize in useState and sync the URL; hand-rolled pagination state in the component; reset to page one when search changes; persist the table's page and sort in history | **usePaginatedData** · primitive `packages/ui/src/hooks/usePaginatedData.ts#usePaginatedData` — Page-numbered tables: this; scroll-loaded lists: useInfiniteData with useInfiniteScrollTrigger. | docs/claude/FRONTEND/API_CLIENT.md § Data Hooks; docs/claude/FRONTEND/API_CLIENT.md § Testing | A table component managing page, pageSize, search and orderBy in local useState, syncing the URL and restoring scroll by hand. (docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › usePaginatedData) |
-| how the list hooks fit together; config, then filters, then the fetching hook, then the renderer; which hook sits on top of which | **Data hooks layering** · pattern docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › Architecture — Any list, table, grid or feed of server data; hooks are renderer-agnostic. | code `makeDataConfig`, `Table`, `useScrollState`, `Pagination` | — |
-| remember the list's filters and page when going back; I'll write history.replaceState for the filters myself; a shareable URL for this filtered view; restore scroll and page on back navigation | **List state persistence** · pattern docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › State Persistence — Use shareableUrl only for linkable views; default history.state for back/forward. | code `makeDataConfig`, `Table`, `useScrollState`, `Pagination` | hand-written URLSearchParams/history.replaceState code to remember a list's filters, sort and page (docs/claude/FRONTEND/API_CLIENT.md § State Persistence; catalog entries readInitialState, writeToHistoryState, writeToHistoryStateAndUrl) |
+| how the list hooks fit together; config, then filters, then the fetching hook, then the renderer; which hook sits on top of which | **Data hooks layering** · pattern docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › Architecture — Any list, table, grid or feed of server data; hooks are renderer-agnostic. | code `listQueryCapabilitiesFromOpenApi`, `Table`, `useScrollState`, `Pagination` | — |
+| remember the list's filters and page when going back; I'll write history.replaceState for the filters myself; a shareable URL for this filtered view; restore scroll and page on back navigation | **List state persistence** · pattern docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › State Persistence — Use shareableUrl only for linkable views; default history.state for back/forward. | code `listQueryCapabilitiesFromOpenApi`, `Table`, `useScrollState`, `Pagination` | hand-written URLSearchParams/history.replaceState code to remember a list's filters, sort and page (docs/claude/FRONTEND/API_CLIENT.md § State Persistence; catalog entries readInitialState, writeToHistoryState, writeToHistoryStateAndUrl) |
 | rows jump between pages when sorted by name; add a stable tiebreaker to the ordering; I'll add createdAt desc as the default order | **Stable id tiebreaker ordering** · pattern § /lib/prisma/paginate — keep page results consistent by appending id desc to non-unique orderings | part 4 | Adding createdAt desc or id desc by hand as a default or tiebreaker ordering in a paginate call, or a page that reorders rows between pages on a non-unique sort. (docs/claude/API_ROUTES.md § paginate() Utility › Stable pagination) |
-| what to name the section ids; section ids become URL hashes | **camelCase section IDs** · rule docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › Section Hash — useSectionHash — Every data-section or sectionId value. | code `makeDataConfig`, `Table`, `useScrollState`, `Pagination` | — |
-| where does the section hash hook go; I'll call the section hash hook in each section | **Mount useSectionHash once at app root** · rule docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › Section Hash — useSectionHash — Any section-hash navigation. | code `makeDataConfig`, `Table`, `useScrollState`, `Pagination` | Calling useSectionHash inside each section or table component instead of once at the app root with data-section attributes. (docs/claude/FRONTEND/API_CLIENT.md § Section Hash — useSectionHash ("Mount once at the app root")) |
+| what to name the section ids; section ids become URL hashes | **camelCase section IDs** · rule docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › Section Hash — useSectionHash — Every data-section or sectionId value. | code `listQueryCapabilitiesFromOpenApi`, `Table`, `useScrollState`, `Pagination` | — |
+| where does the section hash hook go; I'll call the section hash hook in each section | **Mount useSectionHash once at app root** · rule docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › Section Hash — useSectionHash — Any section-hash navigation. | code `listQueryCapabilitiesFromOpenApi`, `Table`, `useScrollState`, `Pagination` | Calling useSectionHash inside each section or table component instead of once at the app root with data-section attributes. (docs/claude/FRONTEND/API_CLIENT.md § Section Hash — useSectionHash ("Mount once at the app root")) |
 | every list endpoint pages; this shouldn't return everything; pass include for relations in the list | **Use paginate() for list endpoints** · rule docs/claude/API_ROUTES.md § Response Format › paginate() Utility › paginate() Utility — Every list endpoint; pass include for relations before reaching for explicit item types. | code `paginate`, `delegate`, `makeController`, `prepareRequestMiddleware` | A list controller returning an unbounded findMany, or hand-assembling data and pagination instead of paginate(c, db.model) and respond.ok(data, { pagination }). (docs/claude/API_ROUTES.md § paginate() Utility ("Use paginate() for list endpoints")) |
 
 - *Also here, by name:* assertChainMatches (`apps/api/src/lib/prisma/keysetCursor.ts`); assertFilterMatches (`apps/api/src/lib/prisma/keysetCursor.ts`); buildPageRange (`packages/ui/src/components/primitives/Pagination.tsx`); cursorPaginateResponseSchema (`apps/api/src/lib/routeTemplates/paginationSchemas.ts`); hydrateCursorValues (`apps/api/src/lib/prisma/keysetCursor.ts`); locateItemInPages (`packages/ui/src/hooks/useInfiniteDataQuery.ts`); paginateResponseSchema (`apps/api/src/lib/routeTemplates/paginationSchemas.ts`); withTotalOrder (`apps/api/src/lib/prisma/paginate.ts`)
@@ -296,9 +296,9 @@ Server data primitives for search, filter, sort, pagination, infinite scroll, sc
 ##### Architecture
 
 ```
-makeDataConfig(operationId)     → DataConfig (searchable fields, orderable fields, enums)
+listQueryCapabilitiesFromOpenApi(operationId)     → ListQueryCapabilities (searchable fields, orderable fields, enums)
     ↓
-useDataFilters(config)          → shared search/filter/sort state + filterQuery
+useListSearchFilterAndOrderState(config)          → shared search/filter/sort state + filterQuery
     ↓
 usePaginatedData({ config })    → filters + page/pageSize + scroll restore + URL sync
 useInfiniteData({ config })     → filters + TanStack infinite query + scroll restore
@@ -312,19 +312,19 @@ Supporting hooks (used internally or standalone):
 - `useInfiniteScrollTrigger` — IntersectionObserver sentinel for load-more
 - `useInfiniteDataQuery` — low-level TanStack Query infinite wrapper
 
-##### makeDataConfig
+##### listQueryCapabilitiesFromOpenApi
 
 Builds the data configuration from the OpenAPI spec's query metadata.
 
-**Location:** `packages/ui/src/lib/makeDataConfig.ts`
+**Location:** `packages/ui/src/lib/listQueryCapabilitiesFromOpenApi.ts`
 
 ```typescript
-import { makeDataConfig } from '@template/ui/lib/makeDataConfig';
+import { listQueryCapabilitiesFromOpenApi } from '@template/ui/lib/listQueryCapabilitiesFromOpenApi';
 
-const config = makeDataConfig('adminOrganizationReadMany');
+const config = listQueryCapabilitiesFromOpenApi('adminOrganizationReadMany');
 // { searchableFields, orderableFields, enumFilters, defaultOrderBy, canSearch, canOrder }
 
-makeDataConfig('operationId', {
+listQueryCapabilitiesFromOpenApi('operationId', {
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
   canSearch: false, // default: true when the operation has searchable fields
   canOrder: true,
@@ -337,7 +337,7 @@ makeDataConfig('operationId', {
 import { usePaginatedData } from '@template/ui/hooks';
 
 const data = usePaginatedData({
-  config: makeDataConfig('adminOrganizationReadMany'),
+  config: listQueryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
   sectionId: 'orgs',          // scroll restore + section hash
   shareableUrl: true,          // ?page=3&search=acme in URL
 });
@@ -359,7 +359,7 @@ Options: `config`, `sectionId?`, `shareableUrl?`, `scrollRestore?`, `defaultPage
 import { useInfiniteData } from '@template/ui/hooks';
 
 const feed = useInfiniteData({
-  config: makeDataConfig('adminOrganizationReadMany'),
+  config: listQueryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
   queryKey: ['orgs'],
   queryFn: (page, filterQuery) => fetchOrgPage({ ...filterQuery, page }), // returns one page
   sectionId: 'orgFeed',
@@ -483,7 +483,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **paginate** `apps/api/src/lib/prisma/paginate.ts#paginate` [primitive] run an offset-paginated findMany with total count and page metadata Use: return paginate(db.model, args, c);
 - **paginateRequestSchema** `apps/api/src/lib/routeTemplates/paginationSchemas.ts#paginateRequestSchema` [primitive] validate offset pagination query params page and pageSize Use: query: paginateRequestSchema
 - **Pagination** `packages/ui/src/components/primitives/Pagination.tsx#Pagination` [primitive] render page controls and report page changes for paged lists Use: <Pagination currentPage={page} totalPages={total} onPageChange={setPage} />
-- **useInfiniteData** `packages/ui/src/hooks/useInfiniteData.ts#useInfiniteData` [primitive] fetch infinite-scroll lists with search, filter, sort state and scroll restore Use: const data = useInfiniteData({ config: makeDataConfig(opId), queryKey, queryFn });
+- **useInfiniteData** `packages/ui/src/hooks/useInfiniteData.ts#useInfiniteData` [primitive] fetch infinite-scroll lists with search, filter, sort state and scroll restore Use: const data = useInfiniteData({ config: listQueryCapabilitiesFromOpenApi(opId), queryKey, queryFn });
 - **useInfiniteDataQuery** `packages/ui/src/hooks/useInfiniteDataQuery.ts#useInfiniteDataQuery` [primitive] wrap TanStack infinite query for paged fetching without filter state Use: const query = useInfiniteDataQuery({ queryKey, queryFn, enabled });
 - **useInfiniteScrollTrigger** `packages/ui/src/hooks/useInfiniteScrollTrigger.ts#useInfiniteScrollTrigger` [primitive] call onLoadMore when a sentinel element scrolls into view Use: const ref = useInfiniteScrollTrigger({ onLoadMore, hasMore, isLoading }); <div ref={ref} />
-- **usePaginatedData** `packages/ui/src/hooks/usePaginatedData.ts#usePaginatedData` [primitive] manage search, filter, sort and page state for a paginated table Use: const data = usePaginatedData({ config: makeDataConfig(operationId), sectionId });
+- **usePaginatedData** `packages/ui/src/hooks/usePaginatedData.ts#usePaginatedData` [primitive] manage search, filter, sort and page state for a paginated table Use: const data = usePaginatedData({ config: listQueryCapabilitiesFromOpenApi(operationId), sectionId });

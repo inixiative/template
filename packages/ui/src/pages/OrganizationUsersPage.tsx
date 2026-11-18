@@ -6,6 +6,7 @@
  */
 
 import { Icon } from '@iconify/react';
+import { useQuery } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { memberRemoval } from '@template/permissions/rebac/rebacSchemaRules';
@@ -22,14 +23,13 @@ import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import {
   createOptimisticListTarget,
   useOptimisticMutation,
-  useQuery,
   useSectionOpen,
 } from '@template/ui/hooks';
 import { useCreateInquiryMutation } from '@template/ui/hooks/inquiry/useCreateInquiryMutation';
-import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { inquiryCheckRecord } from '@template/ui/lib/inquiries/inquiryCheckRecord';
+import { canActOnRecordIfPresent } from '@template/ui/lib/canActOnRecordIfPresent';
+import { inquiryRecordForPermissionCheck } from '@template/ui/lib/inquiries/inquiryRecordForPermissionCheck';
 import { useAppStore } from '@template/ui/store';
 
 type OrganizationUser = OrganizationReadManyUsersResponse['data'][number];
@@ -45,10 +45,10 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
 
   // Filter roles to only those the current actor can invite via inquiry.send permission.
   const inviteRoles = (Object.values(Role) as Role[]).filter((role) =>
-    checkPermission(
+    canActOnRecordIfPresent(
       permissions,
       'inquiry',
-      inquiryCheckRecord(
+      inquiryRecordForPermissionCheck(
         {
           type: 'inviteOrganizationUser',
           sourceModel: 'Organization',
@@ -127,7 +127,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
               size="sm"
               aria-label="Remove member"
               onClick={() => deleteMutation.mutate({ path: { id: member.id } })}
-              show={checkPermission(
+              show={canActOnRecordIfPresent(
                 permissions,
                 'organizationUser',
                 memberRecord,

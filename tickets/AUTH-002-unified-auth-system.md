@@ -103,7 +103,7 @@ export type AuthSession = {
   };
 };
 
-// packages/shared/src/lib/auth/signin.ts
+// packages/shared/src/lib/auth/signIn.ts
 export async function signIn(method: AuthMethod): Promise<AuthSession> {
   switch (method.type) {
     case 'email':
@@ -115,7 +115,7 @@ export async function signIn(method: AuthMethod): Promise<AuthSession> {
   }
 }
 
-// packages/shared/src/lib/auth/signup.ts
+// packages/shared/src/lib/auth/signUp.ts
 export async function signUp(method: AuthMethod): Promise<AuthSession> {
   switch (method.type) {
     case 'email':
@@ -320,7 +320,7 @@ const EmailInput = () => {
   - [ ] Call `auth.signIn({ type: 'oauth', ... })`
 - [ ] Create `SSOButton` component (stub)
 - [ ] Update LoginPage to use new components
-- [ ] Update SignupPage to use new components
+- [ ] Update SignUpPage to use new components
 - [ ] Remove authClient prop from all components
 
 ### Phase 5: Email-Based Routing (Week 2-3)
@@ -362,8 +362,8 @@ const EmailInput = () => {
 
 ### Frontend - Auth Functions
 - `packages/shared/src/lib/auth/types.ts` (NEW)
-- `packages/shared/src/lib/auth/signin.ts` (NEW)
-- `packages/shared/src/lib/auth/signup.ts` (NEW)
+- `packages/shared/src/lib/auth/signIn.ts` (NEW)
+- `packages/shared/src/lib/auth/signUp.ts` (NEW)
 - `packages/shared/src/lib/auth/providers/email.ts` (NEW)
 - `packages/shared/src/lib/auth/providers/oauth.ts` (NEW)
 

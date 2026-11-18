@@ -39,7 +39,7 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
           },
         }));
       },
-      setup: async (me: UserWithRelations) => {
+      installPermissionsForUser: async (me: UserWithRelations) => {
         const { permix } = get().permissions;
         await permix.setup([], { replace: true });
         permix.setActor(actorFromRecordOmittingSensitiveFields(ActorModel.User, me));

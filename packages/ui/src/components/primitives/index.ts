@@ -14,4 +14,4 @@ export * from './SearchableSelect';
 export * from './Select';
 export * from './SlugInput';
 export * from './Table';
-export * from './ThemeToggle';
+export * from './ThemeSelector';

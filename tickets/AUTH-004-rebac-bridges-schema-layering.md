@@ -117,7 +117,7 @@ as db grants are `db:…`.
 - **All 10 workspaces typecheck**; biome clean on the package.
 - Not run here: full `bun run check` is blocked by env artifacts unrelated to this change — nested
   `.worktrees/*/biome.json` (root lint) and a pre-existing UI store circular-init under `bun test`
-  (`createClientSlice` before init, untouched by this migration).
+  (`createQueryClientAndWebsocketSlice` before init, untouched by this migration).
 
 ---
 

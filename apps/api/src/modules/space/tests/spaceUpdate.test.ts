@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -7,7 +6,12 @@ import type {
   SpaceUser,
   User,
 } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSpace,
+  createSpaceUser,
+} from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { parseSuccessBody, patch } from '#tests/utils/request';
@@ -30,14 +34,10 @@ describe('PATCH /api/v1/space/:id', () => {
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
 
-    spaceUser = await db.spaceUser.create({
-      data: {
-        role: 'owner',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: user.id,
-      },
-    });
+    ({ entity: spaceUser } = await createSpaceUser(
+      { role: 'owner' },
+      { user, organization: org, space, organizationUser: orgUser },
+    ));
 
     const harness = createTestApp({
       mockUser: user,

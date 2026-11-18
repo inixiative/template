@@ -6,10 +6,10 @@
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
-import { usePageMeta } from '@template/ui/hooks';
+import { useDocumentTitleAndDescription } from '@template/ui/hooks';
 
 const DashboardPage = () => {
-  const { title, description } = usePageMeta();
+  const { title, description } = useDocumentTitleAndDescription();
 
   return (
     <div className="p-8 space-y-6">

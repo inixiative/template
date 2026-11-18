@@ -7,7 +7,7 @@
 import { Icon } from '@iconify/react';
 import { AppIdentity } from '@template/ui/components/layout/AppIdentity';
 import { Breadcrumbs } from '@template/ui/components/layout/Breadcrumbs';
-import { ShareButton } from '@template/ui/components/utility/ShareButton';
+import { CopyPageLinkButton } from '@template/ui/components/utility/CopyPageLinkButton';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
 
@@ -41,7 +41,7 @@ export const Header = ({ onMenuClick, className }: HeaderProps) => {
         <Breadcrumbs className="hidden min-w-0 sm:block" />
       </div>
       <div className="flex items-center gap-2">
-        {context && context.type !== 'public' && <ShareButton />}
+        {context && context.type !== 'public' && <CopyPageLinkButton />}
       </div>
     </header>
   );

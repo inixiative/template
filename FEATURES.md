@@ -345,7 +345,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## Real-Time Communication
 
 - ✅ **Authenticated WebSockets** — Bun transport with message-based authentication through the HTTP `/me` route; spoof authority follows the same middleware. Credentials are not sent as a token query parameter.
-- ✅ **WebSocket Data Streams** — open/snapshot/append/close streams keyed to a read route, declared once as typed shared definitions (`defineStream`: route snapshot schema, zod-validated action payloads, a required `shared`/`perRecipient` audience enforced by test). The route's response authorizes the open and is the snapshot; open streams are re-authorized every 45s, and transient failures retry with backoff. App-event handlers emit typed appends (`streamAppendHandoff`) through Redis, serialized per stream; the frontend folds them with exhaustive reducers (`useStream`) and side-effect listeners (`useStreamAction`) that share one open stream. The only stream, `organizationReadManyContacts`, is scaffolding.
+- ✅ **WebSocket Data Streams** — open/snapshot/append/close streams keyed to a read route, declared once as typed shared definitions (`defineStream`: route snapshot schema, zod-validated action payloads, a required `shared`/`perRecipient` audience enforced by test). The route's response authorizes the open and is the snapshot; open streams are re-authorized every 45s, and transient failures retry with backoff. App-event handlers emit typed appends (`streamAppendHandoff`) through Redis, serialized per stream; the frontend folds them with exhaustive reducers (`useDataStreamSnapshot`) and side-effect listeners (`useDataStreamMessageListener`) that share one open stream. The only stream, `organizationReadManyContacts`, is scaffolding.
 - ✅ **Authorized Query Channels** — `WS_CHANNELS` declares channel families; its keys are the `WSChannelFamily` names. Subscribe probes the corresponding HTTP route; unauthorized, unknown or malformed channels are rejected. Effective identity changes drop previous subscriptions.
 - ✅ **Refetch and Recovery** — Mounted live queries subscribe automatically. After reconnect, identity and subscriptions are replayed before recovery invalidation. Hints are not persisted or replayed; delivery is not guaranteed while disconnected.
 - ✅ **Redis Pub/Sub** — Channel and user-targeted messages reach connected clients across API instances, with local-only fallback on Redis failure.
@@ -437,7 +437,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Resolved at create** - steps are resolved and stored on the row; editing the registry never affects a running flow. Create checks too, so callers just create a flow instead of pre-checking whether it is needed
 - ✅ **Rechecked on every read** - from step 0, as the caller, with `readAllAsCaller` (batch sub-requests, every page via `fetchAllPages`). Steps can move backward. A failed read deletes the flow (404); a finished one is returned once and deleted
 - ✅ **Transient** - `hardDeleteRecordsPastRetention` deletes flows idle for 15 minutes
-- ✅ **Client** - only `flowId` in the store (`?flow=` mirrors it like `spoof`), the flow read from the query cache, one `FlowBanner` per app, every mutation rechecks via the `MutationCache`, one `flowNext` rule drives the banner and `Modal` close ("Continue" / "Finish"), leaving the flow's pages drops it
+- ✅ **Client** - only `flowId` in the store (`?flow=` mirrors it like `spoof`), the flow read from the query cache, one `FlowBanner` per app, every mutation rechecks via the `MutationCache`, one `nextFlowStepLink` rule drives the banner and `Modal` close ("Continue" / "Finish"), leaving the flow's pages drops it
 
 [Learn more: FLOWS.md](docs/claude/FLOWS.md)
 
@@ -509,7 +509,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Declarative Navigation System** - Navigation config files organized by context (user/org/space/public) and feature (dashboard/settings/communications). Each nav item declares path, label, icon, and required permissions. Menu items automatically filtered based on user permissions and current context. Config reusable across web/admin/superadmin apps with context-specific overrides
 
-- ✅ **Context-Aware Routing** - Routes automatically include current context params (`?org=`, `?space=`). Navigate to organization settings and URL becomes `/settings?org=orgId`. Switch organizations and all links update automatically. `getContextParams()` generates params for any route based on current state
+- ✅ **Context-Aware Routing** - Routes automatically include current context params (`?org=`, `?space=`). Navigate to organization settings and URL becomes `/settings?org=orgId`. Switch organizations and all links update automatically. `permissionCheckTargetForTenantContext()` generates params for any route based on current state
 
 - ✅ **Zustand State Management** - Six slices manage different concerns: **auth** (user/JWT), **tenant** (org/space), **permissions** (RBAC/ReBAC cache), **navigation** (breadcrumbs/menu state), **ui** (theme/modals/toasts), **client** (API base URL/headers). Slice factories enable testing without circular dependencies
 
@@ -517,7 +517,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **API Client Wrappers** - `apiQuery()` for GET requests unwraps nested `data.data` for clean usage. `apiMutation()` for mutations returns full response enabling optimistic update patterns. Both handle auth headers (JWT/token) and spoof headers (`x-spoof-user-email`) automatically
 
-- ✅ **Route Guards** - `requireAuth()` redirects unauthenticated users to `/login?redirectTo=currentPath`. `requirePublic()` redirects authenticated users away from login/signup. Guards preserve context params across redirects. Execute in route `beforeLoad` for instant feedback before component renders
+- ✅ **Route Guards** - `redirectToLoginUnlessAuthenticated()` redirects unauthenticated users to `/login?redirectTo=currentPath`. `redirectAuthenticatedUserAwayFromPublicPage()` redirects authenticated users away from login/signup. Guards preserve context params across redirects. Execute in route `beforeLoad` for instant feedback before component renders
 
 - ✅ **Vite Build System** - Lightning-fast HMR during development, optimized production builds with tree-shaking and code splitting. Supports workspace dependency hot reload via Turborepo watch mode
 
@@ -529,7 +529,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Done (Primitives)
 
-- ✅ **Core Primitives** - Avatar, Badge, Breadcrumb, Button, Card, DropdownMenu, EmptyState, Input, Label, Pagination, PasswordInput, Select, SlugInput, Table, ThemeToggle
+- ✅ **Core Primitives** - Avatar, Badge, Breadcrumb, Button, Card, DropdownMenu, EmptyState, Input, Label, Pagination, PasswordInput, Select, SlugInput, Table, ThemeSelector
 
 - ✅ **AppShell** - Main application layout with sidebar, header, and breadcrumb navigation. Wires to Zustand store for current user, org, space
 
@@ -537,11 +537,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **UserMenu** - Profile dropdown with avatar, name, email, logout, and spoof badge for impersonation
 
-- ✅ **ContextSelector** - Dropdown for switching organizations and spaces, updates URL params and global state
+- ✅ **TenantContextSelector** - Dropdown for switching organizations and spaces, updates URL params and global state
 
 - ✅ **Table + Pagination** - Table primitive with fixed-page pagination (page numbers, per-page selector, record count) and infinite scroll (IntersectionObserver sentinel). Supports viewport scroll with sticky headers and window scroll. All items rendered in DOM (no virtualization) so text selection, Ctrl+F, and copy-paste work.
 
-- ✅ **Data Hooks** - `usePaginatedData` and `useInfiniteData` manage search, filter, sort, and pagination state. `makeDataConfig` auto-generates configuration from the OpenAPI spec (searchable fields, orderable fields, enum filters). Scroll position persisted in `history.state` for back/forward restoration. Optional shareable URL sync (`?page=3&search=acme`).
+- ✅ **Data Hooks** - `usePaginatedData` and `useInfiniteData` manage search, filter, sort, and pagination state. `listQueryCapabilitiesFromOpenApi` auto-generates configuration from the OpenAPI spec (searchable fields, orderable fields, enum filters). Scroll position persisted in `history.state` for back/forward restoration. Optional shareable URL sync (`?page=3&search=acme`).
 
 - ✅ **Section Hash Navigation** - `useSectionHash` auto-discovers `data-section` elements via MutationObserver, syncs URL hash to most visible section. Dot-notation deep linking (`#usersTable.usr_abc123`) scrolls to specific rows.
 
@@ -559,7 +559,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 **20+ Custom Hooks for Common Patterns** - Reusable logic extracted into hooks for consistency across apps. All hooks are type-safe, tested, and follow React best practices.
 
-- ✅ **useAuthenticatedRouting()** - Initializes authentication state, syncs URL params (`?org=`, `?space=`) with store, handles redirects for auth/public routes. Call once in root component - sets up entire auth flow
+- ✅ **useSyncTenantContextWithUrlAndAuthorizeRoute()** - Initializes authentication state, syncs URL params (`?org=`, `?space=`) with store, handles redirects for auth/public routes. Call once in root component - sets up entire auth flow
 
 - ✅ **useOptimisticMutation()** - Wrapper around TanStack Query mutations with optimistic updates for list operations. Instantly updates UI on create/update/delete, automatically rolls back on error. Prevents loading states for better UX
 
@@ -571,17 +571,17 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **useAuthStrategy()** - Detects and configures multi-provider authentication (email/password, OAuth, SAML). Returns available providers, handles provider selection, manages auth flow
 
-- ✅ **usePermission()** - Checks if current user has specific permission in current context. Returns boolean for conditional rendering. Reacts to context switches (org/space changes)
+- ✅ **canActOnRecordIfPresent()** - Checks whether the current permissions allow an action on a record; false when the record is missing. Reads the permissions slice, so it follows context switches (org/space changes)
 
 - ✅ **useDebounce()** - Debounces rapidly changing values (search input, filter selections). Prevents excessive API calls. Configurable delay, cancels pending updates on unmount
 
 - ✅ **useMediaQuery()** - Responsive design helper that returns boolean for media query matches. Use for conditional rendering based on screen size. Server-safe (returns false during SSR)
 
 - ✅ **useAuthProviders()** - Fetches available auth providers for current org or platform. Used by login/signup to render correct OAuth buttons, show SSO option, or show password field based on configured providers
-- ✅ **useDarkMode()** - Reads and sets theme preference (light/dark/system). Syncs with Zustand ui slice, persists across sessions, applies Tailwind `dark:` class to document root. Returns `{ theme, setTheme, isDark }`
-- ✅ **useLanguage()** - Returns current locale string and setter. Backed by Zustand ui slice. Ready for i18n integration — currently returns `en` as default, locale-aware components read from this hook
-- ✅ **usePageMeta()** - Sets `document.title` and meta description for the current route. Accepts raw strings or template with app name. Called in page components to keep browser tab titles contextual
-- 🟡 **useSpaceTheme()** - Hook exists but returns mock values; space theming not yet wired to real data
+- ✅ **useApplyThemeClassToDocument()** - Reads and sets theme preference (light/dark/system). Syncs with Zustand ui slice, persists across sessions, applies Tailwind `dark:` class to document root. Returns `{ theme, setTheme, isDark }`
+- ✅ **useSetDocumentLanguageFromBrowser()** - Returns current locale string and setter. Backed by Zustand ui slice. Ready for i18n integration — currently returns `en` as default, locale-aware components read from this hook
+- ✅ **useDocumentTitleAndDescription()** - Sets `document.title` and meta description for the current route. Accepts raw strings or template with app name. Called in page components to keep browser tab titles contextual
+- 🟡 **useApplySpaceThemeCssVariables()** - Hook exists but returns mock values; space theming not yet wired to real data
 
 ---
 
@@ -637,9 +637,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Route Templates** - Pre-built patterns (readRoute, createRoute, updateRoute) reduce API definition from ~100 lines to ~20 lines. Enforces consistency while eliminating boilerplate
 
-- ✅ **Data Config Builder** - `makeDataConfig(operationId)` reads the OpenAPI spec and auto-generates searchable fields, orderable fields, and enum filters. One line of config per table/list view. `usePaginatedData` and `useInfiniteData` consume the config and produce query objects, pagination props, and scroll restoration
+- ✅ **Data Config Builder** - `listQueryCapabilitiesFromOpenApi(operationId)` reads the OpenAPI spec and auto-generates searchable fields, orderable fields, and enum filters. One line of config per table/list view. `usePaginatedData` and `useInfiniteData` consume the config and produce query objects, pagination props, and scroll restoration
 
-- ✅ **Route Guards** - Reusable auth/permission checks with automatic redirects and context preservation. Drop `beforeLoad: requireAuth()` in route definition - done
+- ✅ **Route Guards** - Reusable auth/permission checks with automatic redirects and context preservation. Drop `beforeLoad: redirectToLoginUnlessAuthenticated()` in route definition - done
 
 [Learn more: TESTING.md](docs/claude/TESTING.md) | [DEVELOPER.md](docs/claude/DEVELOPER.md)
 

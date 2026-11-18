@@ -18,7 +18,7 @@
 - [2. PermissionsSlice](#2-permissionsslice)
   - [State](#state)
   - [Actions](#actions)
-    - [setup(me)](#setupme)
+    - [installPermissionsForUser(me)](#installpermissionsforuserme)
     - [check(model, record, action)](#checkmodel-record-action)
     - [clear()](#clear)
   - [Usage Patterns](#usage-patterns)
@@ -26,10 +26,10 @@
   - [State](#state)
   - [Actions](#actions)
   - [Usage Patterns](#usage-patterns)
-- [4. ClientSlice](#4-clientslice)
+- [4. QueryClientAndWebsocketSlice](#4-queryclientandwebsocketslice)
   - [State](#state)
   - [Actions](#actions)
-    - [setClient(client)](#setclientclient)
+    - [connectQueryClientToWebsocket(queryClient)](#connectqueryclienttowebsocketqueryclient)
   - [Live queries](#live-queries)
   - [Usage Patterns](#usage-patterns)
 - [5. UISlice](#5-uislice)
@@ -73,7 +73,7 @@ UI.
 ```typescript
 // packages/ui/src/store/index.ts
 import { createAuthSlice } from '@template/ui/store/slices/auth';
-import { createClientSlice } from '@template/ui/store/slices/client';
+import { createQueryClientAndWebsocketSlice } from '@template/ui/store/slices/queryClientAndWebsocket';
 import { createNavigationSlice } from '@template/ui/store/slices/navigation';
 import { createPermissionsSlice } from '@template/ui/store/slices/permissions';
 import { createTenantSlice } from '@template/ui/store/slices/tenant';
@@ -84,7 +84,7 @@ import { devtools } from 'zustand/middleware';
 
 export const useAppStore = create<AppStore>()(
   devtools((...a) => ({
-    ...createClientSlice(...a),
+    ...createQueryClientAndWebsocketSlice(...a),
     ...createAuthSlice(...a),
     ...createNavigationSlice(...a),
     ...createPermissionsSlice(...a),
@@ -98,7 +98,7 @@ export const useAppStore = create<AppStore>()(
 (`packages/ui/src/store/types/index.ts`):
 
 ```typescript
-export type AppStore = ClientSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
+export type AppStore = QueryClientAndWebsocketSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
 ```
 
 Apps consume it directly:
@@ -150,7 +150,7 @@ const theme = useAppStore((state) => state.ui.theme);
 
 Memberships are dictionaries, not arrays. `/me` is fetched and hydrated by
 `fetchAndHydrateMe` (`packages/ui/src/lib/auth/fetchAndHydrateMe.ts`), which also calls
-`permissions.setup(me)`.
+`permissions.installPermissionsForUser(me)`.
 
 ### Actions
 
@@ -158,7 +158,7 @@ Memberships are dictionaries, not arrays. `/me` is fetched and hydrated by
 
 Runs once (no-op when `isInitialized`). If a bearer token is stored, fetches `/me`,
 hydrates auth + permissions and authenticates the websocket. On failure it logs out and
-rethrows. Always sets `isInitialized`. Called by the `requireAuth` / `requirePublic`
+rethrows. Always sets `isInitialized`. Called by the `redirectToLoginUnlessAuthenticated` / `redirectAuthenticatedUserAwayFromPublicPage`
 route guards.
 
 #### refreshMe()
@@ -189,7 +189,7 @@ re-identifies the websocket.
 #### logout()
 
 Signs out of this browser: clears the JWT, auth state, permissions and websocket identity,
-calls `tenant.setPublic()` and navigates to `/login`. It makes no server call; the API keeps no
+calls `tenant.switchToPublicContext()` and navigates to `/login`. It makes no server call; the API keeps no
 session to end. Ending every JWT on every device is `POST /api/v1/me/rotateJwts`.
 
 ### Usage Patterns
@@ -214,7 +214,7 @@ await logout();
   permissions: {
     permix: Permix;
     check: (model: AccessorName, record: HydratedRecord, action: ActionRule) => boolean;
-    setup: (me: UserWithRelations) => Promise<void>;
+    installPermissionsForUser: (me: UserWithRelations) => Promise<void>;
     clear: () => void;
   }
 }
@@ -222,7 +222,7 @@ await logout();
 
 ### Actions
 
-#### setup(me)
+#### installPermissionsForUser(me)
 
 Called by `fetchAndHydrateMe`. Sets the Permix user id; a superadmin gets
 `setSuperadmin(true)` and stops there. Otherwise it applies `getUserPermissions`, then
@@ -247,9 +247,6 @@ Replaces `permix` with a fresh instance (called on logout).
 const permissions = useAppStore((state) => state.permissions);
 <Button show={permissions.check('organization', org, 'manage')}>Edit</Button>
 
-// usePermission returns { show, disable, disabledText }; Button takes show / disabled / disabledText
-const editBtn = usePermission({ permissions, model: 'organization', record: org, action: 'manage' });
-<Button show={editBtn.show} disabled={editBtn.disable}>Edit</Button>
 ```
 
 ---
@@ -274,39 +271,39 @@ const editBtn = usePermission({ permissions, model: 'organization', record: org,
 }
 ```
 
-- **context**: the app-level context shown in the ContextSelector.
+- **context**: the app-level context shown in the TenantContextSelector.
 - **page**: the record a page is about, passed to nav `access` checks.
 
 ### Actions
 
 | Action | Effect |
 |---|---|
-| `setPublic()` | `{ type: 'public' }` |
-| `setUser()` | `{ type: 'user' }` (personal) |
-| `setOrganization(organizationId)` | Looks up `auth.organizations`; returns `false` if missing |
-| `setSpace(spaceId)` | Looks up `auth.spaces` and its organization; returns `false` if either is missing |
-| `setPage(page)` / `clearPage()` | Set or reset `page` |
+| `switchToPublicContext()` | `{ type: 'public' }` |
+| `switchToUserContext()` | `{ type: 'user' }` (personal) |
+| `switchToOrganizationContext(organizationId)` | Looks up `auth.organizations`; returns `false` if missing |
+| `switchToSpaceContext(spaceId)` | Looks up `auth.spaces` and its organization; returns `false` if either is missing |
+| `setViewedRecords(viewedRecords)` / `clearViewedRecords()` | Set or reset `viewedRecords` |
 
-`useAuthenticatedRouting` keeps context and the `?org=` / `?space=` URL params in sync
+`useSyncTenantContextWithUrlAndAuthorizeRoute` keeps context and the `?org=` / `?space=` URL params in sync
 and falls back to a context the nav config authorizes.
 
 ### Usage Patterns
 
 ```typescript
 const tenant = useAppStore((state) => state.tenant);
-tenant.setUser();
-tenant.setOrganization('org-123');
-tenant.setSpace('space-456');
+tenant.switchToUserContext();
+tenant.switchToOrganizationContext('org-123');
+tenant.switchToSpaceContext('space-456');
 ```
 
-`ContextSelector` reads `tenant` and `auth` from the store itself; it takes only
+`TenantContextSelector` reads `tenant` and `auth` from the store itself; it takes only
 `locked`, `onManageOrganizations` and `className`.
 
 ---
 
-## 4. ClientSlice
+## 4. QueryClientAndWebsocketSlice
 
-**Location:** `packages/ui/src/store/slices/client.ts` (type: `packages/ui/src/store/types/client.ts`)
+**Location:** `packages/ui/src/store/slices/queryClientAndWebsocket.ts` (type: `packages/ui/src/store/types/queryClientAndWebsocket.ts`)
 
 Holds the TanStack `QueryClient` and the API websocket. The store is the home for the
 query client so it can be reached outside React.
@@ -315,15 +312,15 @@ query client so it can be reached outside React.
 
 ```typescript
 {
-  client: QueryClient | null;   // set at app boot
+  queryClient: QueryClient | null;   // set at app boot
   websocket: ApiWebsocket;      // live-query channels and data streams
-  setClient: (client: QueryClient) => void;
+  connectQueryClientToWebsocket: (queryClient: QueryClient) => void;
 }
 ```
 
 ### Actions
 
-#### setClient(client)
+#### connectQueryClientToWebsocket(queryClient)
 
 Called by `createAppQueryClient()` (`packages/ui/src/lib/createAppQueryClient.ts`), which
 each app's `main.tsx` uses. It subscribes the query cache: an observer added to a data-stream
@@ -332,7 +329,7 @@ removing the observer closes or unsubscribes.
 
 ### Live queries
 
-`createClientSlice` derives the `ws(s)://` URL from `VITE_API_URL`, builds the
+`createQueryClientAndWebsocketSlice` derives the `ws(s)://` URL from `VITE_API_URL`, builds the
 `ApiWebsocket` (`createApiWebsocket`), and on reconnect invalidates live queries to recover
 invalidations missed while disconnected. The slice hands the websocket the query client it writes
 to (`getClient`); nothing under `lib/ws` imports the store, so the store and the websocket do not
@@ -343,8 +340,8 @@ import each other. Live-query registration lives in
 ### Usage Patterns
 
 ```typescript
-const client = useAppStore((state) => state.client);
-client?.invalidateQueries({ queryKey: ['organizations'] });
+const queryClient = useAppStore((state) => state.queryClient);
+queryClient?.invalidateQueries({ queryKey: ['organizations'] });
 ```
 
 ---
@@ -358,7 +355,6 @@ client?.invalidateQueries({ queryKey: ['organizations'] });
 ```typescript
 {
   theme: 'light' | 'dark' | 'system';  // default 'system'
-  isLoading: boolean;
   projectName: string;   // VITE_PROJECT_NAME
   appName: string;       // VITE_APP_NAME
   shortName: string;     // VITE_APP_SHORT_NAME
@@ -371,9 +367,7 @@ client?.invalidateQueries({ queryKey: ['organizations'] });
 
 | Action | Effect |
 |---|---|
-| `setTheme(theme)` | Sets the preference (used by `ThemeToggle`) |
-| `setLoading(loading)` | Global loading flag |
-| `updateTheme(theme)` | Sets the theme; server persistence is not built |
+| `setTheme(theme)` | Sets the preference (used by `ThemeSelector`) |
 
 `useThemePersistence` (in each `__root.tsx`) loads `theme` from `localStorage` on mount and
 writes it back on change.
@@ -401,11 +395,11 @@ writes it back on change.
 |---|---|
 | `setNavigate(fn)` | Stores the TanStack Router `navigate` |
 | `setNavConfig(config)` | Stores the app's nav config |
-| `setCurrentRouteMatch(match)` | Set by `useAuthenticatedRouting` |
-| `navigatePreserving(to, policy)` | Navigate, carrying search params by policy |
+| `setCurrentRouteMatch(match)` | Set by `useSyncTenantContextWithUrlAndAuthorizeRoute` |
+| `navigateKeepingSearchParams(to, policy)` | Navigate, carrying search params by policy |
 | `setFlowId(id)` | The active flow, carried as `?flow=` (see [FLOWS.md](FLOWS.md)) |
 
-`navigatePreserving` policies:
+`navigateKeepingSearchParams` policies:
 - `'context'`: keep `org` / `space`, plus `spoof` and `flow`;
 - `'spoof'`: keep only `spoof` and `flow`;
 - `'all'`: keep every current search param.
@@ -484,15 +478,15 @@ await useAppStore.getState().auth.initialize();
 
 ```
 AuthSlice ──┬──> PermissionsSlice (setup on /me, clear on logout)
-            ├──> TenantSlice (setPublic on logout)
-            ├──> ClientSlice (websocket identity)
+            ├──> TenantSlice (switchToPublicContext on logout)
+            ├──> QueryClientAndWebsocketSlice (websocket identity)
             └──> NavigationSlice (navigate to /login on logout)
 
 TenantSlice ───> AuthSlice (reads organizations/spaces)
 
 NavigationSlice ───> AuthSlice (reads spoofUserEmail)
 
-PermissionsSlice, ClientSlice, UISlice (standalone)
+PermissionsSlice, QueryClientAndWebsocketSlice, UISlice (standalone)
 ```
 
 **Cross-slice access** is safe via `get()` in slice creators:
@@ -502,7 +496,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
   auth: {
     logout: async () => {
       set(/* clear auth */);
-      get().tenant.setPublic(); // Access other slice
+      get().tenant.switchToPublicContext(); // Access other slice
     },
   },
 });
@@ -534,7 +528,7 @@ devtools((...a) => ({ ...slices }), { name: 'SharedAppStore' })
 
 **DO:** Compose slices in the shared store type:
 ```typescript
-export type AppStore = ClientSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
+export type AppStore = QueryClientAndWebsocketSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
 ```
 
 **DON'T:** Create app-specific slices or per-app stores — the store is composed once in `@template/ui/store` and shared by all apps
@@ -582,7 +576,7 @@ const auth: any = useAppStore((state) => state.auth); // ❌
 ```typescript
 logout: () => {
   set(/* clear state */);
-  get().tenant.setPublic(); // Side effect in action
+  get().tenant.switchToPublicContext(); // Side effect in action
 }
 ```
 
@@ -591,7 +585,7 @@ logout: () => {
 // ❌ Component handles side effect
 const logout = () => {
   auth.logout();
-  tenant.setPublic(); // Should be in logout action
+  tenant.switchToPublicContext(); // Should be in logout action
 };
 ```
 
@@ -630,7 +624,7 @@ const logout = () => {
 3. **Add to the shared store + AppStore type:**
    ```typescript
    // packages/ui/src/store/types/index.ts — add MySlice to the intersection
-   export type AppStore = ClientSlice & ... & MySlice;
+   export type AppStore = QueryClientAndWebsocketSlice & ... & MySlice;
 
    // packages/ui/src/store/index.ts — spread the creator
    ...createMySlice(...a),
@@ -652,7 +646,7 @@ const logout = () => {
 ```
 packages/ui/src/store/
 ├── slices/
-│   ├── client.ts       # ClientSlice (QueryClient + websocket)
+│   ├── client.ts       # QueryClientAndWebsocketSlice (QueryClient + websocket)
 │   ├── auth.ts         # AuthSlice
 │   ├── navigation.ts   # NavigationSlice
 │   ├── permissions.ts  # PermissionsSlice
@@ -663,7 +657,7 @@ packages/ui/src/store/
 │   └── index.ts        # AppStore intersection + re-exports
 └── index.ts            # Composes useAppStore (shared by all apps)
 
-packages/ui/src/lib/createAppQueryClient.ts  # Builds the QueryClient and calls setClient
+packages/ui/src/lib/createAppQueryClient.ts  # Builds the QueryClient and calls connectQueryClientToWebsocket
 
 apps/{web,admin,superadmin}/app/
 └── main.tsx            # const queryClient = createAppQueryClient()

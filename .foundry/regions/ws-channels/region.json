@@ -1,7 +1,7 @@
 {
   "id": "ws-channels",
   "title": "WebSocket channels and refetch hints",
-  "routing": "Is this about pushing a 'something changed' hint to the browser: the WS contract (WSEvent, never persisted or replayed), channels vs streams and which lane to pick, WS_CHANNELS and WSChannelFamily, channelKey, subscribe authorization by probing the route (resolveOperationRoute), publishing a refetch (refetch, sendToChannel / sendToUser / broadcast and their Local variants, Redis ws:broadcast fan-out), sendFrame instead of ws.send, the client socket (createApiWebsocket, useApiWebsocket, dispatchMessage, refetchQuery, setClient), live query recovery on reconnect, or horizontal scaling?",
+  "routing": "Is this about pushing a 'something changed' hint to the browser: the WS contract (WSEvent, never persisted or replayed), channels vs streams and which lane to pick, WS_CHANNELS and WSChannelFamily, channelKey, subscribe authorization by probing the route (resolveOperationRoute), publishing a refetch (refetch, sendToChannel / sendToUser / broadcast and their Local variants, Redis ws:broadcast fan-out), sendFrame instead of ws.send, the client socket (createApiWebsocket, useApiWebsocket, dispatchMessage, refetchQuery, connectQueryClientToWebsocket), live query recovery on reconnect, or horizontal scaling?",
   "concepts": ["ws-channels"],
   "tokens": 8991,
   "tokenMethod": "chars/4",

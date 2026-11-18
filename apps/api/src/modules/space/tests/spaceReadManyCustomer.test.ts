@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
 import type {
   CustomerRef,
   Organization,
@@ -10,8 +9,10 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
+  createCustomerRef,
   createOrganizationUser,
   createSpace,
+  createSpaceUser,
   createUser,
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
@@ -36,14 +37,10 @@ describe('GET /api/v1/space/:id/customers', () => {
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
 
-    spaceUser = await db.spaceUser.create({
-      data: {
-        role: 'admin',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: user.id,
-      },
-    });
+    ({ entity: spaceUser } = await createSpaceUser(
+      { role: 'admin' },
+      { user, organization: org, space, organizationUser: orgUser },
+    ));
 
     const harness = createTestApp({
       mockUser: user,
@@ -69,13 +66,11 @@ describe('GET /api/v1/space/:id/customers', () => {
 
   it('returns user customers', async () => {
     const { entity: customerUser } = await createUser();
-    await db.customerRef.create({
-      data: {
-        customerModel: 'User',
-        customerUserId: customerUser.id,
-        providerModel: 'Space',
-        providerSpaceId: space.id,
-      },
+    await createCustomerRef({
+      customerModel: 'User',
+      customerUserId: customerUser.id,
+      providerModel: 'Space',
+      providerSpaceId: space.id,
     });
 
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
@@ -88,13 +83,11 @@ describe('GET /api/v1/space/:id/customers', () => {
 
   it('returns organization customers', async () => {
     const { entity: customerOrg } = await createOrganizationUser({ role: 'owner' });
-    await db.customerRef.create({
-      data: {
-        customerModel: 'Organization',
-        customerOrganizationId: customerOrg.organizationId,
-        providerModel: 'Space',
-        providerSpaceId: space.id,
-      },
+    await createCustomerRef({
+      customerModel: 'Organization',
+      customerOrganizationId: customerOrg.organizationId,
+      providerModel: 'Space',
+      providerSpaceId: space.id,
     });
 
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));

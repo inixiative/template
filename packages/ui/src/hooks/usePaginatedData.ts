@@ -5,8 +5,11 @@
  * @uses none
  */
 import type { PaginationProps } from '@template/ui/components/primitives/Pagination';
-import { type DataFilters, useDataFilters } from '@template/ui/hooks/useDataFilters';
 import { useDebouncedCallback } from '@template/ui/hooks/useDebounce';
+import {
+  type ListSearchFilterAndOrderState,
+  useListSearchFilterAndOrderState,
+} from '@template/ui/hooks/useListSearchFilterAndOrderState';
 import { useScrollState } from '@template/ui/hooks/useScrollState';
 import {
   parseOrderByStrings,
@@ -14,11 +17,11 @@ import {
   writeToHistoryState,
   writeToHistoryStateAndUrl,
 } from '@template/ui/lib/dataStatePersistence';
-import type { DataConfig } from '@template/ui/lib/makeDataConfig';
+import type { ListQueryCapabilities } from '@template/ui/lib/listQueryCapabilitiesFromOpenApi';
 import type * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-export type PaginatedData = DataFilters & {
+export type PaginatedData = ListSearchFilterAndOrderState & {
   page: number;
   pageSize: number;
   setPage: (p: number) => void;
@@ -35,7 +38,7 @@ export type PaginatedData = DataFilters & {
 };
 
 export type UsePaginatedDataOptions = {
-  config: DataConfig;
+  config: ListQueryCapabilities;
   sectionId?: string;
   shareableUrl?: boolean;
   scrollRestore?: boolean;
@@ -67,7 +70,7 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
     ? parseOrderByStrings(initialState.orderBy)
     : undefined;
 
-  const dataFilters = useDataFilters(config, () => setPageRaw(1), {
+  const dataFilters = useListSearchFilterAndOrderState(config, () => setPageRaw(1), {
     search: initialState.search,
     orderBy: initialOrderBy,
   });

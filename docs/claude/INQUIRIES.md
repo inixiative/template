@@ -30,7 +30,7 @@
 - [Frontend](#frontend)
   - [Constants and utilities (`packages/ui/src/lib/inquiries/queryKeys.ts`)](#constants-and-utilities-packagesuisrclibinquiriesquerykeysts)
   - [Query key invalidation maps](#query-key-invalidation-maps)
-  - [`useInquiryPermission`](#useinquirypermission)
+  - [`useCanActOnInquiry`](#usecanactoninquiry)
   - [UI Components](#ui-components)
     - [`InquirySourceControls`](#inquirysourcecontrols)
     - [`InquiryTargetControls`](#inquirytargetcontrols)
@@ -405,38 +405,38 @@ This allows per-type permission rules (e.g. `inviteOrganizationUser` with a high
 export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled'];
 
 // Frontend terminal check — also treats past-expiresAt as terminal
-export const isTerminalInquiry = (inq: { status: InquiryStatus; expiresAt?: string | null }): boolean => {
+export const isInquiryClosedOrExpired = (inq: { status: InquiryStatus; expiresAt?: string | null }): boolean => {
   if (INQUIRY_TERMINAL_STATUSES.includes(inq.status)) return true;
   if (inq.expiresAt && new Date(inq.expiresAt) < new Date()) return true;
   return false;
 };
 
 // Tailwind class string per status (+ synthetic 'expired' key)
-export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string>;
+export const INQUIRY_STATUS_BADGE_CLASSES: Record<InquiryStatus | 'expired', string>;
 
 // Human-readable labels per type
 export const INQUIRY_TYPE_LABELS: Record<InquiryType, string>;
 ```
 
-`isTerminalInquiry` differs from `inquiryTerminalStatuses` (backend): the frontend also treats an expired inquiry as terminal so controls disable immediately without a server round-trip.
+`isInquiryClosedOrExpired` differs from `inquiryTerminalStatuses` (backend): the frontend also treats an expired inquiry as terminal so controls disable immediately without a server round-trip.
 
 ### Query key invalidation maps
 
 ```typescript
 // Keys to invalidate when the SOURCE side mutates (cancel/delete)
-export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
+export const queryKeysToInvalidateWhenSourceMutates: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
 
 // Keys to invalidate when the TARGET side mutates (resolve/approve/deny)
-export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
+export const queryKeysToInvalidateWhenTargetMutates: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
 ```
 
-Each service that resolves in a list (e.g. `transferSpace` received by an org) must add the relevant query key to `targetMutations` so the list refetches after approval.
+Each service that resolves in a list (e.g. `transferSpace` received by an org) must add the relevant query key to `queryKeysToInvalidateWhenTargetMutates` so the list refetches after approval.
 
-### `useInquiryPermission`
+### `useCanActOnInquiry`
 
 ```typescript
-// packages/ui/src/hooks/useInquiryPermission.ts
-useInquiryPermission(
+// packages/ui/src/hooks/useCanActOnInquiry.ts
+useCanActOnInquiry(
   inquiry: CheckableInquiry, // { type, sourceModel, targetModel, content? }: a stored inquiry, or a draft
   action: ActionRule,
   side: 'source' | 'target',
@@ -450,7 +450,7 @@ Side-aware permission check. `side` determines which side of the inquiry the cur
 
 The inquiry object carries the other side's FK data. This is needed because inquiries only partially hydrate relations in list responses (sent = targets only, received = sources only).
 
-`db:inquiry` gates every send and resolve branch on `sourceModel` / `targetModel`, so a check needs both models and the type. A form that offers sending an inquiry not yet created passes a draft (`{ type: 'transferSpace', sourceModel: 'Space', targetModel: 'Organization' }`). Where the parties come from a prop or the check runs per option (the invite form checks each role), build the record with `inquiryCheckRecord(inquiry, side, parties)` (`packages/ui/src/lib/inquiries/inquiryCheckRecord.ts`), the builder the hook uses, and pass it to `checkPermission`. Never hand-roll the record.
+`db:inquiry` gates every send and resolve branch on `sourceModel` / `targetModel`, so a check needs both models and the type. A form that offers sending an inquiry not yet created passes a draft (`{ type: 'transferSpace', sourceModel: 'Space', targetModel: 'Organization' }`). Where the parties come from a prop or the check runs per option (the invite form checks each role), build the record with `inquiryRecordForPermissionCheck(inquiry, side, parties)` (`packages/ui/src/lib/inquiries/inquiryRecordForPermissionCheck.ts`), the builder the hook uses, and pass it to `canActOnRecordIfPresent`. Never hand-roll the record.
 
 ### UI Components
 
@@ -461,12 +461,12 @@ The inquiry object carries the other side's FK data. This is needed because inqu
 <InquirySourceControls inquiry={InquiryItem} size? />
 ```
 
-Renders Edit / Send / Cancel buttons for the source side. Buttons are conditionally shown based on `isTerminalInquiry` and status:
+Renders Edit / Send / Cancel buttons for the source side. Buttons are conditionally shown based on `isInquiryClosedOrExpired` and status:
 - **Edit** — visible when not terminal and the type registers a `source.compose` component (opens it)
 - **Send** — visible when status is `draft` or `changesRequested`
 - **Cancel** — visible when not terminal and status is `sent` or `draft`
 
-All buttons are disabled when `useInquiryPermission(inquiry, 'send', 'source')` is false or the row is still the optimistic placeholder.
+All buttons are disabled when `useCanActOnInquiry(inquiry, 'send', 'source')` is false or the row is still the optimistic placeholder.
 
 #### `InquiryTargetControls`
 
@@ -475,11 +475,11 @@ All buttons are disabled when `useInquiryPermission(inquiry, 'send', 'source')` 
 <InquiryTargetControls inquiry={InquiryItem} size? />
 ```
 
-Renders Approve / Decline buttons, plus Review when the type registers a `target.review` component. Visible when not terminal and status is `sent` or `changesRequested`. Disabled when `useInquiryPermission(inquiry, 'resolve', 'target')` is false.
+Renders Approve / Decline buttons, plus Review when the type registers a `target.review` component. Visible when not terminal and status is `sent` or `changesRequested`. Disabled when `useCanActOnInquiry(inquiry, 'resolve', 'target')` is false.
 
 #### Per-type UI registry (`packages/ui/src/lib/inquiries/registry.ts`)
 
-`registerInquiryType(type, { label, source?, target? })` registers a type's components: `source.summary` / `detail` / `compose` and `target.summary` / `detail` / `review`. Registrations live in `lib/inquiries/registrations/<type>.tsx`; list pages and the controls read them through `getInquiryInterface(type)`.
+`registerInquiryType(type, { label, source?, target? })` registers a type's components: `source.summary` / `detail` / `compose` and `target.summary` / `detail` / `review`. Registrations live in `lib/inquiries/registrations/<type>.tsx`; list pages and the controls read them through `inquiryTypeComponentsFor(type)`.
 
 ### Pages
 

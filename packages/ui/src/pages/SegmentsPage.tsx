@@ -4,6 +4,7 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+import { useQuery } from '@tanstack/react-query';
 import type {
   MeReadManySegmentMembershipsResponse,
   MeReadManySegmentsResponse,
@@ -13,7 +14,6 @@ import type {
   SpaceReadManySegmentsResponse,
 } from '@template/sdk';
 import { Page, Table } from '@template/ui/components';
-import { useQuery } from '@template/ui/hooks';
 import { segmentContextQueries } from '@template/ui/lib/segmentContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';

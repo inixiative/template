@@ -13,21 +13,23 @@ type Breadcrumb = ReturnType<typeof buildBreadcrumbs>[number];
 export const useBreadcrumbs = (): { items: Breadcrumb[]; onNavigate: (href: string) => void } => {
   const currentRouteMatch = useAppStore((state) => state.navigation.currentRouteMatch);
   const context = useAppStore((state) => state.tenant.context);
-  const pageContext = useAppStore((state) => state.tenant.page);
+  const viewedRecords = useAppStore((state) => state.tenant.viewedRecords);
   const spoofUserEmail = useAppStore((state) => state.auth.spoofUserEmail);
-  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
+  const navigateKeepingSearchParams = useAppStore(
+    (state) => state.navigation.navigateKeepingSearchParams,
+  );
 
   const items = useMemo(
     () =>
       currentRouteMatch
-        ? buildBreadcrumbs(currentRouteMatch, context, pageContext, spoofUserEmail)
+        ? buildBreadcrumbs(currentRouteMatch, context, viewedRecords, spoofUserEmail)
         : [],
-    [currentRouteMatch, context, pageContext, spoofUserEmail],
+    [currentRouteMatch, context, viewedRecords, spoofUserEmail],
   );
 
   const onNavigate = useCallback(
-    (href: string) => navigatePreserving(href, 'context'),
-    [navigatePreserving],
+    (href: string) => navigateKeepingSearchParams(href, 'context'),
+    [navigateKeepingSearchParams],
   );
 
   return useMemo(() => ({ items, onNavigate }), [items, onNavigate]);

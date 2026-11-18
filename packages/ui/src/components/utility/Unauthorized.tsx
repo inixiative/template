@@ -19,12 +19,14 @@ export const Unauthorized = ({
   message = "You don't have permission to access this page in the current context.",
 }: UnauthorizedProps) => {
   const isAuthenticated = useAppStore((state) => state.auth.isAuthenticated);
-  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
+  const navigateKeepingSearchParams = useAppStore(
+    (state) => state.navigation.navigateKeepingSearchParams,
+  );
   const getStore = useAppStore.getState;
 
   const goToPrimary = () => {
     if (isAuthenticated) {
-      navigatePreserving('/dashboard', 'spoof');
+      navigateKeepingSearchParams('/dashboard', 'spoof');
       return;
     }
     navigateToLogin(getStore);
