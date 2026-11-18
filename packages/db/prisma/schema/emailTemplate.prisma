@@ -19,7 +19,7 @@ model EmailTemplate {
   mjml    String @db.Text // Full MJML with {{component:slug}} and {{variable.*}} placeholders
 
   // Pre-computed component refs (populated on save)
-  componentSlugs         String[] // Slugs of nested {{component:slug}} references
+  componentSlugs        String[] // Slugs of nested {{component:slug}} references
   missingComponentSlugs String[] // Missing component slugs when rendering this row transitively, honoring slot overrides; not necessarily in componentSlugs; stamped on write by the versioning hook, on ancestors by the recomputeEmailDependents job, and by the send-path guard
 
   // The authoring lenses, declared on the slug's default-tier row and inherited by every tenant row.

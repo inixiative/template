@@ -90,7 +90,7 @@ const baselineKeys = (violations: Violation[]): string[] => {
   });
 };
 
-type FenceInput = {
+type ApplyExemptionsAndBaselineInput = {
   rule: string;
   violations: Violation[];
   usedExemptions?: Set<string>;
@@ -104,7 +104,7 @@ export const applyExemptionsAndBaselineThenExit = ({
   usedExemptions,
   failureExplanationLines,
   passMessage,
-}: FenceInput) => {
+}: ApplyExemptionsAndBaselineInput) => {
   const dataDir = `scripts/ci/${rule}`;
   const baselineFile = `${dataDir}/baseline.txt`;
   const sorted = [...violations].sort((a, b) =>

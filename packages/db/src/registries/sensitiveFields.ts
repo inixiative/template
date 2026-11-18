@@ -33,16 +33,16 @@ export const MASKED_VALUE = '[MASKED]';
 export const maskSensitiveFields = <T extends Record<string, unknown>>(
   model: string,
   data: T,
-  redactValue: unknown = MASKED_VALUE,
+  maskValue: unknown = MASKED_VALUE,
 ): T => {
   const result = { ...data };
   for (const field of sensitiveFieldsOf(model)) {
-    if (field in result) (result as Record<string, unknown>)[field] = redactValue;
+    if (field in result) (result as Record<string, unknown>)[field] = maskValue;
   }
   return result as T;
 };
 
-// Masks the before/after of any sensitive field that changed. The diff is computed on unredacted data
+// Masks the before/after of any sensitive field that changed. The diff is computed on unmasked data
 // (so the key is present), and masking both sides records THAT the field changed without either value.
 export const maskSensitiveFieldsInChangeDiff = (
   model: string,
@@ -59,7 +59,7 @@ export const maskSensitiveFieldsInChangeDiff = (
 };
 
 // Recursively masks any key named in `keys` anywhere in an app-event payload (through objects and
-// arrays). App-event payloads are author-built and not model-bound, so redaction is by field name.
+// arrays). App-event payloads are author-built and not model-bound, so masking is by field name.
 export const maskSensitiveFieldsInPayload = <T>(
   data: T,
   keys: ReadonlySet<string> = SENSITIVE_FIELD_NAMES,

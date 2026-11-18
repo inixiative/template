@@ -15,7 +15,7 @@ model EmailComponent {
   locale String @default("en")
 
   // Pre-computed component refs (populated on save)
-  componentSlugs         String[] // Slugs of nested {{component:slug}} references
+  componentSlugs        String[] // Slugs of nested {{component:slug}} references
   missingComponentSlugs String[] // Missing component slugs when rendering this row transitively, honoring slot overrides; not necessarily in componentSlugs; stamped on write by the versioning hook and on ancestors by the recomputeEmailDependents job
   expectations          String[] // Absolute recipient/sender/data/system paths the body demands — derived at save, never authored
 

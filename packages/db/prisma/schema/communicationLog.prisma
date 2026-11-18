@@ -14,13 +14,13 @@ model CommunicationLog {
   emailTemplateAuditLogId String?   @db.VarChar(36)
   emailTemplateAuditLog   AuditLog? @relation("CommunicationEmailTemplateAuditLog", fields: [emailTemplateAuditLogId], references: [id], onDelete: SetNull)
 
-  senderModel           CommunicationLogSenderModel
-  senderUserId         String?       @db.VarChar(36)
-  senderOrganizationId String?       @db.VarChar(36)
-  senderSpaceId        String?       @db.VarChar(36)
-  senderUser           User?         @relation("CommunicationSenderUser", fields: [senderUserId], references: [id], onDelete: SetNull)
-  senderOrganization   Organization? @relation("CommunicationSenderOrganization", fields: [senderOrganizationId], references: [id], onDelete: SetNull)
-  senderSpace          Space?        @relation("CommunicationSenderSpace", fields: [senderSpaceId], references: [id], onDelete: SetNull)
+  senderModel          CommunicationLogSenderModel
+  senderUserId         String?                     @db.VarChar(36)
+  senderOrganizationId String?                     @db.VarChar(36)
+  senderSpaceId        String?                     @db.VarChar(36)
+  senderUser           User?                       @relation("CommunicationSenderUser", fields: [senderUserId], references: [id], onDelete: SetNull)
+  senderOrganization   Organization?               @relation("CommunicationSenderOrganization", fields: [senderOrganizationId], references: [id], onDelete: SetNull)
+  senderSpace          Space?                      @relation("CommunicationSenderSpace", fields: [senderSpaceId], references: [id], onDelete: SetNull)
 
   recipientUserId    String?  @db.VarChar(36)
   recipientUser      User?    @relation("CommunicationRecipientUser", fields: [recipientUserId], references: [id], onDelete: SetNull)
@@ -28,10 +28,10 @@ model CommunicationLog {
   recipientContact   Contact? @relation(fields: [recipientContactId], references: [id], onDelete: SetNull)
   address            String
 
-  evaluatedMjml  String? @db.Text
-  variables    Json?
+  evaluatedMjml String? @db.Text
+  variables     Json?
   // Typed render issues the send proceeded past (the registry entry opted into degrade). Null = clean.
-  renderIssues Json?
+  renderIssues  Json?
 
   idempotencyKey    String                   @unique
   providerMessageId String?

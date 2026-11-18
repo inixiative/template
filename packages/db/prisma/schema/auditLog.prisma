@@ -25,7 +25,7 @@ model AuditLog {
   action       AuditAction
   subjectModel AuditSubjectModel
 
-  // State before/after — after filtering+redaction
+  // State before/after — after filtering and masking
   before  Json?
   after   Json?
   changes Json?
