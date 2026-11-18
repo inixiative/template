@@ -161,7 +161,7 @@ RBAC, ABAC and ReBAC in one engine, [`@inixiative/permissions`](https://github.c
 | Delegates (tokens, integrations) capped at their owner | Yes | Modelled by hand | Modelled by hand | Modelled by hand | Manual | Rare |
 | Tenant hierarchy (organization, space) | Yes | Modelled in the graph | Via Polar | Via derived roles | Manual | Manual |
 | Every route enforces a declared check | Yes | No | No | No | No | `if (role !== 'admin')` |
-| Schema from Prisma metadata | Yes (prisma-map) | No | No | No | No | No |
+| Schema from Prisma metadata | Yes (field-map) | No | No | No | No | No |
 | "Which records can I read" as one query | Permissions 1.0, end of 2026 | Id lists | Yes (`list_local`) | Yes (query plans) | Yes (`accessibleBy`) | Hand-written |
 
 The library's full comparison, with a source for every cell: [COMPARISON.md](https://github.com/inixiative/permissions/blob/main/COMPARISON.md).
