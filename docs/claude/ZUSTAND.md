@@ -225,8 +225,8 @@ await logout();
 #### installPermissionsForUser(me)
 
 Called by `fetchAndHydrateMe`. Sets the Permix user id; a superadmin gets
-`setSuperadmin(true)` and stops there. Otherwise it applies `userPermissionsForUser`, then
-`permissionEntryForOrganizationRole` per `organizationUsers` row and `spacePermissionsForRole` per
+`setSuperadmin(true)` and stops there. Otherwise it applies `permissionEntryForOwnUser`, then
+`permissionEntryForOrganizationRole` per `organizationUsers` row and `permissionEntryForSpaceRole` per
 `spaceUsers` row (role + entitlements, the `/me` response's entries built from each member's Entitlement rows), mirroring the backend setup.
 
 #### check(model, record, action)

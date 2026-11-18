@@ -104,7 +104,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | add new shared state to the store; I'll create a new store for this feature; where do I add a new piece of client state; a typed slice for the new state | **Adding a store slice** · pattern packages/ui/src/store/ — add new shared state as a typed slice composed into the shared store | part 4 | — |
 | call another slice's action from inside a slice; logout should also reset the tenant; I'll have the component call both actions; one slice reading another | **Cross-slice access via get()** · pattern docs/claude/ZUSTAND.md Slice Dependencies — call another slice's actions from inside a slice creator | part 4 | — |
 | refetch this query when the server pushes a change; realtime updates for a list; I'll poll every few seconds; reconnect should recover anything missed | **Live queries via query cache observers** · pattern docs/claude/ZUSTAND.md §4 Live queries — realtime query updates; reconnect invalidates live queries to recover missed changes | part 4 | — |
-| hide the button if they can't do it; disable the control with a reason; I'll wrap the button in an if on the permission; show controls based on permission | **Permission-gated UI** · pattern docs/claude/ZUSTAND.md § 2. PermissionsSlice — hide or disable controls via Button show/disabled props from permission checks | code `Button`, `canActOnRecordIfPresent`, `fetchAndHydrateMe`, `userPermissionsForUser` | — |
+| hide the button if they can't do it; disable the control with a reason; I'll wrap the button in an if on the permission; show controls based on permission | **Permission-gated UI** · pattern docs/claude/ZUSTAND.md § 2. PermissionsSlice — hide or disable controls via Button show/disabled props from permission checks | code `Button`, `canActOnRecordIfPresent`, `fetchAndHydrateMe`, `permissionEntryForOwnUser` | — |
 | retire this piece of shared state; unwire a slice from the store; delete state nobody uses anymore | **Removing a store slice** · pattern packages/ui/src/store/ — retire shared state by unwiring the slice from store and type | part 4 | — |
 | how slices combine into one store; I'll make a standalone store for this; a module-level variable for shared state; spread the slice creator into the store; add the slice type to the store type | **Slice composition** · pattern packages/ui/src/store/slices/* — New shared state: add a slice in @template/ui/store/slices instead of a separate store. | part 4 | a standalone store or module-level mutable state for new shared state instead of a typed slice creator spread into useAppStore and added to AppStore (docs/claude/ZUSTAND.md § Adding or Removing a Slice) |
 | read store state in a plain function; get the current user in an event handler; I'll pass state into the helper as arguments; access the store from a non-component | **Store access outside React** · pattern docs/claude/ZUSTAND.md Outside React Components — outside components or in handlers; hooks with selectors inside render | part 4 | — |
@@ -353,8 +353,8 @@ await logout();
 ###### installPermissionsForUser(me)
 
 Called by `fetchAndHydrateMe`. Sets the Permix user id; a superadmin gets
-`setSuperadmin(true)` and stops there. Otherwise it applies `userPermissionsForUser`, then
-`permissionEntryForOrganizationRole` per `organizationUsers` row and `spacePermissionsForRole` per
+`setSuperadmin(true)` and stops there. Otherwise it applies `permissionEntryForOwnUser`, then
+`permissionEntryForOrganizationRole` per `organizationUsers` row and `permissionEntryForSpaceRole` per
 `spaceUsers` row (role + entitlements), mirroring the backend setup.
 
 ###### check(model, record, action)

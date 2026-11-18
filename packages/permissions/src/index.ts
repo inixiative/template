@@ -40,5 +40,5 @@ export {
 } from './roles/permissionsOfUser';
 // Shared role utilities
 export { isSuperadmin, roleToStandardAction } from './roles/shared';
-export { spacePermissionsForRole } from './roles/space';
+export { permissionEntryForSpaceRole } from './roles/space';
 export type { PermissionsCheck } from './types';
