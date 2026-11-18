@@ -494,6 +494,7 @@ db.raw.user.findMany()  // Always raw, bypasses txn
 db.scope(id, fn)        // Create AsyncLocalStorage context
 db.txn(fn)              // Start transaction
 db.onCommit(fns)        // Queue callbacks for after commit
+db.onCommitCollect(key, item, flush) // Gather items under a key; flush(items) runs once after commit
 db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or rollback
 db.findForUpdate(model, where, opts?) // SELECT ... FOR NO KEY UPDATE; { upserting: true } fences a missing row
 db.withLockUntilSettled(lockOptions, fn, acquireOptions?) // Redis lock held until the txn ends
@@ -525,6 +526,22 @@ db.onCommit(async () => {
   await sendEmail();
 });
 ```
+
+### Collecting Work for One Commit
+
+```typescript
+db.onCommitCollect('recomputeTotals', orderId, (orderIds) =>
+  enqueueJob('recomputeTotals', { orderIds }),
+);
+```
+
+Every call with the same key inside one transaction adds its item to one list, and `flush` runs once with
+that list after commit, as an `onCommit` batch (the first call's `flush` is the one that runs, so one key
+belongs to one caller). Use it in code that runs inside the transaction, such as a DB hook, when each
+write would otherwise schedule its own job: the transaction then schedules one job for the whole list.
+App-event callbacks run after commit, outside the transaction, so they cannot collect this way. A nested
+`db.txn` collects into the outer one, a rollback flushes nothing, and calling it outside a transaction
+throws.
 
 ### What Runs at Commit
 

@@ -43,6 +43,10 @@ export const markJobSupersededBy = async (jobId: string, supersededBy: string): 
   await redisClient().set(supersededKey(jobId), supersededBy, 'EX', SUPERSEDED_TTL_SEC);
 };
 
+export const deleteJobSupersededMark = async (jobId: string): Promise<void> => {
+  await redisClient().del(supersededKey(jobId));
+};
+
 // A superseding staged job parked in `waiting-children` is not running, so nothing refreshes its lane
 // (LANE_TTL_SEC assumes a running job's watchLane). If the lane expired while it waited, a newer
 // enqueue would find it empty and never mark the parked job superseded, so neither it nor its children would

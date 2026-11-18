@@ -6,7 +6,7 @@
  */
 import type { CommunicationLog } from '@template/db/generated/client/client';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { enqueueJob } from '#/jobs/enqueue';
+import { enqueueSegmentReconcileForCustomers } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
 export type CommunicationOutcomeRecordedPayload = { communicationLog: CommunicationLog };
 
@@ -14,10 +14,12 @@ export const communicationOutcomeRecorded = makeAppEvent<CommunicationOutcomeRec
   cb: [
     async ({ communicationLog }) => {
       if (!communicationLog.recipientUserId) return;
-      await enqueueJob('reconcileCustomerRelationshipSegments', {
-        customerModel: 'User',
-        customerId: communicationLog.recipientUserId,
-      });
+      await enqueueSegmentReconcileForCustomers([
+        {
+          customerModel: 'User',
+          customerId: communicationLog.recipientUserId,
+        },
+      ]);
     },
   ],
 });

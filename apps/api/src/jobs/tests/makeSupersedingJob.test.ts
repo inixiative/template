@@ -71,7 +71,39 @@ describe('makeSupersedingJob', () => {
     expect(await ctx.queue.redis.ttl(lane)).toBeLessThanOrEqual(300);
   });
 
-  test('a child of a superseded parent exits at start and passes the superseded mark down', async () => {
+  test('a child of a superseded parent exits at start, leaving no mark of its own and the parent mark in place', async () => {
+    const innerHandler = mock(async () => {});
+    const handler = makeSupersedingJob<Record<string, never>>(innerHandler, () => 'child-lane');
+    ctx.job.parent = { id: 'old-parent', queueKey: 'bull:jobs' };
+    await markJobSupersededBy('old-parent', 'new-parent');
+
+    await handler(ctx, {});
+
+    expect(innerHandler).toHaveBeenCalledTimes(0);
+    expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBeNull();
+    expect(await fetchJobSupersededBy('old-parent')).toBe('new-parent');
+  });
+
+  test('a job redelivered with unfinished children keeps its superseded mark so they still stop', async () => {
+    ctx = makeTestWorker({
+      getDependenciesCount: mock(() => Promise.resolve({ unprocessed: 2 })),
+    });
+    const lane = laneKey(ctx.job.name, 'test-1');
+    await claimLane(lane, ctx.job.id!);
+    await claimLane(lane, 'newer');
+
+    const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {});
+    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
+    await handler(ctx, { value: 1 });
+
+    expect(innerHandler).not.toHaveBeenCalled();
+    expect(await fetchJobSupersededBy(ctx.job.id!)).toBe('newer');
+  });
+
+  test('a child of a superseded parent that has children of its own passes the superseded mark down at start', async () => {
+    ctx = makeTestWorker({
+      getDependenciesCount: mock(() => Promise.resolve({ unprocessed: 1 })),
+    });
     const innerHandler = mock(async () => {});
     const handler = makeSupersedingJob<Record<string, never>>(innerHandler, () => 'child-lane');
     ctx.job.parent = { id: 'old-parent', queueKey: 'bull:jobs' };
@@ -177,6 +209,8 @@ describe('makeSupersedingJob', () => {
     await handler(ctx, { value: 1 });
 
     expect(innerHandler).not.toHaveBeenCalled();
+    expect(await fetchJobSupersededBy(ctx.job.id!)).toBeNull();
+    expect(await ctx.queue.redis.get(lane)).toBe('newer');
   });
 
   test('should re-assert a lapsed baton at start so the run is visible to lane reads', async () => {

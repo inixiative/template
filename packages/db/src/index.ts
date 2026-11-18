@@ -29,6 +29,7 @@ export { fetchCachedRecordWithTargetEntitlements, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
 export {
   claimLane,
+  deleteJobSupersededMark,
   fetchJobSupersededBy,
   holdLaneWhileParked,
   laneKey,

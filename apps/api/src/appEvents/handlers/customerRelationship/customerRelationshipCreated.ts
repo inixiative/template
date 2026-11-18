@@ -6,16 +6,21 @@
  */
 import type { CustomerRelationship } from '@template/db/generated/client/client';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { reconcileCustomerOf } from '#/modules/segment/lib/reconcileCustomer';
+import {
+  customerReferenceOfRow,
+  enqueueSegmentReconcileForCustomers,
+} from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
 export type CustomerRelationshipCreatedPayload = { customerRelationship: CustomerRelationship };
 
 export const customerRelationshipCreated = makeAppEvent<CustomerRelationshipCreatedPayload>({
   cb: [
     ({ customerRelationship }) =>
-      reconcileCustomerOf(
-        { model: 'CustomerRelationship', axis: 'customerModel' },
-        customerRelationship,
-      ),
+      enqueueSegmentReconcileForCustomers([
+        customerReferenceOfRow(
+          { model: 'CustomerRelationship', axis: 'customerModel' },
+          customerRelationship,
+        ),
+      ]),
   ],
 });

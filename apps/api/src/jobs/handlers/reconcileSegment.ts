@@ -12,7 +12,7 @@ import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { filterSegmentsWithoutRuleIssues } from '#/modules/segment/services/attachRuleHealthToSegments';
 import { publishMembershipChanges } from '#/modules/segment/services/publishMembershipChanges';
-import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRelationship';
+import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRelationships';
 import {
   isReconcilable,
   reconcileSegment as reconcile,

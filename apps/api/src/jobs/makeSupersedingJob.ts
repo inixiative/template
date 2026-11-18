@@ -6,6 +6,7 @@
  * @constructs jobHandler
  */
 import {
+  deleteJobSupersededMark,
   fetchJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
@@ -15,6 +16,7 @@ import {
 } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { WaitingChildrenError } from 'bullmq';
+import { hasUnfinishedChildren } from '#/jobs/hasUnfinishedChildren';
 import { toJobHandler } from '#/jobs/toJobHandler';
 import {
   type JobHandler,
@@ -29,12 +31,14 @@ export type SupersedingJobHandler<TPayload = void> = JobHandler<TPayload> & {
 
 // Takes a plain handler or `{ stages, finish }`. A staged superseding job may only add superseding
 // children (validateChildJobHandler). A child listens to its parent as well as to itself: at start, and
-// on every lane poll (watchLane), a superseded mark on its parent stops it exactly as its own would, and it
-// marks itself superseded with the same superseder so its own children stop in turn, at any depth. Only
+// on every lane poll (watchLane), a superseded mark on its parent stops it exactly as its own would, and a
+// child that has children of its own marks itself superseded with the same superseder so they stop in turn,
+// at any depth. Only
 // superseding jobs are ever marked superseded, so a child of a singleton or plain parent never sees one.
 // Nothing evicts children: when a newer copy replaces the parent, the claimLane superseded mark is all the
-// children need. Once they have ended, the old parent wakes, finds its superseded mark at start, and exits
-// without `finish`.
+// children need. Once they have ended, the old parent wakes, finds its superseded mark at start, deletes it,
+// and exits without `finish`. A job that exits at start while it still has unfinished children (a staged
+// job redelivered mid-stage) keeps its mark instead, so those children still stop.
 export const makeSupersedingJob = <TPayload = void>(
   definition: JobHandler<TPayload> | StagedJob<TPayload>,
   dedupeKeyFn: (payload: TPayload) => string,
@@ -61,7 +65,8 @@ export const makeSupersedingJob = <TPayload = void>(
         ((await fetchJobSupersededBy(job.id)) ??
           (parentId ? await fetchJobSupersededBy(parentId) : null));
       if (job.id && supersededBy) {
-        await markJobSupersededBy(job.id, supersededBy);
+        if (await hasUnfinishedChildren(job)) await markJobSupersededBy(job.id, supersededBy);
+        else await deleteJobSupersededMark(job.id);
         log.info(`Job ${job.id} already superseded before start`, LogScope.job);
         return;
       }

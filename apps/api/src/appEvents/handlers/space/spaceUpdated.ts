@@ -6,17 +6,19 @@
  */
 import type { Space } from '@template/db/generated/client/client';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { enqueueJob } from '#/jobs/enqueue';
+import { enqueueSegmentReconcileForCustomers } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
 export type SpaceUpdatedPayload = { space: Space };
 
 export const spaceUpdated = makeAppEvent<SpaceUpdatedPayload>({
   cb: [
     async ({ space }) => {
-      await enqueueJob('reconcileCustomerRelationshipSegments', {
-        customerModel: 'Space',
-        customerId: space.id,
-      });
+      await enqueueSegmentReconcileForCustomers([
+        {
+          customerModel: 'Space',
+          customerId: space.id,
+        },
+      ]);
     },
   ],
 });
