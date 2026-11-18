@@ -13,6 +13,6 @@ export const reconcileEveryHealthyDynamicSegment = makeSingletonJob(async () => 
   const segments = await fetchHealthyDynamicSegmentsInDependencyOrder();
   for (const segment of segments) await enqueueJob('reconcileSegment', { segmentId: segment.id });
   log.info(
-    `reconcileEveryHealthyDynamicSegment: enqueued ${segments.length} sound dynamic segments`,
+    `reconcileEveryHealthyDynamicSegment: enqueued ${segments.length} healthy dynamic segments`,
   );
 });

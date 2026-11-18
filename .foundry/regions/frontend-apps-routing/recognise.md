@@ -159,7 +159,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - one profile page that shows user or space depending on context
 - I'll guard every page individually
 - bounce them to another route before load, keeping the tenant
-- event-driven incremental updates with a nightly full sweep
+- event-driven incremental updates with a nightly full reconcile
 - the segments screen with owned and memberships views
 - where do I keep client state
 - new user registration form page

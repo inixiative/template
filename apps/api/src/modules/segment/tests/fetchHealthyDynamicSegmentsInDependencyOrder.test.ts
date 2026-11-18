@@ -35,7 +35,7 @@ describe('fetchHealthyDynamicSegmentsInDependencyOrder: what the nightly reconci
     await cleanupTouchedTables(db);
   });
 
-  it('enqueues sound dynamic segments only: a degraded one is skipped, not warned about by its job', async () => {
+  it('enqueues healthy dynamic segments only: a degraded one is skipped, not warned about by its job', async () => {
     const { entity: target } = await createSegment(
       { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeEmailDomainRule },
       { space },

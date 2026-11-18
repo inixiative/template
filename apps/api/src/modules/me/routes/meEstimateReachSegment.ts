@@ -9,8 +9,8 @@ import { validateSubmodelPermission } from '#/middleware/validations/validateSub
 import { Modules } from '#/modules/modules';
 import { OpenApiTags } from '#/modules/openApiTags';
 import {
-  segmentReachBodySchema,
-  segmentReachResponseSchema,
+  segmentEstimateReachBodySchema,
+  segmentEstimateReachResponseSchema,
 } from '#/modules/segment/schemas/segmentSchemas';
 
 export const meEstimateReachSegmentRoute = actionRoute({
@@ -19,8 +19,8 @@ export const meEstimateReachSegmentRoute = actionRoute({
   submodel: Modules.segment,
   action: 'estimateReach',
   skipId: true,
-  bodySchema: segmentReachBodySchema,
-  responseSchema: segmentReachResponseSchema,
+  bodySchema: segmentEstimateReachBodySchema,
+  responseSchema: segmentEstimateReachResponseSchema,
   description: 'Counts your customers a candidate segment rule matches today. Nothing is saved.',
   tags: [OpenApiTags.me, OpenApiTags.segment],
 });

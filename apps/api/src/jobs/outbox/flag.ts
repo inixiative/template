@@ -30,7 +30,7 @@ export const isLaneOverflowing = async (lane: JobLane): Promise<boolean> =>
     ? (await isOverflowFlagSet(JobLane.slow)) || (await isOverflowFlagSet(JobLane.fast))
     : isOverflowFlagSet(JobLane.fast);
 
-// Set-once via NX so re-trips keep the original start time (used by the stuck-overflow alert),
+// Set-once via NX so a repeated set keeps the original start time (used by the stuck-overflow alert),
 // with a TTL the drain renews each tick — survives between ticks, self-clears if the drain dies.
 const setOverflow = (lane: JobLane): Promise<unknown> =>
   queue.redis.set(overflowFlagRedisKey(lane), String(Date.now()), 'EX', overflowTtlSec(), 'NX');
@@ -57,19 +57,19 @@ export const setOverflowFlagForLanesAtCap = async (depths: QueueDepths): Promise
     if (laneDepth(depths, lane) >= laneDepthCap(lane)) await setOverflow(lane);
 };
 
-// Probe fresh and trip from the result. Several Redis commands, so the enqueue path doesn't call this
+// Probe fresh and set the flag from the result. Several Redis commands, so the enqueue path doesn't call this
 // per job — it goes through the depth estimate below.
 export const probeDepthsAndSetOverflowFlagForLanesAtCap = async (): Promise<void> =>
   setOverflowFlagForLanesAtCap(await queueDepths(true));
 
 // A rough, per-process queue depth: the last probe plus every add this process made since. An add that
 // finds the probe older than `probeMs` re-probes (one shared in-flight probe) and the add count resets.
-// The estimate only decides when to look: reaching a cap forces a fresh probe, and the flag trips on the
+// The estimate only decides when to look: reaching a cap forces a fresh probe, and the flag is set from the
 // depths that probe returned, never on the estimate, so neither stale counts nor adds recorded around the
-// probe trip it falsely. A wave of 20k or 100k adds therefore turns
+// probe set it falsely. A wave of 20k or 100k adds therefore turns
 // spilling on part-way through instead of overfilling Redis. Deliberately approximate — it sees only this
 // process's adds, and adds made during a probe are dropped by the reset. It guards against catastrophic
-// overfill, not exact admission: the drain tick trips from the real depth, and the cap sits well below
+// overfill, not exact admission: the drain tick sets it from the real depth, and the cap sits well below
 // Redis memory, so a small overshoot is harmless.
 export const makeDepthEstimator = (
   probeDepths: () => Promise<QueueDepths> = () => queueDepths(true),

@@ -36,7 +36,7 @@ static rule over customer-reference IDs. There is no direct member add/remove AP
 - `reconcileCustomerRefSegments` accepts `{ customerModel, customerId }`, finds that customer's
   references, hydrates each through `fetchLens`, and evaluates dynamic segments with `check()`
   in dependency order. Its superseding key is the customer model and ID.
-- `reconcileEveryHealthyDynamicSegment`, seeded for 04:00 UTC, queues sound dynamic segments in dependency order.
+- `reconcileEveryHealthyDynamicSegment`, seeded for 04:00 UTC, queues healthy dynamic segments in dependency order.
   It is the backstop for writes that do not emit business events.
 
 Controllers emit business events; event handlers enqueue reconciliation jobs. Reconciliation
@@ -52,7 +52,7 @@ a live segment can be degraded because a segment it depends on is degraded.
 
 Owner reads include `ruleIssues`. Customer-facing membership reads expose segment identity,
 name, owner, type and creation date, without the rule or its issues. Degraded segments retain
-their existing membership and are skipped by continuous reconciliation and sweep/fan-out
+their existing membership and are skipped by continuous reconciliation, the nightly reconcile and fan-out
 selection. Evaluation errors still fail jobs and use normal retries.
 
 ## API
@@ -117,7 +117,7 @@ can inspect. See [COMMUNICATIONS.md](COMMUNICATIONS.md#the-email-lens).
 - `apps/api/src/modules/customerRef/lib/lenses/`: the static lenses, `customerRefLens` (vocabulary
   and ownership scope) and `customerRefsByIdLens` (the rows a reconcile hydrates).
 - `apps/api/src/modules/segment/`: routes, services, trigger registry and tests.
-- `apps/api/src/jobs/handlers/`: reconciliation and sweep jobs.
+- `apps/api/src/jobs/handlers/`: segment reconciliation jobs.
 - `apps/web/app/config/nav/features/segments.ts`, `apps/web/app/routes/_authenticated/segments/`:
   sidebar and child routes.
 - `packages/ui/src/pages/SegmentsPage.tsx`: owned and membership views.

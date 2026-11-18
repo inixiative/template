@@ -8,16 +8,16 @@ import { actionRoute } from '#/lib/routeTemplates';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
 import {
-  segmentReachBodySchema,
-  segmentReachResponseSchema,
+  segmentEstimateReachBodySchema,
+  segmentEstimateReachResponseSchema,
 } from '#/modules/segment/schemas/segmentSchemas';
 
 export const organizationEstimateReachSegmentRoute = actionRoute({
   model: Modules.organization,
   submodel: Modules.segment,
   action: 'estimateReach',
-  bodySchema: segmentReachBodySchema,
-  responseSchema: segmentReachResponseSchema,
+  bodySchema: segmentEstimateReachBodySchema,
+  responseSchema: segmentEstimateReachResponseSchema,
   middleware: [validateSubmodelPermission('create')],
   description:
     'Counts the customers of this organization a candidate segment rule matches today. Nothing is saved.',

@@ -21,7 +21,7 @@ import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
 import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
-import { validatePathNotation } from '#/lib/prisma/pathNotation';
+import { isValidPathNotation } from '#/lib/prisma/pathNotation';
 import { defaultOperatorForField, validOperatorsForField } from '#/lib/prisma/scalarOperators';
 import type {
   BracketQueryPrimitive,
@@ -236,7 +236,7 @@ const validateAndTransformSearchFields = (
 
     // Bare scalar — apply field's default operator + coerce.
     if (isPrimitive(value)) {
-      if (!validatePathNotation(currentPath)) {
+      if (!isValidPathNotation(currentPath)) {
         throw makeError({ status: 400, message: `Invalid search field: ${currentPath}` });
       }
       if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
@@ -322,7 +322,7 @@ const validateAndTransformSearchFields = (
     }
 
     if (hasFieldOp) {
-      if (!validatePathNotation(currentPath)) {
+      if (!isValidPathNotation(currentPath)) {
         throw makeError({ status: 400, message: `Invalid search field: ${currentPath}` });
       }
       if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
@@ -439,7 +439,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
         const def = modelFieldAtPath(model, stripRelationOperators(field));
         const clause = def && fieldSearchOperator(def, token);
         if (!clause) return [];
-        if (!validatePathNotation(field))
+        if (!isValidPathNotation(field))
           throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
         return [buildSearchPath(model, field, clause)];
       });

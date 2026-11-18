@@ -656,7 +656,7 @@ const users = await db.user.findMany({ where });
 5. Merges with `filters` object
 6. Returns combined `where` clause
 
-**Security:** Uses `validatePathNotation()` to prevent injection attacks on nested field paths.
+**Security:** Uses `isValidPathNotation()` to prevent injection attacks on nested field paths.
 
 **Example output:**
 ```typescript
@@ -694,7 +694,7 @@ Write `where`s are scoped too, so a soft-deleted row can't be mutated without a 
 Support for dot-notation field access in queries:
 
 ```typescript
-import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
+import { buildNestedPath, isValidPathNotation } from '#/lib/prisma/pathNotation';
 
 // Build nested query structure
 buildNestedPath('user.email', { contains: 'example.com' });
@@ -704,11 +704,11 @@ buildNestedPath('organization.user.email', { contains: 'test' });
 // Returns: { organization: { user: { email: { contains: 'test' } } } }
 
 // Validate path safety
-validatePathNotation('user.email');        // true
-validatePathNotation('user..email');       // false (double dots)
-validatePathNotation('user;email');        // false (invalid chars)
-validatePathNotation('a.b.c.d.e.f');       // false (exceeds max depth of 5)
-validatePathNotation('_private.field');    // false (starts with underscore)
+isValidPathNotation('user.email');        // true
+isValidPathNotation('user..email');       // false (double dots)
+isValidPathNotation('user;email');        // false (invalid chars)
+isValidPathNotation('a.b.c.d.e.f');       // false (exceeds max depth of 5)
+isValidPathNotation('_private.field');    // false (starts with underscore)
 ```
 
 **Use cases:**

@@ -84,7 +84,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the segments link lands on Owned, keeping the context
 - reconcile referenced segments before the ones that reference them
 - drop the broken segments from this list
-- which dynamic audiences are due for a sweep
+- which dynamic audiences are due for the nightly reconcile
 - the nightly full recompute of every dynamic audience
 - is this rule well-formed and are the fields real
 - the rule only references records the owner may use
@@ -217,7 +217,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - redirect the bare segments route to a child
 - segment-of-segment rules need a dependency order
 - I'll recompute health by reading each one's conditions
-- queue sound dynamic segments in dependency order overnight
+- queue healthy dynamic segments in dependency order overnight
 - I'll validate the rule JSON in the controller
 - I'll trust whatever ids the rule contains
 - I'll compute health separately and merge it in

@@ -4,7 +4,7 @@
  * @partOf primitive:batch
  * @uses none
  */
-import { validatePathNotation } from '#/lib/prisma/pathNotation';
+import { isValidPathNotation } from '#/lib/prisma/pathNotation';
 import type { BatchRequest } from '#/modules/batch/services/strategies/types';
 
 const INTERPOLATION_PATTERN = /<<(\d+)\.(\d+)\.([a-zA-Z0-9_.]+)>>/;
@@ -76,7 +76,7 @@ const interpolateString = (value: string, context: InterpolationContext): string
   return value.replace(
     INTERPOLATION_PATTERN_GLOBAL,
     (match: string, roundIdx: string, reqIdx: string, fieldPath: string) => {
-      if (!validatePathNotation(fieldPath)) {
+      if (!isValidPathNotation(fieldPath)) {
         throw new Error(`Invalid interpolation path: ${match}`);
       }
 

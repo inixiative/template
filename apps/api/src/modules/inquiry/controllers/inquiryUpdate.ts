@@ -24,9 +24,9 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   const inquiry = contextResource<'inquiry'>(c);
   const { content, status, expectedUpdatedAt } = c.req.valid('json');
 
-  const handler = inquiryServices[inquiry.type];
-  const effectiveContent = handler.contentSchema.parse(content ?? inquiry.content);
-  if (handler.validate) await handler.validate(inquiry, effectiveContent);
+  const service = inquiryServices[inquiry.type];
+  const effectiveContent = service.contentSchema.parse(content ?? inquiry.content);
+  if (service.validate) await service.validate(inquiry, effectiveContent);
 
   const partial = await hydrate('inquiry', {
     ...inquiry,

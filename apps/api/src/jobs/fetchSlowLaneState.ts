@@ -6,7 +6,7 @@
  */
 import { type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
-import { fetchSlowIdleMs, pruneSlowDeferred } from '#/jobs/slowLaneSignals';
+import { pruneSlowDeferred, recordSlowIdleStartAndFetchIdleMs } from '#/jobs/slowLaneSignals';
 
 export type SlowLaneState = {
   depths: QueueDepths;
@@ -22,6 +22,6 @@ export const fetchSlowLaneState = async (now: number = Date.now()): Promise<Slow
     depths,
     queued: depths.slow,
     deferred: depths.slowDeferred,
-    idleMs: await fetchSlowIdleMs(queue.redis, queue.name, depths.slow, now),
+    idleMs: await recordSlowIdleStartAndFetchIdleMs(queue.redis, queue.name, depths.slow, now),
   };
 };

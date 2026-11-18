@@ -12,7 +12,7 @@ import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponse
 import { inquiryVersionSchema } from '#/modules/inquiry/schemas/inquiryVersionSchema';
 import { Modules } from '#/modules/modules';
 
-// why: a type's own response fields are parsed downstream by its handler's `resolutionInputSchema`
+// why: a type's own response fields are parsed downstream by its service's `resolutionInputSchema`
 const bodySchema = inquiryVersionSchema
   .extend({
     status: inquiryResolutionStatusSchema,

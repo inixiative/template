@@ -182,7 +182,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | authenticate users by JWT and programs by API token, both populating identical context | **Two credentials, one context** · pattern docs/claude/AUTH.md > Overview — Users: user JWT; programs (MCP, integrations, CI): API token. | part 4 | — |
 | websocket upgrade can't set headers, pass the key in the URL; email links need the key in the query string; I'll let every endpoint accept the key as a query param | **URL token fallback** · pattern FEATURES.md › URL Token Fallback — Only when headers impossible; API tokens only, never person JWTs. | part 4 | — |
 | downloads and sockets that cannot send a header; when the query-string key is allowed instead of the header; I'll read the key from the query on this route too | **URL token for header-less clients** · pattern docs/claude/AUTH.md › How It Works — Email links and file downloads; otherwise Authorization: Bearer | part 4 | — |
-| authenticate sockets by replaying /api/v1/identify with the frame's JWT | **WebSocket JWT authentication** · pattern apps/api/src/ws/probe.ts — reauthorize sweep drops identities whose JWT was revoked or expired | part 4 | — |
+| authenticate sockets by replaying /api/v1/identify with the frame's JWT | **WebSocket JWT authentication** · pattern apps/api/src/ws/probe.ts — `reauthorizeOpenStreams` drops identities whose JWT was revoked or expired | part 4 | — |
 | 404 every BetterAuth HTTP endpoint that acts on a live session | **disabledPaths** · primitive apps/api/src/lib/auth.ts — Gates only HTTP router, not auth.api.* server calls. | part 4 | — |
 | change the caller's password and return a fresh JWT, revoking older ones | **meChangePassword** · primitive modules/me/routes/meChangePassword.ts — change the caller's password and return a fresh JWT, revoking older ones | part 4 | — |
 | put the one-time token on the OAuth callback redirect as #ott fragment | **oauthCallbackToken** · primitive apps/api/src/lib/auth/oauthHandoffPlugins.ts — put the one-time token on the OAuth callback redirect as #ott fragment | part 4 | — |
@@ -382,7 +382,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 ##### Spoofing and WebSockets
 
-A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/identify` with it (any credential identifies; a token is a token, with no user), and the reauthorize sweep drops an identity whose JWT was revoked or expired.
+A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/identify` with it (any credential identifies; a token is a token, with no user), and `reauthorizeOpenStreams` drops an identity whose JWT was revoked or expired.
 
 
 ---

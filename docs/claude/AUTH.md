@@ -188,7 +188,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 ### Spoofing and WebSockets
 
-A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/identify` with it (any credential identifies; a token is a token, with no user), and the reauthorize sweep drops an identity whose JWT was revoked or expired.
+A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/identify` with it (any credential identifies; a token is a token, with no user), and `reauthorizeOpenStreams` drops an identity whose JWT was revoked or expired.
 
 
 ---

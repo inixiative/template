@@ -36,8 +36,8 @@ export const createInquiry = async (
   const permix = c.get('permix');
   const { targetEmail: _targetEmail, status, ...body } = c.req.valid('json');
 
-  const handler = inquiryServices[body.type];
-  const content = handler.contentSchema.parse(body.content);
+  const service = inquiryServices[body.type];
+  const content = service.contentSchema.parse(body.content);
   validateInquiryTypeAcceptsSourceAndTargetModels(body.type, source.sourceModel, body.targetModel);
   const target = await resolveInquiryTarget(c);
 
@@ -51,7 +51,7 @@ export const createInquiry = async (
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 
-  await validateInquiryPreCreate(handler, body.type, source, target, content);
+  await validateInquiryPreCreate(service, body.type, source, target, content);
 
   return db.txn(async () => {
     const draft = await db.inquiry.create({

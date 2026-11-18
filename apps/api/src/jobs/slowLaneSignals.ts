@@ -85,7 +85,7 @@ export const recordSlowFinished = async (
   await redis.set(slowLastFinishedKey(queueName), String(now));
 };
 
-export const fetchSlowIdleMs = async (
+export const recordSlowIdleStartAndFetchIdleMs = async (
   redis: SignalRedis,
   queueName: string,
   queuedSlow: number,

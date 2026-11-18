@@ -478,7 +478,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## Segments
 
 - ✅ **Provider-Owned Audiences** — Named sets of `CustomerRef` rows owned by a User, Organization or Space. Every segment has a lens-validated rule; hand-picked audiences are static ID rules.
-- ✅ **Static and Dynamic Membership** — Set-based segment reconciliation plus customer-side dynamic evaluation, driven by business events and backed by a nightly sweep. Segment-of-segment rules run in dependency order.
+- ✅ **Static and Dynamic Membership** — Set-based segment reconciliation plus customer-side dynamic evaluation, driven by business events and backed by a nightly reconcile of every healthy dynamic segment. Segment-of-segment rules run in dependency order.
 - ✅ **Reference Health** — RuleReference edges, cycle/ownership checks and transitive degradation. Owner reads include `ruleIssues`; membership reads hide the rule. Degraded segments retain their existing members and are skipped by continuous reconciliation.
 - ✅ **API and Reach Preview** — Owner-scoped create/list and reach estimation, segment read/update/delete and member lists, plus customer-facing membership lists.
 - ✅ **Nested Navigation** — Segments → Owned and Memberships in user, organization and space contexts. Each page enables only its own query; `/segments` defaults to Owned.

@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind handler, type
+ * @kind service, type
  * @partOf feature:inquiry
  * @uses primitive:appEvents
  */

@@ -58,7 +58,7 @@ DB table holding spilled adhoc job intent (handlerName, jobId, dedupeKey, lane, 
 Gauge of how long slow work has been queued without a slow job finishing; climbing means a stuck lane.
 
 **JOBS_MAX_QUEUE_DEPTH**  
-Shared depth budget (default 100000) that trips overflow; low-water is 0.8 of it.
+Shared depth budget (default 100000) that sets the overflow flag; low-water is 0.8 of it.
 
 **JOBS_SLOW_QUEUE_DEPTH_FRACTION**  
 Share of the depth budget slow jobs may fill before spilling.
@@ -146,7 +146,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | gate slow-lane capacity, parking a job at its priority until a slot frees | **claimSlotOrRequeue** · primitive `apps/api/src/jobs/claimSlotOrRequeue.ts#claimSlotOrRequeue` — Only sanctioned park; never hand-roll delays or moveToDelayed to throttle slow work. | docs/claude/JOBS.md § Fast and Slow Lanes › Slots: Slow Work Uses at Most Its Share; docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane | — |
 | cap how many slow jobs this worker runs at once; slow work shouldn't fill every slot; I'll keep a counter of running slow jobs; per-worker share for slow jobs | **makeSlowSlotPool** · primitive `apps/api/src/jobs/slowSlotPool.ts#makeSlowSlotPool` — In-process slot limit for slow jobs only; cross-process serialization belongs to locks-and-serialization helpers. | — | — |
 | is this lane overflowing, should I spill; slow should also respect fast's overflow; I'll count the queue and compare to a threshold; the spill decision for one lane | **isLaneOverflowing** · primitive `apps/api/src/jobs/outbox/flag.ts#isLaneOverflowing` — Use for spill decisions; isOverflowFlagSet checks only one lane's own flag. | — | — |
-| a snapshot of the slow lane for gauges and the drain; how backed up is slow work; I'll read each slow signal separately; idle time, deferred count and depth in one read | **fetchSlowLaneState** · primitive `apps/api/src/jobs/fetchSlowLaneState.ts#fetchSlowLaneState` — Whole-lane snapshot for gauges and outbox drain; fetchSlowDeferredJobCount or fetchSlowIdleMs only for a single signal. | docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane; docs/claude/JOBS.md § Overflow Buffer | — |
+| a snapshot of the slow lane for gauges and the drain; how backed up is slow work; I'll read each slow signal separately; idle time, deferred count and depth in one read | **fetchSlowLaneState** · primitive `apps/api/src/jobs/fetchSlowLaneState.ts#fetchSlowLaneState` — Whole-lane snapshot for gauges and outbox drain; fetchSlowDeferredJobCount or recordSlowIdleStartAndFetchIdleMs only for a single signal. | docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane; docs/claude/JOBS.md § Overflow Buffer | — |
 | slow jobs wait at the lowest priority so fast work is picked first; keep bulk jobs from blocking foreground jobs; I'll make a second queue for background work; I'll reserve a worker pool for bulk jobs; we're not paying for a separate queue, use pressure and priority; this is ordering, not a lock or a semaphore | **withLanePriority** · primitive `apps/api/src/jobs/lanePriority.ts#withLanePriority` — Newer work replacing older for a key: superseding jobs instead. | docs/claude/CONCURRENCY.md § Job Lanes (`withLanePriority`); docs/claude/JOBS.md § Fast and Slow Lanes › Priority: Fast Work Is Always Picked First | a second BullMQ queue or a reserved worker pool for background work, or ad-hoc numeric priorities, to keep bulk jobs from blocking foreground jobs (docs/claude/CONCURRENCY.md § Job Lanes; docs/claude/JOBS.md § Priority) |
 | declare this handler as slow because it fans out; bulk work goes in the slow lane by default; I'll add a bulk job constructor with a flag; the lane is a tag on the job data, defaulted by the handler; same queue, capacity divided by lane | **Fast and slow job lanes** · pattern docs/claude/JOBS.md — Fast and Slow Lanes — bulk fan-outs: slow lane; everything else stays fast by default | part 4 | — |
 | one depth budget shared, slow gets a share; spill fast when the whole budget is full, slow when its share is; drain fast rows first, then slow; I'll give slow jobs their own queue and cap | **Lane-divided depth budget overflow** · pattern docs/claude/JOBS.md — Pressure: One Budget, Divided by Lane — spill fast when whole budget full, slow when its share or budget full; drain fast then slow | part 4 | — |
@@ -178,7 +178,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | record the park before delaying so the count never misses it; a parked job must never be outside the count | **Record deferral before moveToDelayed** · rule docs/claude/JOBS.md — The Deferral List — parking slow jobs in claimSlotOrRequeue | part 4 | — |
 | the polling loop didn't stop when I flipped the flag; I'll stop the loop with a captured boolean; bun read the captured variable stale for thirty seconds | **Stop loops via shared object, not captured let** · rule apps/api/scripts/slowLaneCheck.ts — Any polling loop run under Bun. | part 4 | a polling loop stopped by a captured `let running` flag, which Bun was observed reading stale for 30 s, instead of a shared object (`loops.isRunning`) (docs/claude/JOBS.md § Validating Against Real Infrastructure) |
 
-- *Also here, by name:* SLOW_LANE_PRIORITY (`apps/api/src/jobs/lanePriority.ts`); pruneSlowDeferred (`apps/api/src/jobs/slowLaneSignals.ts`); fetchSlowDeferredJobCount (`apps/api/src/jobs/slowLaneSignals.ts`); fetchSlowIdleMs (`apps/api/src/jobs/slowLaneSignals.ts`); recordSlowDeferral (`apps/api/src/jobs/slowLaneSignals.ts`); recordSlowFinished (`apps/api/src/jobs/slowLaneSignals.ts`); releaseSlowDeferral (`apps/api/src/jobs/slowLaneSignals.ts`); slowParkDelayMs (`apps/api/src/jobs/slowLaneSignals.ts`); slowSlotCapacity (`apps/api/src/jobs/slowSlotPool.ts`)
+- *Also here, by name:* SLOW_LANE_PRIORITY (`apps/api/src/jobs/lanePriority.ts`); pruneSlowDeferred (`apps/api/src/jobs/slowLaneSignals.ts`); fetchSlowDeferredJobCount (`apps/api/src/jobs/slowLaneSignals.ts`); recordSlowIdleStartAndFetchIdleMs (`apps/api/src/jobs/slowLaneSignals.ts`); recordSlowDeferral (`apps/api/src/jobs/slowLaneSignals.ts`); recordSlowFinished (`apps/api/src/jobs/slowLaneSignals.ts`); releaseSlowDeferral (`apps/api/src/jobs/slowLaneSignals.ts`); slowParkDelayMs (`apps/api/src/jobs/slowLaneSignals.ts`); slowSlotCapacity (`apps/api/src/jobs/slowSlotPool.ts`)
 
 ### Class `job-outbox`: Queue overflow buffer: JobOutbox spill and drain
 
@@ -407,7 +407,7 @@ Defined in the env schema (`apps/api/src/config/env.ts`), read lazily through `o
 
 | Env var | Default | Description |
 |---------|---------|-------------|
-| `JOBS_MAX_QUEUE_DEPTH` | `100000` | Depth cap that trips overflow |
+| `JOBS_MAX_QUEUE_DEPTH` | `100000` | Depth cap that sets the overflow flag |
 | (derived) | `0.8 × cap` | Low-water mark for clearing |
 | `JOBS_OUTBOX_FLUSH_MAX_ROWS` | `1000` | Accumulator size-flush threshold |
 | `JOBS_OVERFLOW_TTL_MS` | `60000` | Flag TTL (drain heartbeats it) |

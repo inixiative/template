@@ -18,14 +18,14 @@ const guide = descriptionsBySchemaFieldPath(inquiryInfoResponseSchema);
 export const inquiryInfoController = makeController(inquiryInfoRoute, async (_c, respond) => {
   return respond.ok({
     guide,
-    types: mapValues(inquiryServices, (handler, type: keyof typeof INQUIRY_TYPES) => ({
+    types: mapValues(inquiryServices, (service, type: keyof typeof INQUIRY_TYPES) => ({
       sources: INQUIRY_TYPES[type].sources.map(({ model }) => model),
       targets: INQUIRY_TYPES[type].targets.map(({ model }) => model),
-      unique: handler.unique ?? null,
-      defaultExpirationDays: handler.defaultExpirationDays ?? null,
-      content: toJsonSchema(handler.contentSchema, 'input'),
-      resolutionInput: toJsonSchema(handler.resolutionInputSchema, 'input'),
-      resolution: toJsonSchema(handler.resolutionSchema, 'output'),
+      unique: service.unique ?? null,
+      defaultExpirationDays: service.defaultExpirationDays ?? null,
+      content: toJsonSchema(service.contentSchema, 'input'),
+      resolutionInput: toJsonSchema(service.resolutionInputSchema, 'input'),
+      resolution: toJsonSchema(service.resolutionSchema, 'output'),
     })),
   });
 });

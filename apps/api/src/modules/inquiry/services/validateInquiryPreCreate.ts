@@ -11,12 +11,12 @@ import type { InquiryService } from '#/modules/inquiry/services/types';
 import { validateUniqueInquiry } from '#/modules/inquiry/validations/validateUniqueInquiry';
 
 export const validateInquiryPreCreate = async (
-  handler: InquiryService,
+  service: InquiryService,
   type: InquiryType,
   source: InquirySourceFields,
   target: InquiryTargetFields,
   content: Record<string, unknown>,
 ): Promise<void> => {
-  if (handler.validate) await handler.validate({ ...source, ...target }, content);
-  if (handler.unique) await validateUniqueInquiry({ type, ...source, ...target }, handler.unique);
+  if (service.validate) await service.validate({ ...source, ...target }, content);
+  if (service.unique) await validateUniqueInquiry({ type, ...source, ...target }, service.unique);
 };

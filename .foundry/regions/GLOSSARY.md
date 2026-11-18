@@ -1151,7 +1151,7 @@ Declares a stream family with kind, ordering, params schema and audience. *Regio
 A stored rule with a missing binding, a lens that no longer admits it, or a dead reference; never matches, never stored as such. *Region:* [Template rules and rule references](json-rules/knowledge.md)
 
 **Degraded segment**  
-A segment whose rule (or a segment it depends on) is broken; keeps members and is skipped by reconciliation and sweep. *Region:* [Customers and segments](customers-segments/knowledge.md)
+A segment whose rule (or a segment it depends on) is broken; keeps members and is skipped by reconciliation and the nightly reconcile. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **Delegate**  
 A token or an integration; acts for its owner and never holds more than its owner. *Region:* [Member rows and delegates](permissions-members/knowledge.md)
@@ -2024,7 +2024,7 @@ Class: BullMQ background jobs: the makeJob wrappers, the handler registry, enque
 Gauge of how long slow work has been queued without a slow job finishing; climbing means a stuck lane. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **JOBS_MAX_QUEUE_DEPTH**  
-Shared depth budget (default 100000) that trips overflow; low-water is 0.8 of it. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
+Shared depth budget (default 100000) that sets the overflow flag; low-water is 0.8 of it. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **JOBS_SLOW_QUEUE_DEPTH_FRACTION**  
 Share of the depth budget slow jobs may fill before spilling. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
@@ -3097,7 +3097,7 @@ Columns recomputed when a tombstoned row is revived. *Region:* [Audit log and so
 Put a batch's db and base context in the in-memory registry, and remove it when the batch ends. *Region:* [Batch API](batch/knowledge.md)
 
 **registerCronJobs**  
-Worker-start reconcile: disable invalid enabled rows, upsert every scheduler, then sweep schedulers with no live row. *Region:* [Cron jobs and schedulers](cron/knowledge.md)
+Worker-start reconcile: disable invalid enabled rows, upsert every scheduler, then remove schedulers with no live row. *Region:* [Cron jobs and schedulers](cron/knowledge.md)
 
 **registerDbHook**  
 Attaches a named before/after handler to given DbActions on a model or '*'. *Region:* [Mutation hooks, immutable fields, ordered lists](mutation-hooks/knowledge.md)
@@ -3876,7 +3876,7 @@ Class tag: newest work for a key wins via claimLane/watchLane batons and superse
 Thrown by a job replaced by newer lane work so it is not treated as a failure. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **reconcileEveryHealthyDynamicSegment**  
-Nightly 04:00 UTC cron that queues sound dynamic segments in dependency order as the backstop. *Region:* [Customers and segments](customers-segments/knowledge.md)
+Nightly 04:00 UTC cron that queues healthy dynamic segments in dependency order as the backstop. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **sync**  
 Applies every check fix and re-locks; refuses a dirty tree without --force. *Region:* [Config package (toolchain, train)](lib-config/knowledge.md)
@@ -4379,7 +4379,7 @@ Check a narrowing chain at construction; returns { ok, errors } with codes such 
 **validateNotLastOwner**  
 Blocks removing or demoting an organization's last owner. *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)
 
-**validatePathNotation**  
+**isValidPathNotation**  
 Rejects unsafe, snake_case, underscore-prefixed or too-deep (MAX_PATH_DEPTH 5) dotted paths. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
 **validatePermission**  

@@ -35,9 +35,9 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **BadRequestError** | `(none: appears only in catalog Use lines)` | [filtering-search](filtering-search/knowledge.md) | — | example-only | catalog isValidOperatorForField / validatePathNotation Use lines |
+| **BadRequestError** | `(none: appears only in catalog Use lines)` | [filtering-search](filtering-search/knowledge.md) | — | example-only | catalog isValidOperatorForField / isValidPathNotation Use lines |
 | **HttpError** | `(none: appears only in an example)` | [lens-usage](lens-usage/knowledge.md) | — | example-only | json-rules lens docs example (gate.ok check) |
-| **makeError 400 BAD_REQUEST** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [request-context-errors](request-context-errors/knowledge.md) | buildWhereClause, coerceValueForField, buildJsonWhere, POST /api/v1/batch/execute *(inferred: validatePathNotation, isValidOperatorForField)* | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
+| **makeError 400 BAD_REQUEST** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [request-context-errors](request-context-errors/knowledge.md) | buildWhereClause, coerceValueForField, buildJsonWhere, POST /api/v1/batch/execute *(inferred: isValidPathNotation, isValidOperatorForField)* | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 | **Prisma.PrismaClientValidationError** | `@prisma/client` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db, query)* | documented | docs/claude/ERRORS.md § The global handler |
 
 ## `authentication-failed`

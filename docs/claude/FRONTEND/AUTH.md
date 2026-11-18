@@ -74,7 +74,7 @@ type SignUpResult =
   | { status: 'redirecting' };
 ```
 
-- `signIn` / `signUp` live in `packages/ui/src/lib/auth/{signin,signup}.ts`; the store wraps them (`auth.signIn`, `auth.signUp`).
+- `signIn` / `signUp` live in `packages/ui/src/lib/auth/{signIn,signUp}.ts`; the store wraps them (`auth.signIn`, `auth.signUp`).
 - `signUp` with email requires `name`. The API requires email verification, so a new account usually returns `verification-pending` and stays logged out.
 - `saml` throws `SAML authentication not yet implemented` (see [AUTH-003](../../../tickets/AUTH-003-saml-sso.md)).
 - OAuth defaults: `callbackURL` = `${origin}/auth/callback`, `errorCallbackURL` = `${origin}/login`.

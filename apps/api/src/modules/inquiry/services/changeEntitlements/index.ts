@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind handler
+ * @kind service
  * @partOf feature:inquiry
  * @uses primitive:authz, infrastructure:prisma
  */

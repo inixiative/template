@@ -814,7 +814,7 @@ const { data, pagination } = await paginate(c, db.organization, {
 - `user.email:desc` - Nested relation
 - `organization.user.email:asc` - Deep nested
 
-**Security:** Uses `validatePathNotation()` to prevent injection attacks.
+**Security:** Uses `isValidPathNotation()` to prevent injection attacks.
 
 ---
 

@@ -361,11 +361,11 @@ await enqueueJob('sendWebhook', {
 
 ##### reconcileSegment / reconcileCustomerRefSegments / reconcileEveryHealthyDynamicSegment
 
-Segment membership. `reconcileSegment` (superseding by segment id) recomputes one segment set-wise via `toPrisma` — static or dynamic, it runs when `segment.created` / `segment.updated` says the rule changed — and fans out to the dynamic segments that reference it. `reconcileCustomerRefSegments` (payload `{ customerModel, customerId }`, superseding by that pair and resolving it to the customer's references) hydrates each customer reference through `fetchLens` and runs `check()` per dynamic segment in dependency order; static segments are never on this rail. It is enqueued by the business events on the rows the segment lens reads (`contact.*`, `organization.*`, `space.*`, `user.redacted`, `communication.outcomeRecorded`), never by a DB hook. `reconcileEveryHealthyDynamicSegment` (cron, seeded at 04:00 UTC) enqueues every sound dynamic segment in dependency order (`fetchHealthyDynamicSegmentsInDependencyOrder`) and is the backstop for writes that bypass a service; a degraded segment never reaches the queue, from the sweep or from a recomputed segment's dependents fan-out. Both reconcile paths publish the junction diff as four events: `segment.membersAdded` / `segment.membersRemoved` (owner side) and `customerRef.segmentsAdded` / `customerRef.segmentsRemoved` (member side).
+Segment membership. `reconcileSegment` (superseding by segment id) recomputes one segment set-wise via `toPrisma` — static or dynamic, it runs when `segment.created` / `segment.updated` says the rule changed — and fans out to the dynamic segments that reference it. `reconcileCustomerRefSegments` (payload `{ customerModel, customerId }`, superseding by that pair and resolving it to the customer's references) hydrates each customer reference through `fetchLens` and runs `check()` per dynamic segment in dependency order; static segments are never on this rail. It is enqueued by the business events on the rows the segment lens reads (`contact.*`, `organization.*`, `space.*`, `user.redacted`, `communication.outcomeRecorded`), never by a DB hook. `reconcileEveryHealthyDynamicSegment` (cron, seeded at 04:00 UTC) enqueues every healthy dynamic segment in dependency order (`fetchHealthyDynamicSegmentsInDependencyOrder`) and is the backstop for writes that bypass a service; a degraded segment never reaches the queue, from `reconcileEveryHealthyDynamicSegment` or from a recomputed segment's dependents fan-out. Both reconcile paths publish the junction diff as four events: `segment.membersAdded` / `segment.membersRemoved` (owner side) and `customerRef.segmentsAdded` / `customerRef.segmentsRemoved` (member side).
 
 `RECONCILE_TRIGGERS` records coverage of the lens's reached models. The added handlers for
 `customerRef.created`, `user.updated`, `tag.deleted`, `tagAttachment.created` and
-`tagAttachment.deleted` still lack production emitters; the sweep remains the backstop.
+`tagAttachment.deleted` still lack production emitters; `reconcileEveryHealthyDynamicSegment` remains the backstop.
 See [SEGMENTS.md](SEGMENTS.md) for current behavior and the remaining work.
 
 ##### rotateEncryptionKeys
@@ -662,7 +662,7 @@ BULL_BOARD_PASSWORD=secret
 
 - ✅ **Cron Jobs** - Scheduled recurring tasks registered at startup. CronJob model persists schedule, last run, next run. Admin endpoints for manual triggering, enabling/disabling schedules. A tick never runs its handler: it enqueues the real run (`enqueueCronRun`), so a scheduled run and a manual trigger collide like any two enqueues
 
-- ✅ **Job Handlers** - Type-safe handlers with full context (db, queue, logger). Registered handlers include email planning/delivery, webhooks, stale-data cleanup, key rotation and segment reconciliation/sweep. Add new handlers by creating file in `handlers/` directory and exporting from index
+- ✅ **Job Handlers** - Type-safe handlers with full context (db, queue, logger). Registered handlers include email planning/delivery, webhooks, stale-data cleanup, key rotation and segment reconciliation. Add new handlers by creating file in `handlers/` directory and exporting from index
 
 - ✅ **BullBoard Dashboard** - Visual job monitoring at `/admin/queues`. View job status (active/waiting/delayed/failed), retry failed jobs, inspect payloads, see execution times. Filterable by queue and status
 
