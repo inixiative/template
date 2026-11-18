@@ -13,9 +13,9 @@
 import ts from 'typescript';
 import {
   applyExemptionsAndBaselineThenExit,
+  fetchSource,
   lineAt,
   listFiles,
-  readSource,
   type Violation,
 } from './ciRuleRunner';
 
@@ -43,7 +43,7 @@ const stringsIn = (node: ts.Node): string[] => {
 };
 
 const registeredAxes = (): Map<string, Axis[]> => {
-  const source = ts.createSourceFile(REGISTRY, readSource(REGISTRY), ts.ScriptTarget.Latest, true);
+  const source = ts.createSourceFile(REGISTRY, fetchSource(REGISTRY), ts.ScriptTarget.Latest, true);
   const axesByModel = new Map<string, Axis[]>();
   const visit = (node: ts.Node) => {
     if (
@@ -82,7 +82,7 @@ const axesByModel = registeredAxes();
 const violations: Violation[] = [];
 
 for (const file of listFiles(['packages'], /\.prisma$/)) {
-  const source = readSource(file);
+  const source = fetchSource(file);
   MODEL.lastIndex = 0;
   for (let m = MODEL.exec(source); m !== null; m = MODEL.exec(source)) {
     const [, model, body] = m;

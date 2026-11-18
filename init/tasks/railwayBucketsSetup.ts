@@ -31,11 +31,11 @@ const writeBucketCredentials = async (
   railwayProjectId: string,
 ): Promise<void> => {
   const system = await retryWithTimeout(
-    () => railwayApi.getBucketCredentials(systemBucketId, railwayEnvironmentId, railwayProjectId),
+    () => railwayApi.fetchBucketCredentials(systemBucketId, railwayEnvironmentId, railwayProjectId),
     credentialsRetry(`${infisicalEnvironment} system bucket`),
   );
   const user = await retryWithTimeout(
-    () => railwayApi.getBucketCredentials(userBucketId, railwayEnvironmentId, railwayProjectId),
+    () => railwayApi.fetchBucketCredentials(userBucketId, railwayEnvironmentId, railwayProjectId),
     credentialsRetry(`${infisicalEnvironment} user bucket`),
   );
 

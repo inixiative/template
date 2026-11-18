@@ -488,7 +488,7 @@ export const OrganizationsPage = () => {
 
 - ✅ **Table + Pagination** - Table primitive with fixed-page pagination (page numbers, per-page selector, record count) and infinite scroll (IntersectionObserver sentinel). Supports viewport scroll with sticky headers and window scroll. All items rendered in DOM (no virtualization) so text selection, Ctrl+F, and copy-paste work.
 
-- ✅ **Data Hooks** - `usePaginatedData` and `useInfiniteData` manage search, filter, sort, and pagination state. `listQueryCapabilitiesFromOpenApi` auto-generates configuration from the OpenAPI spec (searchable fields, orderable fields, enum filters). Scroll position persisted in `history.state` for back/forward restoration. Optional shareable URL sync (`?page=3&search=acme`).
+- ✅ **Data Hooks** - `usePaginatedData` and `useInfiniteData` manage search, filter, sort, and pagination state. `queryCapabilitiesFromOpenApi` auto-generates configuration from the OpenAPI spec (searchable fields, orderable fields, enum filters). Scroll position persisted in `history.state` for back/forward restoration. Optional shareable URL sync (`?page=3&search=acme`).
 
 - ✅ **Section Hash Navigation** - `useSectionHash` auto-discovers `data-section` elements via MutationObserver, syncs URL hash to most visible section. Dot-notation deep linking (`#usersTable.usr_abc123`) scrolls to specific rows.
 

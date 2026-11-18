@@ -10,7 +10,7 @@
 - [Optimistic Mutations](#optimistic-mutations)
 - [Data Hooks](#data-hooks)
   - [Architecture](#architecture)
-  - [listQueryCapabilitiesFromOpenApi](#listquerycapabilitiesfromopenapi)
+  - [queryCapabilitiesFromOpenApi](#listquerycapabilitiesfromopenapi)
   - [usePaginatedData — Page-Number Pagination](#usepaginateddata--page-number-pagination)
   - [useInfiniteData — Infinite Scroll](#useinfinitedata--infinite-scroll)
   - [Table and Pagination](#table-and-pagination)
@@ -129,7 +129,7 @@ Server data primitives for search, filter, sort, pagination, infinite scroll, sc
 ### Architecture
 
 ```
-listQueryCapabilitiesFromOpenApi(operationId)     → ListQueryCapabilities (searchable fields, orderable fields, enums)
+queryCapabilitiesFromOpenApi(operationId)     → ListQueryCapabilities (searchable fields, orderable fields, enums)
     ↓
 useListSearchFilterAndOrderState(config)          → shared search/filter/sort state + filterQuery
     ↓
@@ -145,19 +145,19 @@ Supporting hooks (used internally or standalone):
 - `useInfiniteScrollTrigger` — IntersectionObserver sentinel for load-more
 - `useInfiniteDataQuery` — low-level TanStack Query infinite wrapper
 
-### listQueryCapabilitiesFromOpenApi
+### queryCapabilitiesFromOpenApi
 
 Builds the data configuration from the OpenAPI spec's query metadata.
 
-**Location:** `packages/ui/src/lib/listQueryCapabilitiesFromOpenApi.ts`
+**Location:** `packages/ui/src/lib/queryCapabilitiesFromOpenApi.ts`
 
 ```typescript
-import { listQueryCapabilitiesFromOpenApi } from '@template/ui/lib/listQueryCapabilitiesFromOpenApi';
+import { queryCapabilitiesFromOpenApi } from '@template/ui/lib/queryCapabilitiesFromOpenApi';
 
-const config = listQueryCapabilitiesFromOpenApi('adminOrganizationReadMany');
+const config = queryCapabilitiesFromOpenApi('adminOrganizationReadMany');
 // { searchableFields, orderableFields, enumFilters, defaultOrderBy, canSearch, canOrder }
 
-listQueryCapabilitiesFromOpenApi('operationId', {
+queryCapabilitiesFromOpenApi('operationId', {
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
   canSearch: false, // default: true when the operation has searchable fields
   canOrder: true,
@@ -170,7 +170,7 @@ listQueryCapabilitiesFromOpenApi('operationId', {
 import { usePaginatedData } from '@template/ui/hooks';
 
 const data = usePaginatedData({
-  config: listQueryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
+  config: queryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
   sectionId: 'orgs',          // scroll restore + section hash
   shareableUrl: true,          // ?page=3&search=acme in URL
 });
@@ -192,7 +192,7 @@ Options: `config`, `sectionId?`, `shareableUrl?`, `scrollRestore?`, `defaultPage
 import { useInfiniteData } from '@template/ui/hooks';
 
 const feed = useInfiniteData({
-  config: listQueryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
+  config: queryCapabilitiesFromOpenApi('adminOrganizationReadMany'),
   queryKey: ['orgs'],
   queryFn: (page, filterQuery) => fetchOrgPage({ ...filterQuery, page }), // returns one page
   sectionId: 'orgFeed',
@@ -339,12 +339,12 @@ Run from `packages/ui` (requires `bunfig.toml` for happy-dom preload):
 cd packages/ui && bun run test
 ```
 
-Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `listQueryCapabilitiesFromOpenApi.test.ts`, `buildFilterQuery.test.ts`, `dataStatePersistence.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `makeAuthenticatedApiFetch.test.ts`; bracket encoding in `@template/shared/bracketQuery`.
+Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `queryCapabilitiesFromOpenApi.test.ts`, `buildFilterQuery.test.ts`, `dataStatePersistence.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `makeAuthenticatedApiFetch.test.ts`; bracket encoding in `@template/shared/bracketQuery`.
 
 ## Key Files
 
 - `packages/sdk/src/` — generated client
-- `packages/ui/src/lib/{apiQuery,apiMutation,makeAuthenticatedApiFetch,makeContextQueries,listQueryCapabilitiesFromOpenApi}.ts`
+- `packages/ui/src/lib/{apiQuery,apiMutation,makeAuthenticatedApiFetch,makeContextQueries,queryCapabilitiesFromOpenApi}.ts`
 - `packages/ui/src/hooks/useOptimisticMutation.ts`
 - `packages/ui/src/hooks/{useListSearchFilterAndOrderState,usePaginatedData,useInfiniteData,useInfiniteDataQuery,useInfiniteScrollTrigger,useScrollState,useSectionHash}.ts`
 - `packages/ui/src/hooks/{useDebounce,useValidateUniqueness}.ts`

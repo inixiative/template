@@ -68,16 +68,16 @@ const seedRailwayResumeState = (missingActions: string[]) => {
     Object.keys(defaultConfig.railway.progress).filter((key) => !missingActions.includes(key)),
   );
 
-  // getProjectEnvironments runs unconditionally (line 118 in railwaySetup.ts)
-  railwayApi.vcr.queue('getProjectEnvironments', 'default');
+  // fetchProjectEnvironments runs unconditionally (line 118 in railwaySetup.ts)
+  railwayApi.vcr.queue('fetchProjectEnvironments', 'default');
 };
 
-/** Queue the 4 getSecret fixtures for the final return block in railwaySetup */
+/** Queue the 4 fetchSecret fixtures for the final return block in railwaySetup */
 const queueFinalGetSecrets = () => {
-  infisicalApi.vcr.queue('getSecret', 'prodApiUrl');
-  infisicalApi.vcr.queue('getSecret', 'stagingApiUrl');
-  infisicalApi.vcr.queue('getSecret', 'prodRedisUrl');
-  infisicalApi.vcr.queue('getSecret', 'stagingRedisUrl');
+  infisicalApi.vcr.queue('fetchSecret', 'prodApiUrl');
+  infisicalApi.vcr.queue('fetchSecret', 'stagingApiUrl');
+  infisicalApi.vcr.queue('fetchSecret', 'prodRedisUrl');
+  infisicalApi.vcr.queue('fetchSecret', 'stagingRedisUrl');
 };
 
 config.install();
@@ -90,13 +90,13 @@ describe('Railway Resume Scenario', () => {
     config.clearAll();
 
     seedRailwayResumeState(['storeStagingRedisUrl']);
-    railwayApi.vcr.queue('getRedisUrl', 'staging');
+    railwayApi.vcr.queue('fetchRedisUrl', 'staging');
     // storeStagingRedisUrl step calls setSecretAsync
     infisicalApi.vcr.queue('setSecret', 'stagingRedisUrl');
     // fetchOrCreateRailwayConnectionId() runs unconditionally at line 414 (resolvedConnectionId)
-    railwayApi.vcr.queue('getRailwayWorkspaceToken', 'default');
+    railwayApi.vcr.queue('fetchRailwayWorkspaceToken', 'default');
     infisicalRailwayApi.vcr.queue('createRailwayConnection', 'default');
-    // final return block: 4 getSecret calls
+    // final return block: 4 fetchSecret calls
     queueFinalGetSecrets();
   });
 
@@ -130,11 +130,11 @@ describe('Railway Resume Scenario', () => {
 
     seedRailwayResumeState(['ensureProdApiDeployment']);
     // fetchOrCreateRailwayConnectionId() runs before ensureProdApiDeployment in the code flow
-    railwayApi.vcr.queue('getRailwayWorkspaceToken', 'default');
+    railwayApi.vcr.queue('fetchRailwayWorkspaceToken', 'default');
     infisicalRailwayApi.vcr.queue('createRailwayConnection', 'default');
-    railwayApi.vcr.queue('getLatestDeployment', 'null');
+    railwayApi.vcr.queue('fetchLatestDeployment', 'null');
     railwayApi.vcr.queue('triggerServiceDeployment', 'default');
-    // final return block: 4 getSecret calls
+    // final return block: 4 fetchSecret calls
     queueFinalGetSecrets();
 
     const { setupRailway } = await import(`../railwaySetup?real=${Date.now()}`);

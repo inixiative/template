@@ -12,7 +12,7 @@
 const TOKEN_KEY = 'auth_token';
 const EXPIRY_KEY = 'auth_token_expiry';
 
-export const storedToken = (): string | null => {
+export const fetchStoredTokenAndClearIfExpired = (): string | null => {
   if (typeof window === 'undefined') return null;
   const token = localStorage.getItem(TOKEN_KEY);
   const expiry = localStorage.getItem(EXPIRY_KEY);

@@ -22,7 +22,7 @@ type Violation = { file: string; line: number; text: string; via?: string };
 type Declaration = { node: ts.Node; source: ts.SourceFile };
 
 // A .delete/.deleteMany counts only on a Prisma delegate, so Map.delete or cache.delete is left alone.
-export const listPrismaAccessorNames = (schemaDir: string = SCHEMA_DIR): Set<string> => {
+export const fetchPrismaAccessorNames = (schemaDir: string = SCHEMA_DIR): Set<string> => {
   const delegates = new Set<string>();
   for (const entry of readdirSync(schemaDir, { recursive: true }) as string[]) {
     if (!entry.endsWith('.prisma')) continue;
@@ -216,7 +216,7 @@ export const findHandCleanup = (file: string, delegates: Set<string>): Violation
 };
 
 if (import.meta.main) {
-  const delegates = listPrismaAccessorNames();
+  const delegates = fetchPrismaAccessorNames();
   const violations = process.argv.slice(2).flatMap((file) => findHandCleanup(file, delegates));
 
   if (violations.length) {

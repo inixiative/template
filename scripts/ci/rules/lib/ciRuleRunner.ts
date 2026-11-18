@@ -51,7 +51,7 @@ export const listFiles = (dirs: string[], extension: RegExp): string[] => {
 export const isTestFile = (file: string): boolean =>
   /\.test\.tsx?$/.test(file) || /(^|\/)(tests?|__tests__)\//.test(file);
 
-export const readSource = (file: string): string => readFileSync(join(ROOT, file), 'utf8');
+export const fetchSource = (file: string): string => readFileSync(join(ROOT, file), 'utf8');
 
 export const lineAt = (source: string, offset: number): number => {
   let line = 1;
@@ -66,7 +66,7 @@ const parseEntries = (text: string): string[][] =>
     .filter((l) => l.trim() && !l.trimStart().startsWith('#'))
     .map((l) => l.split('\t'));
 
-const readEntries = (path: string): string[][] =>
+const fetchEntries = (path: string): string[][] =>
   existsSync(join(ROOT, path)) ? parseEntries(readFileSync(join(ROOT, path), 'utf8')) : [];
 
 const mergeBaseEntries = (path: string): string[][] | null => {
@@ -77,8 +77,10 @@ const mergeBaseEntries = (path: string): string[][] | null => {
   return shown.ok ? parseEntries(shown.out) : null;
 };
 
-export const readExemptions = (rule: string): Map<string, string> =>
-  new Map(readEntries(`scripts/ci/${rule}/exempt.txt`).map(([key, reason]) => [key, reason ?? '']));
+export const fetchExemptions = (rule: string): Map<string, string> =>
+  new Map(
+    fetchEntries(`scripts/ci/${rule}/exempt.txt`).map(([key, reason]) => [key, reason ?? '']),
+  );
 
 const baselineKeys = (violations: Violation[]): string[] => {
   const seen = new Map<string, number>();
@@ -130,7 +132,7 @@ export const applyExemptionsAndBaselineThenExit = ({
 
   let failed = false;
 
-  const exemptions = readExemptions(rule);
+  const exemptions = fetchExemptions(rule);
   const unreasoned = [...exemptions].filter(([, reason]) => !reason.trim());
   if (unreasoned.length > 0) {
     failed = true;
@@ -150,7 +152,7 @@ export const applyExemptionsAndBaselineThenExit = ({
     }
   }
 
-  const baseline = new Set(readEntries(baselineFile).map((parts) => parts.join('\t')));
+  const baseline = new Set(fetchEntries(baselineFile).map((parts) => parts.join('\t')));
   const baseEntries = mergeBaseEntries(baselineFile);
   if (baseEntries) {
     const before = new Set(baseEntries.map((parts) => parts.join('\t')));

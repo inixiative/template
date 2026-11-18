@@ -68,7 +68,7 @@ export const setupInfisical = async (
     // Step 1: Select organization
     if (!(await isComplete('infisical', 'selectOrg'))) {
       // Suppressed for TUI: console.log('  • Selecting organization...');
-      const response = await infisicalApi.getOrganization(selectedOrgId);
+      const response = await infisicalApi.fetchOrganization(selectedOrgId);
 
       // Handle nested response structure (API returns { organization: {...} })
       const selectedOrg =
@@ -105,7 +105,7 @@ export const setupInfisical = async (
       }
 
       // Get final project details to capture actual slug
-      const finalProjectDetails = await infisicalApi.getProject(projectId);
+      const finalProjectDetails = await infisicalApi.fetchProject(projectId);
       projectSlug =
         (finalProjectDetails as unknown as { workspace?: { slug: string } }).workspace?.slug ||
         project.slug;
@@ -127,7 +127,7 @@ export const setupInfisical = async (
       // Suppressed for TUI: console.log('  • Renaming dev → root...');
       try {
         // Get full project details to find dev environment ID
-        const projectDetails = await infisicalApi.getProject(projectId);
+        const projectDetails = await infisicalApi.fetchProject(projectId);
         const workspace = (
           projectDetails as unknown as {
             workspace?: { environments?: Array<{ slug: string; id: string }> };
@@ -396,7 +396,7 @@ export const fetchSecretOrThrow = async (
   };
 
   if (process.env.NODE_ENV === 'test') {
-    return infisicalApi.vcr.capture('getSecret', realFn);
+    return infisicalApi.vcr.capture('fetchSecret', realFn);
   }
   return realFn();
 };

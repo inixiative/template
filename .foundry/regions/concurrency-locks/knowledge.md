@@ -602,8 +602,8 @@ How it works:
 2. The running job's `watchLane` polls its lane (~500ms); a different holder means it was usurped
 3. Usurped jobs abort via `ctx.signal` and exit gracefully
 
-4. A staged superseding job's children listen to their parent too: a tombstone on the parent stops them
-   at start or on their next poll, and they tombstone themselves so their own children stop (see
+4. A staged superseding job's children listen to their parent too: a superseded mark on the parent stops them
+   at start or on their next poll, and they superseded mark themselves so their own children stop (see
    [Staged Job](#staged-job-fan-out-and-wait)).
 
 **Superseding does not kill.** `makeSupersedingJob` stops *waiting* for the old run; it does not stop it. Workers run handlers in-process, so the superseded handler's promise keeps running to the end. The signal is cooperative: `fetch`, timers and your own loops can honour it, Prisma queries cannot. A superseded run must therefore never write: check `ctx.signal.aborted` before every write, or fence the write against the lane.

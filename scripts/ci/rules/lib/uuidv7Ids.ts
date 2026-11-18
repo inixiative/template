@@ -16,10 +16,10 @@
 import ts from 'typescript';
 import {
   applyExemptionsAndBaselineThenExit,
+  fetchExemptions,
+  fetchSource,
   lineAt,
   listFiles,
-  readExemptions,
-  readSource,
   type Violation,
 } from './ciRuleRunner';
 
@@ -52,12 +52,12 @@ const attributesOf = (rest: string): string[] => {
   return attributes;
 };
 
-const exemptions = readExemptions('uuidv7-ids');
+const exemptions = fetchExemptions('uuidv7-ids');
 const usedExemptions = new Set<string>();
 const violations: Violation[] = [];
 
 for (const file of listFiles(['apps', 'packages'], /\.prisma$/)) {
-  const source = readSource(file);
+  const source = fetchSource(file);
   MODEL.lastIndex = 0;
   for (let m = MODEL.exec(source); m !== null; m = MODEL.exec(source)) {
     const [, model, body] = m;
@@ -98,7 +98,7 @@ for (const file of listFiles(['apps', 'packages'], /\.prisma$/)) {
 
 for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   if (file.endsWith('.d.ts')) continue;
-  const source = readSource(file);
+  const source = fetchSource(file);
   if (!source.includes('randomUUID')) continue;
   const sourceFile = ts.createSourceFile(
     file,

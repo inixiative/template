@@ -38,16 +38,16 @@ export const fetchJobSupersededBy = async (jobId: string): Promise<string | null
   redisClient().get(supersededKey(jobId));
 
 // Marks one job superseded by id, without touching any lane. A superseding child writes its own when
-// it finds its parent superseded, so the tombstone reaches its children in turn.
+// it finds its parent superseded, so the superseded mark reaches its children in turn.
 export const markJobSupersededBy = async (jobId: string, supersededBy: string): Promise<void> => {
   await redisClient().set(supersededKey(jobId), supersededBy, 'EX', SUPERSEDED_TTL_SEC);
 };
 
 // A superseding staged job parked in `waiting-children` is not running, so nothing refreshes its lane
 // (LANE_TTL_SEC assumes a running job's watchLane). If the lane expired while it waited, a newer
-// enqueue would find it empty and never tombstone the parked job, so neither it nor its children would
+// enqueue would find it empty and never mark the parked job superseded, so neither it nor its children would
 // stop, and it would run `finish` when it woke. So the parked holder stretches its lane to the
-// tombstone's lifetime. Only the current holder does; a job already replaced leaves the lane alone.
+// superseded mark's lifetime. Only the current holder does; a job already replaced leaves the lane alone.
 // When it resumes, watchLane puts the normal TTL back.
 export const holdLaneWhileParked = async (lane: string, jobId: string): Promise<boolean> => {
   if ((await redisClient().get(lane)) !== jobId) return false;
@@ -78,7 +78,7 @@ export const releaseLane = (
 // While we're still the holder we REFRESH the TTL each poll, so the lane never expires out from under
 // a long-running holder — otherwise an expired lane reads as null and a stale older job (running past
 // the TTL) would never see the usurp. An absent lane therefore means "no active claimant", not a usurp.
-// With a `parentId`, a tombstone on the parent fires onUsurped too, after tombstoning this job with the
+// With a `parentId`, a superseded mark on the parent fires onUsurped too, after marking this job superseded with the
 // parent's superseder so its own children see it.
 export const watchLane = (
   lane: string,

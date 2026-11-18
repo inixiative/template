@@ -70,8 +70,8 @@ describe('TokenInputView - fetchSecretOrThrow via VCR', () => {
   });
 
   test('fetchSecretOrThrow returns values from VCR fixtures', async () => {
-    infisicalApi.vcr.queue('getSecret', 'planetscaleTokenId');
-    infisicalApi.vcr.queue('getSecret', 'planetscaleToken');
+    infisicalApi.vcr.queue('fetchSecret', 'planetscaleTokenId');
+    infisicalApi.vcr.queue('fetchSecret', 'planetscaleToken');
 
     const { fetchSecretOrThrow } = await import(`../../tasks/infisicalSetup?v=${Date.now()}`);
 

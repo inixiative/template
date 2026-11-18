@@ -17,7 +17,7 @@ import {
   writeToHistoryState,
   writeToHistoryStateAndUrl,
 } from '@template/ui/lib/dataStatePersistence';
-import type { ListQueryCapabilities } from '@template/ui/lib/listQueryCapabilitiesFromOpenApi';
+import type { ListQueryCapabilities } from '@template/ui/lib/queryCapabilitiesFromOpenApi';
 import type * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 

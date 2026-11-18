@@ -51,8 +51,8 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
       const jobId = isValidJobId(row.jobId) ? row.jobId : Bun.randomUUIDv7();
       let previousHolder: string | null = null;
       try {
-        // A row tombstoned while buffered was displaced by a newer direct enqueue. Re-claiming it
-        // would tombstone the usurper right back (mutual tombstones → neither runs), so drop it.
+        // A row marked superseded while buffered was displaced by a newer direct enqueue. Re-claiming it
+        // would mark the usurper superseded right back (mutual superseded marks → neither runs), so drop it.
         if (baton && (await fetchJobSupersededBy(row.jobId))) {
           displaced.push(row.id);
           continue;

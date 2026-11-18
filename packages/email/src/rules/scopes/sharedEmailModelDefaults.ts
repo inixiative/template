@@ -7,12 +7,12 @@
 import type { NarrowingDefaults } from '@inixiative/json-rules';
 import { conditionPolymorphicAxisPointsAtBoundRow } from '@template/db';
 import {
-  isPlatformOrPointsAtBoundRow,
+  platformOrPointsAtBoundRow,
   pointsAtBoundRowAndIsNotDeleted,
   rerootConditionUnderRelation,
 } from '@template/db/lens';
 
-const tag = isPlatformOrPointsAtBoundRow('Tag', 'ownerModel');
+const tag = platformOrPointsAtBoundRow('Tag', 'ownerModel');
 const segment = pointsAtBoundRowAndIsNotDeleted('Segment', 'ownerModel');
 
 export const SHARED_EMAIL_MODEL_DEFAULTS: NarrowingDefaults['models'] = {

@@ -40,7 +40,7 @@ describe('makeSupersedingJob', () => {
     expect(result).toBe(10);
   });
 
-  test('a job that parks waiting on its children keeps its lane for as long as a tombstone lives', async () => {
+  test('a job that parks waiting on its children keeps its lane for as long as a superseded mark lives', async () => {
     const handler = makeSupersedingJob<Record<string, never>>(
       async () => {
         throw new WaitingChildrenError();
@@ -71,7 +71,7 @@ describe('makeSupersedingJob', () => {
     expect(await ctx.queue.redis.ttl(lane)).toBeLessThanOrEqual(300);
   });
 
-  test('a child of a superseded parent exits at start and passes the tombstone down', async () => {
+  test('a child of a superseded parent exits at start and passes the superseded mark down', async () => {
     const innerHandler = mock(async () => {});
     const handler = makeSupersedingJob<Record<string, never>>(innerHandler, () => 'child-lane');
     ctx.job.parent = { id: 'old-parent', queueKey: 'bull:jobs' };
@@ -83,7 +83,7 @@ describe('makeSupersedingJob', () => {
     expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
   });
 
-  test('a running child aborts when its parent is superseded, and passes the tombstone down', async () => {
+  test('a running child aborts when its parent is superseded, and passes the superseded mark down', async () => {
     let handlerFinished = false;
     const handler = makeSupersedingJob<Record<string, never>>(
       async () => {
@@ -167,10 +167,10 @@ describe('makeSupersedingJob', () => {
     expect(signalAborted).toBe(true);
   });
 
-  test('should not run when the job was displaced while queued (tombstoned before start)', async () => {
+  test('should not run when the job was displaced while queued (marked superseded before start)', async () => {
     const lane = laneKey(ctx.job.name, 'test-1');
     await claimLane(lane, ctx.job.id!);
-    await claimLane(lane, 'newer'); // displaces this job → tombstone survives even if the lane expires
+    await claimLane(lane, 'newer'); // displaces this job → superseded mark survives even if the lane expires
 
     const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {});
     const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);

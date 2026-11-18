@@ -6,7 +6,11 @@
  */
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { ChangePasswordCard } from '@template/ui/components/settings/ChangePasswordCard';
-import { clearToken, setToken, storedToken } from '@template/ui/lib/auth/token';
+import {
+  clearToken,
+  fetchStoredTokenAndClearIfExpired,
+  setToken,
+} from '@template/ui/lib/auth/token';
 import type { ApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
 import { useAppStore } from '@template/ui/store';
 import { createTestStore } from '@template/ui/test';
@@ -90,7 +94,7 @@ describe('ChangePasswordCard', () => {
     const view = render(<ChangePasswordCard />);
     submit(view, 'current-password', 'brand-new-password');
 
-    await waitFor(() => expect(storedToken()).toBe(newToken));
+    await waitFor(() => expect(fetchStoredTokenAndClearIfExpired()).toBe(newToken));
     expect(requests.map(({ credentials: _credentials, ...request }) => request)).toEqual([
       {
         method: 'POST',
@@ -110,7 +114,7 @@ describe('ChangePasswordCard', () => {
     submit(view, 'current-password', 'brand-new-password', 'something-else');
     await waitFor(() => expect(view.getByRole('alert').textContent).toContain('do not match'));
     expect(requests).toEqual([]);
-    expect(storedToken()).toBe(oldToken);
+    expect(fetchStoredTokenAndClearIfExpired()).toBe(oldToken);
   });
 
   test('a refused change shows the server message and keeps the old JWT', async () => {
@@ -119,7 +123,7 @@ describe('ChangePasswordCard', () => {
     const view = render(<ChangePasswordCard />);
     submit(view, 'wrong-password', 'brand-new-password');
     await waitFor(() => expect(view.getByRole('alert').textContent).toContain('Invalid password'));
-    expect(storedToken()).toBe(oldToken);
+    expect(fetchStoredTokenAndClearIfExpired()).toBe(oldToken);
     expect(authenticate).not.toHaveBeenCalled();
   });
 
@@ -134,7 +138,7 @@ describe('ChangePasswordCard', () => {
 
     await waitFor(() => expect(requests).toHaveLength(1));
     await waitFor(() => expect(view.queryByRole('alert')).toBeNull());
-    expect(storedToken()).toBe(oldToken);
+    expect(fetchStoredTokenAndClearIfExpired()).toBe(oldToken);
     expect(authenticate).not.toHaveBeenCalled();
   });
 
@@ -145,7 +149,7 @@ describe('ChangePasswordCard', () => {
 
     await waitFor(() => expect(requests).toHaveLength(1));
     await waitFor(() => expect(view.queryByRole('alert')).toBeNull());
-    expect(storedToken()).toBe(oldToken);
+    expect(fetchStoredTokenAndClearIfExpired()).toBe(oldToken);
     expect(authenticate).not.toHaveBeenCalled();
   });
 
@@ -172,6 +176,6 @@ describe('ChangePasswordCard', () => {
     await waitFor(() =>
       expect(view.getByRole('alert').textContent).toContain('newPassword: Too small'),
     );
-    expect(storedToken()).toBe(oldToken);
+    expect(fetchStoredTokenAndClearIfExpired()).toBe(oldToken);
   });
 });

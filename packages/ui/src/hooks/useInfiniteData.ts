@@ -15,7 +15,7 @@ import {
   useListSearchFilterAndOrderState,
 } from '@template/ui/hooks/useListSearchFilterAndOrderState';
 import { useScrollState } from '@template/ui/hooks/useScrollState';
-import type { ListQueryCapabilities } from '@template/ui/lib/listQueryCapabilitiesFromOpenApi';
+import type { ListQueryCapabilities } from '@template/ui/lib/queryCapabilitiesFromOpenApi';
 import * as React from 'react';
 import { useRef } from 'react';
 

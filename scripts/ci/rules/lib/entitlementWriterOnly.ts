@@ -23,11 +23,11 @@
 import ts from 'typescript';
 import {
   applyExemptionsAndBaselineThenExit,
+  fetchExemptions,
+  fetchSource,
   isTestFile,
   lineAt,
   listFiles,
-  readExemptions,
-  readSource,
   type Violation,
 } from './ciRuleRunner';
 
@@ -53,7 +53,7 @@ const NESTED_WRITES = new Set([
 const RELATION = /Entitlements?$/;
 const MODEL = 'Entitlement';
 
-const exemptions = readExemptions('entitlement-writer-only');
+const exemptions = fetchExemptions('entitlement-writer-only');
 const usedExemptions = new Set<string>();
 const violations: Violation[] = [];
 
@@ -79,7 +79,7 @@ const isRelationName = (name: string): boolean => name !== 'entitlement' && RELA
 
 for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   if (file === WRITER || isTestFile(file) || file.endsWith('.d.ts')) continue;
-  const source = readSource(file);
+  const source = fetchSource(file);
   if (!/[Ee]ntitlement/.test(source)) continue;
   const sourceFile = ts.createSourceFile(
     file,

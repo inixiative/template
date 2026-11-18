@@ -124,14 +124,14 @@ export const setupPlanetScale = async (
     // IMPORTANT: Before production launch, upgrade to multi-replica plan for HA:
     //   pscale database upgrade-plan <database> --org <org> --plan multi
     //   This provides Primary + 2 replicas with 99.99% SLA
-    let _dbResult: Awaited<ReturnType<typeof planetscaleApi.getDatabase>> | undefined;
+    let _dbResult: Awaited<ReturnType<typeof planetscaleApi.fetchDatabase>> | undefined;
     if (!(await isComplete('planetscale', 'createDB'))) {
       try {
         _dbResult = await planetscaleApi.createDatabase(organization, databaseName, region);
       } catch (error) {
         // Database might already exist
         if (error instanceof Error && error.message.includes('already exists')) {
-          _dbResult = await planetscaleApi.getDatabase(organization, databaseName);
+          _dbResult = await planetscaleApi.fetchDatabase(organization, databaseName);
         } else {
           throw error;
         }
@@ -144,7 +144,7 @@ export const setupPlanetScale = async (
       await onStepComplete?.();
     } else {
       // Database already created, just fetch it
-      _dbResult = await planetscaleApi.getDatabase(organization, databaseName);
+      _dbResult = await planetscaleApi.fetchDatabase(organization, databaseName);
     }
 
     // Step 4: Wait for database initial provisioning
@@ -181,7 +181,7 @@ export const setupPlanetScale = async (
         const msg = error instanceof Error ? error.message.toLowerCase() : '';
         if (msg.includes('not found') || msg.includes('does not exist')) {
           // Verify 'prod' branch exists to confirm rename already happened
-          await planetscaleApi.getBranch(organization, databaseName, 'prod');
+          await planetscaleApi.fetchBranch(organization, databaseName, 'prod');
         } else {
           throw error;
         }
@@ -191,7 +191,7 @@ export const setupPlanetScale = async (
     }
 
     // Step 6: Create staging branch (from prod)
-    let _stagingBranch: Awaited<ReturnType<typeof planetscaleApi.getBranch>> | undefined;
+    let _stagingBranch: Awaited<ReturnType<typeof planetscaleApi.fetchBranch>> | undefined;
     if (!(await isComplete('planetscale', 'createStagingBranch'))) {
       try {
         _stagingBranch = await retryWithTimeout(
@@ -216,7 +216,7 @@ export const setupPlanetScale = async (
         );
       } catch (error) {
         if (error instanceof Error && error.message.includes('already exists')) {
-          _stagingBranch = await planetscaleApi.getBranch(organization, databaseName, 'staging');
+          _stagingBranch = await planetscaleApi.fetchBranch(organization, databaseName, 'staging');
         } else {
           throw error;
         }
@@ -225,7 +225,7 @@ export const setupPlanetScale = async (
       await onStepComplete?.();
     } else {
       // Staging branch already created, just fetch it
-      _stagingBranch = await planetscaleApi.getBranch(organization, databaseName, 'staging');
+      _stagingBranch = await planetscaleApi.fetchBranch(organization, databaseName, 'staging');
     }
 
     // Step 7+8: Create roles and store connection strings atomically

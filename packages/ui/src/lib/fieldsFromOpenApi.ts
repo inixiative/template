@@ -121,7 +121,7 @@ const extractOrderableFields = (schema: SpecNode): string[] => {
   return [];
 };
 
-export const listFieldsFromOpenApiOperation = (
+export const fieldsFromOpenApiOperation = (
   path: string,
   method: string = 'get',
 ): ListFieldsFromOpenApi => {
@@ -142,11 +142,10 @@ export const listFieldsFromOpenApiOperation = (
   };
 };
 
-export const listFieldsFromOpenApiOperationId = (operationId: string): ListFieldsFromOpenApi => {
+export const fieldsFromOpenApiOperationId = (operationId: string): ListFieldsFromOpenApi => {
   for (const [path, pathItem] of Object.entries(spec.paths ?? {})) {
     for (const [method, operation] of Object.entries(pathItem)) {
-      if (operation?.operationId === operationId)
-        return listFieldsFromOpenApiOperation(path, method);
+      if (operation?.operationId === operationId) return fieldsFromOpenApiOperation(path, method);
     }
   }
   return {};

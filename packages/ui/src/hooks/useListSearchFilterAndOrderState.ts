@@ -5,7 +5,7 @@
  * @uses none
  */
 import { buildFilterQuery, type FilterState } from '@template/ui/lib/buildFilterQuery';
-import type { ListQueryCapabilities } from '@template/ui/lib/listQueryCapabilitiesFromOpenApi';
+import type { ListQueryCapabilities } from '@template/ui/lib/queryCapabilitiesFromOpenApi';
 import { useMemo, useState } from 'react';
 
 export type ListSearchFilterAndOrderInitialState = {

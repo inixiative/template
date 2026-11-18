@@ -12,7 +12,7 @@ import {
 import { redisClient } from '@template/db/redis/client';
 
 // The supersede lane "baton": one Redis key per lane = its current holder (a jobId). Latest claim wins
-// and tombstones the displaced job; a running job watchLanes its lane and is usurped the moment a
+// and marks the displaced job superseded; a running job watchLanes its lane and is usurped the moment a
 // different jobId holds it. SET/GET plus small Lua evals, so it runs on ioredis-mock.
 const redis = redisClient();
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -31,7 +31,7 @@ describe('supersede lane baton', () => {
     expect(laneKey('h', 'k')).toBe(laneKey('h', 'k')); // stable for the same pair
   });
 
-  test('claimLane records the holder; the latest claim wins and tombstones the displaced job', async () => {
+  test('claimLane records the holder; the latest claim wins and marks the displaced job superseded', async () => {
     const lane = laneKey('h', 'k');
     expect(await claimLane(lane, 'job-a')).toBeNull();
     expect(await redis.get(lane)).toBe('job-a');
@@ -53,7 +53,7 @@ describe('supersede lane baton', () => {
     expect(await redis.ttl(lane)).toBeLessThanOrEqual(300);
   });
 
-  test('holdLaneWhileParked stretches a lane it still holds to a tombstone lifetime, and leaves a newer holder alone', async () => {
+  test('holdLaneWhileParked stretches a lane it still holds to the lifetime of its superseded mark, and leaves a newer holder alone', async () => {
     const lane = laneKey('h', 'parked');
     await claimLane(lane, 'job-a');
     expect(await holdLaneWhileParked(lane, 'job-a')).toBe(true);
@@ -65,7 +65,7 @@ describe('supersede lane baton', () => {
     expect(await redis.ttl(lane)).toBeLessThanOrEqual(300);
   });
 
-  test('watchLane with a parentId: a tombstone on the parent usurps the child and tombstones it too', async () => {
+  test('watchLane with a parentId: a superseded mark on the parent usurps the child and marks it superseded too', async () => {
     const lane = laneKey('h', 'child');
     await claimLane(lane, 'child-job');
     let usurped = false;
@@ -99,7 +99,7 @@ describe('supersede lane baton', () => {
     expect(await fetchJobSupersededBy('job-b')).toBeNull();
   });
 
-  test('reclaimLane displaces an OLDER holder and tombstones it (no stale-wins inversion)', async () => {
+  test('reclaimLane displaces an OLDER holder and marks it superseded (no stale-wins inversion)', async () => {
     // Both batons lapsed under congestion; the older job started first and re-asserted a vacant lane.
     // The newer job must take the baton back at start — otherwise last-wins flips to stale-wins.
     const lane = laneKey('h', 'reclaim-inversion');
@@ -145,7 +145,7 @@ describe('supersede lane baton', () => {
     expect(await redis.get(lane)).toBeNull();
   });
 
-  test('releaseLane rolls back both this claim and the tombstone it created', async () => {
+  test('releaseLane rolls back both this claim and the superseded mark it created', async () => {
     const lane = laneKey('h', 'rollback');
     await claimLane(lane, 'job-a');
     const previousHolder = await claimLane(lane, 'job-b');
@@ -156,7 +156,7 @@ describe('supersede lane baton', () => {
     expect(await fetchJobSupersededBy('job-a')).toBeNull();
   });
 
-  test('releaseLane does not clear a newer claimant or its tombstone', async () => {
+  test('releaseLane does not clear a newer claimant or its superseded mark', async () => {
     const lane = laneKey('h', 'rollback-race');
     await claimLane(lane, 'job-a');
     const previousHolder = await claimLane(lane, 'job-b');

@@ -1,7 +1,7 @@
 {
   "id": "init-architecture",
   "title": "Init script architecture and direction",
-  "routing": "Is this about how the init TUI is structured or where it is heading: ConfigProvider / useConfig / syncConfig and the root config state, fetchProjectConfig with cache-busted imports, markComplete / isComplete and detectSetupState / derived setupState with useMemo, manual sync not polling, viewState naming vs execution flags, state management standards, resource naming, the file layout (init/views, init/tasks, init/api), creating a new task view, checkPrerequisites, execAsync vs execSync, retryWithTimeout, getSecret, the Launch preflight gate, or the cut-over from the TUI to headless init:agent and from push to migrations?",
+  "routing": "Is this about how the init TUI is structured or where it is heading: ConfigProvider / useConfig / syncConfig and the root config state, fetchProjectConfig with cache-busted imports, markComplete / isComplete and detectSetupState / derived setupState with useMemo, manual sync not polling, viewState naming vs execution flags, state management standards, resource naming, the file layout (init/views, init/tasks, init/api), creating a new task view, checkPrerequisites, execAsync vs execSync, retryWithTimeout, fetchSecret, the Launch preflight gate, or the cut-over from the TUI to headless init:agent and from push to migrations?",
   "concepts": ["init-architecture"],
   "tokens": 12066,
   "tokenMethod": "chars/4",

@@ -33,7 +33,7 @@ const defaultsDroppingId = (narrowing: LensNarrowing): string[] => {
   );
 };
 
-export const listLensPathsThatDropId = (narrowing: LensNarrowing): string[] => [
+export const lensPathsThatDropId = (narrowing: LensNarrowing): string[] => [
   ...droppingId(narrowing, projectLens(narrowing)),
   ...defaultsDroppingId(narrowing),
 ];

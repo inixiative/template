@@ -13,10 +13,10 @@
 import ts from 'typescript';
 import {
   applyExemptionsAndBaselineThenExit,
+  fetchSource,
   isTestFile,
   lineAt,
   listFiles,
-  readSource,
   type Violation,
 } from './ciRuleRunner';
 
@@ -65,7 +65,7 @@ const violations: Violation[] = [];
 
 for (const file of listFiles(['apps', 'packages'], /\.(tsx?|sql)$/)) {
   if (isTestFile(file)) continue;
-  const source = readSource(file);
+  const source = fetchSource(file);
   const pieces = file.endsWith('.sql') ? sqlWithoutComments(source) : stringsOf(source);
   for (const { text, offset } of pieces) {
     const line = lineAt(source, offset);

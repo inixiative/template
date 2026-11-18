@@ -79,7 +79,7 @@ jobs/
 ├── lanePriority.ts     # Slow lane → lowest BullMQ priority
 ├── makeJob.ts          # Plain job constructor
 ├── makeSingletonJob.ts # At most one run per key; a busy key skips
-├── makeSupersedingJob.ts # Newer run of a key takes over; children honour a parent's tombstone
+├── makeSupersedingJob.ts # Newer run of a key takes over; children honour a parent's superseded mark
 ├── toJobHandler.ts     # Handler or { stages, finish } → handler (every constructor)
 ├── runJobStages.ts     # Staged jobs: stages, parking in waiting-children, finish
 ├── makeEnqueueChildJob.ts # A stage's ctx.enqueueChildJob (parent link + ignoreDependencyOnFailure, optional delay)
@@ -321,8 +321,8 @@ How it works:
 2. The running job's `watchLane` polls its lane (~500ms); a different holder means it was usurped
 3. Usurped jobs abort via `ctx.signal` and exit gracefully
 
-4. A staged superseding job's children listen to their parent too: a tombstone on the parent stops them
-   at start or on their next poll, and they tombstone themselves so their own children stop (see
+4. A staged superseding job's children listen to their parent too: a superseded mark on the parent stops them
+   at start or on their next poll, and they superseded mark themselves so their own children stop (see
    [Staged Job](#staged-job-fan-out-and-wait)).
 
 **Superseding does not kill.** `makeSupersedingJob` stops *waiting* for the old run; it does not stop it. Workers run handlers in-process, so the superseded handler's promise keeps running to the end. The signal is cooperative: `fetch`, timers and your own loops can honour it, Prisma queries cannot. A superseded run must therefore never write: check `ctx.signal.aborted` before every write, or fence the write against the lane.
@@ -350,7 +350,7 @@ export const refreshThings = makeJob<RefreshThingsPayload>({
 - **`ctx.enqueueChildJob` exists only inside a stage**, so only a job can have children (`makeEnqueueChildJob`). It adds the child with the running job as its `parent` and `ignoreDependencyOnFailure`: a child keeps the queue's retries (3 attempts, exponential backoff), and only after its last attempt fails does it count as done, so a dead child never holds its parent open. Never pass `parent` to `enqueueJob` yourself. The `no-hand-rolled-flows` CI rule keeps BullMQ's flow machinery inside these files.
 - **`ctx.enqueueChildJobs(handler, payloads, { spreadSeconds })`** adds one child per payload and spaces their starts evenly across the window (`spreadDelays`: child `i` starts at `i × spread / count`; the first starts at once). Spacing is BullMQ's `delay` on each child (`ctx.enqueueChildJob(handler, payload, { delay })`), so the parent still waits for all of them. In an inline test run a delayed child returns unrun, so tests that need every child to run pass no spread.
 - **A flow child never spills to the outbox** (see [Spill Routing](#spill-routing)): the drained re-add would lose its parent link.
-- **A superseding child listens to its superseding parent as well as to itself.** A superseding parent may only add superseding children (`validateChildJobHandler`, checked when the child is added). When the parent is replaced, the existing lane claim tombstones it; each child treats that tombstone as its own, at start and on every lane poll (`watchLane(lane, jobId, onUsurped, parentId)`), and tombstones itself (`markJobSupersededBy`) so its own children stop too, at any depth. Nothing evicts children. The old parent then wakes, finds its tombstone at start, and exits without `finish`. A parked superseding parent stretches its lane to the tombstone's lifetime (`holdLaneWhileParked`) so a newer enqueue still finds and tombstones it. A singleton or plain parent is never superseded and may have any children.
+- **A superseding child listens to its superseding parent as well as to itself.** A superseding parent may only add superseding children (`validateChildJobHandler`, checked when the child is added). When the parent is replaced, the existing lane claim marks it superseded; each child treats that superseded mark as its own, at start and on every lane poll (`watchLane(lane, jobId, onUsurped, parentId)`), and marks itself superseded (`markJobSupersededBy`) so its own children stop too, at any depth. Nothing evicts children. The old parent then wakes, finds its superseded mark at start, and exits without `finish`. A parked superseding parent stretches its lane to the superseded mark's lifetime (`holdLaneWhileParked`) so a newer enqueue still finds it and marks it superseded. A singleton or plain parent is never superseded and may have any children.
 - **One open parent at a time:** make the parent a keyed singleton (deduplication holds while it is parked), or add it under a fixed `jobId` with `removeOnComplete`/`removeOnFail`. Whatever adds the parent (a cron root, say) just adds it and finishes: it is not itself a parent.
 - **Tests:** `enqueueJob` runs children inline (an inline run has no worker token and no parent), so the stages and `finish` run in order within one call, and a child that throws fails the parent's call. Child-failure tolerance (`ignoreDependencyOnFailure`) is BullMQ's; `apps/api/scripts/jobFlowCheck.ts` exercises it against real Redis (see [Validating Against Real Infrastructure](#validating-against-real-infrastructure)).
 - A worker that dies mid-stage reruns that stage and may add its children twice. Children must be idempotent.

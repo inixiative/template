@@ -19,12 +19,12 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   applyExemptionsAndBaselineThenExit,
+  fetchExemptions,
+  fetchSource,
   isTestFile,
   lineAt,
   listFiles,
   ROOT,
-  readExemptions,
-  readSource,
   type Violation,
 } from './ciRuleRunner';
 
@@ -99,7 +99,7 @@ const isMount = (call: Call): boolean => {
   return path !== '*' && /=>|\bfunction\b/.test(call.args);
 };
 
-const exemptions = readExemptions('one-middleware-chain');
+const exemptions = fetchExemptions('one-middleware-chain');
 const usedExemptions = new Set<string>();
 const violations: Violation[] = [];
 
@@ -109,7 +109,7 @@ const code = (source: string): string =>
     .replace(/\/\/.*$/gm, (c) => ' '.repeat(c.length));
 
 const mountsIn = (file: string) => {
-  const source = readSource(file);
+  const source = fetchSource(file);
   const text = code(source);
   return [...text.matchAll(RECEIVER)].flatMap((m) =>
     chainedCalls(text, (m.index ?? 0) + m[0].length)
@@ -130,7 +130,7 @@ const outside = (file: string, line: number, key: string, detail: string) => {
 };
 
 if (existsSync(join(ROOT, API))) {
-  const source = readSource(API);
+  const source = fetchSource(API);
   const text = code(source);
   let chainEnd = 0;
   let previous = -1;

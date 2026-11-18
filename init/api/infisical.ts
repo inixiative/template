@@ -58,7 +58,7 @@ class InfisicalApi {
     service: 'infisical',
     version: () => cliVersion('infisical'),
     sanitizers: {
-      getSecret: { fn: maskSecrets },
+      fetchSecret: { fn: maskSecrets },
       setSecret: { fn: maskSecrets },
     },
   });
@@ -89,8 +89,8 @@ class InfisicalApi {
     });
   }
 
-  async getOrganization(organizationId: string): Promise<InfisicalOrganization> {
-    return this.vcr.capture('getOrganization', () =>
+  async fetchOrganization(organizationId: string): Promise<InfisicalOrganization> {
+    return this.vcr.capture('fetchOrganization', () =>
       this.request<InfisicalOrganization>(`/v1/organization/${organizationId}`),
     );
   }
@@ -169,8 +169,8 @@ class InfisicalApi {
     });
   }
 
-  async getProject(projectId: string): Promise<InfisicalProject> {
-    return this.vcr.capture('getProject', () =>
+  async fetchProject(projectId: string): Promise<InfisicalProject> {
+    return this.vcr.capture('fetchProject', () =>
       this.request<InfisicalProject>(`/v1/workspace/${projectId}`),
     );
   }
@@ -274,13 +274,13 @@ class InfisicalApi {
     });
   }
 
-  async getSecret(
+  async fetchSecret(
     projectId: string,
     environment: string,
     key: string,
     path: string = '/',
   ): Promise<string> {
-    return this.vcr.capture('getSecret', async () => {
+    return this.vcr.capture('fetchSecret', async () => {
       const response = await this.request<{ secret: { secretValue: string } }>(
         `/v3/secrets/raw/${key}?workspaceId=${projectId}&environment=${environment}&secretPath=${encodeURIComponent(path)}`,
       );

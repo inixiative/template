@@ -10,7 +10,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 
 export const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
 
-export const isPlatformOrPointsAtBoundRow = (model: ModelName, axis: string): Condition => ({
+export const platformOrPointsAtBoundRow = (model: ModelName, axis: string): Condition => ({
   all: [
     live,
     {

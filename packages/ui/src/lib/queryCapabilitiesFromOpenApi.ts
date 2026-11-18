@@ -5,10 +5,7 @@
  * @partOf primitive:ui
  * @uses none
  */
-import {
-  type EnumFilter,
-  listFieldsFromOpenApiOperationId,
-} from '@template/ui/lib/listFieldsFromOpenApi';
+import { type EnumFilter, fieldsFromOpenApiOperationId } from '@template/ui/lib/fieldsFromOpenApi';
 
 export type ListQueryCapabilities = {
   searchableFields: string[];
@@ -25,11 +22,11 @@ export type ListQueryCapabilitiesOptions = {
   canOrder?: boolean;
 };
 
-export const listQueryCapabilitiesFromOpenApi = (
+export const queryCapabilitiesFromOpenApi = (
   operationId: string,
   options?: ListQueryCapabilitiesOptions,
 ): ListQueryCapabilities => {
-  const metadata = listFieldsFromOpenApiOperationId(operationId);
+  const metadata = fieldsFromOpenApiOperationId(operationId);
   const searchableFields = metadata.searchableFields ?? [];
 
   return {

@@ -32,7 +32,7 @@ These primitives feed a **rules builder** over an in-memory collection: options 
 
 ### `@template/sdk/lenses` — `lensFromOperation.ts`
 
-`lensFromOperation(operationId)` — the primary entry. Resolves the endpoint's 200 response from `openapi.gen.json` (already in the bundle via `listFieldsFromOpenApiOperation`), unwraps the `data` envelope (array → items), and builds the lens named by the response component (`meReceivedManyInquiries` → `InquiryReceivedItem`) or the operationId when inline. Hard-throws on unknown operationId or a response with no data envelope.
+`lensFromOperation(operationId)` — the primary entry. Resolves the endpoint's 200 response from `openapi.gen.json` (already in the bundle via `fieldsFromOpenApiOperation`), unwraps the `data` envelope (array → items), and builds the lens named by the response component (`meReceivedManyInquiries` → `InquiryReceivedItem`) or the operationId when inline. Hard-throws on unknown operationId or a response with no data envelope.
 
 ### `@template/sdk/lenses` — `lensFromSchema.ts`
 
@@ -71,4 +71,4 @@ The template takes `@inixiative/rules-builder@^0.15.0` with its first consumer (
 
 - `@inixiative/json-rules` ^2.14.0 (`check` + `coerceType`, `stampCoercions`, `sourceValuesFromRows`, `createLens`, `projectByPath`, `exposedSurface`); 2.14.1 hardens `sources` typing (`{}` rejected — `SourceSpec` requires `where` or `label`)
 - `@inixiative/rules-builder` ^0.15.0 (`useFilteredCollection`) — taken by the first consuming surface, not by the template packages yet
-- `openapi.gen.json` (generated; already bundled via `listFieldsFromOpenApiOperation`)
+- `openapi.gen.json` (generated; already bundled via `fieldsFromOpenApiOperation`)

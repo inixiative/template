@@ -12,7 +12,7 @@ import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { signIn as signInFn } from '@template/ui/lib/auth/signIn';
 import { signUp as signUpFn } from '@template/ui/lib/auth/signUp';
 import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
-import { clearToken, storedToken } from '@template/ui/lib/auth/token';
+import { clearToken, fetchStoredTokenAndClearIfExpired } from '@template/ui/lib/auth/token';
 import type { AuthMethod } from '@template/ui/lib/auth/types';
 import type { AppStore } from '@template/ui/store/types';
 import type { AuthSlice } from '@template/ui/store/types/auth';
@@ -26,7 +26,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
   // After any auth change, sync the websocket identity. The server re-validates
   // the token; the socket queues the send if it isn't open yet.
   const syncWsAuth = () => {
-    const token = storedToken();
+    const token = fetchStoredTokenAndClearIfExpired();
     if (token) get().websocket.authenticate(token);
   };
 
@@ -69,7 +69,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         if (get().auth.isInitialized) return;
 
         try {
-          if (storedToken()) {
+          if (fetchStoredTokenAndClearIfExpired()) {
             await fetchAndHydrateMe(set, get);
             syncWsAuth();
           }
@@ -123,7 +123,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       setSpoof: async (email: string | null) => {
         set((state: AppStore) => ({ auth: { ...state.auth, spoofUserEmail: email } }));
         await fetchAndHydrateMe(set, get);
-        const token = storedToken();
+        const token = fetchStoredTokenAndClearIfExpired();
         if (token) {
           if (email) get().websocket.spoof(token, email);
           else get().websocket.unspoof(token);

@@ -33,10 +33,10 @@
 import ts from 'typescript';
 import {
   applyExemptionsAndBaselineThenExit,
+  fetchSource,
   isTestFile,
   lineAt,
   listFiles,
-  readSource,
   type Violation,
 } from './ciRuleRunner';
 
@@ -238,7 +238,7 @@ const checksFor = (file: string): Check[] =>
 for (const file of listFiles(['apps', 'packages'], /\.[cm]?[jt]sx?$/)) {
   const checks = checksFor(file);
   if (!checks.length) continue;
-  const source = readSource(file);
+  const source = fetchSource(file);
   const sourceFile = ts.createSourceFile(
     file,
     source,

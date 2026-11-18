@@ -7,7 +7,7 @@
 import type { QueryFunctionContext } from '@tanstack/react-query';
 import { type Client, createClient } from '@template/sdk/generated/client';
 import { serializeBracketQuery } from '@template/shared/bracketQuery';
-import { storedToken } from '@template/ui/lib/auth/token';
+import { fetchStoredTokenAndClearIfExpired } from '@template/ui/lib/auth/token';
 import { telemetryFetch } from '@template/ui/lib/browserTelemetry';
 import { toRoutePattern } from '@template/ui/lib/toRoutePattern';
 
@@ -65,7 +65,7 @@ export const makeAuthenticatedApiFetch = <
 
     const throwOnError = options?.throwOnError ?? true;
 
-    const token = options?.token ?? storedToken();
+    const token = options?.token ?? fetchStoredTokenAndClearIfExpired();
     if (token) headers.Authorization = `Bearer ${token}`;
     if (options?.spoofUserEmail) headers['x-spoof-user-email'] = options.spoofUserEmail;
 

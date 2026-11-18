@@ -7,9 +7,9 @@
 **Updated**: 2026-06-13
 
 > **Built (verified 2026-06-13):** the schema-derived helper layer is done —
-> `listFieldsFromOpenApiOperation.ts` (`listFieldsFromOpenApiOperationId`) reads per-operation
+> `fieldsFromOpenApiOperation.ts` (`fieldsFromOpenApiOperationId`) reads per-operation
 > searchable/orderable fields + enum filters from the generated query metadata;
-> `listQueryCapabilitiesFromOpenApi(operationId)` turns that into a `ListQueryCapabilities`; `useListSearchFilterAndOrderState` +
+> `queryCapabilitiesFromOpenApi(operationId)` turns that into a `ListQueryCapabilities`; `useListSearchFilterAndOrderState` +
 > `buildFilterQuery` + the `Table` primitive consume it. Backend capability is
 > exposed in the OpenAPI spec (lens-driven filter/order). **Remaining:** the
 > optional filter-builder UI component — overlaps INFRA-002's `FieldSelector`;
@@ -40,7 +40,7 @@ The data hooks (`usePaginatedData`, `useInfiniteData`, `useListSearchFilterAndOr
 
 ### Frontend (`packages/ui`)
 
-- `listQueryCapabilitiesFromOpenApi()` reads OpenAPI spec and extracts `searchableFields`, `orderableFields`, `enumFilters`
+- `queryCapabilitiesFromOpenApi()` reads OpenAPI spec and extracts `searchableFields`, `orderableFields`, `enumFilters`
 - `useListSearchFilterAndOrderState` manages search/filter/sort state with `buildFilterQuery` serialization
 - `FilterState.operator` only accepts a subset: `ArrayFieldOperator | 'equals' | 'contains' | 'startsWith' | 'endsWith'` — missing `lt`, `lte`, `gt`, `gte`, `not`
 
@@ -73,7 +73,7 @@ This accepts all operators the backend supports. No behavior change — `buildFi
 
 **File:** New `packages/ui/src/lib/getFieldMetadata.ts`
 
-Extend the existing `listFieldsFromOpenApiOperation` pattern to produce per-field info:
+Extend the existing `fieldsFromOpenApiOperation` pattern to produce per-field info:
 
 ```ts
 export type FieldType = 'string' | 'number' | 'integer' | 'date' | 'boolean' | 'enum' | 'relation';
@@ -156,7 +156,7 @@ Returns true if the path is in `searchableFields` (non-admin) or if `adminMode` 
 
 ### Step 5: Extend ListQueryCapabilities with field metadata
 
-**File:** `packages/ui/src/lib/listQueryCapabilitiesFromOpenApi.ts`
+**File:** `packages/ui/src/lib/queryCapabilitiesFromOpenApi.ts`
 
 ```ts
 export type ListQueryCapabilities = {
@@ -166,7 +166,7 @@ export type ListQueryCapabilities = {
 };
 ```
 
-`listQueryCapabilitiesFromOpenApi` calls `getFieldMetadata` and includes the result.
+`queryCapabilitiesFromOpenApi` calls `getFieldMetadata` and includes the result.
 
 ---
 
@@ -226,7 +226,7 @@ Admin mode uses `filters[...]` which bypasses the whitelist entirely — every f
 | Create | `packages/ui/src/lib/operatorsForFieldType.ts` | Type → valid operators mapping |
 | Create | `packages/ui/src/lib/buildRelationPath.ts` | Dot-notation path builder for Prisma relations |
 | Create | `packages/ui/src/lib/isFieldFilterable.ts` | Check field filterability against config |
-| Modify | `packages/ui/src/lib/listQueryCapabilitiesFromOpenApi.ts` | Add `fields: FieldMetadata[]` |
+| Modify | `packages/ui/src/lib/queryCapabilitiesFromOpenApi.ts` | Add `fields: FieldMetadata[]` |
 | Create | Tests for each new file (one test file per source file) |
 
 ## Non-goals

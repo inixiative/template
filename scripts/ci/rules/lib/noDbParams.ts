@@ -16,11 +16,11 @@
 import ts from 'typescript';
 import {
   applyExemptionsAndBaselineThenExit,
+  fetchExemptions,
+  fetchSource,
   isTestFile,
   lineAt,
   listFiles,
-  readExemptions,
-  readSource,
   type Violation,
 } from './ciRuleRunner';
 
@@ -28,7 +28,7 @@ const OUT_OF_SCOPE = /^packages\/db\//;
 const DB_NAME = /^_?(db|txn|tx|prisma)$/;
 const DB_TYPE = /(^|[^\w.])(Db|PrismaClient|(Prisma\.)?TransactionClient)\b|\btypeof\s+db\b/;
 
-const exemptions = readExemptions('no-db-params');
+const exemptions = fetchExemptions('no-db-params');
 const usedExemptions = new Set<string>();
 const violations: Violation[] = [];
 
@@ -43,7 +43,7 @@ const functionName = (node: ts.Node, sourceFile: ts.SourceFile): string => {
 
 for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   if (isTestFile(file) || OUT_OF_SCOPE.test(file) || file.endsWith('.d.ts')) continue;
-  const source = readSource(file);
+  const source = fetchSource(file);
   if (!/db|tx|prisma|PrismaClient|TransactionClient/i.test(source)) continue;
   const sourceFile = ts.createSourceFile(
     file,

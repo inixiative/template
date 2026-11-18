@@ -998,7 +998,7 @@ Class tag: CustomerRef customer/provider pairs, provider routes and the customer
 Content-free marker: // gloss above a declaration or // gloss:file at the top; trailing content is a lint error. *Region:* [Gloss (margin comments)](lib-gloss/knowledge.md)
 
 **Data hooks layering**  
-listQueryCapabilitiesFromOpenApi → useListSearchFilterAndOrderState → usePaginatedData / useInfiniteData → Table / Pagination / any renderer. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
+queryCapabilitiesFromOpenApi → useListSearchFilterAndOrderState → usePaginatedData / useInfiniteData → Table / Pagination / any renderer. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
 
 **data narrowing**  
 A where clause: which rows are in scope; the field stays visible. *Region:* [The lens model](lens-model/knowledge.md)
@@ -1013,10 +1013,10 @@ Every response is wrapped in { data }; pagination and other metadata ride alongs
 Class: schema conventions such as split schema, UUIDv7 and typed IDs, enum naming, FK typing and false polymorphism. *Region:* [Schema conventions and reference data](data-modeling/knowledge.md)
 
 **ListQueryCapabilities**  
-Frontend config from listQueryCapabilitiesFromOpenApi(operationId): searchable/orderable fields, enum filters, default order, read from the OpenAPI spec. *Region:* [List filtering and search](filtering-search/knowledge.md)
+Frontend config from queryCapabilitiesFromOpenApi(operationId): searchable/orderable fields, enum filters, default order, read from the OpenAPI spec. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
 **ListQueryCapabilities**  
-Frontend config from listQueryCapabilitiesFromOpenApi(operationId) fed to usePaginatedData or useInfiniteData. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
+Frontend config from queryCapabilitiesFromOpenApi(operationId) fed to usePaginatedData or useInfiniteData. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
 
 **datasource provider**  
 prismaOptions.datasource.provider: decides whether toPrisma emits mode: 'insensitive'. *Region:* [Compiling rules to Prisma and SQL](json-rules-backends/knowledge.md)
@@ -1724,7 +1724,7 @@ Lists a model's relations with targetModel, isList, collapsed foreignKey and ann
 Reads the record resourceContextMiddleware loaded for the route's :id, typed by generic. *Region:* [Request context](request-context-errors/knowledge.md)
 
 **fetchSecretOrThrow / setSecretAsync**  
-Read or store a secret in Infisical by project, environment and path (the doc's getSecret / setSecret); the source for secrets on resume. *Region:* [Writing an init task](init-tasks/knowledge.md)
+Read or store a secret in Infisical by project, environment and path (the doc's fetchSecret / setSecret); the source for secrets on resume. *Region:* [Writing an init task](init-tasks/knowledge.md)
 
 **getState()**  
 useAppStore.getState(): reads state or calls actions outside React components and in handlers. *Region:* [Frontend store (Zustand slices)](frontend-store/knowledge.md)

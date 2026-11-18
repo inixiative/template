@@ -29,11 +29,11 @@ export type SupersedingJobHandler<TPayload = void> = JobHandler<TPayload> & {
 
 // Takes a plain handler or `{ stages, finish }`. A staged superseding job may only add superseding
 // children (validateChildJobHandler). A child listens to its parent as well as to itself: at start, and
-// on every lane poll (watchLane), a tombstone on its parent stops it exactly as its own would, and it
-// tombstones itself with the same superseder so its own children stop in turn, at any depth. Only
-// superseding jobs are ever tombstoned, so a child of a singleton or plain parent never sees one.
-// Nothing evicts children: when a newer copy replaces the parent, the claimLane tombstone is all the
-// children need. Once they have ended, the old parent wakes, finds its tombstone at start, and exits
+// on every lane poll (watchLane), a superseded mark on its parent stops it exactly as its own would, and it
+// marks itself superseded with the same superseder so its own children stop in turn, at any depth. Only
+// superseding jobs are ever marked superseded, so a child of a singleton or plain parent never sees one.
+// Nothing evicts children: when a newer copy replaces the parent, the claimLane superseded mark is all the
+// children need. Once they have ended, the old parent wakes, finds its superseded mark at start, and exits
 // without `finish`.
 export const makeSupersedingJob = <TPayload = void>(
   definition: JobHandler<TPayload> | StagedJob<TPayload>,
@@ -50,9 +50,9 @@ export const makeSupersedingJob = <TPayload = void>(
     });
 
     // The enqueue-time baton can expire while this job sits queued (its TTL covers delay + a wait
-    // buffer, but congestion is unbounded). The per-job tombstone is the durable edge: a job displaced
+    // buffer, but congestion is unbounded). The per-job superseded mark is the durable edge: a job displaced
     // while queued exits here even though its lane key already expired. Then re-assert the baton — over
-    // a vacant lane or an OLDER holder (which gets tombstoned and usurped via its own watch), never a
+    // a vacant lane or an OLDER holder (which gets marked superseded and usurped via its own watch), never a
     // newer one, so a newer claimant still usurps us via the first poll below.
     const parentId = job.parent?.id;
     try {

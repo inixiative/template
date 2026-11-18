@@ -44,13 +44,13 @@ export function makeLock(opts: LockOptions): Lock;
 export function makeLock(opts: LockOptions | ClaimOptions): Lock | Claim {
   const redis = opts.redis ?? redisClient();
   if (opts.heartbeat === false) return makeClaim(opts, redis, lockKeyOf(opts));
-  return createRenewingLock(opts, redis, lockKeysOf(opts));
+  return makeRenewingLock(opts, redis, lockKeysOf(opts));
 }
 
 // A lock on one key runs SET NX PX to acquire, fencedRefresh to beat and fencedDelete to release.
 // A lock on several keys runs one command per step over the whole set: fencedSetPrefix per poll,
 // fencedRefreshAll per beat, fencedDeleteAll to release.
-const createRenewingLock = (
+const makeRenewingLock = (
   opts: LockOptions,
   redis: LockRedis,
   keys: [string, ...string[]],

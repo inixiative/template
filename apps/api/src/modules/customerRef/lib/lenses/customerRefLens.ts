@@ -13,14 +13,14 @@ import {
 } from '@inixiative/json-rules';
 import { conditionPolymorphicAxisPointsAtBoundRow } from '@template/db';
 import {
-  isPlatformOrPointsAtBoundRow,
   lensFor,
   live,
   omitForeignKeys,
+  platformOrPointsAtBoundRow,
   pointsAtBoundRowAndIsNotDeleted,
 } from '@template/db/lens';
 
-const tagOwned = isPlatformOrPointsAtBoundRow('Tag', 'ownerModel');
+const tagOwned = platformOrPointsAtBoundRow('Tag', 'ownerModel');
 
 const segmentOwned = pointsAtBoundRowAndIsNotDeleted('Segment', 'ownerModel');
 

@@ -269,7 +269,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect((await ctx.queue.getJob('keep-id'))?.id).toBe('keep-id');
   });
 
-  it('drops a buffered row displaced by a newer direct claim — no re-enqueue, no counter-tombstone', async () => {
+  it('drops a buffered row displaced by a newer direct claim — no re-enqueue, no counter-mark', async () => {
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     const lane = laneKey('recordAppEvent', 'lane-displaced');
     await spillToOutbox({
@@ -284,7 +284,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
     await runDrainOutboxPass();
 
-    // the displaced row is deleted without re-adding — re-claiming would tombstone 'newer' right back
+    // the displaced row is deleted without re-adding — re-claiming would superseded mark 'newer' right back
     expect(await db.jobOutbox.count()).toBe(0);
     expect(await ctx.queue.getJob('older')).toBeUndefined();
     expect(await ctx.queue.redis.get(lane)).toBe('newer');

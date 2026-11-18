@@ -108,7 +108,7 @@ export const setupCloudflarePages = async (
 
       // Create project + GitHub link in one call (CF Pages combines the two)
       if (!(await isComplete('cloudflarePages', app.createAction))) {
-        const existing = await cloudflareApi.getProject(accountId, projectName);
+        const existing = await cloudflareApi.fetchProject(accountId, projectName);
         if (!existing) {
           await cloudflareApi.createProjectFromGitHub(accountId, projectName, {
             githubOwner,
