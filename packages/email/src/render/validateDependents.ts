@@ -9,7 +9,7 @@ import {
   DependentTemplateError,
   type DependentTemplateIssue,
 } from '@template/email/errors/DependentTemplateError';
-import { expand } from '@template/email/render/expand';
+import { expandComponentTagsFromOwnerCascade } from '@template/email/render/expandComponentTags';
 import { ownerCascade, ownerWhere } from '@template/email/render/owner';
 import type { LensForSlug } from '@template/email/render/save';
 import type { OwnerScope } from '@template/email/render/types';
@@ -32,10 +32,10 @@ const embeddingTemplates = async (
         db.emailComponent.findMany({
           where: {
             OR: ownerCascade(ctx.ownerModel).map((tier) => ownerWhere(ctx, tier)),
-            componentRefs: { has: slug },
+            componentSlugs: { has: slug },
           },
         }),
-        db.emailTemplate.findMany({ where: { ...ownerWhere(ctx), componentRefs: { has: slug } } }),
+        db.emailTemplate.findMany({ where: { ...ownerWhere(ctx), componentSlugs: { has: slug } } }),
       ]);
       next.push(...components.map((component) => component.slug));
       templates.push(...owned);
@@ -60,7 +60,7 @@ export const validateDependents = async (
     if (template.slug === savingTemplateSlug) continue;
     const lens = await lensFor(template.slug, ctx);
     if (!lens) continue;
-    const composed = await expand(template.mjml, ctx);
+    const composed = await expandComponentTagsFromOwnerCascade(template.mjml, ctx);
     const issues = [
       ...validateConditions(composed, { lens }),
       ...validateTokens(composed, { lens }),

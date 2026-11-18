@@ -91,7 +91,7 @@ Tests run on Bun's test runner (never Jest or Vitest; TESTING.md) against a real
 
 External services are never called: a provider client wraps each call in `VCR` from @template/shared/vcr; tests queue a cassette with `vcr.queue` and `vcr.capture` replays it, or records a sanitized one when missing or stale (`emitFromCassette` for event-stream providers). The cassette comes from the real account, not from a hand-written response, and never from spying on global fetch or a fake client; cassettes are committed sanitized. The ask "use VCR cassettes, not mocks or stubs" lands here.
 
-Not here: `buildX` / `createX` factories, `createFactory`, `getNextSeq`, `cleanupTouchedTables` and the test CI rules (no-module-mocks, no-jest, spy-must-restore …) are `test-factories-rules`; `createLock` and job primitives under test are `concurrency-locks` and `jobs-cron`.
+Not here: `buildX` / `createX` factories, `registerFactory`, `nextFactorySequenceNumber`, `cleanupTouchedTables` and the test CI rules (no-module-mocks, no-jest, spy-must-restore …) are `test-factories-rules`; `makeLock` and job primitives under test are `concurrency-locks` and `jobs-cron`.
 
 ## 2b. Under construction
 
@@ -101,7 +101,7 @@ Open work you cannot use yet. Do not build against it, and do not build what it 
 
 ## 3. Everything that exists here, by class
 
-Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: makeLock, packages/db/src/lock/makeLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `test-harness`: Test structure: running tests, createTestApp, request helpers, frontend tests
 
@@ -166,7 +166,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | no any, we have the model types; cast through unknown to silence the compiler | **Strict TypeScript, no any** · rule FEATURES.md > Type Safety & Code Generation — All application code across packages. | part 4 | `: any`, `as any`, or `as unknown as T` to silence the compiler (FEATURES.md › Type Safety & Code Generation; CLAUDE.md §7) |
 | the new package test script needs the test env loaded; I'll hardcode env vars in the test script; wrap the test command so it gets the right env file | **Test scripts compose env via with** · rule docs/claude/TESTING.md § Running Tests › Environment Composition — Adding or editing a package test script, especially new packages with DB-backed tests. | code `cleanupTouchedTables`, `startWsCluster` | — |
 | where do the tests for this module go; one test file per action, inside the module; I'll put the tests in a top-level tests directory | **Tests live in module tests/ folder** · rule docs/claude/TESTING.md § Test Structure — Writing any test for a module's routes or controllers. | code `createTestApp`, `createUser` | — |
-| the component test fails on Date versus string; pass the API-shaped entity to the component; cast the factory entity to any for the UI test | **UI tests use serialized factories** · rule scripts/ci/rules/ui-serialized-factories.sh — All frontend UI tests using entity data. | part 4 | — |
+| the component test fails on Date versus string; pass the API-shaped entity to the component; cast the factory entity to any for the UI test | **UI tests use serialized factories** · rule scripts/ci/rules/ui-tests-serialize-factory-records.sh — All frontend UI tests using entity data. | part 4 | — |
 
 - *Also here, by name:* bun run pretest (`package.json`); contactStreamRow (`packages/ui/src/test/contactStreamRow.ts`); createMockJob (`apps/api/tests/createTestWorker.ts`); createTestApp (`apps/api/tests/index.ts`); del (`apps/api/tests/utils/request.ts`); enumField (`apps/api/tests/utils/modelFields.ts`); get (`apps/api/tests/utils/request.ts`); handlers (`packages/ui/src/test/mocks/handlers.ts`); installEnvOverrideProxy (`packages/shared/src/utils/envOverrides.ts`); jsonError (`apps/api/tests/utils/request.ts`); patch (`apps/api/tests/utils/request.ts`); relationField (`apps/api/tests/utils/modelFields.ts`); resetEnvOverrides (`packages/shared/src/utils/envOverrides.ts`); scalarField (`apps/api/tests/utils/modelFields.ts`); testStore (`packages/ui/src/test/testStore.ts`)
 
@@ -435,7 +435,7 @@ CI rule runner and fixtures: `docs/claude/SCRIPTS.md`.
 
 - ✅ **Custom Lint Checks** - Three custom validators run after Biome: `check-import-aliases.sh` (enforces `#/` imports), `check-generated-files.sh` (ensures Prisma/OpenAPI SDK up to date), `run-post-biome-checks.sh` (orchestrates all checks). Prevents common mistakes
 
-- ✅ **Custom CI Rules** - `scripts/ci/run-ci-rules.sh` executes alphabetical rules in `scripts/ci/rules`: `no-jest.sh` (blocks Jest deps/imports/globals), `no-vitest.sh` (blocks Vitest deps/imports), and `ui-serialized-factories.sh` (requires `__serialize()` and forbids `__serialize() as any` in UI tests). `--test` runs rule self-tests against `scripts/ci/rule-violations/*` pass/fail fixtures
+- ✅ **Custom CI Rules** - `scripts/ci/run-ci-rules.sh` executes alphabetical rules in `scripts/ci/rules`: `no-jest.sh` (blocks Jest deps/imports/globals), `no-vitest.sh` (blocks Vitest deps/imports), and `ui-tests-serialize-factory-records.sh` (requires `__serialize()` and forbids `__serialize() as any` in UI tests). `--test` runs rule self-tests against `scripts/ci/rule-violations/*` pass/fail fixtures
 
 - ✅ **Optional Pre-commit Hooks** - Git hooks available for local validation before commit. Not enforced (developer choice) but recommended. Runs lint + type check on staged files
 

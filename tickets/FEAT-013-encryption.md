@@ -44,7 +44,7 @@ The encryption module is fully functional in `@template/db/lib/encryption`:
 packages/db/src/lib/encryption/
 ├── types.ts              # EncryptedFieldData, EncryptionKeyring
 ├── registry.ts           # ENCRYPTED_MODELS — model → keys[] mapping
-├── helpers.ts            # encryptField(), decryptField()
+├── fieldEncryption.ts    # encryptField(), decryptField()
 ├── encryptionService.ts  # Low-level AES-256-GCM crypto operations
 ├── validation.ts         # CI version validation (pre-deploy)
 ├── envValidation.ts      # Environment schema validation

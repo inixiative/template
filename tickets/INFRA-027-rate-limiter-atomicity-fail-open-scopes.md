@@ -124,7 +124,7 @@ provenance in the audit log. IPv6 compounds it: the key is a full /128, so a rou
 - [ ] Resource-derived organization / space context for session users, if per-tenant fair share is wanted
 - [ ] Alert on the fail-open warn
 - [ ] Collapse a request's windows into one multi-key eval (one command instead of one per rule). Blocked on ioredis-mock, which returns `undefined` for any Lua table built by a loop that runs more than once; the per-window evals are still dispatched in one write.
-- [x] Lua lives in `queries/` (`lanes/queries/`, `lock/queries/`, `rateLimit/queries/`), enforced by the `lua-in-queries` CI rule
+- [x] Lua lives in `queries/` (`lanes/queries/`, `lock/queries/`, `rateLimit/queries/`), enforced by the `redis-lua-scripts-live-in-queries-folder` CI rule
 
 ---
 

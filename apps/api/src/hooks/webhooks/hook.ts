@@ -2,11 +2,11 @@ import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
   DbAction,
   db,
-  filterFields,
   HookTiming,
   isNoOpUpdate,
+  omitRegisteredFields,
   registerDbHook,
-  WEBHOOK_NOOP_FIELDS,
+  WEBHOOK_EXCLUDED_FIELDS,
 } from '@template/db';
 import type { WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
@@ -68,7 +68,7 @@ const processSingleRecord = (
 ) => {
   if (
     webhookAction === WebhookAction.update &&
-    isNoOpUpdate(model, resultData, previousData, WEBHOOK_NOOP_FIELDS)
+    isNoOpUpdate(model, resultData, previousData, WEBHOOK_EXCLUDED_FIELDS)
   ) {
     return [];
   }
@@ -83,8 +83,10 @@ const processSingleRecord = (
     model: webhookModel,
     action: webhookAction,
     resourceId: resultData.id,
-    data: filterFields(model, resultData, WEBHOOK_NOOP_FIELDS),
-    previousData: previousData ? filterFields(model, previousData, WEBHOOK_NOOP_FIELDS) : undefined,
+    data: omitRegisteredFields(model, resultData, WEBHOOK_EXCLUDED_FIELDS),
+    previousData: previousData
+      ? omitRegisteredFields(model, previousData, WEBHOOK_EXCLUDED_FIELDS)
+      : undefined,
     timestamp: new Date().toISOString(),
   };
 

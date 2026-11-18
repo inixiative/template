@@ -1,10 +1,10 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { polymorphicKeyColumn } from '@template/db/registries/polymorphicIs';
+import { polymorphicKeyColumn } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 

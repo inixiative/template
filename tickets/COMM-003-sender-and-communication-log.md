@@ -20,11 +20,11 @@ Follows on from [COMM-001](./COMM-001-email-system.md) (the render+send engine).
 
 ## 1. Sender (replaces `ReachContext`)
 
-`ReachContext` is a mess — `ownerModel`-keyed union + `contextKey` + `EmailOwnerModel` + `ComposeContext`/`SaveContext` all overlap. Collapse the runtime side onto **one `SenderType` enum** + a **discriminated union keyed on it** (keep the DU — it caught a real `{Space, organizationId}` bug; the enum also gives us the DB column for the log).
+`ReachContext` is a mess — `ownerModel`-keyed union + `contextKey` + `EmailOwnerModel` + `ComposeContext`/`SaveContext` all overlap. Collapse the runtime side onto **one `CommunicationLogSenderModel` enum** + a **discriminated union keyed on it** (keep the DU — it caught a real `{Space, organizationId}` bug; the enum also gives us the DB column for the log).
 
 ```ts
-// Prisma enum → generated FP const-enum; also the CommunicationLog.senderType column.
-enum SenderType { platform  admin  User  Organization  Space  OrganizationUser  SpaceUser }
+// Prisma enum → generated FP const-enum; also the CommunicationLog.senderModel column.
+enum CommunicationLogSenderModel { platform  admin  User  Organization  Space  OrganizationUser  SpaceUser }
 
 type Sender =
   | { type: 'platform' }
@@ -94,7 +94,7 @@ Two fallback triggers, both walking the sender's chain:
 
 Per-recipient delivery ledger. **One row per recipient per send** (grouped by `sendKey`); **one table**.
 
-- **Sender** persisted: `senderType SenderType` + nullable `senderUserId`/`senderOrganizationId`/`senderSpaceId` (false polymorphism; `platform`/`admin` no FK; relations `onDelete: SetNull`).
+- **Sender** persisted: `senderModel CommunicationLogSenderModel` + nullable `senderUserId`/`senderOrganizationId`/`senderSpaceId` (false polymorphism; `platform`/`admin` no FK; relations `onDelete: SetNull`).
 - **Template ref: FALSE-POLYMORPHISM** — `templateModel` discriminator + `emailTemplateId` FK (`onDelete: Restrict`), registered in `packages/db/src/registries/falsePolymorphism.ts`. Not a slug string. Channel-agnostic.
 - `channel CommunicationChannel { email sms push inApp }` (own enum, not `ContactType`); `recipientContactId`/`address` **nullable**.
 - `kind CommunicationKind` (existing) — what `canDeliver` gates on.
@@ -119,7 +119,7 @@ Intentional resends = distinct events (e.g. `inquiry.resent`), never key mutatio
 |---|---|---|
 | Render-error fallback | cut (fail loud to DLQ) | **build** it (scope cascade) **+** DLQ at floor |
 | Sender arms | `default/Org/Space` only | **+ `User/OrgUser/SpaceUser`** (first-class users) |
-| Sender name/shape | `ReachContext` DU on `ownerModel` | **`Sender`** DU on `SenderType` enum |
+| Sender name/shape | `ReachContext` DU on `ownerModel` | **`Sender`** DU on `CommunicationLogSenderModel` enum |
 | Template owner levels | Org/Space | **+ user-actor levels** (own templates) |
 
 Aligned (no divergence): CommunicationLog shape + **FP template ref**, find-or-create fence, event-anchored idempotency, metadata-only + retention. *(Cascade now diverges too: template uses **two separate chains** (user + org), not Zealot's scope-first peel.)*
@@ -131,7 +131,7 @@ Aligned (no divergence): CommunicationLog shape + **FP template ref**, find-or-c
 (Resolved — user-actor template ownership is **built now, not deferred**: two-chain cascade + `userId` owner FK + denormalized parent FKs. See §2 and the build plan.)
 
 ## Build plan (phased)
-1. **Sender** — `SenderType` enum + `Sender` DU + `senderKey`; rename `ReachContext`/`contextKey`; bridge to `ComposeContext`; update registry `senders()` + `deliverJobId`.
+1. **Sender** — `CommunicationLogSenderModel` enum + `Sender` DU + `senderKey`; rename `ReachContext`/`contextKey`; bridge to `ComposeContext`; update registry `senders()` + `deliverJobId`.
 2. **Cascade + fallback** — `parentForTemplate`; rewrite `lookupTemplate`/`settleTemplate` to walk it for not-found **and** render-error; DLQ at floor.
 3. **CommunicationLog** — enums + model + `falsePolymorphism.ts` entry + migration; wire `sendEmail` find-or-create + `deliver` anti-join/status.
 4. **User-actor template ownership** (not deferred) — grow `EmailOwnerModel` (+`User`/`OrganizationUser`/`SpaceUser`) + `userId` owner FK on `EmailTemplate`/`EmailComponent` + denormalized parent FKs + per-tier partial uniques (migration); add the **user chain** to `parentForTemplate`/`lookupCascade`; map `ownerScope(sender)` user-actors to their own owner tier (not peeled to scope).

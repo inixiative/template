@@ -10,7 +10,7 @@ Explain how a piece of code works in plain English, grounded in its **real names
 ## Rules
 
 - **Read the current file first** — never explain from memory or a summary; names and logic drift.
-- **Use the actual identifiers inline** — methods, variables, fields, types — verbatim (e.g. "`walkUp(slug)` finds rows whose `componentRefs` has `slug`"). Never replace a name with a generic noun ("the helper", "the list").
+- **Use the actual identifiers inline** — methods, variables, fields, types — verbatim (e.g. "`walkUp(slug)` finds rows whose `componentSlugs` has `slug`"). Never replace a name with a generic noun ("the helper", "the list").
 - **Follow execution / logical order, not declaration order** — lead with what it's *for*, then the entry point, then each helper in the order it's actually reached.
 - **Explain the why, not just the what** — the reader can see what a line does; tell them what it's *for* and what would break without it. Call out invariants, ordering constraints, re-entrancy, and non-obvious guards explicitly.
 - **Name and separate the id-/type-spaces** when the code juggles several (e.g. slug vs row id vs snapshot id) — say which is which and where each is produced and consumed.

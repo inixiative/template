@@ -4,9 +4,9 @@ import {
   getJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
+  markJobSupersededBy,
   reclaimLane,
   releaseLane,
-  tombstoneJob,
   watchLane,
 } from '@template/db/lanes/lanes';
 import { getRedisClient } from '@template/db/redis/client';
@@ -78,7 +78,7 @@ describe('supersede lane baton', () => {
       'parent-job',
     );
 
-    await tombstoneJob('parent-job', 'newer-parent');
+    await markJobSupersededBy('parent-job', 'newer-parent');
     await sleep(700);
     stop();
 

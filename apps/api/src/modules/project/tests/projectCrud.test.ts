@@ -17,7 +17,7 @@ import {
   createTag,
   createTagAttachment,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -93,7 +93,7 @@ describe('Project', () => {
     ];
 
     it('creates a project under every owner kind, with the same name in each', async () => {
-      const name = `Template ${getNextSeq()}`;
+      const name = `Template ${nextFactorySequenceNumber()}`;
       for (const owner of owners()) {
         const response = await app.fetch(
           post(`${owner.path}/projects`, { name, description: 'the base repo' }),
@@ -105,7 +105,7 @@ describe('Project', () => {
     });
 
     it("lists only that owner's projects", async () => {
-      const name = `Listed ${getNextSeq()}`;
+      const name = `Listed ${nextFactorySequenceNumber()}`;
       for (const owner of owners()) {
         await app.fetch(post(`${owner.path}/projects`, { name: `${name} ${owner.ownerModel}` }));
       }
@@ -124,7 +124,7 @@ describe('Project', () => {
     });
 
     it('refuses a second live project with the same name under one owner (409)', async () => {
-      const name = `Twice ${getNextSeq()}`;
+      const name = `Twice ${nextFactorySequenceNumber()}`;
       expect((await app.fetch(post('/api/v1/me/projects', { name }))).status).toBe(201);
       expect((await app.fetch(post('/api/v1/me/projects', { name }))).status).toBe(409);
     });
@@ -132,7 +132,10 @@ describe('Project', () => {
     it("refuses owner fields in the body: a project can't be planted on someone else (422)", async () => {
       const { entity: otherUser } = await createUser();
       const response = await app.fetch(
-        post('/api/v1/me/projects', { name: `Mine ${getNextSeq()}`, userId: otherUser.id }),
+        post('/api/v1/me/projects', {
+          name: `Mine ${nextFactorySequenceNumber()}`,
+          userId: otherUser.id,
+        }),
       );
       expect(response.status).toBe(422);
     });
@@ -140,7 +143,7 @@ describe('Project', () => {
 
   describe('a project record', () => {
     it('is read, renamed and tombstoned by its owner; the name is free again after', async () => {
-      const name = `Doomed ${getNextSeq()}`;
+      const name = `Doomed ${nextFactorySequenceNumber()}`;
       const { entity: project } = await createProject({
         name,
         ownerModel: 'User',

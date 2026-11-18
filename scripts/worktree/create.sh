@@ -121,15 +121,15 @@ SLOT_OWNER=("" "" "" "" "" "" "" "" "" "")
 MERGED_WARNINGS=""
 MERGED_COUNT=0
 
-claim() {
+reserve_slot_owner() {
   local slot="$1" owner="$2"
-  valid_slot "$slot" || return 0
+  is_valid_slot "$slot" || return 0
   [ -n "${SLOT_OWNER[$slot]}" ] || SLOT_OWNER[$slot]="$owner"
 }
 
 while IFS= read -r entry; do
   [ -n "$entry" ] || continue
-  claim "${entry%% *}" "${entry#* }"
+  reserve_slot_owner "${entry%% *}" "${entry#* }"
 done < <(registry_entries)
 
 while IFS= read -r wt_path; do
@@ -140,7 +140,7 @@ while IFS= read -r wt_path; do
     warn "$(basename "$wt_path") references more than one slot (${wt_slots}) — reserving all of them. Fix its env files so they agree."
   fi
   for i in $wt_slots; do
-    claim "$i" "$wt_path"
+    reserve_slot_owner "$i" "$wt_path"
     if [ -n "$wt_branch" ] && grep -qxF -- "$wt_branch" <<< "$MERGED_BRANCHES"; then
       MERGED_WARNINGS="${MERGED_WARNINGS}  Slot ${i}: $(basename "$wt_path") (${wt_branch}) — bun run worktree:destroy $(basename "$wt_path")\n"
       MERGED_COUNT=$((MERGED_COUNT + 1))

@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses primitive:shared
  */
@@ -34,7 +34,7 @@ import {
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { lensFor, live, omitForeignKeys } from '@template/db/lens';
-import { redactLens } from '@template/db/lens/redactLens';
+import { omitSensitiveFieldsFromLens } from '@template/db/lens/omitSensitiveFieldsFromLens';
 import {
   RESERVED_SCOPE_ROOTS,
   SCOPE_ROOTS,
@@ -194,14 +194,17 @@ const slot = (
   const prisma = getLensRoot(lens).mapName === 'prisma';
   const declared = firstLayer(lens, models, surface);
   assertValidNarrowing(declared);
-  const shown = prisma ? redactLens(omitForeignKeys(declared)) : declared;
+  const shown = prisma ? omitSensitiveFieldsFromLens(omitForeignKeys(declared)) : declared;
   if (!view) return shown;
   const viewed: LensNarrowing = { parent: shown, root: exactly(shown, view) };
   assertValidNarrowing(viewed);
   return viewed;
 };
 
-export const fieldsLens = (fields: Record<string, string>, model = EMAIL_DATA_MODEL): Lens =>
+export const lensFromFieldTypes = (
+  fields: Record<string, string>,
+  model = EMAIL_DATA_MODEL,
+): Lens =>
   createLens({
     maps: {
       [EMAIL_MAP_NAME]: {
@@ -239,7 +242,8 @@ const SYSTEM_FIELDS: Record<string, string> = {
   ...Object.fromEntries(RAIL_PROVIDED_SYSTEM_FIELDS.map((name) => [name, 'String'])),
 };
 
-export const systemSlot = (): Lens => fieldsLens(SYSTEM_FIELDS, EMAIL_SYSTEM_MODEL);
+export const systemFieldsSlotLens = (): Lens =>
+  lensFromFieldTypes(SYSTEM_FIELDS, EMAIL_SYSTEM_MODEL);
 
 const isUserLens = (lens: RuleLens): boolean => {
   const base = getLensRoot(lens);
@@ -262,7 +266,7 @@ export const emailLens = ({
     scope,
   ),
   data: data ? slot(data, narrowing.data, undefined, scope) : OPAQUE_SLOT,
-  system: systemSlot(),
+  system: systemFieldsSlotLens(),
 });
 
 export const defaultEmailLens: EmailLens = emailLens();

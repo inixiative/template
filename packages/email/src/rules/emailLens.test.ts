@@ -19,7 +19,7 @@ import {
   emailSurface,
   emailSurfaceSourceValues,
   evaluateScopedRule,
-  fieldsLens,
+  lensFromFieldTypes,
   OPAQUE_SLOT,
   parseSlotLenses,
   walkEmailLensPath,
@@ -109,7 +109,7 @@ describe('emailLens — four lenses, one per scope root', () => {
   });
 
   it('a declared-fields data lens exposes exactly its fields', () => {
-    const fields = emailLens({ data: fieldsLens({ verificationUrl: 'String' }) });
+    const fields = emailLens({ data: lensFromFieldTypes({ verificationUrl: 'String' }) });
     expect(walkEmailLensPath('data.verificationUrl', fields).outcome).toBe('resolved');
     expect(walkEmailLensPath('data.other', fields).outcome).toBe('missing');
   });

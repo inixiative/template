@@ -15,13 +15,13 @@
  */
 import ts from 'typescript';
 import {
-  finishFence,
+  applyExemptionsAndBaselineThenExit,
   lineAt,
   listFiles,
   readExemptions,
   readSource,
   type Violation,
-} from './fence';
+} from './ciRuleRunner';
 
 const REQUIRED = ['@id', '@default(dbgenerated("uuidv7()"))', '@db.VarChar(36)'];
 const MODEL = /^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm;
@@ -132,14 +132,14 @@ for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   else violations.push(...fileViolations);
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'uuidv7-ids',
   violations,
   usedExemptions,
-  explain: [
+  failureExplanationLines: [
     'Prisma models without a uuidv7 primary key (every model id is:',
     '  id String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)',
     ') and code that mints ids with randomUUID(): use Bun.randomUUIDv7().',
   ],
-  clean: 'Every Prisma model id is a uuidv7 VarChar(36), and no code mints a v4.',
+  passMessage: 'Every Prisma model id is a uuidv7 VarChar(36), and no code mints a v4.',
 });

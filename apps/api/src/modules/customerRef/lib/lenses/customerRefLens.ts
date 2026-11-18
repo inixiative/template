@@ -11,12 +11,18 @@ import {
   type ModelNarrowing,
   Operator,
 } from '@inixiative/json-rules';
-import { polymorphicIs } from '@template/db';
-import { boundAndLive, lensFor, live, omitForeignKeys, platformOrBound } from '@template/db/lens';
+import { conditionPolymorphicAxisPointsAtBoundRow } from '@template/db';
+import {
+  isPlatformOrPointsAtBoundRow,
+  lensFor,
+  live,
+  omitForeignKeys,
+  pointsAtBoundRowAndIsNotDeleted,
+} from '@template/db/lens';
 
-const tagOwned = platformOrBound('Tag', 'ownerModel');
+const tagOwned = isPlatformOrPointsAtBoundRow('Tag', 'ownerModel');
 
-const segmentOwned = boundAndLive('Segment', 'ownerModel');
+const segmentOwned = pointsAtBoundRowAndIsNotDeleted('Segment', 'ownerModel');
 
 const contacts: ModelNarrowing = {
   picks: [
@@ -43,8 +49,8 @@ const communicationsReceived: ModelNarrowing = {
   picks: ['channel', 'kind', 'status', 'sentAt', 'createdAt'],
   where: {
     any: [
-      { field: 'senderType', operator: Operator.in, value: ['platform', 'admin'] },
-      polymorphicIs('CommunicationLog', 'senderType'),
+      { field: 'senderModel', operator: Operator.in, value: ['platform', 'admin'] },
+      conditionPolymorphicAxisPointsAtBoundRow('CommunicationLog', 'senderModel'),
     ],
   },
 };
@@ -61,7 +67,7 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
   },
   root: {
     picks: ['id', 'customerModel', 'acceptedKinds', 'createdAt', 'updatedAt'],
-    where: polymorphicIs('CustomerRef', 'providerModel'),
+    where: conditionPolymorphicAxisPointsAtBoundRow('CustomerRef', 'providerModel'),
     relations: {
       customerUser: {
         picks: ['id', 'name', 'email', 'emailVerified', 'lastLoginAt', 'createdAt'],

@@ -13,7 +13,7 @@ import {
   createSpace,
   createSpaceUser,
   createWebhookSubscription,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -77,7 +77,7 @@ describe('space/webhookSubscriptions', () => {
 
   describe('POST /space/:id/webhookSubscriptions', () => {
     it('creates a space-owned webhook subscription', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await fetch(
         post(`/api/v1/space/${space.id}/webhookSubscriptions`, {
           model: 'CustomerRef',
@@ -113,7 +113,7 @@ describe('space/webhookSubscriptions', () => {
         mount: [(app) => app.route('/api/v1/space', spaceRouter)],
       });
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await memberHarness.fetch(
         post(`/api/v1/space/${space.id}/webhookSubscriptions`, {
           model: 'CustomerRef',
@@ -131,7 +131,7 @@ describe('space/webhookSubscriptions', () => {
 
   describe('GET /space/:id/webhookSubscriptions', () => {
     it('returns space webhooks', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
         model: 'CustomerRef',
         ownerModel: 'Space',
@@ -150,7 +150,7 @@ describe('space/webhookSubscriptions', () => {
 
     it('excludes other space webhooks', async () => {
       const { entity: otherSpace } = await createSpace({}, { organization: org });
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
         model: 'CustomerRef',
         ownerModel: 'Space',

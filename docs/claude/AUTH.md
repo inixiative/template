@@ -303,7 +303,7 @@ model AuthProvider {
 ### Encryption
 
 ```typescript
-import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
+import { encryptField, decryptField } from '@template/db/lib/encryption/fieldEncryption';
 
 const encrypted = await encryptField('authProvider', 'secrets', { ...data, secrets });
 const secrets = await decryptField('authProvider', 'secrets', authProvider);
@@ -338,7 +338,7 @@ Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`; the sign-in it
 2. Hash token with SHA-256
 3. Look up the token row by hash (cached in Redis with 10-minute TTL; the row alone, no relations)
 4. Validate: `isActive`, not expired
-5. `hydrate('token', row)`: each owner record (user, organization, space, `OrganizationUser`, `SpaceUser`, integration) is read with `fetchOne` under its own cache key, live-scoped
+5. `hydrate('token', row)`: each owner record (user, organization, space, `OrganizationUser`, `SpaceUser`, integration) is read with `fetchCachedRecordWithTargetEntitlements` under its own cache key, live-scoped
 6. Refuse when the owner the token's `ownerModel` names is absent; a member owner also needs its user and tenant rows. A removed or soft-deleted member, or a deleted user, org or space, authenticates no one
 7. Set context based on token type
 
@@ -357,7 +357,7 @@ const authenticateToken = async (c: Context<AppEnv>) => {
   const signIn = await loadTokenContext(keyHash);  // cached row → isActive/expiresAt → hydrate → owner present
   if (!signIn) return;
   if (signIn.fetched) await db.token.update({ where: { id: signIn.context.token.id }, data: { lastUsedAt: new Date() } });
-  await setTokenContext(c, signIn.context);  // the actor is actorOf(Token, the token's scalar columns)
+  await setTokenContext(c, signIn.context);  // the actor is actorFromRedactedRecord(Token, the token's scalar columns)
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
@@ -621,6 +621,6 @@ Only a user JWT or a superadmin spoof makes the request a user (`c.get('user')`)
 | User token | none | its user |
 | Any other token | none | none: `/me` answers 401 |
 
-`GET /api/v1/identify` answers for any credential: the actor `{ model, record }` the rules see, the record being the user, or the token's own columns, without the model's redact fields.
+`GET /api/v1/identify` answers for any credential: the actor `{ model, record }` the rules see, the record being the user, or the token's own columns, without the model's sensitive fields.
 
 A token held by a user (User, OrganizationUser, SpaceUser) is superadmin when its user is, and can spoof. A spoof is a superadmin and an email: the request becomes that user and the token is set aside; `spoofedBy` records who.

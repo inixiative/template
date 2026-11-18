@@ -62,7 +62,7 @@ export const claimPendingRegistration = (params: { args: unknown }): void => {
 };
 
 // Null = no transaction: the mutation came in on db.raw, which opts out of the life cycle.
-export const getCurrentTransaction = (
+export const openTransactionForPrismaQueryOrThrow = (
   model: string,
   operation: string,
   params: unknown,

@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:flows
  * @uses primitive:sdk
  */

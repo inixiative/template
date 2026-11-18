@@ -1,18 +1,22 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { faker } from '@faker-js/faker';
 import { Role } from '@template/db/generated/client/client';
-import { createFactory, getNextSeq, resetSequence } from '@template/db/test/factory';
+import {
+  nextFactorySequenceNumber,
+  registerFactory,
+  resetSequence,
+} from '@template/db/test/factory';
 
 beforeEach(() => {
   resetSequence();
 });
 
-describe('createFactory', () => {
+describe('registerFactory', () => {
   describe('build (in-memory)', () => {
     it('User - builds with defaults', async () => {
-      const userFactory = createFactory('User', {
+      const userFactory = registerFactory('User', {
         defaults: () => ({
-          email: `user-${getNextSeq()}@test.com`,
+          email: `user-${nextFactorySequenceNumber()}@test.com`,
           emailVerified: true,
           name: faker.person.fullName(),
         }),
@@ -27,9 +31,9 @@ describe('createFactory', () => {
     });
 
     it('User - builds with overrides', async () => {
-      const userFactory = createFactory('User', {
+      const userFactory = registerFactory('User', {
         defaults: () => ({
-          email: `user-${getNextSeq()}@test.com`,
+          email: `user-${nextFactorySequenceNumber()}@test.com`,
           emailVerified: true,
         }),
       });
@@ -41,14 +45,14 @@ describe('createFactory', () => {
 
     it('Session - auto-creates User dependency', async () => {
       // Register User factory first
-      createFactory('User', {
+      registerFactory('User', {
         defaults: () => ({
-          email: `user-${getNextSeq()}@test.com`,
+          email: `user-${nextFactorySequenceNumber()}@test.com`,
           emailVerified: true,
         }),
       });
 
-      const sessionFactory = createFactory('Session', {
+      const sessionFactory = registerFactory('Session', {
         defaults: () => ({
           token: faker.string.alphanumeric(32),
           expiresAt: new Date(Date.now() + 86400000),
@@ -63,14 +67,14 @@ describe('createFactory', () => {
     });
 
     it('Session - uses existing User from context', async () => {
-      const userFactory = createFactory('User', {
+      const userFactory = registerFactory('User', {
         defaults: () => ({
-          email: `user-${getNextSeq()}@test.com`,
+          email: `user-${nextFactorySequenceNumber()}@test.com`,
           emailVerified: true,
         }),
       });
 
-      const sessionFactory = createFactory('Session', {
+      const sessionFactory = registerFactory('Session', {
         defaults: () => ({
           token: faker.string.alphanumeric(32),
           expiresAt: new Date(Date.now() + 86400000),
@@ -87,21 +91,21 @@ describe('createFactory', () => {
     });
 
     it('OrganizationUser - auto-creates both User and Organization', async () => {
-      createFactory('User', {
+      registerFactory('User', {
         defaults: () => ({
-          email: `user-${getNextSeq()}@test.com`,
+          email: `user-${nextFactorySequenceNumber()}@test.com`,
           emailVerified: true,
         }),
       });
 
-      createFactory('Organization', {
+      registerFactory('Organization', {
         defaults: () => ({
           name: faker.company.name(),
-          slug: `org-${getNextSeq()}`,
+          slug: `org-${nextFactorySequenceNumber()}`,
         }),
       });
 
-      const orgUserFactory = createFactory('OrganizationUser', {
+      const orgUserFactory = registerFactory('OrganizationUser', {
         defaults: () => ({
           role: Role.member,
         }),
@@ -114,14 +118,14 @@ describe('createFactory', () => {
     });
 
     it('Session - uses existing User passed via context', async () => {
-      const userFactory = createFactory('User', {
+      const userFactory = registerFactory('User', {
         defaults: () => ({
-          email: `user-${getNextSeq()}@test.com`,
+          email: `user-${nextFactorySequenceNumber()}@test.com`,
           emailVerified: true,
         }),
       });
 
-      const sessionFactory = createFactory('Session', {
+      const sessionFactory = registerFactory('Session', {
         defaults: () => ({
           token: faker.string.alphanumeric(32),
           expiresAt: new Date(Date.now() + 86400000),
@@ -139,27 +143,27 @@ describe('createFactory', () => {
     });
 
     it('Token with OrganizationUser - composite FK via ref override', async () => {
-      createFactory('User', {
+      registerFactory('User', {
         defaults: () => ({
-          email: `user-${getNextSeq()}@test.com`,
+          email: `user-${nextFactorySequenceNumber()}@test.com`,
           emailVerified: true,
         }),
       });
 
-      createFactory('Organization', {
+      registerFactory('Organization', {
         defaults: () => ({
           name: faker.company.name(),
-          slug: `org-${getNextSeq()}`,
+          slug: `org-${nextFactorySequenceNumber()}`,
         }),
       });
 
-      createFactory('OrganizationUser', {
+      registerFactory('OrganizationUser', {
         defaults: () => ({
           role: Role.member,
         }),
       });
 
-      const tokenFactory = createFactory('Token', {
+      const tokenFactory = registerFactory('Token', {
         defaults: () => ({
           name: 'Test Token',
           keyHash: faker.string.alphanumeric(64),
@@ -196,19 +200,19 @@ describe('createFactory', () => {
   });
 
   describe('sequence', () => {
-    it('getNextSeq increments', () => {
-      const first = getNextSeq();
-      expect(getNextSeq()).toBe(first + 1);
-      expect(getNextSeq()).toBe(first + 2);
+    it('nextFactorySequenceNumber increments', () => {
+      const first = nextFactorySequenceNumber();
+      expect(nextFactorySequenceNumber()).toBe(first + 1);
+      expect(nextFactorySequenceNumber()).toBe(first + 2);
     });
 
     it('resetSequence resets to baseline', () => {
       resetSequence();
-      const baseline = getNextSeq();
-      getNextSeq();
-      getNextSeq();
+      const baseline = nextFactorySequenceNumber();
+      nextFactorySequenceNumber();
+      nextFactorySequenceNumber();
       resetSequence();
-      expect(getNextSeq()).toBe(baseline);
+      expect(nextFactorySequenceNumber()).toBe(baseline);
     });
   });
 });

@@ -31,7 +31,14 @@
  * BetterAuth server call and deletes it.
  */
 import ts from 'typescript';
-import { finishFence, isTestFile, lineAt, listFiles, readSource, type Violation } from './fence';
+import {
+  applyExemptionsAndBaselineThenExit,
+  isTestFile,
+  lineAt,
+  listFiles,
+  readSource,
+  type Violation,
+} from './ciRuleRunner';
 
 type Found = { node: ts.Node; key: string; detail: string };
 type Check = (node: ts.Node, sourceFile: ts.SourceFile) => Found | null;
@@ -255,13 +262,13 @@ for (const file of listFiles(['apps', 'packages'], /\.[cm]?[jt]sx?$/)) {
   visit(sourceFile);
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'bearer-only-auth',
   violations,
-  explain: [
+  failureExplanationLines: [
     'API auth is bearer-only and session-free (docs/claude/AUTH.md).',
     '  clients send   Authorization: Bearer <JWT | API token>   (API tokens also as ?token=)',
     '  the server     resolves a person from the JWT (jwtAuthMiddleware); no getSession, no cookieCache',
   ],
-  clean: 'No cookie- or session-based API auth.',
+  passMessage: 'No cookie- or session-based API auth.',
 });

@@ -5,10 +5,10 @@
  * @uses infrastructure:prisma
  */
 import { check, narrowRule } from '@inixiative/json-rules';
-import { db, polymorphicTarget } from '@template/db';
+import { db, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import { type ProviderModel, SegmentType } from '@template/db/generated/client/enums';
-import { withRule } from '@template/shared/rules';
+import { branchOnRuleHealth } from '@template/shared/rules';
 import { ownedSegments } from '#/modules/customerRef/lib/ownedSegments';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
 import {
@@ -31,7 +31,7 @@ export type CustomerRefReconciliation = { segmentId: string; diff: MembershipDif
 const providerOf = (
   customerRef: CustomerRef,
 ): { ownerModel: ProviderModel; ownerId: string } | null => {
-  const target = polymorphicTarget(customerRef, 'CustomerRef', 'providerModel');
+  const target = rowPolymorphicAxisPointsAt(customerRef, 'CustomerRef', 'providerModel');
   return target ? { ownerModel: target.kind as ProviderModel, ownerId: target.id } : null;
 };
 
@@ -69,7 +69,7 @@ export const reconcileCustomerRef = async (
 
   const results: CustomerRefReconciliation = [];
   for (const segment of ordered) {
-    const matches = withRule(states.get(segment.id)!.health, {
+    const matches = branchOnRuleHealth(states.get(segment.id)!.health, {
       degraded: () => null,
       sound: (rule) => (row ? check(narrowRule(rule, lens), row) === true : false),
     });

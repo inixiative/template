@@ -30,7 +30,7 @@ export const validateNoCycle = async (
     const components = await lookupCascade([slug], ctx);
     const component = components[slug];
     if (!component) continue;
-    for (const childRef of component.componentRefs) {
+    for (const childRef of component.componentSlugs) {
       stack.push({ slug: childRef, path: [...path, childRef] });
     }
   }

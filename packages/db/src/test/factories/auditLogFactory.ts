@@ -5,9 +5,9 @@
  * @uses none
  */
 import { AuditAction } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const auditLogFactory = createFactory('AuditLog', {
+const auditLogFactory = registerFactory('AuditLog', {
   defaults: () => ({
     action: AuditAction.create,
   }),

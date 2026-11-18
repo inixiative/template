@@ -14,7 +14,7 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   delegate,
-  entitlementsOf,
+  entitlementEntriesOfHolder,
   organizationOwnerPermissions,
   type Permissions,
   permissionsOfUser,
@@ -46,7 +46,7 @@ export const delegatedPermissions = (delegated: PermissionsRow, owner: Permissio
   delegate(rebacSchema, owner, {
     full: delegated.full,
     ceiling: delegated.role ? roleToStandardAction(delegated.role) : undefined,
-    entitlements: entitlementsOf(delegated),
+    entitlements: entitlementEntriesOfHolder(delegated),
   });
 
 export const ownerPermissions = async (delegated: Delegated): Promise<Permissions> => {

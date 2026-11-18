@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:auditLogs, feature:webhooks
  */
 import { DbAction, type HookOptions, type ManyAction } from '@template/db';

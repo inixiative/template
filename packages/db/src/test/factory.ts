@@ -10,7 +10,7 @@ import { prismaMap } from '@template/db/generated/prismaMap';
 import { withDiscriminatorDefaults } from '@template/db/registries/discriminatorDefaults';
 import { withDualPolymorphismIds } from '@template/db/registries/dualPolymorphismIds';
 import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
-import { polymorphicKeyColumns } from '@template/db/registries/polymorphicIs';
+import { polymorphicKeyColumns } from '@template/db/registries/polymorphicAxisPointsAt';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import {
   assertDiscriminatorsChosen,
@@ -82,7 +82,7 @@ const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
 const sessionOffset = Math.floor(Math.random() * 1_000_000);
 let globalSeq = sessionOffset;
 
-export const getNextSeq = () => ++globalSeq;
+export const nextFactorySequenceNumber = () => ++globalSeq;
 export const resetSequence = () => {
   globalSeq = sessionOffset;
 };
@@ -102,7 +102,7 @@ const foreignKeyGiven = (dep: DependencyConfig, scalarFields: Record<string, unk
 export const registeredDependencies = (modelName: ModelName) =>
   factoryRegistry.get(modelName)?.dependencies ?? {};
 
-export const createFactory = <K extends ModelName>(
+export const registerFactory = <K extends ModelName>(
   modelName: K,
   config: FactoryConfig<K>,
 ): Factory<K> => {
@@ -163,7 +163,7 @@ export const createFactory = <K extends ModelName>(
         if (typeof relationValue === 'object' && relationValue !== null && 'id' in relationValue) {
           (ctx as Record<string, unknown>)[depAccessor] = relationValue;
         } else {
-          const depFactory = createFactory(dep.modelName, {
+          const depFactory = registerFactory(dep.modelName, {
             defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
           });
           await (persist
@@ -172,7 +172,7 @@ export const createFactory = <K extends ModelName>(
         }
       } else if (!ctx[depAccessor] && dep.required && !foreignKeyGiven(dep, scalarFields)) {
         assertParentFollowsAxes(modelName, merged, dep.modelName);
-        const depFactory = createFactory(dep.modelName, {
+        const depFactory = registerFactory(dep.modelName, {
           defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
         });
         await (persist ? depFactory.create(undefined, ctx) : depFactory.build(undefined, ctx));

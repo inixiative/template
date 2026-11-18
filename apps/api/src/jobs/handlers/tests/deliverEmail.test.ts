@@ -60,7 +60,7 @@ describe('deliverEmail — send-time component version closure', () => {
   const ctx = () => ({ db, log: () => {} }) as never;
 
   const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
-    (await createCommunicationLog({ senderType: 'platform', address: 'fan@example.com', ...data }))
+    (await createCommunicationLog({ senderModel: 'platform', address: 'fan@example.com', ...data }))
       .entity;
 
   const payloadFor = (
@@ -96,7 +96,7 @@ describe('deliverEmail — send-time component version closure', () => {
       mjml: documentMjml('{{#component:closure-footer}}{{/component:closure-footer}}'),
       ownerModel: 'default',
     });
-    const log = await createLog({ senderType: 'Space', senderSpaceId: space.id });
+    const log = await createLog({ senderModel: 'Space', senderSpaceId: space.id });
 
     await deliverEmail(
       ctx(),
@@ -128,7 +128,7 @@ describe('deliverEmail — send-time component version closure', () => {
     const { entity: hero } = await createEmailComponent({
       slug: 'closure-hero',
       mjml: '{{#component:closure-cta}}{{/component:closure-cta}}',
-      componentRefs: ['closure-cta'],
+      componentSlugs: ['closure-cta'],
     });
     await saveEmailTemplate({
       slug: 'closure-template',

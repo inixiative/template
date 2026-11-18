@@ -4,7 +4,7 @@
  * @partOf primitive:shared
  * @uses none
  */
-import type { RuleIssue, RuleReference } from '@template/shared/rules/withRule';
+import type { RuleIssue, RuleReference } from '@template/shared/rules/ruleHealth';
 
 export class RuleDegradedError extends Error {
   readonly subject: RuleReference;

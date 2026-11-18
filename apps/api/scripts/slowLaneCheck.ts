@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { createRedisConnection, db } from '@template/db';
-import { resolveAll } from '@template/shared/utils';
+import { runAllWithConcurrencyLimit } from '@template/shared/utils';
 import { type Job, PRIORITY_LIMIT, Queue, QueueEvents, Worker } from 'bullmq';
 import { z } from 'zod';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
@@ -143,7 +143,7 @@ const checkLaneCapacity = async () => {
 
   const slowSlots = WORKERS * createSlowSlotPool(concurrency).capacity;
   const startedAt = Date.now();
-  const slowEnqueue = resolveAll(
+  const slowEnqueue = runAllWithConcurrencyLimit(
     Array.from(
       { length: SLOW_JOBS },
       (_, n) => () => enqueueJob('sendWebhook', { n } as never, { lane: JobLane.slow }),

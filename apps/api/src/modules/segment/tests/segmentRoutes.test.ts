@@ -19,7 +19,7 @@ import {
   createSpace,
   createSpaceUser,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -61,8 +61,10 @@ describe('segment routes', () => {
     org = context.organization;
     space = (await createSpace({}, { organization: org })).entity;
 
-    customer = (await createUser({ email: `customer-${getNextSeq()}@acme.test` })).entity;
-    outsider = (await createUser({ email: `outsider-${getNextSeq()}@example.test` })).entity;
+    customer = (await createUser({ email: `customer-${nextFactorySequenceNumber()}@acme.test` }))
+      .entity;
+    outsider = (await createUser({ email: `outsider-${nextFactorySequenceNumber()}@example.test` }))
+      .entity;
     customerRef = (
       await createCustomerRef({
         customerModel: 'User',
@@ -108,7 +110,7 @@ describe('segment routes', () => {
   const createAcmeSegment = async (): Promise<Segment> => {
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments`, {
-        name: `acme-${getNextSeq()}`,
+        name: `acme-${nextFactorySequenceNumber()}`,
         type: 'dynamic',
         conditions: acmeRule,
       }),
@@ -139,7 +141,11 @@ describe('segment routes', () => {
 
   it('the read carries the rows its rule names, so a degraded rule can say which and why', async () => {
     const { entity: target } = await createSegment(
-      { ownerModel: 'Space', name: `target-${getNextSeq()}`, conditions: acmeRule },
+      {
+        ownerModel: 'Space',
+        name: `target-${nextFactorySequenceNumber()}`,
+        conditions: acmeRule,
+      },
       { space },
     );
     const { entity: dependent } = await createSegment(
@@ -207,7 +213,7 @@ describe('segment routes', () => {
     ).entity;
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments`, {
-        name: `picked-${getNextSeq()}`,
+        name: `picked-${nextFactorySequenceNumber()}`,
         type: 'static',
         conditions: { field: 'id', operator: Operator.in, value: [outsiderRef.id, foreign.id] },
       }),
@@ -223,7 +229,7 @@ describe('segment routes', () => {
   it('rejects conditions outside the lens with a 422', async () => {
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments`, {
-        name: `bad-${getNextSeq()}`,
+        name: `bad-${nextFactorySequenceNumber()}`,
         type: 'dynamic',
         conditions: {
           field: 'customerUser.platformRole',

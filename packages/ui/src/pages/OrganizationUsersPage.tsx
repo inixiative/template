@@ -8,7 +8,7 @@
 import { Icon } from '@iconify/react';
 import type { HydratedRecord } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
-import { memberRemoval } from '@template/permissions/rebac/schemaHelpers';
+import { memberRemoval } from '@template/permissions/rebac/rebacSchemaRules';
 import {
   type OrganizationReadManyUsersResponse,
   type OrganizationUserDeleteData,

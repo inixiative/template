@@ -53,7 +53,11 @@ import {
 } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { incrementCounter } from '@template/shared/telemetry';
-import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import {
+  ConcurrencyType,
+  minimumConcurrencyLimitFor,
+  runAllWithConcurrencyLimit,
+} from '@template/shared/utils';
 import { castArray } from 'lodash-es';
 import { uuidv7 } from 'uuidv7';
 
@@ -88,7 +92,7 @@ const publishKeys = (
 ): Promise<PromiseSettledResult<void>[]> =>
   db.parallel(
     keys.map((key) => () => publishKey(overlay, key)),
-    { concurrency: getConcurrency([ConcurrencyType.redis]), resolution: 'allSettled' },
+    { concurrency: minimumConcurrencyLimitFor([ConcurrencyType.redis]), resolution: 'allSettled' },
   );
 
 const drainFinally = async (openTransaction: OpenTransaction | null): Promise<void> => {
@@ -245,7 +249,7 @@ const dbMethods = {
     const typeList = types ? castArray(types) : undefined;
     openTransaction.afterCommitBatches.push({
       fns: callbackList,
-      concurrency: getConcurrency(typeList),
+      concurrency: minimumConcurrencyLimitFor(typeList),
       types: typeList,
     });
   },
@@ -269,7 +273,7 @@ const dbMethods = {
     const inOwnScope = (thunk: () => Promise<T>) =>
       store.run(newScope(uuidv7(), parent?.scopeContext ?? null), thunk);
     if (options?.resolution === 'allSettled') {
-      return resolveAll(
+      return runAllWithConcurrencyLimit(
         thunks.map((thunk) => async (): Promise<PromiseSettledResult<T>> => {
           try {
             return { status: 'fulfilled', value: await inOwnScope(thunk) };
@@ -280,7 +284,7 @@ const dbMethods = {
         options.concurrency,
       );
     }
-    return resolveAll(
+    return runAllWithConcurrencyLimit(
       thunks.map((thunk) => () => inOwnScope(thunk)),
       options?.concurrency,
     );

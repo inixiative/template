@@ -6,14 +6,14 @@
  */
 import { END, END_EACH, IF } from '@template/email/render/conditionParser/grammar';
 import {
-  type Kind,
   nextStructuralToken,
+  type StructuralBlockKind,
 } from '@template/email/render/conditionParser/nextStructuralToken';
 import { readEachMarker } from '@template/email/render/conditionParser/readEachMarker';
 import { readRuleMarker } from '@template/email/render/conditionParser/readRuleMarker';
 
 export const isStructurallyBalanced = (text: string): boolean => {
-  const stack: Kind[] = [];
+  const stack: StructuralBlockKind[] = [];
   let i = 0;
 
   while (true) {

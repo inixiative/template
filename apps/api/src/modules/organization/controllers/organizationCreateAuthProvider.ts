@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
 import { db, revive } from '@template/db';
-import { encryptField } from '@template/db/lib/encryption/helpers';
+import { encryptField } from '@template/db/lib/encryption/fieldEncryption';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateAuthProviderRoute } from '#/modules/organization/routes/organizationCreateAuthProvider';

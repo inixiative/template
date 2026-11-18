@@ -5,9 +5,9 @@
  * @uses none
  */
 import { InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const inquiryFactory = createFactory('Inquiry', {
+const inquiryFactory = registerFactory('Inquiry', {
   defaults: () => ({
     type: InquiryType.inviteOrganizationUser,
     status: InquiryStatus.sent,

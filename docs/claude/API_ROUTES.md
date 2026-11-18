@@ -159,7 +159,7 @@ A lens narrowing can declare a `where` in three places, and they assert three di
 
 **Relation-node where** (`root.relations.<rel>.where`) — a standing condition on that edge: whenever a query traverses this relation, the related rows are scoped by this condition. It says nothing about which roots qualify — a User with zero matching tokens is still in the set. It answers **what the related collection looks like when you traverse to it**. Declared per *path*, not per model: two edges reaching the same model can carry different wheres.
 
-**mapDefaults model where** (`mapDefaults.prisma.models.<Model>.where`) — the broadest: wherever this model appears anywhere in the lens's projection, apply this condition. Placement-independent; this is the mechanism `redactLens` rides.
+**mapDefaults model where** (`mapDefaults.prisma.models.<Model>.where`) — the broadest: wherever this model appears anywhere in the lens's projection, apply this condition. Placement-independent; this is the mechanism `omitSensitiveFieldsFromLens` rides.
 
 `projectLens` merges all three before consumption: each visit's `whereClauses` is the union of node-declared wheres and mapDefaults wheres for that visit's model, keyed by path.
 
@@ -261,7 +261,7 @@ export const authProviderReadManyController = makeController(
 ```typescript
 // organization/controllers/organizationCreateAuthProvider.ts
 import { db, organizationId, userId } from '@template/db';
-import { encryptField } from '@template/db/lib/encryption/helpers';
+import { encryptField } from '@template/db/lib/encryption/fieldEncryption';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 

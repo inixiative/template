@@ -9,7 +9,7 @@ import { lensVisit } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import {
   type EmailOwnerRef,
-  emailOwnerProvider,
+  emailLensOwnerOf,
   lookupLens,
   type OwnerScope,
 } from '@template/email/render';
@@ -35,7 +35,7 @@ export const emailLensFor = (
   sender?: Sender,
 ): EmailLens => {
   const entry = slug ? registry[slug] : undefined;
-  const scope = emailOwnerProvider(owner);
+  const scope = emailLensOwnerOf(owner);
   const memberships = (sender && senderLensOwner(sender)) ?? scope;
   const lens = scopeEmailLens(
     {

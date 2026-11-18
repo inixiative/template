@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses none
  */
@@ -15,7 +15,7 @@ import {
   type PolymorphicValue,
   polymorphicAxis,
 } from '@template/db/registries/falsePolymorphism';
-import { polymorphicKeyColumn } from '@template/db/registries/polymorphicIs';
+import { polymorphicKeyColumn } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
 
 type Row = Record<string, unknown>;

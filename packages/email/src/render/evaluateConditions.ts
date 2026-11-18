@@ -1,11 +1,15 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses primitive:shared
  */
+
+import {
+  evaluateTemplateBlocksAndTokens,
+  type RuleErrorSink,
+} from '@template/email/render/evaluateTemplate';
 import { toScope, type Variables } from '@template/email/render/interpolate';
-import { type RuleErrorSink, settle } from '@template/email/render/settle';
 import type { EmailLens } from '@template/email/rules/emailLens';
 
 export type { RuleErrorSink };
@@ -17,4 +21,9 @@ export const evaluateConditions = (
   onError?: RuleErrorSink,
   existingTargets?: ReadonlySet<string>,
 ): string =>
-  settle(content, toScope(variables), { substitute: false, existingTargets, lens }, onError);
+  evaluateTemplateBlocksAndTokens(
+    content,
+    toScope(variables),
+    { substitute: false, existingTargets, lens },
+    onError,
+  );

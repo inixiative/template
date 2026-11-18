@@ -69,7 +69,7 @@ const selectedFields = (selector: AnyRollingCacheTargets | undefined): string[] 
 //
 // Definitions are written inline in the module that owns the data and register themselves on import,
 // the way factories do. Every module that defines one must be imported by the worker's rolling-cache
-// barrel (apps/api/src/lib/rollingCaches.ts); the `rolling-cache-registered` CI rule enforces that. The
+// barrel (apps/api/src/lib/rollingCaches.ts); the `rolling-caches-imported-by-worker-barrel` CI rule enforces that. The
 // worker schedules in three layers (coordinateRollingCaches → refreshRollingCache →
 // refreshRollingCacheTarget); this module only defines a cache: its targets, its results and the job
 // that writes them.

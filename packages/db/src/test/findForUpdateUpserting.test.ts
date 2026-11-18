@@ -3,7 +3,7 @@ import { db, FindForUpdateLockTimeoutError } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { getRedisClient } from '@template/db/redis/client';
 import { createUser } from '@template/db/test/factories';
-import { getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber } from '@template/db/test/factory';
 import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 const findOrCreateUser = (email: string, model = 'User') =>
@@ -30,7 +30,7 @@ describe('db.findForUpdate upserting mode', () => {
   });
 
   it('serializes concurrent create-if-missing on one key into exactly one row', async () => {
-    const email = `upserting-race-${getNextSeq()}@test.com`;
+    const email = `upserting-race-${nextFactorySequenceNumber()}@test.com`;
     const results = await db.parallel(
       Array.from({ length: 5 }, () => () => findOrCreateUser(email)),
     );
@@ -41,7 +41,7 @@ describe('db.findForUpdate upserting mode', () => {
   });
 
   it('serializes model and accessor aliases for the same missing row', async () => {
-    const email = `upserting-alias-${getNextSeq()}@test.com`;
+    const email = `upserting-alias-${nextFactorySequenceNumber()}@test.com`;
     const results = await db.parallel([
       () => findOrCreateUser(email, 'User'),
       () => findOrCreateUser(email, 'user'),
@@ -52,7 +52,7 @@ describe('db.findForUpdate upserting mode', () => {
   });
 
   it('releases the lock after commit', async () => {
-    const email = `upserting-commit-${getNextSeq()}@test.com`;
+    const email = `upserting-commit-${nextFactorySequenceNumber()}@test.com`;
     await findOrCreateUser(email);
 
     const started = Date.now();
@@ -62,7 +62,7 @@ describe('db.findForUpdate upserting mode', () => {
   });
 
   it('releases the lock after a rollback', async () => {
-    const email = `upserting-rollback-${getNextSeq()}@test.com`;
+    const email = `upserting-rollback-${nextFactorySequenceNumber()}@test.com`;
     await expect(
       db.txn(async () => {
         await db.findForUpdate('User', { email }, { upserting: true });
@@ -79,7 +79,7 @@ describe('db.findForUpdate upserting mode', () => {
   });
 
   it('throws FindForUpdateLockTimeoutError when the holder outlasts the wait', async () => {
-    const email = `upserting-timeout-${getNextSeq()}@test.com`;
+    const email = `upserting-timeout-${nextFactorySequenceNumber()}@test.com`;
     let releaseHolder: () => void = () => {};
     const holderReleased = new Promise<void>((resolve) => {
       releaseHolder = resolve;
@@ -117,7 +117,7 @@ describe('db.findForUpdate upserting mode', () => {
   });
 
   it('does not wait on itself when the same transaction fences a key twice', async () => {
-    const email = `upserting-reentrant-${getNextSeq()}@test.com`;
+    const email = `upserting-reentrant-${nextFactorySequenceNumber()}@test.com`;
     const rows = await withTimeout(
       db.txn(async () => {
         await db.findForUpdate('User', { email }, { upserting: true, waitMs: 200 });
@@ -133,7 +133,10 @@ describe('db.findForUpdate upserting mode', () => {
     const {
       entity: { id: userId, email },
     } = await db.txn(() =>
-      createUser({ email: `upserting-order-${getNextSeq()}@test.com`, name: 'Order' }),
+      createUser({
+        email: `upserting-order-${nextFactorySequenceNumber()}@test.com`,
+        name: 'Order',
+      }),
     );
     const other = await db.parallel<unknown>(
       [
@@ -181,7 +184,10 @@ describe('db.findForUpdate upserting mode', () => {
 
   describe('fencing a batch with one listed field', () => {
     const emails = (label: string, count: number) =>
-      Array.from({ length: count }, () => `upserting-${label}-${getNextSeq()}@test.com`);
+      Array.from(
+        { length: count },
+        () => `upserting-${label}-${nextFactorySequenceNumber()}@test.com`,
+      );
 
     const gate = () => {
       let open: () => void = () => {};

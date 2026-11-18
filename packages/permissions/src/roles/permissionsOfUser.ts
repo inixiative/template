@@ -1,17 +1,20 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:authz
  * @uses none
  */
 import type { Role } from '@template/db/generated/client/enums';
 import type { EntitlementEntry, Permissions } from '@template/permissions/client';
-import { type EntitlementFields, entitlementsOf } from '@template/permissions/entitlementRows';
+import {
+  type EntitlementFields,
+  entitlementEntriesOfHolder,
+} from '@template/permissions/entitlementRows';
 import {
   isMemberSelfGrant,
   type MemberResource,
 } from '@template/permissions/roles/memberSelfGrant';
-import { getOrgPermissions } from '@template/permissions/roles/organization';
+import { permissionEntryForOrganizationRole } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
 import { partition } from 'lodash-es';
@@ -26,7 +29,7 @@ type OrganizationMember = Member & { organizationId: string };
 type SpaceMember = Member & { spaceId: string };
 
 export const organizationOwnerPermissions = (organizationId: string): Permissions => [
-  { entries: [getOrgPermissions('owner', organizationId)] },
+  { entries: [permissionEntryForOrganizationRole('owner', organizationId)] },
 ];
 
 export const spaceOwnerPermissions = (spaceId: string): Permissions => [
@@ -42,7 +45,7 @@ const memberPermissions = (
   tenantOwner: Permissions,
 ): Permissions => {
   const [usersSide, tenantsSide] = partition(
-    entitlementsOf(member),
+    entitlementEntriesOfHolder(member),
     isMemberSelfGrant(resource, member),
   );
   return [
@@ -61,7 +64,9 @@ export const permissionsOfUser = (
   {
     entries: [
       ...(userId ? [getUserPermissions(userId)] : []),
-      ...members.map((member) => getOrgPermissions(member.role, member.organizationId)),
+      ...members.map((member) =>
+        permissionEntryForOrganizationRole(member.role, member.organizationId),
+      ),
       ...spaceMembers.map((member) => getSpacePermissions(member.role, member.spaceId)),
     ],
   },

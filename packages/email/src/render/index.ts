@@ -6,7 +6,6 @@ export {
   composeComponent,
   composeTemplate,
 } from './compose';
-export { computeDegradedComponentRefs } from './computeDegradedComponentRefs';
 export {
   type ComponentWrite,
   collectSlugs,
@@ -14,12 +13,22 @@ export {
   decompose,
   decomposeNodes,
   type ResolveCascade,
-  serialize,
+  serializeNodesToMjml,
 } from './decompose';
 export { deriveTextFromHtml } from './deriveTextFromHtml';
 export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
-export { expand, expandWith, type LookupComponents } from './expand';
-export { hydrate, hydrateCascade, type ResolveHydrateBodies } from './hydrate';
+export type { RenderIssue, RenderIssueKind } from './evaluateTemplate';
+export {
+  expandComponentTagsFromOwnerCascade,
+  expandComponentTagsWithLookup,
+  type LookupComponents,
+} from './expandComponentTags';
+export { fetchMissingComponentSlugs } from './fetchMissingComponentSlugs';
+export {
+  hydrateEmailComponentTags,
+  hydrateEmailComponentTagsFromOwnerCascade,
+  type ResolveHydrateBodies,
+} from './hydrateEmailComponentTags';
 export { type InterpolateOptions, interpolate, type Variables } from './interpolate';
 export { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from './limits';
 export { lookupCascade } from './lookupCascade';
@@ -33,16 +42,16 @@ export {
   type TextNode,
 } from './nodes';
 export {
-  cascadeLookups,
   type EmailOwnerRef,
-  emailOwnerProvider,
+  emailLensOwnerOf,
+  lookupsPerOwnerTier,
   ownerCascade,
+  ownerScopeOfRow,
   ownerWhere,
   parentOwner,
-  rowOwner,
 } from './owner';
 export { parseBlocks } from './parseBlocks';
-export { recomputeDegradedComponentRefs } from './recomputeDegradedComponentRefs';
+export { recomputeAndStoreMissingComponentSlugs } from './recomputeAndStoreMissingComponentSlugs';
 export { sanitizeSubject } from './sanitizeSubject';
 export {
   type LensForSlug,
@@ -50,10 +59,9 @@ export {
   type SaveTemplateInput,
   type SaveTemplateOptions,
   type SaveTemplateResult,
-  saveEmailComponents,
   saveEmailTemplate,
 } from './save';
-export type { RenderIssue, RenderIssueKind } from './settle';
+export { saveComponents } from './saveComponents';
 export { SYSTEM_TOKENS, type SystemToken, type SystemTokenName } from './systemTokens';
 export {
   type EmailModel,

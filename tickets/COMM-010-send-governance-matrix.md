@@ -82,7 +82,7 @@ side's predicate via json-rules `any`, `||` = another path).
 ## Why the lenses split (from COMM-009)
 
 `data` and `system` are **universal** lenses. `sender`/`recipient` are **matrix-varying**: each cell
-`(senderType, recipientType)` exposes different fields, scoped by that side's **lens**. The matrix
+`(senderModel, recipientType)` exposes different fields, scoped by that side's **lens**. The matrix
 predicates are authored *against* those code-defined lenses — data config within a code-defined
 vocabulary (transitions already validates predicates against a lens).
 

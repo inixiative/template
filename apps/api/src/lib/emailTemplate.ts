@@ -11,10 +11,10 @@ import {
   composeTemplate,
   lookupTemplate,
   type OwnerScope,
+  ownerScopeOfRow,
   type RenderIssue,
   type RuleErrorSink,
-  recomputeDegradedComponentRefs,
-  rowOwner,
+  recomputeAndStoreMissingComponentSlugs,
   templateLens,
   type Variables,
 } from '@template/email/render';
@@ -135,7 +135,7 @@ export const settleTemplate = async (
     if (primaryLens) return primaryLens;
     const row = await lookupTemplate(template, scope);
     return row
-      ? emailLensFor(template, rowOwner(row), await templateLens(template, row), sender)
+      ? emailLensFor(template, ownerScopeOfRow(row), await templateLens(template, row), sender)
       : emailLensFor(template, scope, undefined, sender);
   };
 
@@ -206,8 +206,8 @@ export const settleTemplate = async (
       if (error.type === 'component_missing') {
         try {
           const row = await lookupTemplate(template, scope);
-          if (row && !row.degradedComponentRefs.length)
-            await recomputeDegradedComponentRefs('EmailTemplate', row.id);
+          if (row && !row.missingComponentSlugs.length)
+            await recomputeAndStoreMissingComponentSlugs('EmailTemplate', row.id);
         } catch (refreshError) {
           log.error(
             { error: refreshError, template, ownerModel: scope.ownerModel },

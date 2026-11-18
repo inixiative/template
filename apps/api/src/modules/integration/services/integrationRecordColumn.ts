@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper, service
+ * @kind utils, service
  * @partOf feature:integrations
  * @uses infrastructure:prisma
  */

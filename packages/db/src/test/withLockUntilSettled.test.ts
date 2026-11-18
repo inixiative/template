@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { createLock, db } from '@template/db';
+import { db, makeLock } from '@template/db';
 import type { OpenTransaction } from '@template/db/clientTypes';
 import { FIND_FOR_UPDATE_LOCK_SERVICE } from '@template/db/lock/acquireFindForUpdateLock';
 import { findForUpdateLockIdentifier } from '@template/db/lock/findForUpdateLockIdentifier';
 import { holdLockUntilSettled } from '@template/db/lock/holdLockUntilSettled';
-import { getNextSeq } from '@template/db/test/factory';
-import { gate } from '@template/db/test/gate';
+import { nextFactorySequenceNumber } from '@template/db/test/factory';
+import { makeTestGate } from '@template/db/test/makeTestGate';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -20,7 +20,7 @@ const settles = (promise: Promise<unknown>, withinMs: number) =>
 
 const lockOptions = () => ({
   service: 'with-lock-until-settled-test',
-  identifier: `owner-${getNextSeq()}`,
+  identifier: `owner-${nextFactorySequenceNumber()}`,
   ttlMs: 2_000,
   heartbeatMs: 500,
 });
@@ -28,7 +28,7 @@ const lockOptions = () => ({
 const timedOut = () => new Error('timed out waiting for the lock');
 
 const isFree = async (options: ReturnType<typeof lockOptions>) => {
-  const probe = createLock(options);
+  const probe = makeLock(options);
   const acquired = await probe.acquire();
   if (acquired) await probe.release();
   return acquired;
@@ -43,8 +43,8 @@ describe('db.withLockUntilSettled', () => {
 
   it('holds the lock after fn returns, until the transaction commits', async () => {
     const options = lockOptions();
-    const fnReturned = gate();
-    const commit = gate();
+    const fnReturned = makeTestGate();
+    const commit = makeTestGate();
 
     const holding = db.txn(async () => {
       await db.withLockUntilSettled(options, async () => 'ran');
@@ -72,8 +72,8 @@ describe('db.withLockUntilSettled', () => {
 
   it('makes another transaction wait until the holder commits', async () => {
     const options = lockOptions();
-    const fnReturned = gate();
-    const commit = gate();
+    const fnReturned = makeTestGate();
+    const commit = makeTestGate();
     const order: string[] = [];
 
     const holding = db.txn(async () => {
@@ -97,8 +97,8 @@ describe('db.withLockUntilSettled', () => {
 
   it('throws the onTimeout error when the holder outlasts the wait, and holds nothing after', async () => {
     const options = lockOptions();
-    const fnReturned = gate();
-    const commit = gate();
+    const fnReturned = makeTestGate();
+    const commit = makeTestGate();
 
     const holding = db.txn(async () => {
       await db.withLockUntilSettled(options, async () => 'ran');
@@ -119,7 +119,7 @@ describe('db.withLockUntilSettled', () => {
 
   it('releases a lock whose acquisition finishes after the transaction already settled', async () => {
     const options = lockOptions();
-    const outside = createLock(options);
+    const outside = makeLock(options);
     await outside.acquire();
     setTimeout(() => void outside.release(), 200);
 
@@ -211,8 +211,8 @@ describe('db.withLockUntilSettled', () => {
 
   it('a queued holder does not run once a sibling has rolled the transaction back', async () => {
     const options = lockOptions();
-    const firstRunning = gate();
-    const firstDone = gate();
+    const firstRunning = makeTestGate();
+    const firstDone = makeTestGate();
     let queuedRan = false;
     let first: Promise<unknown> = Promise.resolve();
     let queued: Promise<unknown> = Promise.resolve();
@@ -241,7 +241,10 @@ describe('db.withLockUntilSettled', () => {
   });
   describe('sharing keys with a findForUpdate lock set', () => {
     const emails = () =>
-      [`settled-set-a-${getNextSeq()}@test.com`, `settled-set-b-${getNextSeq()}@test.com`] as const;
+      [
+        `settled-set-a-${nextFactorySequenceNumber()}@test.com`,
+        `settled-set-b-${nextFactorySequenceNumber()}@test.com`,
+      ] as const;
     const fenceOptions = (email: string) => ({
       service: FIND_FOR_UPDATE_LOCK_SERVICE,
       identifier: findForUpdateLockIdentifier('User', { email }),
@@ -264,8 +267,8 @@ describe('db.withLockUntilSettled', () => {
 
     it('a findForUpdate set joins a key withLockUntilSettled already holds and takes only the rest', async () => {
       const [a, b] = emails();
-      const held = gate();
-      const commit = gate();
+      const held = makeTestGate();
+      const commit = makeTestGate();
 
       const holding = db.txn(async () => {
         await db.withLockUntilSettled(fenceOptions(a), async () => {

@@ -7,7 +7,7 @@
 import { getLensRoot, type LensNarrowing, projectLens } from '@inixiative/json-rules';
 import { lookupField, type ModelField, type ModelName, toModelName } from '@template/db';
 import { dialect, searchablePaths } from '@template/db/lens';
-import { redactLens } from '@template/db/lens/redactLens';
+import { omitSensitiveFieldsFromLens } from '@template/db/lens/omitSensitiveFieldsFromLens';
 import {
   FIELD_OPERATORS,
   isArrayFieldOperator,
@@ -171,7 +171,7 @@ type EnumValuesAt = (path: string) => readonly string[] | undefined;
 
 const enumValuesLookup = (filterLens: LensNarrowing): EnumValuesAt => {
   const rootKey = getLensRoot(filterLens).model;
-  const byPath = projectLens(redactLens(filterLens));
+  const byPath = projectLens(omitSensitiveFieldsFromLens(filterLens));
   return (path) => {
     const segments = path.split('.');
     const fieldName = segments.pop() as string;

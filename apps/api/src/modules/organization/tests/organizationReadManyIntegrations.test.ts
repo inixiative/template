@@ -11,7 +11,7 @@ import {
   createOrganizationUser,
   createSpace,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { integrationReadResponseSchema } from '#/modules/integration/schemas/integrationSchemas';
 import { organizationRouter } from '#/modules/organization';
@@ -32,7 +32,7 @@ describe('GET /api/v1/organization/:id/integrations', () => {
     user = context.user;
     org = context.organization;
 
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
     names = [`Org A ${seq}`, `Org B ${seq}`, `Org C ${seq}`];
     for (const name of names) {
       await createIntegration({

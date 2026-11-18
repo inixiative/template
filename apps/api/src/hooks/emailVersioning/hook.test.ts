@@ -6,7 +6,7 @@ import {
   createEmailComponent,
   createEmailTemplate,
 } from '@template/db/test';
-import { expand, saveEmailTemplate } from '@template/email/render';
+import { expandComponentTagsFromOwnerCascade, saveEmailTemplate } from '@template/email/render';
 import * as enqueueModule from '#/jobs/enqueue';
 import { recomposeSnapshot } from '#/lib/email/recompose';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -128,7 +128,7 @@ describe('emailVersioning', () => {
       locale: template.locale,
     };
 
-    const live1 = await expand(template.mjml, ctx);
+    const live1 = await expandComponentTagsFromOwnerCascade(template.mjml, ctx);
     const snap1 = await latestSnapshot({ subjectEmailTemplateId: template.id });
     expect(await recomposeSnapshot(snap1!.id)).toBe(live1);
 
@@ -138,7 +138,7 @@ describe('emailVersioning', () => {
     });
 
     const liveTemplate = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
-    const live2 = await expand(liveTemplate.mjml, ctx);
+    const live2 = await expandComponentTagsFromOwnerCascade(liveTemplate.mjml, ctx);
     const snap2 = await latestSnapshot({ subjectEmailTemplateId: template.id });
     expect(await recomposeSnapshot(snap2!.id)).toBe(live2);
   });
@@ -157,7 +157,7 @@ describe('emailVersioning', () => {
       expect(templateSnapshot?.componentVersions).toEqual({ greeting: null });
       expect(
         (await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } }))
-          .degradedComponentRefs,
+          .missingComponentSlugs,
       ).toEqual([]);
       expect(restampEnqueues(enqueue)).toEqual([
         ['recomputeEmailDependents', { slug: 'greeting' }, { delay: 5000 }],
@@ -168,7 +168,7 @@ describe('emailVersioning', () => {
 
     await runRestamp('greeting');
     const liveTemplate = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
-    expect(liveTemplate.degradedComponentRefs).toEqual(['greeting']);
+    expect(liveTemplate.missingComponentSlugs).toEqual(['greeting']);
   });
 
   it('a component edit snapshots its ancestor in the transaction and defers the badge', async () => {
@@ -227,24 +227,24 @@ describe('emailVersioning', () => {
     await createEmailComponent({
       slug: 'card',
       mjml: '{{#slot:inner:default}}{{#component:x}}{{/component:x}}{{/slot:inner:default}}',
-      componentRefs: ['x'],
+      componentSlugs: ['x'],
     });
     const { entity: template } = await createEmailTemplate({
       mjml: mjml('{{#component:card}}{{#slot:inner}}OVERRIDE{{/slot:inner}}{{/component:card}}'),
-      componentRefs: ['card'],
+      componentSlugs: ['card'],
     });
     const { entity: inherited } = await createEmailTemplate({
       mjml: mjml('{{#component:card}}{{/component:card}}'),
-      componentRefs: ['card'],
+      componentSlugs: ['card'],
     });
     const before = await db.auditLog.count({ where: { subjectEmailTemplateId: template.id } });
     await db.emailComponent.update({ where: { id: child.id }, data: { deletedAt: new Date() } });
     await runRestamp('x');
     const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
-    expect(stored.degradedComponentRefs).toEqual([]);
+    expect(stored.missingComponentSlugs).toEqual([]);
     expect(
       (await db.emailTemplate.findUniqueOrThrow({ where: { id: inherited.id } }))
-        .degradedComponentRefs,
+        .missingComponentSlugs,
     ).toEqual(['x']);
     expect(await db.auditLog.count({ where: { subjectEmailTemplateId: template.id } })).toBe(
       before + 1,
@@ -257,13 +257,13 @@ describe('emailVersioning', () => {
     expect(await latestSnapshot({ subjectEmailComponentId: component.id })).toBeNull();
     const { entity: template } = await createEmailTemplate({
       mjml: mjml('{{#component:raw-child}}{{/component:raw-child}}'),
-      componentRefs: ['raw-child'],
+      componentSlugs: ['raw-child'],
     });
     const snapshot = await latestSnapshot({ subjectEmailTemplateId: template.id });
     expect(snapshot?.componentVersions).toEqual({ 'raw-child': null });
     expect(
       (await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } }))
-        .degradedComponentRefs,
+        .missingComponentSlugs,
     ).toEqual([]);
   });
 });

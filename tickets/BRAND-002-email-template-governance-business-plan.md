@@ -89,7 +89,7 @@ Today's mechanics (all in `packages/db/src/lens` + `@inixiative/json-rules`):
 
 - `lensFor(model)` creates a `Lens` over the generated `prismaMap` for any model.
 - `LensNarrowing` composes via `parent` chains: `picks` (whitelist fields), `omits`, `enumOmits` (hide enum values), `where` (server-enforced row scope).
-- Routes declare a static `filterLens`; `scopeNarrowing` middleware merges per-request, ctx-aware `where` conditions; `redactLens` layers the redaction registry on top. The server, not the client, owns the narrowing.
+- Routes declare a static `filterLens`; `scopeNarrowing` middleware merges per-request, ctx-aware `where` conditions; `omitSensitiveFieldsFromLens` layers the redaction registry on top. The server, not the client, owns the narrowing.
 
 Product application — three narrowings, all composed from the same primitive:
 
@@ -113,7 +113,7 @@ The differentiator vs. Beefree/Unlayer "locked rows": their locking is a flag in
 
 ### 3.3 Inheritance is copy-on-write per component — already built
 
-The customization model is **not** "fork the template." `lookupCascade` (`packages/email/src/render/lookupCascade.ts`) resolves each component slug *independently* through space → org → default, and `expand` recursively expands refs through that cascade. So when a subtenant customizes a template:
+The customization model is **not** "fork the template." `lookupCascade` (`packages/email/src/render/lookupCascade.ts`) resolves each component slug *independently* through space → org → default, and `expandComponentTagsFromOwnerCascade` recursively expands refs through that cascade. So when a subtenant customizes a template:
 
 - "Use my parent's template, change the logo" = materialize **one** space-level `EmailComponent` with slug `logo`. Every other block keeps resolving live from the parent at render time. Nothing is copied.
 - **No fork rot.** When the tenant fixes its footer or rebrands a shared component, every subtenant gets it instantly — except where they've deliberately overridden. The classic failure mode ("200 customer copies of a template, now patch the unsubscribe link in all of them") cannot happen.

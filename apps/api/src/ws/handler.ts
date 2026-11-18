@@ -5,7 +5,7 @@
  * @uses none
  */
 import { LogScope, log } from '@template/shared/logger';
-import { createSerializedQueue } from '@template/shared/utils';
+import { makeSerializedQueue } from '@template/shared/utils';
 import { WS_MAX_PENDING_FRAMES } from '@template/shared/ws';
 import type { Server } from 'bun';
 import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
@@ -46,7 +46,7 @@ export const acceptWebSocket = (req: Request, server: WSServer): Response | unde
     latestStreamFrames: new Map(),
     connectedAt: now,
     lastPing: now,
-    queue: createSerializedQueue(),
+    queue: makeSerializedQueue(),
   };
   return server.upgrade(req, { data })
     ? undefined

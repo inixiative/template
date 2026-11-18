@@ -11,7 +11,7 @@ import {
   type ModelNarrowing,
 } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
-import { fieldsLens, OPAQUE_SLOT, type SlotLens } from '@template/email/rules';
+import { lensFromFieldTypes, OPAQUE_SLOT, type SlotLens } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
 import type { Sender } from '#/lib/email/sender';
 
@@ -97,7 +97,7 @@ export const registry: Record<string, EmailEntry> = assertSubstitutes({
     entity: userEntity,
     sender: { type: 'platform' },
     recipients: userRecipient('id'),
-    data: fieldsLens({ verificationUrl: 'String' }),
+    data: lensFromFieldTypes({ verificationUrl: 'String' }),
   },
 });
 

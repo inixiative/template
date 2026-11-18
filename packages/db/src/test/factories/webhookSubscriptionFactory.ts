@@ -5,9 +5,9 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const webhookSubscriptionFactory = createFactory('WebhookSubscription', {
+const webhookSubscriptionFactory = registerFactory('WebhookSubscription', {
   defaults: () => ({
     // public https URL — passes the SSRF policy (the url hook validates on every create)
     url: `https://${faker.internet.domainName()}/${faker.string.alphanumeric(8)}`,

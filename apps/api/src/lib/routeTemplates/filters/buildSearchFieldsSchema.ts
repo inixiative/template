@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:routeTemplates
  * @uses infrastructure:prisma
  */
@@ -11,7 +11,7 @@ import {
   type PathProjection,
   projectLens,
 } from '@inixiative/json-rules';
-import { redactLens } from '@template/db/lens/redactLens';
+import { omitSensitiveFieldsFromLens } from '@template/db/lens/omitSensitiveFieldsFromLens';
 import { leafFilterSchema } from '#/lib/routeTemplates/filters/filterComponents';
 
 const buildNodeShape = (byPath: PathProjection, nodePath: string): Record<string, z.ZodTypeAny> => {
@@ -45,7 +45,7 @@ const buildNodeShape = (byPath: PathProjection, nodePath: string): Record<string
 // of per-kind filter leaves (to-one nested directly, to-many under some/every/none),
 // scoped to the lens's redacted+narrowed searchable fields.
 export const buildSearchFieldsSchema = (filterLens: LensNarrowing): z.ZodTypeAny | undefined => {
-  const byPath = projectLens(redactLens(filterLens));
+  const byPath = projectLens(omitSensitiveFieldsFromLens(filterLens));
   const shape = buildNodeShape(byPath, getLensRoot(filterLens).model);
   if (Object.keys(shape).length === 0) return undefined;
   // Combinators are advertised exactly one level deep: their children are plain nodes carrying

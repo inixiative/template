@@ -18,7 +18,7 @@ import type {
   Segment,
 } from '@template/db/generated/client/client';
 import type { RuleReferenceSourceModel } from '@template/db/generated/client/enums';
-import { rowOwner, templateLens } from '@template/email/render';
+import { ownerScopeOfRow, templateLens } from '@template/email/render';
 import {
   componentRuleContents,
   contentDynamicRuleReferences,
@@ -107,7 +107,7 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
       const template = row as EmailTemplate;
       return emailLensFor(
         template.slug,
-        rowOwner(template),
+        ownerScopeOfRow(template),
         await templateLens(template.slug, template),
       );
     },
@@ -116,7 +116,7 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
   EmailComponent: declare({
     columns: ['mjml'],
     label: (row) => `email component '${row.slug}'`,
-    lens: (row) => emailLensFor(undefined, rowOwner(row as EmailComponent)),
+    lens: (row) => emailLensFor(undefined, ownerScopeOfRow(row as EmailComponent)),
     storage: storedAsMjml(componentRuleContents),
   }),
   Segment: declare({

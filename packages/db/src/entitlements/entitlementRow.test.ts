@@ -10,7 +10,7 @@ import {
   toEntitlementCreateData,
 } from '@template/db/entitlements/entitlementRow';
 import type { Entitlement } from '@template/db/generated/client/client';
-import { fetchOne } from '@template/db/hydrate/fetchOne';
+import { fetchCachedRecordWithTargetEntitlements } from '@template/db/hydrate/fetchCachedRecordWithTargetEntitlements';
 import {
   cleanupTouchedTables,
   createOrganization,
@@ -35,7 +35,7 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     await cleanupTouchedTables(db);
   });
 
-  it('a holder read through fetchOne carries its live rows, in the order granted', async () => {
+  it('a holder read through fetchCachedRecordWithTargetEntitlements carries its live rows, in the order granted', async () => {
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
     const inputs: EntitlementInput[] = [
@@ -54,10 +54,10 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
       { organization },
     );
 
-    const loaded = await fetchOne<{ id: string; targetEntitlements: Entitlement[] }>(
-      'token',
-      token.id,
-    );
+    const loaded = await fetchCachedRecordWithTargetEntitlements<{
+      id: string;
+      targetEntitlements: Entitlement[];
+    }>('token', token.id);
     expect(loaded?.targetEntitlements.map(stored)).toEqual([
       { ...inputs[0], where: null, sourcePath: null },
       inputs[1],
@@ -158,8 +158,12 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     const { entity: token } = await createToken({ ownerModel: 'Organization' }, { organization });
     expect(await storeEntitlements({ model: 'Token', row: token }, [])).toEqual([]);
     expect(
-      (await fetchOne<{ id: string; targetEntitlements: Entitlement[] }>('token', token.id))
-        ?.targetEntitlements,
+      (
+        await fetchCachedRecordWithTargetEntitlements<{
+          id: string;
+          targetEntitlements: Entitlement[];
+        }>('token', token.id)
+      )?.targetEntitlements,
     ).toEqual([]);
   });
 });

@@ -1,8 +1,7 @@
-export { absoluteRule } from './absoluteRule';
 export { collectConditionFieldPaths, collectHydrationPaths } from './collectHydrationPaths';
 export { collectJsonOpacityWarnings } from './collectJsonOpacityWarnings';
 export {
-  checkExpectations,
+  checkExpectedPathsResolveInLens,
   collectUnprovidedPathWarnings,
   deriveComponentExpectations,
   type ExpectationCheck,
@@ -34,7 +33,7 @@ export {
   emailSurface,
   emailSurfaceSourceValues,
   evaluateScopedRule,
-  fieldsLens,
+  lensFromFieldTypes,
   narrowEmailLens,
   narrowVariables,
   OPAQUE_SLOT,
@@ -42,7 +41,7 @@ export {
   type SlotLens,
   slotOf,
   splitRoot,
-  systemSlot,
+  systemFieldsSlotLens,
   walkEmailLensPath,
 } from './emailLens';
 export { emptyRowFor } from './emptyRowFor';
@@ -51,6 +50,7 @@ export {
   RAIL_PROVIDED_SYSTEM_FIELDS,
   type RailProvidedSystemField,
 } from './railProvidedSystemFields';
+export { replaceLoopBindingsWithAbsolutePaths } from './replaceLoopBindingsWithAbsolutePaths';
 export { type BindingChain, resolveBindingPath } from './resolveBindingPath';
 export { componentRuleContents, type RuleContents, templateRuleContents } from './ruleContents';
 export {

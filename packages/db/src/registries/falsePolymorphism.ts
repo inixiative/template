@@ -403,7 +403,7 @@ export const PolymorphismRegistry = {
   CommunicationLog: {
     axes: [
       {
-        field: 'senderType',
+        field: 'senderModel',
         fkMap: {
           platform: [],
           admin: [],

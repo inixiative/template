@@ -21,6 +21,7 @@
   - [The request and the response](#the-request-and-the-response)
   - [Current Handlers](#current-handlers)
   - [Asking to change a record's entitlements](#asking-to-change-a-records-entitlements)
+  - [Transferring a space](#transferring-a-space)
 - [Response Schemas](#response-schemas)
 - [Permissions (ReBAC)](#permissions-rebac)
 - [Adding a New Handler](#adding-a-new-handler)
@@ -353,7 +354,7 @@ There is one response, `inquiryResponseSchema` (`InquiryItem`, `modules/inquiry/
 
 Reading is by ownership channel because carried keys put the organization on every row beneath it. An organization's managers see what is the organization's, including its own integrations and tokens; a member's own integration is the member's, and a space's inquiries are the space's (Aron, 2026-11-16). Seeing is not resolving: `resolve` stays the per-type level. An inquiry entitlement by a tenant path (`targetOrganization`) admits every kind that carries the key, so a grant kept to the tenant's own channel says so in its `where` (`targetSpaceId` and `targetUserId` equal null); without it the granter must be able to read every kind the path reaches.
 
-`db:inquiry` is the `inquiry` object built by `inquiryPermission(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
+`db:inquiry` is the `inquiryResourcePermission` object built by `inquiryResourcePermissionFromParties(INQUIRY_TYPES)` and imported into the schema: each send and resolve branch is gated on the type and on the party model, then asks the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`). A level is an action of that model's own resource (a test checks it exists), or a plain rebac rule (`rel`, `any`, `all`, `rule`) used as written, for a case one action cannot say: an invite's role, a dot-path to a related model.
 
 ## Adding a New Handler
 

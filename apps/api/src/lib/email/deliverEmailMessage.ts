@@ -202,7 +202,7 @@ export const deliverEmailMessage = async (
         status: 'sending',
         address,
         ...resolved,
-        settledMjml: settled.mjml,
+        evaluatedMjml: settled.mjml,
         variables: settled.variables as Prisma.InputJsonValue,
         renderIssues: settled.issues.length
           ? (settled.issues as Prisma.InputJsonValue)

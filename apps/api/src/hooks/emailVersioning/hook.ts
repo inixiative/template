@@ -8,7 +8,7 @@
 // This hook sits on the edge between audit and cache, and treats the two differently.
 //
 // Synchronous, inside the writing transaction: the written row's own snapshot (the audit hook
-// writes it; this hook stamps its componentVersions), the written row's own degradedComponentRefs,
+// writes it; this hook stamps its componentVersions), the written row's own missingComponentSlugs,
 // and a version-bump snapshot for every ancestor whose resolved component versions moved. A
 // snapshot is an audit event. It is per mutation, it is an insert, and the only lock it takes on
 // the ancestor is the key-share lock its subject foreign key implies, which a plain update of the
@@ -16,7 +16,7 @@
 // deferred to a debounced job, three quick edits to a component would collapse into one history
 // entry, and the history would no longer commit or roll back together with the change it records.
 //
-// Deferred, after commit: the ancestors' degradedComponentRefs. That column is a cache of state
+// Deferred, after commit: the ancestors' missingComponentSlugs. That column is a cache of state
 // that can always be derived again from the live rows. It is per state rather than per event, and
 // it is an update on the ancestor row, so writing it here would make every component edit lock
 // every template that embeds it. Instead the hook enqueues one recomputeEmailDependents job per
@@ -24,7 +24,7 @@
 // shares one run. A stale badge is never a wrong email, because sends render from the live
 // components and never read it.
 //
-// degradedComponentRefs is a NOOP field for both models (packages/db registries/ignoreFields), so
+// missingComponentSlugs is a NOOP field for both models (packages/db registries/noopFields), so
 // the job's restamp neither writes an audit entry nor re-enters this hook.
 
 import {
@@ -37,7 +37,7 @@ import {
 } from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorStore } from '@template/db/lib/auditActorContext';
-import { recomputeDegradedComponentRefs } from '@template/email/render';
+import { recomputeAndStoreMissingComponentSlugs } from '@template/email/render';
 import { log } from '@template/shared/logger';
 import { ConcurrencyType } from '@template/shared/utils';
 import { castArray, isEqual } from 'lodash-es';
@@ -100,13 +100,13 @@ const snapshotChildVersions = async (model: EmailModel, record: VersionedRecord)
     where: { id: latest.id },
     data: { componentVersions: versions as Prisma.InputJsonValue },
   });
-  await recomputeDegradedComponentRefs(model, record.id);
+  await recomputeAndStoreMissingComponentSlugs(model, record.id);
 };
 
 const walkUp = async (slug: string, visited: Set<string>): Promise<void> => {
   const [componentAncestors, templateAncestors] = await Promise.all([
-    db.emailComponent.findMany({ where: { componentRefs: { has: slug }, deletedAt: null } }),
-    db.emailTemplate.findMany({ where: { componentRefs: { has: slug }, deletedAt: null } }),
+    db.emailComponent.findMany({ where: { componentSlugs: { has: slug }, deletedAt: null } }),
+    db.emailTemplate.findMany({ where: { componentSlugs: { has: slug }, deletedAt: null } }),
   ]);
 
   const ancestors: { model: EmailModel; record: VersionedRecord }[] = [
@@ -128,7 +128,7 @@ const walkUp = async (slug: string, visited: Set<string>): Promise<void> => {
   }
 };
 
-// Only components have dependents: componentRefs names component slugs, so a template write has no
+// Only components have dependents: componentSlugs names component slugs, so a template write has no
 // ancestor badge to restamp. The write has already committed when these run, so an enqueue failure
 // is logged and swallowed; the badge stays stale until the next write to that slug.
 const restampDependents = (slugs: Set<string>) =>

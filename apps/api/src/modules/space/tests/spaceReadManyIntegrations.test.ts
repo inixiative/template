@@ -13,7 +13,7 @@ import {
   createOrganizationUser,
   createSpace,
   createSpaceUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { integrationReadResponseSchema } from '#/modules/integration/schemas/integrationSchemas';
 import { spaceRouter } from '#/modules/space';
@@ -40,7 +40,7 @@ describe('GET /api/v1/space/:id/integrations', () => {
     const { entity: su } = await createSpaceUser({ role: 'viewer' }, { ...context, space });
     spaceUser = su;
 
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
     names = [`Space A ${seq}`, `Space B ${seq}`, `Space C ${seq}`];
     for (const name of names) {
       await createIntegration({

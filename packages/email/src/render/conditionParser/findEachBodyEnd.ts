@@ -6,14 +6,14 @@
  */
 import { END, END_EACH, IF } from '@template/email/render/conditionParser/grammar';
 import {
-  type Kind,
   nextStructuralToken,
+  type StructuralBlockKind,
 } from '@template/email/render/conditionParser/nextStructuralToken';
 import { readEachMarker } from '@template/email/render/conditionParser/readEachMarker';
 import { readRuleMarker } from '@template/email/render/conditionParser/readRuleMarker';
 
 export const findEachBodyEnd = (content: string, bodyStart: number): number => {
-  const stack: Kind[] = ['each'];
+  const stack: StructuralBlockKind[] = ['each'];
   let i = bodyStart;
 
   while (stack.length > 0) {

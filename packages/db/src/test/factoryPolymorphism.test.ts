@@ -9,7 +9,7 @@ import {
   createTagCategory,
   createUser,
 } from '@template/db/test/factories';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
 describe('polymorphic factories', () => {
   afterEach(async () => {
@@ -18,7 +18,7 @@ describe('polymorphic factories', () => {
 
   it('refuses a factory that defaults its discriminator', () => {
     expect(() =>
-      createFactory('Integration', { defaults: () => ({ ownerModel: 'User' as const }) }),
+      registerFactory('Integration', { defaults: () => ({ ownerModel: 'User' as const }) }),
     ).toThrow('defaults its discriminator ownerModel');
   });
 

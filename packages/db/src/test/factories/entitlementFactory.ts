@@ -12,9 +12,9 @@ import {
   toEntitlementCreateData,
 } from '@template/db/entitlements/entitlementRow';
 import { EntitlementResourceModel } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const entitlementFactory = createFactory('Entitlement', {
+const entitlementFactory = registerFactory('Entitlement', {
   defaults: () => ({
     resource: EntitlementResourceModel.Organization,
     actions: ['read'],

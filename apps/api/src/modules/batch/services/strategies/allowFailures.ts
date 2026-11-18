@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { ConcurrencyType, getConcurrency } from '@template/shared/utils';
+import { ConcurrencyType, minimumConcurrencyLimitFor } from '@template/shared/utils';
 import {
   refreshBatchContext,
   registerBatch,
@@ -65,7 +65,7 @@ export const allowFailures: StrategyExecutor = async (
       });
 
       const roundResults = await db.parallel(roundThunks, {
-        concurrency: getConcurrency([ConcurrencyType.db]),
+        concurrency: minimumConcurrencyLimitFor([ConcurrencyType.db]),
       });
       results.push(roundResults);
 

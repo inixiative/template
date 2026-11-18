@@ -6,7 +6,7 @@
  */
 import { db } from '@template/db';
 import { createPermissions } from '@template/permissions';
-import { logScope, withLogContext } from '@template/shared/logger';
+import { withLogContext, withLogScope } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { installPermissions } from '#/lib/context/installPermissions';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
@@ -71,7 +71,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     await next();
   } else {
     await withLogContext({ requestId }, () =>
-      logScope('api', () => logScope(requestId, () => db.scope(requestId, next, 'api'))),
+      withLogScope('api', () => withLogScope(requestId, () => db.scope(requestId, next, 'api'))),
     );
   }
 };

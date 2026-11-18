@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { CronJob, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createCronJob, createUser, getNextSeq } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCronJob,
+  createUser,
+  nextFactorySequenceNumber,
+} from '@template/db/test';
 import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { createTestApp } from '#tests/createTestApp';
 import { useRealJobsQueue } from '#tests/utils/realJobsQueue';
@@ -32,7 +37,7 @@ describe('admin/cronJob', () => {
 
   describe('GET /api/admin/cronJob', () => {
     it('returns all cron jobs', async () => {
-      const name = `list-test-${getNextSeq()}`;
+      const name = `list-test-${nextFactorySequenceNumber()}`;
       await createCronJob({ name });
 
       const response = await fetch(get('/api/admin/cronJob'));
@@ -45,7 +50,7 @@ describe('admin/cronJob', () => {
 
   describe('POST /api/admin/cronJob', () => {
     it('creates a cron job', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await fetch(
         post('/api/admin/cronJob', {
           name: `new-cron-${seq}`,
@@ -67,13 +72,13 @@ describe('admin/cronJob', () => {
     });
 
     it('rejects duplicate name', async () => {
-      const name = `duplicate-${getNextSeq()}`;
+      const name = `duplicate-${nextFactorySequenceNumber()}`;
       await createCronJob({ name });
 
       const response = await fetch(
         post('/api/admin/cronJob', {
           name,
-          jobId: `dup-job-${getNextSeq()}`,
+          jobId: `dup-job-${nextFactorySequenceNumber()}`,
           description: null,
           pattern: '0 * * * *',
           handler: 'sendWebhook',
@@ -91,7 +96,7 @@ describe('admin/cronJob', () => {
 
   describe('GET /api/admin/cronJob/:id', () => {
     it('returns a cron job by id', async () => {
-      const name = `read-test-${getNextSeq()}`;
+      const name = `read-test-${nextFactorySequenceNumber()}`;
       const { entity: cronJob } = await createCronJob({ name });
 
       const response = await fetch(get(`/api/admin/cronJob/${cronJob.id}`));
@@ -105,7 +110,7 @@ describe('admin/cronJob', () => {
   describe('PATCH /api/admin/cronJob/:id', () => {
     it('updates a cron job', async () => {
       const { entity: cronJob } = await createCronJob({
-        name: `update-test-${getNextSeq()}`,
+        name: `update-test-${nextFactorySequenceNumber()}`,
         enabled: true,
       });
 
@@ -124,7 +129,9 @@ describe('admin/cronJob', () => {
 
   describe('DELETE /api/admin/cronJob/:id', () => {
     it('deletes a cron job', async () => {
-      const { entity: cronJob } = await createCronJob({ name: `delete-test-${getNextSeq()}` });
+      const { entity: cronJob } = await createCronJob({
+        name: `delete-test-${nextFactorySequenceNumber()}`,
+      });
 
       const response = await fetch(del(`/api/admin/cronJob/${cronJob.id}`));
       expect(response.status).toBe(204);
@@ -136,14 +143,18 @@ describe('admin/cronJob', () => {
 
   describe('POST /api/admin/cronJob/:id/trigger', () => {
     it('triggers a cron job', async () => {
-      const { entity: cronJob } = await createCronJob({ name: `trigger-test-${getNextSeq()}` });
+      const { entity: cronJob } = await createCronJob({
+        name: `trigger-test-${nextFactorySequenceNumber()}`,
+      });
 
       const response = await fetch(post(`/api/admin/cronJob/${cronJob.id}/trigger`, {}));
       expect(response.status).toBe(204);
     });
 
     it('triggers with no request body at all', async () => {
-      const { entity: cronJob } = await createCronJob({ name: `trigger-no-body-${getNextSeq()}` });
+      const { entity: cronJob } = await createCronJob({
+        name: `trigger-no-body-${nextFactorySequenceNumber()}`,
+      });
 
       const response = await fetch(
         new Request(`http://t/api/admin/cronJob/${cronJob.id}/trigger`, { method: 'POST' }),
@@ -152,7 +163,9 @@ describe('admin/cronJob', () => {
     });
 
     it('accepts a lane override and rejects an unknown lane', async () => {
-      const { entity: cronJob } = await createCronJob({ name: `trigger-lane-${getNextSeq()}` });
+      const { entity: cronJob } = await createCronJob({
+        name: `trigger-lane-${nextFactorySequenceNumber()}`,
+      });
 
       expect(
         (await fetch(post(`/api/admin/cronJob/${cronJob.id}/trigger`, { lane: 'slow' }))).status,

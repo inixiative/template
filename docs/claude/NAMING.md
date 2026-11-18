@@ -36,7 +36,10 @@
 | `util` | helper | |
 | `services` | handlers | Backend business logic |
 | `handlers` | | Jobs, frontend event handlers |
-| `make` | create | Factories/currying |
+| `make` | create | Returns a function, handler or handle (factories, currying, locks, services); a plain value from inputs is a noun (`lensFromFieldTypes`) |
+| `create` | make | Writes a record, or builds an adapter client (`createResendClient`) |
+| `define` | make, create | Declares a typed definition and returns it; registers nothing (`defineStream`) |
+| `register` | define, create | Adds something to a registry as a side effect (`registerFactory`, `registerSoftDeleteCascadeHook`, `registerTestTracker`) |
 | `validate` | require | Middleware guards |
 | `aToB` | | Integration transformers (e.g., `stripeToUser`) |
 

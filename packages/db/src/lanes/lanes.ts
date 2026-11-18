@@ -10,7 +10,7 @@ import { fencedRelease } from '@template/db/lanes/queries/fencedRelease';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
-import { heartbeat } from '@template/shared/utils';
+import { startHeartbeat } from '@template/shared/utils';
 
 const LANE_TTL_SEC = 300;
 const SUPERSEDED_TTL_SEC = 7 * 24 * 60 * 60;
@@ -39,7 +39,7 @@ export const getJobSupersededBy = async (jobId: string): Promise<string | null> 
 
 // Marks one job superseded by id, without touching any lane. A superseding child writes its own when
 // it finds its parent superseded, so the tombstone reaches its children in turn.
-export const tombstoneJob = async (jobId: string, supersededBy: string): Promise<void> => {
+export const markJobSupersededBy = async (jobId: string, supersededBy: string): Promise<void> => {
   await getRedisClient().set(supersededKey(jobId), supersededBy, 'EX', SUPERSEDED_TTL_SEC);
 };
 
@@ -93,10 +93,10 @@ export const watchLane = (
   onUsurped: () => void,
   parentId?: string,
 ): (() => void) =>
-  heartbeat(async () => {
+  startHeartbeat(async () => {
     const parentSupersededBy = parentId ? await getJobSupersededBy(parentId) : null;
     if (parentSupersededBy) {
-      await tombstoneJob(jobId, parentSupersededBy);
+      await markJobSupersededBy(jobId, parentSupersededBy);
       onUsurped();
       return;
     }

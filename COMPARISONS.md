@@ -547,7 +547,7 @@ The middleware stack is one of the template's strongest practical features. The 
 ## 16. Shared Utilities & Cross-Cutting Concerns
 
 ### What the template provides
-`resolveAll()` concurrency limiter with 6 typed limits (DB: 10, Redis: 50, Queue: 100, Socket: 100, AppEvent: 100, Integration: 5), environment detection (5 environments with type guards), `cn()` for Tailwind class merging, URL search param utilities (parse, pick, read, build), Consola-based logger with AsyncLocalStorage scope injection (11 log scopes: api, db, worker, seed, ws, test, auth, cache, hook, job, email), frontend logger factory, false polymorphism registry (6 models with axis-based constraint generation), test tracker (automatic table cleanup via mutation tracking with TRUNCATE CASCADE), 15 test factories with auto-inferred relationships and serialization.
+`runAllWithConcurrencyLimit()` concurrency limiter with 6 typed limits (DB: 10, Redis: 50, Queue: 100, Socket: 100, AppEvent: 100, Integration: 5), environment detection (5 environments with type guards), `cn()` for Tailwind class merging, URL search param utilities (parse, pick, read, build), Consola-based logger with AsyncLocalStorage scope injection (11 log scopes: api, db, worker, seed, ws, test, auth, cache, hook, job, email), frontend logger factory, false polymorphism registry (6 models with axis-based constraint generation), test tracker (automatic table cleanup via mutation tracking with TRUNCATE CASCADE), 15 test factories with auto-inferred relationships and serialization.
 
 ### Why this matters
 
@@ -555,7 +555,7 @@ Most of these utilities seem small in isolation. Together, they eliminate entire
 
 | Utility | What it prevents |
 |---------|------------------|
-| `resolveAll()` with typed limits | Database connection exhaustion from unbounded parallel queries |
+| `runAllWithConcurrencyLimit()` with typed limits | Database connection exhaustion from unbounded parallel queries |
 | Environment type guards | `if (process.env.NODE_ENV === 'prodution')` typos (compile-time catch) |
 | Logger with ALS scope injection | Logs without context ("which request caused this?") |
 | Test tracker + TRUNCATE CASCADE | Slow test suites from truncating all tables (only cleans modified ones) |

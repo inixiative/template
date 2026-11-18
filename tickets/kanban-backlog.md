@@ -85,9 +85,9 @@ kanban
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
 - [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) - Swappable external service pattern (in progress)
 - [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
-- [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) ✅ - slow lane as lowest priority + per-worker slot share, createLock refresh fix, row-state claim policy
+- [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) ✅ - slow lane as lowest priority + per-worker slot share, makeLock refresh fix, row-state claim policy
 - [INFRA-046: Cache primitives from Zealot after INFRA-037](./archived/INFRA-046-cache-primitives-from-zealot.md) ✅ - clears cancel in-flight computes, queued marker, abort releases the refresh lock, single-flight under lock/, cache telemetry and options, warm on boot
-- [INFRA-047: cache() inside a transaction](./archived/INFRA-047-transaction-cache-overlay.md) ✅ - a per-transaction overlay: reads its own writes, a rollback leaves nothing cached, published at commit behind the generation fence
+- [INFRA-047: fetchThroughCache() inside a transaction](./archived/INFRA-047-transaction-cache-overlay.md) ✅ - a per-transaction overlay: reads its own writes, a rollback leaves nothing cached, published at commit behind the generation fence
 - [INFRA-048: Lock sets from Zealot ZLT-5949](./archived/INFRA-048-lock-sets-from-zealot.md) ✅ - one token, one heartbeat, one release over many keys; findForUpdate takes one lock set; verify() answers from Redis; the key-lock timeout is a 409
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing

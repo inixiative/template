@@ -17,7 +17,7 @@ export const emailComponentSeeds: SeedFile<EmailComponent> = {
       locale: 'en',
       ownerModel: 'default',
       inheritToSpaces: true,
-      componentRefs: [],
+      componentSlugs: [],
       mjml: [
         '<mj-section padding="20px 0">',
         '  <mj-column>',
@@ -35,7 +35,7 @@ export const emailComponentSeeds: SeedFile<EmailComponent> = {
       locale: 'en',
       ownerModel: 'default',
       inheritToSpaces: true,
-      componentRefs: [],
+      componentSlugs: [],
       mjml: [
         '<mj-divider border-color="#e5e7eb" border-width="1px" />',
         '<mj-section padding="20px 0">',

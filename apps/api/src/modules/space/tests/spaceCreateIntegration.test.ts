@@ -14,7 +14,7 @@ import {
   createSpace,
   createSpaceUser,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -61,7 +61,7 @@ describe('POST /api/v1/space/:id/integrations', () => {
   it("creates a space-owned integration carrying the space's organizationId", async () => {
     const response = await fetch(
       post(`/api/v1/space/${space.id}/integrations`, {
-        name: `Space Integration ${getNextSeq()}`,
+        name: `Space Integration ${nextFactorySequenceNumber()}`,
         role: 'viewer',
       }),
     );

@@ -162,14 +162,14 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 |-------|-------------|
 | `action` | `create`, `update`, or `delete` |
 | `subjectModel` | Which model was mutated |
-| `before` / `after` | The record's own columns (filtered + redacted). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
+| `before` / `after` | The record's own columns (filtered + masked). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
 | `changes` | Field-level diff for updates only |
 | `actorUserId` | `me(c)`: the JWT's or spoofed user, or the user of an acting User token (a member's, organization's, space's or integration's token names none) |
 | `actorSpoofUserId` | The superadmin spoofing, when spoofing |
 | `actorTokenId` | The acting token (nulled when the token is deleted) |
 | `actorJobName` | Background job name (if triggered by a job) |
 | `actorIntegrationId` | The integration the actor acted through (its token's owner key, or a job's payload) |
-| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorOf` sanitized (redact fields removed); survives the token's deletion |
+| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorFromRedactedRecord` sanitized (sensitive fields removed); survives the token's deletion |
 | `ipAddress` / `userAgent` | Request metadata |
 | `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
 | `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's tenancy, for filtering the log: its own `organizationId` / `spaceId` / `userId`, or, for a child with none ([parent edges](DATABASE.md#parent-edges)), its parent's (`contextRows`, `apps/api/src/hooks/auditLog/contextRows.ts`). An entitlement row is filed under its holder's tenancy, so an organization's audit view shows the entitlements its members' tokens gained and lost |
@@ -179,12 +179,12 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 
 `buildAuditEntry` (`apps/api/src/hooks/auditLog/hook.ts`) runs each record through:
 
-1. **Filter** (`filterForAudit` → `filterFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
-2. **Diff** — for updates, `computeDiff` compares the filtered, **unredacted** before/after, so a change to a sensitive column is still detected.
+1. **Filter** (`filterForAudit` → `omitRegisteredFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
+2. **Diff** — for updates, `computeDiff` compares the filtered, **unmasked** before/after, so a change to a sensitive column is still detected.
 3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
-4. **Redact** — `redactSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `redactChangeDiff` masks both sides of a changed sensitive field in `changes`.
+4. **Mask** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
-`processAuditData` (filter + redact) builds the same column-only snapshot for the email-versioning hook.
+`processAuditData` (filter + mask) builds the same column-only snapshot for the email-versioning hook.
 
 ### Reading the Log
 
@@ -198,8 +198,8 @@ If a mutation transitions `deletedAt` from `null` to a timestamp, it is recorded
 
 ```typescript
 // packages/db/src/registries/auditEnabledModels.ts — opt-in models
-// packages/db/src/registries/redactFields.ts — sensitive fields per model
-// packages/db/src/registries/ignoreFields.ts — noise fields per model (shared with webhooks/cache)
+// packages/db/src/registries/sensitiveFields.ts — sensitive fields per model
+// packages/db/src/registries/noopFields.ts — noise fields per model (shared with webhooks/cache)
 ```
 
 ### Actor Context
@@ -307,7 +307,7 @@ with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp 
 3. **Treated as a no-op** - updates that only touch ignored fields skip the cache/webhook/audit hooks
 
 ```typescript
-// packages/db/src/registries/ignoreFields.ts
+// packages/db/src/registries/noopFields.ts
 const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
   _global: ['updatedAt'],      // Always ignored for all models
   User: ['lastLoginAt'],       // Login timestamp not meaningful
@@ -339,7 +339,7 @@ export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
 };
 ```
 
-Private fields of a party stay off the row (a settings or config table that is not related), or are dropped from webhooks in `WEBHOOK_NOOP_FIELDS` (`User.platformRole`). A change that touches only dropped fields emits nothing.
+Private fields of a party stay off the row (a settings or config table that is not related), or are listed in `INTERNAL_FIELDS` (`User.platformRole`), which `WEBHOOK_EXCLUDED_FIELDS` drops from webhooks. A change that touches only dropped fields emits nothing.
 
 ---
 
@@ -360,7 +360,7 @@ export const cacheReference: CacheReference = {
 };
 ```
 
-On mutation, the hook marks the keys of both the previous and the resulting row in the transaction's cache overlay (`queueCacheClear` → `markCacheWritten`). They are cleared when the transaction commits, before its held locks are released and before its `db.onCommit` batches; a failed clear makes `db.txn` throw after those batches run ([REDIS.md - cache() inside a transaction](./REDIS.md#cache-inside-a-transaction)).
+On mutation, the hook marks the keys of both the previous and the resulting row in the transaction's cache overlay (`queueCacheClear` → `markCacheWritten`). They are cleared when the transaction commits, before its held locks are released and before its `db.onCommit` batches; a failed clear makes `db.txn` throw after those batches run ([REDIS.md - fetchThroughCache() inside a transaction](./REDIS.md#fetchthroughcache-inside-a-transaction)).
 
 ### Parent edges
 
@@ -372,7 +372,7 @@ A child whose change is a change to its parent names that parent once, in the pa
 cacheKey('user', userId, [], true)  // → cache:user:id:abc:*
 ```
 
-A wildcard clear cancels the `cache()` computes in flight under its pattern (found by their
+A wildcard clear cancels the `fetchThroughCache()` computes in flight under its pattern (found by their
 single-flight locks), then scans and deletes. Prefer exact keys in the reference map: an exact clear
 is one Lua call, a wildcard clear is two scans.
 

@@ -6,10 +6,10 @@
  */
 import type { UserWithRelations } from '@template/db';
 import {
-  cache,
   cacheKey,
   db,
-  fetchOne,
+  fetchCachedRecordWithTargetEntitlements,
+  fetchThroughCache,
   includeTargetEntitlements,
   type OrganizationUserWithEntitlements,
   type SpaceUserWithEntitlements,
@@ -21,7 +21,7 @@ import { compact, uniqBy } from 'lodash-es';
 const USER_CACHE_TTL = 60 * 10 + 6; // 10.1 minutes
 
 export const findUserByEmail = async (email: string): Promise<User | null> => {
-  return cache<User | null>(
+  return fetchThroughCache<User | null>(
     cacheKey('User', { email }),
     () => db.user.findFirst({ where: { email } }),
     USER_CACHE_TTL,
@@ -29,7 +29,7 @@ export const findUserByEmail = async (email: string): Promise<User | null> => {
 };
 
 const organizationUsersOf = (userId: string): Promise<OrganizationUserWithEntitlements[]> =>
-  cache(
+  fetchThroughCache(
     cacheKey('user', userId, ['organizationUsers']),
     () =>
       db.organizationUser.findMany({
@@ -40,7 +40,7 @@ const organizationUsersOf = (userId: string): Promise<OrganizationUserWithEntitl
   );
 
 const spaceUsersOf = (userId: string): Promise<SpaceUserWithEntitlements[]> =>
-  cache(
+  fetchThroughCache(
     cacheKey('user', userId, ['spaceUsers']),
     () =>
       db.spaceUser.findMany({
@@ -51,14 +51,14 @@ const spaceUsersOf = (userId: string): Promise<SpaceUserWithEntitlements[]> =>
   );
 
 const spacesOfOrganization = (organizationId: string): Promise<Space[]> =>
-  cache(
+  fetchThroughCache(
     cacheKey('organization', organizationId, ['spaces']),
     () => db.space.findMany({ where: { organizationId } }),
     USER_CACHE_TTL,
   );
 
 export const findUserWithRelations = async (userId: string): Promise<UserWithRelations | null> => {
-  const user = await fetchOne<User>('user', userId, USER_CACHE_TTL);
+  const user = await fetchCachedRecordWithTargetEntitlements<User>('user', userId, USER_CACHE_TTL);
   if (!user) return null;
 
   const [organizationUsers, spaceUsers] = await Promise.all([
@@ -72,11 +72,17 @@ export const findUserWithRelations = async (userId: string): Promise<UserWithRel
   const [organizations, memberSpaces, ownedSpaces] = await Promise.all([
     Promise.all(
       organizationUsers.map((organizationUser) =>
-        fetchOne<Organization>('organization', organizationUser.organizationId, USER_CACHE_TTL),
+        fetchCachedRecordWithTargetEntitlements<Organization>(
+          'organization',
+          organizationUser.organizationId,
+          USER_CACHE_TTL,
+        ),
       ),
     ),
     Promise.all(
-      spaceUsers.map((spaceUser) => fetchOne<Space>('space', spaceUser.spaceId, USER_CACHE_TTL)),
+      spaceUsers.map((spaceUser) =>
+        fetchCachedRecordWithTargetEntitlements<Space>('space', spaceUser.spaceId, USER_CACHE_TTL),
+      ),
     ),
     Promise.all(ownedOrganizationIds.map(spacesOfOrganization)),
   ]);

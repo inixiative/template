@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses none
  */
@@ -17,14 +17,14 @@ export type DecomposeResult = { mjml: string; refs: string[]; writes: ComponentW
 const slotTag = (name: string, isDefault: boolean): string =>
   `slot:${name}${isDefault ? ':default' : ''}`;
 
-export const serialize = (nodes: Node[]): string =>
+export const serializeNodesToMjml = (nodes: Node[]): string =>
   nodes
     .map((node) => {
       if (node.type === 'text') return node.value;
       if (node.type === 'component')
-        return `{{#component:${node.slug}}}${serialize(node.children)}{{/component:${node.slug}}}`;
+        return `{{#component:${node.slug}}}${serializeNodesToMjml(node.children)}{{/component:${node.slug}}}`;
       const tag = slotTag(node.name, node.isDefault);
-      return `{{#${tag}}}${serialize(node.children)}{{/${tag}}}`;
+      return `{{#${tag}}}${serializeNodesToMjml(node.children)}{{/${tag}}}`;
     })
     .join('');
 

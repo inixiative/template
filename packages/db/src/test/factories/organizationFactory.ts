@@ -5,12 +5,12 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory, getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const organizationFactory = createFactory('Organization', {
+const organizationFactory = registerFactory('Organization', {
   defaults: () => ({
     name: faker.company.name(),
-    slug: `org-${getNextSeq()}-${faker.string.alphanumeric(6).toLowerCase()}`,
+    slug: `org-${nextFactorySequenceNumber()}-${faker.string.alphanumeric(6).toLowerCase()}`,
   }),
 });
 

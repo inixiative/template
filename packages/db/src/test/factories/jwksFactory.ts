@@ -5,9 +5,9 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const jwksFactory = createFactory('Jwks', {
+const jwksFactory = registerFactory('Jwks', {
   defaults: () => ({
     alg: 'ES256',
     publicKey: JSON.stringify({ kty: 'EC', crv: 'P-256', x: faker.string.alphanumeric(43) }),

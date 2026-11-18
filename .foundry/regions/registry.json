@@ -21,13 +21,13 @@
     {
       "tag": "locks",
       "atlas": "primitive:shared / mutex",
-      "description": "Mutual exclusion across processes and rows: createLock, withOwnerLock, db.findForUpdate (SELECT FOR UPDATE)",
+      "description": "Mutual exclusion across processes and rows: makeLock, withOwnerLock, db.findForUpdate (SELECT FOR UPDATE)",
       "region": "concurrency-locks"
     },
     {
       "tag": "concurrency-limits",
       "atlas": "primitive:shared",
-      "description": "In-process coordination: serialized queues, getConcurrency caps, resolveAll bounded batches",
+      "description": "In-process coordination: serialized queues, minimumConcurrencyLimitFor caps, runAllWithConcurrencyLimit bounded batches",
       "region": "concurrency-locks"
     },
     {
@@ -57,7 +57,7 @@
     {
       "tag": "caching",
       "atlas": "primitive:caching",
-      "description": "Read-through cache(): cache keys, TTLs, single-flight, mutation-driven invalidation",
+      "description": "Read-through fetchThroughCache(): cache keys, TTLs, single-flight, mutation-driven invalidation",
       "region": "redis-caching-rate-limits"
     },
     {
@@ -129,7 +129,7 @@
     {
       "tag": "ws-channels",
       "atlas": "primitive:websockets",
-      "description": "Refetch channels: the WS contract, channels vs streams, channel registry and subscribe authorization, publishing a refetch (WS_CHANNELS, LIVE_QUERIES, sendToChannel / sendToUser / broadcast), the client socket and horizontal scaling",
+      "description": "Refetch channels: the WS contract, channels vs streams, channel registry and subscribe authorization, publishing a refetch (WS_CHANNELS, WSChannelFamily, sendToChannel / sendToUser / broadcast), the client socket and horizontal scaling",
       "region": "ws-channels"
     },
     {
@@ -153,13 +153,13 @@
     {
       "tag": "email-render",
       "atlas": "feature:email",
-      "description": "Compose, render and save pipeline for email: interpolation and variable prefixes, conditions, cascade lookup, expand/settle, per-recipient render, MJML validation, preflight, render errors (packages/email/src/render and validations)",
+      "description": "Compose, render and save pipeline for email: interpolation and variable prefixes, conditions, cascade lookup, expandComponentTagsFromOwnerCascade/evaluateTemplateBlocksAndTokens, per-recipient render, MJML validation, preflight, render errors (packages/email/src/render and validations)",
       "region": "email-render"
     },
     {
       "tag": "email-render",
       "atlas": "feature:email",
-      "description": "Compose, render and save pipeline for email: interpolation and variable prefixes, conditions, cascade lookup, expand/settle, per-recipient render, MJML validation, preflight, render errors (packages/email/src/render and validations)",
+      "description": "Compose, render and save pipeline for email: interpolation and variable prefixes, conditions, cascade lookup, expandComponentTagsFromOwnerCascade/evaluateTemplateBlocksAndTokens, per-recipient render, MJML validation, preflight, render errors (packages/email/src/render and validations)",
       "region": "email-render"
     },
     {
@@ -279,13 +279,13 @@
     {
       "tag": "permissions-rebac",
       "atlas": "primitive:authz",
-      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, conditionPolymorphicAxisPointsAtBoundRow), row-level overrides and space \u2192 organization delegation",
       "region": "permissions-rebac"
     },
     {
       "tag": "permissions-rebac",
       "atlas": "primitive:authz",
-      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, conditionPolymorphicAxisPointsAtBoundRow), row-level overrides and space \u2192 organization delegation",
       "region": "permissions-rebac"
     },
     {

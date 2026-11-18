@@ -186,7 +186,7 @@ export class VCR {
 
   private __applyRule<T>(rule: Sanitizer, data: T): T {
     const transformed = rule.fn ? (rule.fn(data) as T) : data;
-    if (rule.keys?.length) return redactKeys(transformed, rule.keys);
+    if (rule.keys?.length) return maskValuesAtKeyPaths(transformed, rule.keys);
     return transformed;
   }
 
@@ -214,17 +214,17 @@ export class VCR {
   }
 }
 
-const redactKeys = <T>(data: T, keys: string[]): T => {
+const maskValuesAtKeyPaths = <T>(data: T, keys: string[]): T => {
   if (!keys.length) return data;
   const clone = JSON.parse(JSON.stringify(data)) as T;
-  for (const key of keys) redactPath(clone, key.split('.'));
+  for (const key of keys) maskValueAtKeyPath(clone, key.split('.'));
   return clone;
 };
 
-const redactPath = (obj: unknown, parts: string[]): void => {
+const maskValueAtKeyPath = (obj: unknown, parts: string[]): void => {
   if (!obj || typeof obj !== 'object') return;
   if (Array.isArray(obj)) {
-    for (const item of obj) redactPath(item, parts);
+    for (const item of obj) maskValueAtKeyPath(item, parts);
     return;
   }
   const record = obj as Record<string, unknown>;
@@ -235,6 +235,6 @@ const redactPath = (obj: unknown, parts: string[]): void => {
       record[head] = v === null || v === undefined || typeof v === 'object' ? v : 'REDACTED';
     }
   } else {
-    redactPath(record[head], rest);
+    maskValueAtKeyPath(record[head], rest);
   }
 };

@@ -5,7 +5,7 @@
  * @uses none
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { redactLogValue } from '@template/shared/logger/redact';
+import { maskLogValue } from '@template/shared/logger/maskLogValue';
 import { browserTelemetrySchema } from '@template/shared/telemetry/browserSchema';
 import { readTelemetryConfig, signalExportOptions } from '@template/shared/telemetry/config';
 import { bodyLimit } from 'hono/body-limit';
@@ -49,7 +49,7 @@ browserTelemetryRouter.post('/', async (c) => {
     (BigInt(Math.trunc(milliseconds * 1000)) * 1000n).toString();
   const attribute = (key: string, value: unknown) => ({
     key,
-    value: { stringValue: String(redactLogValue(value)) },
+    value: { stringValue: String(maskLogValue(value)) },
   });
   const spans = parsed.data.spans.map((span) => ({
     traceId: span.traceId,

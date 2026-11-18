@@ -1,10 +1,10 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { isArmColumns } from '@template/db/registries/polymorphicIs';
+import { isArmColumns } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { getModelRelations, type RelationInfo } from '@template/db/utils/prismaMapRelations';
 

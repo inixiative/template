@@ -86,7 +86,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - make sure every test that touches the db cleans up after
 - redact secrets before committing the cassette
 - a compound key that references one dependency
-- make createFactory expect the model types so callers must provide them
+- make registerFactory expect the model types so callers must provide them
 - create the request and send it in the same call
 - seed a test user with defaults
 - call the factory directly without passing a context, it builds the parents

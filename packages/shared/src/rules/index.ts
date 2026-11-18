@@ -1,8 +1,9 @@
 export { RuleDegradedError, RuleEvaluationError } from './errors';
 export { type LensField, lensFields } from './lensFields';
 export {
-  type RuleArms,
+  branchOnRuleHealth,
   type RuleHealth,
+  type RuleHealthBranches,
   type RuleIssue,
   type RuleLens,
   type RuleReference,
@@ -10,5 +11,4 @@ export {
   referenceKey,
   ruleIssues,
   ruleVocabularyIssues,
-  withRule,
-} from './withRule';
+} from './ruleHealth';

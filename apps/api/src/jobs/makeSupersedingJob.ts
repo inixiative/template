@@ -9,8 +9,8 @@ import {
   getJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
+  markJobSupersededBy,
   reclaimLane,
-  tombstoneJob,
   watchLane,
 } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
@@ -61,7 +61,7 @@ export const makeSupersedingJob = <TPayload = void>(
         ((await getJobSupersededBy(job.id)) ??
           (parentId ? await getJobSupersededBy(parentId) : null));
       if (job.id && supersededBy) {
-        await tombstoneJob(job.id, supersededBy);
+        await markJobSupersededBy(job.id, supersededBy);
         log.info(`Job ${job.id} already superseded before start`, LogScope.job);
         return;
       }

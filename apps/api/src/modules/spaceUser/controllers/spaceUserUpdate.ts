@@ -6,7 +6,7 @@
  */
 import { db, hydrate, includeTargetEntitlements, Prisma } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { memberRoleWrite } from '@template/permissions/rebac/schemaHelpers';
+import { memberRoleWrite } from '@template/permissions/rebac/rebacSchemaRules';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';

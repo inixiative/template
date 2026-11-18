@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
+import { cleanupTouchedTables, createUser, nextFactorySequenceNumber } from '@template/db/test';
 import { batchRouter } from '#/modules/batch';
 import type { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';
 import { meRouter } from '#/modules/me';
@@ -83,7 +83,7 @@ describe('POST /api/v1/batch/execute', () => {
     });
 
     it('interpolates values from previous round', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await fetch(
         post('/api/v1/batch/execute', {
           requests: [

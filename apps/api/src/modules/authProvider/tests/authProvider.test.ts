@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { AuthProviderType, PlatformRole } from '@template/db/generated/client/enums';
-import { type DecryptFieldInput, decryptField } from '@template/db/lib/encryption/helpers';
+import { type DecryptFieldInput, decryptField } from '@template/db/lib/encryption/fieldEncryption';
 import {
   cleanupTouchedTables,
   createAuthProvider,

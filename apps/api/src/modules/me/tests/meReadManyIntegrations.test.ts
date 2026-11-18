@@ -7,7 +7,7 @@ import {
   createSpace,
   createSpaceUser,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { integrationReadResponseSchema } from '#/modules/integration/schemas/integrationSchemas';
 import { meRouter } from '#/modules/me';
@@ -28,7 +28,7 @@ describe('GET /api/v1/me/integrations', () => {
     const { entity: other } = await createUser();
     otherUser = other;
 
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
     names = [`Mine A ${seq}`, `Mine B ${seq}`, `Mine C ${seq}`];
     for (const name of names) {
       await createIntegration({ name, provider: 'github', ownerModel: 'User', userId: user.id });

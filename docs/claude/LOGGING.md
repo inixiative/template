@@ -36,11 +36,11 @@ await withLogContext({ webhookSubscriptionId, operation: 'sendWebhook' }, async 
 
 Both `log.info(fields, message)` and `log.info(message, fields)` preserve object fields. Child bindings survive: `log.child({ component: 'webhooks', webhookSubscriptionId })`. Nested objects stay objects in Pino output; OTLP log attributes serialize nested objects as JSON for compatibility with providers that require primitive attribute values. Put frequently searched identifiers in top-level fields.
 
-`logScope(id, fn)` adds a display scope. Passing `LogScope.worker` as the last argument appends a scope. `withLogContext(fields, fn)` adds named searchable fields across async calls. API logs acquire `requestId`; worker logs acquire `jobId`, `jobName`, and `attempt`. Active spans add `trace_id` and `span_id`, including on error logs.
+`withLogScope(id, fn)` adds a display scope. Passing `LogScope.worker` as the last argument appends a scope. `withLogContext(fields, fn)` adds named searchable fields across async calls. API logs acquire `requestId`; worker logs acquire `jobId`, `jobName`, and `attempt`. Active spans add `trace_id` and `span_id`, including on error logs.
 
 `LOG_LEVEL` filters all facade outputs, including OTLP and BullBoard broadcasts. `success` and `box` map to info severity. Scoped broadcasts still receive text; failures in an observer or broadcaster do not interrupt application code. The native `pinoLogger` export supports SDKs that require Pino itself, but only calls through the `log` facade join the OTLP/broadcast pipeline.
 
-Redaction runs before sinks: sensitive field names (passwords, credentials, tokens, cookies, email, phone, body, payload), credential-bearing URL userinfo, URL queries/fragments in messages, and common authorization strings. Error stacks are bounded; Prisma error details omit SQL/input dumps. Circular structures and bigint are supported. Oversized records lose fields rather than generating enormous export batches. This is a safeguard, not permission to log arbitrary user text. Use identifiers and event names; never log message bodies, headers, raw SQL, query arguments or whole user records.
+Masking runs before sinks: sensitive field names (passwords, credentials, tokens, cookies, email, phone, body, payload), credential-bearing URL userinfo, URL queries/fragments in messages, and common authorization strings. Error stacks are bounded; Prisma error details omit SQL/input dumps. Circular structures and bigint are supported. Oversized records lose fields rather than generating enormous export batches. This is a safeguard, not permission to log arbitrary user text. Use identifiers and event names; never log message bodies, headers, raw SQL, query arguments or whole user records.
 
 ## Setup
 

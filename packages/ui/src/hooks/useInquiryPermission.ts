@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { InquirySide } from '@template/permissions/rebac/inquiryPermission';
+import type { InquirySide } from '@template/permissions/rebac/inquiryResourcePermission';
 import type { ActionRule } from '@template/permissions/rebac/types';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import {

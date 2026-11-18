@@ -185,7 +185,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   c.set('filterLens', null);  // Set by prepareMiddleware (from route's filterLens)
 
   // Wrap in database scope for logging/tracing
-  await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
+  await withLogScope('api', () => withLogScope(requestId, () => db.scope(requestId, next)));
 };
 ```
 
@@ -345,7 +345,7 @@ type TokenWithRelations = WithTargetEntitlements<Token> & {
 };
 ```
 
-Every holder carries `targetEntitlements: Entitlement[]`, its live rows as stored (`includeTargetEntitlements(model)`, `packages/db/src/entitlements`, which names the holder's model because a member arm keys on the owner chain and an `OrganizationUser`'s relation also reaches its `SpaceUser` rows). `loadTokenContext` reads the token with them, and `hydrate` loads the member and integration through `fetchOne`, which includes them for every holder. The rows become library entries only where a holder is handed to the permissions library (`entitlementsOf`, `@template/permissions`). The resource context loads the plain row; the read controllers include its rows.
+Every holder carries `targetEntitlements: Entitlement[]`, its live rows as stored (`includeTargetEntitlements(model)`, `packages/db/src/entitlements`, which names the holder's model because a member arm keys on the owner chain and an `OrganizationUser`'s relation also reaches its `SpaceUser` rows). `loadTokenContext` reads the token with them, and `hydrate` loads the member and integration through `fetchCachedRecordWithTargetEntitlements`, which includes them for every holder. The rows become library entries only where a holder is handed to the permissions library (`entitlementEntriesOfHolder`, `@template/permissions`). The resource context loads the plain row; the read controllers include its rows.
 
 Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 
@@ -489,7 +489,7 @@ resolves tombstones too. Revival is a create path, never load-the-deleted-row-by
 `db.txn`, `db.findForUpdate(model, where, { upserting: true })` on the unique key fences it and
 returns the tombstone if there is one (raw SQL, so the soft-delete scope doesn't hide it); then an
 update whose `where` names `deletedAt` clears it, or a create follows (DATABASE.md → Row Locks and
-Create-If-Missing). No bare `upsert` and no caught unique violation: the `no-create-race-machinery`
+Create-If-Missing). No bare `upsert` and no caught unique violation: the `find-or-create-uses-find-for-update-upserting`
 rule ratchets both down per file. The JobOutbox flush (`apps/api/src/jobs/outbox/accumulator.ts`,
 superseding lanes keyed on `handlerName_dedupeKey`) is the standing pre-rule upsert the ratchet
 grandfathers. Models without `deletedAt` are unaffected.

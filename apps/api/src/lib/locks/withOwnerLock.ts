@@ -1,10 +1,10 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf mutex
  * @uses infrastructure:redis
  */
-import { createLock, db } from '@template/db';
+import { db, makeLock } from '@template/db';
 import { makeError } from '#/lib/errors';
 
 // One scope per owner-wide invariant that row locks cannot protect. `rules` is the first: an
@@ -59,7 +59,7 @@ export const withOwnerLock = async <T>(
 
   if (db.isInTxn()) return db.withLockUntilSettled(lockOptions, fn, acquireOptions);
 
-  const lock = createLock(lockOptions);
+  const lock = makeLock(lockOptions);
   await lock.acquire(acquireOptions);
   try {
     return await fn();

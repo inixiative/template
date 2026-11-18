@@ -26,14 +26,13 @@ export {
   WS_MAX_PENDING_FRAMES,
   WS_MAX_STREAM_NAME_LENGTH,
 } from './frameLimits';
-export { LIVE_QUERIES } from './liveQueries';
 export type { WSFrameErrorFrame, WSStreamAckFrame, WSStreamResyncFrame } from './streamControl';
 export {
   type RegisteredStream,
   STREAM_DEFINITIONS,
   type StreamFamily,
-  streamDefinitionFor,
-  streamDefinitionOf,
+  streamDefinitionForChannelKey,
+  streamDefinitionForFamily,
 } from './streamDefinitions';
 export type {
   StreamKind,

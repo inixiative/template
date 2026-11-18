@@ -18,7 +18,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  finishFence,
+  applyExemptionsAndBaselineThenExit,
   isTestFile,
   lineAt,
   listFiles,
@@ -26,7 +26,7 @@ import {
   readExemptions,
   readSource,
   type Violation,
-} from './fence';
+} from './ciRuleRunner';
 
 const APP = 'apps/api/src/app.ts';
 const ROUTES = 'apps/api/src/routes/index.ts';
@@ -191,15 +191,15 @@ for (const file of listFiles(['apps/api/src'], /\.tsx?$/)) {
   }
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'one-middleware-chain',
   violations,
   usedExemptions,
-  explain: [
+  failureExplanationLines: [
     `Routers served outside the standard middleware chain (${API}):`,
     `  ${CHAIN.join(' → ')}`,
     'Mount routers after apiRateLimit. A deliberate exception is named, with a one-line reason, in',
     'scripts/ci/one-middleware-chain/exempt.txt.',
   ],
-  clean: 'Every router is mounted inside the standard middleware chain.',
+  passMessage: 'Every router is mounted inside the standard middleware chain.',
 });

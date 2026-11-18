@@ -536,7 +536,7 @@ interpolation) is recorded as a failed result rather than rejecting the round wh
 still run, which would let them finish outside the rolled-back transaction.
 
 `allowFailures` and `failOnRound` run each round's sub-requests through `db.parallel` (capped by
-`getConcurrency([ConcurrencyType.db])`), so each sub-request gets its own scope and its own
+`minimumConcurrencyLimitFor([ConcurrencyType.db])`), so each sub-request gets its own scope and its own
 transaction; without that, parallel sub-requests sharing the parent request's scope joined whichever
 transaction a sibling had open.
 

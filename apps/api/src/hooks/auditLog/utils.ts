@@ -4,11 +4,11 @@
  * @uses infrastructure:prisma
  */
 import {
-  filterFields,
+  maskSensitiveFields,
   NOOP_FIELDS,
+  omitRegisteredFields,
   Prisma,
   polymorphicKeyColumns,
-  redactSensitiveFields,
 } from '@template/db';
 import type { AuditActor } from '@template/db/lib/auditActorContext';
 import { isEqual } from 'lodash-es';
@@ -79,12 +79,13 @@ export const buildSubjectFkFields = (
 export const filterForAudit = (
   model: string,
   data: Record<string, unknown>,
-): Record<string, unknown> => filterFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
+): Record<string, unknown> =>
+  omitRegisteredFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
 
 export const processAuditData = (
   model: string,
   data: Record<string, unknown>,
-): Record<string, unknown> => redactSensitiveFields(model, filterForAudit(model, data));
+): Record<string, unknown> => maskSensitiveFields(model, filterForAudit(model, data));
 
 export const computeDiff = (
   before: Record<string, unknown>,

@@ -1,10 +1,10 @@
-# INFRA-047 — cache() inside a transaction: a per-transaction overlay, published at commit
+# INFRA-047 — fetchThroughCache() inside a transaction: a per-transaction overlay, published at commit
 
 **Status:** ✅ Done — template #224, 2026-10-30 · **Line:** INFRA · **Related:** INFRA-046, Zealot ZLT-6069
 
 ## Problem
 
-`cache()` inside `db.txn()` read and published as it does outside one. A miss computed on the
+`fetchThroughCache()` inside `db.txn()` read and published as it does outside one. A miss computed on the
 transaction's client and published the uncommitted row at once, and a rollback dropped the after-commit
 clear that would have removed it: a `transactionAll` batch that promoted a viewer and then failed left
 the viewer's token holding `own`. A hit ignored the transaction's own writes, so a member demoted in one
@@ -29,5 +29,5 @@ round of a `transactionAll` batch kept the role in the next.
 - Long-lived values no write hook clears are read directly and refreshed asynchronously, never computed
   in a request's transaction.
 
-Docs: `docs/claude/REDIS.md#cache-inside-a-transaction`. Tests: `apps/api/src/hooks/cache/hook.test.ts`,
+Docs: `docs/claude/REDIS.md#fetchthroughcache-inside-a-transaction`. Tests: `apps/api/src/hooks/cache/hook.test.ts`,
 `apps/api/src/modules/batch/tests/batchTransactionCache.test.ts`.

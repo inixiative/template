@@ -5,11 +5,11 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory, getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
-const cronJobFactory = createFactory('CronJob', {
+const cronJobFactory = registerFactory('CronJob', {
   defaults: () => ({
-    name: `cron-job-${getNextSeq()}`,
+    name: `cron-job-${nextFactorySequenceNumber()}`,
     jobId: `job-${faker.string.uuid()}`,
     description: faker.lorem.sentence(),
     pattern: '0 0 * * *', // Daily at midnight

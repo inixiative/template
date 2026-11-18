@@ -5,12 +5,12 @@
  * @uses none
  */
 import { singleFlightLockKey } from '@template/db/lock/singleFlight/singleFlightLock';
+import { cacheWrittenMarkerKeyFor } from '@template/db/redis/cache/cacheWrittenMarkerKeyFor';
 import { generationKey } from '@template/db/redis/cache/generation/generationKey';
 import type { Generation } from '@template/db/redis/cache/generation/readGeneration';
 import { publishIfCurrent } from '@template/db/redis/cache/queries/publishIfCurrent';
 import { cacheAccessor } from '@template/db/redis/cache/telemetry/cacheAccessor';
 import { meterLargeWrite } from '@template/db/redis/cache/telemetry/meterLargeWrite';
-import { writtenKey } from '@template/db/redis/cache/writtenKey';
 import type { RedisEval } from '@template/db/redis/types';
 import { log } from '@template/shared/logger';
 import { incrementCounter } from '@template/shared/telemetry';
@@ -29,7 +29,7 @@ export const publishComputed = async (
       {
         key,
         generationKey: generationKey(key),
-        writtenKey: writtenKey(key),
+        writtenKey: cacheWrittenMarkerKeyFor(key),
         lockKey: singleFlightLockKey(key),
       },
       captured,

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
+import { cleanupTouchedTables, createUser, nextFactorySequenceNumber } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import type { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';
 import { createTestApp } from '#tests/createTestApp';
@@ -31,7 +31,7 @@ describe('POST /api/v1/organization', () => {
   });
 
   it('creates an organization with creator as owner', async () => {
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
     const response = await fetch(
       post('/api/v1/organization', {
         name: `Test Org ${seq}`,
@@ -55,7 +55,7 @@ describe('POST /api/v1/organization', () => {
   });
 
   it('rejects duplicate slug', async () => {
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
     await fetch(post('/api/v1/organization', { name: 'First', slug: `dup-slug-${seq}` }));
 
     const response = await fetch(

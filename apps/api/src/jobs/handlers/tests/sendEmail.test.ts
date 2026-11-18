@@ -11,7 +11,7 @@ import {
   createUser,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
-import { fieldsLens } from '@template/email/rules';
+import { lensFromFieldTypes } from '@template/email/rules';
 import { sendEmail } from '#/jobs/handlers/sendEmail';
 import { emailRegistry } from '#/lib/email';
 import { type EmailEntry, type RecipientTarget, registry } from '#/lib/email/registry';
@@ -238,7 +238,7 @@ describe('sendEmail handler', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe('sent');
     expect(rows[0].channel).toBe('email');
-    expect(rows[0].senderType).toBe('platform');
+    expect(rows[0].senderModel).toBe('platform');
     expect(rows[0].address).toBe(u.email);
     expect(rows[0].recipientContactId).not.toBeNull();
     expect(rows[0].emailTemplateId).not.toBeNull();
@@ -364,7 +364,7 @@ describe('sendEmail handler', () => {
       entity: userEntity(),
       sender: { type: 'platform' },
       recipients: recipientSelf,
-      data: fieldsLens({ code: 'String' }),
+      data: lensFromFieldTypes({ code: 'String' }),
     });
 
     await expect(

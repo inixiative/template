@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import type { EntitlementEntry } from '@template/permissions/client';
 import {
-  entitlementsOf,
-  sameEntitlement,
+  entitlementEntriesOfHolder,
+  isSameEntitlement,
   toEntitlementEntry,
   toEntitlementInput,
 } from '@template/permissions/entitlementRows';
@@ -56,11 +56,11 @@ describe('a row is the entry it stores, exactly (Aron, 2026-11-10)', () => {
   });
 
   it('a holder grants the entries of its rows, and nothing without them', () => {
-    expect(entitlementsOf({ targetEntitlements: [toEntitlementInput(selfAnchored)] })).toEqual([
-      { ...selfAnchored, grantsBelow: true },
-    ]);
-    expect(entitlementsOf({})).toEqual([]);
-    expect(entitlementsOf({ targetEntitlements: null })).toEqual([]);
+    expect(
+      entitlementEntriesOfHolder({ targetEntitlements: [toEntitlementInput(selfAnchored)] }),
+    ).toEqual([{ ...selfAnchored, grantsBelow: true }]);
+    expect(entitlementEntriesOfHolder({})).toEqual([]);
+    expect(entitlementEntriesOfHolder({ targetEntitlements: null })).toEqual([]);
   });
 });
 
@@ -68,22 +68,22 @@ describe('a row nothing narrows grants below its record (Aron, 2026-11-14)', () 
   const row = { ...toEntitlementInput(selfAnchored), where: null, lens: null };
 
   it('a row with no where and no lens is marked', () => {
-    expect(entitlementsOf({ targetEntitlements: [row] })).toEqual([
+    expect(entitlementEntriesOfHolder({ targetEntitlements: [row] })).toEqual([
       { ...selfAnchored, grantsBelow: true },
     ]);
   });
 
   it('a lensed row is not, nor a row with a where', () => {
-    expect(entitlementsOf({ targetEntitlements: [{ ...row, lens: { fields: ['id'] } }] })).toEqual([
-      selfAnchored,
-    ]);
-    expect(entitlementsOf({ targetEntitlements: [toEntitlementInput(pathAndWhere)] })).toEqual([
-      pathAndWhere,
-    ]);
+    expect(
+      entitlementEntriesOfHolder({ targetEntitlements: [{ ...row, lens: { fields: ['id'] } }] }),
+    ).toEqual([selfAnchored]);
+    expect(
+      entitlementEntriesOfHolder({ targetEntitlements: [toEntitlementInput(pathAndWhere)] }),
+    ).toEqual([pathAndWhere]);
   });
 
   it('the mark is no part of what a row grants: a lensed row and its unlensed twin stay the same grant', () => {
-    expect(sameEntitlement(row, { ...row, lens: { fields: ['id'] } })).toBe(true);
+    expect(isSameEntitlement(row, { ...row, lens: { fields: ['id'] } })).toBe(true);
     expect(toEntitlementEntry(row)).toEqual(selfAnchored);
   });
 });
@@ -92,10 +92,10 @@ describe('one grant, one lens (Aron, 2026-11-12)', () => {
   it('rows are the same grant when resource, anchor, path, where and actions match, whatever their lens or action order', () => {
     const row = toEntitlementInput(pathAndWhere);
     const lensed = { ...row, actions: [...row.actions].reverse(), lens: { fields: ['id'] } };
-    expect(sameEntitlement(row, lensed)).toBe(true);
-    expect(sameEntitlement(row, { ...row, sourcePath: null })).toBe(false);
-    expect(sameEntitlement(row, { ...row, where: null })).toBe(false);
-    expect(sameEntitlement(row, { ...row, actions: ['read'] })).toBe(false);
-    expect(sameEntitlement(row, { ...row, sourceId: 'other' })).toBe(false);
+    expect(isSameEntitlement(row, lensed)).toBe(true);
+    expect(isSameEntitlement(row, { ...row, sourcePath: null })).toBe(false);
+    expect(isSameEntitlement(row, { ...row, where: null })).toBe(false);
+    expect(isSameEntitlement(row, { ...row, actions: ['read'] })).toBe(false);
+    expect(isSameEntitlement(row, { ...row, sourceId: 'other' })).toBe(false);
   });
 });

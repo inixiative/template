@@ -9,7 +9,7 @@ import {
   cleanupTouchedTables,
   createOrganizationUser,
   createWebhookSubscription,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
@@ -58,7 +58,7 @@ describe('organization/webhookSubscriptions', () => {
 
   describe('POST /organization/:id/webhookSubscriptions', () => {
     it('creates an org-owned webhook subscription', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await fetch(
         post(`/api/v1/organization/${org.id}/webhookSubscriptions`, {
           model: 'CustomerRef',
@@ -85,7 +85,7 @@ describe('organization/webhookSubscriptions', () => {
         mount: [(app) => app.route('/api/v1/organization', organizationRouter)],
       });
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await viewerHarness.fetch(
         post(`/api/v1/organization/${viewerOrg.id}/webhookSubscriptions`, {
           model: 'CustomerRef',
@@ -99,7 +99,7 @@ describe('organization/webhookSubscriptions', () => {
 
   describe('GET /organization/:id/webhookSubscriptions', () => {
     it('returns org webhooks', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
         model: 'CustomerRef',
         ownerModel: 'Organization',
@@ -118,7 +118,7 @@ describe('organization/webhookSubscriptions', () => {
     it('excludes other org webhooks', async () => {
       const { context: otherContext } = await createOrganizationUser();
       const otherOrg = otherContext.organization;
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
         model: 'CustomerRef',
         ownerModel: 'Organization',

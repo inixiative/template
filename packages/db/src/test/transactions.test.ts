@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { faker } from '@faker-js/faker';
 import { db } from '@template/db';
-import { getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber } from '@template/db/test/factory';
 import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 describe('transactions', () => {
@@ -13,7 +13,7 @@ describe('transactions', () => {
 
   describe('db.txn', () => {
     it('executes function within a transaction', async () => {
-      const email = `txn-${getNextSeq()}@test.com`;
+      const email = `txn-${nextFactorySequenceNumber()}@test.com`;
       const result = await db.txn(async () => {
         const user = await db.user.create({
           data: {

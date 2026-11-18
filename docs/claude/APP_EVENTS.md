@@ -142,7 +142,7 @@ streamAppend(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.orga
 
 A `shared` stream's append goes to every connection holding the stream, so it has to match the
 shape of the route's response for every caller. `appendToStream` publishes each stream's appends
-through a per-stream `createSerializedQueue`, so one instance emits them in order. See
+through a per-stream `makeSerializedQueue`, so one instance emits them in order. See
 [WEBSOCKETS.md](WEBSOCKETS.md#data-streams).
 
 Revoking access (membership, role or token removal) does not yet emit an app event that closes

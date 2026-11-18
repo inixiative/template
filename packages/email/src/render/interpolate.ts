@@ -1,11 +1,15 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses none
  */
 import type { ScopeRoot } from '@template/email/render/conditionParser';
-import { type RuleErrorSink, type Scope, settle } from '@template/email/render/settle';
+import {
+  evaluateTemplateBlocksAndTokens,
+  type RuleErrorSink,
+  type Scope,
+} from '@template/email/render/evaluateTemplate';
 import type { SystemTokenName } from '@template/email/render/systemTokens';
 import { type EmailLens, narrowVariables } from '@template/email/rules/emailLens';
 import { escape as escapeHtml } from 'lodash-es';
@@ -57,7 +61,7 @@ export const interpolate = (
   const { lens } = options;
   const scope = toScope(narrowVariables(lens, variables));
   const ruleScope = toScope(narrowVariables(lens, variables, { keepClampColumns: true }));
-  return settle(
+  return evaluateTemplateBlocksAndTokens(
     resolveSystemTokens(template, options),
     scope,
     { substitute: true, existingTargets: options.existingTargets, lens, ruleScope },

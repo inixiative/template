@@ -31,7 +31,7 @@ export const ENCRYPTED_MODELS = {
 } as const;
 
 // Helper to derive field names from key name
-export const getFieldNames = (keyName: string) => {
+export const encryptedColumnNamesForKey = (keyName: string) => {
   const pascal = upperFirst(keyName);
   return {
     encryptedField: `encrypted${pascal}`,
@@ -41,7 +41,7 @@ export const getFieldNames = (keyName: string) => {
 };
 
 // Derives `{ ModelName: [encryptedField, metadataField, versionField, ...] }`
-// from ENCRYPTED_MODELS so downstream registries (ignoreFields, redactFields)
+// from ENCRYPTED_MODELS so downstream registries (noopFields, sensitiveFields)
 // don't need to re-list the same column triplets. Keys are Prisma model names
 // (PascalCase) to match the registry consumers' lookup convention.
 export const getEncryptedFieldsByModel = (): Record<string, string[]> => {
@@ -50,7 +50,7 @@ export const getEncryptedFieldsByModel = (): Record<string, string[]> => {
     const modelName = upperFirst(accessorName);
     const fields: string[] = [];
     for (const keyName of Object.keys(modelConfig.keys)) {
-      const { encryptedField, metadataField, versionField } = getFieldNames(keyName);
+      const { encryptedField, metadataField, versionField } = encryptedColumnNamesForKey(keyName);
       fields.push(encryptedField, metadataField, versionField);
     }
     result[modelName] = fields;

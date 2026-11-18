@@ -12,7 +12,7 @@ import {
   createTag,
   createTagAttachment,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName } from '#/appEvents/handlers';
@@ -74,7 +74,8 @@ describe('reconcile triggers — membership follows the events', () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
     tag = (await createTag()).entity;
-    member = (await createUser({ email: `member-${getNextSeq()}@example.test` })).entity;
+    member = (await createUser({ email: `member-${nextFactorySequenceNumber()}@example.test` }))
+      .entity;
     memberRef = await customerOf(member);
   });
 
@@ -122,19 +123,22 @@ describe('reconcile triggers — membership follows the events', () => {
 
   it('a user update and a new customer reference reconcile that customer', async () => {
     const segment = await liveSegment(acmeRule);
-    const newcomer = (await createUser({ email: `newcomer-${getNextSeq()}@example.test` })).entity;
+    const newcomer = (
+      await createUser({ email: `newcomer-${nextFactorySequenceNumber()}@example.test` })
+    ).entity;
     const newcomerRef = await customerOf(newcomer);
     await emitAppEvent('customerRef.created', { customerRef: newcomerRef });
     expect(await memberIds(segment.id)).toEqual([]);
 
     const renamed = await db.user.update({
       where: { id: newcomer.id },
-      data: { email: `newcomer-${getNextSeq()}@acme.test` },
+      data: { email: `newcomer-${nextFactorySequenceNumber()}@acme.test` },
     });
     await emitAppEvent('user.updated', { user: renamed });
     expect(await memberIds(segment.id)).toEqual([newcomerRef.id]);
 
-    const joiner = (await createUser({ email: `joiner-${getNextSeq()}@acme.test` })).entity;
+    const joiner = (await createUser({ email: `joiner-${nextFactorySequenceNumber()}@acme.test` }))
+      .entity;
     const joinerRef = await customerOf(joiner);
     await emitAppEvent('customerRef.created', { customerRef: joinerRef });
     expect(await memberIds(segment.id)).toEqual([newcomerRef.id, joinerRef.id].sort());

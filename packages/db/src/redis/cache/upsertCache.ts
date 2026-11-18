@@ -4,6 +4,8 @@
  * @partOf primitive:caching, infrastructure:redis
  * @uses none
  */
+
+import { cacheWrittenMarkerKeyFor } from '@template/db/redis/cache/cacheWrittenMarkerKeyFor';
 import { DEFAULT_TTL } from '@template/db/redis/cache/defaultTtl';
 import { generationKey } from '@template/db/redis/cache/generation/generationKey';
 import {
@@ -13,8 +15,7 @@ import {
 import { writeThrough } from '@template/db/redis/cache/queries/writeThrough';
 import { meterLargeWrite } from '@template/db/redis/cache/telemetry/meterLargeWrite';
 import { withCacheSpan } from '@template/db/redis/cache/telemetry/withCacheSpan';
-import { validateKey } from '@template/db/redis/cache/validateKey';
-import { writtenKey } from '@template/db/redis/cache/writtenKey';
+import { validateCacheKeyHasNoUndefined } from '@template/db/redis/cache/validateCacheKeyHasNoUndefined';
 import { getRedisClient } from '@template/db/redis/client';
 import superjson from 'superjson';
 
@@ -24,14 +25,14 @@ export const upsertCache = async <T>(
   options: { ttl?: number; force?: boolean } = {},
 ): Promise<boolean> => {
   const { ttl = DEFAULT_TTL, force = false } = options;
-  validateKey(key);
+  validateCacheKeyHasNoUndefined(key);
 
   return withCacheSpan(key, false, async (setResult) => {
     try {
       const payload = superjson.stringify(value);
       const written = await writeThrough(
         getRedisClient(),
-        { key, generationKey: generationKey(key), writtenKey: writtenKey(key) },
+        { key, generationKey: generationKey(key), writtenKey: cacheWrittenMarkerKeyFor(key) },
         { value: newGeneration(), ttlSeconds: GENERATION_TTL_SECONDS },
         ttl,
         payload,

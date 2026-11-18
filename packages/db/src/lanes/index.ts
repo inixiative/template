@@ -3,9 +3,9 @@ export {
   getJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
+  markJobSupersededBy,
   reclaimLane,
   releaseLane,
   supersededKey,
-  tombstoneJob,
   watchLane,
 } from './lanes';

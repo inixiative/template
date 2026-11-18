@@ -72,7 +72,7 @@ Not here: the encryption engine, the keyring schema and rotation are `encryption
 
 ## 3. Everything that exists here, by class
 
-Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: makeLock, packages/db/src/lock/makeLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `secrets`: Secrets around the app: Infisical storage, secret env vars and keyrings per environment (CI included), provider credentials, how keys rotate
 
@@ -116,7 +116,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | return 404 so non-members can't tell it exists; the lookup runs before the permission check; hide whether the resource exists | **Resource existence is non-secret** · rule docs/claude/PERMISSIONS.md § Validation Middleware › validatePermission — Any route loading a resource by id | code `validateSubmodelPermission`, `rebacSchema`, `resourceContextMiddleware`, `schemaMap` | — |
 | the response includes the encrypted columns; return the decrypted secret in the API; strip the secret from the response schema; secrets at rest, omitted from responses | **Secrets encrypted, never returned** · rule CLAUDE.md §7 Core Engineering Standards — Any credential or secret field. | part 4 | a response schema or select that returns encryptedSecrets / metadata / version columns or the decrypted secret (CLAUDE.md §7 Core Engineering Standards; docs/claude/AUTH.md Operations (secrets omitted)) |
 
-- *Also here, by name:* AUTH_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); SYSTEM_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); createEncryptionEnvRefinement (`packages/db/src/lib/encryption/envValidation.ts`)
+- *Also here, by name:* AUTH_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); SYSTEM_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); makePreviousEncryptionKeyRequiredRefinement (`packages/db/src/lib/encryption/envValidation.ts`)
 
 ## 4. The specifics, in full
 
@@ -165,7 +165,7 @@ model AuthProvider {
 ##### Encryption
 
 ```typescript
-import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
+import { encryptField, decryptField } from '@template/db/lib/encryption/fieldEncryption';
 
 const encrypted = await encryptField('authProvider', 'secrets', { ...data, secrets });
 const secrets = await decryptField('authProvider', 'secrets', authProvider);
@@ -509,7 +509,7 @@ See [ENVIRONMENTS.md](ENVIRONMENTS.md) for full environment configuration.
 
 - ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ job schedulers) opens its own connection
 
-- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
+- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `fetchThroughCache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
 - ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
 

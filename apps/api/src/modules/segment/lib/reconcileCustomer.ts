@@ -1,10 +1,10 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:segment
  * @uses infrastructure:prisma, primitive:jobs
  */
-import { type ModelName, polymorphicTarget } from '@template/db';
+import { type ModelName, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { CustomerModel } from '@template/db/generated/client/enums';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -15,7 +15,7 @@ export const reconcileCustomerOf = async (
   { model, axis }: Polymorphic,
   row: Record<string, unknown>,
 ): Promise<void> => {
-  const target = polymorphicTarget(row, model, axis);
+  const target = rowPolymorphicAxisPointsAt(row, model, axis);
   if (!target) return;
   await enqueueJob('reconcileCustomerRefSegments', {
     customerModel: target.kind as CustomerModel,

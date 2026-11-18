@@ -5,7 +5,7 @@
  * @uses none
  */
 import { getRedisClient } from '@template/db';
-import { streamDefinitionOf, WS_MAX_STREAM_NAME_LENGTH } from '@template/shared/ws';
+import { streamDefinitionForChannelKey, WS_MAX_STREAM_NAME_LENGTH } from '@template/shared/ws';
 import { streamSnapshotFrame } from '#/ws/dataFrame';
 import { sendFrame, sendTo } from '#/ws/delivery';
 import { claimStreamSeq } from '#/ws/queries/claimStreamSeq';
@@ -22,7 +22,7 @@ const SEQ_CLAIM_ATTEMPTS = 3;
 const isOpenableStreamName = (stream: unknown): stream is string =>
   typeof stream === 'string' &&
   stream.length <= WS_MAX_STREAM_NAME_LENGTH &&
-  streamDefinitionOf(stream) !== null;
+  streamDefinitionForChannelKey(stream) !== null;
 
 // Seq first: every append at or below it is already in the snapshot that follows.
 const readSnapshot = async (

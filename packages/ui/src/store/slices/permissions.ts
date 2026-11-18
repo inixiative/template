@@ -4,7 +4,8 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import { actorOf } from '@template/permissions/actorOf';
+
+import { actorFromRedactedRecord } from '@template/permissions/actorFromRedactedRecord';
 import { ActorModel, createPermissions, installPermissions } from '@template/permissions/client';
 import { check as rebacCheck } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
@@ -41,7 +42,7 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
       setup: async (me: UserWithRelations) => {
         const { permix } = get().permissions;
         await permix.setup([], { replace: true });
-        permix.setActor(actorOf(ActorModel.User, me));
+        permix.setActor(actorFromRedactedRecord(ActorModel.User, me));
         if (isSuperadmin(me)) {
           permix.setSuperadmin(true);
           return;

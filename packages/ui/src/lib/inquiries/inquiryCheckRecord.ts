@@ -1,11 +1,11 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
 import type { HydratedRecord } from '@template/db';
-import type { InquirySide } from '@template/permissions/rebac/inquiryPermission';
+import type { InquirySide } from '@template/permissions/rebac/inquiryResourcePermission';
 import type { InquiryItem } from '@template/sdk';
 
 export type CheckableInquiry = Pick<InquiryItem, 'type' | 'sourceModel' | 'targetModel'> & {

@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses primitive:shared
  */
@@ -17,7 +17,7 @@ const pathResolves = (path: string, lens: EmailLens): boolean => {
   return outcome === 'resolved' || outcome === 'beneathJson';
 };
 
-export const checkExpectations = (
+export const checkExpectedPathsResolveInLens = (
   expectations: readonly string[],
   lens: EmailLens,
 ): ExpectationCheck[] => expectations.map((path) => ({ path, ok: pathResolves(path, lens) }));
@@ -26,7 +26,7 @@ export const collectUnprovidedPathWarnings = (
   fieldPaths: readonly string[],
   lens: EmailLens,
 ): string[] =>
-  checkExpectations(fieldPaths, lens)
+  checkExpectedPathsResolveInLens(fieldPaths, lens)
     .filter((check) => !check.ok)
     .map(
       (check) =>

@@ -4,7 +4,7 @@
 
 ## Problem
 
-The template had `cache()` for read-through caching but nothing kept a cache warm on a timer, so each
+The template had `fetchThroughCache()` for read-through caching but nothing kept a cache warm on a timer, so each
 app that needs "refresh X every N minutes" would add its own cron row and scheduler. Zealot folded those
 into one system in #2786, and in the same PR settled the job primitives it is built on: staged jobs on
 every constructor, a binary collision policy, and superseding children that honour their parent.
@@ -31,11 +31,11 @@ parent and a throwing child fails its parent. A superseding parent only adds sup
 `traceJob` treats BullMQ wait signals as OK spans. CI: `no-hand-rolled-flows`.
 
 **Superseding children honour a superseding parent's tombstone.** At start a superseding job exits (and
-writes its own tombstone, `tombstoneJob`) if it or `job.parent.id` is tombstoned; `watchLane(lane, jobId,
+writes its own tombstone, `markJobSupersededBy`) if it or `job.parent.id` is tombstoned; `watchLane(lane, jobId,
 onUsurped, parentId)` does the same while it runs. A parked superseding parent holds its lane for the
 tombstone's lifetime (`holdLaneWhileParked`). No eviction step.
 
-**Rolling caches.** `makeRollingCache` in `packages/db/src/redis/` (next to `cache()`), registry
+**Rolling caches.** `makeRollingCache` in `packages/db/src/redis/` (next to `fetchThroughCache()`), registry
 (`getRollingCache` throws for an unknown name), targets as `{ model, args }` with Prisma's own
 `findMany` args resolved through `db.delegate` (Postgres `DISTINCT`, fail-closed ceiling), three times
 (`intervalSeconds`, `timeoutSeconds`, `ttlSeconds`, validated at registration), `refresh` throws when the
@@ -43,7 +43,7 @@ write fails. Root `coordinateRollingCaches` (seeded cron row, every minute, sing
 `refreshRollingCache` (keyed staged singleton; `finish` sets the timer) → leaf `refreshRollingCacheTarget`
 (superseding by key, slow lane, `settleWithin` + `AbortSignal.any` timeout, emits
 `rollingCache.leafStuck` and throws). Barrel `apps/api/src/lib/rollingCaches.ts` imported by the worker;
-CI: `rolling-cache-registered`. No supervisor, no pending hash, no refire. Full rebuild only.
+CI: `rolling-caches-imported-by-worker-barrel`. No supervisor, no pending hash, no refire. Full rebuild only.
 
 **Supersedes template PR #191** (`jobs-stages-dedup-eviction`), which carried the earlier shape of
 these primitives (eviction via `evictSupersededFlow`/`readUnfinishedChildren`, `isStaged`). Its

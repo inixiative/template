@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { expandWith } from '@template/email/render';
+import { expandComponentTagsWithLookup } from '@template/email/render';
 
 export type ComponentSnapshot = { mjml: string; componentVersions: Record<string, string | null> };
 export type LoadSnapshot = (auditLogId: string) => Promise<ComponentSnapshot | null>;
@@ -33,7 +33,7 @@ export const recomposeFromSnapshots = async (
     frontier = next;
   }
 
-  return expandWith(root.mjml, async (slugs) =>
+  return expandComponentTagsWithLookup(root.mjml, async (slugs) =>
     Object.fromEntries(slugs.map((slug) => [slug, { mjml: bodies[slug] ?? '' }])),
   );
 };
@@ -51,7 +51,7 @@ const loadAuditSnapshot: LoadSnapshot = async (auditLogId) => {
 export const recomposeSnapshot = (auditLogId: string): Promise<string | null> =>
   recomposeFromSnapshots(auditLogId, loadAuditSnapshot);
 
-// The recorded settledMjml is the sent truth (send-time sender-scoped cascade, interpolated);
+// The recorded evaluatedMjml is the sent truth (send-time sender-scoped cascade, interpolated);
 // the pinned snapshot is a save-time reconstruction resolved through the template row's own owner
 // scope, so it is the fallback for rows sent before capture existed, never the preferred source.
 export const recomposeCommunication = async (
@@ -59,7 +59,7 @@ export const recomposeCommunication = async (
 ): Promise<string | null> => {
   const log = await db.communicationLog.findUnique({ where: { id: communicationLogId } });
   if (!log) return null;
-  if (log.settledMjml !== null) return log.settledMjml;
+  if (log.evaluatedMjml !== null) return log.evaluatedMjml;
   if (!log.emailTemplateAuditLogId) return null;
   return recomposeSnapshot(log.emailTemplateAuditLogId);
 };

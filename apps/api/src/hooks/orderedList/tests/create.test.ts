@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
-import { createUser, getNextSeq } from '@template/db/test';
+import { createUser, nextFactorySequenceNumber } from '@template/db/test';
 import {
   email,
   liveOrders,
@@ -154,7 +154,7 @@ describe('multi-scope isolation — createManyAndReturn', () => {
           ownerModel: ContactOwnerModel.User,
           userId: u.id,
           type: ContactType.email,
-          value: { address: `a${getNextSeq()}@ex.com` },
+          value: { address: `a${nextFactorySequenceNumber()}@ex.com` },
         },
         phoneRow(u.id),
       ],

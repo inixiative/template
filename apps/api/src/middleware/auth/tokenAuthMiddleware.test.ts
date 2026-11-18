@@ -3,7 +3,7 @@ import {
   type AccessorName,
   cacheKey,
   db,
-  fetchOne,
+  fetchCachedRecordWithTargetEntitlements,
   getRedisClient,
   unregisterDbHook,
 } from '@template/db';
@@ -236,10 +236,14 @@ describe('the cache hook clears the keys member records are read under', () => {
       userId: spaceUser.userId,
     };
 
-    expect((await fetchOne<SpaceUser>('spaceUser', identifier))?.role).toBe('owner');
+    expect(
+      (await fetchCachedRecordWithTargetEntitlements<SpaceUser>('spaceUser', identifier))?.role,
+    ).toBe('owner');
     await db.spaceUser.update({ where: { id: spaceUser.id }, data: { role: 'viewer' } });
     expect(await getRedisClient().exists(cacheKey('spaceUser', identifier))).toBe(0);
-    expect((await fetchOne<SpaceUser>('spaceUser', identifier))?.role).toBe('viewer');
+    expect(
+      (await fetchCachedRecordWithTargetEntitlements<SpaceUser>('spaceUser', identifier))?.role,
+    ).toBe('viewer');
   });
 
   it("a Space write clears the composite key hydrate reads a token's space under", async () => {
@@ -247,7 +251,7 @@ describe('the cache hook clears the keys member records are read under', () => {
     const { entity: space } = await createSpace({}, { organization });
     const identifier = { organizationId: organization.id, id: space.id };
 
-    await fetchOne<Space>('space', identifier);
+    await fetchCachedRecordWithTargetEntitlements<Space>('space', identifier);
     expect(await getRedisClient().exists(cacheKey('space', identifier))).toBe(1);
     await db.space.update({ where: { id: space.id }, data: { name: 'renamed space' } });
     expect(await getRedisClient().exists(cacheKey('space', identifier))).toBe(0);

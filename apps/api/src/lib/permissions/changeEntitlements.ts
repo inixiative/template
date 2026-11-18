@@ -16,9 +16,9 @@ import {
 import type { Entitlement } from '@template/db/generated/client/client';
 import {
   coversEntitlement,
-  entitlementsOf,
+  entitlementEntriesOfHolder,
+  isSameEntitlement,
   type Permix,
-  sameEntitlement,
   toEntitlementEntry,
   toEntitlementInput,
 } from '@template/permissions';
@@ -55,7 +55,7 @@ const covers = (holding: Granted, input: Granted) =>
 
 const lastOfEqual = (add: EntitlementInput[]): EntitlementInput[] =>
   add.filter(
-    (input, index) => !add.slice(index + 1).some((later) => sameEntitlement(later, input)),
+    (input, index) => !add.slice(index + 1).some((later) => isSameEntitlement(later, input)),
   );
 
 // why: rows are immutable, so a held row a new entry covers stays; only the new entries are filtered.
@@ -98,9 +98,9 @@ export const changeEntitlements = (
         holder.targetEntitlements.filter(
           (row) =>
             !removedIds.includes(row.id) &&
-            entitlementsOf({ targetEntitlements: [row] }).length > 0,
+            entitlementEntriesOfHolder({ targetEntitlements: [row] }).length > 0,
         ),
-        (row) => written.some((input) => sameEntitlement(row, input) && !sameLens(row, input)),
+        (row) => written.some((input) => isSameEntitlement(row, input) && !sameLens(row, input)),
       );
       const tombstonedIds = [...removedIds, ...replaced.map((row) => row.id)];
       const removed = holder.targetEntitlements.filter((row) => tombstonedIds.includes(row.id));

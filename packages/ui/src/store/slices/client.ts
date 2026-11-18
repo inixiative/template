@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses primitive:shared
  */
-import { channelKey, LIVE_QUERIES } from '@template/shared/ws';
+import { channelKey, WS_CHANNELS } from '@template/shared/ws';
 import { createApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
 import { dataStreamOfQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import type { AppStore } from '@template/ui/store/types';
@@ -20,7 +20,7 @@ export const createClientSlice: StateCreator<AppStore, [], [], ClientSlice> = (s
   const liveChannel = (queryKey: readonly unknown[]): string | null => {
     const key = queryKey[0] as { _id?: string; path?: Record<string, unknown> };
     const id = key?._id;
-    if (!id || !LIVE_QUERIES.has(id)) return null;
+    if (!id || !Object.hasOwn(WS_CHANNELS, id)) return null;
     return channelKey({ _id: id, path: key.path });
   };
 

@@ -61,7 +61,7 @@ State changes and their side effects are slice actions; components never set sta
 **actorIsDelegateOfUser**  
 Rule part: the acting token is owned by a user (used to let such a token create an organization). *Region:* [Member rows and delegates](permissions-members/knowledge.md)
 
-**actorOf**  
+**actorFromRedactedRecord**  
 Builds the actor { model, record } (User for a JWT or spoof, Token for an API token) that permix.setActor stores. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **adapter module**  
@@ -551,7 +551,7 @@ Enqueue option that keeps a latency-critical adhoc job out of the outbox. *Regio
 
 ## C
 
-**cache**  
+**fetchThroughCache**  
 Get-or-compute with TTL (default 24h), single-flight on misses, negative caching of null for 1 minute. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 **cacheKey**  
@@ -561,7 +561,7 @@ The one builder of canonical keys: cache:{accessor}:{field}:{value}[:{tags}][:*]
 The reverse-reference map: per model, every cache key a record is reachable by; cleared after commit on mutation. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 **caching**  
-The read-through cache(): cache keys, TTLs, single-flight, mutation-driven invalidation. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
+The read-through fetchThroughCache(): cache keys, TTLs, single-flight, mutation-driven invalidation. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 **canDeliver**  
 The shared preference gate for email and messaging: system passes, otherwise the kind must be accepted. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
@@ -677,7 +677,7 @@ Singleton cron handler that hard-deletes rows idle past a retention window. *Reg
 **cleanupTouchedTables**  
 afterAll truncation of only the tables written during the suite. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 
-**clearKey**  
+**clearCacheKeysMatchingPattern**  
 Delete an exact cache key or a wildcard pattern via SCAN. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 **clientIp**  
@@ -734,7 +734,7 @@ A route segment with children is a grouping with an index page, never a componen
 **{{#component:slug}}**  
 Inline block markup that marks a reusable component inside authored MJML. *Region:* [Email templates and components](email-templates/knowledge.md)
 
-**componentRefs**  
+**componentSlugs**  
 Pre-computed, slug-keyed list of components a body references; resolved through the cascade at read time, never stored as ids. *Region:* [Email templates and components](email-templates/knowledge.md)
 
 **componentVersions**  
@@ -768,7 +768,7 @@ The type of .atlas/concepts.ts: concept -> constituent folders and docs, structu
 The template's registry export in .atlas/concepts.ts: class:name -> { module?, package?, docs? }. *Region:* [Atlas code map (library + template usage)](lib-atlas/knowledge.md)
 
 **concurrency-limits**  
-Class tag: in-process coordination with serialized queues, getConcurrency caps and resolveAll bounded batches. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
+Class tag: in-process coordination with serialized queues, minimumConcurrencyLimitFor caps and runAllWithConcurrencyLimit bounded batches. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **ConcurrencyType**  
 Resource classes with caps: db, redis, queue, socket, integration, etc. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
@@ -866,10 +866,10 @@ Adapter binding @inixiative/permissions' rebac check to the authorize seam for o
 **createBearerToken**  
 Mints a User-owned API token for a test request and returns its Bearer header; createUserJwt mints a user JWT instead. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
 
-**createEncryption**  
+**makeEncryptionService**  
 Low-level encrypt/decrypt service built from a keyring; feature code uses encryptField / decryptField instead. *Region:* [Field encryption and key rotation](encryption/knowledge.md)
 
-**createFactory**  
+**registerFactory**  
 Defines a typed build/create factory for a Prisma model with defaults and only non-inferable dependencies. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 
 **createFlow / meCreateFlow**  
@@ -887,7 +887,7 @@ The lifecycle services: create a draft, send it (then autoApprove), resolve it u
 **createLens**  
 Build a lens from field maps and bridges, anchored at mapName and model; stitches bridges itself. *Region:* [Using a lens: build, gate, fetch](lens-usage/knowledge.md)
 
-**createLock**  
+**makeLock**  
 Single-node Redis lock with heartbeat lease renewal and fenced release; only one process owns a resource. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **createManyAndReturn / updateManyAndReturn**  
@@ -923,7 +923,7 @@ Route template for inserting a record (many: true for createMany); imported from
 **createS3Client**  
 Provider factory building the memoized S3-backed StorageClient from typed config. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
 
-**createSerializedQueue**  
+**makeSerializedQueue**  
 In-process promise chain; each run(fn) waits for the previous to settle. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **createTestApp**  
@@ -1324,7 +1324,7 @@ Composes the four slot surfaces under a presentation root Email for the rule-bui
 Keys fetched Tag and Segment options onto the email surface map. *Region:* [The email lens](email-lens/knowledge.md)
 
 **EmailTemplate**  
-Prisma model for a whole sendable MJML message with slug, locale, subject, kind, componentRefs and owner. *Region:* [Email templates and components](email-templates/knowledge.md)
+Prisma model for a whole sendable MJML message with slug, locale, subject, kind, componentSlugs and owner. *Region:* [Email templates and components](email-templates/knowledge.md)
 
 **emailTemplateAuditLogId**  
 CommunicationLog column pinning the template snapshot that was sent. *Region:* [Email templates and components](email-templates/knowledge.md)
@@ -1520,7 +1520,7 @@ Loads /me into the store and runs permissions.setup. *Region:* [Frontend Authent
 **fetchLens**  
 Loads every row a lens matches (packages/db). *Region:* [Template lenses](lenses/knowledge.md)
 
-**fetchOne**  
+**fetchCachedRecordWithTargetEntitlements**  
 Fetch one hydrated record by identifier, cached in Redis with a TTL. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 **{ __field } reference**  
@@ -1681,7 +1681,7 @@ Answers with the actor { model, record } for any credential. *Region:* [Auth mid
 **GET /api/v1/identify**  
 Answers with the actor { model, record } for any credential. *Region:* [Request context](request-context-errors/knowledge.md)
 
-**getConcurrency**  
+**minimumConcurrencyLimitFor**  
 Returns the tightest predefined cap across the ConcurrencyType resources touched. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **getContextParams**  
@@ -1693,13 +1693,13 @@ Returns [model, record] for the current organization, space or user context. *Re
 **getEncryptedFieldsByModel**  
 Lists every encrypted column per model from the registry, for redaction and ignore lists. *Region:* [Field encryption and key rotation](encryption/knowledge.md)
 
-**getFieldNames**  
+**encryptedColumnNamesForKey**  
 Derives a key's column triplet: encrypted{Key}, encrypted{Key}Metadata, encrypted{Key}KeyVersion. *Region:* [Field encryption and key rotation](encryption/knowledge.md)
 
 **getModelRelations / getAccessorRelations**  
 A model's relations with relation name and target, keyed by model name or by accessor. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
-**getNextSeq**  
+**nextFactorySequenceNumber**  
 Incrementing number for unique test values. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 
 **getPlatformProviders**  
@@ -1803,7 +1803,7 @@ Moves non-directive, non-why, non-dagger comments into the enclosing symbol's gl
 **health route**  
 apps/api/src/routes/health answers process health checks. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
-**heartbeat**  
+**startHeartbeat**  
 Self-scheduling timer that runs the next beat only after the previous settles; returns stop(). *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **heartbeat**  
@@ -2231,8 +2231,6 @@ The bind names one rule reads; listLensBindings covers a lens chain. *Region:* [
 **[:] literal segment**  
 Bracket marker passing a real null, true or false instead of a string. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
-**LIVE_QUERIES**  
-Derived from WS_CHANNELS; gates which mounted queries subscribe over the socket. *Region:* [WebSocket channels and refetch hints](ws-channels/knowledge.md)
 
 **liveWhere / liveIncludes**  
 Helpers that add the deletedAt: null scope to a where or include built by hand. *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
@@ -2246,11 +2244,11 @@ sendToChannelLocal, sendToUserLocal, sendToStreamLocal, broadcastLocal, sendTo: 
 **lock.assertHeld**  
 Throws LockLostError before a scheduler write once the cron lock's lease is gone (answered 409). *Region:* [Cron jobs and schedulers](cron/knowledge.md)
 
-**lockedTargetStates**  
+**fetchRuleReferenceTargetsDeletedAtForUpdate**  
 Locks the rows a rule references (in model-name order) and reads their state inside the transaction. *Region:* [Template rules and rule references](json-rules/knowledge.md)
 
 **locks**  
-Class tag: mutual exclusion across processes and rows (createLock, withOwnerLock, db.findForUpdate). *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
+Class tag: mutual exclusion across processes and rows (makeLock, withOwnerLock, db.findForUpdate). *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **log**  
 The shared logger facade from @template/shared/logger; per-app frontend `log` exports wrap createFrontendLogger. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
@@ -2267,13 +2265,13 @@ Class: structured logging: shared log facade, withLogContext, scopes, redaction.
 **LoginForm**  
 Login form with provider buttons and email fields; LoginPage wraps it. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
 
-**logScope / LogScope**  
+**withLogScope / LogScope**  
 Display-only scope prefix; LogScope.worker etc. are the predefined scopes. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **loop portal**  
 A to-many relation exposed by a scope surface as an entry into a nested element scope. *Region:* [rules-builder library README](lib-rules-builder/knowledge.md)
 
-**lua-in-queries**  
+**redis-lua-scripts-live-in-queries-folder**  
 CI rule: each Redis Lua script lives with its eval function in the module's queries/ folder. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
 ## M
@@ -2309,7 +2307,7 @@ Factory for a throwable AppError with status, message, guidance and fieldErrors;
 Basic typed job wrapper; with stages it becomes a staged fan-out-and-wait job. *Region:* [Background jobs](jobs-cron/knowledge.md)
 
 **makeSingletonJob**  
-Job wrapper that takes a createLock before running so only one run happens at a time across workers. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
+Job wrapper that takes a makeLock before running so only one run happens at a time across workers. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **makeSingletonJob**  
 Wrapper letting one run per key execute at a time: a lock while it runs, deduplicated at enqueue. *Region:* [Background jobs](jobs-cron/knowledge.md)
@@ -2333,7 +2331,7 @@ The generated concept overview; a projection of the code, never hand-edited. *Re
 Per-map narrowing applied wherever a model or enum appears: the home of 'everywhere' clamps such as soft delete. *Region:* [The lens model](lens-model/knowledge.md)
 
 **mapDefaults**  
-Per-map narrowing applied wherever a model appears; what redactLens and omitForeignKeys ride. *Region:* [Template lenses](lenses/knowledge.md)
+Per-map narrowing applied wherever a model appears; what omitSensitiveFieldsFromLens and omitForeignKeys ride. *Region:* [Template lenses](lenses/knowledge.md)
 
 **mapName**  
 Names which map of a FieldMapSet or lens to compile against; a set without it throws. *Region:* [Compiling rules to Prisma and SQL](json-rules-backends/knowledge.md)
@@ -2523,10 +2521,10 @@ Env files and secret values are never committed; examples carry placeholders. *R
 **No TS enum**  
 Use an `as const` object or a Prisma enum instead of the enum keyword. *Region:* [Naming and code style](conventions/knowledge.md)
 
-**no-create-race-machinery**  
+**find-or-create-uses-find-for-update-upserting**  
 CI rule that fails a change adding a bare .upsert( or a unique-violation catch. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
-**no-create-race-machinery**  
+**find-or-create-uses-find-for-update-upserting**  
 CI rule: blocks new bare `.upsert(` and unique-violation catches; use db.findForUpdate with `upserting: true`. *Region:* [Database client and transactions](database-client/knowledge.md)
 
 **no-inline-env-coercion**  
@@ -2538,10 +2536,10 @@ CI rule (scripts/ci/rules/no-lens-spread.sh) forbidding spreading lens objects. 
 **no-module-mocks**  
 CI rule: no mock.module or fake provider clients in tests; record the real provider with VCR instead. *Region:* [Test factories, cleanup and test rules](test-factories-rules/knowledge.md)
 
-**no-prisma-maps**  
+**no-map-renames-in-prisma-models**  
 CI rule banning field @map and model @@map so Prisma names equal DB identifiers. *Region:* [Naming and code style](conventions/knowledge.md)
 
-**no-prisma-maps**  
+**no-map-renames-in-prisma-models**  
 Template CI rule banning field @map and model @@map, so Prisma names equal DB identifiers. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
 **no-radix**  
@@ -2598,7 +2596,7 @@ Single-use, 1-minute token in the OAuth callback fragment, consumed atomically v
 Registry render policy: platform (default, unbranded fallback), fail (retry then DLQ), or degrade (send with empty blocks). *Region:* [Email compose, render and save](email-render/knowledge.md)
 
 **onLockLost**  
-createLock callback fired when the lease is lost so the holder can stop its critical work. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
+makeLock callback fired when the lease is lost so the holder can stop its critical work. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **onShutdown**  
 Registers a cleanup handler for graceful shutdown. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
@@ -2830,10 +2828,10 @@ On an integration subscription, a record with 3 rejections (400/422) since its l
 **Polymorphic sides**  
 owner (tenancy), source/target (edge ends), resource, subject, actor as `<side>Model` plus side-prefixed FKs and relations; never referenced*. *Region:* [Naming and code style](conventions/knowledge.md)
 
-**polymorphicIs**  
+**conditionPolymorphicAxisPointsAtBoundRow**  
 Rule-condition helper matching a polymorphic owner kind and FK; values bound by polymorphicBindings. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
 
-**polymorphicTarget / polymorphicKeyColumn**  
+**rowPolymorphicAxisPointsAt / polymorphicKeyColumn**  
 Read which kind and id a row's polymorphic axis points at, or the key column for one kind. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
 **PolymorphismRegistry**  
@@ -2956,7 +2954,7 @@ Emits segment.membersAdded/Removed and customerRef.segmentsAdded/Removed for non
 ## Q
 
 **query**  
-Delegate helper object (findMany, findUnique, update, del, ...) typed from the delegate you pass. *Region:* [Database client and transactions](database-client/knowledge.md)
+Delegate helper object (findMany, findUnique, update, delete, ...) typed from the delegate you pass. *Region:* [Database client and transactions](database-client/knowledge.md)
 
 **query key**  
 The SDK-generated key (e.g. organizationReadQueryKey) that every apiQuery must be paired with. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
@@ -3050,13 +3048,13 @@ Histogram duration and counter metrics without hand-made meters. *Region:* [Logg
 **recurring-timers**  
 Class tag: non-overlapping in-process recurring work such as heartbeat and unref intervals. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
-**redactFields / ignoreFields**  
+**sensitiveFields / noopFields**  
 Registries for sensitive values (shown as [REDACTED]) versus noise fields (dropped before diffing). *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
 
-**redactLens**  
+**omitSensitiveFieldsFromLens**  
 mapDefaults wrapper that strips redacted fields wherever a model appears. *Region:* [Template lenses](lenses/knowledge.md)
 
-**redactLogValue / stringifyLogValue**  
+**maskLogValue / stringifyLogValue**  
 Redact sensitive fields and URLs from a value, as structure or as string. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **redactUser**  
@@ -3191,7 +3189,7 @@ What the resolver submits; declared fields (except explanation) may override con
 **resolutionSchema**  
 The full stored resolution shape, including fields computed by handleApprove. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
-**resolveAll**  
+**runAllWithConcurrencyLimit**  
 Promise.all over thunks with an optional cap; results in input order. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
 
 **resolveDateConfig**  
@@ -3399,7 +3397,7 @@ Runs scripts/ci/rules alphabetically; --test checks each rule against its pass/f
 Runs check-import-aliases, check-generated-files and check-finder-duplicates after Biome. *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
 
 **runDrainOutboxPass**  
-One drain tick under the outbox-drain createLock: fast rows, then slow rows, then flag settling. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
+One drain tick under the outbox-drain makeLock: fast rows, then slow rows, then flag settling. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
 **runInTransactionContext**  
 Runs a callback with a given transaction client as the ambient db, so nested db.<model> calls join it. *Region:* [Database client and transactions](database-client/knowledge.md)
@@ -3574,7 +3572,7 @@ Planner job: resolve entity, sender, template and recipients, find-or-create per
 **senderLensOwner**  
 Maps the sender to the organization tree that OrganizationUser/SpaceUser rows are clamped to at send. *Region:* [The email lens](email-lens/knowledge.md)
 
-**SenderType**  
+**CommunicationLogSenderModel**  
 Who an email is sent as: platform, admin, User, Organization, Space, OrganizationUser, SpaceUser. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **sendFrame**  
@@ -4575,10 +4573,10 @@ Owner-scoped lock taken before the transaction opens to serialize cross-row writ
 **withRetry**  
 Shared helper that retries a call with backoff while isRetryable says so. *Region:* [API errors and status codes](errors/knowledge.md)
 
-**withRule**  
+**branchOnRuleHealth**  
 The one fork for evaluating a stored rule: degraded (issue, never a match) or sound (evaluate). *Region:* [The email lens](email-lens/knowledge.md)
 
-**withRule**  
+**branchOnRuleHealth**  
 The one fork every stored rule is evaluated through: the sound arm runs, or the degraded arm reports why. *Region:* [Template rules and rule references](json-rules/knowledge.md)
 
 **withSpan**  

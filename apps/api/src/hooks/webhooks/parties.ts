@@ -1,17 +1,17 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:webhooks
  */
 import {
+  type BindableOwnerModel,
   db,
   type FalsePolymorphismRef,
   getPolymorphismConfig,
+  isBindableOwnerModel,
   isFalsePolymorphismRef,
-  isOwnerKind,
-  type PolymorphicKind,
   polymorphicKeyColumn,
-  polymorphicTarget,
+  rowPolymorphicAxisPointsAt,
   webhookEnabledModels,
   webhookRelatedModels,
 } from '@template/db';
@@ -19,11 +19,11 @@ import type { WebhookModel } from '@template/db/generated/client/client';
 import { groupBy, keyBy, mergeWith } from 'lodash-es';
 
 export type WebhookRow = Record<string, unknown> & { id: string };
-export type Party = { kind: PolymorphicKind; id: string };
+export type Party = { kind: BindableOwnerModel; id: string };
 
 const axisParty = (model: WebhookModel, row: Record<string, unknown>, axis: string): Party[] => {
-  const target = polymorphicTarget(row, model, axis);
-  return target && isOwnerKind(target.kind) ? [{ kind: target.kind, id: target.id }] : [];
+  const target = rowPolymorphicAxisPointsAt(row, model, axis);
+  return target && isBindableOwnerModel(target.kind) ? [{ kind: target.kind, id: target.id }] : [];
 };
 
 const partyAxes = (model: WebhookModel) =>

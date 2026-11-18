@@ -95,7 +95,7 @@ Not here: the BetterAuth sign-in, user JWTs, the OAuth one-time token and the `T
 
 ## 3. Everything that exists here, by class
 
-Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: makeLock, packages/db/src/lock/makeLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `tokens-providers`: API keys and login providers: Token rows and token types, owner scopes, creating, hashing and validating a token, token authentication; platform providers and per-organization AuthProvider rows (AUTH.md § Token Authentication, § Token Types, § Multi-Provider Authentication)
 
@@ -168,7 +168,7 @@ model AuthProvider {
 ##### Encryption
 
 ```typescript
-import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
+import { encryptField, decryptField } from '@template/db/lib/encryption/fieldEncryption';
 
 const encrypted = await encryptField('authProvider', 'secrets', { ...data, secrets });
 const secrets = await decryptField('authProvider', 'secrets', authProvider);
@@ -206,7 +206,7 @@ Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`; the sign-in it
 2. Hash token with SHA-256
 3. Look up the token row by hash (cached in Redis with 10-minute TTL; the row alone, no relations)
 4. Validate: `isActive`, not expired
-5. `hydrate('token', row)`: each owner record (user, organization, space, `OrganizationUser`, `SpaceUser`, integration) is read with `fetchOne` under its own cache key, live-scoped
+5. `hydrate('token', row)`: each owner record (user, organization, space, `OrganizationUser`, `SpaceUser`, integration) is read with `fetchCachedRecordWithTargetEntitlements` under its own cache key, live-scoped
 6. Refuse when the owner the token's `ownerModel` names is absent; a member owner also needs its user and tenant rows. A removed or soft-deleted member, or a deleted user, org or space, authenticates no one
 7. Set context based on token type
 
@@ -225,7 +225,7 @@ const authenticateToken = async (c: Context<AppEnv>) => {
   const signIn = await loadTokenContext(keyHash);  // cached row → isActive/expiresAt → hydrate → owner present
   if (!signIn) return;
   if (signIn.fetched) await db.token.update({ where: { id: signIn.context.token.id }, data: { lastUsedAt: new Date() } });
-  await setTokenContext(c, signIn.context);  // the actor is actorOf(Token, the token's scalar columns)
+  await setTokenContext(c, signIn.context);  // the actor is actorFromRedactedRecord(Token, the token's scalar columns)
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {

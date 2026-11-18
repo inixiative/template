@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf infrastructure:redis, mutex
  * @uses none
  */

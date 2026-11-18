@@ -201,7 +201,7 @@ import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 // Cross-package (from anywhere)
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { actorOf } from '@template/permissions';
+import { actorFromRedactedRecord } from '@template/permissions';
 
 // Within a shared package - ALSO use @template/
 // packages/db/src/extensions/mutationLifeCycle/mutationLifeCycleExtension.ts
@@ -215,7 +215,7 @@ Top-level `index.ts` files are the public API - they make exports accessible out
 ```typescript
 // packages/shared/src/logger/index.ts - public API for @template/shared/logger
 export { log } from './logger';
-export { logScope } from './scope';
+export { withLogScope } from './scope';
 ```
 
 Actual code files always use aliases.

@@ -6,9 +6,9 @@
  */
 
 import {
-  cache,
   cacheKey,
   db,
+  fetchThroughCache,
   type HydratedRecord,
   hydrate,
   includeTargetEntitlements,
@@ -37,7 +37,7 @@ const ownerIsPresent = (token: HydratedRecord & Token): boolean => {
 
 export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | null> => {
   let fetched = false;
-  const row = await cache<WithTargetEntitlements<Token> | null>(
+  const row = await fetchThroughCache<WithTargetEntitlements<Token> | null>(
     cacheKey('Token', { keyHash }),
     () => {
       fetched = true;

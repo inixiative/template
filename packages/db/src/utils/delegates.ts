@@ -183,5 +183,4 @@ export const findUnique = query.findUnique;
 export const findMany = query.findMany;
 export const create = query.create;
 export const update = query.update;
-export const del = query.delete; // 'delete' is reserved
 export const count = query.count;

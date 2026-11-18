@@ -1,4 +1,4 @@
-# INFRA-035 — `createLock.acquire` waits
+# INFRA-035 — `makeLock.acquire` waits
 
 **Status:** done · **Line:** INFRA · **Related:** INFRA-031, INFRA-034, Zealot ZLT-5169 (#2531)
 

@@ -317,7 +317,9 @@ export const setupInfisical = async (
         for (const keyConfig of Object.values(modelConfig.keys)) prefixes.add(keyConfig.envPrefix);
       }
 
-      const fetchOne = async (key: string): Promise<string | null> => {
+      const fetchCachedRecordWithTargetEntitlements = async (
+        key: string,
+      ): Promise<string | null> => {
         try {
           const value = await getSecretAsync(key, {
             projectId,
@@ -334,8 +336,8 @@ export const setupInfisical = async (
         const versionKey = `${prefix}_ENCRYPTION_VERSION`;
         const currentKey = `${prefix}_ENCRYPTION_KEY_CURRENT`;
         const [existingVersion, existingCurrent] = await Promise.all([
-          fetchOne(versionKey),
-          fetchOne(currentKey),
+          fetchCachedRecordWithTargetEntitlements(versionKey),
+          fetchCachedRecordWithTargetEntitlements(currentKey),
         ]);
 
         if (existingVersion && existingCurrent) continue;

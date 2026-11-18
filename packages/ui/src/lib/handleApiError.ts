@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper, error
+ * @kind utils, error
  * @partOf primitive:ui
  * @uses primitive:shared
  */

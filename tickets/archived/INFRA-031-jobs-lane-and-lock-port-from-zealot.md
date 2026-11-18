@@ -2,25 +2,25 @@
 
 **Status**: ✅ Done — §1 landed in template #104 (2026-09-13); §2 and §3 ported from Zealot #2248 (2026-09-23), §2 then brought to the shape Zealot #2438 (ZLT-4980) shipped; all on main
 **Assignee**: Aron
-**Priority**: Medium (template's `createLock` carries the same refresh race Zealot fixes in #2271)
+**Priority**: Medium (template's `makeLock` carries the same refresh race Zealot fixes in #2271)
 **Created**: 2026-09-12
 **Updated**: 2026-10-02
 
-The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drain, `createLock`, `heartbeat`, lanes). Zealot has moved again. Bring each item below over once it lands there, in the shape Aron settled — not the shape of Zealot's first pass.
+The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drain, `makeLock`, `startHeartbeat`, lanes). Zealot has moved again. Bring each item below over once it lands there, in the shape Aron settled — not the shape of Zealot's first pass.
 
 ## What template already has (verified 2026-09-12)
 
-- `makeSingletonJob` is a thin caller of `createLock` (`apps/api/src/jobs/makeSingletonJob.ts`). Zealot's #2271 is catching up to this; nothing to port for the constructor itself.
+- `makeSingletonJob` is a thin caller of `makeLock` (`apps/api/src/jobs/makeSingletonJob.ts`). Zealot's #2271 is catching up to this; nothing to port for the constructor itself.
 - Per-module `queries/` folders (`modules/{inquiry,segment,customerRef}/queries/`).
 - `deliverEmail` claims the communication log row as `sending` inside `db.txn` before the provider call.
 
 ## What to port
 
-### 1. `createLock` hardening — Zealot #2271 (ZLT-4600, closes ZLT-4658) — PORTED
+### 1. `makeLock` hardening — Zealot #2271 (ZLT-4600, closes ZLT-4658) — PORTED
 
 Landed in [template #104](https://github.com/inixiative/template/pull/104). Two template-side deltas from Zealot: no `SINGLETON_LOCK_REFRESH_MS` knob (the singleton keeps its constants, the constructor assertion covers them), and `maxSafeHeartbeatMs` takes `commandTimeoutMs` as a required argument because no template Redis connection sets a command timeout — which also means a heartbeat on those connections can hang rather than time out. Whether to set one on the non-blocking connections (Zealot sets 5 s, excluding the BullMQ worker and subscribers) is open.
 
-The pre-port `tick()` used `GET` then `PEXPIRE`, allowing a refresh to extend a new holder's TTL. The current `createLock` calls `fencedRefresh` in one Lua eval. The implemented hardening is:
+The pre-port `tick()` used `GET` then `PEXPIRE`, allowing a refresh to extend a new holder's TTL. The current `makeLock` calls `fencedRefresh` in one Lua eval. The implemented hardening is:
 - The refresh is one compare-and-expire Lua eval. `0` = token definitively not ours → declare lost, reason `token_mismatch`, stop the heartbeat. A thrown refresh spends the missed-beat budget; exhausting it declares loss with reason `refresh_errors` but keeps refreshing (ownership uncertain, not gone).
 - `declareLost` never runs the fenced delete mid-run. `release()` always does, once, after the critical section, and reports `released` / `notHeld` / `unconfirmed`.
 - `maxSafeHeartbeatMs(ttl, maxMissed, commandTimeout)` and the constructor assertion built on it.
@@ -45,7 +45,7 @@ The original forecast for this section, superseded by the above:
 - **No second parking mechanism.** Slow-lane jobs buffer in the outbox (new `lane` column); the drain admits fast rows first, then slow rows while the slot set has room, bounded per pass. No `moveToDelayed` / `DelayedError` / processor token.
 - The worker holds a Lua slot lease while a slow job runs (ZSET scored by lease expiry, heartbeat renew, fenced release, PEXPIRE on the key). That lease is the running-count the drain reads.
 - A **worker presence set** in Redis (instance id, TTL heartbeat) so the cap is `fraction × concurrency × live instances`, one global slot set — not a per-instance key.
-- Redis scripts live in `apps/api/src/jobs/queries/`, one TS module per script (the `queries/` convention applied to Redis). Move the two `lanes` scripts and the `createLock` scripts there when touching them.
+- Redis scripts live in `apps/api/src/jobs/queries/`, one TS module per script (the `queries/` convention applied to Redis). Move the two `lanes` scripts and the `makeLock` scripts there when touching them.
 - `validateJobId` is its own file (BullMQ rejects custom ids containing `:` unless exactly three segments; `0` / `0:` prefixes are also invalid). Called from enqueue and the drain.
 - Every worker knob (`JOBS_WORKER_CONCURRENCY`, slot fraction, lease TTL, …) is in the env schema with defaults in the example env files; no side parser.
 
@@ -68,4 +68,4 @@ Check `deliverEmail` against this: confirm its `sending` claim is row-state only
 Met on main.
 
 
-`createLock` refresh is one eval with the tri-state release and tests mirroring Zealot's; the lane tag + outbox lane + presence set exist with the drain ordering test; `deliverEmail` claim audited against §3; Redis scripts under `jobs/queries/`.
+`makeLock` refresh is one eval with the tri-state release and tests mirroring Zealot's; the lane tag + outbox lane + presence set exist with the drain ordering test; `deliverEmail` claim audited against §3; Redis scripts under `jobs/queries/`.

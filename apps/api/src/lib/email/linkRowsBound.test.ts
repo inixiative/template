@@ -94,7 +94,7 @@ describe("an organization's email sees only its own link rows", () => {
     });
     const log = (
       await createCommunicationLog(
-        { senderType: 'Organization', address: `${user.id}@example.com` },
+        { senderModel: 'Organization', address: `${user.id}@example.com` },
         { organization: mine },
       )
     ).entity;

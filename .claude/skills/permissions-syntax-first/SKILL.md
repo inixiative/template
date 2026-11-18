@@ -64,22 +64,22 @@ The actor is `{ model: 'User' | 'Token', record }` (sanitized row). Rules read i
 
 Shared pieces already in `schema.ts` — reuse, don't re-derive:
 - `actorIsUser` (`__actor.model == User`), `actorIsDelegateOfUser` (`__actor.record.ownerModel == User`);
-- `actionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
+- `actorMayPerformActionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
 - `roleHeldAtOwner`: the role on the row is one the actor holds at the direct owner (owner `own`, admin `manage`, member `operate`, viewer `read`, via `roleToStandardAction`);
 - `memberRowActions(tenant)`: a member row's `operate` and `leave` (`manage` on its user: reaching another tenancy through a user needs manage; `operate` on a user stays in that user's tenancy), `manage`/`own` (the tenant), `read`, `delegateFull`;
 - `memberRoleWrite(tenant)`: manage the tenant and hold there the role being set; `memberRemoval(tenant)` = `leave` or `memberRoleWrite`; `integrationRoleWrite`: `delegateFull` on its owner, or `manage` on the integration and the role held at its owner. Rules routes and controllers check, never named actions;
-- `integrationAdministering` / `integrationAccess`, `tokenAccessIsYours` / `tokenAdministering`: integrations and tokens administered by their owner's kind (tenant: the tenant's roles; member: `operate` on the member row, the tenant owner reads and deletes; user: the user);
+- `integrationAdministering` / `integrationAccess`, `actorMayCreateTokenAtOwnerWithRole` / `tokenAdministering`: integrations and tokens administered by their owner's kind (tenant: the tenant's roles; member: `operate` on the member row, the tenant owner reads and deletes; user: the user);
 - `delegateFull`: the person-only action on a delegate's owner that lets you set `full` (`validateFullGrant` checks it);
-- `managesItsUser(at)`: `{ rel: `${at}user`, action: 'manage' }` — the user, or a delegate of the user at manage or above;
-- `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `managesItsUser(at)`;
-- `ownedBy(owners, at)` and `actionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
+- `actorManagesRecordUser(at)`: `{ rel: `${at}user`, action: 'manage' }` — the user, or a delegate of the user at manage or above;
+- `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `actorManagesRecordUser(at)`;
+- `ownerModelIsOneOf(owners, at)` and `actorMayPerformActionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
 
 Other parts of the system (use them, don't parallel them):
 - `placeEntitlement` + `canGrantEntitlement` (library, over `schemaMap`) — the only check for writing entitlements, validity included; entitlements are `Entitlement` rows and change only through the holder's sub-resource (`GET …/:id/entitlements` lists rows with ids, `POST` with entries, `DELETE` with row ids) via the one writer `changeEntitlements`, every added entry and removed row through that check, never a record update;
 - `RulesRegistry` json-rules write rules, enforced by the rules hook — a row's own columns only (`full` takes no role; where `full` may be set). Nothing in a rules object reads an entitlement or its anchor. A non-full delegate with no role and no entitlements is not refused; it holds nothing. Don't call `validateRules` from controllers;
 - hydration / the lens — relations come from hydrating, never from copying keys;
 - the one `full` skip at install (`delegatedPermissions`);
-- the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement row anchored at itself with no `where`, written after the member is created, backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `permissionsOfUser` routes it to the user and everything else to the tenant. Unlensed and unconditional, it grants below the member row: a `full` delegate of M1 grants over M1's own integrations (`entitlementsOf` marks every row with no `where` and no lens `grantsBelow`; PERMISSIONS.md § Granting below a held row).
+- the `memberSelfGrant` hook: every member row carries `operate` on itself as an entitlement row anchored at itself with no `where`, written after the member is created, backed by its user (`memberSelfGrant`, matched by `isMemberSelfGrant`); `permissionsOfUser` routes it to the user and everything else to the tenant. Unlensed and unconditional, it grants below the member row: a `full` delegate of M1 grants over M1's own integrations (`entitlementEntriesOfHolder` marks every row with no `where` and no lens `grantsBelow`; PERMISSIONS.md § Granting below a held row).
 
 ## 3. Pseudo records
 
@@ -103,7 +103,7 @@ An action on something that does not exist yet, or on a collection, is checked o
 | actions named after other models (`organization.create` on user) | each action on its own model (test: a dotted action is named after its model) |
 | a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpace('integration.')` |
 | `leave` as an alternative that skipped the role check | the role check always runs; "yours" is an extra requirement |
-| `full` arms in the schema | `full` is inheritance: skipped at install (`delegatedPermissions`); setting it takes `delegateFull` on the owner (`validateFullGrant`). CI rule `no-full-in-rebac-schema` |
+| `full` arms in the schema | `full` is inheritance: skipped at install (`delegatedPermissions`); setting it takes `delegateFull` on the owner (`validateFullGrant`). CI rule `rebac-schema-never-reads-full` |
 | deciding who is related to what by comparing `__actor` ids | an action on the record: acting as a member is `operate` on the member row; actor rules only gate person-only actions |
 | a role token acting as its member by default | `operate` on the member row: held by `full`, or given by hand as an entitlement |
 | write-time "ceiling" with a trim in `validateDelegateGrant` | `roleHeldAtOwner` + `memberRoleWrite`/`integrationRoleWrite` + `canGrantEntitlement` |

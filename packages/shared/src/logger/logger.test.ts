@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import { log } from '@template/shared/logger/logger';
-import { addLogBroadcast, logScope } from '@template/shared/logger/scope';
+import { addLogBroadcast, withLogScope } from '@template/shared/logger/scope';
 
 // Capture composed log output via a broadcast target bound to the current scope.
 const capture = (fn: () => void): string[] => {
   const msgs: string[] = [];
   const previous = log.level;
   log.level = 'info';
-  logScope('root', () => {
+  withLogScope('root', () => {
     addLogBroadcast((_level, msg) => msgs.push(msg));
     fn();
   });

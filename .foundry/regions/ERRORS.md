@@ -119,7 +119,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
 | **Bulk write refusal (createMany / updateMany)** | `packages/db (hooked client)` | [mutation-hooks](mutation-hooks/knowledge.md) | createManyAndReturn, updateManyAndReturn *(inferred: db)* | convention | docs/claude/HOOKS.md § Supported Operations |
-| **cache key Error** | `packages/db/src/redis/cache.ts (validateKey)` | [redis-caching-rate-limits](redis-caching-rate-limits/knowledge.md) | validateKey, cache | convention | catalog validateKey |
+| **cache key Error** | `packages/db/src/redis/cache.ts (validateCacheKeyHasNoUndefined)` | [redis-caching-rate-limits](redis-caching-rate-limits/knowledge.md) | validateCacheKeyHasNoUndefined, cache | convention | catalog validateCacheKeyHasNoUndefined |
 | **db.onCommit outside transaction Error** | `@template/db` | [database-client](database-client/knowledge.md) | db.onCommit | convention | docs/claude/DATABASE.md § Transactions › After Commit Callbacks |
 | **db.parallel aggregated failure** | `apps/api/src/appEvents (makeAppEvent / db.parallel)` | [app-events-webhooks](app-events-webhooks/knowledge.md) | db.parallel | convention | docs/claude/APP_EVENTS.md § Purpose and execution |
 | **engineGlobals.with async-callback Error** | `@inixiative/json-rules engineGlobals.with` | [json-rules-runtime](json-rules-runtime/knowledge.md) | engineGlobals.with | convention | @inixiative/json-rules/README.md § Engine Globals |
@@ -127,8 +127,8 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 | **makeError 500 SERVER_ERROR** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [request-context-errors](request-context-errors/knowledge.md) | errorHandlerMiddleware, POST /api/v1/batch/execute | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 | **orderedList buildScope Error** | `apps/api/src/hooks/orderedList/` | [mutation-hooks](mutation-hooks/knowledge.md) | buildScope | convention | catalog buildScope |
 | **ResponseValidationError** | `apps/api/src/lib/utils/makeController.ts` | [request-context-errors](request-context-errors/knowledge.md) | makeController | documented | docs/claude/ERRORS.md § The global handler |
-| **RuleDegradedError** | `packages/shared/src/rules/errors.ts#RuleDegradedError` | [json-rules](json-rules/knowledge.md) | — *(inferred: withRule)* | convention | catalog RuleDegradedError |
-| **RuleEvaluationError** | `packages/shared/src/rules/errors.ts#RuleEvaluationError` | [json-rules](json-rules/knowledge.md) | — *(inferred: withRule)* | convention | catalog RuleEvaluationError |
+| **RuleDegradedError** | `packages/shared/src/rules/errors.ts#RuleDegradedError` | [json-rules](json-rules/knowledge.md) | — *(inferred: branchOnRuleHealth)* | convention | catalog RuleDegradedError |
+| **RuleEvaluationError** | `packages/shared/src/rules/errors.ts#RuleEvaluationError` | [json-rules](json-rules/knowledge.md) | — *(inferred: branchOnRuleHealth)* | convention | catalog RuleEvaluationError |
 | **searchPaths stray-entry Error** | `apps/api/src/lib/prisma/paginate.ts` | [pagination](pagination/knowledge.md) | paginate | documented | docs/claude/API_ROUTES.md § Response Format › Search & Filtering |
 | **validateJobId Error** | `apps/api/src/jobs/validateJobId.ts#validateJobId` | [jobs-cron](jobs-cron/knowledge.md) | validateJobId | convention | docs/claude/JOBS.md § Enqueuing Jobs; catalog validateJobId |
 | **validateRole Error** | `apps/api/src/lib/permissions/validateRole.ts#validateRole` | [permissions-roles](permissions-roles/knowledge.md) | validateRole | documented | docs/claude/PERMISSIONS.md § Permission Setup › Role Validation |

@@ -7,8 +7,8 @@ import {
   UserAction,
 } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
+import { memberRemoval } from '@template/permissions/rebac/rebacSchemaRules';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import { memberRemoval } from '@template/permissions/rebac/schemaHelpers';
 
 const o1 = { id: 'o1' };
 const o9 = { id: 'o9' };

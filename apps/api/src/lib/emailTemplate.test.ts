@@ -158,14 +158,14 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     const expected = await settleTemplate('clean', platform, variables);
     await db.raw.emailComponent.delete({ where: { id: component.id } });
     const before = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
-    expect(before.degradedComponentRefs).toEqual([]);
+    expect(before.missingComponentSlugs).toEqual([]);
     const settled = await settleTemplate(template.slug, platform, variables, undefined, {
       onIssue: 'fail',
       substitute: 'clean',
     });
     expect(settled).toEqual(expected);
     const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
-    expect(stored.degradedComponentRefs).toEqual(['removed-child']);
+    expect(stored.missingComponentSlugs).toEqual(['removed-child']);
     expect(stored.updatedAt).toEqual(before.updatedAt);
   });
 
@@ -184,7 +184,7 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     });
     expect(
       (await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } }))
-        .degradedComponentRefs,
+        .missingComponentSlugs,
     ).toEqual(['removed-fatal-child']);
     await expect(
       settleTemplate(template.slug, platform, variables, undefined, { onIssue: 'fail' }),
@@ -202,7 +202,7 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     // Raw: the versioning hook restamps a row's own marker on every hooked write.
     const marked = await db.raw.emailTemplate.update({
       where: { id: template.id },
-      data: { degradedComponentRefs: ['already-missing', 'previously-missing'] },
+      data: { missingComponentSlugs: ['already-missing', 'previously-missing'] },
     });
     const settled = await settleTemplate(template.slug, platform, variables, undefined, {
       onIssue: 'fail',
@@ -210,7 +210,7 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     });
     expect(settled.slug).toBe('clean');
     const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
-    expect(stored.degradedComponentRefs).toEqual(['already-missing', 'previously-missing']);
+    expect(stored.missingComponentSlugs).toEqual(['already-missing', 'previously-missing']);
     expect(stored.updatedAt).toEqual(marked.updatedAt);
   });
 });

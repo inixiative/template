@@ -4,7 +4,7 @@ import {
   cleanupTouchedTables,
   createUser,
   createWebhookSubscription,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
@@ -48,7 +48,7 @@ describe('me/webhookSubscriptions', () => {
 
   describe('POST /me/webhookSubscriptions', () => {
     it('creates a user-owned webhook subscription', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const response = await fetch(
         post('/api/v1/me/webhookSubscriptions', {
           model: 'CustomerRef',
@@ -65,7 +65,7 @@ describe('me/webhookSubscriptions', () => {
     });
 
     it('rejects duplicate url for same model', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const url = `https://example.com/duplicate-${seq}`;
       await fetch(post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRef', url }));
 
@@ -78,7 +78,7 @@ describe('me/webhookSubscriptions', () => {
 
   describe('GET /me/webhookSubscriptions', () => {
     it('returns user webhooks', async () => {
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
         model: 'CustomerRef',
         ownerModel: 'User',
@@ -96,7 +96,7 @@ describe('me/webhookSubscriptions', () => {
 
     it('excludes other user webhooks', async () => {
       const { entity: otherUser } = await createUser();
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
         model: 'CustomerRef',
         ownerModel: 'User',

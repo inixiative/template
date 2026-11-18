@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:shared
  * @uses none
  */
@@ -30,7 +30,7 @@ export type LogBroadcastFn = (level: string, message: string) => void;
 
 const broadcastStore = new AsyncLocalStorage<LogBroadcastFn[]>();
 
-export const logScope = <T>(id: string | LogScope, fn: () => T): T => {
+export const withLogScope = <T>(id: string | LogScope, fn: () => T): T => {
   const current = store.getStore() ?? [];
   const broadcasts = broadcastStore.getStore();
   const run = () => store.run([...current, id], fn);

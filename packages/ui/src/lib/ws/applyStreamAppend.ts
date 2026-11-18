@@ -1,10 +1,10 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:ui, primitive:websockets
  * @uses primitive:shared
  */
-import { streamDefinitionOf, type WSStreamAppendEvent } from '@template/shared/ws';
+import { streamDefinitionForChannelKey, type WSStreamAppendEvent } from '@template/shared/ws';
 import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import type { MessageContext } from '@template/ui/lib/ws/messageContext';
 import { streamFoldFor } from '@template/ui/lib/ws/streamFolds';
@@ -14,7 +14,7 @@ export const applyStreamAppend = (
   event: WSStreamAppendEvent,
   { client, resync }: MessageContext,
 ): void => {
-  const definition = streamDefinitionOf(event.stream);
+  const definition = streamDefinitionForChannelKey(event.stream);
   if (!definition) return;
   const { ops } = streamFoldFor(definition.kind);
   const fold = Object.hasOwn(ops, event.type) ? ops[event.type] : undefined;

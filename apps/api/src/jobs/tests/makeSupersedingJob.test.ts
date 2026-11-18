@@ -3,8 +3,8 @@ import {
   claimLane,
   getJobSupersededBy,
   laneKey,
+  markJobSupersededBy,
   reclaimLane,
-  tombstoneJob,
   watchLane,
 } from '@template/db';
 import { WaitingChildrenError } from 'bullmq';
@@ -75,7 +75,7 @@ describe('makeSupersedingJob', () => {
     const innerHandler = mock(async () => {});
     const handler = makeSupersedingJob<Record<string, never>>(innerHandler, () => 'child-lane');
     ctx.job.parent = { id: 'old-parent', queueKey: 'bull:jobs' };
-    await tombstoneJob('old-parent', 'new-parent');
+    await markJobSupersededBy('old-parent', 'new-parent');
 
     await handler(ctx, {});
 
@@ -96,7 +96,7 @@ describe('makeSupersedingJob', () => {
     const handlerPromise = handler(ctx, {});
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    await tombstoneJob('running-parent', 'new-parent');
+    await markJobSupersededBy('running-parent', 'new-parent');
     const startTime = Date.now();
     await handlerPromise;
 

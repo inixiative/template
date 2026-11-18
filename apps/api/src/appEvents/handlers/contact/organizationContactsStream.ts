@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:appEvents
  * @uses feature:contact, primitive:websockets
  */

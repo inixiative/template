@@ -5,11 +5,11 @@
  * @uses none
  */
 import { DbAction } from '@template/db/extensions/hookRegistry';
-import { intercept } from '@template/db/extensions/mutationLifeCycle/intercept';
 import {
   fetchExistingRecord,
   fetchExistingRecords,
-} from '@template/db/extensions/mutationLifeCycle/loadPrevious';
+} from '@template/db/extensions/mutationLifeCycle/fetchExistingRecords';
+import { makeMutationLifecycleInterceptor } from '@template/db/extensions/mutationLifeCycle/makeMutationLifecycleInterceptor';
 import { claimPendingRegistration } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 
@@ -22,7 +22,7 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
         return params.query(params.args);
       },
 
-      create: intercept(DbAction.create),
+      create: makeMutationLifecycleInterceptor(DbAction.create),
 
       async createMany({ model }) {
         throw new Error(
@@ -31,9 +31,9 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
         );
       },
 
-      createManyAndReturn: intercept(DbAction.createManyAndReturn),
+      createManyAndReturn: makeMutationLifecycleInterceptor(DbAction.createManyAndReturn),
 
-      update: intercept(DbAction.update, {
+      update: makeMutationLifecycleInterceptor(DbAction.update, {
         loadPrevious: fetchExistingRecord,
       }),
 
@@ -44,17 +44,21 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
         );
       },
 
-      updateManyAndReturn: intercept(DbAction.updateManyAndReturn, {
+      updateManyAndReturn: makeMutationLifecycleInterceptor(DbAction.updateManyAndReturn, {
         loadPrevious: fetchExistingRecords,
       }),
 
-      upsert: intercept(DbAction.upsert, {
+      upsert: makeMutationLifecycleInterceptor(DbAction.upsert, {
         loadPrevious: fetchExistingRecord,
       }),
 
-      delete: intercept(DbAction.delete, { loadPrevious: fetchExistingRecord }),
+      delete: makeMutationLifecycleInterceptor(DbAction.delete, {
+        loadPrevious: fetchExistingRecord,
+      }),
 
-      deleteMany: intercept(DbAction.deleteMany, { loadPrevious: fetchExistingRecords }),
+      deleteMany: makeMutationLifecycleInterceptor(DbAction.deleteMany, {
+        loadPrevious: fetchExistingRecords,
+      }),
     },
   },
 });

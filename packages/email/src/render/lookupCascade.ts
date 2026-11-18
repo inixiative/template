@@ -6,7 +6,7 @@
  */
 import type { EmailComponent } from '@template/db/generated/client/client';
 import { lookupAtOwner } from '@template/email/render/lookup';
-import { cascadeLookups } from '@template/email/render/owner';
+import { lookupsPerOwnerTier } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 
 export const lookupCascade = async (
@@ -15,7 +15,7 @@ export const lookupCascade = async (
 ): Promise<Record<string, EmailComponent | undefined>> => {
   if (!slugs.length) return {};
 
-  const lookups = cascadeLookups(ctx, (tier) =>
+  const lookups = lookupsPerOwnerTier(ctx, (tier) =>
     lookupAtOwner(null, slugs, ctx, tier).then((r) => r.components),
   );
   const results = await Promise.all(lookups.map((fn) => fn()));

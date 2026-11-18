@@ -6,9 +6,9 @@
  */
 import { faker } from '@faker-js/faker';
 import { SegmentType } from '@template/db/generated/client/enums';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const segmentFactory = createFactory('Segment', {
+const segmentFactory = registerFactory('Segment', {
   defaults: () => ({
     name: `${faker.word.adjective()}-${faker.string.alphanumeric(6).toLowerCase()}`,
     type: SegmentType.static,

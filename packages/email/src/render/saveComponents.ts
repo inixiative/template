@@ -57,7 +57,7 @@ const depthFirstOrder = (inputs: EmailComponent[]): EmailComponent[] => {
   const visit = (component: EmailComponent) => {
     if (visited.has(component.slug)) return;
     visited.add(component.slug);
-    for (const ref of component.componentRefs ?? []) {
+    for (const ref of component.componentSlugs ?? []) {
       const child = bySlug.get(ref);
       if (child) visit(child);
     }

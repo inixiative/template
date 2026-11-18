@@ -4,9 +4,9 @@ import {
   DbAction,
   db,
   HookTiming,
+  maskSensitiveFields,
+  maskSensitiveFieldsInChangeDiff,
   Prisma,
-  redactChangeDiff,
-  redactSensitiveFields,
   registerDbHook,
 } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
@@ -76,9 +76,9 @@ const buildAuditEntry = (
 
   if (action === AuditAction.update && changes && Object.keys(changes).length === 0) return null;
 
-  const processedAfter = filteredAfter ? redactSensitiveFields(model, filteredAfter) : undefined;
-  const processedBefore = filteredBefore ? redactSensitiveFields(model, filteredBefore) : undefined;
-  const processedChanges = changes ? redactChangeDiff(model, changes) : undefined;
+  const processedAfter = filteredAfter ? maskSensitiveFields(model, filteredAfter) : undefined;
+  const processedBefore = filteredBefore ? maskSensitiveFields(model, filteredBefore) : undefined;
+  const processedChanges = changes ? maskSensitiveFieldsInChangeDiff(model, changes) : undefined;
 
   return {
     action,

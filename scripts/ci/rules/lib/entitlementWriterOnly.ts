@@ -22,14 +22,14 @@
  */
 import ts from 'typescript';
 import {
-  finishFence,
+  applyExemptionsAndBaselineThenExit,
   isTestFile,
   lineAt,
   listFiles,
   readExemptions,
   readSource,
   type Violation,
-} from './fence';
+} from './ciRuleRunner';
 
 const WRITER = 'apps/api/src/lib/permissions/changeEntitlements.ts';
 const WRITE_METHODS = new Set([
@@ -204,15 +204,15 @@ for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   }
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'entitlement-writer-only',
   violations,
   usedExemptions,
-  explain: [
+  failureExplanationLines: [
     'Entitlement rows written outside the one writer. Go through it, so the grant check runs:',
     "  import { changeEntitlements } from '#/lib/permissions/changeEntitlements';",
     "  await changeEntitlements(c.get('permix'), { model, id }, { add, remove });",
     'A gap in the check is fixed inside the writer, never beside it.',
   ],
-  clean: 'Entitlement rows are written only by changeEntitlements.',
+  passMessage: 'Entitlement rows are written only by changeEntitlements.',
 });

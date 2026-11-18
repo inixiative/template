@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf primitive:authz
  * @uses none
  */
@@ -44,7 +44,7 @@ export const toEntitlementEntry = (row: EntitlementFields): EntitlementEntry => 
 });
 
 /** Two rows grant the same thing: same resource, anchor and path, `where` and actions. A lens is not part of it. */
-export const sameEntitlement = (left: EntitlementFields, right: EntitlementFields): boolean => {
+export const isSameEntitlement = (left: EntitlementFields, right: EntitlementFields): boolean => {
   const [one, other] = [toEntitlementEntry(left), toEntitlementEntry(right)];
   return coversEntitlement(one, other) && coversEntitlement(other, one);
 };
@@ -64,7 +64,7 @@ export const toEntitlementInput = (entry: EntitlementEntry): EntitlementInput =>
 const grantsBelow = (row: EntitlementFields): boolean => row.where == null && row.lens == null;
 
 /** The well-formed entries a holder's live rows grant, for the library's checks; a row nothing narrows grants below its record. */
-export const entitlementsOf = (holder: {
+export const entitlementEntriesOfHolder = (holder: {
   targetEntitlements?: EntitlementFields[] | null;
 }): EntitlementEntry[] =>
   wellFormedEntitlements(

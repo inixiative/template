@@ -1,6 +1,6 @@
 # Flows
 
-A flow walks a user through a few in-app pages, like a tax-filing wizard: invite a teammate, then create a CI token, then a local one. It is a convenience, not a contract. If anything goes wrong — a step's check fails, the user leaves the flow's pages, nobody touches it for 15 minutes — the flow is deleted and the user is simply back on the normal site.
+<!-- toc:start -->
 
 ## Contents
 
@@ -9,6 +9,11 @@ A flow walks a user through a few in-app pages, like a tax-filing wizard: invite
 - [Routes](#routes)
 - [Client](#client)
 - [Adding a flow](#adding-a-flow)
+
+<!-- toc:end -->
+
+A flow walks a user through a few in-app pages, like a tax-filing wizard: invite a teammate, then create a CI token, then a local one. It is a convenience, not a contract. If anything goes wrong — a step's check fails, the user leaves the flow's pages, nobody touches it for 15 minutes — the flow is deleted and the user is simply back on the normal site.
+
 
 ## Registry
 

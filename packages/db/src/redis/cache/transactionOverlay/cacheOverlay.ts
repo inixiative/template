@@ -5,7 +5,7 @@
  * @uses primitive:shared
  */
 import type { Generation } from '@template/db/redis/cache/generation/readGeneration';
-import { createSerializedQueue, type SerializedQueue } from '@template/shared/utils';
+import { makeSerializedQueue, type SerializedQueue } from '@template/shared/utils';
 
 export type OverlayEntry = { payload: string; ttlSeconds: number; generation: Generation | null };
 
@@ -31,7 +31,7 @@ export const onOverlayKey = <T>(
 ): Promise<T> => {
   let queue = overlay.queues.get(key);
   if (!queue) {
-    queue = createSerializedQueue();
+    queue = makeSerializedQueue();
     overlay.queues.set(key, queue);
   }
   return queue.run(fn);

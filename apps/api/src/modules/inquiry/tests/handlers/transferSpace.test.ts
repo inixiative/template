@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { cache, cacheKey, checkCache } from '@template/db';
+import { cacheKey, checkCache, fetchThroughCache } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -237,8 +237,11 @@ describe('handler: transferSpace', () => {
         await db.organizationUser.findMany({ where: { organizationId: targetOrg1.id } })
       ).map(({ id }) => id);
 
-      await cache(cacheKey('token', kept.token.id), async () => kept.token);
-      await cache(cacheKey('integration', kept.integration.id), async () => kept.integration);
+      await fetchThroughCache(cacheKey('token', kept.token.id), async () => kept.token);
+      await fetchThroughCache(
+        cacheKey('integration', kept.integration.id),
+        async () => kept.integration,
+      );
 
       const response = await resolve(await transferInquiry(freshSpace, targetOrg1), 'approved');
       expect(response.status).toBe(200);

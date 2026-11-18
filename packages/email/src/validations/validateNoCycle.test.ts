@@ -24,7 +24,7 @@ describe('validateNoCycle', () => {
   });
 
   it('catches 2-cycle when closing edge is saved (A → B when B → A exists)', async () => {
-    await createEmailComponent({ slug: 'b', componentRefs: ['a'] });
+    await createEmailComponent({ slug: 'b', componentSlugs: ['a'] });
 
     const err = await validateNoCycle('a', ['b'], ctx).catch((e) => e);
     expect(err).toBeInstanceOf(EmailRenderError);
@@ -33,8 +33,8 @@ describe('validateNoCycle', () => {
   });
 
   it('catches 3-cycle and reports the full path (A → B → C → A)', async () => {
-    await createEmailComponent({ slug: 'b', componentRefs: ['c'] });
-    await createEmailComponent({ slug: 'c', componentRefs: ['a'] });
+    await createEmailComponent({ slug: 'b', componentSlugs: ['c'] });
+    await createEmailComponent({ slug: 'c', componentSlugs: ['a'] });
 
     const err = await validateNoCycle('a', ['b'], ctx).catch((e) => e);
     expect(err).toBeInstanceOf(EmailRenderError);
@@ -45,17 +45,17 @@ describe('validateNoCycle', () => {
   // would re-walk D's subtree once per parent, and a buggier variant could
   // even flag D as a false positive on the second visit.
   it('does not flag a DAG with a shared subtree (A → [B, C], B → D, C → D)', async () => {
-    await createEmailComponent({ slug: 'b', componentRefs: ['d'] });
-    await createEmailComponent({ slug: 'c', componentRefs: ['d'] });
-    await createEmailComponent({ slug: 'd', componentRefs: [] });
+    await createEmailComponent({ slug: 'b', componentSlugs: ['d'] });
+    await createEmailComponent({ slug: 'c', componentSlugs: ['d'] });
+    await createEmailComponent({ slug: 'd', componentSlugs: [] });
 
     await expect(validateNoCycle('a', ['b', 'c'], ctx)).resolves.toBeUndefined();
   });
 
   it('does not flag a linear chain (A → B → C → D)', async () => {
-    await createEmailComponent({ slug: 'b', componentRefs: ['c'] });
-    await createEmailComponent({ slug: 'd', componentRefs: [] });
-    await createEmailComponent({ slug: 'c', componentRefs: ['d'] });
+    await createEmailComponent({ slug: 'b', componentSlugs: ['c'] });
+    await createEmailComponent({ slug: 'd', componentSlugs: [] });
+    await createEmailComponent({ slug: 'c', componentSlugs: ['d'] });
 
     await expect(validateNoCycle('a', ['b'], ctx)).resolves.toBeUndefined();
   });

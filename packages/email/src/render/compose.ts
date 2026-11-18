@@ -7,14 +7,17 @@
 import { db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
-import { expand, expandWith } from '@template/email/render/expand';
+import {
+  expandComponentTagsFromOwnerCascade,
+  expandComponentTagsWithLookup,
+} from '@template/email/render/expandComponentTags';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import {
   lookupComponent,
   lookupTemplate,
   templateLens,
 } from '@template/email/render/lookupTemplate';
-import { rowOwner } from '@template/email/render/owner';
+import { ownerScopeOfRow } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 import type { RuleReference } from '@template/shared/rules';
 import { uniqBy } from 'lodash-es';
@@ -62,7 +65,7 @@ export const composeTemplate = async (
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
   const componentResolutions: Record<string, string> = {};
-  const mjml = await expandWith(template.mjml, async (slugs) => {
+  const mjml = await expandComponentTagsWithLookup(template.mjml, async (slugs) => {
     const components = await lookupCascade(slugs, ctx);
     for (const componentSlug of slugs) {
       const component = components[componentSlug];
@@ -81,7 +84,7 @@ export const composeTemplate = async (
     subject: template.subject,
     kind: template.kind,
     ownerModel: template.ownerModel,
-    owner: rowOwner(template),
+    owner: ownerScopeOfRow(template),
     lens: await templateLens(slug, template),
     componentResolutions,
     existingTargets,
@@ -95,7 +98,7 @@ export const composeComponent = async (
   const component = await lookupComponent(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');
 
-  const mjml = await expand(component.mjml, ctx);
+  const mjml = await expandComponentTagsFromOwnerCascade(component.mjml, ctx);
 
   return { mjml };
 };

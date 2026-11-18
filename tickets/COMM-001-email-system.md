@@ -18,7 +18,7 @@ inserting variables) plus delivery tracking, preferences, and admin UI.
 
 **Built and operational (verified in code):**
 - `packages/email/src/client/` — Resend adapter (real batch send) + Console fallback.
-- `packages/email/src/render/` — `compose`/`interpolate`/`expand` MJML pipeline:
+- `packages/email/src/render/` — `compose`/`interpolate`/`expandComponentTagsFromOwnerCascade` MJML pipeline:
   nested components, cycle detection, owner-cascade lookup (Space → Org →
   default/admin), and json-rules **conditional blocks** (`evaluateConditions.ts`
   parses `{{#if rule=<Condition JSON>}}…{{/if}}` → `check(rule, data)`).

@@ -6,7 +6,7 @@
  */
 import { db } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
+import { addLogBroadcast, LogScope, log, withLogScope } from '@template/shared/logger';
 import type { Job } from 'bullmq';
 import { isSlowJobData } from '#/jobs/buildJobData';
 import { claimSlotOrRequeue } from '#/jobs/claimSlotOrRequeue';
@@ -32,8 +32,8 @@ const runJob = async (
 ): Promise<void> => {
   const scopeId = `${job.name}:${job.id}`;
   await traceJob(job, () =>
-    logScope(LogScope.worker, () =>
-      logScope(scopeId, () =>
+    withLogScope(LogScope.worker, () =>
+      withLogScope(scopeId, () =>
         db.scope(
           scopeId,
           async () => {

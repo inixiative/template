@@ -15,14 +15,14 @@
  */
 import ts from 'typescript';
 import {
-  finishFence,
+  applyExemptionsAndBaselineThenExit,
   isTestFile,
   lineAt,
   listFiles,
   readExemptions,
   readSource,
   type Violation,
-} from './fence';
+} from './ciRuleRunner';
 
 const OUT_OF_SCOPE = /^packages\/db\//;
 const DB_NAME = /^_?(db|txn|tx|prisma)$/;
@@ -82,14 +82,14 @@ for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   else violations.push(...fileViolations);
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'no-db-params',
   violations,
   usedExemptions,
-  explain: [
+  failureExplanationLines: [
     'Functions that take a db client as a parameter. Use the scoped client instead:',
     "  import { db } from '@template/db';  // resolves to the open db.txn() transaction",
     'Only the db client itself (packages/db) takes a client.',
   ],
-  clean: 'No db parameters outside the db client.',
+  passMessage: 'No db parameters outside the db client.',
 });

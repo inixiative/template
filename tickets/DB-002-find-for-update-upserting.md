@@ -50,9 +50,9 @@ Each patch is a per-call-site answer to a primitive's gap.
     re-acquired, `OpenTransaction.heldLocks`).
   - `findForUpdateLockTimeoutError.ts` — exported from `@template/db`; `(model, identifier, waitMs)`,
     and the API answers it 409 since INFRA-048.
-- `makeSingletonJob` already runs on `createLock` (owner-checked refresh, fenced release) — no
+- `makeSingletonJob` already runs on `makeLock` (owner-checked refresh, fenced release) — no
   change. `makeSupersedingJob` / lanes keep latest-wins semantics.
-- CI: `scripts/ci/rules/no-create-race-machinery.sh` — per-file ratchet vs the merge base on
+- CI: `scripts/ci/rules/find-or-create-uses-find-for-update-upserting.sh` — per-file ratchet vs the merge base on
   `.upsert(`, `P2002` and `isUniqueConstraintError(` (tests, factories, seeds, generated code and
   the helper's definition exempt; comment lines not counted).
 - Docs: `docs/claude/DATABASE.md` — finally callbacks, create-if-missing.
@@ -78,7 +78,7 @@ Each patch is a per-call-site answer to a primitive's gap.
 
 - `db.txn(fn, { maxWait })` passes through to Prisma's interactive transaction beside `timeout`
   (nested calls reuse the outer transaction and ignore both). Test: `transactions.test.ts`.
-- `cache()` / `upsertCache()` meter writes over 256KB: `cache.value.large` and
+- `fetchThroughCache()` / `upsertCache()` meter writes over 256KB: `cache.value.large` and
   `cache.value.large.bytes` counters tagged by domain and writer, plus a `cache.large_write` warn
   record carrying the full key and ttl. Reporting only; the write still lands. Counters go through
   the new `incrementCounter` in `@template/shared/telemetry`, beside `recordDuration`.

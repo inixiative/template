@@ -4,7 +4,7 @@
  * @partOf feature:auth
  * @uses none
  */
-import { encryptField } from '@template/db/lib/encryption/helpers';
+import { encryptField } from '@template/db/lib/encryption/fieldEncryption';
 import { isEmpty } from 'lodash-es';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';

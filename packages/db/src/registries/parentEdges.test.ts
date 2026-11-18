@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import {
   childrenOf,
-  childWhereAlong,
-  parentAlong,
+  childWhereForParentAlongEdge,
   parentOf,
+  parentRowAlongEdge,
 } from '@template/db/registries/parentEdges';
 
 describe('parent edges', () => {
@@ -32,19 +32,21 @@ describe('parent edges', () => {
 
   it('a foreign-key edge points at one model by one column', () => {
     const edge = { parent: 'Organization' as const, foreignKey: 'organizationId' };
-    expect(parentAlong('OrganizationUser', edge, { organizationId: 'o-1' })).toEqual({
+    expect(parentRowAlongEdge('OrganizationUser', edge, { organizationId: 'o-1' })).toEqual({
       model: 'Organization',
       id: 'o-1',
     });
-    expect(childWhereAlong('OrganizationUser', edge, { model: 'Organization', id: 'o-1' })).toEqual(
-      { organizationId: 'o-1' },
-    );
-    expect(childWhereAlong('OrganizationUser', edge, { model: 'Space', id: 's-1' })).toBeNull();
+    expect(
+      childWhereForParentAlongEdge('OrganizationUser', edge, { model: 'Organization', id: 'o-1' }),
+    ).toEqual({ organizationId: 'o-1' });
+    expect(
+      childWhereForParentAlongEdge('OrganizationUser', edge, { model: 'Space', id: 's-1' }),
+    ).toBeNull();
   });
 
   it('a composite arm with no dual polymorphism id has no single parent id', () => {
     expect(() =>
-      parentAlong('Inquiry', { axis: 'targetModel' }, { targetModel: 'SpaceUser' }),
+      parentRowAlongEdge('Inquiry', { axis: 'targetModel' }, { targetModel: 'SpaceUser' }),
     ).toThrow('give the axis a dualPolymorphismId');
   });
 });

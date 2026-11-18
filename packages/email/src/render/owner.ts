@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind utils
  * @partOf feature:email
  * @uses none
  */
@@ -61,12 +61,12 @@ export const ownerWhere = (ctx: OwnerScope, tier: EmailOwnerModel = ctx.ownerMod
   ...(tier === 'Organization' && ctx.ownerModel === 'Space' && { inheritToSpaces: true }),
 });
 
-export const cascadeLookups = <T>(
+export const lookupsPerOwnerTier = <T>(
   ctx: OwnerScope,
   build: (tier: EmailOwnerModel) => Promise<T>,
 ): (() => Promise<T>)[] => ownerCascade(ctx.ownerModel).map((tier) => () => build(tier));
 
-export const firstResolved = async <T>(
+export const fetchFirstNonEmptyLookupResult = async <T>(
   lookups: (() => Promise<T | null | undefined>)[],
 ): Promise<T | null> => {
   for (const lookup of lookups) {
@@ -81,7 +81,7 @@ export type EmailOwnerRef = Pick<
   'ownerModel' | 'organizationId' | 'spaceId' | 'userId'
 >;
 
-export const rowOwner = (row: EmailOwnerRef & { locale: string }): OwnerScope => ({
+export const ownerScopeOfRow = (row: EmailOwnerRef & { locale: string }): OwnerScope => ({
   ownerModel: row.ownerModel,
   organizationId: row.organizationId,
   spaceId: row.spaceId,
@@ -89,7 +89,7 @@ export const rowOwner = (row: EmailOwnerRef & { locale: string }): OwnerScope =>
   locale: row.locale,
 });
 
-export const emailOwnerProvider = (owner: EmailOwnerRef): EmailLensOwner => {
+export const emailLensOwnerOf = (owner: EmailOwnerRef): EmailLensOwner => {
   switch (owner.ownerModel) {
     case 'Organization':
       return owner.organizationId

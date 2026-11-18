@@ -11,7 +11,14 @@
  * string that also says `select`.
  */
 import ts from 'typescript';
-import { finishFence, isTestFile, lineAt, listFiles, readSource, type Violation } from './fence';
+import {
+  applyExemptionsAndBaselineThenExit,
+  isTestFile,
+  lineAt,
+  listFiles,
+  readSource,
+  type Violation,
+} from './ciRuleRunner';
 
 const LOCK_PRIMITIVE = 'packages/db/src/client.ts';
 const SHARED = /\bFOR\s+(KEY\s+)?SHARE\b|\bLOCK\s+IN\s+SHARE\s+MODE\b/;
@@ -82,15 +89,15 @@ for (const file of listFiles(['apps', 'packages'], /\.(tsx?|sql)$/)) {
   }
 }
 
-finishFence({
+applyExemptionsAndBaselineThenExit({
   rule: 'no-raw-locks',
   violations,
-  explain: [
+  failureExplanationLines: [
     'Raw row-lock SQL outside the db client. Lock rows with the primitive, inside db.txn():',
     '  db.findForUpdate(model, where)                       // SELECT * ... FOR NO KEY UPDATE',
     '  db.findForUpdate(model, where, { changesKey: true }) // FOR UPDATE: the transaction deletes the row or changes a referenced column',
     '  db.findForUpdate(model, where, { upserting: true })  // also fences a row that does not exist yet',
     'There is no shared (FOR SHARE) mode: docs/claude/CONCURRENCY.md, Row locks.',
   ],
-  clean: 'No raw row-lock SQL outside db.findForUpdate.',
+  passMessage: 'No raw row-lock SQL outside db.findForUpdate.',
 });

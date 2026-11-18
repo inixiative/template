@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
-import { fetchOne } from '@template/db/hydrate/fetchOne';
+import { fetchCachedRecordWithTargetEntitlements } from '@template/db/hydrate/fetchCachedRecordWithTargetEntitlements';
 import { hydrate } from '@template/db/hydrate/hydrate';
 import { cacheKey } from '@template/db/redis/cache/cacheKey';
 import { getRedisClient } from '@template/db/redis/client';
@@ -95,7 +95,7 @@ describe('hydrate', () => {
   });
 });
 
-describe('fetchOne', () => {
+describe('fetchCachedRecordWithTargetEntitlements', () => {
   beforeEach(() => {});
 
   afterEach(async () => {
@@ -105,7 +105,7 @@ describe('fetchOne', () => {
   it('fetches by simple id', async () => {
     const { entity: user } = await createUser();
 
-    const result = await fetchOne('user', user.id);
+    const result = await fetchCachedRecordWithTargetEntitlements('user', user.id);
 
     expect(result).toBeDefined();
     expect(result?.id).toBe(user.id);
@@ -114,7 +114,7 @@ describe('fetchOne', () => {
   it('fetches by composite key', async () => {
     const { entity: orgUser } = await createOrganizationUser();
 
-    const result = await fetchOne('organizationUser', {
+    const result = await fetchCachedRecordWithTargetEntitlements('organizationUser', {
       organizationId: orgUser.organizationId,
       userId: orgUser.userId,
     });
@@ -125,20 +125,22 @@ describe('fetchOne', () => {
   });
 
   it('returns null for missing record', async () => {
-    const result = await fetchOne('user', 'nonexistent-id');
+    const result = await fetchCachedRecordWithTargetEntitlements('user', 'nonexistent-id');
     expect(result).toBeNull();
   });
 
-  it('a withDeleted read through fetchOne gets the live view and caches it', async () => {
+  it('a withDeleted read through fetchCachedRecordWithTargetEntitlements gets the live view and caches it', async () => {
     const { entity: user } = await createUser();
     await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
     expect(
       await db.withDeleted(() => db.user.findFirst({ where: { id: user.id } })),
     ).not.toBeNull();
 
-    expect(await db.withDeleted(() => fetchOne('user', user.id))).toBeNull();
+    expect(
+      await db.withDeleted(() => fetchCachedRecordWithTargetEntitlements('user', user.id)),
+    ).toBeNull();
     expect(await getRedisClient().exists(cacheKey('user', user.id))).toBe(1);
-    expect(await fetchOne('user', user.id)).toBeNull();
+    expect(await fetchCachedRecordWithTargetEntitlements('user', user.id)).toBeNull();
   });
 
   it('hydrates live relations only, even inside a withDeleted block', async () => {

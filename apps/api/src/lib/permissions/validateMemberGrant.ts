@@ -7,7 +7,7 @@
 import { type HydratedRecord, hydrate } from '@template/db';
 import type { Permix } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { memberRoleWrite } from '@template/permissions/rebac/schemaHelpers';
+import { memberRoleWrite } from '@template/permissions/rebac/rebacSchemaRules';
 import { makeError } from '#/lib/errors';
 
 const tenantOf = { organizationUser: 'organization', spaceUser: 'space' } as const;

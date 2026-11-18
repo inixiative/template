@@ -32,7 +32,7 @@ that save, so the lens check never runs at save.
   `template_missing`, `component_missing`, `circular_ref`. `onError` never sees these.
   `deliverEmail` marks the CommunicationLog `failed`, rethrows, BullMQ retries three times
   with backoff, then DLQ. The error is deterministic and is retried anyway.
-- *The sink*: `settle` reports strings (a rule threw, rule JSON invalid, each attribute
+- *The sink*: `evaluateTemplateBlocksAndTokens` reports strings (a rule threw, rule JSON invalid, each attribute
   errors, each over cap, each path not an array, token resolved to an object,
   unterminated each). `settleTemplate` collects them, logs a warning, then applies the
   row's policy: `fail` throws `render_failed` into the same retry path; `degrade` sends
@@ -52,9 +52,9 @@ that save, so the lens check never runs at save.
 | 7 | Token on an unknown root or binding | never | literal token ships | the recipient |
 | 8 | Token resolves to an object | render | sink; literal stays | log and recipient |
 | 9 | Component missing at render (deleted, or its shadow removed with no parent) | render | `component_missing` thrown, failed, retries, DLQ; policy does not apply | ops |
-| 10 | Component missing at read (`hydrate`) | read | bare ref kept, no error | editor |
+| 10 | Component missing at read (`hydrateEmailComponentTags`) | read | bare ref kept, no error | editor |
 | 11 | Persisted component cycle | save, render and hydrate all throw `circular_ref` | | ops or editor |
-| 12 | `degradedComponentRefs` | the written row in its own transaction (versioning hook); its ancestors by the after-commit superseding job `recomputeEmailDependents`; guarded send-path recompute after `component_missing` | missing component slugs when rendering this row transitively, honoring slot overrides; not necessarily in `componentRefs`; compose never consults it | admin list |
+| 12 | `missingComponentSlugs` | the written row in its own transaction (versioning hook); its ancestors by the after-commit superseding job `recomputeEmailDependents`; guarded send-path recompute after `component_missing` | missing component slugs when rendering this row transitively, honoring slot overrides; not necessarily in `componentSlugs`; compose never consults it | admin list |
 | 13 | No template anywhere in the cascade | render | `template_missing`, failed, retries, DLQ | ops |
 | 14 | Base owner with `degrade` or `fallback` | render | forced to `fail` | ops |
 | 15 | Rail-provided system token not supplied | never | literal token ships | the recipient |
@@ -75,7 +75,7 @@ that save, so the lens check never runs at save.
   slots, new tokens, new expectations. No template is revalidated. #97 derives and stores
   `expectations` on the component at save; nothing reads them.
 - **Shadow lifecycle.** Shadow deleted with a parent present: falls back, fine. Parent
-  deleted with children referencing it: `degradedComponentRefs` marks the ref, compose
+  deleted with children referencing it: `missingComponentSlugs` marks the ref, compose
   throws at the next send.
 - **Snapshots** (#91) make sent mail recomposable from its pins. Live renders always use
   live rows, so staleness is only ever discovered at send.
@@ -100,7 +100,7 @@ the failing block, and it walks down to the base owner and then fails.
 
 1. Is there a third time, a validation pass on save of any row in the cascade, on deploy,
    or on demand, that checks every template against its lens and its resolved components
-   and writes a status rather than throwing? `degradedComponentRefs` is the one existing
+   and writes a status rather than throwing? `missingComponentSlugs` is the one existing
    example of that shape.
 2. Does `degrade` get one meaning: a failing block renders nothing, an unresolved token
    renders empty, never literal? Is literal token output ever acceptable?
@@ -128,7 +128,7 @@ the failing block, and it walks down to the base owner and then fails.
    relation, anything beneath a Json column — must sit inside an `{{#if}}` branch whose rule
    conjoins a positive presence leaf (`exists` / `notEmpty` / `isDefined: true`) on that path
    or on the nullable prefix that introduced the optionality. Negated leaves, `any` groups and
-   the `{{else}}` branch guard nothing. `guardedToken(path, fallback)` in the authoring surface
+   the `{{else}}` branch guard nothing. `tokenGuardedByExistsCheck(path, fallback)` in the authoring surface
    emits the guarded form — the builder's fallback shortcut. Rules keep the vocabulary gate
    (`validateConditions` with the lens) and the reference gate (`syncRuleReferences`).
 2. **Component ↔ template checks propagate both ways.** A template save judges the components
@@ -136,7 +136,7 @@ the failing block, and it walks down to the base owner and then fails.
    walks every same-owner template that embeds it, transitively through components, and
    re-validates each against that template's lens (`validateDependents`); one failure refuses the
    save with the list (`DependentTemplateError`). Other owners' templates are never refused; they
-   carry the outcome in `degradedComponentRefs`, the at-rest projection — the same direction as a
+   carry the outcome in `missingComponentSlugs`, the at-rest projection — the same direction as a
    gone tag degrading a rule instead of blocking the delete. The written row is stamped in its own
    transaction by the versioning hook, and its ancestors are restamped after commit by the
    superseding job `recomputeEmailDependents` (keyed by slug, 5 second delay). The split is audit
@@ -162,12 +162,12 @@ the failing block, and it walks down to the base owner and then fails.
    partial lists).
 5. **Planning failures are loud.** `sendEmail` throws on a missing registry entry, a missing
    adapter, and a declared `data` field the event did not supply; zero recipients stays an
-   info line. `withRule` gained the `bindings` question (json-rules 2.22.0 `bindOptional`).
+   info line. `branchOnRuleHealth` gained the `bindings` question (json-rules 2.22.0 `bindOptional`).
 
 Adversarial pass on the plan (before build) moved five things: a `fail` floor instead of
 "degrade everywhere" (system mail would have shipped a verification link rendered empty); the
 unsubscribe token as a hard failure rather than an issue; Json-backed paths treated as optional
-so the guard is required where nil actually lives; one lens threaded into `settle` for the
+so the guard is required where nil actually lives; one lens threaded into `evaluateTemplateBlocksAndTokens` for the
 vocabulary question while reference extraction keeps the registry-derived narrowing; and the
 reverse walk refusing only same-owner dependents. Findings not taken: a planner-side
 CommunicationLog row for skipped sends (zero recipients is a legitimate outcome, the rest now

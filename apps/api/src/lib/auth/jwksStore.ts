@@ -10,7 +10,7 @@ import {
   type DecryptFieldInput,
   decryptField,
   encryptField,
-} from '@template/db/lib/encryption/helpers';
+} from '@template/db/lib/encryption/fieldEncryption';
 import type { Jwk } from 'better-auth/plugins';
 import type { JSONWebKeySet } from 'jose';
 import { USER_JWT_TTL_SECONDS } from '#/lib/auth/userJwt';

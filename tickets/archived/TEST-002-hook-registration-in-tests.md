@@ -33,7 +33,7 @@ Found while adding the member self-grant rule (PR #232): the rules hook refuses 
 - [x] Move every test file to it, including `orderedList/tests/setup.ts` (now `setupOrderedListTests()`, called by each file).
 - Dropped (2026-11-10): a helper that registers a hook together with the hooks production pairs it with. It would wrap two calls that 24 test files already make side by side, and `docs/claude/TESTING.md` says to make them together.
 - [x] Document it in `docs/claude/TESTING.md` (Hooks in tests).
-- [x] A CI rule: `scripts/ci/rules/test-hooks-cleared.sh` fails a test file that registers hooks and never clears them, or registers at import time. It still allows `unregisterDbHook` for a hook one test turns on and off.
+- [x] A CI rule: `scripts/ci/rules/tests-registering-db-hooks-clear-them.sh` fails a test file that registers hooks and never clears them, or registers at import time. It still allows `unregisterDbHook` for a hook one test turns on and off.
 
 ---
 

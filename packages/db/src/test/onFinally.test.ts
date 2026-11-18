@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { getNextSeq } from '@template/db/test/factory';
+import { nextFactorySequenceNumber } from '@template/db/test/factory';
 import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 describe('db.onFinally', () => {
@@ -15,7 +15,7 @@ describe('db.onFinally', () => {
   });
 
   it('runs after the commit has landed', async () => {
-    const email = `finally-commit-${getNextSeq()}@test.com`;
+    const email = `finally-commit-${nextFactorySequenceNumber()}@test.com`;
     let seenAfterCommit: unknown = 'not run';
 
     await db.txn(async () => {
@@ -29,7 +29,7 @@ describe('db.onFinally', () => {
   });
 
   it('runs on rollback and the rollback error still propagates', async () => {
-    const email = `finally-rollback-${getNextSeq()}@test.com`;
+    const email = `finally-rollback-${nextFactorySequenceNumber()}@test.com`;
     let seenAfterRollback: unknown = 'not run';
 
     await expect(

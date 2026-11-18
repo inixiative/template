@@ -65,7 +65,7 @@ missed" and "detect the loss and repair it": pick the lane, not a per-stream del
 ## Channel registry and authorization
 
 `packages/shared/src/ws/channels.ts` exports `WS_CHANNELS`, the query-channel registry;
-`LIVE_QUERIES` is derived from its keys. Registered query families are `inquiryRead` and
+its keys are the `WSChannelFamily` names. Registered query families are `inquiryRead` and
 `segmentReadManySegmentMembers`. Stream families are not channels; they live in the stream
 registry (see [Stream definitions](#stream-definitions)).
 
@@ -257,7 +257,7 @@ before its snapshot. Held appends the snapshot already contains are dropped by t
 one published during the read can still repeat a change the read saw, so every fold must be
 idempotent.
 
-Within one API instance, `appendToStream` publishes through a `createSerializedQueue` per stream
+Within one API instance, `appendToStream` publishes through a `makeSerializedQueue` per stream
 key (`apps/api/src/ws/streamPublishOrder.ts`): a stream's appends go out in the order the instance
 emitted them. Across instances, Redis is the ordering boundary: two instances publishing to the
 same stream are delivered in seq order, which need not be the order their writes committed.
@@ -399,7 +399,7 @@ stream the client has not opened, has closed, or that was rejected, are ignored.
 ## Frontend and horizontal scaling
 
 `useApiWebsocket()` is mounted at each app root. The client slice's query-cache listener subscribes
-and unsubscribes mounted queries gated by `LIVE_QUERIES`, and opens and closes streams for
+and unsubscribes mounted queries gated by the keys of `WS_CHANNELS`, and opens and closes streams for
 mounted stream queries; `setClient` wires the QueryClient and reconnect recovery.
 
 `sendToChannel`, `appendToStream` and `broadcast` publish through Redis

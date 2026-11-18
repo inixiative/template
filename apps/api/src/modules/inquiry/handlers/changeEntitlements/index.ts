@@ -4,7 +4,7 @@
  * @partOf feature:inquiry
  * @uses primitive:authz, infrastructure:prisma
  */
-import { db, type EntitlementTarget, polymorphicTarget } from '@template/db';
+import { db, type EntitlementTarget, rowPolymorphicAxisPointsAt } from '@template/db';
 import { toEntitlementEntry } from '@template/permissions';
 import { entitlementProblem } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
@@ -32,7 +32,7 @@ const validate = async (_inquiry: Partial<Inquiry>, content: ChangeEntitlementsC
 };
 
 const holderOf = async (inquiry: Inquiry) => {
-  const target = polymorphicTarget(inquiry, 'Inquiry', 'targetModel');
+  const target = rowPolymorphicAxisPointsAt(inquiry, 'Inquiry', 'targetModel');
   const model = holderModels.find((holderModel) => holderModel === target?.kind);
   const holder =
     target && model ? await db.delegate(model).findUnique({ where: { id: target.id } }) : null;

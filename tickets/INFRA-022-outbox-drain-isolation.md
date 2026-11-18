@@ -8,7 +8,7 @@
 
 > Follow-up to INFRA-021 (jobs overflow buffer). Moves the drain off the shared-queue cron onto a
 > per-worker in-process loop so it can't be starved by the fan-out it meters, and adds poison-row
-> quarantine. The `createLock` single-drainer guarantee is unchanged.
+> quarantine. The `makeLock` single-drainer guarantee is unchanged.
 
 ---
 
@@ -28,7 +28,7 @@ The overflow-buffer drain shipped (INFRA-021) as a `makeSingletonJob` repeatable
 ## Decision
 
 - **Per-worker in-process drain loop** (`startOutboxDrainLoop`, every 15s), not a queued cron. Running
-  on the event loop sidesteps the worker pool entirely. `createLock` (heartbeated TTL + fenced
+  on the event loop sidesteps the worker pool entirely. `makeLock` (heartbeated TTL + fenced
   compare-and-del release) keeps the single-drainer-across-processes guarantee the `makeSingletonJob`
   cron lock provided.
 - **Quarantine.** An `attempts` column bumps on each failed re-enqueue (`updateManyAndReturn` — the
@@ -41,7 +41,7 @@ The overflow-buffer drain shipped (INFRA-021) as a `makeSingletonJob` repeatable
 ## Tasks
 
 - [x] Extract the metering pass into `apps/api/src/jobs/outbox/drain/pass.ts`
-- [x] Per-worker loop + `createLock` guard in `apps/api/src/jobs/outbox/drain/loop.ts`
+- [x] Per-worker loop + `makeLock` guard in `apps/api/src/jobs/outbox/drain/loop.ts`
 - [x] Wire `startOutboxDrainLoop` / `stopOutboxDrainLoop` into the worker; drop the stale queued repeatable on startup
 - [x] Remove the `drainOutbox` cron handler + its `cronJob.seed.ts` row
 - [x] `attempts` column + `@@index([attempts, id])` on `JobOutbox`
@@ -52,12 +52,12 @@ The overflow-buffer drain shipped (INFRA-021) as a `makeSingletonJob` repeatable
 ## Resources
 
 - Builds on: INFRA-021 (jobs overflow buffer)
-- Concurrency primitives: [`docs/claude/CONCURRENCY.md`](../docs/claude/CONCURRENCY.md) (`createLock`)
+- Concurrency primitives: [`docs/claude/CONCURRENCY.md`](../docs/claude/CONCURRENCY.md) (`makeLock`)
 - Jobs system: [`docs/claude/JOBS.md`](../docs/claude/JOBS.md)
 
 ---
 
 ## Comments
 
-_Surfaced by the Zealot ZLT-3008 load test (the template #62 consumer). The `createLock` consolidation
+_Surfaced by the Zealot ZLT-3008 load test (the template #62 consumer). The `makeLock` consolidation
 flows template → consumer; the starvation fix flows consumer → template (here)._

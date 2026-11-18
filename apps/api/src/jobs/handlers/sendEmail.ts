@@ -8,10 +8,14 @@ import { projectRows } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
-import { lookupTemplate, rowOwner, templateLens } from '@template/email/render';
+import { lookupTemplate, ownerScopeOfRow, templateLens } from '@template/email/render';
 import { declaredFields } from '@template/email/rules';
 import { log } from '@template/shared/logger';
-import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import {
+  ConcurrencyType,
+  minimumConcurrencyLimitFor,
+  runAllWithConcurrencyLimit,
+} from '@template/shared/utils';
 import { pick } from 'lodash-es';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeJob } from '#/jobs/makeJob';
@@ -38,42 +42,42 @@ const senderColumns = (sender: Sender) => {
   switch (sender.type) {
     case 'User':
       return {
-        senderType: sender.type,
+        senderModel: sender.type,
         senderUserId: sender.userId,
         senderOrganizationId: null,
         senderSpaceId: null,
       };
     case 'Organization':
       return {
-        senderType: sender.type,
+        senderModel: sender.type,
         senderUserId: null,
         senderOrganizationId: sender.organizationId,
         senderSpaceId: null,
       };
     case 'Space':
       return {
-        senderType: sender.type,
+        senderModel: sender.type,
         senderUserId: null,
         senderOrganizationId: null,
         senderSpaceId: sender.spaceId,
       };
     case 'OrganizationUser':
       return {
-        senderType: sender.type,
+        senderModel: sender.type,
         senderUserId: sender.userId,
         senderOrganizationId: sender.organizationId,
         senderSpaceId: null,
       };
     case 'SpaceUser':
       return {
-        senderType: sender.type,
+        senderModel: sender.type,
         senderUserId: sender.userId,
         senderOrganizationId: null,
         senderSpaceId: sender.spaceId,
       };
     default:
       return {
-        senderType: sender.type,
+        senderModel: sender.type,
         senderUserId: null,
         senderOrganizationId: null,
         senderSpaceId: null,
@@ -112,7 +116,8 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   if (!row) throw new EmailRenderError(template, 'template_missing');
   const targeting = bindWhere(entry.recipients.where, entityRow);
   const lens = slotRowsLens(
-    emailLensFor(template, rowOwner(row), await templateLens(template, row), sender).recipient,
+    emailLensFor(template, ownerScopeOfRow(row), await templateLens(template, row), sender)
+      .recipient,
     targeting,
   );
   const sendKey = plannerJobId(eventName, template, data);
@@ -189,7 +194,10 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
       },
     ];
   });
-  await resolveAll(deliveries, lane === JobLane.slow ? getConcurrency([ConcurrencyType.queue]) : 1);
+  await runAllWithConcurrencyLimit(
+    deliveries,
+    lane === JobLane.slow ? minimumConcurrencyLimitFor([ConcurrencyType.queue]) : 1,
+  );
   const fanned = deliveries.length;
 
   log.info(`Email fanned out: template=${template} jobs=${fanned} lane=${lane}`);

@@ -89,7 +89,7 @@ describe('email seeds persist through the app save', () => {
           slug: 'seed-org-tag',
           locale: 'en',
           ownerModel: 'default',
-          componentRefs: [],
+          componentSlugs: [],
           mjml: `<mj-text>{{#if rule=${rule}}}VIP{{/if}}</mj-text>`,
         },
       ],

@@ -6,10 +6,10 @@
  */
 import { singleFlightLockKey } from '@template/db/lock/singleFlight/singleFlightLock';
 import type { CacheCheck } from '@template/db/redis/cache/cacheStates';
-import { queuedKey } from '@template/db/redis/cache/queued/queuedKey';
+import { cacheWrittenMarkerKeyFor } from '@template/db/redis/cache/cacheWrittenMarkerKeyFor';
+import { cacheQueuedMarkerKeyFor } from '@template/db/redis/cache/queued/cacheQueuedMarkerKeyFor';
 import { withCacheSpan } from '@template/db/redis/cache/telemetry/withCacheSpan';
-import { validateKey } from '@template/db/redis/cache/validateKey';
-import { writtenKey } from '@template/db/redis/cache/writtenKey';
+import { validateCacheKeyHasNoUndefined } from '@template/db/redis/cache/validateCacheKeyHasNoUndefined';
 import { getRedisClient } from '@template/db/redis/client';
 import superjson from 'superjson';
 
@@ -20,14 +20,14 @@ export const checkCache = async <T>(
     computedUnder = key,
   }: { freshForSeconds?: number; computedUnder?: string } = {},
 ): Promise<CacheCheck<T>> => {
-  validateKey(key);
+  validateCacheKeyHasNoUndefined(key);
   return withCacheSpan(key, true, async (setResult) => {
     try {
       const [payload, written, lock, queued] = await getRedisClient().mget(
         key,
-        writtenKey(key),
+        cacheWrittenMarkerKeyFor(key),
         singleFlightLockKey(computedUnder),
-        queuedKey(computedUnder),
+        cacheQueuedMarkerKeyFor(computedUnder),
       );
       const isComputing = lock !== null;
       const isQueued = !isComputing && queued !== null;

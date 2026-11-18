@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { createLock } from '@template/db/lock/createLock';
+import { makeLock } from '@template/db/lock/makeLock';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 
@@ -8,9 +8,9 @@ const keyFor = (id: string) => `${redisNamespace.lock}:s:${id}`;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const claim = (identifier: string, holder: string, ttlMs = 200) =>
-  createLock({ service: 's', identifier, holder, ttlMs, heartbeat: false });
+  makeLock({ service: 's', identifier, holder, ttlMs, heartbeat: false });
 
-describe('createLock with heartbeat: false — one-shot claim', () => {
+describe('makeLock with heartbeat: false — one-shot claim', () => {
   it('the first claim succeeds and reports its own holder', async () => {
     const id = newId();
     expect(await claim(id, 'first').acquire()).toEqual({ claimed: true, holder: 'first' });
@@ -49,7 +49,7 @@ describe('createLock with heartbeat: false — one-shot claim', () => {
   });
 
   it('defaults a holder when the caller supplies none', async () => {
-    const result = await createLock({
+    const result = await makeLock({
       service: 's',
       identifier: newId(),
       heartbeat: false,
@@ -69,9 +69,9 @@ describe('createLock with heartbeat: false — one-shot claim', () => {
   });
 });
 
-describe('createLock default behaviour is unchanged', () => {
+describe('makeLock default behaviour is unchanged', () => {
   it('still renews and still releases', async () => {
-    const lock = createLock({ service: 's', identifier: newId(), ttlMs: 300, heartbeatMs: 60 });
+    const lock = makeLock({ service: 's', identifier: newId(), ttlMs: 300, heartbeatMs: 60 });
     expect(await lock.acquire()).toBe(true);
     await sleep(200);
     expect(await lock.verify()).toBe(true);

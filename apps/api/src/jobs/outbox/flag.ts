@@ -5,7 +5,7 @@
  * @uses infrastructure:redis
  */
 import { LogScope, log } from '@template/shared/logger';
-import { heartbeat } from '@template/shared/utils';
+import { startHeartbeat } from '@template/shared/utils';
 import {
   DEPTH_PROBE_MS,
   flagKey,
@@ -138,7 +138,7 @@ export const withOverflowRenew = async <T>(fn: () => Promise<T>): Promise<T> => 
     for (const lane of LANES) await renewOverflow(lane);
   };
   const renewMs = Math.floor((overflowTtlSec() * 1000) / 3); // a third of the TTL — always below it by construction
-  const stop = heartbeat(renewAll, renewMs);
+  const stop = startHeartbeat(renewAll, renewMs);
   try {
     return await fn();
   } finally {

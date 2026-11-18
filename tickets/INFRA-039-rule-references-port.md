@@ -87,7 +87,7 @@ template level with it.
   references through id sources, and the id sources it reads at evaluation.
 - `ruleReferenceTargets(edges)`: each edge's target with its state (`existing`, `deleted`,
   `purged`). The one edge reader.
-- `lockedTargetStates(references)`: each referenced row's `deletedAt`, read `FOR UPDATE`.
+- `fetchRuleReferenceTargetsDeletedAtForUpdate(references)`: each referenced row's `deletedAt`, read `FOR UPDATE`.
 - `validations/deadRuleReferences(scopes, references?)`: the references whose row is deleted or
   outside its scope's owner scope, as `{ model, id, state }`.
 - `validations/assertRuleReferencesExist(scopes, references?)`: throws a `RuleReferenceError` with

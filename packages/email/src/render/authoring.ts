@@ -29,9 +29,8 @@ export {
   decompose,
   decomposeNodes,
   type ResolveCascade,
-  serialize,
+  serializeNodesToMjml,
 } from '@template/email/render/decompose';
-export { guardedToken } from '@template/email/render/guardedToken';
 export { canNestMjml, MJML_CHILD_TAGS } from '@template/email/render/mjmlNesting';
 export type { ComponentNode, Node, SlotNode, TextNode } from '@template/email/render/nodes';
 export { parseBlocks } from '@template/email/render/parseBlocks';
@@ -48,3 +47,4 @@ export {
   type SystemToken,
   type SystemTokenName,
 } from '@template/email/render/systemTokens';
+export { tokenGuardedByExistsCheck } from '@template/email/render/tokenGuardedByExistsCheck';

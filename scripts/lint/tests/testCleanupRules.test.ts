@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { findHandCleanup, modelDelegates } from '../lib/testHandCleanup';
+import { findHandCleanup, listPrismaAccessorNames } from '../lib/testHandCleanup';
 import { findTrackerRegistrations } from '../lib/testTrackerRegistration';
 
 let sandbox: string;
@@ -14,7 +14,7 @@ const write = (content: string, name = `case${fileCount++}.test.ts`) => {
   return full;
 };
 
-const delegates = modelDelegates();
+const delegates = listPrismaAccessorNames();
 
 beforeEach(() => {
   sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'test-cleanup-rules-'));
@@ -24,7 +24,7 @@ afterEach(() => {
   fs.rmSync(sandbox, { recursive: true, force: true });
 });
 
-describe('modelDelegates', () => {
+describe('listPrismaAccessorNames', () => {
   test('reads Prisma model delegates from the schema', () => {
     expect(delegates.has('emailTemplate')).toBe(true);
     expect(delegates.has('organizationUser')).toBe(true);

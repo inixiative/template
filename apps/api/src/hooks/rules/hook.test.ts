@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db } from '@template/db';
-import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
+import { cleanupTouchedTables, createUser, nextFactorySequenceNumber } from '@template/db/test';
 import { registerHooks } from '#/hooks';
 import { clearRulesCache, RulesRegistry, setRulesCache } from '#/hooks/rules/registry';
 
@@ -31,7 +31,7 @@ describe('rules hook', () => {
         error: 'name required',
       });
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const { entity: user } = await createUser({
         email: `test${seq}@example.com`,
         name: 'Test User',
@@ -48,7 +48,7 @@ describe('rules hook', () => {
         error: 'name required',
       });
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const promise = async () => createUser({ email: `test${seq}@example.com`, name: '' });
 
       await expect(promise).toThrow('name required');
@@ -62,8 +62,8 @@ describe('rules hook', () => {
         error: 'name required',
       });
 
-      const seq1 = getNextSeq();
-      const seq2 = getNextSeq();
+      const seq1 = nextFactorySequenceNumber();
+      const seq2 = nextFactorySequenceNumber();
       const promise = async () =>
         db.user.createManyAndReturn({
           data: [
@@ -82,7 +82,7 @@ describe('rules hook', () => {
     beforeEach(async () => {
       const { entity: user } = await createUser({
         name: 'Original',
-        email: `merge${getNextSeq()}@example.com`,
+        email: `merge${nextFactorySequenceNumber()}@example.com`,
       });
       userId = user.id;
     });
@@ -97,7 +97,7 @@ describe('rules hook', () => {
 
       const result = await db.user.update({
         where: { id: userId },
-        data: { email: `updated${getNextSeq()}@example.com` },
+        data: { email: `updated${nextFactorySequenceNumber()}@example.com` },
       });
 
       expect(result.name).toBe('Original');
@@ -149,7 +149,7 @@ describe('rules hook', () => {
         error: 'name required',
       });
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const result = await db.user.upsert({
         where: { email: `upsert${seq}@example.com` },
         create: { email: `upsert${seq}@example.com`, name: 'New User' },
@@ -167,7 +167,7 @@ describe('rules hook', () => {
         error: 'name required',
       });
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const promise = async () =>
         db.user.upsert({
           where: { email: `upsert${seq}@example.com` },
@@ -201,7 +201,7 @@ describe('rules hook', () => {
     it('true: always passes', async () => {
       setRulesCache('User', true);
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const { entity: user } = await createUser({ email: `bool${seq}@example.com`, name: 'Test' });
 
       expect(user).toBeDefined();
@@ -210,7 +210,7 @@ describe('rules hook', () => {
     it('false: always fails', async () => {
       setRulesCache('User', false);
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const promise = async () => createUser({ email: `bool${seq}@example.com`, name: 'Test' });
 
       await expect(promise).toThrow();
@@ -253,7 +253,7 @@ describe('rules hook', () => {
         ],
       });
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Test' });
 
       expect(user).toBeDefined();
@@ -268,7 +268,7 @@ describe('rules hook', () => {
         error: 'must be admin or verified',
       });
 
-      const seq = getNextSeq();
+      const seq = nextFactorySequenceNumber();
       const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Admin' });
 
       expect(user.name).toBe('Admin');

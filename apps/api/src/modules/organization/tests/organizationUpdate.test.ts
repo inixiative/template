@@ -6,7 +6,7 @@ import {
   createOrganization,
   createOrganizationUser,
   createUser,
-  getNextSeq,
+  nextFactorySequenceNumber,
 } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import type { organizationUpdateRoute } from '#/modules/organization/routes/organizationUpdate';
@@ -57,7 +57,7 @@ describe('PATCH /api/v1/organization/:id', () => {
   });
 
   it('rejects duplicate slug', async () => {
-    const seq = getNextSeq();
+    const seq = nextFactorySequenceNumber();
     await createOrganization({ slug: `taken-slug-${seq}` });
 
     const response = await fetch(

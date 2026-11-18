@@ -15,13 +15,13 @@ const badges = async (ids: { components: string[]; templates: string[] }) => ({
       where: { id: { in: ids.components } },
       orderBy: { id: 'asc' },
     })
-  ).map((row) => [row.slug, row.degradedComponentRefs]),
+  ).map((row) => [row.slug, row.missingComponentSlugs]),
   templates: (
     await db.emailTemplate.findMany({
       where: { id: { in: ids.templates } },
       orderBy: { id: 'asc' },
     })
-  ).map((row) => [row.slug, row.degradedComponentRefs]),
+  ).map((row) => [row.slug, row.missingComponentSlugs]),
 });
 
 // logo is rendered by `direct` itself and by `nested` only through the header component.
@@ -30,17 +30,17 @@ const seedLogoConsumers = async () => {
   const { entity: header } = await createEmailComponent({
     slug: 'header',
     mjml: '<mj-text>Header</mj-text>{{#component:logo}}{{/component:logo}}',
-    componentRefs: ['logo'],
+    componentSlugs: ['logo'],
   });
   const { entity: direct } = await createEmailTemplate({
     slug: 'direct',
     mjml: mjml('{{#component:logo}}{{/component:logo}}'),
-    componentRefs: ['logo'],
+    componentSlugs: ['logo'],
   });
   const { entity: nested } = await createEmailTemplate({
     slug: 'nested',
     mjml: mjml('{{#component:header}}{{/component:header}}'),
-    componentRefs: ['header'],
+    componentSlugs: ['header'],
   });
   const { entity: unrelated } = await createEmailTemplate({
     slug: 'unrelated',

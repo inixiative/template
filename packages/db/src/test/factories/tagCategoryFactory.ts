@@ -5,9 +5,9 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory } from '@template/db/test/factory';
+import { registerFactory } from '@template/db/test/factory';
 
-const tagCategoryFactory = createFactory('TagCategory', {
+const tagCategoryFactory = registerFactory('TagCategory', {
   defaults: () => ({
     name: `${faker.word.noun()}-${faker.string.alphanumeric(6).toLowerCase()}`,
   }),

@@ -87,7 +87,7 @@ POST /api/v1/batch/execute takes { strategy, requests: rounds[][], headers? }. R
 
 Pick the strategy by failure semantics: transactionAll when everything must commit or roll back together; transactionPerRound when each round is atomic and earlier rounds may stay committed; allowFailures to attempt everything with each request committing on its own; failOnRound to stop after the first round with a failure, without rollback. Each strategy is a StrategyExecutor listed in BatchExecutionStrategies (constants.ts), which also derives the type and zod enum. Internally, registerBatch puts the db and the caller's base context in an in-memory registry; prepareRequest sees X-Batch-Id, skips re-authentication and deep-clones the mutable context (user, organizationUsers, spaces, token, …) into each sub-request with a fresh permix. readAsCaller and readAllAsCaller reuse that machinery to read one API path, or every page of a list (through fetchAllPages, capped), with the caller's identity, permissions, tenancy and rate-limit exemption; Flows read their steps this way. The registry is in memory, so it does not span several server instances.
 
-Related regions: the per-request context that sub-requests clone and the general 200-vs-4xx status rules are `request-context-errors`; the endpoints being batched are `api-routes / api-schemas-openapi`; fetchAllPages and list pagination are `filtering-search / pagination`; Flows, the main in-process user of readAllAsCaller, are `flows`; db.txn and the transaction client are `database-client / data-modeling`; bounded in-process concurrency (resolveAll) is `concurrency-locks`.
+Related regions: the per-request context that sub-requests clone and the general 200-vs-4xx status rules are `request-context-errors`; the endpoints being batched are `api-routes / api-schemas-openapi`; fetchAllPages and list pagination are `filtering-search / pagination`; Flows, the main in-process user of readAllAsCaller, are `flows`; db.txn and the transaction client are `database-client / data-modeling`; bounded in-process concurrency (runAllWithConcurrencyLimit) is `concurrency-locks`.
 
 ## 2b. Under construction
 
@@ -97,7 +97,7 @@ Open work you cannot use yet. Do not build against it, and do not build what it 
 
 ## 3. Everything that exists here, by class
 
-Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: makeLock, packages/db/src/lock/makeLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `batch`: Batch API: rounds, execution strategies, interpolation, status tracking
 
@@ -724,7 +724,7 @@ interpolation) is recorded as a failed result rather than rejecting the round wh
 still run, which would let them finish outside the rolled-back transaction.
 
 `allowFailures` and `failOnRound` run each round's sub-requests through `db.parallel` (capped by
-`getConcurrency([ConcurrencyType.db])`), so each sub-request gets its own scope and its own
+`minimumConcurrencyLimitFor([ConcurrencyType.db])`), so each sub-request gets its own scope and its own
 transaction; without that, parallel sub-requests sharing the parent request's scope joined whichever
 transaction a sibling had open.
 

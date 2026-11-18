@@ -1,8 +1,8 @@
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
-import { getNextSeq } from '@template/db/test';
+import { nextFactorySequenceNumber } from '@template/db/test';
 
-export const e164 = () => `+1555${String(getNextSeq()).padStart(7, '0').slice(-7)}`;
+export const e164 = () => `+1555${String(nextFactorySequenceNumber()).padStart(7, '0').slice(-7)}`;
 
 export const phone = (userId: string, position?: number) =>
   db.contact.create({
@@ -29,7 +29,7 @@ export const email = (userId: string) =>
       ownerModel: ContactOwnerModel.User,
       userId,
       type: ContactType.email,
-      value: { address: `test${getNextSeq()}@example.com` },
+      value: { address: `test${nextFactorySequenceNumber()}@example.com` },
     },
   });
 
@@ -39,7 +39,7 @@ export const mkEmail = (userId: string) =>
       ownerModel: ContactOwnerModel.User,
       userId,
       type: ContactType.email,
-      value: { address: `t${getNextSeq()}@ex.com` },
+      value: { address: `t${nextFactorySequenceNumber()}@ex.com` },
     },
   });
 
