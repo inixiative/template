@@ -11,7 +11,7 @@ The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drai
 ## What template already has (verified 2026-09-12)
 
 - `makeSingletonJob` is a thin caller of `makeLock` (`apps/api/src/jobs/makeSingletonJob.ts`). Zealot's #2271 is catching up to this; nothing to port for the constructor itself.
-- Per-module `queries/` folders (`modules/{inquiry,segment,customerRef}/queries/`).
+- Per-module `queries/` folders (`modules/{inquiry,segment,customerRelationship}/queries/`).
 - `deliverEmail` claims the communication log row as `sending` inside `db.txn` before the provider call.
 
 ## What to port

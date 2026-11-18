@@ -26,31 +26,31 @@ model User {
   platformRole PlatformRole @default(user)
 
   // Relations
-  accounts               Account[]
-  sessions               Session[]
-  organizationUsers      OrganizationUser[]
-  spaceUsers             SpaceUser[]
-  tokens                 Token[]
-  cronJobsCreated        CronJob[]
-  webhookSubscriptions   WebhookSubscription[]
-  integrations           Integration[]
-  projects               Project[]
-  contacts               Contact[]
-  tagAttachments         TagAttachment[]
-  tags                   Tag[]
-  tagCategories          TagCategory[]
-  inquiriesSent          Inquiry[]             @relation("InquirySource")
-  inquiriesReceived      Inquiry[]             @relation("InquiryTarget")
-  customerRefs           CustomerRef[]         @relation("customerRefs")
-  providerRefs           CustomerRef[]         @relation("providerRefs")
-  auditLogsAsActor       AuditLog[]            @relation("AuditLogActorUser")
-  auditLogsAsSpoofActor  AuditLog[]            @relation("AuditLogActorSpoofUser")
-  auditLogsAsSubject     AuditLog[]            @relation("AuditLogSubjectUser")
-  auditLogsAsContextUser AuditLog[]            @relation("AuditLogContextUser")
-  communicationsSent     CommunicationLog[]    @relation("CommunicationSenderUser")
-  communicationsReceived CommunicationLog[]    @relation("CommunicationRecipientUser")
-  segments               Segment[]
-  flows                  Flow[]
+  accounts                        Account[]
+  sessions                        Session[]
+  organizationUsers               OrganizationUser[]
+  spaceUsers                      SpaceUser[]
+  tokens                          Token[]
+  cronJobsCreated                 CronJob[]
+  webhookSubscriptions            WebhookSubscription[]
+  integrations                    Integration[]
+  projects                        Project[]
+  contacts                        Contact[]
+  tagAttachments                  TagAttachment[]
+  tags                            Tag[]
+  tagCategories                   TagCategory[]
+  inquiriesSent                   Inquiry[]              @relation("InquirySource")
+  inquiriesReceived               Inquiry[]              @relation("InquiryTarget")
+  customerRelationshipsAsProvider CustomerRelationship[] @relation("CustomerRelationshipAsProvider")
+  customerRelationshipsAsCustomer CustomerRelationship[] @relation("CustomerRelationshipAsCustomer")
+  auditLogsAsActor                AuditLog[]             @relation("AuditLogActorUser")
+  auditLogsAsSpoofActor           AuditLog[]             @relation("AuditLogActorSpoofUser")
+  auditLogsAsSubject              AuditLog[]             @relation("AuditLogSubjectUser")
+  auditLogsAsContextUser          AuditLog[]             @relation("AuditLogContextUser")
+  communicationsSent              CommunicationLog[]     @relation("CommunicationSenderUser")
+  communicationsReceived          CommunicationLog[]     @relation("CommunicationRecipientUser")
+  segments                        Segment[]
+  flows                           Flow[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

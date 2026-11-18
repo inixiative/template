@@ -13,7 +13,7 @@ export const includeCustomer = {
   customerSpace: {
     include: { organization: true },
   },
-} as const satisfies Prisma.CustomerRefInclude;
+} as const satisfies Prisma.CustomerRelationshipInclude;
 
 // Include provider side relations
 export const includeProvider = {
@@ -22,10 +22,10 @@ export const includeProvider = {
   providerSpace: {
     include: { organization: true },
   },
-} as const satisfies Prisma.CustomerRefInclude;
+} as const satisfies Prisma.CustomerRelationshipInclude;
 
 // Include both sides (complete)
 export const includeComplete = {
   ...includeCustomer,
   ...includeProvider,
-} as const satisfies Prisma.CustomerRefInclude;
+} as const satisfies Prisma.CustomerRelationshipInclude;

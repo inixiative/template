@@ -6,7 +6,7 @@
 
 A dynamic segment's membership moves for two reasons: a row its rule reads changes, or the clock
 does. The first is covered — `RECONCILE_TRIGGERS` maps every model the lens reads to the events
-that carry its change, and `reconcileCustomerRefSegments` re-evaluates the one customer. The
+that carry its change, and `reconcileCustomerRelationshipSegments` re-evaluates the one customer. The
 second has only the nightly backstop: `reconcileEveryHealthyDynamicSegment` at 04:00 UTC re-enqueues every sound dynamic
 segment. A rule like "last order within the past 2 hours" or "signed up this week" is therefore up
 to a day stale, while the sweep spends most of its budget on rules that never read the clock.

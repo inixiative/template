@@ -31,7 +31,7 @@ const fetchInfo = async () => {
 describe('GET /api/v1/segment/info', () => {
   it('answers without a session and tags conditions as a rule', async () => {
     const info = await fetchInfo();
-    expect(info.root).toBe('CustomerRef');
+    expect(info.root).toBe('CustomerRelationship');
     expect(info.conditions).toBe('rule');
   });
 

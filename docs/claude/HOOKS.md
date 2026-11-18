@@ -131,8 +131,8 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `ruleReference` | Keeps `RuleReference` edges in step with each rule-bearing column (`RULE_REFERENCE_SURFACES`, `apps/api/src/hooks/ruleReference/surfaces.ts`: email templates and components, segment `conditions`, `Entitlement.where` read through `entitlementWhereLens`, which names the entitled record by id) |
 | `ruleReference:target` | Copies a named row's `deletedAt` onto the edges that name it, for every edge in `NAMING_EDGES` (`targetHook.ts`): `RuleReference.targetDeletedAt` and `Entitlement.sourceDeletedAt`. A purged row is left to the null FK |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
-| `segmentConditions` | Segment `conditions` required, validated by `validateSegmentConditions` (against `customerRefLens`, compiled with `resolvedCustomerRefLens(ownerModel, …)`) + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
-| `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
+| `segmentConditions` | Segment `conditions` required, validated by `validateSegmentConditions` (against `customerRelationshipLens`, compiled with `resolvedCustomerRelationshipLens(ownerModel, …)`) + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
+| `segmentMemberOwner` | A SegmentMember's customer relationship must belong to the segment's owner as its provider |
 | `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). Each delete behavior has its own registry, keyed by the child model: `HARD_DELETE_ON_TOMBSTONE` (`@template/db` registries) hard-deletes ephemeral rows that must not survive a revive — `Session`, `WebhookSubscription`, `WebhookEvent`, `RuleReference`, `Flow`; `REGENERATE_ON_REVIVE` rebuilds the derived ones (`RuleReference`) when the parent is revived; `SKIP_REVIVE` (`@template/db` registries: `Token`) tombstones a row with its parent and never revives it (a grant has to be issued again), and the cascade never reaches its children (a token's entitlement rows stay dead); `CLOSE_ON_PARENT_DELETE` closes a child instead of burying it: its open rows get the close written and nothing is tombstoned, so every row stays as the record (an `Inquiry` whose party is tombstoned is canceled unless already decided), and every parent of such a model must be soft-delete; `CASCADE_EXEMPT` lists the reference relations that never cascade (every `Entitlement` source, every `RuleReference` target); `validateDeleteBehavior` refuses an inconsistent registry at boot |
 | `tagOwnerCategory` | A created Tag's ownerModel + FK must match its TagCategory's owner. A tag never moves: `tagCategoryId` is refused on update (422) and the owner fields are stripped |
 | `webhooks` | Webhook delivery on mutations (post-commit) |
@@ -238,20 +238,20 @@ Automatic webhook delivery on database mutations.
 ```typescript
 // packages/db/src/registries/webhook/enabledModels.ts
 export const webhookEnabledModels: WebhookModel[] = [
-  WebhookModel.CustomerRef,
+  WebhookModel.CustomerRelationship,
 ];
 ```
 
 ### How It Works
 
 1. A mutation runs the `webhookDelivery` hook (after the write; jobs are scheduled with `db.onCommit`). It acts when the model is webhook-enabled, or when `webhookRelatedModels` lists it as a party of one
-2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRef's parties are its customer and its provider. A related row (a User, Organization or Space) takes the counterparty of every live CustomerRef it sits on, on either axis
+2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRelationship's parties are its customer and its provider. A related row (a User, Organization or Space) takes the counterparty of every live CustomerRelationship it sits on, on either axis
 3. It loads only the active subscriptions owned by those parties, and enqueues one `sendWebhook` job per (subscription, changed row), skipping the write's origin integration and no-op updates
 4. The job signs the payload with RSA-SHA256 and delivers it
 
 ### Tenancy (AUTH-006 stopgap)
 
-A subscription receives a CustomerRef change when its owner (User, Organization or Space) is one of its two parties. It receives a party's own change when its owner is that party's counterparty on a live CustomerRef: a provider hears its customers, a customer hears its providers. The changed party does not hear its own change, and nothing travels past one CustomerRef. A row that sits on several CustomerRefs, or on both axes, reaches each subscription once. A soft delete (`deletedAt` set) is delivered as `delete`. When a party is soft-deleted, its counterparties still hear it through CustomerRefs the cascade tombstoned with the same `deletedAt`; CustomerRefs deleted earlier stay silent. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
+A subscription receives a CustomerRelationship change when its owner (User, Organization or Space) is one of its two parties. It receives a party's own change when its owner is that party's counterparty on a live CustomerRelationship: a provider hears its customers, a customer hears its providers. The changed party does not hear its own change, and nothing travels past one CustomerRelationship. A row that sits on several CustomerRelationships, or on both axes, reaches each subscription once. A soft delete (`deletedAt` set) is delivered as `delete`. When a party is soft-deleted, its counterparties still hear it through CustomerRelationships the cascade tombstoned with the same `deletedAt`; CustomerRelationships deleted earlier stay silent. An organization does not yet hear about the CustomerRelationships of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
 
 ### Webhook Payload
 
@@ -330,14 +330,14 @@ Sensitive columns are not no-op fields: they are `SENSITIVE_FIELDS`, which audit
 
 ### Related Models
 
-A party's own row changes reach its counterparties on its CustomerRefs. Each party model is registered on both axes:
+A party's own row changes reach its counterparties on its CustomerRelationships. Each party model is registered on both axes:
 
 ```typescript
 // packages/db/src/registries/webhook/relatedModels.ts
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
   User: [
-    { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
-    { model: 'CustomerRef', axis: 'providerModel', value: 'User' },
+    { model: 'CustomerRelationship', axis: 'customerModel', value: 'User' },
+    { model: 'CustomerRelationship', axis: 'providerModel', value: 'User' },
   ],
 };
 ```

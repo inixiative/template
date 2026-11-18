@@ -13,29 +13,29 @@ model Organization {
   slug String @unique
 
   // Relations
-  organizationUsers    OrganizationUser[]
-  spaceUsers           SpaceUser[]
-  tokens               Token[]
-  webhookSubscriptions WebhookSubscription[]
-  integrations         Integration[]
-  projects             Project[]
-  contacts             Contact[]
-  tagAttachments       TagAttachment[]
-  tags                 Tag[]
-  tagCategories        TagCategory[]
-  inquiriesSent        Inquiry[]             @relation("InquirySource")
-  inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
-  emailComponents      EmailComponent[]
-  emailTemplates       EmailTemplate[]
-  targetRuleReferences RuleReference[]       @relation("RuleReferenceTarget")
-  spaces               Space[]
-  customerRefs         CustomerRef[]         @relation("customerRefs")
-  providerRefs         CustomerRef[]         @relation("providerRefs")
-  authProviders        AuthProvider[]
-  auditLogsAsContext   AuditLog[]            @relation("AuditLogContextOrganization")
-  auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectOrganization")
-  communicationsSent   CommunicationLog[]    @relation("CommunicationSenderOrganization")
-  segments             Segment[]
+  organizationUsers               OrganizationUser[]
+  spaceUsers                      SpaceUser[]
+  tokens                          Token[]
+  webhookSubscriptions            WebhookSubscription[]
+  integrations                    Integration[]
+  projects                        Project[]
+  contacts                        Contact[]
+  tagAttachments                  TagAttachment[]
+  tags                            Tag[]
+  tagCategories                   TagCategory[]
+  inquiriesSent                   Inquiry[]              @relation("InquirySource")
+  inquiriesReceived               Inquiry[]              @relation("InquiryTarget")
+  emailComponents                 EmailComponent[]
+  emailTemplates                  EmailTemplate[]
+  targetRuleReferences            RuleReference[]        @relation("RuleReferenceTarget")
+  spaces                          Space[]
+  customerRelationshipsAsProvider CustomerRelationship[] @relation("CustomerRelationshipAsProvider")
+  customerRelationshipsAsCustomer CustomerRelationship[] @relation("CustomerRelationshipAsCustomer")
+  authProviders                   AuthProvider[]
+  auditLogsAsContext              AuditLog[]             @relation("AuditLogContextOrganization")
+  auditLogsAsSubject              AuditLog[]             @relation("AuditLogSubjectOrganization")
+  communicationsSent              CommunicationLog[]     @relation("CommunicationSenderOrganization")
+  segments                        Segment[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

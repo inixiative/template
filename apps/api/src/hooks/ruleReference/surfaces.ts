@@ -31,7 +31,7 @@ import {
 import type { RuleLens, RuleReference } from '@template/shared/rules';
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import { entitlementWhereLens } from '#/lib/permissions/entitlementWhereLens';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
+import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
 type Row = Record<string, unknown>;
@@ -123,7 +123,7 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
     columns: ['conditions'],
     label: (row) => `segment '${row.name ?? row.id}'`,
     lens: (row) =>
-      resolvedCustomerRefLens((row as Segment).ownerModel, segmentOwnerId(row as Segment)),
+      resolvedCustomerRelationshipLens((row as Segment).ownerModel, segmentOwnerId(row as Segment)),
     storage: storedAsCondition('conditions'),
   }),
   Entitlement: declare({

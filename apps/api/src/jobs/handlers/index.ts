@@ -13,9 +13,9 @@ import {
   recomputeEmailDependents,
 } from '#/jobs/handlers/recomputeEmailDependents';
 import {
-  type ReconcileCustomerRefSegmentsPayload,
-  reconcileCustomerRefSegments,
-} from '#/jobs/handlers/reconcileCustomerRefSegments';
+  type ReconcileCustomerRelationshipSegmentsPayload,
+  reconcileCustomerRelationshipSegments,
+} from '#/jobs/handlers/reconcileCustomerRelationshipSegments';
 import { reconcileEveryHealthyDynamicSegment } from '#/jobs/handlers/reconcileEveryHealthyDynamicSegment';
 import { type ReconcileSegmentPayload, reconcileSegment } from '#/jobs/handlers/reconcileSegment';
 import {
@@ -37,7 +37,7 @@ export const JobHandlerName = {
   rotateEncryptionKeys: 'rotateEncryptionKeys',
   hardDeleteRecordsPastRetention: 'hardDeleteRecordsPastRetention',
   reconcileSegment: 'reconcileSegment',
-  reconcileCustomerRefSegments: 'reconcileCustomerRefSegments',
+  reconcileCustomerRelationshipSegments: 'reconcileCustomerRelationshipSegments',
   reconcileEveryHealthyDynamicSegment: 'reconcileEveryHealthyDynamicSegment',
   recomputeEmailDependents: 'recomputeEmailDependents',
   coordinateRollingCaches: 'coordinateRollingCaches',
@@ -54,7 +54,7 @@ export type JobPayloads = {
   rotateEncryptionKeys: undefined;
   hardDeleteRecordsPastRetention: HardDeleteRecordsPastRetentionPayload;
   reconcileSegment: ReconcileSegmentPayload;
-  reconcileCustomerRefSegments: ReconcileCustomerRefSegmentsPayload;
+  reconcileCustomerRelationshipSegments: ReconcileCustomerRelationshipSegmentsPayload;
   reconcileEveryHealthyDynamicSegment: undefined;
   recomputeEmailDependents: RecomputeEmailDependentsPayload;
   coordinateRollingCaches: undefined;
@@ -73,7 +73,7 @@ export const jobHandlers: JobHandlers = {
   rotateEncryptionKeys,
   hardDeleteRecordsPastRetention,
   reconcileSegment,
-  reconcileCustomerRefSegments,
+  reconcileCustomerRelationshipSegments,
   reconcileEveryHealthyDynamicSegment,
   recomputeEmailDependents,
   coordinateRollingCaches,

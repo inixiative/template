@@ -21,7 +21,7 @@ export const segmentDeleteController = makeController(segmentDeleteRoute, async 
   });
   await emitAppEvent('segment.deleted', {
     segment: deleted,
-    customerRefIds: map(members, 'customerRefId'),
+    customerRelationshipIds: map(members, 'customerRelationshipId'),
   });
   return respond.noContent();
 });

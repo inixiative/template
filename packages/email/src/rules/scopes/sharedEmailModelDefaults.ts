@@ -20,5 +20,7 @@ export const SHARED_EMAIL_MODEL_DEFAULTS: NarrowingDefaults['models'] = {
   Segment: { where: segment, sources: { id: { label: 'name', where: segment } } },
   TagAttachment: { where: rerootConditionUnderRelation('tag', tag) },
   SegmentMember: { where: rerootConditionUnderRelation('segment', segment) },
-  CustomerRef: { where: conditionPolymorphicAxisPointsAtBoundRow('CustomerRef', 'providerModel') },
+  CustomerRelationship: {
+    where: conditionPolymorphicAxisPointsAtBoundRow('CustomerRelationship', 'providerModel'),
+  },
 };

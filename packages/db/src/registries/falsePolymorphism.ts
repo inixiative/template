@@ -40,7 +40,7 @@ export type PolymorphicConfig = {
 
 // Reference to a model via its false polymorphic relationship
 export type FalsePolymorphismRef = {
-  model: ModelName; // The polymorphic model (e.g., CustomerRef)
+  model: ModelName; // The polymorphic model (e.g., CustomerRelationship)
   axis: string; // Which axis (e.g., customerModel, providerModel)
   value: string; // The type value (e.g., User, Organization, Space)
 };
@@ -168,19 +168,19 @@ export const PolymorphismRegistry = {
       {
         field: 'model',
         fkMap: {
-          CustomerRef: [],
+          CustomerRelationship: [],
         },
       },
     ],
-    // All owner types can subscribe to CustomerRef
+    // All owner types can subscribe to CustomerRelationship
     allowedCombinations: {
-      User: ['CustomerRef'],
-      Organization: ['CustomerRef'],
-      Space: ['CustomerRef'],
+      User: ['CustomerRelationship'],
+      Organization: ['CustomerRelationship'],
+      Space: ['CustomerRelationship'],
     },
   },
 
-  CustomerRef: {
+  CustomerRelationship: {
     axes: [
       {
         field: 'customerModel',
@@ -367,7 +367,7 @@ export const PolymorphismRegistry = {
           CronJob: ['subjectCronJobId'],
           EmailTemplate: ['subjectEmailTemplateId'],
           EmailComponent: ['subjectEmailComponentId'],
-          CustomerRef: ['subjectCustomerRefId'],
+          CustomerRelationship: ['subjectCustomerRelationshipId'],
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
           Entitlement: ['subjectEntitlementId'],
@@ -394,7 +394,7 @@ export const PolymorphismRegistry = {
       {
         field: 'model',
         fkMap: {
-          CustomerRef: ['customerRefId'],
+          CustomerRelationship: ['customerRelationshipId'],
         },
       },
     ],

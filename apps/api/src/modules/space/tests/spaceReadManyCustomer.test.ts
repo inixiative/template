@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
-  CustomerRef,
+  CustomerRelationship,
   Organization,
   OrganizationUser,
   Space,
@@ -9,7 +9,7 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
-  createCustomerRef,
+  createCustomerRelationship,
   createOrganizationUser,
   createSpace,
   createSpaceUser,
@@ -37,10 +37,8 @@ describe('GET /api/v1/space/:id/customers', () => {
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
 
-    ({ entity: spaceUser } = await createSpaceUser(
-      { role: 'admin' },
-      { user, organization: org, space, organizationUser: orgUser },
-    ));
+    const { entity: su } = await createSpaceUser({ role: 'admin' }, { ...context, space });
+    spaceUser = su;
 
     const harness = createTestApp({
       mockUser: user,
@@ -60,13 +58,13 @@ describe('GET /api/v1/space/:id/customers', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
     expect(response.status).toBe(200);
 
-    const { data } = await parseSuccessBody<CustomerRef[]>(response);
+    const { data } = await parseSuccessBody<CustomerRelationship[]>(response);
     expect(data.length).toBe(0);
   });
 
   it('returns user customers', async () => {
     const { entity: customerUser } = await createUser();
-    await createCustomerRef({
+    await createCustomerRelationship({
       customerModel: 'User',
       customerUserId: customerUser.id,
       providerModel: 'Space',
@@ -76,14 +74,14 @@ describe('GET /api/v1/space/:id/customers', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
     expect(response.status).toBe(200);
 
-    const { data } = await parseSuccessBody<CustomerRef[]>(response);
+    const { data } = await parseSuccessBody<CustomerRelationship[]>(response);
     expect(data.length).toBeGreaterThanOrEqual(1);
     expect(data.some((c) => c.customerUserId === customerUser.id)).toBe(true);
   });
 
   it('returns organization customers', async () => {
     const { entity: customerOrg } = await createOrganizationUser({ role: 'owner' });
-    await createCustomerRef({
+    await createCustomerRelationship({
       customerModel: 'Organization',
       customerOrganizationId: customerOrg.organizationId,
       providerModel: 'Space',
@@ -93,7 +91,7 @@ describe('GET /api/v1/space/:id/customers', () => {
     const response = await fetch(get(`/api/v1/space/${space.id}/customers`));
     expect(response.status).toBe(200);
 
-    const { data } = await parseSuccessBody<CustomerRef[]>(response);
+    const { data } = await parseSuccessBody<CustomerRelationship[]>(response);
     expect(data.some((c) => c.customerOrganizationId === customerOrg.organizationId)).toBe(true);
   });
 });

@@ -12,7 +12,7 @@
 
 ## What to measure
 
-- **Customer rail** (`reconcileCustomerRefSegments` → `reconcileCustomerRef`): queries per run. Today it evaluates *every* dynamic segment of the customer's providers (`dynamicSegmentsOf(...).filter(isReconcilableDynamicSegment)`) and runs `check()` per segment over one hydrated ref. Count segments evaluated × queries per evaluation at current segment counts.
+- **Customer rail** (`reconcileCustomerRelationshipSegments` → `reconcileCustomerRelationship`): queries per run. Today it evaluates *every* dynamic segment of the customer's providers (`dynamicSegmentsOf(...).filter(isReconcilableDynamicSegment)`) and runs `check()` per segment over one hydrated ref. Count segments evaluated × queries per evaluation at current segment counts.
 - **Segment rail** (`reconcileSegment`): set-based, one query per segment via `toPrisma` over the resolved lens, plus junction diff writes. Count queries + write volume per rule change.
 - **Sweep** (`reconcileEveryHealthyDynamicSegment`, 04:00 UTC): full pass over sound dynamic segments in dependency order. Cost per night at current scale.
 - **Trigger frequency**: events per customer per day across `RECONCILE_TRIGGERS`. The job supersedes per customer, so burst writes collapse — measure how much that actually absorbs.
@@ -32,6 +32,6 @@ At what scale — segments per owner × customers × trigger events per day — 
 - FEAT-021 (segments; "Field-level trigger narrowing" and "Reach-set delta" open items)
 - INFRA-030 (reference registry — the derive-at-save precedent)
 - FEAT-003 (future flags — the segment-count multiplier)
-- `apps/api/src/modules/segment/services/reconcileCustomerRef.ts`
-- `apps/api/src/jobs/handlers/reconcileCustomerRefSegments.ts`
+- `apps/api/src/modules/segment/services/reconcileCustomerRelationship.ts`
+- `apps/api/src/jobs/handlers/reconcileCustomerRelationshipSegments.ts`
 - `apps/api/src/modules/segment/lib/reconcileTriggers.ts`

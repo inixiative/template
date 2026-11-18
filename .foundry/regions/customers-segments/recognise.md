@@ -4,7 +4,7 @@
 
 ## What this region is
 
-The provider–customer relationship and the audiences a provider defines over its own customers: how segment rules are validated against the customer-ref lens, how membership is computed and kept current by event-driven reconciliation, and how degraded rules are tracked and contained.
+The provider–customer relationship and the audiences a provider defines over its own customers: how segment rules are validated against the customer-relationship lens, how membership is computed and kept current by event-driven reconciliation, and how degraded rules are tracked and contained.
 
 ## What it exists for
 
@@ -152,7 +152,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - full recompute of who's in it
 - I'll write a DFS over the conditions to find cycles
 - I'll return the segment with its rule to the member
-- I'll fetch each customer ref one by one
+- I'll fetch each customer relationship one by one
 - the admin view that shows everyone involved
 - attach the customer user, org or space to each row
 - attach the provider org or space to each row

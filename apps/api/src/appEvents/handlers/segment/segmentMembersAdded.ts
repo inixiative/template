@@ -12,7 +12,7 @@ export type SegmentMembersAddedPayload = {
   segmentId: string;
   ownerModel: ProviderModel;
   ownerId: string;
-  customerRefIds: string[];
+  customerRelationshipIds: string[];
 };
 
 export const segmentMembersAdded = makeAppEvent<SegmentMembersAddedPayload>({

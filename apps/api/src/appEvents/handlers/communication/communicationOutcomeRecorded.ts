@@ -14,7 +14,7 @@ export const communicationOutcomeRecorded = makeAppEvent<CommunicationOutcomeRec
   cb: [
     async ({ communicationLog }) => {
       if (!communicationLog.recipientUserId) return;
-      await enqueueJob('reconcileCustomerRefSegments', {
+      await enqueueJob('reconcileCustomerRelationshipSegments', {
         customerModel: 'User',
         customerId: communicationLog.recipientUserId,
       });

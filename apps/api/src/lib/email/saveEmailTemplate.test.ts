@@ -23,7 +23,7 @@ const taggedBlock = (tagId: string) =>
 
 const inSegmentBlock = (segmentId: string) =>
   `{{#if rule=${JSON.stringify({
-    field: 'recipient.providerRefs',
+    field: 'recipient.customerRelationshipsAsCustomer',
     arrayOperator: 'any',
     condition: {
       field: 'segmentMembers',

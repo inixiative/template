@@ -14,9 +14,9 @@ const integrationRecordFactory = registerFactory('IntegrationRecord', {
       foreignKey: { id: 'integrationId' },
       required: true,
     },
-    customerRef: {
-      modelName: 'CustomerRef',
-      foreignKey: { id: 'customerRefId' },
+    customerRelationship: {
+      modelName: 'CustomerRelationship',
+      foreignKey: { id: 'customerRelationshipId' },
       required: false,
     },
   },

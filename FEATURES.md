@@ -242,7 +242,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Post-Transaction Queue** - Jobs enqueued during transaction but only executed after successful commit. Ensures webhooks and external notifications don't fire for rolled-back changes. Critical for maintaining consistency between database state and external systems
 
-- ✅ **Robust False Polymorphism** - Pattern for polymorphic relationships without database-level polymorphism. Models like Token (user/organization/space scoped) and CustomerRef (references different customer types) use explicit foreign keys with validation. More type-safe and performant than traditional polymorphic associations. [Learn more: DATABASE.md](docs/claude/DATABASE.md)
+- ✅ **Robust False Polymorphism** - Pattern for polymorphic relationships without database-level polymorphism. Models like Token (user/organization/space scoped) and CustomerRelationship (references different customer types) use explicit foreign keys with validation. More type-safe and performant than traditional polymorphic associations. [Learn more: DATABASE.md](docs/claude/DATABASE.md)
 
 - ✅ **Split Schema Architecture** - One Prisma file per model in `packages/db/prisma/schema/` for better organization and merge conflict reduction. Schema files dynamically combined during generation. Makes large schemas manageable
 
@@ -256,7 +256,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories). The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
-- ✅ **34 Database Models** - account, appEvent, auditLog, authProvider, communicationLog, communicationComponentVersion, contact, cronJob, customerRef, emailTemplate, emailComponent, flow, integrationRecord, integration, jobOutbox, inquiry, organizationUser, organization, project, jwks, segment, segmentMember, session, ruleReference, spaceUser, tag, space, tagAttachment, user, token, tagCategory, verification, webhookSubscription, webhookEvent
+- ✅ **34 Database Models** - account, appEvent, auditLog, authProvider, communicationLog, communicationComponentVersion, contact, cronJob, customerRelationship, emailTemplate, emailComponent, flow, integrationRecord, integration, jobOutbox, inquiry, organizationUser, organization, project, jwks, segment, segmentMember, session, ruleReference, spaceUser, tag, space, tagAttachment, user, token, tagCategory, verification, webhookSubscription, webhookEvent
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -266,9 +266,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Runtime Schema Introspection** - Parse Prisma's runtime data model and inline schema to extract FK mappings, relations, and field metadata at runtime. Enables dynamic hydration, validation, and tooling without hardcoded model knowledge
 
-- ✅ **Advanced Constraints** - Partial unique indexes are declared in the Prisma schema (the `partialIndexes` preview feature: `@@unique([...], where: { ... })`; `CustomerRef` keeps one row per customer/provider pair this way). Row checks the schema can't express are json-rules in `RulesRegistry` (`apps/api/src/hooks/rules/registry.ts`), enforced by the `rules` hook on every write, so the rule lives in the mutation lifecycle with the rest of the write guards instead of in hand-written SQL. [Learn more: HOOKS.md](docs/claude/HOOKS.md#rules-registry)
+- ✅ **Advanced Constraints** - Partial unique indexes are declared in the Prisma schema (the `partialIndexes` preview feature: `@@unique([...], where: { ... })`; `CustomerRelationship` keeps one row per customer/provider pair this way). Row checks the schema can't express are json-rules in `RulesRegistry` (`apps/api/src/hooks/rules/registry.ts`), enforced by the `rules` hook on every write, so the rule lives in the mutation lifecycle with the rest of the write guards instead of in hand-written SQL. [Learn more: HOOKS.md](docs/claude/HOOKS.md#rules-registry)
 
-- ✅ **False Polymorphism Registry** - Centralized configuration (`PolymorphismRegistry`) defining polymorphic patterns across models. Single source of truth for constraints, validation hooks, and FK resolution. Supports multi-axis polymorphism (Token owner + model, CustomerRef customer + provider)
+- ✅ **False Polymorphism Registry** - Centralized configuration (`PolymorphismRegistry`) defining polymorphic patterns across models. Single source of truth for constraints, validation hooks, and FK resolution. Supports multi-axis polymorphism (Token owner + model, CustomerRelationship customer + provider)
 
 - ✅ **Model Name Utilities** - Type-safe conversion between model names (`User`) and accessor names (`user`). Guards like `isModelName()` and `isAccessorName()` prevent runtime errors from invalid model references
 
@@ -469,7 +469,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Customer Management
 
-- ✅ `CustomerRef` models a customer/provider pair, with User, Organization and Space branches on both axes. Segments operate on these references.
+- ✅ `CustomerRelationship` models a customer/provider pair, with User, Organization and Space branches on both axes. Segments operate on these relationships.
 - ✅ Provider list (`/me/providers`) and Space customer list (`/space/:id/customers`) routes exist.
 - 🟡 Provider-side User/Organization customer lists and broader relationship-management UI remain work in progress.
 
@@ -477,7 +477,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Segments
 
-- ✅ **Provider-Owned Audiences** — Named sets of `CustomerRef` rows owned by a User, Organization or Space. Every segment has a lens-validated rule; hand-picked audiences are static ID rules.
+- ✅ **Provider-Owned Audiences** — Named sets of `CustomerRelationship` rows owned by a User, Organization or Space. Every segment has a lens-validated rule; hand-picked audiences are static ID rules.
 - ✅ **Static and Dynamic Membership** — Set-based segment reconciliation plus customer-side dynamic evaluation, driven by business events and backed by a nightly reconcile of every healthy dynamic segment. Segment-of-segment rules run in dependency order.
 - ✅ **Reference Health** — RuleReference edges, cycle/ownership checks and transitive degradation. Owner reads include `ruleIssues`; membership reads hide the rule. Degraded segments retain their existing members and are skipped by continuous reconciliation.
 - ✅ **API and Reach Preview** — Owner-scoped create/list and reach estimation, segment read/update/delete and member lists, plus customer-facing membership lists.
@@ -715,7 +715,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Context Isolation in Batch API** - Each request in a batch gets its own isolated AppEnv (db, auth, permissions). Prevents one batch operation from leaking context into another. Transaction strategies (transactionAll, transactionPerRound) wrap operations without sharing mutable state
 - ✅ **Multi-Strategy Authentication** - Single middleware chain handles person JWTs, Bearer API tokens, and API-token URL params (never cookies or sessions). Strategy auto-detected from request headers — no route-level branching. Spoof header (`x-spoof-user-email`) layered on top for superadmin impersonation
-- ✅ **False Polymorphism** - Polymorphic relationships (Token owner, CustomerRef) use explicit FK columns instead of type + ID string pairs. Each possible owner type has its own nullable FK. Prisma enforces referential integrity per FK. PolymorphismRegistry centralizes constraints, validation, and FK resolution
+- ✅ **False Polymorphism** - Polymorphic relationships (Token owner, CustomerRelationship) use explicit FK columns instead of type + ID string pairs. Each possible owner type has its own nullable FK. Prisma enforces referential integrity per FK. PolymorphismRegistry centralizes constraints, validation, and FK resolution
 - ✅ **Dynamic Schema Generation** - Prisma schema split across one file per model in `prisma/schema/`. Build step concatenates files before generation. Reduces merge conflicts, enables per-model organization, and makes large schemas navigable
 - ✅ **Permission-Based Menu Rendering** - Navigation config declares required permissions per item. Menu rendered by evaluating each item's permission against the Permix client. Items hidden (not just disabled) if user lacks permission. Re-evaluated on context switch (org/space change)
 - ✅ **Encryption Versioning** - Each encrypted field stores the key version used to encrypt it. Rotation job queries fields WHERE version < current and re-encrypts in batches. CI blocks deploys if version gaps or downgrades detected. Dual-key window (current + previous) enables zero-downtime rotation

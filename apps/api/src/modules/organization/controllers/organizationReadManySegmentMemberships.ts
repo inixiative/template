@@ -18,7 +18,7 @@ export const organizationReadManySegmentMembershipsController = makeController(
 
     const { data, pagination } = await paginate(c, db.segmentMember, {
       where: {
-        customerRef: { customerOrganizationId: organization.id },
+        customerRelationship: { customerOrganizationId: organization.id },
         segment: { deletedAt: null },
       },
       include: includeSegmentForCustomer,

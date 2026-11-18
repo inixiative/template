@@ -9,8 +9,8 @@ import { db, Prisma } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { branchOnRuleHealth, RuleDegradedError, RuleEvaluationError } from '@template/shared/rules';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
-import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
+import { customerRelationshipProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentRuleState } from '#/modules/segment/services/segmentRuleHealth';
 
 const isInfrastructureFault = (error: unknown): boolean =>
@@ -23,11 +23,11 @@ export const compileSegmentWhere = async (
   rule: Condition,
 ): Promise<Record<string, unknown>> => {
   const plan = toPrisma(rule, {
-    lens: resolvedCustomerRefLens(ownerModel, ownerId),
+    lens: resolvedCustomerRelationshipLens(ownerModel, ownerId),
     now: new Date(),
   });
   const where = await executePrismaPlan(plan, db as never);
-  return andWhere([where, { [customerRefProviderFk(ownerModel)]: ownerId }]);
+  return andWhere([where, { [customerRelationshipProviderFk(ownerModel)]: ownerId }]);
 };
 
 const segmentWhere = async (segment: Segment): Promise<Record<string, unknown>> => {
@@ -42,7 +42,7 @@ const segmentWhere = async (segment: Segment): Promise<Record<string, unknown>> 
 export const evaluateSegment = async (segment: Segment): Promise<string[]> => {
   try {
     const where = await segmentWhere(segment);
-    const rows = await db.customerRef.findMany({ where, select: { id: true } });
+    const rows = await db.customerRelationship.findMany({ where, select: { id: true } });
     return rows.map((row) => row.id);
   } catch (error) {
     if (error instanceof RuleDegradedError || isInfrastructureFault(error)) throw error;

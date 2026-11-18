@@ -268,7 +268,7 @@ describe("renderEmailTemplateWithFallback — rules evaluate through the owner's
 
   const inSegmentBlock = (segmentId: string) =>
     `{{#if rule=${JSON.stringify({
-      field: 'recipient.providerRefs',
+      field: 'recipient.customerRelationshipsAsCustomer',
       arrayOperator: 'any',
       condition: {
         field: 'segmentMembers',
@@ -286,7 +286,7 @@ describe("renderEmailTemplateWithFallback — rules evaluate through the owner's
         name: 'Ada',
         email: 'ada@example.com',
         tagAttachments: [{ deletedAt: null, tag: { ...tag, name: 't' } }],
-        providerRefs: [],
+        customerRelationshipsAsCustomer: [],
       },
       data: {},
     });

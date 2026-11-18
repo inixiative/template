@@ -3,7 +3,7 @@ import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type {
-  CustomerRef,
+  CustomerRelationship,
   Organization,
   OrganizationUser,
   Segment,
@@ -13,7 +13,7 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
-  createCustomerRef,
+  createCustomerRelationship,
   createOrganizationUser,
   createSegment,
   createSpace,
@@ -54,9 +54,9 @@ describe('segment routes', () => {
   let org: Organization;
   let space: Space;
   let customer: User;
-  let customerRef: CustomerRef;
+  let customerRelationship: CustomerRelationship;
   let outsider: User;
-  let outsiderRef: CustomerRef;
+  let outsiderRelationship: CustomerRelationship;
 
   beforeEach(async () => {
     const { entity: ou, context } = await createOrganizationUser({ role: 'admin' });
@@ -69,16 +69,16 @@ describe('segment routes', () => {
       .entity;
     outsider = (await createUser({ email: `outsider-${nextFactorySequenceNumber()}@example.test` }))
       .entity;
-    customerRef = (
-      await createCustomerRef({
+    customerRelationship = (
+      await createCustomerRelationship({
         customerModel: 'User',
         providerModel: 'Space',
         customerUserId: customer.id,
         providerSpaceId: space.id,
       })
     ).entity;
-    outsiderRef = (
-      await createCustomerRef({
+    outsiderRelationship = (
+      await createCustomerRelationship({
         customerModel: 'User',
         providerModel: 'Space',
         customerUserId: outsider.id,
@@ -130,8 +130,8 @@ describe('segment routes', () => {
 
     const members = await ownerFetch(get(`/api/v1/segment/${segment.id}/segmentMembers`));
     const { data } = await parseSuccessBody<SegmentMemberWithCustomer[]>(members);
-    expect(data.map((member) => member.customerRefId)).toEqual([customerRef.id]);
-    expect(data[0]!.customerRef.customerUser).toBeTruthy();
+    expect(data.map((member) => member.customerRelationshipId)).toEqual([customerRelationship.id]);
+    expect(data[0]!.customerRelationship.customerUser).toBeTruthy();
   });
 
   it('the space lists the segments it owns', async () => {
@@ -208,7 +208,7 @@ describe('segment routes', () => {
   it('the owner hand-picks an audience as a static segment over ids, scoped to their own customers', async () => {
     const elsewhere = (await createSpace({}, { organization: org })).entity;
     const foreign = (
-      await createCustomerRef({
+      await createCustomerRelationship({
         customerModel: 'User',
         providerModel: 'Space',
         customerUserId: outsider.id,
@@ -219,7 +219,11 @@ describe('segment routes', () => {
       post(`/api/v1/space/${space.id}/segments`, {
         name: `picked-${nextFactorySequenceNumber()}`,
         type: 'static',
-        conditions: { field: 'id', operator: Operator.in, value: [outsiderRef.id, foreign.id] },
+        conditions: {
+          field: 'id',
+          operator: Operator.in,
+          value: [outsiderRelationship.id, foreign.id],
+        },
       }),
     );
     expect(response.status).toBe(201);
@@ -227,7 +231,7 @@ describe('segment routes', () => {
 
     const members = await ownerFetch(get(`/api/v1/segment/${picked.id}/segmentMembers`));
     const { data } = await parseSuccessBody<SegmentMember[]>(members);
-    expect(data.map((member) => member.customerRefId)).toEqual([outsiderRef.id]);
+    expect(data.map((member) => member.customerRelationshipId)).toEqual([outsiderRelationship.id]);
   });
 
   it('rejects conditions outside the lens with a 422', async () => {
@@ -310,8 +314,8 @@ describe('segment routes', () => {
 
     const removed = await db.appEvent.findMany({
       where: {
-        name: 'customerRef.segmentsRemoved',
-        data: { path: ['customerRefId'], equals: customerRef.id },
+        name: 'customerRelationship.segmentsRemoved',
+        data: { path: ['customerRelationshipId'], equals: customerRelationship.id },
       },
     });
     expect(

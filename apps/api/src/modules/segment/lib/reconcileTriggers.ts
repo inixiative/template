@@ -11,7 +11,7 @@ import type { AppEventName } from '#/appEvents/handlers';
 export const RECONCILE_TRIGGERS: Partial<Record<ModelName, AppEventName[]>> = {
   CommunicationLog: ['communication.outcomeRecorded'],
   Contact: ['contact.created', 'contact.updated', 'contact.deleted'],
-  CustomerRef: ['customerRef.created'],
+  CustomerRelationship: ['customerRelationship.created'],
   Organization: ['organization.updated', 'organization.deleted'],
   Segment: ['segment.created', 'segment.updated', 'segment.deleted'],
   SegmentMember: ['segment.membersAdded', 'segment.membersRemoved'],

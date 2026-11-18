@@ -1,9 +1,9 @@
 // ============================================================================
-// SEGMENT MEMBER - One customer reference's membership in one segment
+// SEGMENT MEMBER - One customer relationship's membership in one segment
 // ============================================================================
 // Append/delete lifecycle, no soft delete: a membership either holds or it
 // does not. Rows are written only by the reconcile jobs, which diff the
-// segment's rule against the live set. The member's customer reference must
+// segment's rule against the live set. The member's customer relationship must
 // belong to the segment's owner as its provider (segmentMemberOwner hook).
 
 model SegmentMember {
@@ -15,13 +15,13 @@ model SegmentMember {
   segmentId String  @db.VarChar(36)
   segment   Segment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
 
-  customerRefId String      @db.VarChar(36)
-  customerRef   CustomerRef @relation(fields: [customerRefId], references: [id], onDelete: Cascade)
+  customerRelationshipId String               @db.VarChar(36)
+  customerRelationship   CustomerRelationship @relation(fields: [customerRelationshipId], references: [id], onDelete: Cascade)
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@unique([segmentId, customerRefId])
-  @@index([customerRefId])
+  @@unique([segmentId, customerRelationshipId])
+  @@index([customerRelationshipId])
 }

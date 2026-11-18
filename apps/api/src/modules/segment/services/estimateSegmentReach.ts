@@ -21,7 +21,7 @@ export const estimateSegmentReach = async (
   if (!validation.valid) throw invalidSegmentConditionsError(validation.errors);
   const conditions = validation.normalized as Condition;
   await assertSegmentReferencesOwned({ ownerModel, ownerId, conditions });
-  return db.customerRef.count({
+  return db.customerRelationship.count({
     where: await compileSegmentWhere(ownerModel, ownerId, conditions),
   });
 };

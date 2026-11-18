@@ -17,7 +17,7 @@ export const spaceReadManySegmentMembershipsController = makeController(
     const space = contextResource<'space'>(c);
 
     const { data, pagination } = await paginate(c, db.segmentMember, {
-      where: { customerRef: { customerSpaceId: space.id }, segment: { deletedAt: null } },
+      where: { customerRelationship: { customerSpaceId: space.id }, segment: { deletedAt: null } },
       include: includeSegmentForCustomer,
     });
 

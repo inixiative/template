@@ -12,7 +12,7 @@ export type UserRedactedPayload = { userId: string };
 export const userRedacted = makeAppEvent<UserRedactedPayload>({
   cb: [
     async ({ userId }) => {
-      await enqueueJob('reconcileCustomerRefSegments', {
+      await enqueueJob('reconcileCustomerRelationshipSegments', {
         customerModel: 'User',
         customerId: userId,
       });

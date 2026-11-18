@@ -4,7 +4,7 @@
 
 ## What this region is
 
-The lenses the template builds on json-rules and where it wires them in: base lenses per Prisma model, route filter lenses and per-request scope, sensitive-field and foreign-key wrappers, the fetch and option-source helpers, frontend filter lenses derived from the OpenAPI spec, and the segment (customerRef) lens. The email lens members listed here are the region's.
+The lenses the template builds on json-rules and where it wires them in: base lenses per Prisma model, route filter lenses and per-request scope, sensitive-field and foreign-key wrappers, the fetch and option-source helpers, frontend filter lenses derived from the OpenAPI spec, and the segment (customerRelationship) lens. The email lens members listed here are the region's.
 
 ## What it exists for
 

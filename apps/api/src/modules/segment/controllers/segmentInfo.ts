@@ -7,7 +7,7 @@
 import { lensFields } from '@template/shared/rules';
 import { descriptionsBySchemaFieldPath } from '#/lib/jsonSchema/descriptionsBySchemaFieldPath';
 import { makeController } from '#/lib/utils/makeController';
-import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
+import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 import { segmentInfoRoute } from '#/modules/segment/routes/segmentInfo';
 import { segmentInfoResponseSchema } from '#/modules/segment/schemas/segmentInfoResponseSchema';
 
@@ -18,8 +18,8 @@ export const segmentInfoController = makeController(segmentInfoRoute, async (_c,
     guide,
     types: {
       conditions: 'rule',
-      root: 'CustomerRef',
-      fields: lensFields(customerRefLens),
+      root: 'CustomerRelationship',
+      fields: lensFields(customerRelationshipLens),
     },
   });
 });

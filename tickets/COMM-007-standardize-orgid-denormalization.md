@@ -18,7 +18,7 @@ Comply — `Space → [organizationId, spaceId]`:
 
 Do NOT comply — `Space → [spaceId]` only (to fix):
 - Contact, Tag, TagCategory, TagAttachment, WebhookSubscription
-- CustomerRef (`customerSpaceId` only), Inquiry (`source/targetSpaceId` only)
+- CustomerRelationship (`customerSpaceId` only), Inquiry (`source/targetSpaceId` only)
 - CommunicationLog (`senderSpaceId`; its `SpaceUser → [senderUserId, senderSpaceId]` also drops org)
 
 ## Work per model

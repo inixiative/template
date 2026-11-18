@@ -68,8 +68,8 @@ The file IS the asset. It holds storage metadata, ownership, and its position in
 model File {
   id              String    @id @default(uuid())
   organizationId  String?                         // null for user-personal files
-  uploadedBy      String                          // userId or customerRefId
-  uploadedByModel String    @default("User")      // "User" | "CustomerRef"
+  uploadedBy      String                          // userId or customerRelationshipId
+  uploadedByModel String    @default("User")      // "User" | "CustomerRelationship"
 
   folderId        String?                         // null = root level (no folder)
   path            String                          // materialized path (MUTABLE — updates on move)
@@ -165,7 +165,7 @@ model FilePermission {
   targetId      String                            // fileId OR folderId
   targetModel   String                            // "File" | "Folder"
   granteeId     String
-  granteeModel  String                            // User | Organization | Space | CustomerRef
+  granteeModel  String                            // User | Organization | Space | CustomerRelationship
   role          String    @default("viewer")       // viewer | member | admin | owner
   expiresAt     DateTime?
   createdBy     String                            // userId who created this permission
@@ -174,9 +174,9 @@ model FilePermission {
 
   createdAt     DateTime  @default(now())
 
-  // Polymorphic FK: targetId → File or Folder, granteeId → User/Org/Space/CustomerRef
+  // Polymorphic FK: targetId → File or Folder, granteeId → User/Org/Space/CustomerRelationship
   // Uses the template's existing false polymorphism pattern (app-level validation, no DB FK constraint)
-  // Same approach as Token.ownerModel, CustomerRef, AuditLog.subjectModel
+  // Same approach as Token.ownerModel, CustomerRelationship, AuditLog.subjectModel
 
   @@unique([targetId, targetModel, granteeId, granteeModel])
   // Re-granting after revoke: clear revokedAt/revokedBy on the existing record
@@ -762,7 +762,7 @@ Public exposure is exclusively a ResourceBinding concern.
 |----------|----------------------|-----------------|
 | User uploads to Space | User (owner) + Space (viewer) on file | — (no binding yet) |
 | User uploads personal file | User (owner) only | — |
-| Customer submits to Space | CustomerRef (viewer) on file | attachment, internal |
+| Customer submits to Space | CustomerRelationship (viewer) on file | attachment, internal |
 | Set as org logo | — (existing permissions sufficient) | logo, **public** |
 | Set as internal attachment | — | attachment, internal |
 | Admin shares org folder to Space | Space FilePermission (viewer) on folder | — |
@@ -1376,7 +1376,7 @@ Current handler (`apps/api/src/modules/inquiry/services/transferSpace/index.ts`)
 | Model | Question | Risk if ignored |
 |-------|----------|-----------------|
 | **WebhookSubscription** | Survive transfer? | Old org gets events from new org's space |
-| **CustomerRef** | Move with space? | Customers lose access or data leaks |
+| **CustomerRelationship** | Move with space? | Customers lose access or data leaks |
 | **Inquiry** (pending) | Cancel on transfer? | Stale inquiries in wrong org context |
 
 ### Should NOT change
@@ -1680,7 +1680,7 @@ model File {
 
   // Provenance — who performed the upload; distinct from storage ownership
   uploadedBy      String
-  uploadedByModel String  @default("User")   // User | CustomerRef
+  uploadedByModel String  @default("User")   // User | CustomerRelationship
 }
 ```
 

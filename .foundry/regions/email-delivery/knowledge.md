@@ -23,7 +23,7 @@
 ## Glossary
 
 **acceptedKinds**  
-CommunicationKind[] on Contact (and optionally CustomerRef) listing the kinds the contact accepts.
+CommunicationKind[] on Contact (and optionally CustomerRelationship) listing the kinds the contact accepts.
 
 **canDeliver**  
 The shared preference gate for email and messaging: system passes, otherwise the kind must be accepted.
@@ -641,4 +641,4 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **apps/api/src/routes/unsubscribe** `apps/api/src/routes/unsubscribe` [system] handle email unsubscribe link requests Use: link unsubscribe URLs in emails to the unsubscribe route
 
 #### Class `communication-preferences`
-- **canDeliver** `apps/api/src/lib/messaging/canDeliver.ts#canDeliver` [primitive] check whether a contact accepts a communication kind; system always passes Use: if (canDeliver(kind, contact, customerRef)) dispatch(contact)
+- **canDeliver** `apps/api/src/lib/messaging/canDeliver.ts#canDeliver` [primitive] check whether a contact accepts a communication kind; system always passes Use: if (canDeliver(kind, contact, customerRelationship)) dispatch(contact)

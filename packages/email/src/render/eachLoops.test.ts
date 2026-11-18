@@ -82,7 +82,7 @@ describe('{{#each}} loops', () => {
       id: 'u1',
       name: 'vip',
       email: 'ann@example.com',
-      providerRefs: [
+      customerRelationshipsAsCustomer: [
         { segmentMembers: [member('s1'), member('s2')] },
         { segmentMembers: [member('s3')] },
       ],
@@ -95,7 +95,7 @@ describe('{{#each}} loops', () => {
     const toRoot = '{"field":"item.tag.name","operator":"equals","path":"recipient.name"}';
     const fromRoot = '{"field":"recipient.name","operator":"equals","path":"item.tag.name"}';
     const out = interpolate(
-      `{{#each recipient.providerRefs as=ref}}{{#each ref.segmentMembers as=member}}{{#if rule=${inner}}}{{member.segment.id}} {{/if}}{{/each}}{{/each}}|{{#each recipient.tagAttachments as=item filter=${toRoot}}}{{item.tag.id}}{{/each}}|{{#each recipient.tagAttachments as=item filter=${fromRoot}}}{{item.tag.id}}{{/each}}`,
+      `{{#each recipient.customerRelationshipsAsCustomer as=ref}}{{#each ref.segmentMembers as=member}}{{#if rule=${inner}}}{{member.segment.id}} {{/if}}{{/each}}{{/each}}|{{#each recipient.tagAttachments as=item filter=${toRoot}}}{{item.tag.id}}{{/each}}|{{#each recipient.tagAttachments as=item filter=${fromRoot}}}{{item.tag.id}}{{/each}}`,
       { recipient, sender: { id: 'org-1', name: 'Acme' }, data: {} },
       undefined,
       { lens },

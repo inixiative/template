@@ -42,16 +42,24 @@ export const cacheKeysByModel: CacheKeysByModel = {
     cacheKey('space', r.spaceId, ['spaceUsers']),
   ],
 
-  CustomerRef: (r) => {
-    const keys: string[] = [cacheKey('customerRef', r.id)];
-    if (r.customerUserId) keys.push(cacheKey('user', r.customerUserId, ['customerRefs']));
+  CustomerRelationship: (r) => {
+    const keys: string[] = [cacheKey('customerRelationship', r.id)];
+    if (r.customerUserId)
+      keys.push(cacheKey('user', r.customerUserId, ['customerRelationshipsAsCustomer']));
     if (r.customerOrganizationId)
-      keys.push(cacheKey('organization', r.customerOrganizationId, ['customerRefs']));
-    if (r.customerSpaceId) keys.push(cacheKey('space', r.customerSpaceId, ['customerRefs']));
-    if (r.providerUserId) keys.push(cacheKey('user', r.providerUserId, ['providerRefs']));
+      keys.push(
+        cacheKey('organization', r.customerOrganizationId, ['customerRelationshipsAsCustomer']),
+      );
+    if (r.customerSpaceId)
+      keys.push(cacheKey('space', r.customerSpaceId, ['customerRelationshipsAsCustomer']));
+    if (r.providerUserId)
+      keys.push(cacheKey('user', r.providerUserId, ['customerRelationshipsAsProvider']));
     if (r.providerOrganizationId)
-      keys.push(cacheKey('organization', r.providerOrganizationId, ['providerRefs']));
-    if (r.providerSpaceId) keys.push(cacheKey('space', r.providerSpaceId, ['providerRefs']));
+      keys.push(
+        cacheKey('organization', r.providerOrganizationId, ['customerRelationshipsAsProvider']),
+      );
+    if (r.providerSpaceId)
+      keys.push(cacheKey('space', r.providerSpaceId, ['customerRelationshipsAsProvider']));
     return keys;
   },
 

@@ -55,8 +55,8 @@ const communicationsReceived: ModelNarrowing = {
   },
 };
 
-export const customerRefLens: LensNarrowing = omitForeignKeys({
-  parent: lensFor('CustomerRef'),
+export const customerRelationshipLens: LensNarrowing = omitForeignKeys({
+  parent: lensFor('CustomerRelationship'),
   mapDefaults: {
     prisma: {
       models: {
@@ -67,7 +67,7 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
   },
   root: {
     picks: ['id', 'customerModel', 'acceptedKinds', 'createdAt', 'updatedAt'],
-    where: conditionPolymorphicAxisPointsAtBoundRow('CustomerRef', 'providerModel'),
+    where: conditionPolymorphicAxisPointsAtBoundRow('CustomerRelationship', 'providerModel'),
     relations: {
       customerUser: {
         picks: ['id', 'name', 'email', 'emailVerified', 'lastLoginAt', 'createdAt'],
@@ -103,11 +103,11 @@ const membershipProbe = {
 } as Condition;
 
 if (
-  !describeRuleSources(membershipProbe, customerRefLens).some(
+  !describeRuleSources(membershipProbe, customerRelationshipLens).some(
     (source) => source.model === 'Segment' && source.field === 'id' && !source.dynamic,
   )
 ) {
   throw new Error(
-    'customerRefLens no longer reaches the Segment.id membership source; segment references would read every rule as reference-free',
+    'customerRelationshipLens no longer reaches the Segment.id membership source; segment references would read every rule as reference-free',
   );
 }

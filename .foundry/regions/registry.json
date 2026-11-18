@@ -477,7 +477,7 @@
     {
       "tag": "customers",
       "atlas": "feature:customer",
-      "description": "CustomerRef customer/provider pairs, provider routes and lens",
+      "description": "CustomerRelationship customer/provider pairs, provider routes and lens",
       "region": "customers-segments"
     },
     {

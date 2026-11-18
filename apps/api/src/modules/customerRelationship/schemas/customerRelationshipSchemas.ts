@@ -4,7 +4,11 @@
  * @partOf feature:customer
  * @uses none
  */
-import { CustomerRefScalarSchema, OrganizationScalarSchema, SpaceScalarSchema } from '@template/db';
+import {
+  CustomerRelationshipScalarSchema,
+  OrganizationScalarSchema,
+  SpaceScalarSchema,
+} from '@template/db';
 import { OpenApiTags } from '#/modules/openApiTags';
 import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
@@ -26,20 +30,20 @@ const providerSchema = {
   }).nullable(),
 };
 
-// CustomerRef from customer's perspective (provider details expanded)
-export const customerRefAsCustomerSchema = CustomerRefScalarSchema.extend({
+// CustomerRelationship from customer's perspective (provider details expanded)
+export const customerRelationshipAsCustomerSchema = CustomerRelationshipScalarSchema.extend({
   ...providerSchema,
 });
 
-// CustomerRef from provider's perspective (customer details expanded)
-export const customerRefAsProviderSchema = CustomerRefScalarSchema.extend({
+// CustomerRelationship from provider's perspective (customer details expanded)
+export const customerRelationshipAsProviderSchema = CustomerRelationshipScalarSchema.extend({
   ...customerSchema,
 });
 
-// Combined tags for CustomerRef routes (alphabetized)
-export const customerRefTags = [
+// Combined tags for CustomerRelationship routes (alphabetized)
+export const customerRelationshipTags = [
   OpenApiTags.customer,
-  OpenApiTags.customerRef,
+  OpenApiTags.customerRelationship,
   OpenApiTags.organization,
   OpenApiTags.provider,
   OpenApiTags.space,

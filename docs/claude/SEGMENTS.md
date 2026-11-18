@@ -17,23 +17,23 @@
 
 ## Purpose and ownership
 
-A segment is a named set of a provider's `CustomerRef` rows. Its owner is a User,
-Organization or Space (`ProviderModel`), and every member must be a customer reference
+A segment is a named set of a provider's `CustomerRelationship` rows. Its owner is a User,
+Organization or Space (`ProviderModel`), and every member must be a customer relationship
 belonging to that provider. Segment rules do not describe an unrestricted set of users.
 
-`CustomerRef` is the rule root. `customerRefLens` declares the fields and relations that
+`CustomerRelationship` is the rule root. `customerRelationshipLens` declares the fields and relations that
 rules may read, including contacts, tags, received communications and other segment
-memberships. `resolvedCustomerRefLens(ownerModel, ownerId)` binds the provider scope.
+memberships. `resolvedCustomerRelationshipLens(ownerModel, ownerId)` binds the provider scope.
 Shared lens conditions also restrict related tags and communications to the permitted owner.
 
 ## Static and dynamic membership
 
 Every segment has `conditions`. A static segment is computed after creation or a rule
 change; a dynamic segment also reacts to customer changes. A hand-picked audience is a
-static rule over customer-reference IDs. There is no direct member add/remove API.
+static rule over customer-relationship IDs. There is no direct member add/remove API.
 
 - `reconcileSegment` evaluates the whole set through `toPrisma` and applies a membership diff.
-- `reconcileCustomerRefSegments` accepts `{ customerModel, customerId }`, finds that customer's
+- `reconcileCustomerRelationshipSegments` accepts `{ customerModel, customerId }`, finds that customer's
   references, hydrates each through `fetchLens`, and evaluates dynamic segments with `check()`
   in dependency order. Its superseding key is the customer model and ID.
 - `reconcileEveryHealthyDynamicSegment`, seeded for 04:00 UTC, queues healthy dynamic segments in dependency order.
@@ -67,8 +67,8 @@ Paths below are relative to `/api/v1`:
 | Create a segment | `/me/segments`, `/organization/:id/segments`, `/space/:id/segments` |
 | Estimate rule reach without saving | `POST /me/segments/estimateReach`, `/organization/:id/segments/estimateReach`, `/space/:id/segments/estimateReach` |
 
-`GET /segment/info` (public) describes what `conditions` may read: every field `customerRefLens`
-exposes (dotted path from `CustomerRef`, kind, enum values, list relations, and `sourced` fields that
+`GET /segment/info` (public) describes what `conditions` may read: every field `customerRelationshipLens`
+exposes (dotted path from `CustomerRelationship`, kind, enum values, list relations, and `sourced` fields that
 take the id of a row the owner may name), built with `projectLens` (`lensFields` in
 `@template/shared/rules`). `conditions` is tagged `rule`: its grammar is `@inixiative/json-rules` and
 is not restated. Its `guide` says what each key means.
@@ -91,31 +91,31 @@ has not shipped.
 ## Events and email integration
 
 Membership diffs publish two event pairs: `segment.membersAdded` / `segment.membersRemoved`
-for the owner, and `customerRef.segmentsAdded` / `customerRef.segmentsRemoved` for the customer.
+for the owner, and `customerRelationship.segmentsAdded` / `customerRelationship.segmentsRemoved` for the customer.
 Owner events refetch the segment's member-list channel. For User customers, customer events
 send a targeted `meReadManySegmentMemberships` refetch to that user's sockets. Segment deletion
 captures member IDs before the junction is removed and publishes the removals too.
 
-The email recipient lens exposes `providerRefs.segmentMembers.segment`. Its owner scoping,
+The email recipient lens exposes `customerRelationshipsAsCustomer.segmentMembers.segment`. Its owner scoping,
 reference admission and degraded-segment filtering constrain which memberships a template
 can inspect. See [COMMUNICATIONS.md](COMMUNICATIONS.md#the-email-lens).
 
 ## Remaining work
 
 - `RECONCILE_TRIGGERS` covers the lens's reached models, but registry coverage is not proof of
-  every writer emitting an event. `customerRef.created`, `user.updated`, `tag.deleted`,
+  every writer emitting an event. `customerRelationship.created`, `user.updated`, `tag.deleted`,
   `tagAttachment.created` and `tagAttachment.deleted` have handlers without production emitters.
 - Field/model-specific trigger narrowing and hydration of only the affected rule paths are pending.
 - The rule editor, provider-side customer lists for User/Organization, and a last-active timestamp
-  on `CustomerRef` (the TODO in `packages/db/prisma/schema/customerRef.prisma`) remain separate work.
-- Whether `customerRefLens` should become a general customer lens is an unresolved design question.
+  on `CustomerRelationship` (the TODO in `packages/db/prisma/schema/customerRelationship.prisma`) remain separate work.
+- Whether `customerRelationshipLens` should become a general customer lens is an unresolved design question.
 - Feature flags and flag-selected email variants are not implemented.
 
 ## Source map
 
 - `packages/db/prisma/schema/segment.prisma`, `segmentMember.prisma`: data model.
-- `apps/api/src/modules/customerRef/lib/lenses/`: the static lenses, `customerRefLens` (vocabulary
-  and ownership scope) and `customerRefsByIdLens` (the rows a reconcile hydrates).
+- `apps/api/src/modules/customerRelationship/lib/lenses/`: the static lenses, `customerRelationshipLens` (vocabulary
+  and ownership scope) and `customerRelationshipsByIdLens` (the rows a reconcile hydrates).
 - `apps/api/src/modules/segment/`: routes, services, trigger registry and tests.
 - `apps/api/src/jobs/handlers/`: segment reconciliation jobs.
 - `apps/web/app/config/nav/features/segments.ts`, `apps/web/app/routes/_authenticated/segments/`:

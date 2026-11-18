@@ -29,4 +29,6 @@ const channelOf = ({ customerModel, customerId }: Customer): WSHandoff => {
   };
 };
 
-export const customerSegmentsChanged = (customer: Customer): WSHandoff[] => [channelOf(customer)];
+export const customerRelationshipSegmentMembershipRefetchHandoffs = (
+  customer: Customer,
+): WSHandoff[] => [channelOf(customer)];

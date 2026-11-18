@@ -851,7 +851,7 @@ check(permix, rebacSchema, submodel, pseudo, action);
 - It never reads the request body. Checks that depend on the body (a token's role or `full`, an integration's role, an inquiry's `send`) stay in their services.
 - Using it on a route with no submodel throws on each request to that route (`validateSubmodelPermission.test.ts`).
 
-Routes that still check an action on the owner (`validatePermission` on spaces, members, inquiries, customer refs, segments) are not migrated yet.
+Routes that still check an action on the owner (`validatePermission` on spaces, members, inquiries, customer relationships, segments) are not migrated yet.
 
 ### Lists under an owner
 

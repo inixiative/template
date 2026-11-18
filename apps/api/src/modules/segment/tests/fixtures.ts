@@ -7,7 +7,7 @@ export const acmeEmailDomainRule = {
   value: '@acme.test',
 };
 
-export const memberIds = async (segmentId: string): Promise<string[]> =>
+export const segmentMemberCustomerRelationshipIds = async (segmentId: string): Promise<string[]> =>
   (await db.segmentMember.findMany({ where: { segmentId } }))
-    .map((member) => member.customerRefId)
+    .map((member) => member.customerRelationshipId)
     .sort();

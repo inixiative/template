@@ -19,7 +19,7 @@ const axisRelations = (model: 'Entitlement' | 'RuleReference', side: string) =>
 // field. An FK is ownership by default; list the edges that merely point at a
 // counterparty or an author — those rows outlive the referenced parent.
 export const CASCADE_EXEMPT: Record<string, readonly string[]> = {
-  CustomerRef: ['customerOrganization', 'customerSpace', 'customerUser'],
+  CustomerRelationship: ['customerOrganization', 'customerSpace', 'customerUser'],
   // An entitlement acts from its anchor; it does not belong to it. A deleted anchor is stamped on
   // the row (`sourceDeletedAt`), and the row dies only with its target.
   Entitlement: axisRelations('Entitlement', 'source'),

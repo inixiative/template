@@ -15,8 +15,8 @@ export const segmentOwnerFk = (ownerModel: ProviderModel): string =>
 export const segmentOwnerId = (segment: OwnerColumns): string =>
   rowPolymorphicAxisPointsAt(segment, 'Segment', 'ownerModel')!.id;
 
-export const customerRefProviderFk = (ownerModel: ProviderModel): string =>
-  polymorphicKeyColumn('CustomerRef', 'providerModel', ownerModel)!;
+export const customerRelationshipProviderFk = (ownerModel: ProviderModel): string =>
+  polymorphicKeyColumn('CustomerRelationship', 'providerModel', ownerModel)!;
 
-export const customerRefCustomerFk = (customerModel: CustomerModel): string =>
-  polymorphicKeyColumn('CustomerRef', 'customerModel', customerModel)!;
+export const customerRelationshipCustomerFk = (customerModel: CustomerModel): string =>
+  polymorphicKeyColumn('CustomerRelationship', 'customerModel', customerModel)!;

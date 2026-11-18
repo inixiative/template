@@ -44,7 +44,7 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
   it('hard-deletes a tombstoned user’s webhook subscriptions', async () => {
     const { entity: user, context } = await createUser();
     const { entity: subscription } = await createWebhookSubscription(
-      { model: 'CustomerRef', ownerModel: 'User' },
+      { model: 'CustomerRelationship', ownerModel: 'User' },
       context,
     );
 
@@ -82,7 +82,7 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
     });
     const { entity: token } = await createToken({ ownerModel: 'Integration' }, { integration });
     const { entity: subscription } = await createWebhookSubscription(
-      { model: 'CustomerRef', ownerModel: 'User', integrationId: integration.id },
+      { model: 'CustomerRelationship', ownerModel: 'User', integrationId: integration.id },
       context,
     );
 

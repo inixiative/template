@@ -16,6 +16,6 @@ describe('spaceKeyColumns', () => {
   });
 
   it('skips space references that carry no organization, which the transfer leaves as they are', () => {
-    expect(spaceKeyColumns('CustomerRef')).toEqual([]);
+    expect(spaceKeyColumns('CustomerRelationship')).toEqual([]);
   });
 });
