@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { fieldOf, modelOf } from '@inixiative/field-map';
+import { fieldOf } from '@inixiative/field-map';
 import {
   HARD_DELETE_ON_TOMBSTONE,
   hasDeletedAt,

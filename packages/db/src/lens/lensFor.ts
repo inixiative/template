@@ -5,7 +5,6 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { FieldMap } from '@inixiative/field-map';
 import { createLens, type Lens } from '@inixiative/json-rules';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { ModelName } from '@template/db/utils/modelNames';

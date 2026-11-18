@@ -9,7 +9,6 @@ import {
   andWhere,
   bindLens,
   getLensRoot,
-  type LensNarrowing,
   listLensBindings,
   type RuleValue,
 } from '@inixiative/json-rules';
