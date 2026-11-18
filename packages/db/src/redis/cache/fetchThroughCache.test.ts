@@ -516,7 +516,7 @@ describe('fetchThroughCache invalidation during a read', () => {
     return { produce, hasRead, resume };
   };
 
-  const readRaw = async (key: string): Promise<unknown> => {
+  const fetchRawValue = async (key: string): Promise<unknown> => {
     const raw = await redisClient().get(key);
     return raw === null ? null : superjson.parse(raw);
   };
@@ -544,7 +544,7 @@ describe('fetchThroughCache invalidation during a read', () => {
     );
     expect(next).toBe('new');
     expect(runs).toBe(1);
-    expect(await readRaw(key)).toBe('new');
+    expect(await fetchRawValue(key)).toBe('new');
   });
 
   it('does not publish a value read before a pattern clear ran', async () => {
@@ -560,7 +560,7 @@ describe('fetchThroughCache invalidation during a read', () => {
     expect(await redisClient().get(key)).toBeNull();
 
     expect(await fetchThroughCache(key, async () => 'new', 60)).toBe('new');
-    expect(await readRaw(key)).toBe('new');
+    expect(await fetchRawValue(key)).toBe('new');
   });
 
   it('does not publish after its lock lapsed, though the pattern clear that followed found no lock to cancel', async () => {
@@ -587,7 +587,7 @@ describe('fetchThroughCache invalidation during a read', () => {
     paused.resume();
 
     expect(await inFlight).toBe('old');
-    expect(await readRaw(key)).toBe('fresh');
+    expect(await fetchRawValue(key)).toBe('fresh');
   });
 
   it('does not let a generation that expired and was set again match the value captured before it', async () => {
@@ -615,7 +615,7 @@ describe('fetchThroughCache invalidation during a read', () => {
     paused.resume();
 
     expect(await inFlight).toBe('kept');
-    expect(await readRaw(key)).toBe('kept');
+    expect(await fetchRawValue(key)).toBe('kept');
   });
 
   it('throws and deletes nothing when the pattern clear cannot cancel a compute in flight', async () => {
@@ -637,7 +637,7 @@ describe('fetchThroughCache invalidation during a read', () => {
     paused.resume();
     await inFlight;
 
-    expect(await readRaw(cached)).toBe('cached');
+    expect(await fetchRawValue(cached)).toBe('cached');
   });
 
   it('throws when the pattern clear cannot scan', async () => {
@@ -661,7 +661,7 @@ describe('fetchThroughCache invalidation during a read', () => {
       scan.mockRestore();
     }
 
-    expect(await readRaw(key)).toBe('cached');
+    expect(await fetchRawValue(key)).toBe('cached');
   });
 
   it('throws when the pattern clear cannot delete what it scanned', async () => {
@@ -677,7 +677,7 @@ describe('fetchThroughCache invalidation during a read', () => {
       del.mockRestore();
     }
 
-    expect(await readRaw(key)).toBe('cached');
+    expect(await fetchRawValue(key)).toBe('cached');
   });
 
   it('logs and returns 0 when an exact clear fails', async () => {
@@ -691,7 +691,7 @@ describe('fetchThroughCache invalidation during a read', () => {
       evalSpy.mockRestore();
     }
 
-    expect(await readRaw(key)).toBe('cached');
+    expect(await fetchRawValue(key)).toBe('cached');
   });
 
   it('a retried pattern clear still cancels a producer that read before the failed one', async () => {

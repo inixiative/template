@@ -6,7 +6,7 @@
  */
 import type { RoutingSearchParams } from '@template/ui/hooks/useSyncTenantContextWithUrlAndAuthorizeRoute/types';
 import type { SearchInput } from '@template/ui/lib/searchParams';
-import { readSearchParam } from '@template/ui/lib/searchParams';
+import { searchParamValue } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
 
 export type SyncStoreFromSearchParamsInput = {
@@ -17,10 +17,10 @@ export type SyncStoreFromSearchParamsInput = {
 
 export const parseRoutingSearchParams = (search: SearchInput): RoutingSearchParams => {
   return {
-    organizationId: readSearchParam(search, 'org'),
-    spaceId: readSearchParam(search, 'space'),
-    spoofEmail: readSearchParam(search, 'spoof'),
-    flowId: readSearchParam(search, 'flow'),
+    organizationId: searchParamValue(search, 'org'),
+    spaceId: searchParamValue(search, 'space'),
+    spoofEmail: searchParamValue(search, 'spoof'),
+    flowId: searchParamValue(search, 'flow'),
   };
 };
 

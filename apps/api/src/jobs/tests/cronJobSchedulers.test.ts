@@ -65,7 +65,7 @@ describe('registerCronJobs reconciles the schedulers with the enabled rows', () 
     expect(turnedOff).toEqual([{ enabled: false }, { enabled: false }]);
   });
 
-  it('throws before the sweep when an upsert fails, so a working legacy repeatable stays', async () => {
+  it('throws before removing orphaned schedulers when an upsert fails, so a working legacy repeatable stays', async () => {
     const cronJob = await createScheduledCronJob();
     await jobs().realQueue.removeJobScheduler(cronJob.jobId);
     const legacy = await jobs().realQueue.add(

@@ -4,20 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { type FieldRegistry, unionRegistries } from '@template/db/registries/fieldRegistry';
 import { orderedListFieldsByModel } from '@template/db/registries/orderedList';
 import { isEqual, omit } from 'lodash-es';
-
-export type FieldRegistry = Record<string, string[]>;
-
-export const unionRegistries = (...registries: FieldRegistry[]): FieldRegistry => {
-  const merged: FieldRegistry = {};
-  for (const registry of registries) {
-    for (const [model, fields] of Object.entries(registry)) {
-      merged[model] = [...new Set([...(merged[model] ?? []), ...fields])];
-    }
-  }
-  return merged;
-};
 
 const NOOP_FIELDS_BASE: FieldRegistry = {
   _global: ['updatedAt'],

@@ -11,8 +11,8 @@
 - [2. The domain](#2-the-domain)
 - [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
-  - [Class `locks`](#class-locks-mutual-exclusion-across-processes-and-rows-createlock-withownerlock-dbfindforupdate-select-for-update)
-  - [Class `concurrency-limits`](#class-concurrency-limits-in-process-coordination-serialized-queues-getconcurrency-caps-resolveall-bounded-batches)
+  - [Class `locks`](#class-locks-mutual-exclusion-across-processes-and-rows-makelock-withownerlock-dbfindforupdate-select-for-update)
+  - [Class `concurrency-limits`](#class-concurrency-limits-in-process-coordination-serialized-queues-minimumconcurrencylimitfor-caps-runallwithconcurrencylimit-bounded-batches)
   - [Class `supersede-lanes`](#class-supersede-lanes-newest-work-for-a-key-wins-claimlanewatchlane-batons-superseding-jobs)
   - [Class `recurring-timers`](#class-recurring-timers-non-overlapping-in-process-recurring-work-heartbeat-unref-intervals)
   - [Class `debounce`](#class-debounce-debouncing-values-and-callbacks-before-they-hit-the-backend-usedebounce)
@@ -273,7 +273,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 Each unit is the doc section verbatim, with its headings shifted down two levels. A source line above it gives the path, the section and the doc's H1.
 
-<!-- unit doc:docs/claude/CONCURRENCY.md#distributed-lock-createlock -->
+<!-- unit doc:docs/claude/CONCURRENCY.md#distributed-lock-makelock -->
 **Source:** `docs/claude/CONCURRENCY.md` § Distributed Lock (`makeLock`) (in "Concurrency")
 
 #### Distributed Lock (`makeLock`)
@@ -425,7 +425,7 @@ Combine when needed: a per-resource Redis lock + a per-resource serialized queue
 
 ---
 
-<!-- unit doc:docs/claude/CONCURRENCY.md#serialized-queue-createserializedqueue -->
+<!-- unit doc:docs/claude/CONCURRENCY.md#serialized-queue-makeserializedqueue -->
 **Source:** `docs/claude/CONCURRENCY.md` § Serialized Queue (`makeSerializedQueue`) (in "Concurrency")
 
 #### Serialized Queue (`makeSerializedQueue`)
@@ -490,7 +490,7 @@ Six lines. The `.then(onSuccess, onReject)` form ensures fn runs whether the pre
 
 ---
 
-<!-- unit doc:docs/claude/CONCURRENCY.md#concurrency-limits-getconcurrency -->
+<!-- unit doc:docs/claude/CONCURRENCY.md#concurrency-limits-minimumconcurrencylimitfor -->
 **Source:** `docs/claude/CONCURRENCY.md` § Concurrency Limits (`minimumConcurrencyLimitFor`) (in "Concurrency")
 
 #### Concurrency Limits (`minimumConcurrencyLimitFor`)
@@ -508,7 +508,7 @@ Use when you'd otherwise blow through a connection pool or rate limit.
 
 ---
 
-<!-- unit doc:docs/claude/CONCURRENCY.md#bounded-batch-resolveall -->
+<!-- unit doc:docs/claude/CONCURRENCY.md#bounded-batch-runallwithconcurrencylimit -->
 **Source:** `docs/claude/CONCURRENCY.md` § Bounded Batch (`runAllWithConcurrencyLimit`) (in "Concurrency")
 
 #### Bounded Batch (`runAllWithConcurrencyLimit`)

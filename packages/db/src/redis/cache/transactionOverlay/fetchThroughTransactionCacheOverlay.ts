@@ -4,8 +4,9 @@
  * @partOf primitive:caching, infrastructure:redis
  * @uses none
  */
-import { readGeneration } from '@template/db/redis/cache/generation/readGeneration';
-import { readCached } from '@template/db/redis/cache/readCached';
+
+import { fetchCachedValue } from '@template/db/redis/cache/fetchCachedValue';
+import { fetchCacheGeneration } from '@template/db/redis/cache/generation/fetchCacheGeneration';
 import { resolveTtl } from '@template/db/redis/cache/resolveTtl';
 import type { CacheResult } from '@template/db/redis/cache/telemetry/withCacheSpan';
 import {
@@ -16,7 +17,7 @@ import {
 import { redisClient } from '@template/db/redis/client';
 import superjson from 'superjson';
 
-export const readInTransaction = <T>(
+export const fetchThroughTransactionCacheOverlay = <T>(
   overlay: CacheOverlay,
   key: string,
   fn: () => Promise<T>,
@@ -32,12 +33,12 @@ export const readInTransaction = <T>(
 
     const redis = redisClient();
     if (!isWrittenInTransaction(overlay, key)) {
-      const cached = await readCached<T>(redis, key);
+      const cached = await fetchCachedValue<T>(redis, key);
       setResult(cached.result);
       if (cached.result === 'hit') return cached.value;
     }
 
-    const generation = await readGeneration(redis, key);
+    const generation = await fetchCacheGeneration(redis, key);
     const value = await fn();
     overlay.values.set(key, {
       payload: superjson.stringify(value),

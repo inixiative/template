@@ -5,7 +5,7 @@
  * @uses none
  */
 import { encryptedFieldsByModel } from '@template/db/lib/encryption/registry';
-import { type FieldRegistry, unionRegistries } from '@template/db/registries/noopFields';
+import { type FieldRegistry, unionRegistries } from '@template/db/registries/fieldRegistry';
 
 const SENSITIVE_FIELDS_BASE: FieldRegistry = {
   Account: ['password'],

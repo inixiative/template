@@ -150,16 +150,16 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+// Rule references: the rows a stored rule names, as edges
+export { fetchParentRows } from './utils/fetchParentRows';
 export {
   fetchRuleReferenceTargetsDeletedAtForUpdate,
   type RuleReferenceTargetDeletedState,
 } from './utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
-export { hasDeletedAt, lookupField, modelFields } from './utils/fieldMetadata';
+export { hasDeletedAt, modelFieldAtPath, modelFields } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
-// Rule references: the rows a stored rule names, as edges
-export { loadParentRows } from './utils/loadParentRows';
 // Model name utilities
 export {
   type AccessorName,
@@ -210,8 +210,6 @@ export {
   type ValidateRuleForLensOptions,
   validateRuleForLens,
 } from './validations/validateRuleForLens';
-
-// Hook shared utilities (ignore fields, redact fields)
 
 // For model types: import from @template/db/client or @template/db/models
 // For runtime enum values: import from @template/db/enums

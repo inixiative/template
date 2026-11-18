@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test';
 import { redisClient } from '@template/db';
 import { claimStreamSeq } from '#/ws/queries/claimStreamSeq';
+import { fetchStreamSeq } from '#/ws/queries/fetchStreamSeq';
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
-import { readStreamSeq } from '#/ws/queries/readStreamSeq';
 import { STREAM_SEQ_TTL_MS, streamSeqKey } from '#/ws/streamSeq';
 
 const stream = 'seqtest:stream';
@@ -22,7 +22,7 @@ describe('stream seq counter', () => {
       target: stream,
     }).then(([seq]) => seq as number);
 
-  const read = () => readStreamSeq(redisClient(), streamSeqKey(stream));
+  const read = () => fetchStreamSeq(redisClient(), streamSeqKey(stream));
 
   it('a snapshot stamp is the seq of the last append, and the next append is one past it', async () => {
     await publish();

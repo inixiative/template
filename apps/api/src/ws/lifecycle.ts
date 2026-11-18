@@ -20,7 +20,7 @@ export const updateLastPing = (ws: WSSocket): void => {
 };
 
 // Closes + removes connections that haven't pinged within the window. Snapshots
-// the values first (removeConnection mutates byId).
+// the values first (removeConnection mutates connectionsById).
 export const cleanupStaleConnections = (): number => {
   const now = Date.now();
   let cleaned = 0;

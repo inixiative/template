@@ -1,6 +1,6 @@
 import type React from 'react';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getProjectConfig, type ProjectConfig } from './getProjectConfig';
+import { fetchProjectConfig, type ProjectConfig } from './fetchProjectConfig';
 
 type ConfigContextType = {
   config: ProjectConfig | null;
@@ -13,7 +13,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [config, setConfig] = useState<ProjectConfig | null>(null);
 
   const syncConfig = useCallback(async () => {
-    const cfg = await getProjectConfig();
+    const cfg = await fetchProjectConfig();
     setConfig(cfg);
   }, []);
 

@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { queue } from '#/jobs/queue';
 import {
   fetchSlowDeferredJobCount,
+  fetchSlowIdleMs,
   pruneSlowDeferred,
-  readSlowIdleMs,
   recordSlowDeferral,
   recordSlowFinished,
   releaseSlowDeferral,
@@ -64,23 +64,23 @@ describe('slow-lane idle clock', () => {
     const name = queueName();
     await recordSlowFinished(redis, name, 1_000);
 
-    expect(await readSlowIdleMs(redis, name, 0, 500_000)).toBe(0);
+    expect(await fetchSlowIdleMs(redis, name, 0, 500_000)).toBe(0);
   });
 
   it('counts from the last slow finish while slow work is queued', async () => {
     const name = queueName();
-    await readSlowIdleMs(redis, name, 4, 1_000);
+    await fetchSlowIdleMs(redis, name, 4, 1_000);
     await recordSlowFinished(redis, name, 10_000);
 
-    expect(await readSlowIdleMs(redis, name, 4, 70_000)).toBe(60_000);
+    expect(await fetchSlowIdleMs(redis, name, 4, 70_000)).toBe(60_000);
   });
 
   it('starts its clock when slow work arrives on an idle lane, not at a finish from before', async () => {
     const name = queueName();
     await recordSlowFinished(redis, name, 1_000);
-    await readSlowIdleMs(redis, name, 0, 2_000);
+    await fetchSlowIdleMs(redis, name, 0, 2_000);
 
-    expect(await readSlowIdleMs(redis, name, 1, 900_000)).toBe(0);
-    expect(await readSlowIdleMs(redis, name, 1, 960_000)).toBe(60_000);
+    expect(await fetchSlowIdleMs(redis, name, 1, 900_000)).toBe(0);
+    expect(await fetchSlowIdleMs(redis, name, 1, 960_000)).toBe(60_000);
   });
 });

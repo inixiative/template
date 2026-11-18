@@ -6,7 +6,7 @@
  */
 import { db } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
-import { lookupCascade, type OwnerScope } from '@template/email/render';
+import { fetchComponentsThroughOwnerCascade, type OwnerScope } from '@template/email/render';
 
 export type VersionedRecord = Pick<
   EmailTemplate | EmailComponent,
@@ -35,7 +35,7 @@ export const resolveComponentVersions = async (
   const refs = [...new Set(record.componentSlugs ?? [])];
   if (!refs.length) return {};
 
-  const children = await lookupCascade(refs, ownerScopeOf(record));
+  const children = await fetchComponentsThroughOwnerCascade(refs, ownerScopeOf(record));
   const componentIds = refs
     .map((slug) => children[slug]?.id)
     .filter((id): id is string => Boolean(id));

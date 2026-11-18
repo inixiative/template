@@ -12,13 +12,13 @@ import { createTestSocket } from '#tests/createTestSocket';
 afterEach(() => clearRegistry());
 
 describe('registry', () => {
-  it('addConnection indexes byId', () => {
+  it('addConnection indexes connectionsById', () => {
     const { socket } = createTestSocket({ connectionId: 'c1', userId: 'u1' });
     addConnection(socket);
     expect(connectionsById.get('c1')).toBe(socket);
   });
 
-  it('removeConnection cleans byId and every channel index', () => {
+  it('removeConnection cleans connectionsById and every channel index', () => {
     const { socket } = createTestSocket({ connectionId: 'c1', userId: 'u1' });
     addConnection(socket);
     subscribeToChannel(socket, 'ch1');

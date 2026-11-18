@@ -30,9 +30,9 @@
       "doc:docs/claude/JOBS.md#handler-patterns/rolling-caches-root-branch-leaf",
       "doc:docs/claude/REDIS.md#cache-utilities",
       "doc:docs/claude/REDIS.md#cache-utilities/cachekey-builder",
-      "doc:docs/claude/REDIS.md#cache-utilities/cache-get-or-set",
+      "doc:docs/claude/REDIS.md#cache-utilities/fetchthroughcache-get-or-set",
       "doc:docs/claude/REDIS.md#cache-utilities/checkcache",
-      "doc:docs/claude/REDIS.md#cache-utilities/clearkey",
+      "doc:docs/claude/REDIS.md#cache-utilities/clearcachekeysmatchingpattern",
       "doc:docs/claude/REDIS.md#cache-utilities/automatic-invalidation",
       "doc:docs/claude/REDIS.md#cache-utilities/rolling-caches"
     ],

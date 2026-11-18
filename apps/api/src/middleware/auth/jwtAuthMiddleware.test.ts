@@ -21,7 +21,7 @@ import { createUserJwt } from '#tests/utils/createUserJwt';
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
-const readMe = (headers: Record<string, string>, query = '') =>
+const fetchMe = (headers: Record<string, string>, query = '') =>
   app.request(`/api/v1/me${query}`, { headers });
 
 const bearer = (jwt: string) => ({ authorization: `Bearer ${jwt}` });
@@ -81,7 +81,7 @@ describe('a user authenticates with a JWT, never a session', () => {
 
   it('neither sign-in nor /me returns jwtVersion', async () => {
     expect(handoff.user).not.toHaveProperty('jwtVersion');
-    const me = (await (await readMe(bearer(handoff.token))).json()) as { data: object };
+    const me = (await (await fetchMe(bearer(handoff.token))).json()) as { data: object };
     expect(me.data).toHaveProperty('id');
     expect(me.data).not.toHaveProperty('jwtVersion');
   });
@@ -104,24 +104,24 @@ describe('a user authenticates with a JWT, never a session', () => {
   });
 
   it('the JWT authenticates API requests as the user', async () => {
-    const response = await readMe(bearer(handoff.token));
+    const response = await fetchMe(bearer(handoff.token));
     expect(response.status).toBe(200);
     expect(((await response.json()) as { data: { id: string } }).data.id).toBe(verifiedUser.userId);
   });
 
   it('a JWT in the URL authenticates no one', async () => {
-    const response = await readMe({}, `?token=${encodeURIComponent(handoff.token)}`);
+    const response = await fetchMe({}, `?token=${encodeURIComponent(handoff.token)}`);
     expect(response.status).toBe(401);
   });
 
   it('a Better Auth session token authenticates no one, as a bearer, a cookie or ?token=', async () => {
     const context = await auth.$context;
     const session = await context.internalAdapter.createSession(verifiedUser.userId);
-    expect((await readMe(bearer(session.token))).status).toBe(401);
-    expect((await readMe({ cookie: `better-auth.session_token=${session.token}` })).status).toBe(
+    expect((await fetchMe(bearer(session.token))).status).toBe(401);
+    expect((await fetchMe({ cookie: `better-auth.session_token=${session.token}` })).status).toBe(
       401,
     );
-    expect((await readMe({}, `?token=${session.token}`)).status).toBe(401);
+    expect((await fetchMe({}, `?token=${session.token}`)).status).toBe(401);
     await context.internalAdapter.deleteSession(session.token);
   });
 
@@ -159,7 +159,7 @@ describe('a user authenticates with a JWT, never a session', () => {
     await rotateUserJwts(verifiedUser.userId);
     const again = await signInOverHttp(verifiedUser.email, verifiedUser.password);
     const { token } = (await again.json()) as UserJwtHandoff;
-    expect((await readMe(bearer(token))).status).toBe(200);
+    expect((await fetchMe(bearer(token))).status).toBe(200);
   });
 
   it('publishes its signing keys', async () => {
@@ -204,27 +204,27 @@ describe('JWT verification', () => {
     const forged = Buffer.from(
       JSON.stringify({ sub: Bun.randomUUIDv7(), iat: nowSeconds() }),
     ).toString('base64url');
-    expect((await readMe(bearer(`${header}.${forged}.${signature}`))).status).toBe(401);
+    expect((await fetchMe(bearer(`${header}.${forged}.${signature}`))).status).toBe(401);
   });
 
   it('rejects an expired JWT', async () => {
     const expired = await signSelf({ iat: nowSeconds() - 7200, exp: nowSeconds() - 3600 });
-    expect((await readMe(bearer(expired))).status).toBe(401);
+    expect((await fetchMe(bearer(expired))).status).toBe(401);
   });
 
   it('rejects a JWT for another audience', async () => {
     const other = await signSelf({}, { jwt: { audience: 'https://other.example' } });
-    expect((await readMe(bearer(other))).status).toBe(401);
+    expect((await fetchMe(bearer(other))).status).toBe(401);
   });
 
   it('rejects a JWT from an untrusted issuer', async () => {
     const other = await signSelf({}, { jwt: { issuer: 'https://evil.example' } });
-    expect((await readMe(bearer(other))).status).toBe(401);
+    expect((await fetchMe(bearer(other))).status).toBe(401);
   });
 
   it('rejects a JWT whose subject is not a user', async () => {
     const stranger = await signSelf({ sub: Bun.randomUUIDv7() });
-    expect((await readMe(bearer(stranger))).status).toBe(401);
+    expect((await fetchMe(bearer(stranger))).status).toBe(401);
   });
 
   it('rejects a JWT without iat', async () => {
@@ -235,7 +235,7 @@ describe('JWT verification', () => {
       .setAudience(userJwtIssuerUrlOrThrow())
       .setExpirationTime('5m')
       .sign(pair.privateKey);
-    expect((await readMe(bearer(unsigned))).status).toBe(401);
+    expect((await fetchMe(bearer(unsigned))).status).toBe(401);
   });
 });
 
@@ -277,16 +277,16 @@ describe('JWTs from a configured external issuer', () => {
 
   it('accepts the issuer’s JWT through the same verification path', async () => {
     configureIssuer();
-    expect((await readMe(bearer(await signExternal()))).status).toBe(200);
+    expect((await fetchMe(bearer(await signExternal()))).status).toBe(200);
   });
 
   it('refuses the external key claiming to be this API', async () => {
     configureIssuer();
-    expect((await readMe(bearer(await signExternal(userJwtIssuerUrlOrThrow())))).status).toBe(401);
+    expect((await fetchMe(bearer(await signExternal(userJwtIssuerUrlOrThrow())))).status).toBe(401);
   });
 
   it('refuses the issuer when it is not configured', async () => {
-    expect((await readMe(bearer(await signExternal()))).status).toBe(401);
+    expect((await fetchMe(bearer(await signExternal()))).status).toBe(401);
   });
 });
 
@@ -309,17 +309,17 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
   it('rotateUserJwts refuses the old JWT on the next request and a new JWT works', async () => {
     const target = await freshUser();
     const older = await createUserJwt(target);
-    expect((await readMe(older)).status).toBe(200);
+    expect((await fetchMe(older)).status).toBe(200);
     await rotateUserJwts(target.id);
-    expect((await readMe(older)).status).toBe(401);
-    expect((await readMe(await createUserJwt(await reload(target)))).status).toBe(200);
+    expect((await fetchMe(older)).status).toBe(401);
+    expect((await fetchMe(await createUserJwt(await reload(target)))).status).toBe(200);
   });
 
   it('a JWT without the version is refused', async () => {
     const { token } = await auth.api.signJWT({
       body: { payload: { sub: user.id, iat: nowSeconds() } },
     });
-    expect((await readMe(bearer(token))).status).toBe(401);
+    expect((await fetchMe(bearer(token))).status).toBe(401);
   });
 
   it('a role change applies at once under the same JWT: permissions are not on the token', async () => {
@@ -345,7 +345,7 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
     const jwt = await createUserJwt(await freshUser());
     const response = await app.request('/api/v1/me/rotateJwts', { method: 'POST', headers: jwt });
     expect(response.status).toBe(204);
-    expect((await readMe(jwt)).status).toBe(401);
+    expect((await fetchMe(jwt)).status).toBe(401);
   });
 
   it("an API token cannot rotate its user's JWTs", async () => {
@@ -365,7 +365,7 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
       headers: await createUserJwt(superadmin),
     });
     expect(response.status).toBe(204);
-    expect((await readMe(jwt)).status).toBe(401);
+    expect((await fetchMe(jwt)).status).toBe(401);
   });
 
   it('a password reset revokes', async () => {
@@ -374,12 +374,12 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
     await auth.options.emailAndPassword?.onPasswordReset?.({
       user: { ...target, name: target.name ?? '' },
     });
-    expect((await readMe(jwt)).status).toBe(401);
+    expect((await fetchMe(jwt)).status).toBe(401);
   });
 
   it('a superadmin JWT spoofs, and the WebSocket identity follows the JWT', async () => {
     const admin = await createUserJwt(await reload(superadmin));
-    const spoofed = await readMe({ ...admin, 'x-spoof-user-email': user.email });
+    const spoofed = await fetchMe({ ...admin, 'x-spoof-user-email': user.email });
     expect(((await spoofed.json()) as { data: { id: string } }).data.id).toBe(user.id);
 
     const identity = await resolveIdentity(admin);
@@ -397,10 +397,10 @@ describe('account deletion revokes', () => {
   it("a soft-deleted user's JWT is refused", async () => {
     const { entity: user } = await createUser();
     const jwt = await createUserJwt(user);
-    expect((await readMe(jwt)).status).toBe(200);
+    expect((await fetchMe(jwt)).status).toBe(200);
 
     await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
-    expect((await readMe(jwt)).status).toBe(401);
+    expect((await fetchMe(jwt)).status).toBe(401);
   });
 
   it('redacting the account locks its JWTs out', async () => {
@@ -408,7 +408,7 @@ describe('account deletion revokes', () => {
     const jwt = await createUserJwt(user);
     const response = await app.request('/api/v1/me/redact', { method: 'POST', headers: jwt });
     expect(response.status).toBe(204);
-    expect((await readMe(jwt)).status).toBe(401);
+    expect((await fetchMe(jwt)).status).toBe(401);
     expect(await db.user.findFirst({ where: { id: user.id } })).toBeNull();
   });
 });

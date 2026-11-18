@@ -26,13 +26,13 @@
       "docs/claude/JOBS.md"
     ],
     "docUnits": [
-      "doc:docs/claude/CONCURRENCY.md#distributed-lock-createlock",
+      "doc:docs/claude/CONCURRENCY.md#distributed-lock-makelock",
       "doc:docs/claude/CONCURRENCY.md#row-locks-db-findforupdate",
       "doc:docs/claude/DATABASE.md#transactions",
       "doc:docs/claude/CONCURRENCY.md#preface",
-      "doc:docs/claude/CONCURRENCY.md#serialized-queue-createserializedqueue",
-      "doc:docs/claude/CONCURRENCY.md#concurrency-limits-getconcurrency",
-      "doc:docs/claude/CONCURRENCY.md#bounded-batch-resolveall",
+      "doc:docs/claude/CONCURRENCY.md#serialized-queue-makeserializedqueue",
+      "doc:docs/claude/CONCURRENCY.md#concurrency-limits-minimumconcurrencylimitfor",
+      "doc:docs/claude/CONCURRENCY.md#bounded-batch-runallwithconcurrencylimit",
       "doc:docs/claude/CONCURRENCY.md#supersede-lanes-claimlane-watchlane",
       "doc:docs/claude/JOBS.md#handler-patterns",
       "doc:docs/claude/JOBS.md#handler-patterns/superseding-job",

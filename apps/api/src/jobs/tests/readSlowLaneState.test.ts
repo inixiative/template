@@ -1,8 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { fetchSlowLaneState } from '#/jobs/fetchSlowLaneState';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { laneDepthsFrom } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
-import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import {
   recordSlowDeferral,
   recordSlowFinished,
@@ -27,7 +27,7 @@ describe('laneDepthsFrom', () => {
   });
 });
 
-describe('readSlowLaneState', () => {
+describe('fetchSlowLaneState', () => {
   const counts = { waiting: 0, prioritized: 0, active: 0, delayed: 0 };
   let restore = (): void => {};
 
@@ -58,7 +58,7 @@ describe('readSlowLaneState', () => {
     for (let i = 0; i < 6; i++)
       await recordSlowDeferral(queue.redis, queue.name, `parked-${i}`, Date.now() + 20_000);
 
-    const state = await readSlowLaneState();
+    const state = await fetchSlowLaneState();
 
     expect(state.deferred).toBe(6);
     expect(state.queued).toBe(2 + 6);
@@ -71,18 +71,18 @@ describe('readSlowLaneState', () => {
     await recordSlowDeferral(queue.redis, queue.name, 'orphaned', now - SLOW_DEFERRED_GRACE_MS - 1);
     await recordSlowDeferral(queue.redis, queue.name, 'parked', now + 1_000);
 
-    expect((await readSlowLaneState(now)).deferred).toBe(1);
+    expect((await fetchSlowLaneState(now)).deferred).toBe(1);
     expect(await queue.redis.zcard(`job:${queue.name}:slow:deferred`)).toBe(1);
   });
 
   it('reads the idle clock against the slow count: 0 while nothing slow is queued, then time since a finish', async () => {
     await recordSlowFinished(queue.redis, queue.name, 1_000);
-    expect((await readSlowLaneState(500_000)).idleMs).toBe(0);
+    expect((await fetchSlowLaneState(500_000)).idleMs).toBe(0);
 
     Object.assign(counts, { prioritized: 3 });
-    await readSlowLaneState(600_000);
+    await fetchSlowLaneState(600_000);
     await recordSlowFinished(queue.redis, queue.name, 610_000);
 
-    expect((await readSlowLaneState(670_000)).idleMs).toBe(60_000);
+    expect((await fetchSlowLaneState(670_000)).idleMs).toBe(60_000);
   });
 });

@@ -1,7 +1,7 @@
 import { infisicalRailwayApi } from '../api/infisicalRailway';
 import { railwayApi } from '../api/railway';
 import { updateConfigField, updateConfigFields } from '../utils/configHelpers';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import {
   clearError,
   clearProgress,
@@ -10,7 +10,7 @@ import {
   setError,
 } from '../utils/progressTracking';
 import { retryWithTimeout } from '../utils/retry';
-import { getSecretAsync, setSecretAsync } from './infisicalSetup';
+import { fetchSecretOrThrow, setSecretAsync } from './infisicalSetup';
 
 type SetupResult = {
   projectId: string;
@@ -74,7 +74,7 @@ export const setupRailway = async (
   onStepComplete?: () => Promise<void>,
 ): Promise<SetupResult> => {
   try {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const configProjectName = config.project.name;
     const infisicalProjectId = config.infisical.projectId;
 
@@ -416,7 +416,7 @@ export const setupRailway = async (
 
     // Step 11: Create Infisical Railway connection
     let connectionId = '';
-    const getConnectionId = async (): Promise<string> => {
+    const fetchOrCreateRailwayConnectionId = async (): Promise<string> => {
       if (connectionId) {
         return connectionId;
       }
@@ -441,7 +441,7 @@ export const setupRailway = async (
     };
 
     if (!(await isComplete('railway', 'createInfisicalConnection'))) {
-      connectionId = await getConnectionId();
+      connectionId = await fetchOrCreateRailwayConnectionId();
       await markComplete('railway', 'createInfisicalConnection');
       await onStepComplete?.();
     }
@@ -486,7 +486,7 @@ export const setupRailway = async (
     }
 
     // Get connection ID once for all syncs
-    const resolvedConnectionId = await getConnectionId();
+    const resolvedConnectionId = await fetchOrCreateRailwayConnectionId();
 
     // Step 16: Ensure prod API service sync before GitHub connect
     if (!(await isComplete('railway', 'createInfisicalSyncProd'))) {
@@ -794,25 +794,25 @@ export const setupRailway = async (
     }
 
     // Fetch final URLs from Infisical (source of truth)
-    const prodApiUrl = await getSecretAsync('API_URL', {
+    const prodApiUrl = await fetchSecretOrThrow('API_URL', {
       projectId: infisicalProjectId,
       environment: 'prod',
       path: '/',
     });
 
-    const stagingApiUrl = await getSecretAsync('API_URL', {
+    const stagingApiUrl = await fetchSecretOrThrow('API_URL', {
       projectId: infisicalProjectId,
       environment: 'staging',
       path: '/',
     });
 
-    const prodRedisUrl = await getSecretAsync('REDIS_URL', {
+    const prodRedisUrl = await fetchSecretOrThrow('REDIS_URL', {
       projectId: infisicalProjectId,
       environment: 'prod',
       path: '/api',
     });
 
-    const stagingRedisUrl = await getSecretAsync('REDIS_URL', {
+    const stagingRedisUrl = await fetchSecretOrThrow('REDIS_URL', {
       projectId: infisicalProjectId,
       environment: 'staging',
       path: '/api',

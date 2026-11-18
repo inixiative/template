@@ -129,7 +129,7 @@ The transition **engine** is at parity (map-qualified `resource`, bridge-aware s
 - **No consumer** — `@inixiative/transitions` is imported nowhere in the template.
 - **One real lifecycle** — `inquiry` (`draft → sent → {changesRequested, approved, denied, canceled}`),
   validators in `apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts` +
-  `services/resolution.ts`. `CommunicationLog`/`WebhookEvent` are job-driven and simple. Not enough
+  `services/resolveInquiry.ts`. `CommunicationLog`/`WebhookEvent` are job-driven and simple. Not enough
   heterogeneity to earn a framework.
 - **No multi-source/bridges** today.
 

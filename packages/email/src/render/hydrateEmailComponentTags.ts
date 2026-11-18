@@ -7,7 +7,7 @@
 
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { serializeNodesToMjml } from '@template/email/render/decompose';
-import { lookupCascade } from '@template/email/render/lookupCascade';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
 import type { ComponentNode, Node, SlotNode } from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import type { OwnerScope } from '@template/email/render/types';
@@ -24,7 +24,7 @@ export const hydrateEmailComponentTagsFromOwnerCascade = (
   ctx: OwnerScope,
 ): Promise<string> => {
   const resolve: ResolveHydrateBodies = async (slugs) => {
-    const components = await lookupCascade(slugs, ctx);
+    const components = await fetchComponentsThroughOwnerCascade(slugs, ctx);
     return Object.fromEntries(slugs.map((slug) => [slug, components[slug]?.mjml]));
   };
   return hydrateEmailComponentTags(mjml, resolve);

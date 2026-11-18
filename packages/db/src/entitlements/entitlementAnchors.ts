@@ -19,7 +19,7 @@ export const anchorKey = ({
 }: Pick<EntitlementInput, 'sourceModel' | 'sourceId'>) => `${sourceModel}:${sourceId}`;
 
 /** Every anchor the inputs name, one read per anchor model; a missing key is an anchor that does not exist. */
-export const loadEntitlementAnchors = async (
+export const fetchEntitlementAnchors = async (
   inputs: EntitlementInput[],
 ): Promise<EntitlementAnchors> => {
   const anchors: EntitlementAnchors = {};

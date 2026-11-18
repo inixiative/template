@@ -9,14 +9,14 @@ import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
   expandComponentTagsFromOwnerCascade,
-  expandComponentTagsWithLookup,
+  expandComponentTagsWithFetcher,
 } from '@template/email/render/expandComponentTags';
-import { lookupCascade } from '@template/email/render/lookupCascade';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
 import {
-  lookupComponent,
-  lookupTemplate,
-  templateLens,
-} from '@template/email/render/lookupTemplate';
+  fetchComponentThroughOwnerCascade,
+  fetchTemplateLens,
+  fetchTemplateThroughOwnerCascade,
+} from '@template/email/render/fetchTemplateThroughOwnerCascade';
 import { ownerScopeOfRow } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 import type { RuleReference } from '@template/shared/rules';
@@ -61,12 +61,12 @@ export const composeTemplate = async (
   slug: string,
   ctx: OwnerScope,
 ): Promise<ComposeTemplateResult> => {
-  const template = await lookupTemplate(slug, ctx);
+  const template = await fetchTemplateThroughOwnerCascade(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
   const componentResolutions: Record<string, string> = {};
-  const mjml = await expandComponentTagsWithLookup(template.mjml, async (slugs) => {
-    const components = await lookupCascade(slugs, ctx);
+  const mjml = await expandComponentTagsWithFetcher(template.mjml, async (slugs) => {
+    const components = await fetchComponentsThroughOwnerCascade(slugs, ctx);
     for (const componentSlug of slugs) {
       const component = components[componentSlug];
       if (component) componentResolutions[componentSlug] = component.id;
@@ -85,7 +85,7 @@ export const composeTemplate = async (
     kind: template.kind,
     ownerModel: template.ownerModel,
     owner: ownerScopeOfRow(template),
-    lens: await templateLens(slug, template),
+    lens: await fetchTemplateLens(slug, template),
     componentResolutions,
     existingTargets,
   };
@@ -95,7 +95,7 @@ export const composeComponent = async (
   slug: string,
   ctx: OwnerScope,
 ): Promise<ComposeComponentResult> => {
-  const component = await lookupComponent(slug, ctx);
+  const component = await fetchComponentThroughOwnerCascade(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');
 
   const mjml = await expandComponentTagsFromOwnerCascade(component.mjml, ctx);

@@ -58,7 +58,7 @@ const perType = (
   })),
 });
 
-const readRule = (side: InquirySide, model: InquiryPartyModel): ActionRule[] => {
+const rulesGrantingRead = (side: InquirySide, model: InquiryPartyModel): ActionRule[] => {
   const level = INQUIRY_READ_LEVELS[model];
   if (!level) return [];
   const rel: ActionRule = { rel: `${side}${model}`, action: level.action };
@@ -86,7 +86,7 @@ export const inquiryResourcePermissionFromParties = (
     read: {
       any: (['source', 'target'] as const).flatMap((side) =>
         (Object.keys(INQUIRY_READ_LEVELS) as InquiryPartyModel[]).flatMap((model) =>
-          readRule(side, model),
+          rulesGrantingRead(side, model),
         ),
       ),
     },

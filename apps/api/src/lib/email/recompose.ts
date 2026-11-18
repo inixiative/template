@@ -5,16 +5,16 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { expandComponentTagsWithLookup } from '@template/email/render';
+import { expandComponentTagsWithFetcher } from '@template/email/render';
 
 export type ComponentSnapshot = { mjml: string; componentVersions: Record<string, string | null> };
-export type LoadSnapshot = (auditLogId: string) => Promise<ComponentSnapshot | null>;
+export type FetchSnapshot = (auditLogId: string) => Promise<ComponentSnapshot | null>;
 
 export const recomposeFromSnapshots = async (
   auditLogId: string,
-  load: LoadSnapshot,
+  fetchSnapshot: FetchSnapshot,
 ): Promise<string | null> => {
-  const root = await load(auditLogId);
+  const root = await fetchSnapshot(auditLogId);
   if (!root) return null;
 
   const bodies: Record<string, string> = {};
@@ -25,7 +25,7 @@ export const recomposeFromSnapshots = async (
     for (const [slug, childId] of frontier) {
       if (!childId || seen.has(childId) || bodies[slug] !== undefined) continue;
       seen.add(childId);
-      const child = await load(childId);
+      const child = await fetchSnapshot(childId);
       if (!child) continue;
       bodies[slug] = child.mjml;
       next.push(...Object.entries(child.componentVersions));
@@ -33,12 +33,12 @@ export const recomposeFromSnapshots = async (
     frontier = next;
   }
 
-  return expandComponentTagsWithLookup(root.mjml, async (slugs) =>
+  return expandComponentTagsWithFetcher(root.mjml, async (slugs) =>
     Object.fromEntries(slugs.map((slug) => [slug, { mjml: bodies[slug] ?? '' }])),
   );
 };
 
-const loadAuditSnapshot: LoadSnapshot = async (auditLogId) => {
+const fetchAuditSnapshot: FetchSnapshot = async (auditLogId) => {
   const snapshot = await db.auditLog.findUnique({ where: { id: auditLogId } });
   const mjml = (snapshot?.after as { mjml?: string } | null)?.mjml;
   if (!mjml) return null;
@@ -49,7 +49,7 @@ const loadAuditSnapshot: LoadSnapshot = async (auditLogId) => {
 };
 
 export const recomposeSnapshot = (auditLogId: string): Promise<string | null> =>
-  recomposeFromSnapshots(auditLogId, loadAuditSnapshot);
+  recomposeFromSnapshots(auditLogId, fetchAuditSnapshot);
 
 // The recorded evaluatedMjml is the sent truth (send-time sender-scoped cascade, interpolated);
 // the pinned snapshot is a save-time reconstruction resolved through the template row's own owner

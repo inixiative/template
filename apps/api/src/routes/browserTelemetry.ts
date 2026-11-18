@@ -7,7 +7,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { maskLogValue } from '@template/shared/logger/maskLogValue';
 import { browserTelemetrySchema } from '@template/shared/telemetry/browserSchema';
-import { readTelemetryConfig, signalExportOptions } from '@template/shared/telemetry/config';
+import { signalExportOptions, telemetryConfigFromEnv } from '@template/shared/telemetry/config';
 import { bodyLimit } from 'hono/body-limit';
 import { rateLimit } from '#/middleware/rateLimit/rateLimit';
 import { globalRateLimitKey, ipRateLimitKey } from '#/middleware/rateLimit/rateLimitKeys';
@@ -24,7 +24,7 @@ browserTelemetryRouter.use(
 );
 browserTelemetryRouter.post('/', async (c) => {
   if (process.env.OTEL_BROWSER_ENABLED !== 'true') return c.body(null, 404);
-  const config = readTelemetryConfig('api');
+  const config = telemetryConfigFromEnv('api');
   if (!config) return c.body(null, 404);
   const origin = c.req.header('origin');
   const allowedOrigins = [

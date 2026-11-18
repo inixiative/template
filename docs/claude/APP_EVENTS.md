@@ -100,7 +100,7 @@ defines the entity lens, sender, recipient rules, data lens and render policy.
 
 The planner resolves entity/sender/template ownership, hydrates recipients through the
 owner-scoped recipient lens, and creates or reuses a `CommunicationLog` row per recipient
-using its idempotency key. It then enqueues `deliverEmail`. Delivery settles the template and
+using its idempotency key. It then enqueues `deliverEmail`. Delivery evaluates the template and
 its component versions, applies contact preferences and address verification, renders and
 sends, and records the result. See [COMMUNICATIONS.md](COMMUNICATIONS.md#planner-planemaildeliveries)
 for the complete planner/delivery and degraded-rule behavior.

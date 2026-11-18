@@ -249,7 +249,7 @@ export const createApiWebsocket = (
     onReconnect?.();
   };
 
-  const settleReconnectAck = (channel: string): void => {
+  const recordReconnectAck = (channel: string): void => {
     if (!pendingAcks) return;
     pendingAcks.delete(channel);
     if (pendingAcks.size === 0) finishReconnect();
@@ -295,9 +295,9 @@ export const createApiWebsocket = (
       case 'subscribeRejected':
         console.error(`ws subscribe rejected: ${frame.channel}`);
         channels.delete(frame.channel as string);
-        return void settleReconnectAck(frame.channel as string);
+        return void recordReconnectAck(frame.channel as string);
       case 'subscribed':
-        return void settleReconnectAck(frame.channel as string);
+        return void recordReconnectAck(frame.channel as string);
       case 'unsubscribed':
       case 'closed':
         return;

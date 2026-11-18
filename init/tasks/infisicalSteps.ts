@@ -1,11 +1,11 @@
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import type { InfisicalAction } from '../utils/progressTracking';
 
 type InfisicalProgress = Partial<Record<InfisicalAction, boolean>>;
 
 type InfisicalProgressGroup = {
   actions: readonly InfisicalAction[];
-  getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
+  labelFor: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
 const countCompletedActions = (
@@ -211,19 +211,19 @@ export const infisicalIdentitySecretSteps = [
   {
     action: 'storeProjectNameSecret',
     key: 'PROJECT_NAME',
-    getValue: (config: ProjectConfig) => config.project.name,
+    valueFor: (config: ProjectConfig) => config.project.name,
     path: '/',
   },
   {
     action: 'storeViteProjectNameSecret',
     key: 'VITE_PROJECT_NAME',
-    getValue: (config: ProjectConfig) => config.project.name,
+    valueFor: (config: ProjectConfig) => config.project.name,
     path: '/',
   },
   {
     action: 'storeViteAppShortNameSecret',
     key: 'VITE_APP_SHORT_NAME',
-    getValue: (config: ProjectConfig) => config.project.name,
+    valueFor: (config: ProjectConfig) => config.project.name,
     path: '/',
   },
 ] as const;
@@ -254,83 +254,83 @@ export const infisicalEncryptionKeySteps = [
 const infisicalProgressGroups: readonly InfisicalProgressGroup[] = [
   {
     actions: ['selectOrg'],
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.infisical.organizationSlug
         ? `Organization selected: ${config.infisical.organizationSlug}`
         : 'Organization selected',
   },
   {
     actions: ['createProject'],
-    getLabel: (config) =>
+    labelFor: (config) =>
       config.infisical.projectSlug
         ? `Project created: ${config.infisical.projectSlug}`
         : 'Project created',
   },
   {
     actions: ['renameEnv'],
-    getLabel: () => 'Environments configured',
+    labelFor: () => 'Environments configured',
   },
   {
     actions: infisicalFolderSteps
       .filter((step) => step.environment === 'root')
       .map((step) => step.action),
-    getLabel: countLabel('Root app folders created'),
+    labelFor: countLabel('Root app folders created'),
   },
   {
     actions: infisicalFolderSteps
       .filter((step) => step.environment === 'staging')
       .map((step) => step.action),
-    getLabel: countLabel('Staging app folders created'),
+    labelFor: countLabel('Staging app folders created'),
   },
   {
     actions: infisicalFolderSteps
       .filter((step) => step.environment === 'prod')
       .map((step) => step.action),
-    getLabel: countLabel('Production app folders created'),
+    labelFor: countLabel('Production app folders created'),
   },
   {
     actions: infisicalInheritanceSteps
       .filter((step) => step.destinationEnvironment === 'staging')
       .map((step) => step.action),
-    getLabel: countLabel('Staging inheritance chains configured'),
+    labelFor: countLabel('Staging inheritance chains configured'),
   },
   {
     actions: infisicalInheritanceSteps
       .filter((step) => step.destinationEnvironment === 'prod')
       .map((step) => step.action),
-    getLabel: countLabel('Production inheritance chains configured'),
+    labelFor: countLabel('Production inheritance chains configured'),
   },
   {
     actions: infisicalIdentitySecretSteps.map((step) => step.action),
-    getLabel: countLabel('Shared app identity secrets stored'),
+    labelFor: countLabel('Shared app identity secrets stored'),
   },
   {
     actions: infisicalAppNameSecretSteps.map((step) => step.action),
-    getLabel: countLabel('Per-app display names stored'),
+    labelFor: countLabel('Per-app display names stored'),
   },
   {
     actions: ['ensureProdApiAuthSecret'],
-    getLabel: () => 'Production API auth secret initialized',
+    labelFor: () => 'Production API auth secret initialized',
   },
   {
     actions: ['ensureStagingApiAuthSecret'],
-    getLabel: () => 'Staging API auth secret initialized',
+    labelFor: () => 'Staging API auth secret initialized',
   },
   {
     actions: ['ensureProdWebhookSigningKeys'],
-    getLabel: () => 'Production webhook signing keypair initialized',
+    labelFor: () => 'Production webhook signing keypair initialized',
   },
   {
     actions: ['ensureStagingWebhookSigningKeys'],
-    getLabel: () => 'Staging webhook signing keypair initialized',
+    labelFor: () => 'Staging webhook signing keypair initialized',
   },
   {
     actions: ['ensureProdEncryptionKeys'],
-    getLabel: () => 'Production encryption keys initialized',
+    labelFor: () => 'Production encryption keys initialized',
   },
   {
     actions: ['ensureStagingEncryptionKeys'],
-    getLabel: () => 'Staging encryption keys initialized',
+    labelFor: () => 'Staging encryption keys initialized',
   },
 ] as const;
 
@@ -341,14 +341,12 @@ export type InfisicalProgressSummary = {
   totalCount: number;
 };
 
-export const getInfisicalProgressSummaries = (
-  config: ProjectConfig,
-): InfisicalProgressSummary[] => {
+export const infisicalProgressSummaries = (config: ProjectConfig): InfisicalProgressSummary[] => {
   return infisicalProgressGroups.map((group) => {
     const completedCount = countCompletedActions(config.infisical.progress, group.actions);
     const totalCount = group.actions.length;
     return {
-      label: group.getLabel(config, completedCount, totalCount),
+      label: group.labelFor(config, completedCount, totalCount),
       completed: completedCount === totalCount,
       completedCount,
       totalCount,

@@ -13,6 +13,7 @@ export {
   polymorphicAxis,
   polymorphismConfigForModel,
 } from './falsePolymorphism';
+export * from './fieldRegistry';
 export * from './hardDeleteOnTombstone';
 export * from './internalFields';
 export * from './noopFields';
@@ -23,4 +24,3 @@ export * from './sensitiveFields';
 export * from './skipRevive';
 export * from './softDeleteModels';
 export * from './webhook';
-export * from './webhookExcludedFields';

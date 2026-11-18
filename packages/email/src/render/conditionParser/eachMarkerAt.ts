@@ -5,18 +5,18 @@
  * @uses none
  */
 import type { Condition } from '@inixiative/json-rules';
+import { bareWordAt } from '@template/email/render/conditionParser/bareWordAt';
 import { findJsonEnd } from '@template/email/render/conditionParser/findJsonEnd';
 import { EACH } from '@template/email/render/conditionParser/grammar';
 import { parseRuleJson } from '@template/email/render/conditionParser/parseRuleJson';
-import { readBareWord } from '@template/email/render/conditionParser/readBareWord';
 import { skipWhitespace } from '@template/email/render/conditionParser/skipWhitespace';
 import type { EachBlock } from '@template/email/render/conditionParser/types';
 
 export type EachMarker = Omit<EachBlock, 'body' | 'end'> & { next: number };
 
-export const readEachMarker = (content: string, i: number): EachMarker | null => {
+export const eachMarkerAt = (content: string, i: number): EachMarker | null => {
   let cursor = skipWhitespace(content, i + EACH.length);
-  const { value: path, next: afterPath } = readBareWord(content, cursor);
+  const { value: path, next: afterPath } = bareWordAt(content, cursor);
   if (!path) return null;
   cursor = afterPath;
 
@@ -54,7 +54,7 @@ export const readEachMarker = (content: string, i: number): EachMarker | null =>
       (nextWhitespace !== -1 && nextWhitespace < eq) ||
       eq === cursor
     ) {
-      const { value, next } = readBareWord(content, cursor);
+      const { value, next } = bareWordAt(content, cursor);
       attributeErrors.push(
         `malformed attribute "${value}" on {{#each}} block (expected name=value)`,
       );
@@ -86,13 +86,13 @@ export const readEachMarker = (content: string, i: number): EachMarker | null =>
         cursor = braceEnd + 1;
         continue;
       }
-      const { value, next } = readBareWord(content, valueStart);
+      const { value, next } = bareWordAt(content, valueStart);
       filterError = `filter must be a JSON object, got "${value}"`;
       cursor = next;
       continue;
     }
 
-    const { value, next } = readBareWord(content, valueStart);
+    const { value, next } = bareWordAt(content, valueStart);
     if (attrName === 'as') as = value;
     else if (attrName === 'index') index = value;
     cursor = next;

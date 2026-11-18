@@ -34,7 +34,7 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
       createManyAndReturn: makeMutationLifecycleInterceptor(DbAction.createManyAndReturn),
 
       update: makeMutationLifecycleInterceptor(DbAction.update, {
-        loadPrevious: fetchExistingRecord,
+        fetchPreviousRecords: fetchExistingRecord,
       }),
 
       async updateMany({ model }) {
@@ -45,19 +45,19 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
       },
 
       updateManyAndReturn: makeMutationLifecycleInterceptor(DbAction.updateManyAndReturn, {
-        loadPrevious: fetchExistingRecords,
+        fetchPreviousRecords: fetchExistingRecords,
       }),
 
       upsert: makeMutationLifecycleInterceptor(DbAction.upsert, {
-        loadPrevious: fetchExistingRecord,
+        fetchPreviousRecords: fetchExistingRecord,
       }),
 
       delete: makeMutationLifecycleInterceptor(DbAction.delete, {
-        loadPrevious: fetchExistingRecord,
+        fetchPreviousRecords: fetchExistingRecord,
       }),
 
       deleteMany: makeMutationLifecycleInterceptor(DbAction.deleteMany, {
-        loadPrevious: fetchExistingRecords,
+        fetchPreviousRecords: fetchExistingRecords,
       }),
     },
   },

@@ -3,12 +3,12 @@ import { db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { decompose } from '@template/email/render/decompose';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
 import {
   hydrateEmailComponentTags,
   hydrateEmailComponentTagsFromOwnerCascade,
   type ResolveHydrateBodies,
 } from '@template/email/render/hydrateEmailComponentTags';
-import { lookupCascade } from '@template/email/render/lookupCascade';
 import { saveEmailTemplate } from '@template/email/render/save';
 import type { OwnerScope } from '@template/email/render/types';
 
@@ -306,7 +306,7 @@ describe('hydrateEmailComponentTagsFromOwnerCascade (DB-backed)', () => {
     });
 
     const hydrated = await hydrateEmailComponentTagsFromOwnerCascade(template.mjml, ctx);
-    const existing = await lookupCascade(['roundtrip-cmp'], ctx);
+    const existing = await fetchComponentsThroughOwnerCascade(['roundtrip-cmp'], ctx);
     const result = decompose(hydrated, (slug) => existing[slug]?.mjml);
 
     expect(result.writes).toEqual([]);

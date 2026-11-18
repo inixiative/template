@@ -20,7 +20,7 @@ const { fetch } = createTestApp({
   mount: [(app) => app.route('/api/v1/inquiry', inquiryRouter)],
 });
 
-const loadInfo = async () => {
+const fetchInfo = async () => {
   const response = await fetch(get('/api/v1/inquiry/info'));
   expect(response.status).toBe(200);
   return (await parseSuccessBody<{ types: Record<string, InquiryTypeInfo> }>(response)).data.types;
@@ -28,12 +28,12 @@ const loadInfo = async () => {
 
 describe('GET /api/v1/inquiry/info', () => {
   it('answers without a session and lists every registered handler', async () => {
-    const types = await loadInfo();
+    const types = await fetchInfo();
     expect(Object.keys(types).sort()).toEqual(Object.keys(inquiryServices).sort());
   });
 
   it('reports each type’s declared source and target models and its handler rules', async () => {
-    const types = await loadInfo();
+    const types = await fetchInfo();
     for (const [type, handler] of Object.entries(inquiryServices)) {
       const { sources, targets } = INQUIRY_TYPES[type as InquiryType];
       expect(types[type]!.sources).toEqual(sources.map(({ model }) => model));
@@ -44,7 +44,7 @@ describe('GET /api/v1/inquiry/info', () => {
   });
 
   it('describes content, resolution input and stored resolution as JSON Schema', async () => {
-    const types = await loadInfo();
+    const types = await fetchInfo();
     expect(types.createSpace!.content.required).toEqual(['name', 'slug']);
     expect(types.createSpace!.resolution.properties).toHaveProperty('spaceId');
     expect(types.inviteOrganizationUser!.content.properties!.role!.enum).toEqual(

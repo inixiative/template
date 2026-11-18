@@ -3,7 +3,7 @@ import type React from 'react';
 import { useCallback, useState } from 'react';
 import { StepProgress } from '../components/StepProgress';
 import { setupRailwayPostgres } from '../tasks/railwayPostgresSetup';
-import { getRailwayPostgresProgressItems } from '../tasks/railwayPostgresSteps';
+import { railwayPostgresProgressItems } from '../tasks/railwayPostgresSteps';
 import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import { clearError, clearProgress } from '../utils/progressTracking';
@@ -26,7 +26,7 @@ export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> =
 
   const detectState = (): SetupState => {
     if (!config) return 'new';
-    const items = getRailwayPostgresProgressItems(config);
+    const items = railwayPostgresProgressItems(config);
     // Skipped items count as "satisfied" — staging Postgres steps when staging
     // is disabled aren't actual pending work, so a prod-only run with all 5
     // prod steps green should land on 'complete' and let Enter dismiss the view.
@@ -82,7 +82,7 @@ export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> =
   }
 
   const stagingEnabled = config.features.staging.enabled;
-  const progressItems = getRailwayPostgresProgressItems(config);
+  const progressItems = railwayPostgresProgressItems(config);
 
   return (
     <Box flexDirection="column" padding={1}>

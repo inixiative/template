@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { infisicalApi } from '../../api/infisical';
 import { createMockConfig, defaultConfig } from '../../tests/mocks';
-import type { ProjectConfig } from '../../utils/getProjectConfig';
+import type { ProjectConfig } from '../../utils/fetchProjectConfig';
 
 const config = createMockConfig();
 

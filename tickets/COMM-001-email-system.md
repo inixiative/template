@@ -80,7 +80,7 @@ narrowing.
 
 - **Subtenancy brand lock.** An org setting `spaceEmailPolicy: free | locked` (+
   the locked/required component slugs), enforced server-side: on `locked`,
-  `lookupCascade` stops letting a Space override the locked slugs, and save/render
+  `fetchComponentsThroughOwnerCascade` stops letting a Space override the locked slugs, and save/render
   requires or auto-injects them. The *mechanism* (org component + `inheritToSpaces`
   + cascade) already exists; only the lock/enforcement is missing. **No settings
   table exists** (searched: no `Setting`/`Preference`/`Config`/`Policy` model or

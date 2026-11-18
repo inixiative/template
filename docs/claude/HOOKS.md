@@ -26,7 +26,7 @@
   - [Retries](#retries)
   - [Circuit Breaker](#circuit-breaker)
   - [Poisoned Records](#poisoned-records)
-  - [Ignored Fields](#ignored-fields)
+  - [No-op Fields](#no-op-fields)
   - [Related Models](#related-models)
 - [Cache Invalidation](#cache-invalidation)
   - [How It Works](#how-it-works)
@@ -184,7 +184,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
 4. **Mask** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[MASKED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
-`maskSensitiveAndOmitNoopFieldsForAudit` (filter + mask) builds the same column-only snapshot for the email-versioning hook.
+`maskSensitiveAndOmitNoopFieldsForAudit` (omit + mask) builds the same column-only snapshot for the email-versioning hook.
 
 ### Reading the Log
 
@@ -273,8 +273,8 @@ Headers: `Content-Type: application/json`, `X-Webhook-Signature: <base64>`
 A delivery is one `sendWebhook` job, and its BullMQ attempts (the queue default: 3, exponential
 backoff from 5 s) are its retry cycle. A failure that says the receiver could not take it right now —
 a network error or timeout, any 5xx, 404 or 429 — is recorded as a `retrying` event and rethrown, so
-BullMQ retries the job. The last attempt (`isFinalAttempt(ctx.job)` in `jobs/`) settles the delivery
-as `unreachable` (or `error` for a 429) and the job completes. Every other failure settles on its
+BullMQ retries the job. The last attempt (`isFinalAttempt(ctx.job)` in `jobs/`) records the final outcome
+as `unreachable` (or `error` for a 429) and the job completes. Every other failure is final on its
 first attempt and is not retried: a blocked redirect, 401 and 403 are configuration the receiver has
 to change, and 400 / 422 are about the record's content, so resending the same bytes gets the same
 answer (see [Poisoned Records](#poisoned-records)).
@@ -282,7 +282,7 @@ answer (see [Poisoned Records](#poisoned-records)).
 ### Circuit Breaker
 
 After 5 consecutive failed deliveries, the subscription auto-disables (`isActive = false`). Only
-settled events count: `retrying` attempts are left out, so a retry cycle counts once, as its outcome.
+final events count: `retrying` attempts are left out, so a retry cycle counts once, as its outcome.
 
 ### Poisoned Records
 
@@ -298,32 +298,35 @@ calls it first, and later deliveries of that record are skipped before signing,
 with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp yet. See
 `tickets/INFRA-032-webhook-poisoned-records.md`.
 
-### Ignored Fields
+### No-op Fields
 
-`HOOK_IGNORE_FIELDS` is the **shared** ignore registry — used by audit, cache, webhooks, and the generic `isNoOpUpdate`. Any field listed here is:
+`NOOP_FIELDS` (`packages/db/src/registries/noopFields.ts`) lists the fields whose change is not worth recording or firing. Audit, cache, webhooks and `isNoOpUpdate` share it. A field listed here is:
 
-1. **Excluded from payload** - never sent to webhook subscribers
-2. **Stripped before audit diff** - changes don't produce AuditLog entries
-3. **Treated as a no-op** - updates that only touch ignored fields skip the cache/webhook/audit hooks
+1. **Left out of webhook payloads** - with the sensitive and internal fields (`WEBHOOK_EXCLUDED_FIELDS`)
+2. **Omitted before the audit diff** - changing only it writes no AuditLog entry
+3. **Treated as a no-op** - an update that touches only no-op fields skips the cache, webhook and audit hooks
 
 ```typescript
 // packages/db/src/registries/noopFields.ts
-const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
-  _global: ['updatedAt'],      // Always ignored for all models
-  User: ['lastLoginAt'],       // Login timestamp not meaningful
-  Token: ['lastUsedAt'],       // Token usage timestamp not meaningful
+const NOOP_FIELDS_BASE: FieldRegistry = {
+  _global: ['updatedAt'],
+  User: ['lastLoginAt'],
+  Token: ['lastUsedAt'],
+  EmailTemplate: ['missingComponentSlugs'],
+  EmailComponent: ['missingComponentSlugs'],
 };
 
-// Auto-composes from encryption + orderedList registries so encrypted column
-// triplets (encryptedX / encryptedXMetadata / encryptedXKeyVersion) and
-// ordered-list position fields don't need to be re-listed per model.
-export const HOOK_IGNORE_FIELDS = buildHookIgnoreFields();
+export const NOOP_FIELDS: FieldRegistry = unionRegistries(
+  NOOP_FIELDS_BASE,
+  orderedListFieldsByModel(),
+);
 ```
 
 Use cases:
-- **Timestamps** (`updatedAt`, `lastUsedAt`) - noisy, not meaningful
-- **Sensitive data** (encrypted blobs) - auto-composed from encryption registry
-- **Presentation-only state** (ordered-list `position`) - auto-composed from orderedList registry; the `orderedList` hook owns cache invalidation for ordering cascades (see [Ordered List](#ordered-list))
+- **Timestamps** (`updatedAt`, `lastUsedAt`) - change on every write, carry no meaning
+- **Presentation-only state** (ordered-list `position`) - folded in from the orderedList registry; the `orderedList` hook owns cache invalidation for ordering cascades (see [Ordered List](#ordered-list))
+
+Sensitive columns are not no-op fields: they are `SENSITIVE_FIELDS`, which audit masks and webhooks leave out.
 
 ### Related Models
 
@@ -347,13 +350,13 @@ Private fields of a party stay off the row (a settings or config table that is n
 
 Automatic cache clearing on mutations via `cacheKeysByModel`.
 
-**Note**: Cache invalidation shares the same no-op detection logic as webhooks (`isNoOpUpdate`). If only ignored fields changed (see [Ignored Fields](#ignored-fields)), cache clearing is skipped.
+**Note**: Cache invalidation shares the same no-op detection logic as webhooks (`isNoOpUpdate`). If only no-op fields changed (see [No-op Fields](#no-op-fields)), cache clearing is skipped.
 
 ### How It Works
 
 ```typescript
-// hooks/cache/constants/cacheReference.ts
-export const cacheKeysByModel: CacheReference = {
+// hooks/cache/constants/cacheKeysByModel.ts
+export const cacheKeysByModel: CacheKeysByModel = {
   User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
   Token: (r) => [cacheKey('token', { keyHash: r.keyHash }), cacheKey('token', r.id)],
   // ...
@@ -364,7 +367,7 @@ On mutation, the hook marks the keys of both the previous and the resulting row 
 
 ### Parent edges
 
-A child whose change is a change to its parent names that parent once, in the parent edge registry (`packages/db/src/registries/parentEdges.ts`, [DATABASE.md](DATABASE.md#parent-edges)). `Entitlement`'s parent is its target: the hook loads the parent rows (`loadParentRows` (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheKeysByModel` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
+A child whose change is a change to its parent names that parent once, in the parent edge registry (`packages/db/src/registries/parentEdges.ts`, [DATABASE.md](DATABASE.md#parent-edges)). `Entitlement`'s parent is its target: the hook loads the parent rows (`fetchParentRows` (`db.withDeleted`, so a target dying in the same write still has its keys found) and clears their `cacheKeysByModel` keys too, so a token's sign-in cache (`token:keyHash`), an integration's or member's hydrated row and the user's `organizationUsers` / `spaceUsers` lists drop as soon as an entitlement row is written or tombstoned. The rows have to be loaded because after-hooks see a write's own columns only (`pickColumns`), and a token's key is its `keyHash`, which the entitlement row doesn't carry.
 
 ### Wildcard Keys
 
@@ -671,7 +674,7 @@ export const orderedListRegistry: OrderedListRegistry = {
 };
 ```
 
-Lives in `packages/db/src/registries/` alongside the encryption and false-polymorphism registries so it can be composed into other db-level registries (notably `HOOK_IGNORE_FIELDS` — see [Ignored Fields](#ignored-fields)). The hook implementations and SQL primitives still live in `apps/api/src/hooks/orderedList/` and `apps/api/src/lib/prisma/orderedList.ts`.
+Lives in `packages/db/src/registries/` alongside the encryption and false-polymorphism registries so it can be composed into other db-level registries (notably `NOOP_FIELDS` — see [No-op Fields](#no-op-fields)). The hook implementations and SQL primitives still live in `apps/api/src/hooks/orderedList/` and `apps/api/src/lib/prisma/orderedList.ts`.
 
 The key is the Prisma model name. The value maps each ordered field to its scope: an array of column names that partition rows into independent lists. For Contact, every `(userId|orgId|spaceId, type)` combination is its own list — `position` resets to 1 for each scope.
 
@@ -697,7 +700,7 @@ Every bulk hook is O(scopes), not O(rows). Importing a 1000-row CSV of Contacts 
 
 ### Cache invalidation
 
-Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `HOOK_IGNORE_FIELDS` (auto-composed from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook marks the affected rows' keys in the transaction's cache overlay through `queueCacheClear` (`apps/api/src/hooks/cache/queueCacheClear.ts`), the same call the cache hook makes, and they are cleared at commit. Anything else that changes rows outside the lifecycle (a key change that reaches rows by `ON UPDATE CASCADE`) uses it too. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
+Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `NOOP_FIELDS` (folded in from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook marks the affected rows' keys in the transaction's cache overlay through `queueCacheClear` (`apps/api/src/hooks/cache/queueCacheClear.ts`), the same call the cache hook makes, and they are cleared at commit. Anything else that changes rows outside the lifecycle (a key change that reaches rows by `ON UPDATE CASCADE`) uses it too. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
 
 ### Scope strictness
 

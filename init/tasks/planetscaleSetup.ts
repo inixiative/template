@@ -1,6 +1,6 @@
 import { planetscaleApi } from '../api/planetscale';
 import { execFileAsync } from '../utils/exec';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 
 /**
  * Initialize Prisma migration table in the database
@@ -30,7 +30,7 @@ import {
   setError,
 } from '../utils/progressTracking';
 import { retryWithTimeout } from '../utils/retry';
-import { getSecretAsync, setSecretAsync } from './infisicalSetup';
+import { fetchSecretOrThrow, setSecretAsync } from './infisicalSetup';
 
 type SetupResult = {
   databaseName: string;
@@ -59,7 +59,7 @@ export const setupPlanetScale = async (
   onStepComplete?: StepCallback,
 ): Promise<SetupResult> => {
   try {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const configProjectName = config.project.name;
     const databaseName = configProjectName; // Use project name as database name
     const infisicalProjectId = config.infisical.projectId;
@@ -334,7 +334,7 @@ export const setupPlanetScale = async (
       try {
         // Fetch connection strings from Infisical (source of truth)
         await onStepComplete?.('Fetching prod connection string from Infisical...');
-        const prodConnectionString = await getSecretAsync('DATABASE_URL', {
+        const prodConnectionString = await fetchSecretOrThrow('DATABASE_URL', {
           projectId: infisicalProjectId,
           environment: 'prod',
           path: '/api',
@@ -355,7 +355,7 @@ export const setupPlanetScale = async (
     if (!(await isComplete('planetscale', 'initStagingMigrationTable'))) {
       try {
         await onStepComplete?.('Fetching staging connection string from Infisical...');
-        const stagingConnectionString = await getSecretAsync('DATABASE_URL', {
+        const stagingConnectionString = await fetchSecretOrThrow('DATABASE_URL', {
           projectId: infisicalProjectId,
           environment: 'staging',
           path: '/api',
@@ -386,13 +386,13 @@ export const setupPlanetScale = async (
     // Suppressed for TUI: console.log(`   • Configure Render/Vercel to use these connections\n`);
 
     // Fetch connection strings from Infisical (source of truth)
-    const prodConnectionString = await getSecretAsync('DATABASE_URL', {
+    const prodConnectionString = await fetchSecretOrThrow('DATABASE_URL', {
       projectId: infisicalProjectId,
       environment: 'prod',
       path: '/api',
     });
 
-    const stagingConnectionString = await getSecretAsync('DATABASE_URL', {
+    const stagingConnectionString = await fetchSecretOrThrow('DATABASE_URL', {
       projectId: infisicalProjectId,
       environment: 'staging',
       path: '/api',

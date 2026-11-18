@@ -84,7 +84,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - don't delete rows by hand after tests
 - I'll register the table tracker at the top of the file
 - make sure every test that touches the db cleans up after
-- redact secrets before committing the cassette
+- mask secrets before committing the cassette
 - a compound key that references one dependency
 - make registerFactory expect the model types so callers must provide them
 - create the request and send it in the same call

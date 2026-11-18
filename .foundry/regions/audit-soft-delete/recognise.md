@@ -4,7 +4,7 @@
 
 ## What this region is
 
-Two standing hooks with their own concerns: the audit log (which models, which actor, what diff, what is redacted) and soft delete (the scope every read gets for free, as the single bypass, cascade tombstones and ). The hook machinery they run inside is the region.
+Two standing hooks with their own concerns: the audit log (which models, which actor, what diff, what is masked) and soft delete (the scope every read gets for free, as the single bypass, cascade tombstones and ). The hook machinery they run inside is the region.
 
 ## What it exists for
 
@@ -24,7 +24,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - attribute writes in a job or request
 - which models and fields get audited
 - keep secrets and noise out of the audit log
-- redact or ignore audit fields
+- mask or omit audit fields
 - record that something happened
 - change history vs a named event
 - history of a record
@@ -59,7 +59,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the where clause that filters out deleted rows
 - add deleted-at null to the where
 - prepare the record for the audit payload
-- redact secrets inside a diff
+- mask secrets inside a diff
 - mask the password hash in the audit log
 - rebuild the derived rows when the parent comes back
 - wire up the cascade hook
@@ -69,7 +69,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - all the models that soft-delete
 - hide deleted rows from every read automatically
 - soft-delete the children when the parent goes
-- hand-written diff and redaction before storing
+- hand-written diff and masking before storing
 - write audit rows by hand in the service
 - set the actor around a block of code
 - who did this on an HTTP request
@@ -91,9 +91,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the include tree still returns deleted children
 - add the live filter to a compiled where
 - filter the include by hand for deleted rows
-- ignore noise and redact secrets before storing
+- omit noise and mask secrets before storing
 - scrub the before and after values of sensitive fields
-- fields that show as redacted
+- fields that show as masked
 - hard-deleted rows that must be recreated on revive
 - validate delete behavior per model at startup
 - set deleted-at back to null
@@ -151,7 +151,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - pass a fake user id for the background job
 - the engine behind include scoping
 - the engine behind the read filter
-- filter and redact in one step
+- omit and mask in one step
 - mask sensitive fields in the change set
 - secrets in the audit payload
 - rows gone on delete, remade on restore

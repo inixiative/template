@@ -350,7 +350,7 @@ describe('sendWebhook handler', () => {
       expect(events.map((event) => [event.status, event.httpStatus])).toEqual([['retrying', null]]);
     });
 
-    it('settles the delivery on the last attempt: records it unreachable and completes', async () => {
+    it('records the final outcome on the last attempt: unreachable, and the job completes', async () => {
       respondWith(503, 'Service Unavailable');
       const sub = await createSubscription();
 
@@ -364,7 +364,7 @@ describe('sendWebhook handler', () => {
       [422, 'Unprocessable Entity'],
       [401, 'Unauthorized'],
       [302, 'Found'],
-    ])('does not retry HTTP %d: the first attempt settles the delivery as an error', async (status, statusText) => {
+    ])('does not retry HTTP %d: the first attempt records the final outcome as an error', async (status, statusText) => {
       respondWith(status, statusText);
       const sub = await createSubscription();
 

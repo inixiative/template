@@ -10,10 +10,10 @@ import { StepProgress } from '../components/StepProgress';
 import { useAsyncAction } from '../components/useAsyncAction';
 import { setSecretAsync } from '../tasks/infisicalSetup';
 import { setupPlanetScale } from '../tasks/planetscaleSetup';
-import { getPlanetScaleProgressItems } from '../tasks/planetscaleSteps';
+import { planetScaleProgressItems } from '../tasks/planetscaleSteps';
 import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
-import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig, type ProjectConfig } from '../utils/fetchProjectConfig';
 import { clearError, clearProgress, markComplete, setError } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
@@ -99,10 +99,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({
 
   // Derive setup state from config (no delay)
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
-  const progressItems = useMemo(
-    () => (config ? getPlanetScaleProgressItems(config) : []),
-    [config],
-  );
+  const progressItems = useMemo(() => (config ? planetScaleProgressItems(config) : []), [config]);
   const error = config?.planetscale.error ?? '';
 
   // Load organizations
@@ -291,7 +288,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({
 
     const actionError = await tokenAction.run('Saving to Infisical...', async () => {
       // Re-read config from disk to avoid stale React closure
-      const freshConfig = await getProjectConfig();
+      const freshConfig = await fetchProjectConfig();
       const infisicalProjectId = freshConfig.infisical.projectId;
       const orgName = freshConfig.planetscale.organization;
       const region = freshConfig.planetscale.region;

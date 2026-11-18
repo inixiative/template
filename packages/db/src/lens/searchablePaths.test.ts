@@ -7,14 +7,14 @@ const userLens = lensFor('User');
 const accountLens = lensFor('Account');
 
 describe('searchablePaths', () => {
-  describe('redaction (registry-driven)', () => {
-    it('omits redacted fields from the root model', () => {
+  describe('sensitive fields (registry-driven)', () => {
+    it('omits sensitive fields from the root model', () => {
       const paths = searchablePaths({ parent: accountLens });
       expect(paths).not.toContain('password');
       expect(paths).toContain('accountId');
     });
 
-    it('omits redacted fields wherever the model appears via relations', () => {
+    it('omits sensitive fields wherever the model appears via relations', () => {
       const paths = searchablePaths({
         parent: userLens,
         root: { relations: { accounts: {} } },

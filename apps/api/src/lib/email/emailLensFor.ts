@@ -10,7 +10,7 @@ import { lensFor } from '@template/db/lens';
 import {
   type EmailOwnerRef,
   emailLensOwnerOf,
-  lookupLens,
+  fetchLensThroughOwnerCascade,
   type OwnerScope,
 } from '@template/email/render';
 import {
@@ -59,4 +59,4 @@ export const emailLensFor = (
 export const fetchStoredLensAndBuildEmailLens = async (
   slug: string,
   owner: OwnerScope,
-): Promise<EmailLens> => emailLensFor(slug, owner, await lookupLens(slug, owner));
+): Promise<EmailLens> => emailLensFor(slug, owner, await fetchLensThroughOwnerCascade(slug, owner));

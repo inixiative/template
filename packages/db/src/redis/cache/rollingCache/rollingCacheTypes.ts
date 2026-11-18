@@ -129,7 +129,7 @@ export type RegisteredRollingCache = {
   targetOf: (params: unknown) => unknown;
   results: RollingCacheResults<unknown>;
   channel?: (target: unknown) => string;
-  read: (result: string, params: unknown) => Promise<CacheCheck<RollingCacheValue>>;
+  fetchResult: (result: string, params: unknown) => Promise<CacheCheck<RollingCacheValue>>;
   markQueued: (target: unknown) => Promise<boolean>;
   clearQueued: (target: unknown) => Promise<void>;
   refresh: (target: unknown, options?: RollingCacheRefreshOptions) => Promise<boolean>;
@@ -142,7 +142,7 @@ export type RollingCache<TTarget, TResults extends RollingCacheResults<TTarget>>
   | 'targetOf'
   | 'results'
   | 'channel'
-  | 'read'
+  | 'fetchResult'
   | 'markQueued'
   | 'clearQueued'
   | 'refresh'
@@ -154,7 +154,7 @@ export type RollingCache<TTarget, TResults extends RollingCacheResults<TTarget>>
   ) => TTarget;
   results: TResults;
   channel?: (target: TTarget) => string;
-  read: <
+  fetchResult: <
     TValue extends RollingCacheValue,
     R extends keyof TResults & string = keyof TResults & string,
   >(

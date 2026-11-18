@@ -14,7 +14,7 @@ type Row = Record<string, unknown>;
 export type LoadedParent = { model: ModelName; row: Row };
 
 /** Each child row's parent, read with tombstones so a parent dying in the same write is still found; null when it has none. */
-export const loadParentRows = async (
+export const fetchParentRows = async (
   child: ModelName,
   rows: Row[],
 ): Promise<(LoadedParent | null)[]> => {

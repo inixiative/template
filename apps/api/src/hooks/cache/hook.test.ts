@@ -18,7 +18,7 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
-import { loadTokenContext } from '#/lib/context/loadTokenContext';
+import { fetchTokenContext } from '#/lib/context/fetchTokenContext';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
@@ -106,16 +106,16 @@ describe('a read through the cache inside a transaction', () => {
       { organizationUser: member.entity },
     );
     const keyHash = createHash('sha256').update(token.rawKey).digest('hex');
-    await loadTokenContext(keyHash);
+    await fetchTokenContext(keyHash);
     await rollingBack(async () => {
       await db.organizationUser.update({
         where: { id: member.entity.id },
         data: { role: 'owner' },
       });
       await clearCacheKeysMatchingPattern(memberKeyOf(member.entity));
-      await loadTokenContext(keyHash);
+      await fetchTokenContext(keyHash);
     });
-    const after = await loadTokenContext(keyHash);
+    const after = await fetchTokenContext(keyHash);
     const role = (after?.context.token as unknown as { organizationUser: { role: string } })
       .organizationUser.role;
     expect(role).toBe('viewer');

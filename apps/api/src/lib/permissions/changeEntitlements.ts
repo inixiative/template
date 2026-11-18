@@ -8,8 +8,8 @@ import {
   db,
   type EntitlementInput,
   type EntitlementTarget,
+  fetchEntitlementAnchors,
   includeTargetEntitlements,
-  loadEntitlementAnchors,
   missingAnchors,
   toEntitlementCreateData,
 } from '@template/db';
@@ -105,7 +105,7 @@ export const changeEntitlements = (
       const tombstonedIds = [...removedIds, ...replaced.map((row) => row.id)];
       const removed = holder.targetEntitlements.filter((row) => tombstonedIds.includes(row.id));
 
-      const anchors = await loadEntitlementAnchors(written);
+      const anchors = await fetchEntitlementAnchors(written);
       const [missing] = missingAnchors(written, anchors);
       if (missing)
         throw makeError({

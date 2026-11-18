@@ -132,9 +132,9 @@ Aligned (no divergence): CommunicationLog shape + **FP template ref**, find-or-c
 
 ## Build plan (phased)
 1. **Sender** — `CommunicationLogSenderModel` enum + `Sender` DU + `senderKey`; rename `ReachContext`/`contextKey`; bridge to `ComposeContext`; update registry `senders()` + `deliverJobId`.
-2. **Cascade + fallback** — `parentForTemplate`; rewrite `lookupTemplate`/`renderEmailTemplateWithFallback` to walk it for not-found **and** render-error; DLQ at floor.
+2. **Cascade + fallback** — `parentForTemplate`; rewrite `fetchTemplateThroughOwnerCascade`/`renderEmailTemplateWithFallback` to walk it for not-found **and** render-error; DLQ at floor.
 3. **CommunicationLog** — enums + model + `falsePolymorphism.ts` entry + migration; wire `planEmailDeliveries` find-or-create + `deliver` anti-join/status.
-4. **User-actor template ownership** (not deferred) — grow `EmailOwnerModel` (+`User`/`OrganizationUser`/`SpaceUser`) + `userId` owner FK on `EmailTemplate`/`EmailComponent` + denormalized parent FKs + per-tier partial uniques (migration); add the **user chain** to `parentForTemplate`/`lookupCascade`; map `senderToOwnerScope(sender)` user-actors to their own owner tier (not peeled to scope).
+4. **User-actor template ownership** (not deferred) — grow `EmailOwnerModel` (+`User`/`OrganizationUser`/`SpaceUser`) + `userId` owner FK on `EmailTemplate`/`EmailComponent` + denormalized parent FKs + per-tier partial uniques (migration); add the **user chain** to `parentForTemplate`/`fetchComponentsThroughOwnerCascade`; map `senderToOwnerScope(sender)` user-actors to their own owner tier (not peeled to scope).
 
 ## Acceptance
 - `ReachContext`/`contextKey` gone; `Sender`/`senderKey` throughout; DU type-safety retained.

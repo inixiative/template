@@ -25,7 +25,7 @@ import type { Sender } from '#/lib/email/sender';
 import { unsubscribeUrl } from '#/lib/email/unsubscribe';
 import { type RenderedEmailTemplate, renderEmailTemplateWithFallback } from '#/lib/emailTemplate';
 import { canDeliver } from '#/lib/messaging/canDeliver';
-import { settleCommunication } from '#/lib/messaging/settleCommunication';
+import { recordCommunicationOutcome } from '#/lib/messaging/recordCommunicationOutcome';
 import { isShutdownInProgress, sleepUnlessShuttingDown } from '#/lib/shutdown';
 
 const DELIVERABILITY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -57,7 +57,7 @@ const isRetryableSendError = (error: unknown): boolean =>
 
 // The claim reads the row and nothing else: only a `queued` row is open. `sending`, `sent`, and every
 // recorded outcome are closed, so a retry, a duplicate job, or a re-dispatch never resends. A crash
-// between claim and settle leaves `sending` for a user to resolve, never for the claim to reopen.
+// between claim and the recorded outcome leaves `sending` for a user to resolve, never for the claim to reopen.
 // Failures before the claim that nothing deterministic caused (the verifier, the database) throw
 // with the row still `queued`, so the job retry picks it up — nothing has been sent yet.
 export const deliverEmailMessage = async (
@@ -88,8 +88,8 @@ export const deliverEmailMessage = async (
     return;
   }
 
-  const settleRenderFailure = (error: unknown) =>
-    settleCommunication(open, {
+  const recordRenderFailure = (error: unknown) =>
+    recordCommunicationOutcome(open, {
       status: 'failed',
       reasonCode:
         error instanceof EmailRenderError &&
@@ -99,12 +99,12 @@ export const deliverEmailMessage = async (
       error: errorMessageOf(error),
     });
 
-  let settled: RenderedEmailTemplate;
+  let renderedTemplate: RenderedEmailTemplate;
   let address = entry.address;
   let cc: string[] | undefined;
   let bcc: string[] | undefined;
   try {
-    settled = await renderEmailTemplateWithFallback(
+    renderedTemplate = await renderEmailTemplateWithFallback(
       template,
       sender,
       async (lens) => {
@@ -135,20 +135,20 @@ export const deliverEmailMessage = async (
     );
   } catch (error) {
     if (!isEmailContentError(error)) throw error;
-    await settleRenderFailure(error);
+    await recordRenderFailure(error);
     return;
   }
   const resolved = {
-    kind: settled.kind,
-    emailTemplateId: settled.emailTemplateId,
-    emailTemplateAuditLogId: settled.emailTemplateAuditLogId,
+    kind: renderedTemplate.kind,
+    emailTemplateId: renderedTemplate.emailTemplateId,
+    emailTemplateAuditLogId: renderedTemplate.emailTemplateAuditLogId,
   };
 
   const deliverable = entry.recipientContact
-    ? canDeliver(settled.kind, entry.recipientContact)
-    : settled.kind === 'system';
+    ? canDeliver(renderedTemplate.kind, entry.recipientContact)
+    : renderedTemplate.kind === 'system';
   if (!deliverable) {
-    await settleCommunication(open, { status: 'suppressed', address, ...resolved });
+    await recordCommunicationOutcome(open, { status: 'suppressed', address, ...resolved });
     return;
   }
 
@@ -173,7 +173,7 @@ export const deliverEmailMessage = async (
     }
   }
   if (deliverability === 'undeliverable') {
-    await settleCommunication(open, {
+    await recordCommunicationOutcome(open, {
       status: 'undeliverable',
       address,
       error: undeliverableReason ?? 'undeliverable',
@@ -184,16 +184,16 @@ export const deliverEmailMessage = async (
 
   let html: string;
   try {
-    html = (await mjml2html(settled.mjml, { validationLevel: 'skip' })).html;
+    html = (await mjml2html(renderedTemplate.mjml, { validationLevel: 'skip' })).html;
   } catch (error) {
-    await settleRenderFailure(error);
+    await recordRenderFailure(error);
     return;
   }
-  const from = await resolveFromAddress(settled.slug, sender);
+  const from = await resolveFromAddress(renderedTemplate.slug, sender);
   const headers =
-    settled.kind !== 'system' && entry.recipientContactId
+    renderedTemplate.kind !== 'system' && entry.recipientContactId
       ? {
-          'List-Unsubscribe': `<${unsubscribeUrl({ userId: recipientId, contactId: entry.recipientContactId, kind: settled.kind })}>`,
+          'List-Unsubscribe': `<${unsubscribeUrl({ userId: recipientId, contactId: entry.recipientContactId, kind: renderedTemplate.kind })}>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         }
       : undefined;
@@ -205,17 +205,17 @@ export const deliverEmailMessage = async (
         status: 'sending',
         address,
         ...resolved,
-        evaluatedMjml: settled.mjml,
-        variables: settled.variables as Prisma.InputJsonValue,
-        renderIssues: settled.issues.length
-          ? (settled.issues as Prisma.InputJsonValue)
+        evaluatedMjml: renderedTemplate.mjml,
+        variables: renderedTemplate.variables as Prisma.InputJsonValue,
+        renderIssues: renderedTemplate.issues.length
+          ? (renderedTemplate.issues as Prisma.InputJsonValue)
           : Prisma.JsonNull,
       },
     });
     if (rows.length === 0) return rows;
 
     await db.communicationComponentVersion.deleteMany({ where: { communicationLogId } });
-    const resolutions = Object.entries(settled.componentResolutions);
+    const resolutions = Object.entries(renderedTemplate.componentResolutions);
     if (resolutions.length > 0) {
       const snapshots = await db.auditLog.findMany({
         where: {
@@ -250,7 +250,7 @@ export const deliverEmailMessage = async (
           cc,
           bcc,
           from,
-          subject: sanitizeSubject(settled.subject),
+          subject: sanitizeSubject(renderedTemplate.subject),
           html,
           text: deriveTextFromHtml(html),
           headers,
@@ -273,7 +273,7 @@ export const deliverEmailMessage = async (
   } catch (error) {
     // Recorded, not thrown: the send is at-most-once. If this write itself fails, the throw below
     // retries the job, which meets the `sending` row and stops.
-    await settleCommunication(
+    await recordCommunicationOutcome(
       { id: communicationLogId, status: 'sending' },
       {
         status: 'failed',
@@ -284,7 +284,7 @@ export const deliverEmailMessage = async (
     log.error(`Email send for ${communicationLogId} failed`, error, LogScope.email);
     return;
   }
-  await settleCommunication(
+  await recordCommunicationOutcome(
     { id: communicationLogId, status: 'sending' },
     { status: 'sent', providerMessageId, sentAt: new Date() },
   );

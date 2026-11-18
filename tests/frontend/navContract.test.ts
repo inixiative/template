@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { navConfig as adminNavConfig } from '../../apps/admin/app/config/nav';
 import { navConfig as webNavConfig } from '../../apps/web/app/config/nav';
 
-const getRouteTargetsFromRouteTree = (filePath: string): Set<string> => {
+const fetchRouteTargetsFromRouteTree = (filePath: string): Set<string> => {
   const source = readFileSync(filePath, 'utf8');
   const toMatch = source.match(/to:\s*([\s\S]*?)\n\s*id:/);
   if (!toMatch) return new Set();
@@ -42,7 +42,7 @@ const normalizeNavPath = (path: string): string => {
 
 describe('frontend nav contract', () => {
   it('web nav paths resolve to generated route targets', () => {
-    const routeTargets = getRouteTargetsFromRouteTree(
+    const routeTargets = fetchRouteTargetsFromRouteTree(
       resolve(process.cwd(), 'apps/web/app/routeTree.gen.ts'),
     );
     const navPaths = flattenNavPaths([
@@ -58,7 +58,7 @@ describe('frontend nav contract', () => {
   });
 
   it('admin nav paths resolve to generated route targets', () => {
-    const routeTargets = getRouteTargetsFromRouteTree(
+    const routeTargets = fetchRouteTargetsFromRouteTree(
       resolve(process.cwd(), 'apps/admin/app/routeTree.gen.ts'),
     );
     const navPaths = flattenNavPaths([

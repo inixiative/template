@@ -330,7 +330,7 @@ Schema and encryption support SAML rows; sign-in does not. The client throws `SA
 
 ## Token Authentication
 
-Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`; the sign-in itself is `loadTokenContext` (`apps/api/src/lib/context/loadTokenContext.ts`), which `refreshUserContext` re-runs between batch rounds. API key authentication.
+Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`; the sign-in itself is `fetchTokenContext` (`apps/api/src/lib/context/fetchTokenContext.ts`), which `refreshUserContext` re-runs between batch rounds. API key authentication.
 
 ### How It Works
 
@@ -354,7 +354,7 @@ const authenticateToken = async (c: Context<AppEnv>) => {
   if (!apiKey) return;
 
   const keyHash = createHash('sha256').update(apiKey).digest('hex');
-  const signIn = await loadTokenContext(keyHash);  // cached row → isActive/expiresAt → hydrate → owner present
+  const signIn = await fetchTokenContext(keyHash);  // cached row → isActive/expiresAt → hydrate → owner present
   if (!signIn) return;
   if (signIn.fetched) await db.token.update({ where: { id: signIn.context.token.id }, data: { lastUsedAt: new Date() } });
   await setTokenContext(c, signIn.context);  // the actor is actorFromRecordOmittingSensitiveFields(Token, the token's scalar columns)

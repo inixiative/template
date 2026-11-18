@@ -20,9 +20,9 @@ import { app } from '#/app';
 import { sendToStreamLocal } from '#/ws/delivery';
 import { websocketHandler } from '#/ws/handler';
 import { appendToStream, initWebSocketPubSub } from '#/ws/pubsub';
-import { readStreamSeq } from '#/ws/queries/readStreamSeq';
+import { fetchStreamSeq } from '#/ws/queries/fetchStreamSeq';
+import { reauthorizeOpenStreams } from '#/ws/reauthorizeOpenStreams';
 import { clearRegistry, connectionIdsByStream, connectionsById } from '#/ws/registry';
-import { reauthorizeOpenStreams } from '#/ws/streamReauthorizeSweep';
 import { streamSeqKey } from '#/ws/streamSeq';
 import { createTestSocket, type SentFrame, sentFrames } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
@@ -367,7 +367,7 @@ describe('data streams (real app)', () => {
 
     it('stamps the snapshot with the seq of the last append before its read', async () => {
       await appendToStream(stream, { type: 'remove', payload: { id: 'before' } });
-      const { seq: counter } = await readStreamSeq(redisClient(), streamSeqKey(stream));
+      const { seq: counter } = await fetchStreamSeq(redisClient(), streamSeqKey(stream));
       const { socket, sent } = connect(bearer);
       await websocketHandler.message(socket, openFrame(stream));
 
@@ -433,7 +433,7 @@ describe('data streams (real app)', () => {
       const reconnected = connect(bearer);
       await websocketHandler.message(reconnected.socket, openFrame(stream));
       const snapshot = sentFrames<SnapshotFrame>(reconnected.sent)[1];
-      expect(snapshot.seq).toBe((await readStreamSeq(redisClient(), streamSeqKey(stream))).seq);
+      expect(snapshot.seq).toBe((await fetchStreamSeq(redisClient(), streamSeqKey(stream))).seq);
       expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toContain(created.id);
 
       await appendToStream(stream, { type: 'remove', payload: { id: created.id } });

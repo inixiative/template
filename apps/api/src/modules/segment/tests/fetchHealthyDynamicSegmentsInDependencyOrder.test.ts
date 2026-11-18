@@ -9,7 +9,7 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { sweepableSegments } from '#/modules/segment/services/sweepableSegments';
+import { fetchHealthyDynamicSegmentsInDependencyOrder } from '#/modules/segment/services/fetchHealthyDynamicSegmentsInDependencyOrder';
 
 const acmeEmailDomainRule = {
   field: 'customerUser.email',
@@ -23,7 +23,7 @@ const membersOf = (segmentId: string) => ({
   condition: { field: 'segment.id', operator: Operator.equals, value: segmentId },
 });
 
-describe('sweepable segments — what the nightly sweep enqueues', () => {
+describe('fetchHealthyDynamicSegmentsInDependencyOrder: what the nightly reconcile enqueues', () => {
   let space: Space;
 
   beforeEach(async () => {
@@ -54,7 +54,7 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
     );
     await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
 
-    const ids = (await sweepableSegments()).map((segment) => segment.id);
+    const ids = (await fetchHealthyDynamicSegmentsInDependencyOrder()).map((segment) => segment.id);
     expect(ids).toContain(sound.id);
     expect(ids).not.toContain(degraded.id);
     expect(ids).not.toContain(pinned.id);

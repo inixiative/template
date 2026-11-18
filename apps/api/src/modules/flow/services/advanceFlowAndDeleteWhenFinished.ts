@@ -10,7 +10,7 @@ import { FlowStepState } from '@template/shared/flows';
 import { log } from '@template/shared/logger';
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
-import { readAllAsCaller } from '#/modules/batch/services/readAllAsCaller';
+import { fetchAllAsCaller } from '#/modules/batch/services/fetchAllAsCaller';
 import type { FlowStep } from '#/modules/flow/schemas/flowSchemas';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -24,7 +24,7 @@ export const advanceFlowAndDeleteWhenFinished = async (c: Context<AppEnv>, flow:
 
   try {
     for (const step of steps) {
-      const data = await readAllAsCaller(c, step.readPath, READ_ALL);
+      const data = await fetchAllAsCaller(c, step.readPath, READ_ALL);
       if (check(step.rule, { data }) !== true) break;
       stepStates[currentStep++] = FlowStepState.done;
     }

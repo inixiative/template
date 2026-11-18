@@ -5,7 +5,7 @@
  * @uses none
  */
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
-import { lookupCascade } from '@template/email/render/lookupCascade';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
 import {
   type ComponentNode,
   collectSlugsFromNodes,
@@ -15,13 +15,13 @@ import {
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import type { OwnerScope, RenderObserver } from '@template/email/render/types';
 
-export type LookupComponents = (
+export type FetchComponents = (
   slugs: string[],
 ) => Promise<Record<string, { mjml: string } | undefined>>;
 
 type ComponentCache = Map<string, Node[] | null>;
 
-type Renderer = { lookup: LookupComponents; cache: ComponentCache; observer?: RenderObserver };
+type Renderer = { lookup: FetchComponents; cache: ComponentCache; observer?: RenderObserver };
 
 type RenderScope = {
   overrides: Map<string, Node[]>;
@@ -29,9 +29,9 @@ type RenderScope = {
   parent: RenderScope | null;
 };
 
-export const expandComponentTagsWithLookup = async (
+export const expandComponentTagsWithFetcher = async (
   mjml: string,
-  lookup: LookupComponents,
+  lookup: FetchComponents,
   observer?: RenderObserver,
 ): Promise<string> =>
   renderNodes(
@@ -45,9 +45,13 @@ export const expandComponentTagsFromOwnerCascade = (
   ctx: OwnerScope,
   observer?: RenderObserver,
 ): Promise<string> =>
-  expandComponentTagsWithLookup(mjml, (slugs) => lookupCascade(slugs, ctx), observer);
+  expandComponentTagsWithFetcher(
+    mjml,
+    (slugs) => fetchComponentsThroughOwnerCascade(slugs, ctx),
+    observer,
+  );
 
-const loadComponents = async (slugs: string[], renderer: Renderer): Promise<void> => {
+const fetchComponents = async (slugs: string[], renderer: Renderer): Promise<void> => {
   const missing = [...new Set(slugs)].filter((slug) => !renderer.cache.has(slug));
   if (!missing.length) return;
 
@@ -63,7 +67,7 @@ const renderNodes = async (
   scope: RenderScope,
   renderer: Renderer,
 ): Promise<string> => {
-  await loadComponents(collectSlugsFromNodes(nodes), renderer);
+  await fetchComponents(collectSlugsFromNodes(nodes), renderer);
 
   let out = '';
   for (const node of nodes) {
@@ -97,7 +101,7 @@ const renderComponentRef = async (
     if (isOverrideSlot(child)) overrides.set(child.name, child.children);
   }
 
-  await loadComponents([node.slug], renderer);
+  await fetchComponents([node.slug], renderer);
   const body = renderer.cache.get(node.slug);
   if (!body) {
     const error = new EmailRenderError(node.slug, 'component_missing');

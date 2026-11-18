@@ -20,14 +20,14 @@ const empty = (path: string, detail: string, onError?: RuleErrorSink): string =>
   return '';
 };
 
-type Read = { value: unknown } | { refused: string };
+type ScopeRootValue = { value: unknown } | { refused: string };
 
-const readScopeRoot = (
+const scopeRootValue = (
   root: string,
   path: string,
   scope: Scope,
   options?: TemplateEvaluationOptions,
-): Read => {
+): ScopeRootValue => {
   const slot = options?.lens && slotOf(options.lens, root);
   if (!slot || slot === OPAQUE_SLOT) return { value: get(scope[root], path) };
   const row = (options.ruleScope ?? scope)[root];
@@ -50,7 +50,7 @@ export const substituteToken = (
 
   if (RESERVED_SCOPE_ROOTS.has(root)) {
     if (!path) return empty(token, `{{${token}}} names a scope root, not a value`, onError);
-    const read = readScopeRoot(root, path, scope, options);
+    const read = scopeRootValue(root, path, scope, options);
     if ('refused' in read)
       return empty(token, `{{${token}}} is not a value the lens shows (${read.refused})`, onError);
     const value = read.value;

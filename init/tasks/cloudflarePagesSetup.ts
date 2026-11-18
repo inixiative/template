@@ -1,9 +1,9 @@
 import { cloudflareApi } from '../api/cloudflare';
 import { updateConfigField } from '../utils/configHelpers';
 import { execFileAsync } from '../utils/exec';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import { clearError, isComplete, markComplete, setError } from '../utils/progressTracking';
-import { getSecretAsync, setSecretAsync } from './infisicalSetup';
+import { fetchSecretOrThrow, setSecretAsync } from './infisicalSetup';
 
 type AppKey = 'web' | 'admin' | 'superadmin';
 
@@ -29,7 +29,7 @@ export const setupCloudflarePages = async (
   await clearError('cloudflarePages');
 
   try {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const project = config.project.name;
     const githubOwner = config.project.organization;
     const githubRepo = config.project.name;
@@ -64,7 +64,7 @@ export const setupCloudflarePages = async (
 
     process.env.CLOUDFLARE_API_TOKEN = apiToken;
 
-    const accountId = (await getProjectConfig()).cloudflarePages.accountId;
+    const accountId = (await fetchProjectConfig()).cloudflarePages.accountId;
 
     const apps: {
       key: AppKey;
@@ -185,7 +185,11 @@ const fetchEnvVars = async (
   // FE apps need it to call the backend.
   if (!result.VITE_API_URL) {
     try {
-      const apiUrl = await getSecretAsync('API_URL', { projectId, environment: env, path: '/api' });
+      const apiUrl = await fetchSecretOrThrow('API_URL', {
+        projectId,
+        environment: env,
+        path: '/api',
+      });
       if (apiUrl) result.VITE_API_URL = apiUrl;
     } catch {
       // ignore — API_URL may not exist yet

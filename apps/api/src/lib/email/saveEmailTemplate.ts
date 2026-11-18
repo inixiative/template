@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import {
-  lookupLens,
+  fetchLensThroughOwnerCascade,
   ownerScopeOf,
   type SaveTemplateInput,
   type SaveTemplateResult,
@@ -15,6 +15,10 @@ import { emailLensFor, fetchStoredLensAndBuildEmailLens } from '#/lib/email/emai
 
 export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
   const owner = ownerScopeOf(input);
-  const lens = emailLensFor(input.slug, owner, input.lens ?? (await lookupLens(input.slug, owner)));
+  const lens = emailLensFor(
+    input.slug,
+    owner,
+    input.lens ?? (await fetchLensThroughOwnerCascade(input.slug, owner)),
+  );
   return saveWithoutLens(input, { lens, lensFor: fetchStoredLensAndBuildEmailLens });
 };

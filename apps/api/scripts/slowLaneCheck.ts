@@ -5,6 +5,7 @@ import { type Job, PRIORITY_LIMIT, Queue, QueueEvents, Worker } from 'bullmq';
 import { z } from 'zod';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
 import { enqueueJob } from '#/jobs/enqueue';
+import { fetchSlowLaneState } from '#/jobs/fetchSlowLaneState';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import {
   flushOutbox,
@@ -16,7 +17,6 @@ import {
 import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
-import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import { SLOW_PARK_MIN_MS } from '#/jobs/slowLaneSignals';
 import { makeSlowSlotPool } from '#/jobs/slowSlotPool';
 import { JobLane, JobType } from '#/jobs/types';
@@ -324,7 +324,7 @@ const checkSendLargerThanShare = async () => {
 };
 
 const checkHungSlowHandlers = async () => {
-  const idleBefore = (await readSlowLaneState()).idleMs;
+  const idleBefore = (await fetchSlowLaneState()).idleMs;
   let releaseHung: () => void = () => {};
   const hungGate = new Promise<void>((resolve) => {
     releaseHung = resolve;
@@ -342,13 +342,13 @@ const checkHungSlowHandlers = async () => {
     await enqueueJob('sendWebhook', { n } as never, { lane: JobLane.slow });
 
   await waitUntil(() => hung.running >= 1, 30_000);
-  await readSlowLaneState();
+  await fetchSlowLaneState();
   await sleep(HUNG_FOR_MS);
-  const whileHung = await readSlowLaneState();
+  const whileHung = await fetchSlowLaneState();
   releaseHung();
   await waitUntil(async () => hung.completed === HUNG_JOBS && (await queueEmpty()), 120_000);
   await withDeadline('hung: worker close', worker.close());
-  const afterDrained = await readSlowLaneState();
+  const afterDrained = await fetchSlowLaneState();
 
   return {
     report: {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { clearHookRegistry, DbAction, db, HookTiming, registerDbHook } from '@template/db';
-import { readPrismaTransaction } from '@template/db/extensions/prismaTransaction';
+import { prismaTransactionOf } from '@template/db/extensions/prismaTransaction';
 import { Prisma } from '@template/db/generated/client/client';
 import { nextFactorySequenceNumber } from '@template/db/test/factory';
 import { cleanupTouchedTables } from '@template/db/test/testTracker';
@@ -254,7 +254,7 @@ describe('managed transactions', () => {
 
 // If this fails, Prisma moved or renamed the executing-transaction marker that db.txn()'s
 // registration handshake and the mutation extension both read. Re-point
-// readPrismaTransaction() in extensions/prismaTransaction.ts at the new location; do not
+// prismaTransactionOf() in extensions/prismaTransaction.ts at the new location; do not
 // fall back to db.isInTxn(), which is what this replaced.
 describe('Prisma internal transaction marker (db.txn registration depends on it)', () => {
   it('exposes the interactive transaction id on __internalParams, with a distinct id per transaction', async () => {
@@ -266,7 +266,7 @@ describe('Prisma internal transaction marker (db.txn registration depends on it)
         query: {
           $allModels: {
             async findFirst(params) {
-              observedTransactions.push(readPrismaTransaction(params));
+              observedTransactions.push(prismaTransactionOf(params));
               return params.query(params.args);
             },
           },

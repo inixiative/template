@@ -8,9 +8,9 @@ import { deadRuleReferences } from '@template/db';
 import { type PreflightResult, runPreflight } from '@template/email/preflight';
 import { decompose } from '@template/email/render/decompose';
 import type { RuleErrorSink } from '@template/email/render/evaluateTemplate';
-import { expandComponentTagsWithLookup } from '@template/email/render/expandComponentTags';
+import { expandComponentTagsWithFetcher } from '@template/email/render/expandComponentTags';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
 import { interpolate, type Variables } from '@template/email/render/interpolate';
-import { lookupCascade } from '@template/email/render/lookupCascade';
 import type { EmailOwnerRef } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 import { collectConditionFieldPaths } from '@template/email/rules/collectHydrationPaths';
@@ -43,9 +43,9 @@ const SAMPLE_VARIABLES: Variables = {
 const expandDraft = (mjml: string, ctx: OwnerScope): Promise<string> => {
   const { mjml: bareRefMjml, writes } = decompose(mjml, () => undefined);
   const drafted = new Map(writes.map((write) => [write.slug, write.mjml]));
-  return expandComponentTagsWithLookup(bareRefMjml, async (slugs) => {
+  return expandComponentTagsWithFetcher(bareRefMjml, async (slugs) => {
     const missing = slugs.filter((slug) => !drafted.has(slug));
-    const persisted = missing.length ? await lookupCascade(missing, ctx) : {};
+    const persisted = missing.length ? await fetchComponentsThroughOwnerCascade(missing, ctx) : {};
     return Object.fromEntries(
       slugs.map((slug) => {
         const draft = drafted.get(slug);

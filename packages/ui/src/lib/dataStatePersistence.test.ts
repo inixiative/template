@@ -2,25 +2,25 @@ import { describe, expect, it } from 'bun:test';
 import { buildFilterQuery } from '@template/ui/lib/buildFilterQuery';
 import {
   currentUrlWithListStateParams,
+  listPageStateFromUrl,
   parseOrderByStrings,
-  readStateFromUrl,
 } from '@template/ui/lib/dataStatePersistence';
 
-describe('readStateFromUrl — page/pageSize hardening', () => {
+describe('listPageStateFromUrl — page/pageSize hardening', () => {
   it('parses valid positive integers', () => {
-    expect(readStateFromUrl('?page=3&pageSize=50')).toEqual({ page: 3, pageSize: 50 });
+    expect(listPageStateFromUrl('?page=3&pageSize=50')).toEqual({ page: 3, pageSize: 50 });
   });
 
   it('ignores non-numeric page/pageSize (NaN)', () => {
-    expect(readStateFromUrl('?page=abc&pageSize=xyz')).toEqual({});
+    expect(listPageStateFromUrl('?page=abc&pageSize=xyz')).toEqual({});
   });
 
   it('ignores zero and negative page/pageSize', () => {
-    expect(readStateFromUrl('?page=0&pageSize=-5')).toEqual({});
+    expect(listPageStateFromUrl('?page=0&pageSize=-5')).toEqual({});
   });
 
   it('carries search and orderBy through', () => {
-    expect(readStateFromUrl('?search=hi&orderBy=name:asc')).toEqual({
+    expect(listPageStateFromUrl('?search=hi&orderBy=name:asc')).toEqual({
       search: 'hi',
       orderBy: ['name:asc'],
     });
@@ -80,31 +80,34 @@ describe('currentUrlWithListStateParams', () => {
   });
 });
 
-// --- readStateFromUrl (pass search string directly) ---
+// --- listPageStateFromUrl (pass search string directly) ---
 
-describe('readStateFromUrl', () => {
+describe('listPageStateFromUrl', () => {
   it('reads page', () => {
-    expect(readStateFromUrl('?page=3').page).toBe(3);
+    expect(listPageStateFromUrl('?page=3').page).toBe(3);
   });
 
   it('reads pageSize', () => {
-    expect(readStateFromUrl('?pageSize=50').pageSize).toBe(50);
+    expect(listPageStateFromUrl('?pageSize=50').pageSize).toBe(50);
   });
 
   it('reads search', () => {
-    expect(readStateFromUrl('?search=hello').search).toBe('hello');
+    expect(listPageStateFromUrl('?search=hello').search).toBe('hello');
   });
 
   it('reads multiple orderBy', () => {
-    expect(readStateFromUrl('?orderBy=a:asc&orderBy=b:desc').orderBy).toEqual(['a:asc', 'b:desc']);
+    expect(listPageStateFromUrl('?orderBy=a:asc&orderBy=b:desc').orderBy).toEqual([
+      'a:asc',
+      'b:desc',
+    ]);
   });
 
   it('returns empty for no params', () => {
-    expect(readStateFromUrl('')).toEqual({});
+    expect(listPageStateFromUrl('')).toEqual({});
   });
 
   it('ignores unrelated params', () => {
-    const state = readStateFromUrl('?org=abc&page=2');
+    const state = listPageStateFromUrl('?org=abc&page=2');
     expect(state.page).toBe(2);
     expect(state).not.toHaveProperty('org');
   });
@@ -123,7 +126,7 @@ describe('URL round-trip', () => {
     const url = currentUrlWithListStateParams(original);
     // Extract search string from the URL
     const searchString = url.includes('?') ? url.slice(url.indexOf('?')) : '';
-    const restored = readStateFromUrl(searchString);
+    const restored = listPageStateFromUrl(searchString);
     expect(restored).toEqual(original);
   });
 
@@ -131,13 +134,13 @@ describe('URL round-trip', () => {
     const original = { search: 'foo & bar = baz' };
     const url = currentUrlWithListStateParams(original);
     const searchString = url.includes('?') ? url.slice(url.indexOf('?')) : '';
-    expect(readStateFromUrl(searchString).search).toBe('foo & bar = baz');
+    expect(listPageStateFromUrl(searchString).search).toBe('foo & bar = baz');
   });
 
   it('page 1 omitted but defaults back to undefined', () => {
     const url = currentUrlWithListStateParams({ page: 1, pageSize: 20 });
     const searchString = url.includes('?') ? url.slice(url.indexOf('?')) : '';
-    const restored = readStateFromUrl(searchString);
+    const restored = listPageStateFromUrl(searchString);
     expect(restored.page).toBeUndefined(); // page 1 not in URL
     expect(restored.pageSize).toBe(20);
   });
@@ -174,7 +177,9 @@ describe('parseOrderByStrings', () => {
 
 describe('hydration chain: URL → filters → query', () => {
   it('shared URL hydrates into correct server query', () => {
-    const persisted = readStateFromUrl('?page=3&pageSize=50&search=acme&orderBy=createdAt:desc');
+    const persisted = listPageStateFromUrl(
+      '?page=3&pageSize=50&search=acme&orderBy=createdAt:desc',
+    );
     const orderByObjects = parseOrderByStrings(persisted.orderBy!);
     const filterQuery = buildFilterQuery(persisted.search!, ['name', 'email'], {}, orderByObjects);
     const query: Record<string, unknown> = {
@@ -192,7 +197,7 @@ describe('hydration chain: URL → filters → query', () => {
   });
 
   it('empty URL produces default query', () => {
-    const persisted = readStateFromUrl('');
+    const persisted = listPageStateFromUrl('');
     const filterQuery = buildFilterQuery('', [], {}, []);
     const query: Record<string, unknown> = {
       ...filterQuery,

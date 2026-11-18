@@ -9,7 +9,7 @@ import type { AppEventName } from '#/appEvents/handlers';
 
 /** The events that carry a change of each model the segment lens reads — the propagation graph, keyed by the lens. */
 export const RECONCILE_TRIGGERS: Partial<Record<ModelName, AppEventName[]>> = {
-  CommunicationLog: ['communication.settled'],
+  CommunicationLog: ['communication.outcomeRecorded'],
   Contact: ['contact.created', 'contact.updated', 'contact.deleted'],
   CustomerRef: ['customerRef.created'],
   Organization: ['organization.updated', 'organization.deleted'],

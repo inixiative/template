@@ -404,7 +404,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
   and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
-  builder gets `emailSurface` of it (which strips clamps and sources), while save and settle keep the lens
+  builder gets `emailSurface` of it (which strips clamps and sources), while save and evaluation keep the lens
   itself (`defaultEmailLens` when none is threaded) — extraction never runs on the exposed
   surface. Adding a referenceable model = a registry entry + an FK column (the hook and email's
   sources derive); a surface that reaches it declares its own labeled id source.

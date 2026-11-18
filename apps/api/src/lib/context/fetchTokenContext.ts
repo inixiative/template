@@ -35,7 +35,7 @@ const ownerIsPresent = (token: HydratedRecord & Token): boolean => {
   return Boolean(owner) && (memberParts[token.ownerModel] ?? []).every((part) => owner?.[part]);
 };
 
-export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | null> => {
+export const fetchTokenContext = async (keyHash: string): Promise<TokenSignIn | null> => {
   let fetched = false;
   const row = await fetchThroughCache<WithTargetEntitlements<Token> | null>(
     cacheKey('Token', { keyHash }),

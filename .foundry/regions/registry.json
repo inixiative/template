@@ -135,13 +135,13 @@
     {
       "tag": "ws-data-streams",
       "atlas": "primitive:websockets",
-      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useDataStreamSnapshot / useDataStreamMessageListener and the stream folds",
+      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and periodic re-authorization, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useDataStreamSnapshot / useDataStreamMessageListener and the stream folds",
       "region": "ws-data-streams"
     },
     {
       "tag": "ws-data-streams",
       "atlas": "primitive:websockets",
-      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useDataStreamSnapshot / useDataStreamMessageListener and the stream folds",
+      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and periodic re-authorization, ordering, sequence numbers and resync, producing appends (streamAppendHandoff, parseRowWithRouteResponseSchema, appendToStream), useDataStreamSnapshot / useDataStreamMessageListener and the stream folds",
       "region": "ws-data-streams"
     },
     {
@@ -429,7 +429,7 @@
     {
       "tag": "audit-log",
       "atlas": "feature:auditLogs",
-      "description": "Audit log capture: enabled models, actor, diffs, redaction",
+      "description": "Audit log capture: enabled models, actor, diffs, masking",
       "region": "audit-soft-delete"
     },
     {
@@ -489,7 +489,7 @@
     {
       "tag": "logging",
       "atlas": "primitive:shared / infrastructure:observability",
-      "description": "Structured logging: shared log facade, withLogContext, scopes, redaction",
+      "description": "Structured logging: shared log facade, withLogContext, scopes, masking",
       "region": "observability-lifecycle"
     },
     {

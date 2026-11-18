@@ -7,6 +7,7 @@
 import { claimLane, db, fetchJobSupersededBy, laneKey, releaseLane } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import type { JobsOptions } from 'bullmq';
+import { fetchSlowLaneState } from '#/jobs/fetchSlowLaneState';
 import { withLanePriority } from '#/jobs/lanePriority';
 import {
   hasPendingFastSpills,
@@ -23,7 +24,6 @@ import {
 import { runUnderJobOutboxWriteMutex } from '#/jobs/outbox/mutex';
 import { laneDepth, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
-import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import { recordDelayedSlowAdd } from '#/jobs/slowLaneSignals';
 import { type JobData, JobLane } from '#/jobs/types';
 import { isValidJobId } from '#/jobs/validateJobId';
@@ -115,7 +115,7 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
   });
 };
 
-const settleFlags = async (depths: QueueDepths): Promise<void> => {
+const clearOverflowFlagsBelowLowWater = async (depths: QueueDepths): Promise<void> => {
   const belowLowWater = (lane: JobLane) => laneDepth(depths, lane) < lowWater(lane);
   if (!belowLowWater(JobLane.fast) && !belowLowWater(JobLane.slow)) {
     await warnIfOverflowStuck(JobLane.fast, depths.total);
@@ -163,8 +163,8 @@ export const runDrainOutboxPass = async (): Promise<void> => {
     const slowRoom = Math.min(room - fastAdmitted, laneDepthCap(JobLane.slow) - depths.slow);
     await admitLaneRows(JobLane.slow, slowRoom);
 
-    const { depths: settled } = await readSlowLaneState();
-    await setOverflowFlagForLanesAtCap(settled);
-    await settleFlags(settled);
+    const { depths: depthsAfterAdmitting } = await fetchSlowLaneState();
+    await setOverflowFlagForLanesAtCap(depthsAfterAdmitting);
+    await clearOverflowFlagsBelowLowWater(depthsAfterAdmitting);
   });
 };

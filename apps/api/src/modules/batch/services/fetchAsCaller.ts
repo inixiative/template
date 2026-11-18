@@ -10,7 +10,7 @@ import { executeRequest } from '#/modules/batch/services/strategies/executeReque
 import type { RequestResult } from '#/modules/batch/services/strategies/types';
 import type { AppEnv } from '#/types/appEnv';
 
-export const readAsCaller = async (c: Context<AppEnv>, path: string): Promise<RequestResult> => {
+export const fetchAsCaller = async (c: Context<AppEnv>, path: string): Promise<RequestResult> => {
   const batchId = Bun.randomUUIDv7();
   registerBatch(batchId, c);
   try {

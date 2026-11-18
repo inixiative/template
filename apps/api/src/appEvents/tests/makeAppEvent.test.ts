@@ -75,7 +75,7 @@ describe('makeAppEvent', () => {
       expect(rows[0].actorUserId).toBe('user-1');
     });
 
-    it('redacts sensitive keys anywhere in the persisted payload', async () => {
+    it('masks sensitive keys anywhere in the persisted payload', async () => {
       const event = createEvent('test', {
         userId: 'u1',
         keyHash: 'super-secret',

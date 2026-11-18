@@ -4,7 +4,7 @@
  * @partOf primitive:caching, mutex
  * @uses primitive:shared
  */
-import type { Generation } from '@template/db/redis/cache/generation/readGeneration';
+import type { Generation } from '@template/db/redis/cache/generation/fetchCacheGeneration';
 import { makeSerializedQueue, type SerializedQueue } from '@template/shared/utils';
 
 export type OverlayEntry = { payload: string; ttlSeconds: number; generation: Generation | null };

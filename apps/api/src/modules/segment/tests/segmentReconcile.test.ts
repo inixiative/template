@@ -392,7 +392,7 @@ describe('segment reconcile', () => {
       recipientUserId: other.id,
       senderSpaceId: elsewhere.id,
     });
-    await emitAppEvent('communication.settled', { communicationLog: foreign.entity });
+    await emitAppEvent('communication.outcomeRecorded', { communicationLog: foreign.entity });
     expect(await memberIds(segment.id)).toEqual([]);
 
     const ours = await createCommunicationLog({
@@ -401,7 +401,7 @@ describe('segment reconcile', () => {
       recipientUserId: other.id,
       senderSpaceId: space.id,
     });
-    await emitAppEvent('communication.settled', { communicationLog: ours.entity });
+    await emitAppEvent('communication.outcomeRecorded', { communicationLog: ours.entity });
     expect(await memberIds(segment.id)).toEqual([otherRef.id]);
   });
 

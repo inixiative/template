@@ -194,7 +194,7 @@ const INSTALL_COMMANDS: Record<string, string> = {
   docker: 'brew install --cask docker',
 };
 
-export const getInstallCommand = (cli: string): string =>
+export const installCommandFor = (cli: string): string =>
   INSTALL_COMMANDS[cli] ?? `# install ${cli} manually`;
 
 const SESSION_CHECKS: Record<string, () => Promise<InfisicalSession>> = {
@@ -220,7 +220,7 @@ export const checkProviderPrereq = async (
 ): Promise<{ ok: true } | { ok: false; reason: string; fixCommand: string }> => {
   const status = await checkCLIAsync(cli, cli);
   if (!status.installed) {
-    return { ok: false, reason: `${cli} CLI not installed`, fixCommand: getInstallCommand(cli) };
+    return { ok: false, reason: `${cli} CLI not installed`, fixCommand: installCommandFor(cli) };
   }
   const sessionCheck = SESSION_CHECKS[cli];
   if (sessionCheck) {

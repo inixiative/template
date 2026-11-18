@@ -10,7 +10,7 @@
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
-  - [Class `request-context`](#class-request-context-request-lifecycle-appenv-preparerequest-context-settersaccessors-resource-and-job-context)
+  - [Class `request-context`](#class-request-context-request-lifecycle-appenv-preparerequestmiddleware-context-settersaccessors-resource-and-job-context)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
     - `docs/claude/ARCHITECTURE.md`: Request Flow
@@ -385,11 +385,11 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
   c.set('spaceUsers', spaceUsers);
   c.set('spaces', spaces);
 
-  await installPermissions(c);
+  await installPermissionsFromRequestContext(c);
 };
 ```
 
-`installPermissions` (`apps/api/src/lib/context/installPermissionsFromRequestContext.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's user, or the user behind a User, OrganizationUser or SpaceUser token), and installs either the user's table or the token's permissions over its owner. Every token goes through `setTokenContext`, which never sets a user: a User token carries its user's members as context, any other token none.
+`installPermissionsFromRequestContext` (`apps/api/src/lib/context/installPermissionsFromRequestContext.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's user, or the user behind a User, OrganizationUser or SpaceUser token), and installs either the user's table or the token's permissions over its owner. Every token goes through `setTokenContext`, which never sets a user: a User token carries its user's members as context, any other token none.
 
 ##### What It Does
 
@@ -578,7 +578,7 @@ await refreshUserContext(c);
 ```
 
 **What it does:**
-1. With a token: re-runs the token sign-in (`loadTokenContext` with the token's `keyHash`) and rebuilds through `setTokenContext`, so a member's token keeps exactly its own member row and a revoked token stops with a 401
+1. With a token: re-runs the token sign-in (`fetchTokenContext` with the token's `keyHash`) and rebuilds through `setTokenContext`, so a member's token keeps exactly its own member row and a revoked token stops with a 401
 2. With a user: reloads the user with all relations via cached `findUserWithRelations` and rebuilds through `setUserContext`
 3. Either way the table is replaced, never added to
 

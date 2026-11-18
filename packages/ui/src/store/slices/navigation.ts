@@ -5,7 +5,7 @@
  * @uses none
  */
 import { currentLocation } from '@template/ui/lib/currentLocation';
-import { pickSearchParams, readSearchParam } from '@template/ui/lib/searchParams';
+import { pickSearchParams, searchParamValue } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
 import type { NavigationSlice, SearchParamsToKeep } from '@template/ui/store/types/navigation';
 import type { StateCreator } from 'zustand';
@@ -29,7 +29,7 @@ const searchKeptFromCurrentSearch = (
     searchParamsToKeep === 'context'
       ? pickSearchParams(currentSearch, ['org', 'space'])
       : undefined;
-  const spoof = spoofUserEmail ?? readSearchParam(currentSearch, 'spoof');
+  const spoof = spoofUserEmail ?? searchParamValue(currentSearch, 'spoof');
 
   if (!preservedContext && !spoof && !flowId) return undefined;
 

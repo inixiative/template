@@ -1,9 +1,9 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { getSecretAsync } from '../tasks/infisicalSetup';
+import { fetchSecretOrThrow } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 
 const PLANETSCALE_API = 'https://api.planetscale.com/v1';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/planetscale');
@@ -77,15 +77,15 @@ class PlanetScaleApi {
   });
 
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const projectId = config.infisical.projectId;
     if (!projectId) throw new Error('Infisical project not configured. Run Infisical setup first.');
 
-    const tokenId = await getSecretAsync('PLANETSCALE_TOKEN_ID', {
+    const tokenId = await fetchSecretOrThrow('PLANETSCALE_TOKEN_ID', {
       projectId,
       environment: 'root',
     });
-    const token = await getSecretAsync('PLANETSCALE_TOKEN', { projectId, environment: 'root' });
+    const token = await fetchSecretOrThrow('PLANETSCALE_TOKEN', { projectId, environment: 'root' });
 
     const response = await fetch(`${PLANETSCALE_API}${endpoint}`, {
       ...options,

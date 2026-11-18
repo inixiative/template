@@ -5,14 +5,14 @@ import { githubApi } from '../api/github';
 import { infisicalVercelApi } from '../api/infisicalVercel';
 import { vercelApi } from '../api/vercel';
 import { updateConfigField, updateConfigFields } from '../utils/configHelpers';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import { isComplete, markComplete, setError } from '../utils/progressTracking';
 import { setSecretAsync } from './infisicalSetup';
 
 /**
- * Read Vercel API token from local CLI auth config
+ * Vercel API token from the local CLI auth config
  */
-const readVercelToken = async (): Promise<string> => {
+const fetchVercelToken = async (): Promise<string> => {
   const authPath = path.join(homedir(), 'Library/Application Support/com.vercel.cli/auth.json');
   const authContent = await readFile(authPath, 'utf-8');
   const auth = JSON.parse(authContent);
@@ -40,7 +40,7 @@ export const setupVercel = async (
   syncConfig: () => Promise<void>,
 ): Promise<void> => {
   try {
-    const projectConfig = await getProjectConfig();
+    const projectConfig = await fetchProjectConfig();
     const projectName = projectConfig.project.name;
     const infisicalProjectId = projectConfig.infisical.projectId;
     let webProjectId = projectConfig.vercel.webProjectId;
@@ -121,7 +121,7 @@ export const setupVercel = async (
 
     // Step 5: Store Vercel API token in Infisical
     if (!(await isComplete('vercel', 'storeVercelToken'))) {
-      vercelToken = await readVercelToken();
+      vercelToken = await fetchVercelToken();
       await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_API_TOKEN', vercelToken);
       await markComplete('vercel', 'storeVercelToken');
       await syncConfig();
@@ -130,7 +130,7 @@ export const setupVercel = async (
     // Step 6: Ensure Vercel connection exists in Infisical
     if (!connectionId || !(await isComplete('vercel', 'createInfisicalConnection'))) {
       if (!vercelToken) {
-        vercelToken = await readVercelToken();
+        vercelToken = await fetchVercelToken();
       }
 
       if (!connectionId) {

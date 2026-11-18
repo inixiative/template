@@ -15,11 +15,11 @@ import { initializeOpenTelemetry, shutdownOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
 import { enqueueJob } from '#/jobs/enqueue';
+import { fetchSlowLaneState } from '#/jobs/fetchSlowLaneState';
 import { flushOutbox } from '#/jobs/outbox';
 import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
-import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import { makeSlowSlotPool } from '#/jobs/slowSlotPool';
 import { warmRollingCaches } from '#/jobs/warmRollingCaches';
@@ -60,7 +60,7 @@ export const initializeWorker = async (): Promise<void> => {
   const slowIdle = meter.createObservableGauge('jobs.slow.idle_ms', { unit: 'ms' });
   meter.addBatchObservableCallback(
     async (result) => {
-      const slowLane = await readSlowLaneState();
+      const slowLane = await fetchSlowLaneState();
       const attributes = { 'messaging.destination.name': 'jobs' };
       result.observe(slowQueued, slowLane.queued, attributes);
       result.observe(slowDeferred, slowLane.deferred, attributes);

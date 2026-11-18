@@ -8,7 +8,7 @@ import { redirect } from '@tanstack/react-router';
 import {
   buildPathWithSearch,
   pickSearchParams,
-  readSearchParam,
+  searchParamValue,
 } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
 
@@ -49,7 +49,7 @@ export const createAuthGuards = (currentAppStore: () => AppStore) => ({
 
     if (currentAppStore().auth.isAuthenticated) {
       const search = context?.location.search;
-      const redirectTo = readSearchParam(search, 'redirectTo') || '/dashboard';
+      const redirectTo = searchParamValue(search, 'redirectTo') || '/dashboard';
 
       throw redirect({
         to: redirectTo,

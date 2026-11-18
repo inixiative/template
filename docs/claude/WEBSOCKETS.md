@@ -108,8 +108,8 @@ constants in `packages/shared/src/ws/frameLimits.ts`). A frame arriving while th
 not dropped silently: the server answers
 `{ type: 'error', action, stream?, channel?, retryable: true }`. The frontend sends a heartbeat
 every 30 seconds and reconnects if pong does not arrive within 5 seconds. `ping` is answered
-before the per-connection queue, so a slow snapshot read or the re-authorization sweep never
-delays `pong` into a spurious reconnect. The server sweeps connections idle for more than 5
+before the per-connection queue, so a slow snapshot read or the periodic re-authorization never
+delays `pong` into a spurious reconnect. The server closes connections idle for more than 5
 minutes.
 
 `disconnect()` closes the socket and clears the client's heartbeat, acknowledgement, retry and
@@ -236,16 +236,16 @@ default page size). `routeAccessOf` classifies every other status: 429 and 5xx a
 **retryable** and answer `error` with `retryable: true`; anything else is a **rejection** and
 answers `openRejected`.
 
-Open streams are re-authorized. `startStreamReauthorizeSweep` (started at API boot) re-probes
+Open streams are re-authorized. `startReauthorizeOpenStreamsInterval` (started at API boot) re-probes
 every open stream every 45 seconds through the cheap `x-auth-probe` path (middleware runs, the
 controller does not) with the connection's credential. A rejection closes the stream with
-`openRejected`; a retryable status closes it with a retryable `error`. The sweep runs on each
+`openRejected`; a retryable status closes it with a retryable `error`. The re-authorization runs on each
 connection's serialized queue and never queues a second recheck behind an unfinished one. Its
-probes carry a server-only system probe secret that the API rate limiter exempts, so the sweep
+probes carry a server-only system probe secret that the API rate limiter exempts, so the re-authorization
 spends no caller's or organization's HTTP budget; client-driven opens and subscribes still count.
-A probe that throws closes its stream as retryable and the sweep continues with the rest.
+A probe that throws closes its stream as retryable and the re-authorization continues with the rest.
 
-Revocation is therefore bounded by the sweep interval (plus the HTTP layer's own caches: the
+Revocation is therefore bounded by the re-authorization interval (plus the HTTP layer's own caches: the
 route answers 403 only once the membership/token cache is cleared). Closing streams immediately
 on membership, role or token removal through an app event is a planned follow-up.
 
@@ -281,7 +281,7 @@ Lua script (`apps/api/src/ws/queries/publishStreamAppend.ts`) that `INCR`s the c
 recipient's, for a per-recipient append) and `PUBLISH`es the append with those seqs, so publish
 order is seq order and two instances publishing one stream never produce a false gap. Each
 instance hands every holder the seq of its own counter. `openDataStream` reads the caller's counter
-(`queries/readStreamSeq.ts`, key from `streamSeqKeyFor`) **before** the snapshot read starts and
+(`queries/fetchStreamSeq.ts`, key from `streamSeqKeyFor`) **before** the snapshot read starts and
 stamps the snapshot with it: appends are published after their transaction commits, so every
 append at or below the stamp is already in the snapshot.
 

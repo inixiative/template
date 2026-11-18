@@ -352,7 +352,7 @@ The init wizard has a dedicated `Railway Buckets Setup` action (sibling to `Rail
 - `init/tasks/railwayBucketsSteps.ts` — progress summary groups
 - `init/views/RailwayBucketsSetupView.tsx` — TUI view
 - `init/api/railway.ts` — `getProjectBuckets`, `ensureBucket`, `createBucket`, `getBucketCredentials` methods
-- `init/utils/getProjectConfig.ts` + `init/utils/progressTracking.ts` — config schema + progress action types
+- `init/utils/fetchProjectConfig.ts` + `init/utils/progressTracking.ts` — config schema + progress action types
 
 ### Provisioning is fully automated via Railway's GraphQL API
 
@@ -446,7 +446,7 @@ Plus a setup step to create the CI test buckets before tests run.
 
 ### Phase 2 — Railway provisioning (depends on INFRA-001)
 
-- [x] Add `railwayBuckets` config schema (`init/utils/getProjectConfig.ts`)
+- [x] Add `railwayBuckets` config schema (`init/utils/fetchProjectConfig.ts`)
 - [x] Add `RailwayBucketsAction` progress types (`init/utils/progressTracking.ts`)
 - [x] Add bucket detection + credential fetch methods to `railwayApi` (`init/api/railway.ts`)
 - [x] `railwayBucketsSetup.ts` task — detect bucket services, capture credentials, write to Infisical

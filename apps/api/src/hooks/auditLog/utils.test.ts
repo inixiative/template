@@ -29,14 +29,14 @@ describe('auditLog/utils', () => {
       expect(result).toHaveProperty('email', 'test@example.com');
     });
 
-    it('redacts sensitive Account fields', () => {
+    it('masks sensitive Account fields', () => {
       const data = { id: '1', accountId: 'acc-1', password: 'secret', providerId: 'email' };
       const result = maskSensitiveAndOmitNoopFieldsForAudit('Account', data);
       expect(result.password).toBe('[MASKED]');
       expect(result.providerId).toBe('email');
     });
 
-    it('redacts keyHash on Token', () => {
+    it('masks keyHash on Token', () => {
       const data = { id: '1', name: 'tok', keyHash: 'sha256-hash' };
       const result = maskSensitiveAndOmitNoopFieldsForAudit('Token', data);
       expect(result.keyHash).toBe('[MASKED]');
@@ -60,7 +60,7 @@ describe('auditLog/utils', () => {
     });
   });
 
-  // The audit diff is computed on unredacted data, so a changed sensitive field IS in the diff;
+  // The audit diff is computed on unmasked data, so a changed sensitive field IS in the diff;
   // maskSensitiveFieldsInChangeDiff then masks both sides so the row records THAT it changed without the value.
   // This is what keeps a sensitive-only change from vanishing under the empty-diff guard.
   describe('maskSensitiveFieldsInChangeDiff', () => {

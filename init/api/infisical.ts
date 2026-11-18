@@ -20,7 +20,7 @@ type InfisicalProject = { id: string; name: string; slug: string };
 type InfisicalEnvironment = { id: string; name: string; slug: string };
 type InfisicalOrganization = { id: string; name: string; slug: string };
 
-export const getInfisicalToken = async (): Promise<string> => {
+export const fetchInfisicalTokenOrThrow = async (): Promise<string> => {
   try {
     const { stdout } = await execAsync('infisical user get token', {
       encoding: 'utf-8',
@@ -44,13 +44,13 @@ export const toInfisicalSlug = (name: string): string => {
   return slug.length >= 5 ? slug : slug.padEnd(5, '0');
 };
 
-const redactSecrets = (s: unknown) =>
+const maskSecrets = (s: unknown) =>
   typeof s === 'string'
     ? s
-        .replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@')
-        .replace(/pscale_tkn_\w+/g, 'REDACTED')
-        .replace(/pscale_pw_\w+/g, 'REDACTED')
-        .replace(/rw_Fe26\.\S+/g, 'REDACTED')
+        .replace(/:\/\/([^:]+):([^@]+)@/g, '://MASKED:MASKED@')
+        .replace(/pscale_tkn_\w+/g, 'MASKED')
+        .replace(/pscale_pw_\w+/g, 'MASKED')
+        .replace(/rw_Fe26\.\S+/g, 'MASKED')
     : s;
 
 class InfisicalApi {
@@ -58,13 +58,13 @@ class InfisicalApi {
     service: 'infisical',
     version: () => cliVersion('infisical'),
     sanitizers: {
-      getSecret: { fn: redactSecrets },
-      setSecret: { fn: redactSecrets },
+      getSecret: { fn: maskSecrets },
+      setSecret: { fn: maskSecrets },
     },
   });
 
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = await getInfisicalToken();
+    const token = await fetchInfisicalTokenOrThrow();
     const response = await fetch(`${INFISICAL_API}${endpoint}`, {
       ...options,
       headers: {
@@ -106,7 +106,7 @@ class InfisicalApi {
 
   async upsertProject(name: string): Promise<InfisicalProject> {
     return this.vcr.capture('upsertProject', async () => {
-      const token = await getInfisicalToken();
+      const token = await fetchInfisicalTokenOrThrow();
       const orgId = JSON.parse(atob(token.split('.')[1])).organizationId;
       const listResponse = await this.request<{ workspaces?: InfisicalProject[] }>(
         `/v2/organizations/${orgId}/workspaces`,

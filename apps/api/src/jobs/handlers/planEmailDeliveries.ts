@@ -8,7 +8,11 @@ import { projectRows } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
-import { lookupTemplate, ownerScopeOfRow, templateLens } from '@template/email/render';
+import {
+  fetchTemplateLens,
+  fetchTemplateThroughOwnerCascade,
+  ownerScopeOfRow,
+} from '@template/email/render';
 import { declaredFields } from '@template/email/rules';
 import { log } from '@template/shared/logger';
 import {
@@ -115,11 +119,11 @@ export const planEmailDeliveries = makeJob<PlanEmailDeliveriesPayload>(async (_c
   const dataVars = fields ? pick(data, fields) : (projectRows(entityLens, [entityRow])[0] ?? {});
 
   const sender = senderFromEntityFields(entry.sender, entityRow);
-  const row = await lookupTemplate(template, senderToOwnerScope(sender));
+  const row = await fetchTemplateThroughOwnerCascade(template, senderToOwnerScope(sender));
   if (!row) throw new EmailRenderError(template, 'template_missing');
   const targeting = bindWhere(entry.recipients.where, entityRow);
   const lens = narrowSlotLensToRowsMatchingOrThrow(
-    emailLensFor(template, ownerScopeOfRow(row), await templateLens(template, row), sender)
+    emailLensFor(template, ownerScopeOfRow(row), await fetchTemplateLens(template, row), sender)
       .recipient,
     targeting,
   );

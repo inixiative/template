@@ -5,16 +5,16 @@
  * @uses none
  */
 import {
-  expandComponentTagsWithLookup,
-  type LookupComponents,
+  expandComponentTagsWithFetcher,
+  type FetchComponents,
 } from '@template/email/render/expandComponentTags';
 
 export const fetchMissingComponentSlugs = async (
   mjml: string,
-  lookup: LookupComponents,
+  lookup: FetchComponents,
 ): Promise<string[]> => {
   const missing = new Set<string>();
-  await expandComponentTagsWithLookup(mjml, lookup, {
+  await expandComponentTagsWithFetcher(mjml, lookup, {
     onRenderFailure: (error) => {
       if (error.type === 'component_missing') missing.add(error.slug);
     },

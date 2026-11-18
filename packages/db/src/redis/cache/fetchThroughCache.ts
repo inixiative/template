@@ -6,9 +6,9 @@
 import { db } from '@template/db/client';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { DEFAULT_TTL } from '@template/db/redis/cache/defaultTtl';
-import { readThrough } from '@template/db/redis/cache/readThrough';
+import { fetchThroughRedisWithSingleFlight } from '@template/db/redis/cache/fetchThroughRedisWithSingleFlight';
 import { withCacheSpan } from '@template/db/redis/cache/telemetry/withCacheSpan';
-import { readInTransaction } from '@template/db/redis/cache/transactionOverlay/readInTransaction';
+import { fetchThroughTransactionCacheOverlay } from '@template/db/redis/cache/transactionOverlay/fetchThroughTransactionCacheOverlay';
 import { validateCacheKeyHasNoUndefined } from '@template/db/redis/cache/validateCacheKeyHasNoUndefined';
 
 export const fetchThroughCache = async <T>(
@@ -21,7 +21,7 @@ export const fetchThroughCache = async <T>(
   const overlay = db.cacheOverlay();
   return withCacheSpan(key, true, (setResult) =>
     overlay
-      ? readInTransaction(overlay, key, live, ttl, setResult)
-      : readThrough(key, live, ttl, setResult),
+      ? fetchThroughTransactionCacheOverlay(overlay, key, live, ttl, setResult)
+      : fetchThroughRedisWithSingleFlight(key, live, ttl, setResult),
   );
 };

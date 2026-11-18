@@ -9,7 +9,7 @@ A socket receives two kinds of traffic today:
 - **Channels and streams** it subscribed to, named by content (`inquiryRead:id:X`). Each is
   authorized by replaying its GET route with the socket's own credential (`canSubscribe`,
   `streamProbe`), so a token sees exactly what its claim reads. Streams are re-probed every 45s
-  (`streamReauthorizeSweep.ts`); channels are not re-checked after subscribe.
+  (`reauthorizeOpenStreams.ts`); channels are not re-checked after subscribe.
 - **Pushes addressed to a user**: an app event's websocket handoff targets `userIds`
   (`appEvents/channels/websocket.ts`), delivered through `sendToUser` → the `byUser` index of sockets
   keyed by `ws.data.userId` (`ws/identity.ts`, `ws/pubsub.ts`). `perRecipient` streams key their seq

@@ -3,7 +3,7 @@ import { ENCRYPTED_MODELS } from '../../packages/db/src/lib/encryption/registry'
 import { infisicalApi, infisicalSecretArgument, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';
 import { execFileAsync, execFileWithInput } from '../utils/exec';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import {
   clearError,
   clearProgress,
@@ -29,7 +29,7 @@ export const setupInfisical = async (
   onStepComplete?: () => Promise<void>,
 ): Promise<{ projectId: string; organizationId: string }> => {
   try {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const configProjectName = config.project.name;
 
     // Clear any previous error when starting/continuing
@@ -200,7 +200,7 @@ export const setupInfisical = async (
     for (const step of infisicalIdentitySecretSteps) {
       if (await isComplete('infisical', step.action)) continue;
 
-      await setSecretAsync(projectId, 'root', step.key, step.getValue(config), step.path);
+      await setSecretAsync(projectId, 'root', step.key, step.valueFor(config), step.path);
       await markComplete('infisical', step.action);
       await onStepComplete?.();
     }
@@ -220,7 +220,7 @@ export const setupInfisical = async (
 
       let hasValidSecret = false;
       try {
-        const existing = await getSecretAsync('BETTER_AUTH_SECRET', {
+        const existing = await fetchSecretOrThrow('BETTER_AUTH_SECRET', {
           projectId,
           environment: step.environment,
           path: '/api',
@@ -244,12 +244,12 @@ export const setupInfisical = async (
       if (!stagingEnabled && step.environment === 'staging') continue;
       let hasValidKey = false;
       try {
-        const existing = await getSecretAsync('WEBHOOK_SIGNING_PRIVATE_KEY', {
+        const existing = await fetchSecretOrThrow('WEBHOOK_SIGNING_PRIVATE_KEY', {
           projectId,
           environment: step.environment,
           path: '/api',
         });
-        const existingPublic = await getSecretAsync('WEBHOOK_SIGNING_PUBLIC_KEY', {
+        const existingPublic = await fetchSecretOrThrow('WEBHOOK_SIGNING_PUBLIC_KEY', {
           projectId,
           environment: step.environment,
           path: '/api',
@@ -317,11 +317,9 @@ export const setupInfisical = async (
         for (const keyConfig of Object.values(modelConfig.keys)) prefixes.add(keyConfig.envPrefix);
       }
 
-      const fetchCachedRecordWithTargetEntitlements = async (
-        key: string,
-      ): Promise<string | null> => {
+      const fetchSecretOrNull = async (key: string): Promise<string | null> => {
         try {
-          const value = await getSecretAsync(key, {
+          const value = await fetchSecretOrThrow(key, {
             projectId,
             environment: step.environment,
             path: '/api',
@@ -336,8 +334,8 @@ export const setupInfisical = async (
         const versionKey = `${prefix}_ENCRYPTION_VERSION`;
         const currentKey = `${prefix}_ENCRYPTION_KEY_CURRENT`;
         const [existingVersion, existingCurrent] = await Promise.all([
-          fetchCachedRecordWithTargetEntitlements(versionKey),
-          fetchCachedRecordWithTargetEntitlements(currentKey),
+          fetchSecretOrNull(versionKey),
+          fetchSecretOrNull(currentKey),
         ]);
 
         if (existingVersion && existingCurrent) continue;
@@ -379,7 +377,7 @@ export const generateSecretAsync = async (length = 32): Promise<string> => {
 /**
  * Get a secret using Infisical CLI (VCR-backed in tests)
  */
-export const getSecretAsync = async (
+export const fetchSecretOrThrow = async (
   key: string,
   options?: {
     projectId?: string;

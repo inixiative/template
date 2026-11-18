@@ -3,7 +3,7 @@ import { infisicalApi } from '../../api/infisical';
 import { infisicalRailwayApi } from '../../api/infisicalRailway';
 import { railwayApi } from '../../api/railway';
 import { createMockConfig, defaultConfig } from '../../tests/mocks';
-import type { ProjectConfig } from '../../utils/getProjectConfig';
+import type { ProjectConfig } from '../../utils/fetchProjectConfig';
 
 const config = createMockConfig();
 
@@ -93,7 +93,7 @@ describe('Railway Resume Scenario', () => {
     railwayApi.vcr.queue('getRedisUrl', 'staging');
     // storeStagingRedisUrl step calls setSecretAsync
     infisicalApi.vcr.queue('setSecret', 'stagingRedisUrl');
-    // getConnectionId() runs unconditionally at line 414 (resolvedConnectionId)
+    // fetchOrCreateRailwayConnectionId() runs unconditionally at line 414 (resolvedConnectionId)
     railwayApi.vcr.queue('getRailwayWorkspaceToken', 'default');
     infisicalRailwayApi.vcr.queue('createRailwayConnection', 'default');
     // final return block: 4 getSecret calls
@@ -129,7 +129,7 @@ describe('Railway Resume Scenario', () => {
     config.clearAll();
 
     seedRailwayResumeState(['ensureProdApiDeployment']);
-    // getConnectionId() runs before ensureProdApiDeployment in the code flow
+    // fetchOrCreateRailwayConnectionId() runs before ensureProdApiDeployment in the code flow
     railwayApi.vcr.queue('getRailwayWorkspaceToken', 'default');
     infisicalRailwayApi.vcr.queue('createRailwayConnection', 'default');
     railwayApi.vcr.queue('getLatestDeployment', 'null');

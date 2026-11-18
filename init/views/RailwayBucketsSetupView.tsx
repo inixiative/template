@@ -3,7 +3,7 @@ import type React from 'react';
 import { useCallback, useState } from 'react';
 import { StepProgress } from '../components/StepProgress';
 import { setupRailwayBuckets } from '../tasks/railwayBucketsSetup';
-import { getRailwayBucketsProgressItems } from '../tasks/railwayBucketsSteps';
+import { railwayBucketsProgressItems } from '../tasks/railwayBucketsSteps';
 import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import { clearError, clearProgress } from '../utils/progressTracking';
@@ -26,7 +26,7 @@ export const RailwayBucketsSetupView: React.FC<RailwayBucketsSetupViewProps> = (
 
   const detectState = (): SetupState => {
     if (!config) return 'new';
-    const items = getRailwayBucketsProgressItems(config);
+    const items = railwayBucketsProgressItems(config);
     if (items.every((item) => item.completed || item.skipped)) return 'complete';
     if (items.some((item) => item.completed)) return 'incomplete';
     return 'new';
@@ -77,7 +77,7 @@ export const RailwayBucketsSetupView: React.FC<RailwayBucketsSetupViewProps> = (
   }
 
   const stagingEnabled = config.features.staging.enabled;
-  const progressItems = getRailwayBucketsProgressItems(config);
+  const progressItems = railwayBucketsProgressItems(config);
   const projectName = config.project.name;
 
   return (

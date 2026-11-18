@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
 import {
-  loadEntitlementAnchors,
+  fetchEntitlementAnchors,
   missingAnchors,
 } from '@template/db/entitlements/entitlementAnchors';
 import {
@@ -101,7 +101,7 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
     const [row] = toEntitlementCreateData(
       inputs,
       { model: 'SpaceUser', row: spaceUser },
-      await loadEntitlementAnchors(inputs),
+      await fetchEntitlementAnchors(inputs),
     );
     expect(row).toMatchObject({
       sourceModel: 'OrganizationUser',
@@ -150,7 +150,7 @@ describe('an entitlement row is stored as it was given (Aron, 2026-11-10)', () =
         sourceId: 'no-such-member',
       },
     ];
-    expect(missingAnchors(inputs, await loadEntitlementAnchors(inputs))).toEqual(inputs);
+    expect(missingAnchors(inputs, await fetchEntitlementAnchors(inputs))).toEqual(inputs);
   });
 
   it('a target with no rows holds none', async () => {

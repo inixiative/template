@@ -10,7 +10,7 @@ import { log } from '@template/shared/logger';
 
 export type Generation = string;
 
-export const readGeneration = async (
+export const fetchCacheGeneration = async (
   redis: ReturnType<typeof redisClient>,
   key: string,
 ): Promise<Generation | null> => {

@@ -113,18 +113,18 @@ const accumulate = (row: OutboxRow, { flushImmediately = false }: SpillOptions):
     const isFast = outboxLaneOf(row) === JobLane.fast;
     pendingSpills++;
     if (isFast) pendingFastSpills++;
-    const settle = (): void => {
+    const decrementPendingSpills = (): void => {
       pendingSpills--;
       if (isFast) pendingFastSpills--;
     };
     acc.push({
       row,
       resolve: () => {
-        settle();
+        decrementPendingSpills();
         resolve();
       },
       reject: (e: unknown) => {
-        settle();
+        decrementPendingSpills();
         reject(e);
       },
     });

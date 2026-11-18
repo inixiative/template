@@ -85,7 +85,7 @@ jobs/
 ├── makeEnqueueChildJob.ts # A stage's ctx.enqueueChildJob (parent link + ignoreDependencyOnFailure, optional delay)
 ├── makeEnqueueChildJobs.ts # A stage's ctx.enqueueChildJobs (fan-out with starts spread over spreadSeconds)
 ├── spreadDelays.ts     # Even start offsets for a spread fan-out
-├── checkRollingCache.ts # The api read of a rolling cache: queue the leaf on a miss, answer with the channel
+├── fetchRollingCacheAndQueueRefreshWhenMissing.ts # The api read of a rolling cache: queue the leaf on a miss, answer with the channel
 ├── parkOnUnfinishedChildren.ts # moveToWaitingChildren → WaitingChildrenError
 ├── validateChildJobHandler.ts # A superseding parent only adds superseding children
 ├── singletonDeduplicationId.ts # BullMQ deduplication id for a singleton key
@@ -140,14 +140,14 @@ await enqueueJob('sendWebhook', {
 |---------|--------|
 | Signing | RSA-SHA256 (`X-Webhook-Signature` header) |
 | Timeout | 5 seconds per attempt |
-| Retries | Network error, timeout, 5xx, 404 and 429 rethrow so the job retries (queue default 3 attempts, exponential backoff); the last attempt (`isFinalAttempt`) settles the delivery. 400/422, 401/403 and redirects settle on the first attempt |
+| Retries | Network error, timeout, 5xx, 404 and 429 rethrow so the job retries (queue default 3 attempts, exponential backoff); the last attempt (`isFinalAttempt`) records the final outcome. 400/422, 401/403 and redirects are final on the first attempt |
 | Circuit breaker | Disables after 5 consecutive failed deliveries; a retry cycle counts once |
 | Poisoned records | Integration-owned subscriptions skip a record after 3 rejections (HTTP 400/422) while other records deliver |
-| Logging | Creates a `WebhookEvent` per attempt: `retrying` for an attempt that will be retried, the settled status for the last |
+| Logging | Creates a `WebhookEvent` per attempt: `retrying` for an attempt that will be retried, the final status for the last |
 
 ### reconcileSegment / reconcileCustomerRefSegments / reconcileEveryHealthyDynamicSegment
 
-Segment membership. `reconcileSegment` (superseding by segment id) recomputes one segment set-wise via `toPrisma` — static or dynamic, it runs when `segment.created` / `segment.updated` says the rule changed — and fans out to the dynamic segments that reference it. `reconcileCustomerRefSegments` (payload `{ customerModel, customerId }`, superseding by that pair and resolving it to the customer's references) hydrates each customer reference through `fetchLens` and runs `check()` per dynamic segment in dependency order; static segments are never on this rail. It is enqueued by the business events on the rows the segment lens reads (`contact.*`, `organization.*`, `space.*`, `user.redacted`, `communication.settled`), never by a DB hook. `reconcileEveryHealthyDynamicSegment` (cron, seeded at 04:00 UTC) enqueues every sound dynamic segment in dependency order (`sweepableSegments`) and is the backstop for writes that bypass a service; a degraded segment never reaches the queue, from the sweep or from a recomputed segment's dependents fan-out. Both reconcile paths publish the junction diff as four events: `segment.membersAdded` / `segment.membersRemoved` (owner side) and `customerRef.segmentsAdded` / `customerRef.segmentsRemoved` (member side).
+Segment membership. `reconcileSegment` (superseding by segment id) recomputes one segment set-wise via `toPrisma` — static or dynamic, it runs when `segment.created` / `segment.updated` says the rule changed — and fans out to the dynamic segments that reference it. `reconcileCustomerRefSegments` (payload `{ customerModel, customerId }`, superseding by that pair and resolving it to the customer's references) hydrates each customer reference through `fetchLens` and runs `check()` per dynamic segment in dependency order; static segments are never on this rail. It is enqueued by the business events on the rows the segment lens reads (`contact.*`, `organization.*`, `space.*`, `user.redacted`, `communication.outcomeRecorded`), never by a DB hook. `reconcileEveryHealthyDynamicSegment` (cron, seeded at 04:00 UTC) enqueues every sound dynamic segment in dependency order (`fetchHealthyDynamicSegmentsInDependencyOrder`) and is the backstop for writes that bypass a service; a degraded segment never reaches the queue, from the sweep or from a recomputed segment's dependents fan-out. Both reconcile paths publish the junction diff as four events: `segment.membersAdded` / `segment.membersRemoved` (owner side) and `customerRef.segmentsAdded` / `customerRef.segmentsRemoved` (member side).
 
 `RECONCILE_TRIGGERS` records coverage of the lens's reached models. The added handlers for
 `customerRef.created`, `user.updated`, `tag.deleted`, `tagAttachment.created` and
@@ -452,7 +452,7 @@ It cannot go by due time: BullMQ promotes delayed jobs only when a worker fetche
 
 #### Slow-Lane Signals
 
-The worker registers three observable gauges beside `messaging.queue.messages`, read from one snapshot (`readSlowLaneState`):
+The worker registers three observable gauges beside `messaging.queue.messages`, read from one snapshot (`fetchSlowLaneState`):
 
 - `jobs.slow.queued` — the slow band plus the deferred slow jobs: the number the slow share is enforced against.
 - `jobs.slow.deferred` — the deferred part alone: jobs parked by the slot share and delayed slow adds.
@@ -522,7 +522,7 @@ A pass:
 1. Reads the lane depths (`queueDepths`). Fetches up to the budget's free room of non-quarantined **fast** rows oldest-first (FIFO) and re-enqueues them, re-claiming the supersede lane first when `dedupeKey` is set. A stored job id BullMQ would reject is replaced with a fresh one rather than failing forever.
 2. Does the same for **slow** rows, up to what is left of the budget and of the slow share, re-adding each at the slow priority.
 3. Deletes drained rows per lane in one statement; increments `attempts` on rows that failed re-enqueue. After `MAX_DRAIN_ATTEMPTS` (5) failures a row is quarantined (skipped) so a poison row at the head can't starve newer rows.
-4. Reads the slow-lane snapshot (`readSlowLaneState`: prunes the deferral list, fresh lane depths, idle clock). Under the outbox mutex: clears each lane's flag once that lane is below its own low-water with no admittable row and no pending spill of that lane; resets quarantined rows to `attempts: 0` only when the queue is below low-water and neither lane has an admittable row or a pending spill.
+4. Reads the slow-lane snapshot (`fetchSlowLaneState`: prunes the deferral list, fresh lane depths, idle clock). Under the outbox mutex: clears each lane's flag once that lane is below its own low-water with no admittable row and no pending spill of that lane; resets quarantined rows to `attempts: 0` only when the queue is below low-water and neither lane has an admittable row or a pending spill.
 
 The whole pass runs inside `withOverflowRenew` so a long pass can't let either flag's TTL lapse mid-tick.
 

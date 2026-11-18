@@ -194,9 +194,9 @@ packages/email/src/
 │   ├── extractRefs.ts    # Component extraction (mapRefs)
 │   ├── interpolate.ts    # Variable substitution + conditionals
 │   ├── evaluateConditions.ts  # {{#if rule=...}} evaluation
-│   ├── lookup.ts         # Single-tier ownership lookup
-│   ├── lookupCascade.ts  # Cascade lookup across ownership tiers
-│   ├── lookupTemplate.ts # lookupTemplate/lookupComponent entrypoints
+│   ├── fetchEmailRowsAtOwner.ts # Single-tier ownership fetch
+│   ├── fetchComponentsThroughOwnerCascade.ts  # Cascade lookup across ownership tiers
+│   ├── fetchTemplateThroughOwnerCascade.ts # fetchTemplateThroughOwnerCascade/fetchComponentThroughOwnerCascade entrypoints
 │   ├── resolveVariants.ts # Match-or-create component variants
 │   ├── validateNoCycle.ts # Component ref cycle guard
 │   ├── save.ts           # saveEmailTemplate coordinator
@@ -264,7 +264,7 @@ model EmailComponent {
 ###### CommunicationLog
 
 Per-recipient delivery ledger — one row per recipient per send (grouped by `sendKey`) — and the
-deduplicated send intent (`idempotencyKey @unique`). It stores the settled MJML, render variables
+deduplicated send intent (`idempotencyKey @unique`). It stores the evaluated MJML, render variables
 (including the hydrated recipient projection), render issues, and template/component audit references.
 It does not store the final provider HTML. Sender is false-polymorphic; `kind`/`emailTemplateId`
 are filled when delivery resolves the template.

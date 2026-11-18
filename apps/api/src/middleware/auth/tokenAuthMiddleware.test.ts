@@ -52,7 +52,7 @@ const organizationUserToken = (organizationUser: OrganizationUser) =>
 const spaceUserToken = (spaceUser: SpaceUser) =>
   ownerBearer({ ownerModel: 'SpaceUser' }, { spaceUser });
 
-const readMe = (headers: Record<string, string>) => app.request('/api/v1/me', { headers });
+const fetchMe = (headers: Record<string, string>) => app.request('/api/v1/me', { headers });
 
 const { app: tokenApp } = createTestApp({
   mount: [
@@ -131,7 +131,7 @@ describe('an OrganizationUser token follows its member row, not the cached token
     // The FK cascade deletes the token with no Token hook firing, so its cache entry survives.
     unregisterDbHook('preventHardDelete');
     await db.organizationUser.delete({ where: { id: organizationUser.id } });
-    expect((await readMe(headers)).status).toBe(401);
+    expect((await fetchMe(headers)).status).toBe(401);
   });
 
   it('a soft-deleted member row is refused', async () => {
@@ -143,7 +143,7 @@ describe('an OrganizationUser token follows its member row, not the cached token
       where: { id: organizationUser.id },
       data: { deletedAt: new Date() },
     });
-    expect((await readMe(headers)).status).toBe(401);
+    expect((await fetchMe(headers)).status).toBe(401);
   });
 
   it("a superadmin's member token is not superadmin; their own token is, until revoked", async () => {
@@ -208,7 +208,7 @@ describe('a SpaceUser token follows its member row, not the cached token', () =>
 
     unregisterDbHook('preventHardDelete');
     await db.spaceUser.delete({ where: { id: spaceUser.id } });
-    expect((await readMe(headers)).status).toBe(401);
+    expect((await fetchMe(headers)).status).toBe(401);
   });
 
   it('removing the org member row refuses the space token', async () => {
@@ -220,7 +220,7 @@ describe('a SpaceUser token follows its member row, not the cached token', () =>
       where: { id: organizationUser.id },
       data: { deletedAt: new Date() },
     });
-    expect((await readMe(headers)).status).toBe(401);
+    expect((await fetchMe(headers)).status).toBe(401);
   });
 });
 

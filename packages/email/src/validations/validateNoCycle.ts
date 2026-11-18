@@ -5,7 +5,7 @@
  * @uses none
  */
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
-import { lookupCascade } from '@template/email/render/lookupCascade';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
 import type { OwnerScope } from '@template/email/render/types';
 
 export const validateNoCycle = async (
@@ -27,7 +27,7 @@ export const validateNoCycle = async (
     if (visited.has(slug)) continue;
     visited.add(slug);
 
-    const components = await lookupCascade([slug], ctx);
+    const components = await fetchComponentsThroughOwnerCascade([slug], ctx);
     const component = components[slug];
     if (!component) continue;
     for (const childRef of component.componentSlugs) {

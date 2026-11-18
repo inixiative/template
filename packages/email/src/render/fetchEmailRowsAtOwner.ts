@@ -17,17 +17,17 @@ export type TemplateWithSnapshot = Prisma.EmailTemplateGetPayload<{
   include: typeof latestSnapshotInclude;
 }>;
 
-type LookupResult = {
+type TemplateAndComponentsAtOwner = {
   template: TemplateWithSnapshot | null;
   components: Record<string, EmailComponent>;
 };
 
-export const lookupAtOwner = async (
+export const fetchEmailRowsAtOwner = async (
   templateSlug: string | null,
   componentSlugs: string[],
   ctx: OwnerScope,
   tier: EmailOwnerModel = ctx.ownerModel,
-): Promise<LookupResult> => {
+): Promise<TemplateAndComponentsAtOwner> => {
   const where = ownerWhere(ctx, tier);
 
   const [comps, template] = await Promise.all([

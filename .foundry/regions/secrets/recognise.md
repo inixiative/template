@@ -77,7 +77,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - an init step needs an API key
 - inject secrets into the cloud environment
 - changing a key
-- redact secrets from logs
+- mask secrets in logs
 - example env files only
 - hash or encrypt this token
 - display a secret the user can't see again

@@ -1,4 +1,4 @@
-import { getProjectConfig, type PROGRESS_KEYS, writeProjectConfig } from './getProjectConfig';
+import { fetchProjectConfig, type PROGRESS_KEYS, writeProjectConfig } from './fetchProjectConfig';
 
 export type ProgressSection = keyof typeof PROGRESS_KEYS;
 
@@ -22,7 +22,7 @@ export const markComplete = async <S extends ProgressSection>(
   section: S,
   action: ProgressActions[S],
 ): Promise<void> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   (config[section] as { progress: Record<string, boolean> }).progress[action] = true;
   await writeProjectConfig(config);
 };
@@ -34,7 +34,7 @@ export const isComplete = async <S extends ProgressSection>(
   section: S,
   action: ProgressActions[S],
 ): Promise<boolean> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   return (config[section] as { progress: Record<string, boolean> }).progress[action] === true;
 };
 
@@ -42,7 +42,7 @@ export const isComplete = async <S extends ProgressSection>(
  * Clear all progress for a section (set all flags to false)
  */
 export const clearProgress = async (section: ProgressSection): Promise<void> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   const progress = (config[section] as { progress: Record<string, boolean> }).progress;
   for (const key in progress) {
     progress[key] = false;
@@ -54,7 +54,7 @@ export const clearProgress = async (section: ProgressSection): Promise<void> => 
  * Set error message for a section
  */
 export const setError = async (section: ProgressSection, message: string): Promise<void> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   (config[section] as { error: string }).error = message;
   await writeProjectConfig(config);
 };

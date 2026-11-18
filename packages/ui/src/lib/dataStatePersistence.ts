@@ -47,7 +47,7 @@ function parsePositiveInt(value: string | null): number | undefined {
   return Number.isInteger(n) && n > 0 ? n : undefined;
 }
 
-export function readStateFromUrl(searchString?: string): ListPageState {
+export function listPageStateFromUrl(searchString?: string): ListPageState {
   const params = new URLSearchParams(searchString ?? window.location.search);
   const state: ListPageState = {};
 
@@ -66,7 +66,10 @@ export function readStateFromUrl(searchString?: string): ListPageState {
   return state;
 }
 
-export function readInitialState(stateKey: string | undefined, checkUrl: boolean): ListPageState {
+export function initialListPageState(
+  stateKey: string | undefined,
+  checkUrl: boolean,
+): ListPageState {
   if (typeof window === 'undefined') return {};
 
   if (stateKey) {
@@ -81,7 +84,7 @@ export function readInitialState(stateKey: string | undefined, checkUrl: boolean
   }
 
   if (checkUrl) {
-    const fromUrl = readStateFromUrl();
+    const fromUrl = listPageStateFromUrl();
     if (Object.keys(fromUrl).length > 0) return fromUrl;
   }
 

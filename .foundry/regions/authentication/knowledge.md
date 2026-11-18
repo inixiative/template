@@ -479,7 +479,7 @@ Only a JWT session or a superadmin spoof makes the request a user (`c.get('user'
 | User token | none | its user |
 | Any other token | none | none: `/me` answers 401 |
 
-`GET /api/v1/identify` answers for any credential: the actor `{ model, record }` the rules see, the record being the user, or the token's own columns, without the model's redact fields.
+`GET /api/v1/identify` answers for any credential: the actor `{ model, record }` the rules see, the record being the user, or the token's own columns, without the model's sensitive fields.
 
 A token held by a user (User, OrganizationUser, SpaceUser) is superadmin when its user is, and can spoof. A spoof is a superadmin and an email: the request becomes that user and the token is set aside; `spoofedBy` records who.
 

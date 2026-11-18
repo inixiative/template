@@ -20,10 +20,17 @@ export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
 export type { RenderIssue, RenderIssueKind } from './evaluateTemplate';
 export {
   expandComponentTagsFromOwnerCascade,
-  expandComponentTagsWithLookup,
-  type LookupComponents,
+  expandComponentTagsWithFetcher,
+  type FetchComponents,
 } from './expandComponentTags';
+export { fetchComponentsThroughOwnerCascade } from './fetchComponentsThroughOwnerCascade';
 export { fetchMissingComponentSlugs } from './fetchMissingComponentSlugs';
+export {
+  fetchComponentThroughOwnerCascade,
+  fetchLensThroughOwnerCascade,
+  fetchTemplateLens,
+  fetchTemplateThroughOwnerCascade,
+} from './fetchTemplateThroughOwnerCascade';
 export {
   hydrateEmailComponentTags,
   hydrateEmailComponentTagsFromOwnerCascade,
@@ -31,8 +38,6 @@ export {
 } from './hydrateEmailComponentTags';
 export { type InterpolateOptions, interpolate, type Variables } from './interpolate';
 export { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from './limits';
-export { lookupCascade } from './lookupCascade';
-export { lookupComponent, lookupLens, lookupTemplate, templateLens } from './lookupTemplate';
 export {
   type ComponentNode,
   collectSlugsFromNodes,
@@ -44,7 +49,7 @@ export {
 export {
   type EmailOwnerRef,
   emailLensOwnerOf,
-  lookupsPerOwnerTier,
+  fetchersPerOwnerTier,
   ownerCascade,
   ownerScopeOfRow,
   ownerWhere,

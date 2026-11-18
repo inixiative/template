@@ -61,12 +61,12 @@ export const ownerWhere = (ctx: OwnerScope, tier: EmailOwnerModel = ctx.ownerMod
   ...(tier === 'Organization' && ctx.ownerModel === 'Space' && { inheritToSpaces: true }),
 });
 
-export const lookupsPerOwnerTier = <T>(
+export const fetchersPerOwnerTier = <T>(
   ctx: OwnerScope,
   build: (tier: EmailOwnerModel) => Promise<T>,
 ): (() => Promise<T>)[] => ownerCascade(ctx.ownerModel).map((tier) => () => build(tier));
 
-export const fetchFirstNonEmptyLookupResult = async <T>(
+export const fetchFirstNonEmptyResult = async <T>(
   lookups: (() => Promise<T | null | undefined>)[],
 ): Promise<T | null> => {
   for (const lookup of lookups) {

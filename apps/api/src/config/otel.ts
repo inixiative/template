@@ -1,6 +1,6 @@
 import { log } from '@template/shared/logger';
 import { setLogService } from '@template/shared/logger/records';
-import { readTelemetryConfig } from '@template/shared/telemetry/config';
+import { telemetryConfigFromEnv } from '@template/shared/telemetry/config';
 
 let telemetry:
   | Awaited<ReturnType<typeof import('@template/shared/telemetry/initialize').initializeTelemetry>>
@@ -10,7 +10,7 @@ export const initializeOpenTelemetry = async (role: 'api' | 'worker' = 'api') =>
     'service.name': `${process.env.OTEL_SERVICE_NAME || 'template'}-${role}`,
     'service.role': role,
   });
-  const config = readTelemetryConfig(role);
+  const config = telemetryConfigFromEnv(role);
   if (!config) return;
   const { initializeTelemetry } = await import('@template/shared/telemetry/initialize');
   telemetry = initializeTelemetry(config);

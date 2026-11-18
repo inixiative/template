@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
-export const readBareWord = (content: string, i: number): { value: string; next: number } => {
+export const bareWordAt = (content: string, i: number): { value: string; next: number } => {
   let next = i;
   while (
     next < content.length &&

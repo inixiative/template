@@ -11,7 +11,7 @@
 - [2. The domain](#2-the-domain)
 - [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
-  - [Class `ws-channels`](#class-ws-channels-refetch-channels-the-ws-contract-channels-vs-streams-channel-registry-and-subscribe-authorization-publishing-a-refetch-wschannels-livequeries-sendtochannel--sendtouser--broadcast-the-client-socket-and-horizontal-scaling)
+  - [Class `ws-channels`](#class-ws-channels-refetch-channels-the-ws-contract-channels-vs-streams-channel-registry-and-subscribe-authorization-publishing-a-refetch-ws_channels-wschannelfamily-sendtochannel--sendtouser--broadcast-the-client-socket-and-horizontal-scaling)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
     - `docs/claude/WEBSOCKETS.md`: Contract; Channels vs streams: when to use which; Channel registry and authorization; Publishing a refetch; Frontend and horizontal scaling; Source and verification

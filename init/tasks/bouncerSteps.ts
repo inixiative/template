@@ -1,11 +1,11 @@
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import type { ProjectConfig } from '../utils/fetchProjectConfig';
 import type { BouncerAction } from '../utils/progressTracking';
 
 type BouncerProgress = ProjectConfig['bouncer']['progress'];
 
 type BouncerProgressGroup = {
   actions: readonly BouncerAction[];
-  getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
+  labelFor: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
 const countCompletedActions = (
@@ -18,7 +18,7 @@ const countCompletedActions = (
 const bouncerProgressGroups: readonly BouncerProgressGroup[] = [
   {
     actions: ['storeApiKey'],
-    getLabel: () => 'API key stored in Infisical',
+    labelFor: () => 'API key stored in Infisical',
   },
 ];
 
@@ -29,12 +29,12 @@ export type BouncerProgressSummary = {
   totalCount: number;
 };
 
-export const getBouncerProgressSummaries = (config: ProjectConfig): BouncerProgressSummary[] => {
+export const bouncerProgressSummaries = (config: ProjectConfig): BouncerProgressSummary[] => {
   return bouncerProgressGroups.map((group) => {
     const completedCount = countCompletedActions(config.bouncer.progress, group.actions);
     const totalCount = group.actions.length;
     return {
-      label: group.getLabel(config, completedCount, totalCount),
+      label: group.labelFor(config, completedCount, totalCount),
       completed: completedCount === totalCount,
       completedCount,
       totalCount,
@@ -42,10 +42,10 @@ export const getBouncerProgressSummaries = (config: ProjectConfig): BouncerProgr
   });
 };
 
-export const getBouncerProgressItems = (
+export const bouncerProgressItems = (
   config: ProjectConfig,
 ): Array<{ label: string; completed: boolean }> => {
-  return getBouncerProgressSummaries(config).map((summary) => ({
+  return bouncerProgressSummaries(config).map((summary) => ({
     label: summary.label,
     completed: summary.completed,
   }));

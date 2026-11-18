@@ -260,7 +260,7 @@ One boolean per remote write, marked only after it succeeded, so a rerun resumes
 Required: 'shared' (identical data for every holder, test-enforced) or 'perRecipient' (appends carry recipient userIds). *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
 
 **audit-log**  
-Class: the AuditLog trail of mutations on enabled models, with actor, diffs and redaction. *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
+Class: the AuditLog trail of mutations on enabled models, with actor, diffs and masking. *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
 
 **AUDIT_ENABLED_MODELS**  
 Opt-in list of AuditSubjectModel values whose mutations are audited. *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
@@ -714,7 +714,7 @@ Class: CommunicationKind opt-in/opt-out via acceptedKinds and canDeliver, plus u
 system (always delivered), platform and activity (opt-out), marketing (opt-in). *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **CommunicationLog**  
-Per-recipient delivery ledger and dedup fence (idempotencyKey @unique), grouped by sendKey; stores settled MJML, variables and renderIssues. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
+Per-recipient delivery ledger and dedup fence (idempotencyKey @unique), grouped by sendKey; stores evaluated MJML, variables and renderIssues. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **CommunicationReasonCode**  
 Why a failed row failed, e.g. not_found, render_failed, ambiguous_timeout, quota_exceeded, unsubscribe_unavailable. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
@@ -1178,7 +1178,7 @@ Route template for deleting a record by id; its controller answers respond.noCon
 Cached address validity on Contact; distinct from preference (acceptedKinds) and channel ownership (verifiedAt). *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
 
 **deliverEmail**  
-Per-recipient job (body in deliverEmailMessage) that settles, gates, renders, claims, sends and records one email. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
+Per-recipient job (body in deliverEmailMessage) that evaluates, gates, renders, claims, sends and records one email. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **deliverEmailHandoffs**  
 Email bridge that enqueues planEmailDeliveries for handoffs with deterministic planner job ids. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
@@ -1691,7 +1691,7 @@ Turns tenant context into [model, record] for permissions.check in access rules.
 Returns [model, record] for the current organization, space or user context. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **encryptedFieldsByModel**  
-Lists every encrypted column per model from the registry, for redaction and ignore lists. *Region:* [Field encryption and key rotation](encryption/knowledge.md)
+Lists every encrypted column per model from the registry, for the sensitive-field and no-op lists. *Region:* [Field encryption and key rotation](encryption/knowledge.md)
 
 **encryptedColumnNamesForKey**  
 Derives a key's column triplet: encrypted{Key}, encrypted{Key}Metadata, encrypted{Key}KeyVersion. *Region:* [Field encryption and key rotation](encryption/knowledge.md)
@@ -1708,7 +1708,7 @@ Lists Google and GitHub when their *_CLIENT_ID / *_CLIENT_SECRET env vars are se
 **polymorphismConfigForModel**  
 Returns a model's `{ typeField, fkMap }` from PolymorphismRegistry, or null if it isn't polymorphic. *Region:* [Schema conventions and reference data](data-modeling/knowledge.md)
 
-**getProjectConfig**  
+**fetchProjectConfig**  
 Reads project.config.ts via a timestamp-busted dynamic import so repeat reads are fresh. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
 
 **redisClient**  
@@ -1723,7 +1723,7 @@ Lists a model's relations with targetModel, isList, collapsed foreignKey and ann
 **contextResource**  
 Reads the record resourceContextMiddleware loaded for the route's :id, typed by generic. *Region:* [Request context](request-context-errors/knowledge.md)
 
-**getSecretAsync / setSecretAsync**  
+**fetchSecretOrThrow / setSecretAsync**  
 Read or store a secret in Infisical by project, environment and path (the doc's getSecret / setSecret); the source for secrets on resume. *Region:* [Writing an init task](init-tasks/knowledge.md)
 
 **getState()**  
@@ -1815,8 +1815,8 @@ Appends that arrive during the snapshot read, sent after it and dropped by seq i
 **Hierarchical Tokens**  
 Tokens scoped to User (cross-org), Organization (all spaces) or Space (one space). *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)
 
-**HOOK_IGNORE_FIELDS**  
-Shared ignore registry: fields excluded from webhook payloads, stripped from audit diffs and treated as no-op updates; composes encrypted and ordered-list fields. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
+**NOOP_FIELDS**  
+Shared no-op registry: fields left out of webhook payloads, omitted from audit diffs and treated as no-op updates; folds in ordered-list fields. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
 
 **HookTiming / DbAction**  
 Enums naming when a hook runs (before/after) and on which operations (create, update, deleteMany, ...). *Region:* [Mutation hooks, immutable fields, ordered lists](mutation-hooks/knowledge.md)
@@ -1890,7 +1890,7 @@ Class tag: the patterns one init task follows. *Region:* [Writing an init task](
 Installs signal handling that runs onShutdown handlers within a timeout; called once. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **initializeTelemetry**  
-Starts process telemetry once from readTelemetryConfig('api'|'worker'). *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
+Starts process telemetry once from telemetryConfigFromEnv('api'|'worker'). *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **initializeWorker**  
 Starts the BullMQ worker; skipped in the test environment. *Region:* [Background jobs](jobs-cron/knowledge.md)
@@ -1968,9 +1968,9 @@ Tells content errors (render, parse, MJML, token, condition) apart so they fail 
 Tells the self-grant of that exact row apart from every other entitlement on it. *Region:* [Member rows and delegates](permissions-members/knowledge.md)
 
 **isNoOpUpdate**  
-Shared no-op detection: an update touching only ignored fields skips cache clearing. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
+Shared no-op detection: an update touching only no-op fields skips cache clearing. *Region:* [Redis, caching and rate limits](redis-caching-rate-limits/knowledge.md)
 
-**isNoOpUpdate / NOOP_FIELDS / HOOK_IGNORE_FIELDS**  
+**isNoOpUpdate / NOOP_FIELDS**  
 Shared registry of noise fields (updatedAt, lastLoginAt, positions) whose change alone is a no-op for audit, cache and webhooks. *Region:* [Mutation hooks, immutable fields, ordered lists](mutation-hooks/knowledge.md)
 
 **isRequired**  
@@ -2217,7 +2217,7 @@ Class: Biome, custom lint scripts and the CI rule runner that enforce style. *Re
 Page with a create action, a Table, and optimistic create and delete: the one shape every list page follows. *Region:* [UI components and shared pages](ui-components/knowledge.md)
 
 **List state persistence**  
-readInitialState / writeToHistoryState / writeToHistoryStateAndUrl keep list state in history.state, or the URL when shareable. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
+initialListPageState / writeToHistoryState / writeToHistoryStateAndUrl keep list state in history.state, or the URL when shareable. *Region:* [API client, SDK and query hooks](api-client/knowledge.md)
 
 **List state persistence**  
 page, pageSize, search, orderBy and scroll position kept in history.state per view key (data:<id>, scroll:<id>). *Region:* [Offset and cursor pagination](pagination/knowledge.md)
@@ -2235,7 +2235,7 @@ Bracket marker passing a real null, true or false instead of a string. *Region:*
 **liveWhere / liveIncludes**  
 Helpers that add the deletedAt: null scope to a where or include built by hand. *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
 
-**loadTokenContext**  
+**fetchTokenContext**  
 Token sign-in: cached row by keyHash, isActive and expiresAt, owner records loaded live, refused when the owner is gone. *Region:* [API tokens and login providers](tokens-providers/knowledge.md)
 
 ***Local senders**  
@@ -2260,7 +2260,7 @@ Component logger with bound fields. *Region:* [Logging, telemetry, shutdown](obs
 Env var filtering every facade output including OTLP and BullBoard broadcasts. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **logging**  
-Class: structured logging: shared log facade, withLogContext, scopes, redaction. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
+Class: structured logging: shared log facade, withLogContext, scopes, masking. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **LoginForm**  
 Login form with provider buttons and email fields; LoginPage wraps it. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
@@ -2426,7 +2426,7 @@ Generated zod schema of a Prisma model's scalar fields from @template/db; the de
 **ModelField**  
 Union of ScalarField, EnumField and RelationField; narrow before resolving names. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
-**modelFields / lookupField**  
+**modelFields / modelFieldAtPath**  
 A model's whole field map, versus one field resolved by dotted path across relations. *Region:* [Prisma-map and schema introspection](lib-prisma-map/knowledge.md)
 
 **ModelNames / AccessorNames**  
@@ -2991,10 +2991,10 @@ A view over a raw record with every relation on, for permissions and transitions
 **react**  
 tsup preset for React/UI packages: `export default react({ entry })`. *Region:* [Config package (toolchain, train)](lib-config/knowledge.md)
 
-**readAllAsCaller**  
+**fetchAllAsCaller**  
 Reads every page of a list endpoint in-process as the caller, capped by pages. *Region:* [Batch API](batch/knowledge.md)
 
-**readAsCaller**  
+**fetchAsCaller**  
 Reads one API path in-process with the caller's identity, permissions and tenancy. *Region:* [Batch API](batch/knowledge.md)
 
 **readLensValue**  
@@ -3052,10 +3052,10 @@ Class tag: non-overlapping in-process recurring work such as heartbeat and unref
 Registries for sensitive values (shown as [MASKED]) versus noise fields (dropped before diffing). *Region:* [Audit log and soft delete](audit-soft-delete/knowledge.md)
 
 **omitSensitiveFieldsFromLens**  
-mapDefaults wrapper that strips redacted fields wherever a model appears. *Region:* [Template lenses](lenses/knowledge.md)
+mapDefaults wrapper that omits sensitive fields wherever a model appears. *Region:* [Template lenses](lenses/knowledge.md)
 
 **maskLogValue / stringifyLogValue**  
-Redact sensitive fields and URLs from a value, as structure or as string. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
+Mask sensitive fields and URLs in a value, as structure or as string. *Region:* [Logging, telemetry, shutdown](observability-lifecycle/knowledge.md)
 
 **redactUser**  
 Anonymizes a user's PII on account deletion, keeps the row and ends every JWT (rotateUserJwts). *Region:* [Auth middleware chain and users](auth-middleware-users/knowledge.md)
@@ -3761,8 +3761,8 @@ paginate() appends { id: desc } when no id ordering is given, so pages stay cons
 **Staged job**  
 A makeJob with ordered stages; each stage waits for the children it added, as a BullMQ flow parent. *Region:* [Background jobs](jobs-cron/knowledge.md)
 
-**stale sweep**  
-Server closes connections idle for more than 5 minutes (cleanupStaleConnections, startStaleSweep). *Region:* [WebSocket connections](ws-connections/knowledge.md)
+**stale-connection cleanup**  
+Server closes connections idle for more than 5 minutes (cleanupStaleConnections, startStaleConnectionCleanupInterval). *Region:* [WebSocket connections](ws-connections/knowledge.md)
 
 **stamp rule**  
 A path glob -> @kind or @partOf rule in config.ts; explicit annotations always win. *Region:* [Atlas code map (library + template usage)](lib-atlas/knowledge.md)
@@ -3776,8 +3776,8 @@ Production run scripts (start:api, start:worker, start:web); local dev uses bun 
 **startOutboxDrainLoop**  
 Starts the per-worker ~2 s drain interval at worker startup; not a cron. *Region:* [Job lanes and overflow outbox](job-lanes-outbox/knowledge.md)
 
-**startStreamReauthorizeSweep**  
-Boot-time sweep that re-probes every open stream every 45s via x-auth-probe. *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
+**startReauthorizeOpenStreamsInterval**  
+Boot-time interval that re-probes every open stream every 45s via x-auth-probe. *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)
 
 ***Steps.ts**  
 Per-provider step lists in init/tasks that drive both progress flags and the status list labels. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
@@ -4598,7 +4598,7 @@ The rows a write sets, coalesced across single and bulk data and both arms of an
 Class tag: refetch channels, the default real-time lane. *Region:* [WebSocket channels and refetch hints](ws-channels/knowledge.md)
 
 **ws-connections**  
-Class: the WebSocket connection: upgrade, authenticate frame and identity, registry, frame limits, heartbeat, stale sweep, senders, client reconnect. *Region:* [WebSocket connections](ws-connections/knowledge.md)
+Class: the WebSocket connection: upgrade, authenticate frame and identity, registry, frame limits, heartbeat, stale-connection cleanup, senders, client reconnect. *Region:* [WebSocket connections](ws-connections/knowledge.md)
 
 **ws-data-streams**  
 Class tag: incremental data streams over the socket. *Region:* [WebSocket data streams](ws-data-streams/knowledge.md)

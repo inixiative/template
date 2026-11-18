@@ -12,7 +12,7 @@ segment. A rule like "last order within the past 2 hours" or "signed up this wee
 to a day stale, while the sweep spends most of its budget on rules that never read the clock.
 
 Nothing records which rules are clock-sensitive. `isReconcilableDynamicSegment` is dynamic-and-reconcilable;
-`sweepableSegments` takes everything that passes it.
+`fetchHealthyDynamicSegmentsInDependencyOrder` takes everything that passes it.
 
 ## Shape (Aron, 2026-10-03, 2026-10-29)
 

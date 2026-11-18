@@ -11,7 +11,7 @@ import { skipWhitespace } from '@template/email/render/conditionParser/skipWhite
 
 export type RuleMarker = { rule?: Condition; ruleError?: string; next: number };
 
-export const readRuleMarker = (content: string, i: number, token: string): RuleMarker | null => {
+export const ruleMarkerAt = (content: string, i: number, token: string): RuleMarker | null => {
   const jsonStart = skipWhitespace(content, i + token.length);
 
   let valueEnd: number;

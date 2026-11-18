@@ -16,7 +16,7 @@ model User {
   displayName   String?
   image         String?
 
-  // Stamped on sign-in by jwtHandoff when it issues the JWT. Operational, not
+  // Stamped on sign-in by jwtHandoffPlugin when it issues the JWT. Operational, not
   // versioned — see registries/noopFields.
   lastLoginAt DateTime?
   // Every person JWT carries it as `ver`; incrementing it signs the user out everywhere.

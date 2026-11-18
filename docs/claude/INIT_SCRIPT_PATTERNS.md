@@ -126,7 +126,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [config, setConfig] = useState<ProjectConfig | null>(null);
 
   const syncConfig = useCallback(async () => {
-    const cfg = await getProjectConfig();
+    const cfg = await fetchProjectConfig();
     setConfig(cfg);
   }, []);
 
@@ -183,7 +183,7 @@ const runSetup = async (orgId: string) => {
 
 **Pattern:** Add timestamp query param to dynamic imports to bypass Node/Bun module cache.
 
-**Location:** `init/utils/getProjectConfig.ts`
+**Location:** `init/utils/fetchProjectConfig.ts`
 
 **Why:**
 - Config file is `.ts`, loaded via `import()`
@@ -192,7 +192,7 @@ const runSetup = async (orgId: string) => {
 
 **Implementation:**
 ```typescript
-export const getProjectConfig = async (): Promise<ProjectConfig> => {
+export const fetchProjectConfig = async (): Promise<ProjectConfig> => {
   const configPath = join(process.cwd(), 'project.config.ts');
 
   // Bust import cache with timestamp to get fresh config
@@ -368,7 +368,7 @@ if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
 
 // ✅ Good: Fetch from Infisical (where step 8 stored it)
 if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
-  const prodConnectionString = await getSecretAsync('DATABASE_URL', {
+  const prodConnectionString = await fetchSecretOrThrow('DATABASE_URL', {
     projectId: infisicalProjectId,
     environment: 'prod',
     path: '/api',
@@ -378,7 +378,7 @@ if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
 
 // ✅ Good: Re-read from config (don't trust local variables)
 if (!(await isComplete('planetscale', 'configureDB'))) {
-  const latestConfig = await getProjectConfig();
+  const latestConfig = await fetchProjectConfig();
   const orgName = latestConfig.planetscale.organization;
   const dbName = latestConfig.planetscale.database;
   await updateDatabaseSettings(orgName, dbName, { ... });
@@ -386,8 +386,8 @@ if (!(await isComplete('planetscale', 'configureDB'))) {
 ```
 
 **Rule of thumb:**
-- Secrets → Always fetch from Infisical with `getSecretAsync()`
-- Config metadata → Always re-read from config with `getProjectConfig()`
+- Secrets → Always fetch from Infisical with `fetchSecretOrThrow()`
+- Config metadata → Always re-read from config with `fetchProjectConfig()`
 - Never pass connection strings, passwords, or API keys between steps
 
 ### 9. Retry Logic for Async Initialization
@@ -819,7 +819,7 @@ const runSetup = async (workspaceId: string) => {
   // Check if token exists in Infisical
   let hasToken = false;
   try {
-    const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
+    const token = await fetchSecretOrThrow('RAILWAY_WORKSPACE_TOKEN', {
       projectId: infisicalProjectId,
       environment: 'root',
     });
@@ -1097,7 +1097,7 @@ init/
 │   └── ...                   # Other task logic
 ├── utils/
 │   ├── configState.tsx       # ⭐ Root config context
-│   ├── getProjectConfig.ts   # Config reader (cache-busted)
+│   ├── fetchProjectConfig.ts   # Config reader (cache-busted)
 │   ├── prompts.ts            # ⭐ Composable prompt system
 │   ├── progressTracking.ts  # markComplete/isComplete helpers
 │   └── checkPrerequisites.ts# CLI/session check helpers
@@ -1189,7 +1189,7 @@ export const setupRender = async (
   config: ProjectConfig,
   onStepComplete?: () => Promise<void>
 ): Promise<void> => {
-  // IMPORTANT: Receive config as parameter from view (don't call getProjectConfig)
+  // IMPORTANT: Receive config as parameter from view (don't call fetchProjectConfig)
   // This ensures you're using the same config the view is showing
   const projectName = config.project.name;
 
@@ -1207,7 +1207,7 @@ export const setupRender = async (
 };
 ```
 
-**Critical:** Always receive `config` as a parameter. Never call `getProjectConfig()` directly in task functions - this can cause config mismatches where the task sees different data than the UI.
+**Critical:** Always receive `config` as a parameter. Never call `fetchProjectConfig()` directly in task functions - this can cause config mismatches where the task sees different data than the UI.
 
 ### 3. Wire Up in App
 

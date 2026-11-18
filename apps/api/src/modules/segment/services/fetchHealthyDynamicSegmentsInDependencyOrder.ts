@@ -16,7 +16,7 @@ import {
   targetSegmentIdsBySegmentId,
 } from '#/modules/segment/services/segmentReferenceGraph';
 
-export const sweepableSegments = async (): Promise<Segment[]> => {
+export const fetchHealthyDynamicSegmentsInDependencyOrder = async (): Promise<Segment[]> => {
   const dynamic = await db.segment.findMany({
     where: { deletedAt: null, type: SegmentType.dynamic },
   });

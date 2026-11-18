@@ -37,7 +37,7 @@ afterEach(async () => {
 
 const broken = () =>
   entitlementInputFor('db:integration', ['db:organization', organization.id], ['read']);
-const readOrganization = () =>
+const organizationReadEntitlement = () =>
   entitlementInputFor('db:organization', ['db:organization', organization.id], ['read']);
 const manageItsIntegrations = (): EntitlementInput => ({
   ...entitlementInputFor(
@@ -95,7 +95,7 @@ describe('a malformed stored entitlement is pruned at sign-in, the rest kept (R9
   });
 
   it('a token with no role keeps its well-formed entitlements; the broken one is gone', async () => {
-    const key = await tokenKey(null, [readOrganization(), broken()]);
+    const key = await tokenKey(null, [organizationReadEntitlement(), broken()]);
     expect(await actorModel(key)).toBe('Token');
     expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
   });
@@ -147,7 +147,7 @@ describe('the API refuses a malformed entitlement; a broken row stored by hand i
   };
 
   it('the 422 names what is wrong with the entry', async () => {
-    const noAction = { ...readOrganization(), actions: [] };
+    const noAction = { ...organizationReadEntitlement(), actions: [] };
     const response = await (await asOwner())(
       post(`/api/v1/organization/${organization.id}/integrations`, {
         name: `i-${Bun.randomUUIDv7()}`,
@@ -182,12 +182,12 @@ describe('the API refuses a malformed entitlement; a broken row stored by hand i
       entitlements: [broken()],
     });
     const response = await (await asOwner())(
-      post(`/api/v1/integration/${stored.id}/entitlements`, [readOrganization()]),
+      post(`/api/v1/integration/${stored.id}/entitlements`, [organizationReadEntitlement()]),
     );
     expect(response.status).toBe(201);
     expect((await heldEntitlements({ model: 'Integration', id: stored.id })) as unknown).toEqual([
       broken(),
-      readOrganization(),
+      organizationReadEntitlement(),
     ]);
   });
 });

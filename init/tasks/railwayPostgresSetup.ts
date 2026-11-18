@@ -1,6 +1,6 @@
 import { railwayApi } from '../api/railway';
 import { updateConfigField } from '../utils/configHelpers';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 import { clearError, isComplete, markComplete, setError } from '../utils/progressTracking';
 import { retryWithTimeout } from '../utils/retry';
 import { setSecretAsync } from './infisicalSetup';
@@ -58,7 +58,7 @@ export const setupRailwayPostgres = async (onStepComplete?: () => Promise<void>)
   await clearError('railwayPostgres');
 
   try {
-    const config = await getProjectConfig();
+    const config = await fetchProjectConfig();
     const { projectId, prodEnvironmentId, stagingEnvironmentId } = config.railway;
     const infisicalProjectId = config.infisical.projectId;
     const stagingEnabled = config.features.staging.enabled;

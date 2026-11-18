@@ -246,7 +246,7 @@ _Source-checked 2026-06-08 against `@inixiative/json-rules@2.5.0` + `@monorepo/p
   a plan whose `where` is one OR'd filter.
 
 - **Field-scope = reuse `@monorepo/db/lens`, don't build.** `lensFor(model)` is the base lens;
-  `omitSensitiveFieldsFromLens(lens)` narrows out redacted fields (from `HOOK_REDACT_FIELDS`); the read route
+  `omitSensitiveFieldsFromLens(lens)` omits sensitive fields (from `SENSITIVE_FIELDS`); the read route
   already composes `projectByPath(omitSensitiveFieldsFromLens(filterLens))` for its filter surface. So a
   transition's field allowlist + authoring validation = `checkRuleAgainstLens(predicate,
   omitSensitiveFieldsFromLens(lensFor(model)) [+ context narrowings])`. No new field-security layer.
@@ -338,7 +338,7 @@ multi-step sagas — anything that must *do*, not *gate*.
   `Any`/`All`, `applyLens`, `checkRuleAgainstLens`, `createLens`, `Lens`/`LensNarrowing`, `projectByPath`.
 - **permissions**: `packages/permissions/src/rebac/{types,check,schema,permissionRulesSchema,ownerActions}.ts`.
 - **db lens**: `packages/db/src/lens/{lensFor,omitSensitiveFieldsFromLens,rootLens,searchablePaths,orderablePaths}.ts`;
-  `packages/db/src/registries/sensitiveFields.ts` (`HOOK_REDACT_FIELDS`).
+  `packages/db/src/registries/sensitiveFields.ts` (`SENSITIVE_FIELDS`).
 - **route helpers (lens-scoped filtering precedent)**: `apps/api/src/lib/routeTemplates/read.ts`,
   `.../filters/{buildSearchFieldsSchema,buildOrderBySchema}.ts`, `.../utils/prepareMiddleware.ts`,
   `apps/api/src/lib/prisma/buildWhereClause.ts`, `apps/api/src/types/appEnv.ts`, `routeTemplates/types.ts`.

@@ -18,7 +18,7 @@ import type {
   Segment,
 } from '@template/db/generated/client/client';
 import type { RuleReferenceSourceModel } from '@template/db/generated/client/enums';
-import { ownerScopeOfRow, templateLens } from '@template/email/render';
+import { fetchTemplateLens, ownerScopeOfRow } from '@template/email/render';
 import {
   componentRuleContents,
   contentDynamicRuleReferences,
@@ -56,7 +56,7 @@ type RuleReferenceDeclaration<Lens> = {
 };
 
 export type RuleReferenceSurface = Pick<RuleReferenceDeclaration<unknown>, 'columns' | 'label'> & {
-  read: (
+  fetchRuleReferencesOfRow: (
     row: Row,
     judged: readonly string[],
   ) => Promise<{ references: RuleReference[]; judged: RuleReferenceReading }>;
@@ -90,7 +90,7 @@ const storedAsCondition =
 const declare = <Lens>(declaration: RuleReferenceDeclaration<Lens>): RuleReferenceSurface => ({
   columns: declaration.columns,
   label: declaration.label,
-  read: async (row, judged) => {
+  fetchRuleReferencesOfRow: async (row, judged) => {
     const lens = await declaration.lens(row);
     return {
       references: declaration.storage(row, lens, declaration.columns).references,
@@ -108,7 +108,7 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
       return emailLensFor(
         template.slug,
         ownerScopeOfRow(template),
-        await templateLens(template.slug, template),
+        await fetchTemplateLens(template.slug, template),
       );
     },
     storage: storedAsMjml(templateRuleContents),

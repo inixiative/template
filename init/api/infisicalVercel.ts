@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { getInfisicalToken } from './infisical';
+import { fetchInfisicalTokenOrThrow } from './infisical';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisicalVercel');
 
@@ -38,7 +38,7 @@ class InfisicalVercelApi {
     version: async () =>
       (await Promise.all([cliVersion('infisical'), cliVersion('vercel')])).join('|'),
     sanitizers: {
-      createVercelConnection: { fn: () => 'REDACTED' },
+      createVercelConnection: { fn: () => 'MASKED' },
     },
   });
 
@@ -46,7 +46,7 @@ class InfisicalVercelApi {
     infisicalProjectId: string,
   ): Promise<Array<{ id: string; name: string }>> {
     return this.vcr.capture('listVercelConnections', async () => {
-      const infisicalToken = await getInfisicalToken();
+      const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/app-connections/vercel?projectId=${infisicalProjectId}`,
         { method: 'GET', headers: { Authorization: `Bearer ${infisicalToken}` } },
@@ -65,7 +65,7 @@ class InfisicalVercelApi {
 
   async listVercelSyncs(infisicalProjectId: string): Promise<VercelSecretSync[]> {
     return this.vcr.capture('listVercelSyncs', async () => {
-      const infisicalToken = await getInfisicalToken();
+      const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/secret-syncs/vercel?projectId=${infisicalProjectId}`,
         { method: 'GET', headers: { Authorization: `Bearer ${infisicalToken}` } },
@@ -91,7 +91,7 @@ class InfisicalVercelApi {
       );
       if (existing) return existing.id;
 
-      const infisicalToken = await getInfisicalToken();
+      const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch('https://app.infisical.com/api/v1/app-connections/vercel', {
         method: 'POST',
         headers: { Authorization: `Bearer ${infisicalToken}`, 'Content-Type': 'application/json' },
@@ -127,7 +127,7 @@ class InfisicalVercelApi {
     vercelBranch?: string,
   ): Promise<string> {
     return this.vcr.capture('createVercelSync', async () => {
-      const infisicalToken = await getInfisicalToken();
+      const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch('https://app.infisical.com/api/v1/secret-syncs/vercel', {
         method: 'POST',
         headers: { Authorization: `Bearer ${infisicalToken}`, 'Content-Type': 'application/json' },
@@ -163,7 +163,7 @@ class InfisicalVercelApi {
 
   async deleteVercelSync(syncId: string): Promise<void> {
     return this.vcr.capture('deleteVercelSync', async () => {
-      const infisicalToken = await getInfisicalToken();
+      const infisicalToken = await fetchInfisicalTokenOrThrow();
       const response = await fetch(
         `https://app.infisical.com/api/v1/secret-syncs/vercel/${syncId}`,
         {

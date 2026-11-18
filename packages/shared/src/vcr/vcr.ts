@@ -232,7 +232,7 @@ const maskValueAtKeyPath = (obj: unknown, parts: string[]): void => {
   if (rest.length === 0) {
     if (head in record) {
       const v = record[head];
-      record[head] = v === null || v === undefined || typeof v === 'object' ? v : 'REDACTED';
+      record[head] = v === null || v === undefined || typeof v === 'object' ? v : 'MASKED';
     }
   } else {
     maskValueAtKeyPath(record[head], rest);

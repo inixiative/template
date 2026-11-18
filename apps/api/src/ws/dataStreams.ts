@@ -12,7 +12,7 @@ import {
 } from '@template/shared/ws';
 import { sendFrame, sendTo } from '#/ws/delivery';
 import { claimStreamSeq } from '#/ws/queries/claimStreamSeq';
-import { readStreamSeq } from '#/ws/queries/readStreamSeq';
+import { fetchStreamSeq } from '#/ws/queries/fetchStreamSeq';
 import { connectionsById } from '#/ws/registry';
 import { rejectDataStream } from '#/ws/rejectDataStream';
 import { streamSeqKeyFor } from '#/ws/streamSeq';
@@ -28,19 +28,19 @@ const isOpenableStreamName = (stream: unknown): stream is string =>
   streamDefinitionForChannelKey(stream) !== null;
 
 // Seq first: every append at or below it is already in the snapshot that follows.
-const readSnapshot = async (
+const fetchSeqAndSnapshot = async (
   ws: WSSocket,
   stream: string,
   attempt = 1,
 ): Promise<{ seq: number; read: StreamRead }> => {
   const redis = redisClient();
   const seqKey = streamSeqKeyFor(stream, ws.data.userId);
-  const counter = await readStreamSeq(redis, seqKey);
+  const counter = await fetchStreamSeq(redis, seqKey);
   const read = await fetchStreamSnapshot(ws.data.headers, stream);
   if (read.access !== 'granted' || (await claimStreamSeq(redis, seqKey, counter)))
     return { seq: counter.seq, read };
   if (attempt >= SEQ_CLAIM_ATTEMPTS) return { seq: counter.seq, read: { access: 'retryable' } };
-  return readSnapshot(ws, stream, attempt + 1);
+  return fetchSeqAndSnapshot(ws, stream, attempt + 1);
 };
 
 // Subscribed before the snapshot read so no later append is missed; held appends flush after it.
@@ -51,7 +51,7 @@ export const openDataStream = async (ws: WSSocket, stream: string): Promise<void
   const held: string[] = [];
   ws.data.heldAppends.set(stream, held);
 
-  const { seq, read } = await readSnapshot(ws, stream).catch((error: unknown) => {
+  const { seq, read } = await fetchSeqAndSnapshot(ws, stream).catch((error: unknown) => {
     unsubscribeFromStream(ws, stream);
     throw error;
   });

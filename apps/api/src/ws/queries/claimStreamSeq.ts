@@ -5,7 +5,7 @@
  * @uses infrastructure:redis
  */
 import type { RedisEval } from '@template/db';
-import type { StreamSeqRead } from '#/ws/queries/readStreamSeq';
+import type { StreamSeqRead } from '#/ws/queries/fetchStreamSeq';
 import { STREAM_SEQ_TTL_MS } from '#/ws/streamSeq';
 
 // A counter absent at the read is seeded with that read only if still absent; 0 means another

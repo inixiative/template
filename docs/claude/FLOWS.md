@@ -37,7 +37,7 @@ type FlowStep = {                // exactly what is stored on Flow.steps
 ```
 
 - **`readPath`** comes from the generic `apiPath(operationId, pathParams?, query?)` (`apps/api/src/lib/openapi/apiPath.ts`): it resolves the SDK operationId to its path and serializes `query` with `serializeBracketQuery`. Put every predicate the route's own `searchFields` can express in `query`; the rule only judges what comes back.
-- **`rule`** runs with json-rules `check` over `{ data }`. For a list read, `data` is every matching row (`readAllAsCaller` walks the pages with `fetchAllPages`, capped); use `ArrayOperator.notEmpty` / `atLeast` / `any`. For a single read, `data` is the record.
+- **`rule`** runs with json-rules `check` over `{ data }`. For a list read, `data` is every matching row (`fetchAllAsCaller` walks the pages with `fetchAllPages`, capped); use `ArrayOperator.notEmpty` / `atLeast` / `any`. For a single read, `data` is the record.
 - **`advance`**: `auto` moves the user to the next step as soon as the step holds. `confirm` waits for the user (see [Client](#client)). Use `confirm` when the page shows something the user must see before leaving, like a token's one-time secret.
 - **Bindings never carry the caller.** A flow belongs to its user (`Flow.userId`), and `createFlow` hands `steps` that `userId`. Bindings schemas are strict (`z.strictObject`), so a `userId` in the body is a 422; the registry test sends one for every flow.
 - **Polymorphic targets** use `polymorphicSchema` ([HOOKS.md](HOOKS.md#request-validation)) with `omit: ['userId']`, so a personal target is just `{ ownerModel: 'User' }`, and `extend` for the flow's other bindings (`returnUrl`).
@@ -61,7 +61,7 @@ advanceFlowAndDeleteWhenFinished
 ```
 
 - **Backward moves are normal.** Delete the CI token and the next read puts you back on that step.
-- **Reads run as the caller** through `readAllAsCaller` / `readAsCaller` in the batch module (`registerBatch` + `executeRequest`): same session, permissions, tenancy and rate-limit exemption as the caller's own request.
+- **Reads run as the caller** through `fetchAllAsCaller` / `fetchAsCaller` in the batch module (`registerBatch` + `executeRequest`): same session, permissions, tenancy and rate-limit exemption as the caller's own request.
 - **Any read error drops the flow**: non-2xx, a thrown rule, or a `fetchAllPages` cap. The row is deleted and the route answers 404. Two tabs racing to finish the same flow end the same way: the loser's write misses the row (P2025) and answers 404.
 - **Finished**: when every step holds, the response carries `currentStep === steps.length` and the row is hard-deleted.
 - **Don't pre-check; create and see.** Create runs the same checks. A flow whose steps all hold already comes back complete and is never stored, so a caller never has to ask "does this user need the flow?" first.

@@ -29,7 +29,7 @@ All steps rendered upfront with done / spinner / pending markers instead of stre
 **execAsync**  
 promisify(exec) wrapper every init/api CLI call uses; execSync there is a bug.
 
-**getSecretAsync / setSecretAsync**  
+**fetchSecretOrThrow / setSecretAsync**  
 Read or store a secret in Infisical by project, environment and path (the doc's getSecret / setSecret); the source for secrets on resume.
 
 **Idempotent create**  
@@ -104,7 +104,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | figure out whether setup is fresh, stale or finished; work out how far setup got from the saved config; I'll compare each flag by hand to decide the status | **detectSetupState** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md — compute new, stale, incomplete or complete setup status from config | part 4 | — |
 | check if it exists first, then create it; list the existing ones before creating; look it up and only create when missing; find or create the connection | **ensureRailwayConnection** · primitive ensureRailwayConnection — Check-before-create alternative; createRailwayConnection recovers after a failed create instead | part 4 | — |
 | run a CLI command passing secret values on stdin instead of argv | **execFileWithInput** · primitive init/utils/exec.ts — Commands that need a secret; plain execAsync only for secret-free commands. | part 4 | — |
-| always pull from infisical in steps with passwords, never trust passed props; the step should read the secret from Infisical, not from props; pull the password from the secret store each step; never trust a connection string passed from the last step; fetch the token from Infisical when the step needs it; I'll pass the database password from step one into step two | **getSecret** · primitive getSecretAsync — read a stored Infisical secret to check required values before setup | part 4 | passing a connection string, password or API key from one init step to the next instead of re-fetching it from Infisical (docs/claude/INIT_SCRIPT_PATTERNS.md § 8 (in code: getSecretAsync in init/tasks/infisicalSetup.ts)) |
+| always pull from infisical in steps with passwords, never trust passed props; the step should read the secret from Infisical, not from props; pull the password from the secret store each step; never trust a connection string passed from the last step; fetch the token from Infisical when the step needs it; I'll pass the database password from step one into step two | **getSecret** · primitive fetchSecretOrThrow — read a stored Infisical secret to check required values before setup | part 4 | passing a connection string, password or API key from one init step to the next instead of re-fetching it from Infisical (docs/claude/INIT_SCRIPT_PATTERNS.md § 8 (in code: fetchSecretOrThrow in init/tasks/infisicalSetup.ts)) |
 | fetch the existing connections for this project; see what's already connected in the project; find an existing connection by name | **listRailwayConnections** · primitive listRailwayConnections — list Infisical Railway app connections in a project to find existing ones | part 4 | — |
 | record that this setup step finished; check whether the step already ran before doing it again; resume setup from where it stopped; skip steps that are already done on rerun; I'll track finished steps in a local variable | **markComplete / isComplete** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md > 8 — check per-step progress flags so resumed setup skips finished steps | part 4 | — |
 | let the user pick a workspace or organization; a picker for the provider's orgs; I'll build a select list for the workspaces | **OrgSelector** · primitive OrgSelector — let the user pick a provider organization or workspace during setup | part 4 | — |
@@ -293,7 +293,7 @@ if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
 
 // ✅ Good: Fetch from Infisical (where step 8 stored it)
 if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
-  const prodConnectionString = await getSecretAsync('DATABASE_URL', {
+  const prodConnectionString = await fetchSecretOrThrow('DATABASE_URL', {
     projectId: infisicalProjectId,
     environment: 'prod',
     path: '/api',
@@ -303,7 +303,7 @@ if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
 
 // ✅ Good: Re-read from config (don't trust local variables)
 if (!(await isComplete('planetscale', 'configureDB'))) {
-  const latestConfig = await getProjectConfig();
+  const latestConfig = await fetchProjectConfig();
   const orgName = latestConfig.planetscale.organization;
   const dbName = latestConfig.planetscale.database;
   await updateDatabaseSettings(orgName, dbName, { ... });
@@ -311,8 +311,8 @@ if (!(await isComplete('planetscale', 'configureDB'))) {
 ```
 
 **Rule of thumb:**
-- Secrets → Always fetch from Infisical with `getSecretAsync()`
-- Config metadata → Always re-read from config with `getProjectConfig()`
+- Secrets → Always fetch from Infisical with `fetchSecretOrThrow()`
+- Config metadata → Always re-read from config with `fetchProjectConfig()`
 - Never pass connection strings, passwords, or API keys between steps
 
 <!-- unit doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/9-retry-logic-for-async-initialization -->
@@ -773,7 +773,7 @@ const runSetup = async (workspaceId: string) => {
   // Check if token exists in Infisical
   let hasToken = false;
   try {
-    const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
+    const token = await fetchSecretOrThrow('RAILWAY_WORKSPACE_TOKEN', {
       projectId: infisicalProjectId,
       environment: 'root',
     });

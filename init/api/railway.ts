@@ -2,9 +2,9 @@ import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { getSecretAsync, setSecretAsync } from '../tasks/infisicalSetup';
+import { fetchSecretOrThrow, setSecretAsync } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
-import { getProjectConfig } from '../utils/getProjectConfig';
+import { fetchProjectConfig } from '../utils/fetchProjectConfig';
 
 const escapeName = (str: string) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
@@ -41,14 +41,14 @@ class RailwayApi {
     sanitizers: {
       getRedisUrl: {
         fn: (s) =>
-          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s,
+          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://MASKED:MASKED@') : s,
       },
       getPostgresUrl: {
         fn: (s) =>
-          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s,
+          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://MASKED:MASKED@') : s,
       },
-      getRailwayUserToken: { fn: () => 'REDACTED' },
-      getRailwayWorkspaceToken: { fn: () => 'REDACTED' },
+      getRailwayUserToken: { fn: () => 'MASKED' },
+      getRailwayWorkspaceToken: { fn: () => 'MASKED' },
     },
   });
 
@@ -82,13 +82,13 @@ class RailwayApi {
 
   async getRailwayUserToken(): Promise<string> {
     return this.vcr.capture('getRailwayUserToken', async () => {
-      const config = await getProjectConfig();
+      const config = await fetchProjectConfig();
       const projectId = config.infisical.projectId;
       if (!projectId)
         throw new Error('Infisical project not configured. Run Infisical setup first.');
 
       try {
-        const token = await getSecretAsync('RAILWAY_USER_TOKEN', {
+        const token = await fetchSecretOrThrow('RAILWAY_USER_TOKEN', {
           projectId,
           environment: 'root',
         });
@@ -111,13 +111,13 @@ class RailwayApi {
 
   async getRailwayWorkspaceToken(): Promise<string> {
     return this.vcr.capture('getRailwayWorkspaceToken', async () => {
-      const config = await getProjectConfig();
+      const config = await fetchProjectConfig();
       const projectId = config.infisical.projectId;
       if (!projectId)
         throw new Error('Infisical project not configured. Run Infisical setup first.');
 
       try {
-        const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
+        const token = await fetchSecretOrThrow('RAILWAY_WORKSPACE_TOKEN', {
           projectId,
           environment: 'root',
         });

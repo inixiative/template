@@ -113,7 +113,7 @@ The differentiator vs. Beefree/Unlayer "locked rows": their locking is a flag in
 
 ### 3.3 Inheritance is copy-on-write per component — already built
 
-The customization model is **not** "fork the template." `lookupCascade` (`packages/email/src/render/lookupCascade.ts`) resolves each component slug *independently* through space → org → default, and `expandComponentTagsFromOwnerCascade` recursively expands refs through that cascade. So when a subtenant customizes a template:
+The customization model is **not** "fork the template." `fetchComponentsThroughOwnerCascade` (`packages/email/src/render/fetchComponentsThroughOwnerCascade.ts`) resolves each component slug *independently* through space → org → default, and `expandComponentTagsFromOwnerCascade` recursively expands refs through that cascade. So when a subtenant customizes a template:
 
 - "Use my parent's template, change the logo" = materialize **one** space-level `EmailComponent` with slug `logo`. Every other block keeps resolving live from the parent at render time. Nothing is copied.
 - **No fork rot.** When the tenant fixes its footer or rebrands a shared component, every subtenant gets it instantly — except where they've deliberately overridden. The classic failure mode ("200 customer copies of a template, now patch the unsubscribe link in all of them") cannot happen.
@@ -289,7 +289,7 @@ _2026-06-11 — Revision: pinned the tenancy vocabulary (org = tenant, space = s
 
 _2026-06-11 — Revision: INFRA-002 Rules Builder added as a builder prerequisite (~80% of the editing primitives: lens traversal, field pickers, enum evaluation, value injection — building a rule and editing a template are the same interaction); theme build-out added as a net-new workstream (SpaceTheme type + useApplySpaceThemeCssVariables exist frontend-only, nothing persisted; persist at org+space, expose `{{theme.*}}` reserved variables, overlaps FEAT-007); delegated subtenant billing added (per-space metering day one, invoicing v1, Stripe Connect direct payment v2)._
 
-_2026-06-11 — Revision: added §3.3 — verified that copy-on-write per-component inheritance is already implemented (`lookupCascade` resolves each component slug independently through space → org → default). Subtenant customization = sparse overrides, everything else inherits live; no fork rot; overridable surface = lens surface. Builder inheritance UX (inherited/overridden badges, revert-to-inherited) added to §4.2._
+_2026-06-11 — Revision: added §3.3 — verified that copy-on-write per-component inheritance is already implemented (`fetchComponentsThroughOwnerCascade` resolves each component slug independently through space → org → default). Subtenant customization = sparse overrides, everything else inherits live; no fork rot; overridable surface = lens surface. Builder inheritance UX (inherited/overridden badges, revert-to-inherited) added to §4.2._
 
 _2026-06-11 — Revision: unsubscribe + contact communication preferences referenced as launch scope (§4.1): `CommunicationCategory` enum exists, preference management is an open COMM-001 TODO; unsubscribe link as a lens-locked reserved variable; per-contact, per-tenant preferences on the Contact model; per-tenant suppression in the send job. Refs COMM-002, FEAT-012._
 

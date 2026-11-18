@@ -1,4 +1,4 @@
-import { getProjectConfig, writeProjectConfig } from './getProjectConfig';
+import { fetchProjectConfig, writeProjectConfig } from './fetchProjectConfig';
 
 /**
  * Update a single field in a config section
@@ -9,7 +9,7 @@ export const updateConfigField = async (
   key: string,
   value: string,
 ): Promise<void> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   (config as unknown as Record<string, Record<string, unknown>>)[section][key] = value;
   await writeProjectConfig(config);
 };
@@ -22,7 +22,7 @@ export const updateConfigFields = async (
   section: string,
   fields: Record<string, string>,
 ): Promise<void> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   const sectionObj = (config as unknown as Record<string, Record<string, unknown>>)[section];
   for (const [key, value] of Object.entries(fields)) {
     sectionObj[key] = value;
@@ -34,7 +34,7 @@ export const updateConfigFields = async (
  * Set the launched flag at the root of project config
  */
 export const setLaunched = async (value: boolean): Promise<void> => {
-  const config = await getProjectConfig();
+  const config = await fetchProjectConfig();
   (config as Record<string, unknown>).launched = value;
   await writeProjectConfig(config);
 };

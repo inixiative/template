@@ -43,7 +43,7 @@ type MutationParams = {
 };
 
 type Interception = {
-  loadPrevious?: (
+  fetchPreviousRecords?: (
     openTransaction: OpenTransaction,
     model: Prisma.ModelName,
     where: Record<string, unknown>,
@@ -51,7 +51,7 @@ type Interception = {
 };
 
 export const makeMutationLifecycleInterceptor =
-  (action: DbAction, { loadPrevious }: Interception = {}) =>
+  (action: DbAction, { fetchPreviousRecords }: Interception = {}) =>
   async (params: MutationParams) => {
     const { model, operation, args, query } = params;
     const openTransaction = openTransactionForPrismaQueryOrThrow(model, operation, params);
@@ -59,8 +59,8 @@ export const makeMutationLifecycleInterceptor =
     assertNoNestedWrites(model, args);
     const hookOptions = { model, operation, action, args } as HookOptions;
     const where = args.where as Record<string, unknown>;
-    if (loadPrevious)
-      hookOptions.previous = (await loadPrevious(openTransaction, model, where)) as never;
+    if (fetchPreviousRecords)
+      hookOptions.previous = (await fetchPreviousRecords(openTransaction, model, where)) as never;
     await runHooks(openTransaction, HookTiming.before, hookOptions);
     const result = await query(args);
     if (action === DbAction.deleteMany) hookOptions.result = hookOptions.previous as never;

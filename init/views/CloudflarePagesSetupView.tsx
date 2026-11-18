@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { type CFAccount, cloudflareApi } from '../api/cloudflare';
 import { StepProgress } from '../components/StepProgress';
 import { setupCloudflarePages } from '../tasks/cloudflarePagesSetup';
-import { getCloudflarePagesProgressItems } from '../tasks/cloudflarePagesSteps';
+import { cloudflarePagesProgressItems } from '../tasks/cloudflarePagesSteps';
 import { useConfig } from '../utils/configState';
 import { clearError, clearProgress } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
@@ -155,7 +155,7 @@ export const CloudflarePagesSetupView: React.FC<Props> = ({ onComplete, onCancel
   }
 
   // status view
-  const progressItems = getCloudflarePagesProgressItems(config);
+  const progressItems = cloudflarePagesProgressItems(config);
   const allDone = progressItems.every((i) => i.completed || i.skipped);
 
   return (

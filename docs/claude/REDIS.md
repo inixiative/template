@@ -472,7 +472,7 @@ const check = await fetchRollingCacheAndQueueRefreshWhenMissing(spaceStats, 'tot
   where a pass is spread + every attempt × timeout + the retry backoff
   (`ROLLING_CACHE_LEAF_BACKOFF_SECONDS`): an entry outlives every attempt of the next pass's leaf.
   Time a job waits in the queue (busy workers, slow-lane slots, stall recovery) is not in the bound.
-- **A read never computes.** `read(result, params)` is `checkCache` on that result's key: `empty`,
+- **A read never computes.** `fetchResult(result, params)` is `checkCache` on that result's key: `empty`,
   `queued` (a refresh is enqueued), `computing` (the target's lock is held), `fresh`, or `stale`
   (older than one scheduled refresh, with `isComputing` and `isQueued` beside it).
   `fetchRollingCacheAndQueueRefreshWhenMissing` (`apps/api/src/jobs/fetchRollingCacheAndQueueRefreshWhenMissing.ts`) is the api read: on `empty`, or

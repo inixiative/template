@@ -110,7 +110,7 @@ const listRequests = () =>
 const waitForEveryProviderListRequest = () =>
   waitFor(() => expect(listRequests().length).toBeGreaterThanOrEqual(providerSectionCount));
 
-const readProviderFilter = (url: URL) =>
+const providerFilterOf = (url: URL) =>
   url.searchParams.get('searchFields[provider][equals][:]') === 'null'
     ? null
     : url.searchParams.get('searchFields[provider][equals]');
@@ -130,7 +130,7 @@ beforeEach(async () => {
     const url = new URL(request.url);
     const path = url.pathname;
     if (request.method === 'GET' && path.endsWith('/integrations')) {
-      const provider = readProviderFilter(url);
+      const provider = providerFilterOf(url);
       const page = Number(url.searchParams.get('page') ?? 1);
       const pageSize = Number(url.searchParams.get('pageSize') ?? 100);
       requests.push({ method: 'GET', path, provider, page });

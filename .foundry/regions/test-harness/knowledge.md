@@ -473,7 +473,7 @@ send(options) {
 - Outside tests `capture` calls straight through.
 - In tests the test queues a cassette per call (`client.vcr.queue('send', 'accepted')`); `capture` replays it, or records a sanitized one when the file is missing or its `version` differs from the service's current version.
 - A recorded `status >= 400` replays as a thrown error.
-- Sanitizers redact keys before a cassette is written; commit only sanitized cassettes.
+- Sanitizers mask keys before a cassette is written; commit only sanitized cassettes.
 
 Used by `packages/email` (Resend, Bouncer) and the `init/api/*` clients (all but `cloudflare` and `resend`).
 

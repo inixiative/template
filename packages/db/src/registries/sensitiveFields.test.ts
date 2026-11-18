@@ -6,7 +6,6 @@ import {
   SENSITIVE_FIELD_NAMES,
   SENSITIVE_FIELDS,
   sensitiveFieldsOf,
-  WEBHOOK_EXCLUDED_FIELDS,
 } from '@template/db/registries';
 
 describe('SENSITIVE_FIELDS', () => {
@@ -22,17 +21,8 @@ describe('SENSITIVE_FIELDS', () => {
   });
 });
 
-describe('WEBHOOK_EXCLUDED_FIELDS (NOOP ∪ REDACT)', () => {
-  it('drops both noop noise and sensitive columns', () => {
-    expect(WEBHOOK_EXCLUDED_FIELDS._global).toContain('updatedAt');
-    expect(WEBHOOK_EXCLUDED_FIELDS.Token).toEqual(
-      expect.arrayContaining(['lastUsedAt', 'keyHash']),
-    );
-  });
-});
-
 describe('SENSITIVE_FIELD_NAMES', () => {
-  it('is the flat set of every redacted field name across models', () => {
+  it('is the flat set of every sensitive field name across models', () => {
     expect(SENSITIVE_FIELD_NAMES.has('password')).toBe(true);
     expect(SENSITIVE_FIELD_NAMES.has('keyHash')).toBe(true);
     expect(SENSITIVE_FIELD_NAMES.has('encryptedSecrets')).toBe(true);

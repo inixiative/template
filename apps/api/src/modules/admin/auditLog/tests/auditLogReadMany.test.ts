@@ -21,7 +21,7 @@ import { get, parseSuccessBody } from '#tests/utils/request';
 
 type ReadManyResponse = z.infer<typeof auditLogReadManyRoute.responseSchema>[];
 
-const readEntitlement = (organizationId: string) => ({
+const organizationReadEntitlement = (organizationId: string) => ({
   resource: 'Organization' as const,
   actions: ['read'],
   sourceModel: 'Organization' as const,
@@ -40,7 +40,10 @@ describe('GET /api/admin/auditLog: a record and its children in one stream', () 
     ({ entity: organization } = await createOrganization());
     ({ entity: member } = await createOrganizationUser({}, { organization }));
     ({ entity: token } = await createToken(
-      { ownerModel: 'OrganizationUser', entitlements: [readEntitlement(organization.id)] },
+      {
+        ownerModel: 'OrganizationUser',
+        entitlements: [organizationReadEntitlement(organization.id)],
+      },
       { organizationUser: member },
     ));
     const harness = createTestApp({
@@ -87,7 +90,10 @@ describe('GET /api/admin/auditLog: a record and its children in one stream', () 
 
   it("a token's history leaves out another token's entitlements", async () => {
     await createToken(
-      { ownerModel: 'OrganizationUser', entitlements: [readEntitlement(organization.id)] },
+      {
+        ownerModel: 'OrganizationUser',
+        entitlements: [organizationReadEntitlement(organization.id)],
+      },
       { organizationUser: member },
     );
 

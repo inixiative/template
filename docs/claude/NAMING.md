@@ -159,7 +159,7 @@ import { contextResource } from '#/lib/context/contextResource';    // Internal 
 
 // packages/shared/src/logger/index.ts (top-level barrel)
 export { log } from './logger';                       // Relative OK here
-export { logScope } from './scope';
+export { withLogScope } from './scope';
 
 // packages/shared/src/logger/logger.ts (NOT a barrel)
 import { currentLogScopes } from '@template/shared/logger/scope';  // Use alias, not relative

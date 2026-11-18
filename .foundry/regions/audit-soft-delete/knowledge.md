@@ -11,7 +11,7 @@
 - [2. The domain](#2-the-domain)
 - [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
-  - [Class `audit-log`](#class-audit-log-audit-log-capture-enabled-models-actor-diffs-redaction)
+  - [Class `audit-log`](#class-audit-log-audit-log-capture-enabled-models-actor-diffs-masking)
   - [Class `soft-delete`](#class-soft-delete-soft-delete-tombstone-cascade-and-revive-soft-delete-read-scoping)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
@@ -22,7 +22,7 @@
 ## Glossary
 
 **audit-log**  
-Class: the AuditLog trail of mutations on enabled models, with actor, diffs and redaction.
+Class: the AuditLog trail of mutations on enabled models, with actor, diffs and masking.
 
 **AUDIT_ENABLED_MODELS**  
 Opt-in list of AuditSubjectModel values whose mutations are audited.
@@ -74,11 +74,11 @@ A soft-deleted row; cascade tombstones owned children with the parent's exact ti
 
 ## 1. What this Warden covers
 
-Two standing hooks with their own concerns: the audit log (which models, which actor, what diff, what is redacted) and soft delete (the `deletedAt` scope every read gets for free, `db.withDeleted` as the single bypass, cascade tombstones and `revive`). The hook machinery they run inside is the `mutation-hooks` region.
+Two standing hooks with their own concerns: the audit log (which models, which actor, what diff, what is masked) and soft delete (the `deletedAt` scope every read gets for free, `db.withDeleted` as the single bypass, cascade tombstones and `revive`). The hook machinery they run inside is the `mutation-hooks` region.
 
 ## 2. The domain
 
-Audit log (HOOKS.md § Audit Log): `AUDIT_ENABLED_MODELS` (`isAuditEnabled`) turns on capture for a model; after a write the pipeline ignores, redacts and diffs (`maskSensitiveAndOmitNoopFieldsForAudit`, `computeDiff`, `maskSensitiveFieldsInChangeDiff`, the noopFields and sensitiveFields registries) and writes an `AuditLog` row with before/after/diff and the actor from `auditActorContext`; a soft delete is recorded as `delete`. The actor is set by `auditActorMiddleware` for requests and `jobAuditActor` for background jobs; code outside a request wraps its writes in `auditActorContext.scope`, never threads an actor id through arguments. Audit-enabled implies soft-deleted: the log keeps meaning only while the row exists. History is the audit log; there is no bespoke history or events table.
+Audit log (HOOKS.md § Audit Log): `AUDIT_ENABLED_MODELS` (`isAuditEnabled`) turns on capture for a model; after a write the pipeline omits no-op fields, masks sensitive ones and diffs (`maskSensitiveAndOmitNoopFieldsForAudit`, `computeDiff`, `maskSensitiveFieldsInChangeDiff`, the noopFields and sensitiveFields registries) and writes an `AuditLog` row with before/after/diff and the actor from `auditActorContext`; a soft delete is recorded as `delete`. The actor is set by `auditActorMiddleware` for requests and `jobAuditActor` for background jobs; code outside a request wraps its writes in `auditActorContext.scope`, never threads an actor id through arguments. Audit-enabled implies soft-deleted: the log keeps meaning only while the row exists. History is the audit log; there is no bespoke history or events table.
 
 Soft delete: `SOFT_DELETE_MODELS` (`isSoftDeleteModel`, `hasDeletedAt`) have a `deletedAt` column. `softDeleteScopeExtension` injects `deletedAt: null` into every read and write where and nested include (`liveWhere`, `liveIncludes`), so nobody hand-writes it ("No hand-written deletedAt: null"), and `db.withDeleted(() => …)` is the single bypass, awaited inside the callback and chosen by the endpoint (`includeDeletedMiddleware`, the admin router), never by who the caller is. The `softDeleteCascade` hook (`registerSoftDeleteCascadeHook`, `tombstoneChildren`) tombstones owned children with a shared timestamp that `revive` / `reviveChildren` match, hard-deletes the `HARD_DELETE_ON_TOMBSTONE` models (`isHardDeletedOnTombstone`), skips `CASCADE_EXEMPT` relations and regenerates `REGENERATE_ON_REVIVE` values. Revival of a soft-deleted row goes through `db.findForUpdate`, not a create-path upsert.
 
@@ -94,7 +94,7 @@ Open work you cannot use yet. Do not build against it, and do not build what it 
 
 Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: makeLock, packages/db/src/lock/makeLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
-### Class `audit-log`: Audit log capture: enabled models, actor, diffs, redaction
+### Class `audit-log`: Audit log capture: enabled models, actor, diffs, masking
 
 **Job: attribute an audited write to the right actor** (Audit actor: auditActorContext vs auditActorMiddleware vs jobAuditActor) — docs/claude/HOOKS.md § Audit Log › Actor Context; catalog
 
@@ -106,7 +106,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 **Job: control which models and fields reach the audit log** (What reaches the log: AUDIT_ENABLED_MODELS vs isAuditEnabled vs sensitiveFields registry vs noopFields registry vs maskSensitiveAndOmitNoopFieldsForAudit vs maskSensitiveFieldsInChangeDiff) — docs/claude/HOOKS.md § Field Processing Pipeline, § Registries
 
-*Said as:* "which models and fields get audited", "keep secrets and noise out of the audit log", "redact or ignore audit fields"
+*Said as:* "which models and fields get audited", "keep secrets and noise out of the audit log", "mask or omit audit fields"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -124,19 +124,19 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | turn on audit history for this model; write audit rows by hand in the service; add a created-by column so we know who did it; this model should have change history; opt a model into the audit log | **AUDIT_ENABLED_MODELS** · primitive `packages/db/src/registries/auditEnabledModels.ts#AUDIT_ENABLED_MODELS` — Register models here; check membership with isAuditEnabled. | docs/claude/HOOKS.md § Audit Log | writing audit rows by hand in a service (`db.auditLog.create`), or adding `createdBy` / `approverUserId` / 'who changed it' columns and parameters that the audit log already records (docs/claude/HOOKS.md § Audit Log › Enabling Audit for a Model) |
 | record the actor for writes outside a request; set the actor around a block of code; thread the acting user id through the function arguments; ad-hoc actor and email threaded per call site; the real principal already rides the context | **auditActorContext** · primitive `packages/db/src/lib/auditActorContext.ts#auditActorContext` — Use scope rather than touching auditActorStore directly; it awaits inside the store so lazy thenables keep the actor. | docs/claude/HOOKS.md § Audit Log; docs/claude/APP_EVENTS.md § Purpose and execution | threading the acting user id through function arguments so a write can be attributed, or setting the actor store directly (docs/claude/HOOKS.md § Audit Log › Actor Context) |
 | the request's user becomes the audit actor; who did this on an HTTP request; set the actor from the session on every request; the middleware that records who is acting | **auditActorMiddleware** · primitive `apps/api/src/middleware/auth/auditActorMiddleware.ts#auditActorMiddleware` — record the request's token or integration actor for audit and app events | docs/claude/AUTH.md § Auth Middleware Chain; docs/claude/SCRIPTS.md § Linting | — |
-| before and after per field; what changed between the two snapshots; field-level diff of two records | **computeDiff** · primitive `apps/api/src/hooks/auditLog/utils.ts#computeDiff` — Detecting changes only; for a stored redacted snapshot use maskSensitiveAndOmitNoopFieldsForAudit. | docs/claude/HOOKS.md § Audit Log | — |
-| strip noop fields like updatedAt and list positions before auditing | **omitNoopFieldsForAudit** · primitive `apps/api/src/hooks/auditLog/utils.ts#omitNoopFieldsForAudit` — Before diffing (keeps sensitive values); for a redacted stored snapshot use maskSensitiveAndOmitNoopFieldsForAudit. | docs/claude/HOOKS.md § Audit Log | — |
+| before and after per field; what changed between the two snapshots; field-level diff of two records | **computeDiff** · primitive `apps/api/src/hooks/auditLog/utils.ts#computeDiff` — Detecting changes only; for a stored masked snapshot use maskSensitiveAndOmitNoopFieldsForAudit. | docs/claude/HOOKS.md § Audit Log | — |
+| strip noop fields like updatedAt and list positions before auditing | **omitNoopFieldsForAudit** · primitive `apps/api/src/hooks/auditLog/utils.ts#omitNoopFieldsForAudit` — Before diffing (keeps sensitive values); for a masked stored snapshot use maskSensitiveAndOmitNoopFieldsForAudit. | docs/claude/HOOKS.md § Audit Log | — |
 | is this model audited; check whether the model is in the audit list; read the enabled-models array directly; narrow the model to an audited one | **isAuditEnabled** · primitive `packages/db/src/registries/auditEnabledModels.ts#isAuditEnabled` — Use instead of reading AUDIT_ENABLED_MODELS directly; also narrows type to AuditSubjectModel. | — | — |
 | who did this in the audit log when a job runs; attribute the job's writes to the job and its integration; a job writing with no actor; pass a fake user id for the background job; record the actor for background work | **jobAuditActor** · primitive `apps/api/src/jobs/jobAuditActor.ts#jobAuditActor` — build an audit actor attributing writes to a job and its integration | — | a job writing with no actor, or passing a fake user id, instead of scoping writes to the job's audit actor (catalog jobAuditActor) |
-| prepare the record for the audit payload; ignore noise and redact secrets before storing; the default audit payload processing; filter and redact in one step | **maskSensitiveAndOmitNoopFieldsForAudit** · primitive `apps/api/src/hooks/auditLog/utils.ts#maskSensitiveAndOmitNoopFieldsForAudit` — Storing snapshots; for diffing use omitNoopFieldsForAudit then computeDiff so sensitive changes are detected. | docs/claude/HOOKS.md § Audit Log | — |
-| redact secrets inside a diff; scrub the before and after values of sensitive fields; the diff still shows the token hash; mask sensitive fields in the change set | **maskSensitiveFieldsInChangeDiff** · primitive `packages/db/src/registries/sensitiveFields.ts#maskSensitiveFieldsInChangeDiff` — For `changes` diffs; for full before/after rows use maskSensitiveFields. | docs/claude/HOOKS.md § Audit Log | — |
+| prepare the record for the audit payload; omit noise and mask secrets before storing; the default audit payload processing; omit and mask in one step | **maskSensitiveAndOmitNoopFieldsForAudit** · primitive `apps/api/src/hooks/auditLog/utils.ts#maskSensitiveAndOmitNoopFieldsForAudit` — Storing snapshots; for diffing use omitNoopFieldsForAudit then computeDiff so sensitive changes are detected. | docs/claude/HOOKS.md § Audit Log | — |
+| mask secrets inside a diff; scrub the before and after values of sensitive fields; the diff still shows the token hash; mask sensitive fields in the change set | **maskSensitiveFieldsInChangeDiff** · primitive `packages/db/src/registries/sensitiveFields.ts#maskSensitiveFieldsInChangeDiff` — For `changes` diffs; for full before/after rows use maskSensitiveFields. | docs/claude/HOOKS.md § Audit Log | — |
 | attribute audit rows to user, spoofer, token, job and integration from request context | **Audit actor attribution** · pattern audit log doc, entry fields table — attribute audit rows to user, spoofer, token, job and integration from request context | part 4 | — |
-| how a change becomes an audit row; hand-written diff and redaction before storing; skip the audit row when nothing changed | **Audit pipeline: ignore, redact, diff** · pattern apps/api/src/hooks/auditLog/hook.ts (Field Processing Pipeline) — filter noop fields from each record, then redact and diff it for the audit entry | part 4 | a hand-written diff or redaction of passwords and token hashes before storing a change record (docs/claude/HOOKS.md § Field Processing Pipeline) |
-| build an audit row by filtering, redacting and diffing a mutated record | **buildAuditEntry** · primitive apps/api/src/hooks/auditLog/hook.ts — build an audit row by filtering, redacting and diffing a mutated record | part 4 | — |
+| how a change becomes an audit row; hand-written diff and masking before storing; skip the audit row when nothing changed | **Audit pipeline: omit, mask, diff** · pattern apps/api/src/hooks/auditLog/hook.ts (Field Processing Pipeline) — filter noop fields from each record, then mask and diff it for the audit entry | part 4 | a hand-written diff or masking of passwords and token hashes before storing a change record (docs/claude/HOOKS.md § Field Processing Pipeline) |
+| build an audit row by omitting, masking and diffing a mutated record | **buildAuditEntry** · primitive apps/api/src/hooks/auditLog/hook.ts — build an audit row by omitting, masking and diffing a mutated record | part 4 | — |
 | strip the ignored fields off the record; drop the noise fields before comparing; remove timestamps from the snapshot; the record minus the fields we ignore | **omitRegisteredFields** · primitive apps/api/src/hooks/auditLog/hook.ts (Field Processing Pipeline) — Use directly outside audit; inside audit go through omitNoopFieldsForAudit | part 4 | — |
 | fields the audit log shouldn't bother with; updated-at and last-login shouldn't make audit rows; add a noise field to the ignore list; non-meaningful changes to leave out | **noopFields registry** · primitive packages/db/src/registries/noopFields.ts — Noise fields to ignore: noopFields; sensitive values to keep but mask: sensitiveFields instead. | part 4 | — |
 | return the permission actor as { model: 'User' \| 'Token', record } | **permix.getActor** · primitive audit log doc, actor — Full actor incl. tokens; actingUser(c) when only the user id is needed | part 4 | — |
-| mask the password hash in the audit log; fields that show as redacted; register a sensitive field so it never appears in history; secrets in the audit payload | **sensitiveFields registry** · primitive packages/db/src/registries/sensitiveFields.ts — Sensitive values to mask: sensitiveFields; noise fields to drop from change detection: noopFields instead. | part 4 | — |
+| mask the password hash in the audit log; fields that show as masked; register a sensitive field so it never appears in history; secrets in the audit payload | **sensitiveFields registry** · primitive packages/db/src/registries/sensitiveFields.ts — Sensitive values to mask: sensitiveFields; noise fields to drop from change detection: noopFields instead. | part 4 | — |
 | The changes field-level diff is recorded only for update actions. | **Audit diff for updates only** · rule audit log doc, entry fields table — Reading or writing audit entries | part 4 | — |
 | Audit before/after snapshots hold the record's own columns, never relations or earlier audit history. | **Audit snapshots are column-only** · rule audit log doc, entry fields table — Every audited mutation | part 4 | — |
 | An update whose diff is empty after filtering must not write an audit log. | **Empty-diff updates write no audit log** · rule Audit pipeline — Empty-diff guard — Update mutations on audit-enabled models. | part 4 | — |
@@ -223,14 +223,14 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 |-------|-------------|
 | `action` | `create`, `update`, or `delete` |
 | `subjectModel` | Which model was mutated |
-| `before` / `after` | The record's own columns (filtered + redacted). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
+| `before` / `after` | The record's own columns (no-op fields omitted, sensitive ones masked). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
 | `changes` | Field-level diff for updates only |
 | `actorUserId` | `actingUser(c)`: the JWT's or spoofed user, or the user of an acting User token (a member's, organization's, space's or integration's token names none) |
 | `actorSpoofUserId` | The superadmin spoofing, when spoofing |
 | `actorTokenId` | The acting token (nulled when the token is deleted) |
 | `actorJobName` | Background job name (if triggered by a job) |
 | `actorIntegrationId` | The integration the actor acted through (its token's owner key, or a job's payload) |
-| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorFromRecordOmittingSensitiveFields` sanitized (redact fields removed); survives the token's deletion |
+| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorFromRecordOmittingSensitiveFields` with its sensitive fields omitted; survives the token's deletion |
 | `ipAddress` / `userAgent` | Request metadata |
 | `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
 | `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's own tenancy, for filtering the log |
@@ -241,11 +241,11 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 `buildAuditEntry` (`apps/api/src/hooks/auditLog/hook.ts`) runs each record through:
 
 1. **Filter** (`omitNoopFieldsForAudit` → `omitRegisteredFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
-2. **Diff** — for updates, `computeDiff` compares the filtered, **unredacted** before/after, so a change to a sensitive column is still detected.
+2. **Diff** — for updates, `computeDiff` compares the filtered, **unmasked** before/after, so a change to a sensitive column is still detected.
 3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
-4. **Redact** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[MASKED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
+4. **Mask** — `maskSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[MASKED]`, and `maskSensitiveFieldsInChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
-`maskSensitiveAndOmitNoopFieldsForAudit` (filter + redact) builds the same column-only snapshot for the email-versioning hook.
+`maskSensitiveAndOmitNoopFieldsForAudit` (omit + mask) builds the same column-only snapshot for the email-versioning hook.
 
 ##### Soft Delete Detection
 
@@ -408,11 +408,11 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **AUDIT_ENABLED_MODELS** `packages/db/src/registries/auditEnabledModels.ts#AUDIT_ENABLED_MODELS` [primitive] list models whose mutations are recorded in the audit log Use: add AuditSubjectModel.X to AUDIT_ENABLED_MODELS in packages/db/src/registries/auditEnabledModels.ts
 - **auditActorContext** `packages/db/src/lib/auditActorContext.ts#auditActorContext` [primitive] run a function with an audit actor set so mutations record who did them Use: await auditActorContext.scope(actor, () => doWork())
 - **auditActorMiddleware** `apps/api/src/middleware/auth/auditActorMiddleware.ts#auditActorMiddleware` [primitive] record the request's token or integration actor for audit and app events Use: app.use(auditActorMiddleware)
-- **computeDiff** `apps/api/src/hooks/auditLog/utils.ts#computeDiff` [primitive] compute per-field before/after changes between two unredacted snapshots Use: computeDiff(omitNoopFieldsForAudit(model, before), omitNoopFieldsForAudit(model, after))
+- **computeDiff** `apps/api/src/hooks/auditLog/utils.ts#computeDiff` [primitive] compute per-field before/after changes between two unmasked snapshots Use: computeDiff(omitNoopFieldsForAudit(model, before), omitNoopFieldsForAudit(model, after))
 - **omitNoopFieldsForAudit** `apps/api/src/hooks/auditLog/utils.ts#omitNoopFieldsForAudit` [primitive] strip noop fields like updatedAt and list positions before auditing Use: omitNoopFieldsForAudit(model, data)
 - **isAuditEnabled** `packages/db/src/registries/auditEnabledModels.ts#isAuditEnabled` [primitive] check whether a model's mutations should be audited Use: if (isAuditEnabled(modelName)) { ... }
 - **jobAuditActor** `apps/api/src/jobs/jobAuditActor.ts#jobAuditActor` [primitive] build an audit actor attributing writes to a job and its integration Use: jobAuditActor(jobName, payload)
-- **maskSensitiveAndOmitNoopFieldsForAudit** `apps/api/src/hooks/auditLog/utils.ts#maskSensitiveAndOmitNoopFieldsForAudit` [primitive] build a filtered, redacted column snapshot of a record for audit storage Use: maskSensitiveAndOmitNoopFieldsForAudit(model, data)
+- **maskSensitiveAndOmitNoopFieldsForAudit** `apps/api/src/hooks/auditLog/utils.ts#maskSensitiveAndOmitNoopFieldsForAudit` [primitive] build a column snapshot with no-op fields omitted and sensitive ones masked of a record for audit storage Use: maskSensitiveAndOmitNoopFieldsForAudit(model, data)
 - **maskSensitiveFieldsInChangeDiff** `packages/db/src/registries/sensitiveFields.ts#maskSensitiveFieldsInChangeDiff` [primitive] mask both sides of changed sensitive fields in a change diff Use: maskSensitiveFieldsInChangeDiff(model, changes)
 
 #### Class `soft-delete`

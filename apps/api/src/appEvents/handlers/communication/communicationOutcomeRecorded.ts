@@ -8,9 +8,9 @@ import type { CommunicationLog } from '@template/db/generated/client/client';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import { enqueueJob } from '#/jobs/enqueue';
 
-export type CommunicationSettledPayload = { communicationLog: CommunicationLog };
+export type CommunicationOutcomeRecordedPayload = { communicationLog: CommunicationLog };
 
-export const communicationSettled = makeAppEvent<CommunicationSettledPayload>({
+export const communicationOutcomeRecorded = makeAppEvent<CommunicationOutcomeRecordedPayload>({
   cb: [
     async ({ communicationLog }) => {
       if (!communicationLog.recipientUserId) return;

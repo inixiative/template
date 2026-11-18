@@ -630,7 +630,7 @@ const normalizePlanetScaleProgress = (
  * - USE_INTERNAL_CONFIG=true -> project.config.template-internal.ts
  * - Otherwise -> project.config.ts
  */
-export const getProjectConfig = async (): Promise<ProjectConfig> => {
+export const fetchProjectConfig = async (): Promise<ProjectConfig> => {
   const useInternal = process.env.USE_INTERNAL_CONFIG === 'true';
   let configFile = useInternal ? 'project.config.template-internal.ts' : 'project.config.ts';
   let configPath = join(process.cwd(), configFile);
@@ -817,10 +817,10 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
 /**
  * Get the target config file path (for writing updates)
  */
-export const getProjectConfigPath = (): string => {
+export const projectConfigPath = (): string => {
   const useInternal = process.env.USE_INTERNAL_CONFIG === 'true';
   const internalPath = join(process.cwd(), 'project.config.template-internal.ts');
-  // Same fallback as getProjectConfig: prefer internal only when it actually exists.
+  // Same fallback as fetchProjectConfig: prefer internal only when it actually exists.
   if (useInternal && existsSync(internalPath)) return internalPath;
   return join(process.cwd(), 'project.config.ts');
 };
@@ -830,7 +830,7 @@ export const getProjectConfigPath = (): string => {
  */
 export const writeProjectConfig = async (config: ProjectConfig): Promise<void> => {
   const { writeFileSync } = await import('node:fs');
-  const configPath = getProjectConfigPath();
+  const configPath = projectConfigPath();
   const { email: _legacyEmail, ...restConfig } = config as ProjectConfig & {
     email?: ProjectConfig['resend'];
   };

@@ -31,15 +31,15 @@ export const targetSegmentIdsBySegmentId = (segments: Segment[]): ReferenceMap =
 };
 
 export const findReferenceCycle = (references: ReferenceMap, start: string): string[] | null => {
-  const settled = new Set<string>();
+  const fullyExploredIds = new Set<string>();
   const walk = (id: string, path: string[]): string[] | null => {
-    if (settled.has(id) || path.includes(id)) return null;
+    if (fullyExploredIds.has(id) || path.includes(id)) return null;
     for (const next of references.get(id) ?? []) {
       if (next === start) return [...path, id, start];
       const found = walk(next, [...path, id]);
       if (found) return found;
     }
-    settled.add(id);
+    fullyExploredIds.add(id);
     return null;
   };
   return walk(start, []);

@@ -28,7 +28,7 @@
       "doc:docs/claude/TESTING.md#factories/triggering-optional-dependencies",
       "doc:docs/claude/TESTING.md#factories/context-keys",
       "doc:docs/claude/TESTING.md#factories/reusing-entities",
-      "doc:docs/claude/TESTING.md#factories/unique-data-with-getnextseq",
+      "doc:docs/claude/TESTING.md#factories/unique-data-with-nextfactorysequencenumber",
       "doc:docs/claude/TESTING.md#factories/typedbuildresult-type-safety",
       "doc:docs/claude/TESTING.md#factories/fk-auto-inference",
       "doc:docs/claude/TESTING.md#factories/composite-foreign-keys",

@@ -10,7 +10,7 @@ import superjson from 'superjson';
 
 type CacheRead<T> = { result: 'hit'; value: T } | { result: 'miss' | 'error' };
 
-export const readCached = async <T>(
+export const fetchCachedValue = async <T>(
   redis: ReturnType<typeof redisClient>,
   key: string,
 ): Promise<CacheRead<T>> => {

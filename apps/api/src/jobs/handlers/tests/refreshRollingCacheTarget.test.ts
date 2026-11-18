@@ -45,7 +45,7 @@ describe('refreshRollingCacheTarget', () => {
     const key = rollingCache.targetKey({ id: organization.id });
 
     await enqueueJob('refreshRollingCacheTarget', { name, key, target: { id: organization.id } });
-    expect(await rollingCache.read('value', { id: organization.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { id: organization.id })).toMatchObject({
       state: 'fresh',
       value: 'Rolling Org',
     });
@@ -53,7 +53,7 @@ describe('refreshRollingCacheTarget', () => {
 
     await enqueueJob('refreshRollingCacheTarget', { name, key, target: { id: organization.id } });
 
-    expect(await rollingCache.read('value', { id: organization.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { id: organization.id })).toMatchObject({
       value: 'Renamed Org',
     });
   });
@@ -151,7 +151,7 @@ describe('refreshRollingCacheTarget', () => {
       }),
     ).rejects.toThrow('compute failed');
 
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'empty' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'empty' });
   });
 
   it('throws when no definition registered the name', async () => {
@@ -194,7 +194,7 @@ describe('refreshRollingCacheTarget', () => {
     await aborted;
     await Bun.sleep(50);
 
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'queued' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'queued' });
   });
 
   it('a leaf whose compute stops quietly at the deadline still reports itself stuck and clears the queued marker on its last attempt', async () => {
@@ -216,6 +216,6 @@ describe('refreshRollingCacheTarget', () => {
       enqueueJob('refreshRollingCacheTarget', { name, key, target: null }),
     ).rejects.toThrow(`did not refresh ${key} within 1s`);
 
-    expect(await rollingCache.read('value', undefined)).toEqual({ state: 'empty' });
+    expect(await rollingCache.fetchResult('value', undefined)).toEqual({ state: 'empty' });
   });
 });

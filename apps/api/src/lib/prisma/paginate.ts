@@ -13,7 +13,7 @@ import {
   type RuleValue,
 } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
-import { isScalarField, lookupField, modelFields } from '@template/db';
+import { isScalarField, modelFieldAtPath, modelFields } from '@template/db';
 import { stableHash } from '@template/shared/utils';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { type ValidatedContext, validatedQuery } from '#/lib/context/validatedRequestData';
@@ -202,7 +202,7 @@ const primaryKeysOf = (model: string): string[] =>
 
 export const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
   const lastKey = chain[chain.length - 1]?.[0];
-  const lastField = lastKey ? lookupField(model, lastKey) : undefined;
+  const lastField = lastKey ? modelFieldAtPath(model, lastKey) : undefined;
   if (lastField && isScalarField(lastField) && lastField.isId && lastField.isRequired) return chain;
 
   const [primaryKey, ...rest] = primaryKeysOf(model);

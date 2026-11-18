@@ -67,9 +67,9 @@ const buildAuditEntry = (
 ): Prisma.AuditLogCreateManyInput | null => {
   const actor = auditActorContext.currentActor();
 
-  // Filter noop fields, then diff on the UNMASKED result so a change to a sensitive field is still
+  // Omit no-op fields, then diff on the UNMASKED result so a change to a sensitive field is still
   // detected — masking first would mask both sides to the same token and the change would vanish
-  // under the empty-diff guard. Redact the stored snapshots and the changed values afterward.
+  // under the empty-diff guard. Mask the stored snapshots and the changed values afterward.
   const filteredAfter =
     action !== AuditAction.delete ? omitNoopFieldsForAudit(model, record) : undefined;
   const filteredBefore = previous ? omitNoopFieldsForAudit(model, previous) : undefined;

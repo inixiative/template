@@ -88,11 +88,11 @@ describe('coordinateRollingCaches', () => {
     await coordinate();
 
     expect(await redisClient().exists(cacheKey(name, acme.id))).toBe(1);
-    expect(await rollingCache.read('value', { organizationId: acme.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { organizationId: acme.id })).toMatchObject({
       state: 'fresh',
       value: 2,
     });
-    expect(await rollingCache.read('value', { organizationId: globex.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { organizationId: globex.id })).toMatchObject({
       value: 1,
     });
     expect(await redisClient().ttl(rollingCacheTimerKey(name))).toBeGreaterThan(
@@ -121,7 +121,7 @@ describe('coordinateRollingCaches', () => {
 
     const states = await Promise.all(
       [acme, globex].map(
-        async ({ id }) => (await rollingCache.read('value', { organizationId: id })).state,
+        async ({ id }) => (await rollingCache.fetchResult('value', { organizationId: id })).state,
       ),
     );
     expect(states).toContain('empty');
@@ -192,7 +192,7 @@ describe('coordinateRollingCaches', () => {
 
     const states = await Promise.all(
       [acme, globex].map(
-        async ({ id }) => (await rollingCache.read('value', { organizationId: id })).state,
+        async ({ id }) => (await rollingCache.fetchResult('value', { organizationId: id })).state,
       ),
     );
     expect(states.sort()).toEqual(['empty', 'fresh']);
@@ -207,13 +207,13 @@ describe('coordinateRollingCaches', () => {
     await createSpace({ name: `${name} b` }, { organization: acme });
 
     await coordinate();
-    expect(await rollingCache.read('value', { organizationId: acme.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { organizationId: acme.id })).toMatchObject({
       value: 1,
     });
 
     await markRollingCacheTimerDue(name);
     await coordinate();
-    expect(await rollingCache.read('value', { organizationId: acme.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { organizationId: acme.id })).toMatchObject({
       value: 2,
     });
   });
@@ -236,10 +236,14 @@ describe('coordinateRollingCaches', () => {
 
     await coordinate();
 
-    expect(await rollingCache.read('value', { id: acme.id, name: 'ignored' })).toMatchObject({
-      value: `${name} Acme`,
-    });
-    expect(await rollingCache.read('value', { id: globex.id, name: 'ignored' })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { id: acme.id, name: 'ignored' })).toMatchObject(
+      {
+        value: `${name} Acme`,
+      },
+    );
+    expect(
+      await rollingCache.fetchResult('value', { id: globex.id, name: 'ignored' }),
+    ).toMatchObject({
       value: `${name} Globex`,
     });
   });
@@ -257,7 +261,7 @@ describe('coordinateRollingCaches', () => {
     await markRollingCacheTimerDue(name);
     await expect(coordinate()).rejects.toThrow('compute failed');
 
-    expect(await rollingCache.read('value', { organizationId: broken.id })).toMatchObject({
+    expect(await rollingCache.fetchResult('value', { organizationId: broken.id })).toMatchObject({
       value: 1,
     });
     expect(await redisClient().pttl(rollingCacheTimerKey(name))).toBeLessThanOrEqual(

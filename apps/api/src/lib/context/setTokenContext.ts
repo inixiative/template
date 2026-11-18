@@ -5,8 +5,8 @@
  * @uses primitive:authz
  */
 import type { Context } from 'hono';
+import type { TokenContext } from '#/lib/context/fetchTokenContext';
 import { installPermissionsFromRequestContext } from '#/lib/context/installPermissionsFromRequestContext';
-import type { TokenContext } from '#/lib/context/loadTokenContext';
 import { setMemberContext } from '#/lib/context/setUserContext';
 import type { AppEnv } from '#/types/appEnv';
 

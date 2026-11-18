@@ -6,11 +6,11 @@
  */
 import type { Condition } from '@inixiative/json-rules';
 import { ELSE, ELSE_IF, END, IF } from '@template/email/render/conditionParser/grammar';
-import { readRuleMarker } from '@template/email/render/conditionParser/readRuleMarker';
+import { ruleMarkerAt } from '@template/email/render/conditionParser/ruleMarkerAt';
 import type { Branch, IfBlock } from '@template/email/render/conditionParser/types';
 
 export const parseIfBlock = (content: string, openIdx: number): IfBlock | null => {
-  const open = readRuleMarker(content, openIdx, IF);
+  const open = ruleMarkerAt(content, openIdx, IF);
   if (!open) return null;
 
   const branches: Branch[] = [];
@@ -32,7 +32,7 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
   let i = open.next;
   while (i < content.length) {
     if (content.startsWith(IF, i)) {
-      const nested = readRuleMarker(content, i, IF);
+      const nested = ruleMarkerAt(content, i, IF);
       if (nested) {
         depth++;
         i = nested.next;
@@ -51,7 +51,7 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
       continue;
     }
     if (content.startsWith(ELSE_IF, i)) {
-      const marker = readRuleMarker(content, i, ELSE_IF);
+      const marker = ruleMarkerAt(content, i, ELSE_IF);
       if (marker) {
         if (depth === 1) {
           closeCurrent(i);

@@ -95,10 +95,10 @@ packages/email/src/
 │   ├── expandComponentTags.ts         # Recursive component expansion
 │   ├── interpolate.ts    # Variable substitution + conditionals
 │   ├── evaluateConditions.ts  # {{#if rule=...}} evaluation
-│   ├── settle/           # Token/branch/each settlement used by interpolate
-│   ├── lookup.ts         # Single-tier ownership lookup
-│   ├── lookupCascade.ts  # Cascade lookup across ownership tiers
-│   ├── lookupTemplate.ts # lookupTemplate/lookupComponent entrypoints
+│   ├── evaluateTemplate/ # Token, branch and each evaluation used by interpolate
+│   ├── fetchEmailRowsAtOwner.ts # Single-tier ownership fetch
+│   ├── fetchComponentsThroughOwnerCascade.ts  # Cascade lookup across ownership tiers
+│   ├── fetchTemplateThroughOwnerCascade.ts # fetchTemplateThroughOwnerCascade/fetchComponentThroughOwnerCascade entrypoints
 │   ├── save.ts           # saveEmailTemplate coordinator
 │   ├── saveComponents.ts # Component persistence
 │   ├── upsertEmailTemplateRowAtOwnerScope.ts   # Template persistence
@@ -195,7 +195,7 @@ model EmailComponent {
 #### CommunicationLog
 
 Per-recipient delivery ledger — one row per recipient per send (grouped by `sendKey`) — and the
-deduplicated send intent (`idempotencyKey @unique`). It stores the settled MJML, render variables
+deduplicated send intent (`idempotencyKey @unique`). It stores the evaluated MJML, render variables
 (including the hydrated recipient projection), render issues, and template/component audit references.
 It does not store the final provider HTML. Sender is false-polymorphic; `kind`/`emailTemplateId`
 are filled when delivery resolves the template.
@@ -327,7 +327,7 @@ other lens. Everything a template does with a path or a rule goes through it:
   and in preflight.
 - **Rules** — `emailRuleViolations` is the vocabulary (save and `branchOnRuleHealth` at render),
   `emailRuleReferences` the rows a rule names, and `applyEmailLens` + `check` the evaluation:
-  settle never checks a raw rule, so a lens `where` decides at send what it decides at save. A
+  evaluation never checks a raw rule, so a lens `where` decides at send what it decides at save. A
   rule inside `{{#each}}` is the array rule it always was (`scopedRule`): one `any` per enclosing
   loop, binding leaves element-relative, root leaves climbing with `$$`; vocabulary, references
   and evaluation all read that one form, and evaluation runs slot-relative against the iterated
@@ -378,7 +378,7 @@ lens shows (`restrictRuleToSenderMembers`), so a space reaches its own members b
 when its lens widens. Registry sends target the entity's own recipient (an invite's target need not
 be a member yet). Without a sender (save, preview, rule surface) the template owner stands in. The owner
 is decided per site: save takes it from the input, the rule surface and preflight from the body
-(default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
+(default: platform), and evaluation from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
 the tree for now. The picker gets real options for Tag and Segment (`fetchSourceValuesOfEmailLens`, the lens's
 `toSourceQueries` run through Prisma by `sourceQueryValues`, keyed onto the `email` surface map by
@@ -446,7 +446,7 @@ The render pipeline has two phases:
 │  PHASE 1: Compose (once per template)                       │
 │  composeTemplate(slug, ctx) → { id, mjml, subject, kind }   │
 │     └── expandComponentTagsFromOwnerCascade(mjml, componentSlugs, ctx)                    │
-│         └── lookupCascade → fetch components → replace refs │
+│         └── fetchComponentsThroughOwnerCascade → fetch components → replace refs │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -537,7 +537,7 @@ const { template, components } = await saveEmailTemplate(
 Pipeline steps:
 1. Validate MJML syntax (`validateMjml`) and conditional rules in `mjml` and `subject`
    (`assertValidConditions`): fail fast instead of shipping a render-time time-bomb
-2. Look up every referenced slug through the owner's cascade (`lookupCascade`)
+2. Look up every referenced slug through the owner's cascade (`fetchComponentsThroughOwnerCascade`)
 3. Extract components (`decomposeNodes`): inline bodies that differ from the cascade become component writes
 4. Refuse component reference cycles (`validateNoCycle`)
 5. Save components + template in one transaction (`db.txn`), then expand the saved template and
@@ -632,7 +632,7 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 The body lives in `lib/email/deliverEmailMessage.ts`; `deliverEmail` is its job wrapper. **The claim reads
 the row and nothing else: only a `queued` row is open.** `sending`, `sent`, `failed`, `suppressed` and
 `undeliverable` are all closed — a retry, a duplicate job, or a re-dispatch never resends. A crash between
-claim and settle leaves `sending` for a person to resolve (an explicit resend with a staleness bound), never
+claim and the recorded outcome leaves `sending` for a person to resolve (an explicit resend with a staleness bound), never
 for the claim to reopen.
 
 1. Load the log; **skip unless `queued`**.
@@ -758,7 +758,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
   and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
-  builder gets `emailSurface` of it (which strips clamps and sources), while save and settle keep the lens
+  builder gets `emailSurface` of it (which strips clamps and sources), while save and evaluation keep the lens
   itself (`defaultEmailLens` when none is threaded) — extraction never runs on the exposed
   surface. Adding a referenceable model = a registry entry + an FK column (the hook and email's
   sources derive); a surface that reaches it declares its own labeled id source.

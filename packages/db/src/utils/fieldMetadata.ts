@@ -20,7 +20,7 @@ export const modelFields = (modelName: string): Record<string, ModelField> | und
 export const hasDeletedAt = (modelName: string): boolean =>
   fieldOfModel(modelName, 'deletedAt') !== undefined;
 
-export const lookupField = (modelName: string, path: string): ModelField | undefined => {
+export const modelFieldAtPath = (modelName: string, path: string): ModelField | undefined => {
   const segments = path.split('.');
   let currentModel: string | undefined = modelName;
   for (let i = 0; i < segments.length; i += 1) {

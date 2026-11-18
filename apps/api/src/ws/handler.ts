@@ -23,15 +23,15 @@ import type { StreamFrame, WSData, WSMessage, WSSocket } from '#/ws/types';
 
 type WSServer = Server<WSData>;
 
-const staleSweep = makeUnrefInterval({
+const staleConnectionCleanupInterval = makeUnrefInterval({
   intervalMs: 60_000,
   tick: () => {
     const cleaned = cleanupStaleConnections();
     if (cleaned > 0) log.info(`Cleaned up ${cleaned} stale WebSocket connections`, LogScope.ws);
   },
 });
-export const startStaleSweep = staleSweep.start;
-export const stopStaleSweep = staleSweep.stop;
+export const startStaleConnectionCleanupInterval = staleConnectionCleanupInterval.start;
+export const stopStaleConnectionCleanupInterval = staleConnectionCleanupInterval.stop;
 
 export const acceptWebSocket = (req: Request, server: WSServer): Response | undefined => {
   const now = Date.now();
@@ -163,7 +163,7 @@ export const websocketHandler = {
     }
     const msg = parseFrame(raw);
     if (!msg) return;
-    // Liveness must not wait behind queued snapshot reads or the re-authorization sweep.
+    // Liveness must not wait behind queued snapshot reads or the periodic stream re-authorization.
     if (msg.action === 'ping') {
       updateLastPing(ws);
       sendTo(ws, { type: 'pong' });

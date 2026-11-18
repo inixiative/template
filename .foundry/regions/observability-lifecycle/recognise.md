@@ -4,13 +4,13 @@
 
 ## What this region is
 
-How the template's processes report what they do (structured, redacted logs; OpenTelemetry traces and metrics; error reporting) and how they start, answer health checks, run in-process loops, and shut down cleanly.
+How the template's processes report what they do (structured, masked logs; OpenTelemetry traces and metrics; error reporting) and how they start, answer health checks, run in-process loops, and shut down cleanly.
 
 ## What it exists for
 
 - Attach context fields to log lines
 - Choose the logger for where the code runs
-- Redact a value before logging it
+- Mask a value before logging it
 - Trace or measure work
 - Report errors to an error tracker
 - Turn telemetry on and point it at an exporter
@@ -33,7 +33,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - don't log the password or token
 - I'll delete the sensitive keys before logging
 - mask secrets in the log payload
-- a redacted object versus a redacted string
+- a masked object versus a masked string
 - trace or measure this operation
 - I'll time it with Date.now and log the elapsed ms
 - count how often this happens
@@ -111,7 +111,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - flush traces before the process exits
 - a per-signal endpoint on a different host
 - wait between retries but bail if shutting down
-- a redacted string for output
+- a masked string for output
 - the app is healthy but nothing shows in New Relic
 - trace every Prisma query
 - the fetch wrapper that carries trace headers
@@ -208,7 +208,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - initialize tracing for the worker
 - a one-off check for shutdown
 - why don't job traces link to requests
-- does the password show as redacted in exported spans
+- does the password show as masked in exported spans
 - the shared logger for backend code
 - I'll create a child logger with the module name
 - silence debug logs in production
@@ -232,7 +232,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - telemetry secrets in browser build variables
 - read the OTEL env into a config
 - a latency histogram without a span
-- redact the structured value, keep it as an object
+- mask the structured value, keep it as an object
 - capture client-side exceptions
 - the adapter in front of Sentry
 - tag all logs with the service name

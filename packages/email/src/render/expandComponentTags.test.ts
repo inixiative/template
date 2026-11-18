@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
-  expandComponentTagsWithLookup,
-  type LookupComponents,
+  expandComponentTagsWithFetcher,
+  type FetchComponents,
 } from '@template/email/render/expandComponentTags';
 
-const lookupFrom =
-  (bodies: Record<string, string>, calls: string[][] = []): LookupComponents =>
+const fetchComponentsFrom =
+  (bodies: Record<string, string>, calls: string[][] = []): FetchComponents =>
   async (slugs) => {
     calls.push([...slugs]);
     return Object.fromEntries(
@@ -15,7 +15,7 @@ const lookupFrom =
   };
 
 const render = (mjml: string, bodies: Record<string, string>, calls?: string[][]) =>
-  expandComponentTagsWithLookup(mjml, lookupFrom(bodies, calls));
+  expandComponentTagsWithFetcher(mjml, fetchComponentsFrom(bodies, calls));
 
 const reexposing = {
   b: '{{#component:c}}{{#slot:body}}{{#slot:heading:default}}B default{{/slot:heading:default}}{{/slot:body}}{{/component:c}}',
@@ -236,9 +236,9 @@ describe('expandComponentTagsFromOwnerCascade', () => {
     });
 
     it('does not treat inherited object keys as components', async () => {
-      const lookup: LookupComponents = async () => ({});
+      const lookup: FetchComponents = async () => ({});
       await expect(
-        expandComponentTagsWithLookup(
+        expandComponentTagsWithFetcher(
           '{{#component:constructor}}{{/component:constructor}}',
           lookup,
         ),
@@ -253,9 +253,9 @@ describe('expandComponentTagsFromOwnerCascade', () => {
 describe('render observers', () => {
   it('reports a missing component and continues rendering', async () => {
     const failures: EmailRenderError[] = [];
-    const output = await expandComponentTagsWithLookup(
+    const output = await expandComponentTagsWithFetcher(
       'before{{#component:missing}}{{/component:missing}}{{#component:present}}{{/component:present}}after',
-      lookupFrom({ present: 'PRESENT' }),
+      fetchComponentsFrom({ present: 'PRESENT' }),
       { onRenderFailure: (error) => failures.push(error) },
     );
     expect(output).toBe('beforePRESENTafter');
@@ -266,9 +266,9 @@ describe('render observers', () => {
 
   it('reports a circular reference instead of throwing', async () => {
     const failures: EmailRenderError[] = [];
-    const output = await expandComponentTagsWithLookup(
+    const output = await expandComponentTagsWithFetcher(
       '{{#component:a}}{{/component:a}}tail',
-      lookupFrom({
+      fetchComponentsFrom({
         a: 'A{{#component:b}}{{/component:b}}',
         b: 'B{{#component:a}}{{/component:a}}',
       }),

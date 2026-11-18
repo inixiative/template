@@ -13,7 +13,7 @@
 
 ## Build
 
-1. `EmailTemplate.variant String @default("default")`, `EmailTemplate.live Boolean @default(true)`; the natural-key uniques gain `variant`; every lookup (`lookupAtOwner`, cascade, compose, planner) carries `variant` and `live: true`; preflight/preview may name a non-live variant.
+1. `EmailTemplate.variant String @default("default")`, `EmailTemplate.live Boolean @default(true)`; the natural-key uniques gain `variant`; every lookup (`fetchEmailRowsAtOwner`, cascade, compose, planner) carries `variant` and `live: true`; preflight/preview may name a non-live variant.
 2. Built 2026-10-06. `saveScopedRow` revives a tombstoned natural key (`withDeleted` lookup → update in place), and the twelve natural-key uniques on `EmailTemplate` and `EmailComponent` cover deleted rows. Zealot's single `ownerKey` column, which would let the unique drop the tier predicates too, is still open.
 
    **Dev databases.** There is no migrations directory; the schema lands through `db:push`. A dev database that already holds duplicate tombstones for one natural key will refuse the new uniques, so collapse them by hand before pushing: per (slug, locale, owner) keep the newest row and delete the rest. This is dev-only data, so collapsing it by hand loses nothing that matters.

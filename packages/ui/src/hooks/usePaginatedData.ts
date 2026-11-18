@@ -12,8 +12,8 @@ import {
 } from '@template/ui/hooks/useListSearchFilterAndOrderState';
 import { useScrollState } from '@template/ui/hooks/useScrollState';
 import {
+  initialListPageState,
   parseOrderByStrings,
-  readInitialState,
   writeToHistoryState,
   writeToHistoryStateAndUrl,
 } from '@template/ui/lib/dataStatePersistence';
@@ -61,7 +61,7 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
   const shouldRestoreScroll = scrollRestore ?? sectionId != null;
 
   const stateKey = sectionId ? `data:${sectionId}` : undefined;
-  const initialState = readInitialState(stateKey, shareableUrl);
+  const initialState = initialListPageState(stateKey, shareableUrl);
 
   const [page, setPageRaw] = useState(initialState.page ?? 1);
   const [pageSize, setPageSizeRaw] = useState(initialState.pageSize ?? defaultPageSize);

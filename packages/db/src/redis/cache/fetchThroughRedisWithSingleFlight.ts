@@ -6,16 +6,16 @@
  */
 import { acquireSingleFlight } from '@template/db/lock/singleFlight/acquireSingleFlight';
 import { singleFlightLock } from '@template/db/lock/singleFlight/singleFlightLock';
-import { readGeneration } from '@template/db/redis/cache/generation/readGeneration';
+import { fetchCachedValue } from '@template/db/redis/cache/fetchCachedValue';
+import { fetchCacheGeneration } from '@template/db/redis/cache/generation/fetchCacheGeneration';
 import { publishComputed } from '@template/db/redis/cache/publishComputed';
-import { readCached } from '@template/db/redis/cache/readCached';
 import { resolveTtl } from '@template/db/redis/cache/resolveTtl';
 import type { CacheResult } from '@template/db/redis/cache/telemetry/withCacheSpan';
 import { redisClient } from '@template/db/redis/client';
 import { log } from '@template/shared/logger';
 import superjson from 'superjson';
 
-export const readThrough = async <T>(
+export const fetchThroughRedisWithSingleFlight = async <T>(
   key: string,
   fn: () => Promise<T>,
   ttl: number | ((value: T) => number),
@@ -23,7 +23,7 @@ export const readThrough = async <T>(
 ): Promise<T> => {
   const redis = redisClient();
 
-  const cached = await readCached<T>(redis, key);
+  const cached = await fetchCachedValue<T>(redis, key);
   setResult(cached.result);
   if (cached.result === 'hit') return cached.value;
 
@@ -33,7 +33,7 @@ export const readThrough = async <T>(
   const { holdsLock } = flight;
 
   try {
-    const generation = holdsLock ? await readGeneration(redis, key) : null;
+    const generation = holdsLock ? await fetchCacheGeneration(redis, key) : null;
     const value = await fn();
     const effectiveTtl = resolveTtl(value, ttl);
 

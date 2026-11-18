@@ -86,7 +86,7 @@ describe('flows', () => {
     return (await parseSuccessBody<FlowResponse>(response)).data;
   };
 
-  const readIn = async (app: Harness, flowId: string) => {
+  const fetchFlowThroughApp = async (app: Harness, flowId: string) => {
     const response = await app.fetch(get(`/api/v1/flow/${flowId}`));
     expect(response.status).toBe(200);
     return (await parseSuccessBody<FlowResponse>(response)).data;
@@ -162,19 +162,19 @@ describe('flows', () => {
     const flow = await started(app, organization.id);
 
     await sendInvite(organization, InquiryStatus.draft);
-    expect((await readIn(app, flow.id)).currentStep).toBe(0);
+    expect((await fetchFlowThroughApp(app, flow.id)).currentStep).toBe(0);
 
     await createOrganizationToken(organization, 'personal');
-    expect((await readIn(app, flow.id)).currentStep).toBe(0);
+    expect((await fetchFlowThroughApp(app, flow.id)).currentStep).toBe(0);
 
     await sendInvite(organization, InquiryStatus.sent);
     const ciToken = await createOrganizationToken(organization, 'ci runner');
-    const advanced = await readIn(app, flow.id);
+    const advanced = await fetchFlowThroughApp(app, flow.id);
     expect(advanced.currentStep).toBe(2);
     expect(advanced.stepStates).toEqual(['done', 'done', 'pending']);
 
     await harness.db.token.update({ where: { id: ciToken.id }, data: { deletedAt: new Date() } });
-    const back = await readIn(app, flow.id);
+    const back = await fetchFlowThroughApp(app, flow.id);
     expect(back.currentStep).toBe(1);
     expect(back.stepStates).toEqual(['done', 'pending', 'pending']);
   });
@@ -208,7 +208,7 @@ describe('flows', () => {
     await createOrganizationToken(organization, 'ci');
     await createOrganizationToken(organization, 'local');
 
-    const finished = await readIn(app, flow.id);
+    const finished = await fetchFlowThroughApp(app, flow.id);
 
     expect(finished.currentStep).toBe(3);
     expect(finished.stepStates).toEqual(['done', 'done', 'done']);

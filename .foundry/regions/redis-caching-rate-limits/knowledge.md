@@ -12,7 +12,7 @@
 - [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `redis`](#class-redis-redis-connections-key-namespaces-built-in-key-uses)
-  - [Class `caching`](#class-caching-read-through-cache-cache-keys-ttls-single-flight-mutation-driven-invalidation)
+  - [Class `caching`](#class-caching-read-through-fetchthroughcache-cache-keys-ttls-single-flight-mutation-driven-invalidation)
   - [Class `rate-limiting`](#class-rate-limiting-fixed-window-rate-limits-keyed-by-userspaceorgip-429--retry-after)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
@@ -69,7 +69,7 @@ The dedicated subscriber connection (SUBSCRIBE blocks) and the publisher client.
 The function keying a bucket: userRateLimitKey, principalRateLimitKey, spaceRateLimitKey, organizationRateLimitKey, ipRateLimitKey.
 
 **isNoOpUpdate**  
-Shared no-op detection: an update touching only ignored fields skips cache clearing.
+Shared no-op detection: an update touching only no-op fields skips cache clearing.
 
 **redis-lua-scripts-live-in-queries-folder**  
 CI rule: each Redis Lua script lives with its eval function in the module's queries/ folder.
@@ -188,7 +188,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | cache the permission lookups across calls; I'll memoize the whole check call; wrap the single load read, not the engine; the hydrator already de-dupes within one call | **Cache in hydrator load seam** · pattern @inixiative/permissions/README.md § Hydration (Prisma example) — Hydrator already de-dupes within one call; wrap load only for cross-call caching. | code `createHydrator`, `buildPrismaMapV7`, `createRebacCheck`, `buildPrismaMapV6` | a memo map wrapped around the whole hydrator or check call, or caching added inside the engine, instead of wrapping the single read passed as load (@inixiative/permissions/README.md § Hydration ("load is the cache seam")) |
 | tests run against an in-memory redis; all connections go to one shared mock under test | **In-memory Redis mock in tests** · pattern packages/db/src/redis/client.ts — route redisClient, redisSubscriber and createRedisConnection to one shared RedisMock in tests | part 4 | — |
 | log when redis connects or errors; redis connection events go through the shared logger | **Redis connection event logging** · pattern docs/claude/REDIS.md § Error Handling › Connection Errors — log Redis connect and error events through the shared logger | part 4 | — |
-| serve a rolling cache entry, computing once via fetchThroughCache() on cold miss | **read** · primitive packages/db/src/redis/cache/rollingCache/makeRollingCache.ts — Normal reads; refresh to force recompute. | part 4 | — |
+| serve a rolling cache entry, computing once via fetchThroughCache() on cold miss | **fetchResult** · primitive packages/db/src/redis/cache/rollingCache/makeRollingCache.ts — Normal reads; refresh to force recompute. | part 4 | — |
 | recompute one target and overwrite its entry, skipping write if aborted | **refresh** · primitive packages/db/src/redis/cache/rollingCache/makeRollingCache.ts — Forcing recompute; read for serving values. | part 4 | — |
 | the key contains the word undefined; catch a bad key before it hits redis | **validateCacheKeyHasNoUndefined** · primitive docs/claude/REDIS.md § Error Handling › Key Validation — throw when a cache key contains 'undefined' to catch bugs early | part 4 | throws cache key Error (`server-error`) |
 | never hand-format a cache key; every read, write and clear uses the same builder | **Build cache keys only with cacheKey** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Every cache read, write and invalidation. | code `cacheKey`, `User`, `clearCacheKeysMatchingPattern`, `makeRollingCache` | Any hand-formatted key in a cache read, write or clear. (docs/claude/REDIS.md § Invalidation conventions) |
@@ -212,7 +212,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 
-**Job: key a rate limit by user, principal, IP, space or org** (Identities: userRateLimitKey vs principalRateLimitKey vs ipRateLimitKey vs spaceRateLimitKey vs organizationRateLimitKey) — catalog rateLimit/identities.ts; docs/claude/REDIS.md § Rate Limiting
+**Job: key a rate limit by user, principal, IP, space or org** (Rate limit keys: userRateLimitKey vs principalRateLimitKey vs ipRateLimitKey vs spaceRateLimitKey vs organizationRateLimitKey) — catalog rateLimit/identities.ts; docs/claude/REDIS.md § Rate Limiting
 
 *Said as:* "limit per user or per IP", "which identity should the limit key on", "anonymous callers need a limit too", "an org-wide cap versus a per-space cap"
 
@@ -517,13 +517,13 @@ function validateCacheKeyHasNoUndefined(key: string): void {
 
 Automatic cache clearing on mutations via `cacheKeysByModel`.
 
-**Note**: Cache invalidation shares the same no-op detection logic as webhooks (`isNoOpUpdate`). If only ignored fields changed (see [Ignored Fields](#ignored-fields)), cache clearing is skipped.
+**Note**: Cache invalidation shares the same no-op detection logic as webhooks (`isNoOpUpdate`). If only no-op fields changed (see [No-op Fields](#no-op-fields)), cache clearing is skipped.
 
 ##### How It Works
 
 ```typescript
-// hooks/cache/constants/cacheReference.ts
-export const cacheKeysByModel: CacheReference = {
+// hooks/cache/constants/cacheKeysByModel.ts
+export const cacheKeysByModel: CacheKeysByModel = {
   User: (r) => [
     cacheKey('User', r.id),
     cacheKey('User', r.email, ['email']),
@@ -758,7 +758,7 @@ const check = await fetchRollingCacheAndQueueRefreshWhenMissing(spaceStats, 'tot
   reports itself stuck. `ttlSeconds` (default: interval × (`ROLLING_CACHE_LEAF_ATTEMPTS` + 2)) is how
   long an entry lives; registration throws unless it is longer than interval + spread + every
   attempt × timeout + one tick.
-- **A read never computes.** `read(result, params)` is `checkCache` on that result's key: `empty`,
+- **A read never computes.** `fetchResult(result, params)` is `checkCache` on that result's key: `empty`,
   `queued` (a refresh is enqueued), `computing` (the target's lock is held), `fresh`, or `stale`
   (older than one scheduled refresh, with `isComputing` and `isQueued` beside it).
   `fetchRollingCacheAndQueueRefreshWhenMissing` (`apps/api/src/jobs/fetchRollingCacheAndQueueRefreshWhenMissing.ts`) is the api read: on `empty`, or

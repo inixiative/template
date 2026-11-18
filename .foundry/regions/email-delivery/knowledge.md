@@ -11,7 +11,7 @@
 - [2. The domain](#2-the-domain)
 - [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
-  - [Class `email-delivery`](#class-email-delivery-email-sending-sendemail-planner-deliveremail-senders-provider-adapters)
+  - [Class `email-delivery`](#class-email-delivery-email-sending-planemaildeliveries-planner-deliveremail-senders-provider-adapters)
   - [Class `communication-preferences`](#class-communication-preferences-communicationkind-opt-inopt-out-acceptedkinds-candeliver-unsubscribe-links)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
@@ -38,7 +38,7 @@ Class: CommunicationKind opt-in/opt-out via acceptedKinds and canDeliver, plus u
 system (always delivered), platform and activity (opt-out), marketing (opt-in).
 
 **CommunicationLog**  
-Per-recipient delivery ledger and dedup fence (idempotencyKey @unique), grouped by sendKey; stores settled MJML, variables and renderIssues.
+Per-recipient delivery ledger and dedup fence (idempotencyKey @unique), grouped by sendKey; stores evaluated MJML, variables and renderIssues.
 
 **CommunicationReasonCode**  
 Why a failed row failed, e.g. not_found, render_failed, ambiguous_timeout, quota_exceeded, unsubscribe_unavailable.
@@ -53,7 +53,7 @@ Cached Bouncer verdict (30 days); undeliverable addresses are skipped pre-send.
 Real Resend client with a caller-supplied key; dev/test client that logs instead of sending.
 
 **deliverEmail**  
-Per-recipient job (body in deliverEmailMessage) that settles, gates, renders, claims, sends and records one email.
+Per-recipient job (body in deliverEmailMessage) that evaluates, gates, renders, claims, sends and records one email.
 
 **deliverEmailHandoffs**  
 Email bridge that enqueues planEmailDeliveries for handoffs with deterministic planner job ids.
@@ -105,7 +105,7 @@ Everything between "this event should email someone" and the provider's answer: 
 
 Outbound email is event-driven and never a direct client call. Business logic emits an app event whose handler returns an email handoff. `deliverEmailHandoffs` enqueues the `planEmailDeliveries` planner with a deterministic job id and `PlanEmailDeliveriesPayload` `{ eventName, template, data }`. There are no caller-supplied recipients. The planner resolves the registry `EmailEntry` for the slug (entity, sender, recipients, cc/bcc and data, all as lenses). It resolves the template row for the sender's scope and fetches recipients through its recipient lens (`narrowSlotLensToRowsMatchingOrThrow`). It then find-or-creates one `queued` `CommunicationLog` per recipient on its event-anchored `idempotencyKey`, the at-most-once fence, and enqueues `deliverEmail` with the log id. Fan-outs wider than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` go on the slow lane. No address rides the queue. Delivery re-reads the recipient through the lens.
 
-`deliverEmail` is the job wrapper around `deliverEmailMessage`. Only a `queued` row is open. It settles the template (`renderEmailTemplateWithFallback`, `recipientVariables`, `renderForRecipient`), where a vanished recipient or data row means `failed`/`not_found`, and content errors (`isEmailContentError`) fail as `render_failed` with no retry. It then runs gate ① scope (`inScope`, a stub today), gate ② preferences (`canDeliver(kind, contact)`), and deliverability (a Bouncer verdict cached on `Contact.deliverability` for 30 days, via `emailVerifier`). It renders `mjml2html`, adds `List-Unsubscribe` headers to non-system mail, and CAS-claims `queued → sending`. It sends with `Idempotency-Key: <communicationLogId>`, retrying only rate limits and 5xx inside the claim with shutdown-aware backoff, and records `sent` or `failed` with a `CommunicationReasonCode`. Every terminal write is CAS-guarded. Failures are recorded, not thrown. Sender identity (`CommunicationLogSenderModel`, `senderFromEntityFields`, `fetchSenderRowThroughLens` loading the sending row through `lensFor`, `resolveFromAddress`) is separate from branding, which the template cascade decides. Provider clients are `createResendClient` (real, per-tenant key) and `createConsoleClient` (dev), registered on `emailRegistry` and read with `defaultEmailClient`. Errors split into `EmailProviderError` (send) and content errors.
+`deliverEmail` is the job wrapper around `deliverEmailMessage`. Only a `queued` row is open. It evaluates the template (`renderEmailTemplateWithFallback`, `recipientVariables`, `renderForRecipient`), where a vanished recipient or data row means `failed`/`not_found`, and content errors (`isEmailContentError`) fail as `render_failed` with no retry. It then runs gate ① scope (`inScope`, a stub today), gate ② preferences (`canDeliver(kind, contact)`), and deliverability (a Bouncer verdict cached on `Contact.deliverability` for 30 days, via `emailVerifier`). It renders `mjml2html`, adds `List-Unsubscribe` headers to non-system mail, and CAS-claims `queued → sending`. It sends with `Idempotency-Key: <communicationLogId>`, retrying only rate limits and 5xx inside the claim with shutdown-aware backoff, and records `sent` or `failed` with a `CommunicationReasonCode`. Every terminal write is CAS-guarded. Failures are recorded, not thrown. Sender identity (`CommunicationLogSenderModel`, `senderFromEntityFields`, `fetchSenderRowThroughLens` loading the sending row through `lensFor`, `resolveFromAddress`) is separate from branding, which the template cascade decides. Provider clients are `createResendClient` (real, per-tenant key) and `createConsoleClient` (dev), registered on `emailRegistry` and read with `defaultEmailClient`. Errors split into `EmailProviderError` (send) and content errors.
 
 Preferences live on `Contact.acceptedKinds` (`CommunicationKind`). `system` always delivers, `platform` and `activity` are opt-out, and `marketing` is opt-in. Read them only through `canDeliver`, which messaging shares. Every User gets an email Contact at creation (`userEmailContact`). Unsubscribe is a stateless HMAC capability link bound to `{userId, contactId, kind}` (`signUnsubscribe`, `unsubscribeUrl`, `verifyUnsubscribe`). It goes to a pre-auth, POST-only route, so GET prefetch never unsubscribes. Non-system templates must contain an unconditional `{{system.unsubscribeUrl}}`, and one rendered for a recipient with no contact fails `unsubscribe_unavailable`. Rich preference management is the authenticated in-app surface, not the link. Deliverability and `verifiedAt` are separate from preference.
 
@@ -223,7 +223,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Dead-reference checks run only on rule columns that differ from the pre-image. | **Only changed rule columns are checked** · rule docs/claude/COMMUNICATIONS.md — Applies to writes to rule-bearing models. | part 4 | — |
 | Delivery must only proceed from a queued log; all other statuses are closed and never resent. | **Only queued rows are open** · rule lib/email/deliverEmailMessage.ts — any delivery, retry or re-dispatch | part 4 | — |
 | A rule inside a loop over the opaque data bag must not read a lens-backed root. | **Opaque data loops cannot read lens-backed roots** · rule docs/claude/COMMUNICATIONS.md § Email › The email lens › The email lens — Rules inside loops over the opaque data bag. | code `Organization`, `Space`, `User`, `emailLensFor` | — |
-| Every prisma slot in an email lens must exclude foreign keys and be redacted. | **Prisma lens slots foreign-key-free and redacted** · rule apps/api/src/lib/email/emailLensFor.ts — declaring any prisma slot in an email lens | part 4 | — |
+| Every prisma slot in an email lens must exclude foreign keys and omit sensitive fields. | **Prisma lens slots foreign-key-free and sensitive-field-free** · rule apps/api/src/lib/email/emailLensFor.ts — declaring any prisma slot in an email lens | part 4 | — |
 | Retry only rate-limit/5xx up to five times; close everything else on first attempt, recording not throwing. | **Provider send retry policy** · rule docs/claude/COMMUNICATIONS.md — when sending through the email provider | part 4 | — |
 | Render-issue handling is declared on the template's code registry entry, never on the row; subject issues are always fatal. | **Render issue behaviour on registry entry** · rule apps/api/src/lib/email/emailTemplateRegistry.ts — Any template needing non-default render-issue handling. | part 4 | — |
 | Rule reference edges are written only by the ruleReference hook over RULE_REFERENCE_SURFACES. | **Rule reference edges written by one hook** · rule docs/claude/COMMUNICATIONS.md — Applies to any model that stores rules. | part 4 | — |
@@ -264,7 +264,7 @@ defines the entity lens, sender, recipient rules, data lens and render policy.
 
 The planner resolves entity/sender/template ownership, hydrates recipients through the
 owner-scoped recipient lens, and creates or reuses a `CommunicationLog` row per recipient
-using its idempotency key. It then enqueues `deliverEmail`. Delivery settles the template and
+using its idempotency key. It then enqueues `deliverEmail`. Delivery evaluates the template and
 its component versions, applies contact preferences and address verification, renders and
 sends, and records the result. See [COMMUNICATIONS.md](COMMUNICATIONS.md#planner-planemaildeliveries)
 for the complete planner/delivery and degraded-rule behavior.
@@ -361,7 +361,7 @@ model EmailComponent {
 ###### CommunicationLog
 
 Per-recipient delivery ledger — one row per recipient per send (grouped by `sendKey`) — and the
-deduplicated send intent (`idempotencyKey @unique`). It stores the settled MJML, render variables
+deduplicated send intent (`idempotencyKey @unique`). It stores the evaluated MJML, render variables
 (including the hydrated recipient projection), render issues, and template/component audit references.
 It does not store the final provider HTML. Sender is false-polymorphic; `kind`/`emailTemplateId`
 are filled when delivery resolves the template.
@@ -491,7 +491,7 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 The body lives in `lib/email/deliverEmailMessage.ts`; `deliverEmail` is its job wrapper. **The claim reads
 the row and nothing else: only a `queued` row is open.** `sending`, `sent`, `failed`, `suppressed` and
 `undeliverable` are all closed — a retry, a duplicate job, or a re-dispatch never resends. A crash between
-claim and settle leaves `sending` for a person to resolve (an explicit resend with a staleness bound), never
+claim and the recorded outcome leaves `sending` for a person to resolve (an explicit resend with a staleness bound), never
 for the claim to reopen.
 
 1. Load the log; **skip unless `queued`**.

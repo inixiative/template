@@ -1,7 +1,7 @@
 import {
-  type CommunicationSettledPayload,
-  communicationSettled,
-} from '#/appEvents/handlers/communication/communicationSettled';
+  type CommunicationOutcomeRecordedPayload,
+  communicationOutcomeRecorded,
+} from '#/appEvents/handlers/communication/communicationOutcomeRecorded';
 import {
   type ContactCreatedPayload,
   contactCreated,
@@ -88,7 +88,7 @@ import {
 import type { AppEventHandlerFn } from '#/appEvents/makeAppEvent';
 
 export type AppEventPayloads = {
-  'communication.settled': CommunicationSettledPayload;
+  'communication.outcomeRecorded': CommunicationOutcomeRecordedPayload;
   'contact.created': ContactCreatedPayload;
   'contact.updated': ContactUpdatedPayload;
   'contact.deleted': ContactDeletedPayload;
@@ -118,7 +118,7 @@ export type AppEventPayloads = {
 };
 
 export const AppEventName = {
-  communicationSettled: 'communication.settled',
+  communicationOutcomeRecorded: 'communication.outcomeRecorded',
   contactCreated: 'contact.created',
   contactUpdated: 'contact.updated',
   contactDeleted: 'contact.deleted',
@@ -150,7 +150,7 @@ export const AppEventName = {
 export type AppEventName = (typeof AppEventName)[keyof typeof AppEventName];
 
 export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
-  'communication.settled': communicationSettled,
+  'communication.outcomeRecorded': communicationOutcomeRecorded,
   'contact.created': contactCreated,
   'contact.updated': contactUpdated,
   'contact.deleted': contactDeleted,

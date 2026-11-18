@@ -3,7 +3,7 @@ import { actorFromRecordOmittingSensitiveFields } from '@template/permissions/ac
 import { ActorModel } from '@template/permissions/client';
 
 describe('actorFromRecordOmittingSensitiveFields', () => {
-  it("keeps the actor row's columns and drops its relations and redacted fields", () => {
+  it("keeps the actor row's columns and drops its relations and sensitive fields", () => {
     const token = {
       id: 't1',
       ownerModel: 'Integration',

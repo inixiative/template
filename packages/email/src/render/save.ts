@@ -13,7 +13,7 @@ import type {
 import { visitTemplateBlocks } from '@template/email/render/conditionParser';
 import { decomposeNodes } from '@template/email/render/decompose';
 import { expandComponentTagsFromOwnerCascade } from '@template/email/render/expandComponentTags';
-import { lookupCascade } from '@template/email/render/lookupCascade';
+import { fetchComponentsThroughOwnerCascade } from '@template/email/render/fetchComponentsThroughOwnerCascade';
 import { collectSlugsFromNodes } from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
@@ -87,7 +87,7 @@ export const saveEmailTemplate = async (
 
   return db.txn(
     async () => {
-      const existing = await lookupCascade(slugs, ctx);
+      const existing = await fetchComponentsThroughOwnerCascade(slugs, ctx);
       const { mjml, refs, writes } = decomposeNodes(nodes, (slug) => existing[slug]?.mjml);
 
       const finalComponents = writes.map((write) => ({

@@ -10,8 +10,8 @@ import {
   acceptWebSocket,
   drainConnections,
   initWebSocketPubSub,
-  startStaleSweep,
-  startStreamReauthorizeSweep,
+  startReauthorizeOpenStreamsInterval,
+  startStaleConnectionCleanupInterval,
   websocketHandler,
 } from '#/ws';
 
@@ -26,9 +26,8 @@ initGracefulShutdown({ timeout: 30_000 });
 // Initialize WebSocket pub/sub for cross-server broadcasting
 initWebSocketPubSub();
 
-// Start the periodic stale-connection sweep
-startStaleSweep();
-startStreamReauthorizeSweep();
+startStaleConnectionCleanupInterval();
+startReauthorizeOpenStreamsInterval();
 
 const server = Bun.serve({
   port: process.env.PORT,

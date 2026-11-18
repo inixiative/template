@@ -21,7 +21,7 @@ const { fetch } = createTestApp({
   mount: [(app) => app.route('/api/v1/segment', segmentRouter)],
 });
 
-const loadInfo = async () => {
+const fetchInfo = async () => {
   const response = await fetch(get('/api/v1/segment/info'));
   expect(response.status).toBe(200);
   return (await parseSuccessBody<{ guide: Record<string, string>; types: SegmentInfo }>(response))
@@ -30,13 +30,13 @@ const loadInfo = async () => {
 
 describe('GET /api/v1/segment/info', () => {
   it('answers without a session and tags conditions as a rule', async () => {
-    const info = await loadInfo();
+    const info = await fetchInfo();
     expect(info.root).toBe('CustomerRef');
     expect(info.conditions).toBe('rule');
   });
 
   it('lists fields every one of which the save gate accepts', async () => {
-    const info = await loadInfo();
+    const info = await fetchInfo();
     const byPath = new Map(info.fields.map((field) => [field.path, field]));
     expect(byPath.get('customerUser.contacts')).toMatchObject({ kind: 'relation', isList: true });
     expect(byPath.get('segmentMembers.segment.id')?.sourced).toBe(true);

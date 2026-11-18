@@ -37,10 +37,10 @@ export const reauthorizeOpenStreams = async (): Promise<void> => {
   await Promise.all(sockets.map(reauthorizeQueued));
 };
 
-const sweep = makeUnrefInterval({
+const reauthorizeOpenStreamsInterval = makeUnrefInterval({
   intervalMs: REAUTHORIZE_INTERVAL_MS,
   tick: () => void reauthorizeOpenStreams(),
 });
 
-export const startStreamReauthorizeSweep = sweep.start;
-export const stopStreamReauthorizeSweep = sweep.stop;
+export const startReauthorizeOpenStreamsInterval = reauthorizeOpenStreamsInterval.start;
+export const stopReauthorizeOpenStreamsInterval = reauthorizeOpenStreamsInterval.stop;

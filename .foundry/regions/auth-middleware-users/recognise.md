@@ -12,7 +12,7 @@ What the API does with a credential once it arrives: the middleware chain that t
 - Find out who is acting on a request
 - Throttle callers or recognize health probes
 - Find or create a user
-- Redact user or record data
+- Redact a user or mask record data
 - Expose the caller's own account vs another user's
 
 ## How people say these problems

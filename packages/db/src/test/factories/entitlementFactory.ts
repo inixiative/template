@@ -5,7 +5,7 @@
  * @uses none
  */
 import { db } from '@template/db/client';
-import { loadEntitlementAnchors } from '@template/db/entitlements/entitlementAnchors';
+import { fetchEntitlementAnchors } from '@template/db/entitlements/entitlementAnchors';
 import {
   type EntitlementHolder,
   type EntitlementInput,
@@ -28,7 +28,7 @@ export const createEntitlement = entitlementFactory.create;
 export const storeEntitlements = async (holder: EntitlementHolder, inputs: EntitlementInput[]) =>
   inputs.length
     ? db.entitlement.createManyAndReturn({
-        data: toEntitlementCreateData(inputs, holder, await loadEntitlementAnchors(inputs)),
+        data: toEntitlementCreateData(inputs, holder, await fetchEntitlementAnchors(inputs)),
       })
     : [];
 

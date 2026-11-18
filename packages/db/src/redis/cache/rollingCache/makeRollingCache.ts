@@ -77,7 +77,7 @@ const selectedFields = (selector: AnyRollingCacheTargets | undefined): string[] 
 // - `targets` is `{ model, args }`: the model's own findMany args. Each row is one target: a leaf
 //   job's payload and the argument to `compute`. A cache with no selector has one target, the whole
 //   system.
-// - `read(result, params)` never computes. It is `checkCache` on that result's key, fresh for one
+// - `fetchResult(result, params)` never computes. It is `checkCache` on that result's key, fresh for one
 //   scheduled refresh (interval + spread + one attempt + a tick), with `computing` taken from the
 //   target's lock. Only a leaf computes; a caller that wants a miss to start one goes through
 //   `fetchRollingCacheAndQueueRefreshWhenMissing` in the api.
@@ -155,7 +155,7 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
     return (key as (params: unknown) => string)(params);
   };
 
-  const read = (result: string, params: unknown): Promise<CacheCheck<RollingCacheValue>> =>
+  const fetchResult = (result: string, params: unknown): Promise<CacheCheck<RollingCacheValue>> =>
     checkCache(resultKey(result, params), {
       freshForSeconds,
       computedUnder: targetKey(targetOf(params)),
@@ -209,7 +209,7 @@ export const makeRollingCache = ((config: AnyConfig): RegisteredRollingCache => 
     targetKey,
     targetOf,
     results,
-    read,
+    fetchResult,
     markQueued,
     clearQueued,
     refresh,

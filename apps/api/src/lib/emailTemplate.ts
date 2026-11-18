@@ -9,13 +9,13 @@ import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
   type ComposeTemplateResult,
   composeTemplate,
-  lookupTemplate,
+  fetchTemplateLens,
+  fetchTemplateThroughOwnerCascade,
   type OwnerScope,
   ownerScopeOfRow,
   type RenderIssue,
   type RuleErrorSink,
   recomputeAndStoreMissingComponentSlugs,
-  templateLens,
   type Variables,
 } from '@template/email/render';
 import { type EmailLens, narrowVariables } from '@template/email/rules';
@@ -76,7 +76,7 @@ export type RenderedEmailTemplate = {
 };
 
 type Rendered = {
-  settled: RenderedEmailTemplate;
+  renderedTemplate: RenderedEmailTemplate;
   subjectIssues: RenderIssue[];
   ownerModel: OwnerScope['ownerModel'];
 };
@@ -100,7 +100,7 @@ const renderComposed = (
     onError: subjectSink,
   });
   return {
-    settled: {
+    renderedTemplate: {
       slug,
       subject,
       mjml,
@@ -133,9 +133,9 @@ export const renderEmailTemplateWithFallback = async (
 
   const primaryBound = async (): Promise<EmailLens> => {
     if (primaryLens) return primaryLens;
-    const row = await lookupTemplate(template, scope);
+    const row = await fetchTemplateThroughOwnerCascade(template, scope);
     return row
-      ? emailLensFor(template, ownerScopeOfRow(row), await templateLens(template, row), sender)
+      ? emailLensFor(template, ownerScopeOfRow(row), await fetchTemplateLens(template, row), sender)
       : emailLensFor(template, scope, undefined, sender);
   };
 
@@ -158,7 +158,7 @@ export const renderEmailTemplateWithFallback = async (
   };
 
   const clean = (rendered: Rendered): boolean =>
-    !rendered.subjectIssues.length && !rendered.settled.issues.length;
+    !rendered.subjectIssues.length && !rendered.renderedTemplate.issues.length;
 
   let primaryKind: CommunicationKind | undefined;
   let primaryOwner: OwnerScope['ownerModel'] | undefined;
@@ -178,10 +178,10 @@ export const renderEmailTemplateWithFallback = async (
     const rendered = await render(slug, at, await primaryBound());
     if (!clean(rendered)) {
       throw new EmailRenderError(slug, 'render_failed', [
-        describe([...rendered.subjectIssues, ...rendered.settled.issues]),
+        describe([...rendered.subjectIssues, ...rendered.renderedTemplate.issues]),
       ]);
     }
-    return { ...rendered.settled, kind: primaryKind ?? rendered.settled.kind };
+    return { ...rendered.renderedTemplate, kind: primaryKind ?? rendered.renderedTemplate.kind };
   };
 
   const substituted = async (reason: string): Promise<RenderedEmailTemplate> => {
@@ -196,7 +196,7 @@ export const renderEmailTemplateWithFallback = async (
   let rendered: Rendered;
   try {
     rendered = await render(template);
-    primaryKind = rendered.settled.kind;
+    primaryKind = rendered.renderedTemplate.kind;
     primaryOwner = rendered.ownerModel;
   } catch (error) {
     if (
@@ -207,7 +207,7 @@ export const renderEmailTemplateWithFallback = async (
     ) {
       if (error.type === 'component_missing') {
         try {
-          const row = await lookupTemplate(template, scope);
+          const row = await fetchTemplateThroughOwnerCascade(template, scope);
           if (row && !row.missingComponentSlugs.length)
             await recomputeAndStoreMissingComponentSlugs('EmailTemplate', row.id);
         } catch (refreshError) {
@@ -225,14 +225,14 @@ export const renderEmailTemplateWithFallback = async (
 
   if (rendered.subjectIssues.length)
     return substituted(`subject: ${describe(rendered.subjectIssues)}`);
-  if (!rendered.settled.issues.length) return rendered.settled;
+  if (!rendered.renderedTemplate.issues.length) return rendered.renderedTemplate;
 
-  const summary = describe(rendered.settled.issues);
+  const summary = describe(rendered.renderedTemplate.issues);
   if (policy.onIssue !== 'degrade') return substituted(summary);
 
   log.warn(
     `Email render degraded: template=${template} owner=${scope.ownerModel} — ${summary}`,
     LogScope.email,
   );
-  return rendered.settled;
+  return rendered.renderedTemplate;
 };

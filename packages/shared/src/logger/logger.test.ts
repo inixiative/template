@@ -42,7 +42,7 @@ describe('log.child', () => {
   });
 });
 
-it('native Pino respects level and redacts child bindings as well as arguments', () => {
+it('native Pino respects level and masks child bindings as well as arguments', () => {
   const modulePath = `${import.meta.dir}/pinoAdapter.ts`;
   const result = Bun.spawnSync({
     cmd: [
