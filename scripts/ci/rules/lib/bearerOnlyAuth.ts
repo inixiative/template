@@ -6,7 +6,7 @@
  * API auth is bearer-only and session-free: a person presents a JWT, a program an API token, in
  * `Authorization: Bearer`. A cookie or a BetterAuth session never authenticates a request. Sessions
  * exist only inside BetterAuth's own `/api/auth/*` handler for the sign-in handshake (OAuth state, the
- * one-time-token handoff), and jwtHandoff swaps each for a JWT; that is library code, not ours. Each
+ * one-time-token handoff), and jwtHandoffPlugin swaps each for a JWT; that is library code, not ours. Each
  * check is one entry in CHECKS, so the rule grows by adding one.
  *
  * Fails, in non-test source under apps/ and packages/, on:
