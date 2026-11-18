@@ -344,6 +344,40 @@ A query over ArtifactPermission where one of the user's principals is grantee (a
 
 ---
 
+## 6A. Plan change: grants become entitlements (pending, 2026-11-17)
+
+**Status: blocks further work on this ticket.** Aron, 2026-11-17: "I think artifact permission might need to just be made an entitlement, but there might be some other math there... make an update on the plan to resolve that before any future work is done there."
+
+**Why.** §6 and §9 resolve artifact access in `checkArtifactAccess`, beside the permission system ("artifacts are not a ReBAC schema entry"). That is a second access path: its own grant table, its own role caps, its own inheritance walk, its own 404/403 split. Template already has one grant table (`Entitlement`: an anchor, a holder, actions, `where`, lens) and one check (`@inixiative/permissions`). Two paths drift apart, and every later fix lands twice.
+
+### Mapping
+
+| Today (§3.4, §6) | As an entitlement |
+|---|---|
+| `ArtifactPermission { artifactId, grantee*, role }` | `Entitlement { source: Artifact, target: grantee, actions }`; `Artifact` joins `EntitlementResourceModel` |
+| Grantees: User, Organization, Space, OrganizationUser, SpaceUser, CustomerRef, Integration | `EntitlementTargetModel`; whichever are missing are added there |
+| `role` (viewer / member / admin / owner) | the role's actions (read / operate / manage / own), as roles map everywhere else |
+| Implicit owner grant (`OrganizationManager`, `SpaceManager`, `OrganizationOwner` for org-user content) | ordinary ReBAC owner rules in the schema entry for `Artifact`; no rows |
+| Cap: the actor's role on the grantee; can't grant above your own role | the entitlement writer's grant check (`changeEntitlements`): you only hand on what you hold |
+| One live grant per artifact and grantee | the writer's rule: an effectively equal entitlement replaces the held row |
+| Revoke = soft delete, audited | the same on `Entitlement` |
+| `checkArtifactAccess`, `validateArtifactAccess`, `resolveArtifactAccess` | `validatePermission` on artifact routes, over an `Artifact` schema entry; these go |
+
+### The math to settle before building
+
+Each item is settled by writing the case on the existing primitive and running it, not by reading.
+
+1. **Inheritance through containers.** `inherit` takes the union of every container's grants. On the permission system that is the list arm on placements, recursing into the container: `{ rel: 'placements', arrayOperator: 'any', condition: { rel: 'containerArtifact', action } }`, declared `@permissions(down: [containerArtifact])`. That path comes back to `Artifact`, and the 11-15 ruling records "a path back to a model is a declared leaf (documented, not built)". Settle: does `check` walk Artifact → placement → Artifact to depth 10 with per-check memoizing, or does permissions need that leaf built first?
+2. **`private` cuts inheritance; `public` widens.** `private` is a positive condition on the record (`access` is not `private`) guarding the list arm, which fits. Public is "this node is public, or any container resolves public": the same recursion as item 1, over the `read` action with no holder.
+3. **Expiry.** `expiresAt` is per grant. `Entitlement` has no expiry; Signets and tokens expire on the holder. Either `Entitlement` gains `expiresAt` for every holder, or a time-limited share becomes a holder that expires (a share link). Choose one; not artifact-only.
+4. **`preserveOnRevoke` and `fromVersion`.** These are artifact semantics on a grant row. Lazy copy is already driven by `ResourceBinding` (an active use always triggers it), so `preserveOnRevoke` can become a binding the grantee holds instead of a grant column. `fromVersion` (a share that starts at a version) belongs to `file` and `FileVersion`, not to access.
+5. **The reader set without an actor.** `resolveArtifactAccess` builds everyone who can read an artifact, for an index or a webhook audience. The permission system answers "can this actor", not "who can". Settle whether that inverse exists (the webhook audiences in `apps/api/src/hooks/webhooks/audiences.ts` compute one), and use it rather than keeping `resolveArtifactAccess` as a second resolver.
+6. **404 vs 403.** No read gives 404, read without the action gives 403. Check that `validatePermission` already makes this split for every resource; if not, it is added there, for every resource.
+
+### What happens to this PR
+
+Once 1–6 are settled with Aron: the `ArtifactPermission` model, its routes and the `artifact*Access` services are removed. Grants go through each holder's add and remove entitlement routes (the 11-16 "one way to change entitlements" ruling). Placements, kinds, transfers, bindings and org-user folders are unchanged.
+
 ## 7. Upload Flow (Presigned POST)
 
 ### Why presigned POST
@@ -503,6 +537,7 @@ From Zealot's `NoopAssetsClient` pattern:
 
 ## 12. Open Decisions
 
+- [ ] **Grants become entitlements** (§6A) — settle items 1–6 before any further build on this ticket.
 - [ ] **Personal file billing** — who pays for `ownerModel: User` files? Platform? Plan tier?
 - [ ] **Soft delete retention** — how long before purge? 30d? 90d?
 - [ ] **Virus scanning** — scan on confirm? Skip for v1?
