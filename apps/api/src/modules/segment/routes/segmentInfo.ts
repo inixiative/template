@@ -14,5 +14,5 @@ export const segmentInfoRoute = readRoute({
   skipId: true,
   responseSchema: segmentInfoResponseSchema,
   description:
-    'What segment `conditions` may read: every field `customerRefLens` exposes on `CustomerRef` (`root`), with its kind. `conditions` itself is a json-rules condition; its grammar is `@inixiative/json-rules`, not restated here. A `sourced` field takes the id of a row its owner may name. Public endpoint.',
+    'What segment `conditions` may read: every field `customerRelationshipLens` exposes on `CustomerRelationship` (`root`), with its kind. `conditions` itself is a json-rules condition; its grammar is `@inixiative/json-rules`, not restated here. A `sourced` field takes the id of a row its owner may name. Public endpoint.',
 });

@@ -6,7 +6,7 @@ export * from './communicationComponentVersionFactory';
 export * from './communicationLogFactory';
 export * from './contactFactory';
 export * from './cronJobFactory';
-export * from './customerRefFactory';
+export * from './customerRelationshipFactory';
 export * from './emailComponentFactory';
 export * from './emailTemplateFactory';
 export * from './entitlementFactory';

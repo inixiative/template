@@ -38,7 +38,7 @@ const tagged = (id: string): Condition => ({
 });
 
 const inSegment = (id: string): Condition => ({
-  field: 'recipient.providerRefs',
+  field: 'recipient.customerRelationshipsAsCustomer',
   arrayOperator: 'any',
   condition: {
     field: 'segmentMembers',
@@ -61,7 +61,7 @@ describe('emailLens — four lenses, one per scope root', () => {
       'recipient.tagAttachments.tag.id',
       'recipient.spaceUsers.space.name',
       'recipient.organizationUsers.organization.id',
-      'recipient.providerRefs.segmentMembers.segment.id',
+      'recipient.customerRelationshipsAsCustomer.segmentMembers.segment.id',
     ]) {
       expect(walkEmailLensPath(path, lens).outcome).toBe('resolved');
     }
@@ -236,7 +236,7 @@ describe('emailLens — evaluation goes through the lens', () => {
       id: 'u1',
       name: 'Ann',
       tagAttachments: [{ deletedAt: null, tag: { id: 'tag-a', name: 'vip', ...tagOwner } }],
-      providerRefs: [
+      customerRelationshipsAsCustomer: [
         {
           providerModel: 'Organization',
           providerUserId: null,
@@ -484,7 +484,12 @@ describe('emailSurface — the four lenses composed for the builder', () => {
     expect(ok(across('recipient.organizationUsers', exists('organization.name')))).toBe(true);
     expect(ok(across('recipient.tagAttachments', exists('tag.name')))).toBe(true);
     expect(
-      ok(across('recipient.providerRefs', across('segmentMembers', exists('segment.name')))),
+      ok(
+        across(
+          'recipient.customerRelationshipsAsCustomer',
+          across('segmentMembers', exists('segment.name')),
+        ),
+      ),
     ).toBe(true);
     expect(ok(exists('sender.name'))).toBe(true);
     expect(

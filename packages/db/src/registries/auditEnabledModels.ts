@@ -14,7 +14,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
   AuditSubjectModel.SpaceUser,
   AuditSubjectModel.AuthProvider,
   AuditSubjectModel.Inquiry,
-  AuditSubjectModel.CustomerRef,
+  AuditSubjectModel.CustomerRelationship,
   AuditSubjectModel.EmailTemplate,
   AuditSubjectModel.EmailComponent,
   AuditSubjectModel.Integration,

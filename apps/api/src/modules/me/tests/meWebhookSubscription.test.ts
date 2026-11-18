@@ -51,14 +51,14 @@ describe('me/webhookSubscriptions', () => {
       const seq = getNextSeq();
       const response = await fetch(
         post('/api/v1/me/webhookSubscriptions', {
-          model: 'CustomerRef',
+          model: 'CustomerRelationship',
           url: `https://example.com/webhook-${seq}`,
         }),
       );
       const { data } = await json<WebhookSubscription>(response);
 
       expect(response.status).toBe(201);
-      expect(data.model).toBe('CustomerRef');
+      expect(data.model).toBe('CustomerRelationship');
       expect(data.ownerModel).toBe('User');
       expect(data.userId).toBe(user.id);
       expect(data.isActive).toBe(true);
@@ -67,10 +67,10 @@ describe('me/webhookSubscriptions', () => {
     it('rejects duplicate url for same model', async () => {
       const seq = getNextSeq();
       const url = `https://example.com/duplicate-${seq}`;
-      await fetch(post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRef', url }));
+      await fetch(post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRelationship', url }));
 
       const response = await fetch(
-        post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRef', url }),
+        post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRelationship', url }),
       );
       expect(response.status).toBe(409);
     });
@@ -80,7 +80,7 @@ describe('me/webhookSubscriptions', () => {
     it('returns user webhooks', async () => {
       const seq = getNextSeq();
       await createWebhookSubscription({
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         ownerModel: 'User',
         userId: user.id,
         url: `https://example.com/list-${seq}`,
@@ -98,7 +98,7 @@ describe('me/webhookSubscriptions', () => {
       const { entity: otherUser } = await createUser();
       const seq = getNextSeq();
       await createWebhookSubscription({
-        model: 'CustomerRef',
+        model: 'CustomerRelationship',
         ownerModel: 'User',
         userId: otherUser.id,
         url: `https://example.com/other-${seq}`,

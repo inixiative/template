@@ -21,9 +21,9 @@ export const applyMembershipDiff = async ({
 }: DiffScope): Promise<MembershipDiff> => {
   const matchingSet = new Set(matching);
   const current = await db.segmentMember.findMany({
-    where: { segmentId, ...(within && { customerRefId: { in: within } }) },
+    where: { segmentId, ...(within && { customerRelationshipId: { in: within } }) },
   });
-  const currentIds = new Set(current.map((member) => member.customerRefId));
+  const currentIds = new Set(current.map((member) => member.customerRelationshipId));
 
   const toAdd = [...matchingSet].filter((id) => !currentIds.has(id));
   const toRemove = [...currentIds].filter((id) => !matchingSet.has(id));
@@ -43,13 +43,15 @@ export const applyMembershipDiff = async ({
   await db.txn(async () => {
     if (toAdd.length) {
       const written = await db.segmentMember.createManyAndReturn({
-        data: toAdd.map((customerRefId) => ({ segmentId, customerRefId })),
+        data: toAdd.map((customerRelationshipId) => ({ segmentId, customerRelationshipId })),
         skipDuplicates: true,
       });
-      added = written.map((member) => member.customerRefId);
+      added = written.map((member) => member.customerRelationshipId);
     }
     if (toRemove.length)
-      await db.segmentMember.deleteMany({ where: { segmentId, customerRefId: { in: toRemove } } });
+      await db.segmentMember.deleteMany({
+        where: { segmentId, customerRelationshipId: { in: toRemove } },
+      });
   });
 
   return { added, removed: toRemove };

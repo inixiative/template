@@ -7,11 +7,11 @@
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
-import { providerFilterSchema } from '#/modules/customerRef/schemas/customerRefQuerySchemas';
+import { providerFilterSchema } from '#/modules/customerRelationship/schemas/customerRelationshipQuerySchemas';
 import {
-  customerRefAsCustomerSchema,
-  customerRefTags,
-} from '#/modules/customerRef/schemas/customerRefSchemas';
+  customerRelationshipAsCustomerSchema,
+  customerRelationshipTags,
+} from '#/modules/customerRelationship/schemas/customerRelationshipSchemas';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
@@ -22,8 +22,8 @@ export const meReadManyProvidersRoute = readRoute({
   many: true,
   skipId: true,
   paginate: true,
-  filterLens: { parent: lensFor('CustomerRef') },
+  filterLens: { parent: lensFor('CustomerRelationship') },
   query: providerFilterSchema,
-  responseSchema: customerRefAsCustomerSchema,
-  tags: [Tags.me, Tags.provider, ...customerRefTags],
+  responseSchema: customerRelationshipAsCustomerSchema,
+  tags: [Tags.me, Tags.provider, ...customerRelationshipTags],
 });

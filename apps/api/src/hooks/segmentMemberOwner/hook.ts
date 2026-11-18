@@ -2,25 +2,25 @@ import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import type { SegmentMember } from '@template/db/generated/client/client';
 import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
-import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { customerRelationshipProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
 type MemberRow = Partial<SegmentMember>;
 
 const assertMemberBelongsToOwner = async (row: MemberRow): Promise<void> => {
-  if (!row.segmentId || !row.customerRefId) return;
+  if (!row.segmentId || !row.customerRelationshipId) return;
   const segment = await db.segment.findUnique({ where: { id: row.segmentId } });
   if (!segment) throw makeError({ status: 422, message: `Segment ${row.segmentId} not found` });
-  const customerRef = await db.customerRef.findFirst({
+  const customerRelationship = await db.customerRelationship.findFirst({
     where: {
-      id: row.customerRefId,
+      id: row.customerRelationshipId,
       providerModel: segment.ownerModel,
-      [customerRefProviderFk(segment.ownerModel)]: segmentOwnerId(segment),
+      [customerRelationshipProviderFk(segment.ownerModel)]: segmentOwnerId(segment),
     },
   });
-  if (!customerRef) {
+  if (!customerRelationship) {
     throw makeError({
       status: 422,
-      message: `CustomerRef ${row.customerRefId} is not a customer of the segment's ${segment.ownerModel}`,
+      message: `CustomerRelationship ${row.customerRelationshipId} is not a customer of the segment's ${segment.ownerModel}`,
     });
   }
 };

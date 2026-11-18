@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { WS_CHANNELS } from '@template/shared/ws';
-import { customerSegmentsChanged } from '#/appEvents/handlers/customerRef/customerSegmentsChanged';
+import { customerSegmentsChanged } from '#/appEvents/handlers/customerRelationship/customerSegmentsChanged';
 import { meChannel } from '#/ws/meChannel';
 
 describe("a customer's segments changed: refetch on the customer's own channel", () => {

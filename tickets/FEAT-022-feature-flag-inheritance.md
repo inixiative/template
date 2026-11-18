@@ -12,7 +12,7 @@
 
 ## What FEAT-003 already fixed so this can be answered later
 
-- Subjects are `CustomerRef`s and hops are providers, so a "path" is a chain of customer relationships (user → space → org → platform), not a chain of memberships.
+- Subjects are `CustomerRelationship`s and hops are providers, so a "path" is a chain of customer relationships (user → space → org → platform), not a chain of memberships.
 - `custom:` marks rows that will never participate in a chain; bare slugs are the platform's and are the only candidates for inheritance.
 - Values are typed and multi-valued. Booleans can intersect along a path; `A` / `B` / `C` cannot, so any chain semantics must separate *permission to serve* from *selection of a variant*.
 - Disabled means the type's zero, never a served default, so "an ancestor refuses" has one meaning.

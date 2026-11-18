@@ -13,7 +13,7 @@ export type SegmentMembersRemovedPayload = {
   segmentId: string;
   ownerModel: ProviderModel;
   ownerId: string;
-  customerRefIds: string[];
+  customerRelationshipIds: string[];
 };
 
 export const segmentMembersRemoved = makeAppEvent<SegmentMembersRemovedPayload>({

@@ -26,7 +26,7 @@ A path's NULL cases including a missing optional to-one hop, carried as `{ rel: 
 A `Date`, epoch number or zoned ISO string; used as-is, never re-anchored. *Region:* [json-rules dates, windows and verbs](json-rules-dates/knowledge.md)
 
 **acceptedKinds**  
-CommunicationKind[] on Contact (and optionally CustomerRef) listing the kinds the contact accepts. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
+CommunicationKind[] on Contact (and optionally CustomerRelationship) listing the kinds the contact accepts. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **acceptedKinds**  
 CommunicationKind[] on Contact: the kinds this contact accepts. *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
@@ -567,7 +567,7 @@ The read-through cache(): cache keys, TTLs, single-flight, mutation-driven inval
 The shared preference gate for email and messaging: system passes, otherwise the kind must be accepted. *Region:* [Email delivery and preferences](email-delivery/knowledge.md)
 
 **canDeliver**  
-Shared gate: system always delivers; otherwise the kind must be in contact.acceptedKinds (and customerRef.acceptedKinds when given). *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
+Shared gate: system always delivers; otherwise the kind must be in contact.acceptedKinds (and customerRelationship.acceptedKinds when given). *Region:* [Messaging and contacts](messaging-contacts/knowledge.md)
 
 **candidate**  
 A published version newer than the blessed one, waiting for dependents to adopt it. *Region:* [Config package (toolchain, train)](lib-config/knowledge.md)
@@ -786,7 +786,7 @@ The json-rules rule AST the builder owns and emits. *Region:* [rules-builder lib
 The json-rules rule AST the builder owns and emits. *Region:* [Rule builder: template usage](rules-builder/knowledge.md)
 
 **conditions**  
-The json-rules rule every segment carries; a hand-picked audience is a static rule over customer-ref ids. *Region:* [Customers and segments](customers-segments/knowledge.md)
+The json-rules rule every segment carries; a hand-picked audience is a static rule over customer-relationship ids. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **config sync / config check**  
 Apply versions.json pins and presets locally / verify them read-only. *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
@@ -978,19 +978,19 @@ Cooperative abort signal a superseding job checks to stop work. *Region:* [Concu
 Keyset pagination returning items with nextCursor and hasMore, no totals; for large or live-changing lists. *Region:* [Offset and cursor pagination](pagination/knowledge.md)
 
 **CustomerModel**  
-Discriminator for the customer side of a CustomerRef. *Region:* [Customers and segments](customers-segments/knowledge.md)
+Discriminator for the customer side of a CustomerRelationship. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
-**CustomerRef**  
+**CustomerRelationship**  
 A customer (User, Organization or Space) linked to the provider (User, Organization or Space) serving it; the segment rule root. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
-**customerRefLens**  
-Lens declaring the CustomerRef fields and relations a segment rule may read (contacts, tags, communications, segment memberships). *Region:* [Customers and segments](customers-segments/knowledge.md)
+**customerRelationshipLens**  
+Lens declaring the CustomerRelationship fields and relations a segment rule may read (contacts, tags, communications, segment memberships). *Region:* [Customers and segments](customers-segments/knowledge.md)
 
-**customerRefLens**  
-The CustomerRef rule root lens segments validate against; resolvedCustomerRefLens binds it to one provider. *Region:* [Template lenses](lenses/knowledge.md)
+**customerRelationshipLens**  
+The CustomerRelationship rule root lens segments validate against; resolvedCustomerRelationshipLens binds it to one provider. *Region:* [Template lenses](lenses/knowledge.md)
 
 **customers**  
-Class tag: CustomerRef customer/provider pairs, provider routes and the customer-ref lens. *Region:* [Customers and segments](customers-segments/knowledge.md)
+Class tag: CustomerRelationship customer/provider pairs, provider routes and the customer-relationship lens. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 ## D
 
@@ -1941,7 +1941,7 @@ A named provider connection owned by a user, organization, OrganizationUser, spa
 db:integration rules by owner kind: create, manage, delete, delegateFull; operate and read. *Region:* [Member rows and delegates](permissions-members/knowledge.md)
 
 **IntegrationRecord**  
-Links an Integration to a synced CustomerRef, with poisonedAt for repeated rejections. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
+Links an Integration to a synced CustomerRelationship, with poisonedAt for repeated rejections. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
 
 **integrations**  
 Class: owner Integrations (provider connections) and the IntegrationRecords they sync. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
@@ -2945,13 +2945,13 @@ Cut fetched rows to what a lens shows: hidden columns and off relations removed,
 init/utils/prompts.ts helper composing keyboard hint text from commands in a fixed order. *Region:* [Writing an init task](init-tasks/knowledge.md)
 
 **ProviderModel**  
-Discriminator for the provider side of a CustomerRef, and for a Segment's owner. *Region:* [Customers and segments](customers-segments/knowledge.md)
+Discriminator for the provider side of a CustomerRelationship, and for a Segment's owner. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **_public**  
 Layout route for unauthenticated pages (login, signup, auth.callback). *Region:* [Frontend apps, routes and layouts](frontend-apps-routing/knowledge.md)
 
 **publishMembershipChanges**  
-Emits segment.membersAdded/Removed and customerRef.segmentsAdded/Removed for non-empty diffs. *Region:* [Customers and segments](customers-segments/knowledge.md)
+Emits segment.membersAdded/Removed and customerRelationship.segmentsAdded/Removed for non-empty diffs. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 ## Q
 
@@ -3038,7 +3038,7 @@ Rebuilds the as-sent composition by splicing pinned component snapshots into the
 **RECONCILE_TRIGGERS**  
 Registry mapping each model the segment lens reads to the events that trigger reconciliation. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
-**reconcileCustomerRefSegments**  
+**reconcileCustomerRelationshipSegments**  
 Job keyed by { customerModel, customerId } that re-evaluates that customer's refs against dynamic segments; superseding per customer. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **reconcileSegment**  
@@ -3200,8 +3200,8 @@ The single resolver seam (src/date.ts): zone from a name, a value source, or 'UT
 **handleApprove(c, inquiry, content, response)**  
 The approval side effect: `content` is what was asked, `response` is the copy the approver sends back; nothing is merged. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
-**resolvedCustomerRefLens**  
-customerRefLens bound to one provider owner (ownerModel, ownerId). *Region:* [Customers and segments](customers-segments/knowledge.md)
+**resolvedCustomerRelationshipLens**  
+customerRelationshipLens bound to one provider owner (ownerModel, ownerId). *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **resolveIdentity**  
 Authenticates socket headers into anonymous, user or failure. *Region:* [WebSocket connections](ws-connections/knowledge.md)
@@ -3542,7 +3542,7 @@ The ordered list of SeedFiles; order must respect FK dependencies. *Region:* [Da
 Upserts one SeedFile's records through its model delegate. *Region:* [Database scripts and seeding](database-tooling/knowledge.md)
 
 **Segment**  
-A named set of one provider's CustomerRef rows, defined by a lens-validated rule in conditions. *Region:* [Customers and segments](customers-segments/knowledge.md)
+A named set of one provider's CustomerRelationship rows, defined by a lens-validated rule in conditions. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **Segment-of-segment rule**  
 A segment condition naming another segment; evaluated in dependency order and checked for cycles (findReferenceCycle). *Region:* [Customers and segments](customers-segments/knowledge.md)
@@ -3554,7 +3554,7 @@ Hook that requires, validates and normalizes Segment conditions against the owne
 Resolves the lens a segment owner's conditions are validated against. *Region:* [Template lenses](lenses/knowledge.md)
 
 **SegmentMember**  
-Junction linking one CustomerRef into a Segment, unique per pair, written only by reconciliation. *Region:* [Customers and segments](customers-segments/knowledge.md)
+Junction linking one CustomerRelationship into a Segment, unique per pair, written only by reconciliation. *Region:* [Customers and segments](customers-segments/knowledge.md)
 
 **segments**  
 Class tag: provider-owned audiences with static/dynamic membership reconciliation. *Region:* [Customers and segments](customers-segments/knowledge.md)
@@ -4504,7 +4504,7 @@ The three frontend apps: consumer/participant, operator, and platform-operations
 The after-commit db hook that finds a model's active subscriptions and enqueues one sendWebhook job per subscription. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
 
 **webhookEnabledModels**  
-Registry of models whose mutations fire outbound webhooks (currently CustomerRef). *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
+Registry of models whose mutations fire outbound webhooks (currently CustomerRelationship). *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
 
 **WebhookEvent**  
 One delivery attempt: status (pending/sent/failed), payload, HTTP status and response; cleaned after 90 days. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)

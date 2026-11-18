@@ -13,7 +13,7 @@ export type SpaceDeletedPayload = { space: Space };
 export const spaceDeleted = makeAppEvent<SpaceDeletedPayload>({
   cb: [
     async ({ space }) => {
-      await enqueueJob('reconcileCustomerRefSegments', {
+      await enqueueJob('reconcileCustomerRelationshipSegments', {
         customerModel: 'Space',
         customerId: space.id,
       });

@@ -3,7 +3,7 @@ import { db } from '@template/db';
 import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
-  createCustomerRef,
+  createCustomerRelationship,
   createIntegration,
   createIntegrationRecord,
   createUser,
@@ -18,7 +18,7 @@ describe('poisonIntegrationRecord', () => {
   const setup = async () => {
     const { entity: provider } = await createUser();
     const { entity: customer } = await createUser();
-    const { entity: customerRef } = await createCustomerRef({
+    const { entity: customerRelationship } = await createCustomerRelationship({
       customerModel: 'User',
       providerModel: 'User',
       customerUserId: customer.id,
@@ -28,15 +28,15 @@ describe('poisonIntegrationRecord', () => {
       ownerModel: IntegrationOwnerModel.User,
       userId: provider.id,
     });
-    return { customerRef, integration };
+    return { customerRelationship, integration };
   };
 
   it('keeps the first poison when the record is poisoned again', async () => {
-    const { customerRef, integration } = await setup();
+    const { customerRelationship, integration } = await setup();
     const input = {
       integrationId: integration.id,
-      model: WebhookModel.CustomerRef,
-      resourceId: customerRef.id,
+      model: WebhookModel.CustomerRelationship,
+      resourceId: customerRelationship.id,
     };
 
     const first = await poisonIntegrationRecord({ ...input, reason: 'HTTP 400: first' });
@@ -47,16 +47,16 @@ describe('poisonIntegrationRecord', () => {
   });
 
   it('stamps an existing record that is not poisoned yet', async () => {
-    const { customerRef, integration } = await setup();
+    const { customerRelationship, integration } = await setup();
     const { entity: existing } = await createIntegrationRecord(
-      { model: 'CustomerRef' },
-      { integration, customerRef },
+      { model: 'CustomerRelationship' },
+      { integration, customerRelationship },
     );
 
     const poisoned = await poisonIntegrationRecord({
       integrationId: integration.id,
-      model: WebhookModel.CustomerRef,
-      resourceId: customerRef.id,
+      model: WebhookModel.CustomerRelationship,
+      resourceId: customerRelationship.id,
       reason: 'HTTP 422: Unprocessable Entity',
     });
 

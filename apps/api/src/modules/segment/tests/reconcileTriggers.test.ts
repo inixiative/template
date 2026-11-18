@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { db, type ModelName } from '@template/db';
-import type { CustomerRef, Segment, Space, Tag, User } from '@template/db/generated/client/client';
+import type {
+  CustomerRelationship,
+  Segment,
+  Space,
+  Tag,
+  User,
+} from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
-  createCustomerRef,
+  createCustomerRelationship,
   createOrganizationUser,
   createSegment,
   createSpace,
@@ -16,7 +22,7 @@ import {
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName } from '#/appEvents/handlers';
-import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefReachedModels';
+import { customerRelationshipReachedModels } from '#/modules/customerRelationship/lib/customerRelationshipReachedModels';
 import { RECONCILE_TRIGGERS } from '#/modules/segment/lib/reconcileTriggers';
 import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
 
@@ -36,7 +42,7 @@ const tagNamedRule = (name: string) => ({
 describe('reconcile triggers — the lens defines the propagation graph', () => {
   it('every model the segment lens reads has an event that reconciles it, and every event exists', () => {
     const names = new Set<string>(Object.values(AppEventName));
-    for (const model of customerRefReachedModels()) {
+    for (const model of customerRelationshipReachedModels()) {
       const events = RECONCILE_TRIGGERS[model as ModelName] ?? [];
       expect(events.length, `${model} has no reconcile trigger`).toBeGreaterThan(0);
       for (const event of events)
@@ -49,11 +55,11 @@ describe('reconcile triggers — membership follows the events', () => {
   let space: Space;
   let tag: Tag;
   let member: User;
-  let memberRef: CustomerRef;
+  let memberRef: CustomerRelationship;
 
-  const customerOf = async (user: User): Promise<CustomerRef> =>
+  const customerOf = async (user: User): Promise<CustomerRelationship> =>
     (
-      await createCustomerRef({
+      await createCustomerRelationship({
         customerModel: 'User',
         providerModel: 'Space',
         customerUserId: user.id,
@@ -120,11 +126,11 @@ describe('reconcile triggers — membership follows the events', () => {
     expect(await memberIds(segment.id)).toEqual([]);
   });
 
-  it('a user update and a new customer reference reconcile that customer', async () => {
+  it('a user update and a new customer relationship reconcile that customer', async () => {
     const segment = await liveSegment(acmeRule);
     const newcomer = (await createUser({ email: `newcomer-${getNextSeq()}@example.test` })).entity;
     const newcomerRef = await customerOf(newcomer);
-    await emitAppEvent('customerRef.created', { customerRef: newcomerRef });
+    await emitAppEvent('customerRelationship.created', { customerRelationship: newcomerRef });
     expect(await memberIds(segment.id)).toEqual([]);
 
     const renamed = await db.user.update({
@@ -136,7 +142,7 @@ describe('reconcile triggers — membership follows the events', () => {
 
     const joiner = (await createUser({ email: `joiner-${getNextSeq()}@acme.test` })).entity;
     const joinerRef = await customerOf(joiner);
-    await emitAppEvent('customerRef.created', { customerRef: joinerRef });
+    await emitAppEvent('customerRelationship.created', { customerRelationship: joinerRef });
     expect(await memberIds(segment.id)).toEqual([newcomerRef.id, joinerRef.id].sort());
   });
 });

@@ -6,7 +6,7 @@
  */
 import { createFactory } from '@template/db/test/factory';
 
-const customerRefFactory = createFactory('CustomerRef', {
+const customerRelationshipFactory = createFactory('CustomerRelationship', {
   defaults: () => ({}),
   dependencies: {
     customerUser: {
@@ -42,5 +42,5 @@ const customerRefFactory = createFactory('CustomerRef', {
   },
 });
 
-export const buildCustomerRef = customerRefFactory.build;
-export const createCustomerRef = customerRefFactory.create;
+export const buildCustomerRelationship = customerRelationshipFactory.build;
+export const createCustomerRelationship = customerRelationshipFactory.create;

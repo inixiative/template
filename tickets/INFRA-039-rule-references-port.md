@@ -72,7 +72,7 @@ template level with it.
 - [x] Dual polymorphism ids in the polymorphism registry; immutable edge ends.
 - [x] Static email scopes; `ownedSegments` without a caller where.
 - [x] One sync entry for save and revive; save-gate helpers in `validations/`; one edge reader.
-- [x] Static lens files: `customerRef/lib/lenses/` (`customerRefLens`, `customerRefsByIdLens`),
+- [x] Static lens files: `customerRelationship/lib/lenses/` (`customerRelationshipLens`, `customerRelationshipsByIdLens`),
   `lib/email/lenses/` (one sender row lens per sender model); the email registry's user entity.
 - [x] Email scopes: four static declarations in `packages/email/src/rules/scopes/`, picked by
   `emailScopeFor(owner, sender)` and bound; `clampByKind`, `EMAIL_OWNER_SCOPES`,
@@ -116,8 +116,8 @@ Segment and email callers:
 - `TENANT_EMAIL_SCOPE` / `OWNER_EMAIL_SCOPE` / `PLATFORM_OWNER_EMAIL_SCOPE` / `PLATFORM_EMAIL_SCOPE`,
   `emailScopeFor`, `emailLensBindings`, `scopeEmailLens(input, owner, sender)`; `equalsSuppliedBind`
   (`packages/db`), the branch shape for an owner id that a kind may not supply.
-- `customerRef/lib/lenses/customerRefLens`, `customerRef/lib/lenses/customerRefsByIdLens`: static;
-  `resolvedCustomerRefLens`, `ownedSegments` and `customerRefReachedModels` each in their own file
+- `customerRelationship/lib/lenses/customerRelationshipLens`, `customerRelationship/lib/lenses/customerRelationshipsByIdLens`: static;
+  `resolvedCustomerRelationshipLens`, `ownedSegments` and `customerRelationshipReachedModels` each in their own file
   beside them.
 
 ## Notes
@@ -125,7 +125,7 @@ Segment and email callers:
 - **The degraded signal is read from edges, not published.** `ruleReference.stale` had no consumer.
   A reader asks the edges (`ruleReferenceTargets`), and an alert or a job counts those rows.
 - **Lens use left in health.** Segment health still extracts which ids the stored tree
-  references through the static `customerRefLens`. That is a pure walk with no query, and it is
+  references through the static `customerRelationshipLens`. That is a pure walk with no query, and it is
   how a reference with no edge is seen. `ruleIssues` also checks the tree's vocabulary against that
   lens. Removing both would mean health cannot see a missing edge.
 - **A save that races a target's delete.** The edge writer still locks the target rows. With no

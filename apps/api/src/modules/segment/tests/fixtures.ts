@@ -9,5 +9,5 @@ export const acmeRule = {
 
 export const memberIds = async (segmentId: string): Promise<string[]> =>
   (await db.segmentMember.findMany({ where: { segmentId } }))
-    .map((member) => member.customerRefId)
+    .map((member) => member.customerRelationshipId)
     .sort();

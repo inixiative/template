@@ -32,7 +32,7 @@ user — different lenses, different provenance, one send)? And multiple sender 
 
 ## The key modeling insight to preserve
 
-For polymorphic targets ("customer refs"), **the join row is the real target** — e.g. a customer
+For polymorphic targets ("customer relationships"), **the join row is the real target** — e.g. a customer
 *rep* (the join between org and user) is what you actually address, and reasoning from the join
 resolves recipients better than overloading lenses on `User`. Explore "address the join model,
 derive the User(s) from it" before reaching for multi-lens unions — it may dissolve most of the

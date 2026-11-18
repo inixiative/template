@@ -150,7 +150,7 @@ streams immediately; the periodic re-authorization in
 [WEBSOCKETS.md](WEBSOCKETS.md#authorization-and-re-authorization) closes them within one
 interval.
 
-Segments also publish member-side `customerRef.segmentsAdded` / `customerRef.segmentsRemoved`
+Segments also publish member-side `customerRelationship.segmentsAdded` / `customerRelationship.segmentsRemoved`
 events. For User customers those target the user's sockets with a membership-query refetch.
 See [SEGMENTS.md](SEGMENTS.md#events-and-email-integration).
 

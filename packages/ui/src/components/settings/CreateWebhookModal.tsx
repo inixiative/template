@@ -12,7 +12,7 @@ import { memo, useState } from 'react';
 type CreateWebhookFormData = Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>;
 type WebhookModel = CreateWebhookFormData['model'];
 
-const webhookModelValues = ['CustomerRef'] as const satisfies readonly WebhookModel[];
+const webhookModelValues = ['CustomerRelationship'] as const satisfies readonly WebhookModel[];
 const webhookModelOptions = enumToSelectOptions<WebhookModel>(webhookModelValues);
 
 const isHttpUrl = (value: string) => {

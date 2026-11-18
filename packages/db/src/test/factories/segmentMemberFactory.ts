@@ -14,9 +14,9 @@ const segmentMemberFactory = createFactory('SegmentMember', {
       foreignKey: { id: 'segmentId' },
       required: true,
     },
-    customerRef: {
-      modelName: 'CustomerRef',
-      foreignKey: { id: 'customerRefId' },
+    customerRelationship: {
+      modelName: 'CustomerRelationship',
+      foreignKey: { id: 'customerRelationshipId' },
       required: true,
     },
   },

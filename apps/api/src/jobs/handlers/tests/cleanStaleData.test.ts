@@ -34,7 +34,7 @@ describe('cleanStaleData handler', () => {
       ownerModel: 'User',
       userId: user.id,
       url: 'https://example.com/1',
-      model: 'CustomerRef',
+      model: 'CustomerRelationship',
     });
     const { entity: oldEvent } = await createWebhookEvent(
       { status: 'success', action: 'create', resourceId: user.id, createdAt: daysAgo(91) },
@@ -72,7 +72,7 @@ describe('cleanStaleData handler', () => {
       ownerModel: 'User',
       userId: user.id,
       url: 'https://example.com/2',
-      model: 'CustomerRef',
+      model: 'CustomerRelationship',
     });
     const { entity: recent } = await createWebhookEvent(
       { status: 'success', action: 'create', resourceId: user.id, createdAt: daysAgo(89) },
@@ -89,7 +89,7 @@ describe('cleanStaleData handler', () => {
       ownerModel: 'User',
       userId: user.id,
       url: 'https://example.com/3',
-      model: 'CustomerRef',
+      model: 'CustomerRelationship',
     });
     const { entity: oldSuccess } = await createWebhookEvent(
       { status: 'success', action: 'create', resourceId: user.id, createdAt: daysAgo(100) },
@@ -128,7 +128,7 @@ describe('cleanStaleData handler', () => {
       ownerModel: 'User',
       userId: user.id,
       url: 'https://example.com/4',
-      model: 'CustomerRef',
+      model: 'CustomerRelationship',
     });
     await createWebhookEvent(
       { status: 'success', action: 'create', resourceId: user.id, createdAt: daysAgo(100) },

@@ -9,7 +9,7 @@ import { db, type RuleReferenceRow, ruleReferences, ruleReferenceTargets } from 
 import type { Segment } from '@template/db/generated/client/client';
 import { type RuleHealth, type RuleIssue, referenceKey, ruleIssues } from '@template/shared/rules';
 import { groupBy, keyBy } from 'lodash-es';
-import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
+import { customerRelationshipLens } from '#/modules/customerRelationship/lib/lenses/customerRelationshipLens';
 
 export type SegmentRuleState = { segment: Segment; health: RuleHealth; issues: RuleIssue[] };
 
@@ -21,9 +21,9 @@ const healthOf = (
 ): RuleHealth & {
   existingTargets: Set<string>;
 } => ({
-  lens: customerRefLens,
+  lens: customerRelationshipLens,
   rule: segment.conditions as Condition,
-  references: ruleReferences(customerRefLens, segment.conditions as Condition),
+  references: ruleReferences(customerRelationshipLens, segment.conditions as Condition),
   existingTargets: new Set(
     ruleReferenceTargets(edges)
       .filter((target) => target.state === 'existing')

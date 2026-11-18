@@ -16,5 +16,5 @@ export const SHARED_EMAIL_MODEL_DEFAULTS: NarrowingDefaults['models'] = {
   Segment: { where: segment, sources: { id: { label: 'name', where: segment } } },
   TagAttachment: { where: through('tag', tag) },
   SegmentMember: { where: through('segment', segment) },
-  CustomerRef: { where: polymorphicIs('CustomerRef', 'providerModel') },
+  CustomerRelationship: { where: polymorphicIs('CustomerRelationship', 'providerModel') },
 };

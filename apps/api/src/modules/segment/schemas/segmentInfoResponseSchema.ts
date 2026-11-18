@@ -36,7 +36,7 @@ export const segmentInfoResponseSchema = infoResponseSchema(
               ),
           }),
         )
-        .describe('Every field a condition may read, from `customerRefLens`.'),
+        .describe('Every field a condition may read, from `customerRelationshipLens`.'),
     })
     .describe('What a segment’s `conditions` may read.'),
 );

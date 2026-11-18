@@ -4,7 +4,7 @@
 
 ## Context
 
-Records hang from two parents of one model on different polymorphic axes: an inquiry's `sourceOrganization` and `targetOrganization` (`sourceModel` / `targetModel`), a customer ref's customer and provider. Placement is path-driven in the library (`placeUnder(map, resource, path, anchorResource, anchor)`): the path names the relation, so the side is never guessed.
+Records hang from two parents of one model on different polymorphic axes: an inquiry's `sourceOrganization` and `targetOrganization` (`sourceModel` / `targetModel`), a customer relationship's customer and provider. Placement is path-driven in the library (`placeUnder(map, resource, path, anchorResource, anchor)`): the path names the relation, so the side is never guessed.
 
 ## To do
 
