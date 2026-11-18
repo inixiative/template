@@ -13,9 +13,9 @@ const FENCED_RELEASE = `
 if redis.call('get', KEYS[1]) == ARGV[1] then
   redis.call('del', KEYS[1])
   if ARGV[2] ~= '' then
-    local superseded mark = ARGV[3] .. ARGV[2]
-    if redis.call('get', superseded mark) == ARGV[1] then
-      redis.call('del', superseded mark)
+    local supersededMarkKey = ARGV[3] .. ARGV[2]
+    if redis.call('get', supersededMarkKey) == ARGV[1] then
+      redis.call('del', supersededMarkKey)
     end
   end
 end
