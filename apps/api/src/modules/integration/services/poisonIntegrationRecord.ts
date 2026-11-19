@@ -11,14 +11,14 @@ import { integrationRecordForeignKeyForModel } from '#/modules/integration/servi
 
 export const poisonIntegrationRecord = (input: {
   integrationId: string;
-  model: WebhookModel;
+  recordModel: WebhookModel;
   resourceId: string;
   reason: string;
 }): Promise<IntegrationRecord> =>
   db.txn(async () => {
     const recordKey = {
       integrationId: input.integrationId,
-      [integrationRecordForeignKeyForModel(input.model)]: input.resourceId,
+      [integrationRecordForeignKeyForModel(input.recordModel)]: input.resourceId,
     };
     const poison = { poisonedAt: new Date(), poisonedReason: input.reason };
 
@@ -27,5 +27,7 @@ export const poisonIntegrationRecord = (input: {
     });
     if (existing?.poisonedAt) return existing;
     if (existing) return db.integrationRecord.update({ where: { id: existing.id }, data: poison });
-    return db.integrationRecord.create({ data: { ...recordKey, model: input.model, ...poison } });
+    return db.integrationRecord.create({
+      data: { ...recordKey, recordModel: input.recordModel, ...poison },
+    });
   });

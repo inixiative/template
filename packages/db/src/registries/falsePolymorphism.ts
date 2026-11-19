@@ -103,10 +103,10 @@ export const PolymorphismRegistry = {
       {
         field: 'resourceModel',
         fkMap: {
-          User: ['userId'],
-          Organization: ['organizationId'],
-          Space: ['spaceId'],
-          Project: ['projectId'],
+          User: ['resourceUserId'],
+          Organization: ['resourceOrganizationId'],
+          Space: ['resourceSpaceId'],
+          Project: ['resourceProjectId'],
         },
       },
     ],
@@ -163,12 +163,6 @@ export const PolymorphismRegistry = {
           User: ['userId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],
-        },
-      },
-      {
-        field: 'model',
-        fkMap: {
-          CustomerRelationship: [],
         },
       },
     ],
@@ -392,9 +386,9 @@ export const PolymorphismRegistry = {
   IntegrationRecord: {
     axes: [
       {
-        field: 'model',
+        field: 'recordModel',
         fkMap: {
-          CustomerRelationship: ['customerRelationshipId'],
+          CustomerRelationship: ['recordCustomerRelationshipId'],
         },
       },
     ],

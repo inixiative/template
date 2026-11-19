@@ -98,7 +98,7 @@ describe('a token of an organization member acts as that member, never as the us
     expect(await status('POST', '/me/redact')).toBe(401);
     expect(
       await status('POST', '/me/webhookSubscriptions', {
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
         url: `https://example.com/${Bun.randomUUIDv7()}`,
       }),
     ).toBe(401);

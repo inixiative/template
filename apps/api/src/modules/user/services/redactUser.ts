@@ -62,7 +62,7 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
     data: { deletedAt: now },
   });
   await db.tagAttachment.updateManyAndReturn({
-    where: { userId, deletedAt: null },
+    where: { resourceUserId: userId, deletedAt: null },
     data: { deletedAt: now },
   });
 

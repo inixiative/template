@@ -10,7 +10,7 @@ import type { Party } from '#/hooks/webhooks/parties';
 export const findPartySubscriptions = (model: WebhookModel, parties: Party[]) =>
   db.webhookSubscription.findMany({
     where: {
-      model,
+      resourceModel: model,
       isActive: true,
       ...wherePolymorphicSideIsOneOf('WebhookSubscription', 'ownerModel', parties),
     },

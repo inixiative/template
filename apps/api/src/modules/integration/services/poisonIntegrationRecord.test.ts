@@ -35,7 +35,7 @@ describe('poisonIntegrationRecord', () => {
     const { customerRelationship, integration } = await setup();
     const input = {
       integrationId: integration.id,
-      model: WebhookModel.CustomerRelationship,
+      recordModel: WebhookModel.CustomerRelationship,
       resourceId: customerRelationship.id,
     };
 
@@ -49,13 +49,13 @@ describe('poisonIntegrationRecord', () => {
   it('stamps an existing record that is not poisoned yet', async () => {
     const { customerRelationship, integration } = await setup();
     const { entity: existing } = await createIntegrationRecord(
-      { model: 'CustomerRelationship' },
+      { recordModel: 'CustomerRelationship' },
       { integration, customerRelationship },
     );
 
     const poisoned = await poisonIntegrationRecord({
       integrationId: integration.id,
-      model: WebhookModel.CustomerRelationship,
+      recordModel: WebhookModel.CustomerRelationship,
       resourceId: customerRelationship.id,
       reason: 'HTTP 422: Unprocessable Entity',
     });

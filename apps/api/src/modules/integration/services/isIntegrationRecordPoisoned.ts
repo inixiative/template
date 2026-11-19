@@ -10,13 +10,13 @@ import { integrationRecordForeignKeyForModel } from '#/modules/integration/servi
 
 export const isIntegrationRecordPoisoned = async (input: {
   integrationId: string;
-  model: WebhookModel;
+  recordModel: WebhookModel;
   resourceId: string;
 }): Promise<boolean> => {
   const record = await db.integrationRecord.findFirst({
     where: {
       integrationId: input.integrationId,
-      [integrationRecordForeignKeyForModel(input.model)]: input.resourceId,
+      [integrationRecordForeignKeyForModel(input.recordModel)]: input.resourceId,
       poisonedAt: { not: null },
     },
     select: { id: true },
