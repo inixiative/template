@@ -10,7 +10,10 @@ import type { CustomerRelationship, Segment } from '@template/db/generated/clien
 import { type ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import { branchOnRuleHealth } from '@template/shared/rules';
 import { chunk, groupBy } from 'lodash-es';
-import type { ProviderSide } from '#/modules/customerRelationship/lib/customerRelationshipSides';
+import {
+  type ProviderSide,
+  providerSideOfCustomerRelationship,
+} from '#/modules/customerRelationship/lib/customerRelationshipSides';
 import { ownedSegments } from '#/modules/customerRelationship/lib/ownedSegments';
 import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
 import { applyMembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
@@ -27,15 +30,6 @@ import {
 import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth';
 
 const PAGE_SIZE = 500;
-
-const providerSideOfRow = (customerRelationship: CustomerRelationship): ProviderSide | null => {
-  const target = rowPolymorphicAxisPointsAt(
-    customerRelationship,
-    'CustomerRelationship',
-    'providerModel',
-  );
-  return target ? { providerModel: target.kind as ProviderModel, providerId: target.id } : null;
-};
 
 export const dynamicSegmentsOf = async (
   ownerModel: ProviderModel,
@@ -59,7 +53,7 @@ const customerRelationshipIdsByProvider = (
   customerRelationships: CustomerRelationship[],
 ): (ProviderSide & { ids: string[] })[] => {
   const withProvider = customerRelationships.flatMap((customerRelationship) => {
-    const provider = providerSideOfRow(customerRelationship);
+    const provider = providerSideOfCustomerRelationship(customerRelationship);
     return provider ? [{ provider, id: customerRelationship.id }] : [];
   });
   return Object.values(

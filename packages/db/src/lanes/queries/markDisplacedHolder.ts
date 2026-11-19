@@ -7,8 +7,8 @@
 import type { RedisEval } from '@template/db/redis/types';
 
 // Runs once the new holder exists. While the lane still names it, the holder it displaced is marked
-// superseded on its own record. If a newer claim took the lane first, the new holder marks itself. A
-// record that does not exist is never created.
+// superseded on its own record. If a newer claim that exists took the lane first, the new holder marks
+// itself. A record that does not exist is never created, and never supersedes anyone.
 const MARK_DISPLACED_HOLDER = `
 local holder = redis.call('get', KEYS[1])
 local me = ARGV[1]
@@ -19,7 +19,7 @@ if holder == me then
   if previous ~= '' and previous ~= me and redis.call('exists', prefix .. previous) == 1 then
     redis.call('hset', prefix .. previous, field, me)
   end
-elseif holder and redis.call('exists', prefix .. me) == 1 then
+elseif holder and redis.call('exists', prefix .. holder) == 1 and redis.call('exists', prefix .. me) == 1 then
   redis.call('hset', prefix .. me, field, holder)
 end
 return 0

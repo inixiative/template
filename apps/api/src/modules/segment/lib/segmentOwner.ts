@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { polymorphicKeyColumn, rowPolymorphicAxisPointsAt } from '@template/db';
-import type { CustomerModel, ProviderModel } from '@template/db/generated/client/enums';
+import type { ProviderModel } from '@template/db/generated/client/enums';
 
 type OwnerColumns = { ownerModel: ProviderModel } & Record<string, unknown>;
 
@@ -17,6 +17,3 @@ export const segmentOwnerId = (segment: OwnerColumns): string =>
 
 export const customerRelationshipProviderFk = (ownerModel: ProviderModel): string =>
   polymorphicKeyColumn('CustomerRelationship', 'providerModel', ownerModel)!;
-
-export const customerRelationshipCustomerFk = (customerModel: CustomerModel): string =>
-  polymorphicKeyColumn('CustomerRelationship', 'customerModel', customerModel)!;

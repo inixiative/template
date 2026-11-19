@@ -4,15 +4,16 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { polymorphicKeyColumn } from '@template/db/registries/polymorphicAxisPointsAt';
+import {
+  type PointedAtRecord,
+  polymorphicKeyColumn,
+} from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
-
-export type PolymorphicTarget = { kind: string; id: string };
 
 export const wherePolymorphicSideIsOneOf = (
   model: ModelName,
   sideField: string,
-  targets: PolymorphicTarget[],
+  targets: PointedAtRecord[],
 ): { OR: Record<string, unknown>[] } => {
   const idsByKind = new Map<string, Set<string>>();
   for (const { kind, id } of targets)

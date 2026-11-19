@@ -66,6 +66,8 @@ export const axisTargetIdColumn = (
   value: string,
 ): string | null => axis.dualPolymorphismId ?? polymorphicKeyColumn(model, axis.field, value);
 
+export type PointedAtRecord = { kind: string; id: string };
+
 /**
  * The row a false-polymorphic axis points at, its kind and id, or null when it points at nobody.
  * A dual axis names it by its dual polymorphism id, and by the typed FK until that id is written.
@@ -74,7 +76,7 @@ export const rowPolymorphicAxisPointsAt = (
   row: Record<string, unknown>,
   model: ModelName,
   axisField: string,
-): { kind: string; id: string } | null => {
+): PointedAtRecord | null => {
   const kind = row[axisField];
   if (typeof kind !== 'string') return null;
   const { dualPolymorphismId } = polymorphicAxis(model, axisField);

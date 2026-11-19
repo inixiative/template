@@ -69,11 +69,13 @@ export const makeSupersedingJob = <TPayload = void>(
     });
 
     const parentId = job.parent?.id;
+    let parentLane: string | undefined;
     try {
       if (job.id && (await isSupersededBeforeStart(job.id, parentId, lane))) {
         log.info(`Job ${job.id} already superseded before start`, LogScope.job);
         return;
       }
+      if (parentId) parentLane = await parentLaneOf(ctx.queue, parentId);
     } catch (err) {
       log.error(
         `Supersession check failed at job start (${job.id}) — continuing`,
@@ -82,7 +84,6 @@ export const makeSupersedingJob = <TPayload = void>(
       );
     }
 
-    const parentLane = parentId ? await parentLaneOf(ctx.queue, parentId) : undefined;
     const stopWatch = watchLane(
       jobLaneStore,
       {

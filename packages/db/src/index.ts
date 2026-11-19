@@ -105,6 +105,7 @@ export {
   conditionPolymorphicAxisPointsAtBoundRow,
   isArmColumns,
   isBindableOwnerModel,
+  type PointedAtRecord,
   polymorphicBindings,
   polymorphicKeyColumn,
   polymorphicKeyColumns,

@@ -69,9 +69,19 @@ describe('supersede lanes', () => {
     const lane = laneKey('h', 'race');
     const previous = await claimLane(store, lane, 'job-b');
     await claimLane(store, lane, 'job-c');
+    await createHolderRecord('job-c');
     await createHolderRecord('job-b');
     await markDisplacedHolder(store, lane, 'job-b', previous);
     expect(await fetchSupersededBy(store, 'job-b')).toBe('job-c');
+  });
+
+  test('a newer claim whose add failed never supersedes the job that was added', async () => {
+    const lane = laneKey('h', 'failed-add');
+    const previous = await claimLane(store, lane, 'job-b');
+    await claimLane(store, lane, 'job-c');
+    await createHolderRecord('job-b');
+    await markDisplacedHolder(store, lane, 'job-b', previous);
+    expect(await fetchSupersededBy(store, 'job-b')).toBeNull();
   });
 
   test('claimLaneUnlessNewerHolder takes a vacant lane or one held by an older holder', async () => {

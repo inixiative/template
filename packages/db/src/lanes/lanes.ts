@@ -11,6 +11,7 @@ import {
 import { evictingClaim } from '@template/db/lanes/queries/evictingClaim';
 import { markDisplacedHolder as markDisplacedHolderQuery } from '@template/db/lanes/queries/markDisplacedHolder';
 import { pollLane } from '@template/db/lanes/queries/pollLane';
+import { fencedRefresh } from '@template/db/lock/queries/fencedRefresh';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import type { RedisEval } from '@template/db/redis/types';
 import { startHeartbeat } from '@template/shared/utils';
@@ -21,7 +22,7 @@ const PARKED_LANE_TTL_SEC = 3 * 60 * 60;
 const LANE_POLL_MS = 500;
 
 export type LaneStore = {
-  redis: RedisEval & Pick<Redis, 'get' | 'hget' | 'expire'>;
+  redis: RedisEval & Pick<Redis, 'hget'>;
   holderKeyPrefix: string;
   supersededField: string;
 };
@@ -66,15 +67,11 @@ export const fetchSupersededBy = (
   holderId: string,
 ): Promise<string | null> => redis.hget(`${holderKeyPrefix}${holderId}`, supersededField);
 
-export const holdLaneWhileParked = async (
+export const holdLaneWhileParked = (
   { redis }: LaneStore,
   lane: string,
   holderId: string,
-): Promise<boolean> => {
-  if ((await redis.get(lane)) !== holderId) return false;
-  await redis.expire(lane, PARKED_LANE_TTL_SEC);
-  return true;
-};
+): Promise<boolean> => fencedRefresh(redis, lane, holderId, PARKED_LANE_TTL_SEC * 1000);
 
 export type WatchedLane = {
   lane: string;

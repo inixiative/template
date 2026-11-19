@@ -7,10 +7,8 @@
 import type { Contact } from '@template/db/generated/client/client';
 import { organizationContactUpsert } from '#/appEvents/handlers/contact/organizationContactsStream';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import {
-  customerSideOfRow,
-  enqueueSegmentReconcileForCustomers,
-} from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
+import { customerSideOfRow } from '#/modules/customerRelationship/lib/customerRelationshipSides';
+import { enqueueSegmentReconcileForCustomers } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
 export type ContactCreatedPayload = { contact: Contact };
 
