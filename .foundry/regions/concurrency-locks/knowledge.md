@@ -548,7 +548,7 @@ const stop = watchLane(store, { lane, holderId: jobId }, () => abortThisJob());
 ```
 
 - `claimLane` only takes the baton, with a TTL covering the job's delay (`LANE_TTL_SEC` plus the delay).
-- `markDisplacedHolder` runs once the new holder exists. While the lane still names it, the displaced holder's record gets the field; if a newer claim got there first, the new holder marks itself. It never creates a record that does not exist.
+- `markDisplacedHolder` runs once the new holder exists. While the lane still names it, the displaced holder's record gets the field; if a newer claim that exists got there first, the new holder marks itself. It never creates a record that does not exist.
 - A failed add throws and leaves nothing to undo: no mark was written, and a baton naming a holder with no record counts as no holder.
 - `claimLaneUnlessNewerHolder` takes the baton unless a newer holder that exists holds it (holder ids are uuidv7, so a string compare is an age compare). A job's start and the outbox drain use it.
 - `watchLane` polls (`LANE_POLL_MS`) in one script: it fires when the holder's record says it was superseded, when its parent's record does (copying the superseder onto its own record so its own children stop), or when another holder with a record takes the lane. Otherwise it refreshes its own baton, and its parent's while the parent still holds it.

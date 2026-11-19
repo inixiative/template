@@ -108,6 +108,7 @@ export {
   type PointedAtRecord,
   polymorphicBindings,
   polymorphicKeyColumn,
+  polymorphicKeyColumnOrThrow,
   polymorphicKeyColumns,
   rowPolymorphicAxisPointsAt,
 } from './registries/polymorphicAxisPointsAt';

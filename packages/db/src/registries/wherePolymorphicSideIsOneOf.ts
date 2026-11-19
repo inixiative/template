@@ -6,7 +6,7 @@
  */
 import {
   type PointedAtRecord,
-  polymorphicKeyColumn,
+  polymorphicKeyColumnOrThrow,
 } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
 
@@ -20,9 +20,10 @@ export const wherePolymorphicSideIsOneOf = (
     idsByKind.set(kind, (idsByKind.get(kind) ?? new Set()).add(id));
   return {
     OR: [...idsByKind].map(([kind, ids]) => {
-      const column = polymorphicKeyColumn(model, sideField, kind);
-      if (!column) throw new Error(`${model}.${sideField} has no ${kind} arm`);
-      return { [sideField]: kind, [column]: { in: [...ids] } };
+      return {
+        [sideField]: kind,
+        [polymorphicKeyColumnOrThrow(model, sideField, kind)]: { in: [...ids] },
+      };
     }),
   };
 };

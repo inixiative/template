@@ -9,6 +9,7 @@ import {
   type FalsePolymorphismRef,
   isBindableOwnerModel,
   isFalsePolymorphismRef,
+  type PointedAtRecord,
   polymorphicKeyColumn,
   polymorphismConfigForModel,
   rowPolymorphicAxisPointsAt,
@@ -19,7 +20,7 @@ import type { WebhookModel } from '@template/db/generated/client/client';
 import { groupBy, keyBy, mergeWith } from 'lodash-es';
 
 export type WebhookRow = Record<string, unknown> & { id: string };
-export type Party = { kind: BindableOwnerModel; id: string };
+export type Party = PointedAtRecord & { kind: BindableOwnerModel };
 
 const axisParty = (model: WebhookModel, row: Record<string, unknown>, axis: string): Party[] => {
   const target = rowPolymorphicAxisPointsAt(row, model, axis);

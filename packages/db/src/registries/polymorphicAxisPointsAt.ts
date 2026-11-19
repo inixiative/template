@@ -59,6 +59,19 @@ export const polymorphicKeyColumn = (
   return idColumn;
 };
 
+export const polymorphicKeyColumnOrThrow = (
+  model: ModelName,
+  axisField: string,
+  value: string,
+): string => {
+  const column = polymorphicKeyColumn(model, axisField, value);
+  if (!column)
+    throw new Error(
+      `${model}.${axisField} has no ${value} arm — add its key column to the schema and to PolymorphismRegistry`,
+    );
+  return column;
+};
+
 /** The column naming the row an axis points at: its dual polymorphism id when it has one, else the arm's id column. */
 export const axisTargetIdColumn = (
   model: ModelName,
