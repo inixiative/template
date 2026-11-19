@@ -9,7 +9,7 @@ import {
   db,
   type HookOptions,
   HookTiming,
-  polymorphicKeyColumn,
+  polymorphicKeyColumnOrThrow,
   registerDbHook,
 } from '@template/db';
 import type { Entitlement, Prisma } from '@template/db/generated/client/client';
@@ -58,7 +58,7 @@ export const registerEntitlementChangeRequestsHook = () => {
             type: InquiryType.changeEntitlements,
             status: { notIn: inquiryTerminalStatuses },
             targetModel: model,
-            [polymorphicKeyColumn('Inquiry', 'targetModel', model) as string]: targetId,
+            [polymorphicKeyColumnOrThrow('Inquiry', 'targetModel', model)]: targetId,
             ...(resolving ? { id: { not: resolving } } : {}),
           },
         });

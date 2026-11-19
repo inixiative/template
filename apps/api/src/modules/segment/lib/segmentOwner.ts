@@ -4,16 +4,16 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { polymorphicKeyColumn, rowPolymorphicAxisPointsAt } from '@template/db';
+import { polymorphicKeyColumnOrThrow, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 
 type OwnerColumns = { ownerModel: ProviderModel } & Record<string, unknown>;
 
 export const segmentOwnerFk = (ownerModel: ProviderModel): string =>
-  polymorphicKeyColumn('Segment', 'ownerModel', ownerModel)!;
+  polymorphicKeyColumnOrThrow('Segment', 'ownerModel', ownerModel);
 
 export const segmentOwnerId = (segment: OwnerColumns): string =>
   rowPolymorphicAxisPointsAt(segment, 'Segment', 'ownerModel')!.id;
 
 export const customerRelationshipProviderFk = (ownerModel: ProviderModel): string =>
-  polymorphicKeyColumn('CustomerRelationship', 'providerModel', ownerModel)!;
+  polymorphicKeyColumnOrThrow('CustomerRelationship', 'providerModel', ownerModel);
