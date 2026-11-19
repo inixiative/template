@@ -19,8 +19,8 @@
     "./roles/*": "./src/roles/*"
   },
   "dependencies": {
-    "@inixiative/field-map": "^0.1.1",
-    "@inixiative/permissions": "^0.24.0",
+    "@inixiative/field-map": "^0.1.2",
+    "@inixiative/permissions": "^0.25.0",
     "@template/db": "workspace:*",
     "lodash-es": "^4.18.1",
     "zod": "^4.3.6"

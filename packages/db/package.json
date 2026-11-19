@@ -38,9 +38,9 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@inixiative/field-map": "^0.1.1",
+    "@inixiative/field-map": "^0.1.2",
     "@inixiative/json-rules": "^4.2.0",
-    "@inixiative/permissions": "^0.24.0",
+    "@inixiative/permissions": "^0.25.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@supercharge/promise-pool": "^3.3.0",

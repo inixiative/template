@@ -22,7 +22,7 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@inixiative/field-map": "^0.1.1",
+    "@inixiative/field-map": "^0.1.2",
     "@inixiative/json-rules": "^4.2.0",
     "@inixiative/rules-builder": "^0.33.0",
     "@template/db": "workspace:*",
