@@ -9,13 +9,13 @@ import { prismaMap } from '@template/db/generated/prismaMap';
 import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 
-const defaultOf = (modelName: ModelName, field: string) => {
+export const columnDefaultOf = (modelName: ModelName, field: string) => {
   const entry = fieldOf(prismaMap, modelName, field);
   return entry && 'default' in entry ? entry.default : undefined;
 };
 
 export const discriminatorDefault = (modelName: ModelName, field: string): unknown => {
-  const fieldDefault = defaultOf(modelName, field);
+  const fieldDefault = columnDefaultOf(modelName, field);
   return fieldDefault?.kind === 'literal' ? fieldDefault.value : undefined;
 };
 
