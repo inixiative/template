@@ -1,9 +1,12 @@
 // ============================================================================
 // SEGMENT MEMBER - One customer relationship's membership in one segment
 // ============================================================================
-// Append/delete lifecycle, no soft delete: a membership either holds or it
-// does not. Rows are written only by the reconcile jobs, which diff the
-// segment's rule against the live set. The member's customer relationship must
+// Soft-deleted: a member that leaves is tombstoned, so the entitlements
+// anchored at it and the rules naming it are degraded rather than left naming
+// a live row; it is tombstoned and revived with its segment. A member that
+// comes back is a new live row (the unique holds over live rows only). Rows are
+// written only by the reconcile jobs, which diff the segment's rule against
+// the live set. The member's customer relationship must
 // belong to the segment's owner as its provider (segmentMemberOwner hook).
 
 model SegmentMember {
@@ -11,6 +14,7 @@ model SegmentMember {
   sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
   targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
   createdAt            DateTime        @default(now())
+  deletedAt            DateTime?
 
   segmentId String  @db.VarChar(36)
   segment   Segment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
@@ -22,6 +26,7 @@ model SegmentMember {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@unique([segmentId, customerRelationshipId])
+  @@unique([segmentId, customerRelationshipId], where: raw("\"deletedAt\" IS NULL"), map: "SegmentMember_segment_customerRelationship_key")
+  @@index([segmentId])
   @@index([customerRelationshipId])
 }

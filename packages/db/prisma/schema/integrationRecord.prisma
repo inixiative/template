@@ -6,12 +6,14 @@
 // (PolymorphismRegistry.IntegrationRecord). The only standing today is
 // poisoned: the integration rejected this record terminally while its
 // subscription kept delivering other records, so sendWebhook skips it.
-// Nothing clears poisonedAt yet.
+// Nothing clears poisonedAt yet. Soft-deleted with its integration and its
+// record, and revived with them.
 
 model IntegrationRecord {
   id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   integrationId String      @db.VarChar(36)
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
@@ -31,7 +33,7 @@ model IntegrationRecord {
 
   // Per-record uniqueness — partial uniques (see Contact for rationale). Each
   // partial doubles as the lookup index for that record column.
-  @@unique([integrationId, customerRelationshipId], where: { customerRelationshipId: { not: null } })
+  @@unique([integrationId, customerRelationshipId], where: raw("\"customerRelationshipId\" IS NOT NULL AND \"deletedAt\" IS NULL"), map: "IntegrationRecord_integration_customerRelationship_key")
   @@index([integrationId])
   @@index([customerRelationshipId])
 }
