@@ -415,8 +415,9 @@ A polymorphic slot is named for the role the row plays, as `<side>Model` + typed
 
 Never `referenced*`.
 
-A side whose typed FKs are `onDelete: SetNull` keeps a plain id beside them: register the axis with
-`dualPolymorphismId` (`sourceId`, `targetId`) in `packages/db/src/registries/falsePolymorphism.ts`. Why:
+A side whose typed FKs are `onDelete: SetNull` to a model that can be hard-deleted keeps a plain id beside
+them: register the axis with `dualPolymorphismId` (`sourceId`, `targetId`, `subjectId`) in
+`packages/db/src/registries/falsePolymorphism.ts`. A soft-delete target is never hard-deleted and needs none. Why:
 SetNull nulls the typed key when the row it points at is hard-deleted, and only the plain id still says
 what it was; the required-FK rule accepts it in the key's place. CI rule
 `set-null-arm-requires-dual-polymorphism-id` enforces this; `Cascade` arms are exempt.

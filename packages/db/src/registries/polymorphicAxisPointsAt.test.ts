@@ -39,12 +39,22 @@ describe('conditionPolymorphicAxisPointsAtBoundRow', () => {
     ).not.toBe(true);
   });
 
-  it('refuses an axis the registry does not declare, and a kind no single key binds', () => {
+  it('refuses an axis the registry does not declare', () => {
     expect(() => conditionPolymorphicAxisPointsAtBoundRow('Tag', 'nope')).toThrow(
       'no false-polymorphic axis',
     );
-    expect(() => conditionPolymorphicAxisPointsAtBoundRow('EmailTemplate', 'ownerModel')).toThrow(
-      'no single kind binds',
+  });
+
+  it('a composite arm binds through its own id column: a Space owner through spaceId', () => {
+    const bound = bindRule(
+      conditionPolymorphicAxisPointsAtBoundRow('EmailTemplate', 'ownerModel'),
+      polymorphicBindings('Space', 'space-1'),
     );
+    expect(check(bound, { ownerModel: 'Space', organizationId: 'org-1', spaceId: 'space-1' })).toBe(
+      true,
+    );
+    expect(
+      check(bound, { ownerModel: 'Space', organizationId: 'org-1', spaceId: 'space-2' }),
+    ).not.toBe(true);
   });
 });

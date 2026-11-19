@@ -87,6 +87,7 @@ const buildAuditEntry = (
   return {
     action,
     subjectModel: model,
+    subjectId: typeof record.id === 'string' ? record.id : null,
     before: (processedBefore as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     after: (processedAfter as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     changes: (processedChanges as Prisma.InputJsonValue) ?? Prisma.JsonNull,

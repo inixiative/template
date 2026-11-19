@@ -25,6 +25,7 @@ export const createVersionBumpSnapshot = async (
   const entry: Prisma.AuditLogCreateManyInput = {
     action: AuditAction.update,
     subjectModel: model,
+    subjectId: typeof record.id === 'string' ? record.id : null,
     before: processed,
     after: processed,
     changes: Prisma.JsonNull,

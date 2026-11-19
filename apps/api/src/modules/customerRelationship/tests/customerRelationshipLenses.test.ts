@@ -10,8 +10,7 @@ const OWNER = '00000000-0000-7000-8000-0000000000aa';
 const IDS = ['00000000-0000-7000-8000-0000000000b1', '00000000-0000-7000-8000-0000000000b2'];
 const OWNER_MODELS = ['Organization', 'Space', 'User'] as const;
 
-const DECLARED_BY_THE_DELETED_CUSTOMER_BUILDER =
-  '0db117a351980990de285cc1039c30132f371996cb7d14b9ed35c30b24f9f19e';
+const DECLARED_LAYER = '3d9feb6f90d8a70125401ab48e37d60b9ff37e45c55ea04b3c507ff9a0c76394';
 
 const sortedKeys = (value: unknown): unknown =>
   Array.isArray(value)
@@ -39,10 +38,8 @@ describe('the customer relationship lenses', () => {
     }
   });
 
-  it('customerRelationshipLens declares exactly the layer the deleted customer() builder produced', () => {
-    expect(declaredLayerDigest(customerRelationshipLens)).toBe(
-      DECLARED_BY_THE_DELETED_CUSTOMER_BUILDER,
-    );
+  it('customerRelationshipLens declares exactly its pinned layer (a Space-sent communication carries its organization)', () => {
+    expect(declaredLayerDigest(customerRelationshipLens)).toBe(DECLARED_LAYER);
   });
 
   it('customerRelationshipsByIdLens, bound, is the narrowing hydrateCustomerRelationships assembled per call', () => {

@@ -346,6 +346,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'subjectModel',
+        dualPolymorphismId: 'subjectId',
         fkMap: {
           User: ['subjectUserId'],
           Organization: ['subjectOrganizationId'],
@@ -403,9 +404,9 @@ export const PolymorphismRegistry = {
           admin: [],
           User: ['senderUserId'],
           Organization: ['senderOrganizationId'],
-          Space: ['senderSpaceId'],
-          OrganizationUser: ['senderUserId', 'senderOrganizationId'],
-          SpaceUser: ['senderUserId', 'senderSpaceId'],
+          Space: ['senderOrganizationId', 'senderSpaceId'],
+          OrganizationUser: ['senderOrganizationId', 'senderUserId'],
+          SpaceUser: ['senderOrganizationId', 'senderSpaceId', 'senderUserId'],
         },
       },
     ],

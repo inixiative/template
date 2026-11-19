@@ -122,9 +122,12 @@ export const conditionPolymorphicAxisPointsAtBoundRow = (
     string,
     readonly string[],
   ][];
+  const idColumnOf = (value: string, fks: readonly string[]): string | undefined =>
+    fks.length === 1 ? fks[0] : polymorphicArmColumns(model, axisField, value).id;
   const kindOf = (fk: string): BindableOwnerModel | undefined =>
     entries.find(
-      ([value, fks]) => isBindableOwnerModel(value) && fks.length === 1 && fks[0] === fk,
+      ([value, fks]) =>
+        isBindableOwnerModel(value) && fks.length > 0 && idColumnOf(value, fks) === fk,
     )?.[0] as BindableOwnerModel | undefined;
   const columns = [...new Set(entries.flatMap(([, fks]) => fks))];
   for (const [value, fks] of entries) {

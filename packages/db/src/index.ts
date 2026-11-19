@@ -170,7 +170,7 @@ export {
   toModelName,
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
-export { polymorphicArmRelation } from './utils/polymorphicArmKeys';
+export { polymorphicArmKeys, polymorphicArmRelation } from './utils/polymorphicArmKeys';
 export { relationsOfModel } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';
