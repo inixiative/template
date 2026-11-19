@@ -102,6 +102,9 @@ const foreignKeyGiven = (dep: DependencyConfig, scalarFields: Record<string, unk
 export const registeredDependencies = (modelName: ModelName) =>
   factoryRegistry.get(modelName)?.dependencies ?? {};
 
+export const registeredDefaults = (modelName: ModelName) =>
+  factoryRegistry.get(modelName)?.defaults;
+
 export const registerFactory = <K extends ModelName>(
   modelName: K,
   config: FactoryConfig<K>,

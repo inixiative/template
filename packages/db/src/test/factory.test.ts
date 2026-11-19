@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { faker } from '@faker-js/faker';
-import { Role } from '@template/db/generated/client/client';
 import {
-  nextFactorySequenceNumber,
-  registerFactory,
-  resetSequence,
-} from '@template/db/test/factory';
+  buildOrganizationUser,
+  buildSession,
+  buildToken,
+  buildUser,
+} from '@template/db/test/factories';
+import { nextFactorySequenceNumber, resetSequence } from '@template/db/test/factory';
 
 beforeEach(() => {
   resetSequence();
@@ -14,52 +14,22 @@ beforeEach(() => {
 describe('registerFactory', () => {
   describe('build (in-memory)', () => {
     it('User - builds with defaults', async () => {
-      const userFactory = registerFactory('User', {
-        defaults: () => ({
-          email: `user-${nextFactorySequenceNumber()}@test.com`,
-          emailVerified: true,
-          name: faker.person.fullName(),
-        }),
-      });
-
-      const { entity: user, context } = await userFactory.build();
+      const { entity: user, context } = await buildUser();
 
       expect(user.id).toBeDefined();
-      expect(user.email).toMatch(/^user-\d+@test\.com$/);
+      expect(user.email).toMatch(/^user-\d+@/);
       expect(user.emailVerified).toBe(true);
       expect(context.user).toBe(user);
     });
 
     it('User - builds with overrides', async () => {
-      const userFactory = registerFactory('User', {
-        defaults: () => ({
-          email: `user-${nextFactorySequenceNumber()}@test.com`,
-          emailVerified: true,
-        }),
-      });
-
-      const { entity: user } = await userFactory.build({ email: 'custom@test.com' });
+      const { entity: user } = await buildUser({ email: 'custom@test.com' });
 
       expect(user.email).toBe('custom@test.com');
     });
 
     it('Session - auto-creates User dependency', async () => {
-      // Register User factory first
-      registerFactory('User', {
-        defaults: () => ({
-          email: `user-${nextFactorySequenceNumber()}@test.com`,
-          emailVerified: true,
-        }),
-      });
-
-      const sessionFactory = registerFactory('Session', {
-        defaults: () => ({
-          token: faker.string.alphanumeric(32),
-          expiresAt: new Date(Date.now() + 86400000),
-        }),
-      });
-
-      const { entity: session, context } = await sessionFactory.build();
+      const { entity: session, context } = await buildSession();
 
       expect(session.userId).toBeDefined();
       expect(context.user).toBeDefined();
@@ -67,133 +37,38 @@ describe('registerFactory', () => {
     });
 
     it('Session - uses existing User from context', async () => {
-      const userFactory = registerFactory('User', {
-        defaults: () => ({
-          email: `user-${nextFactorySequenceNumber()}@test.com`,
-          emailVerified: true,
-        }),
-      });
+      const { entity: user, context } = await buildUser();
 
-      const sessionFactory = registerFactory('Session', {
-        defaults: () => ({
-          token: faker.string.alphanumeric(32),
-          expiresAt: new Date(Date.now() + 86400000),
-        }),
-      });
-
-      // Build user first
-      const { entity: user, context } = await userFactory.build();
-
-      // Build session with existing context
-      const { entity: session } = await sessionFactory.build(undefined, context);
+      const { entity: session } = await buildSession(undefined, context);
 
       expect(session.userId).toBe(user.id);
     });
 
     it('OrganizationUser - auto-creates both User and Organization', async () => {
-      registerFactory('User', {
-        defaults: () => ({
-          email: `user-${nextFactorySequenceNumber()}@test.com`,
-          emailVerified: true,
-        }),
-      });
-
-      registerFactory('Organization', {
-        defaults: () => ({
-          name: faker.company.name(),
-          slug: `org-${nextFactorySequenceNumber()}`,
-        }),
-      });
-
-      const orgUserFactory = registerFactory('OrganizationUser', {
-        defaults: () => ({
-          role: Role.member,
-        }),
-      });
-
-      const { entity: orgUser, context } = await orgUserFactory.build();
+      const { entity: orgUser, context } = await buildOrganizationUser();
 
       expect(orgUser.userId).toBe(context.user!.id);
       expect(orgUser.organizationId).toBe(context.organization!.id);
     });
 
     it('Session - uses existing User passed via context', async () => {
-      const userFactory = registerFactory('User', {
-        defaults: () => ({
-          email: `user-${nextFactorySequenceNumber()}@test.com`,
-          emailVerified: true,
-        }),
-      });
+      const { entity: user } = await buildUser();
 
-      const sessionFactory = registerFactory('Session', {
-        defaults: () => ({
-          token: faker.string.alphanumeric(32),
-          expiresAt: new Date(Date.now() + 86400000),
-        }),
-      });
-
-      // Build user first
-      const { entity: user } = await userFactory.build();
-
-      // Pass existing user via context (type-safe approach)
-      const { entity: session, context } = await sessionFactory.build(undefined, { user });
+      const { entity: session, context } = await buildSession(undefined, { user });
 
       expect(session.userId).toBe(user.id);
       expect(context.user).toBe(user);
     });
 
     it('Token with OrganizationUser - composite FK via ref override', async () => {
-      registerFactory('User', {
-        defaults: () => ({
-          email: `user-${nextFactorySequenceNumber()}@test.com`,
-          emailVerified: true,
-        }),
-      });
-
-      registerFactory('Organization', {
-        defaults: () => ({
-          name: faker.company.name(),
-          slug: `org-${nextFactorySequenceNumber()}`,
-        }),
-      });
-
-      registerFactory('OrganizationUser', {
-        defaults: () => ({
-          role: Role.member,
-        }),
-      });
-
-      const tokenFactory = registerFactory('Token', {
-        defaults: () => ({
-          name: 'Test Token',
-          keyHash: faker.string.alphanumeric(64),
-          keyPrefix: faker.string.alphanumeric(16),
-          role: Role.member,
-          isActive: true,
-        }),
-        dependencies: {
-          organizationUser: {
-            modelName: 'OrganizationUser',
-            foreignKey: { organizationId: 'organizationId', userId: 'userId' },
-            required: false,
-          },
-          space: null,
-          spaceUser: null,
-          integration: null,
-        },
-      });
-
-      // Pass organizationUser: {} to trigger creation
-      const { entity: token, context } = await tokenFactory.build({
+      const { entity: token, context } = await buildToken({
         ownerModel: 'OrganizationUser',
         organizationUser: {},
       });
 
-      // Token should have both FKs from the created OrganizationUser
       expect(context.organizationUser).toBeDefined();
       expect(token.userId).toBe(context.organizationUser!.userId);
       expect(token.organizationId).toBe(context.organizationUser!.organizationId);
-      // OrganizationUser should have created User and Organization
       expect(context.user).toBeDefined();
       expect(context.organization).toBeDefined();
     });
