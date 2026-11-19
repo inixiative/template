@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { db, type OwnerKeys, whereAxisCarriesOwnerKeys } from '@template/db';
+import { db, type OwnerKeys, wherePolymorphicSideIsOneOf } from '@template/db';
 import type { Prisma } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -164,7 +164,9 @@ describe('an inquiry carries the owner keys of the record each side names (Aron,
           .sort();
 
       for (const [view, { owner, holds }] of Object.entries(views)) {
-        const carried = await listed(whereAxisCarriesOwnerKeys('Inquiry', `${side}Model`, owner));
+        const carried = await listed(
+          wherePolymorphicSideIsOneOf('Inquiry', `${side}Model`, [{ ownerKeys: owner }]),
+        );
         expect({ view, carried }).toEqual({ view, carried: [...holds].sort() });
       }
     });

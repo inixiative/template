@@ -37,6 +37,40 @@ describe('wherePolymorphicSideIsOneOf', () => {
       wherePolymorphicSideIsOneOf('RuleReference', 'sourceModel', [
         { model: 'EmailTemplate', id: 't1' },
       ]),
-    ).toEqual({ OR: [{ sourceModel: 'EmailTemplate', sourceId: { in: ['t1'] } }] });
+    ).toEqual({ sourceModel: 'EmailTemplate', sourceId: { in: ['t1'] } });
+  });
+
+  it('an owner match is one flat filter on the side’s columns: the owner and what carries its keys', () => {
+    expect(
+      wherePolymorphicSideIsOneOf('Inquiry', 'targetModel', [
+        { ownerKeys: { Organization: 'o1', Space: 's1', User: null } },
+      ]),
+    ).toEqual({ targetOrganizationId: 'o1', targetSpaceId: 's1', targetUserId: null });
+  });
+
+  it('several sides: rows where any of them matches', () => {
+    expect(
+      wherePolymorphicSideIsOneOf(
+        'Inquiry',
+        ['sourceModel', 'targetModel'],
+        [{ ownerKeys: { Organization: 'o1', Space: null, User: null } }],
+      ),
+    ).toEqual({
+      OR: [
+        { sourceOrganizationId: 'o1', sourceSpaceId: null, sourceUserId: null },
+        { targetOrganizationId: 'o1', targetSpaceId: null, targetUserId: null },
+      ],
+    });
+  });
+
+  it('rows and owners mix on one side', () => {
+    expect(
+      wherePolymorphicSideIsOneOf('Inquiry', 'targetModel', [
+        { model: 'Token', id: 't1' },
+        { ownerKeys: { User: 'u1' } },
+      ]),
+    ).toEqual({
+      OR: [{ targetModel: 'Token', targetTokenId: { in: ['t1'] } }, { targetUserId: 'u1' }],
+    });
   });
 });

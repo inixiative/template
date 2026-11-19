@@ -3,7 +3,7 @@
  * @kind controller
  * @partOf feature:tenancy
  */
-import { whereAxisCarriesOwnerKeys } from '@template/db';
+import { wherePolymorphicSideIsOneOf } from '@template/db';
 import { contextResource } from '#/lib/context/contextResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
@@ -17,11 +17,15 @@ export const spaceReadManyInquiriesSentController = makeController(
     const space = contextResource<'space'>(c);
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', {
-          Organization: space.organizationId,
-          Space: space.id,
-          User: null,
-        }),
+        ...wherePolymorphicSideIsOneOf('Inquiry', 'sourceModel', [
+          {
+            ownerKeys: {
+              Organization: space.organizationId,
+              Space: space.id,
+              User: null,
+            },
+          },
+        ]),
       },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },

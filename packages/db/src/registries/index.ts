@@ -18,7 +18,6 @@ export * from './hardDeleteOnTombstone';
 export * from './internalFields';
 export * from './noopFields';
 export * from './orderedList';
-export * from './ownerWhere';
 export * from './parentEdges';
 export * from './sensitiveFields';
 export * from './skipRevive';
