@@ -254,7 +254,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - `scripts/ci/rule-violations/no-jest/fail/import`
 - `scripts/ci/rule-violations/no-jest/fail/global`
 
-A rule exits 1 for a reported violation and 2 when it crashed (a TypeScript detector's uncaught error, through `ciRuleRunner.ts`). A `fail` case passes its self-test only on exit 1, so a case cannot pass because its detector threw: a detector reports what it cannot read as a violation instead of throwing.
+A rule exits 1 for a reported violation and 2 when it crashed (a TypeScript detector's uncaught error or unhandled rejection, through `scripts/ci/rules/lib/exitTwoWhenDetectorCrashes.ts`, which every detector imports directly or through `ciRuleRunner.ts`). A `fail` case passes its self-test only on exit 1, so a case cannot pass because its detector threw: a detector reports what it cannot read as a violation instead of throwing.
 
 **no-jest.sh:**
 - Fails on Jest dependencies in `package.json`

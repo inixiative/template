@@ -13,17 +13,11 @@
  * A key names the violation by content (model, mount path, function and parameter, SQL text), never
  * by line, so unrelated edits do not churn it and a new violation does not inherit a fixed one's key.
  */
+import './exitTwoWhenDetectorCrashes';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 export type Violation = { file: string; line: number; key: string; detail: string };
-
-/** A detector that throws exits 2, never 1, so a crash is never read as a reported violation. */
-export const DETECTOR_CRASHED_EXIT_CODE = 2;
-process.on('uncaughtException', (error) => {
-  console.error(error);
-  process.exit(DETECTOR_CRASHED_EXIT_CODE);
-});
 
 export const ROOT = process.cwd();
 
