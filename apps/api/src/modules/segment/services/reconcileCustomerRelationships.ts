@@ -5,7 +5,6 @@
  * @uses infrastructure:prisma
  */
 import { check, narrowRule } from '@inixiative/json-rules';
-import { rowPolymorphicAxisPointsAt } from '@template/db';
 import type { CustomerRelationship, Segment } from '@template/db/generated/client/client';
 import { type ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import { branchOnRuleHealth } from '@template/shared/rules';

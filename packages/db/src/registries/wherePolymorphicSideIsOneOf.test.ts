@@ -31,4 +31,12 @@ describe('wherePolymorphicSideIsOneOf', () => {
       ]),
     ).toThrow('CustomerRelationship.customerModel has no Tag arm');
   });
+
+  it('a dual side matches on its dual id, not the typed foreign key a hard delete nulls', () => {
+    expect(
+      wherePolymorphicSideIsOneOf('RuleReference', 'sourceModel', [
+        { kind: 'EmailTemplate', id: 't1' },
+      ]),
+    ).toEqual({ OR: [{ sourceModel: 'EmailTemplate', sourceId: { in: ['t1'] } }] });
+  });
 });
