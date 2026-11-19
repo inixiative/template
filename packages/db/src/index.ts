@@ -29,14 +29,14 @@ export { fetchCachedRecordWithTargetEntitlements, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
 export {
   claimLane,
-  fetchJobSupersededBy,
+  claimLaneUnlessNewerHolder,
+  fetchSupersededBy,
   holdLaneWhileParked,
+  type LaneClaim,
+  type LaneStore,
   laneKey,
-  markJobSupersededBy,
-  reclaimLane,
-  releaseLane,
-  shortenJobSupersededMark,
-  supersededKey,
+  markDisplacedHolder,
+  type WatchedLane,
   watchLane,
 } from './lanes';
 // Distributed lock

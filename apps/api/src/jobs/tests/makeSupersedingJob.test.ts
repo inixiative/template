@@ -1,47 +1,44 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import {
-  claimLane,
-  fetchJobSupersededBy,
-  laneKey,
-  markJobSupersededBy,
-  reclaimLane,
-  supersededKey,
-  watchLane,
-} from '@template/db';
+import { claimLane, fetchSupersededBy, laneKey } from '@template/db';
 import { WaitingChildrenError } from 'bullmq';
+import { jobLaneStore } from '#/jobs/jobLaneStore';
 import { makeSupersedingJob, type SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import type { WorkerContext } from '#/jobs/types';
 import { makeTestWorker } from '#tests/makeTestWorker';
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 describe('makeSupersedingJob', () => {
   let ctx: WorkerContext;
+  const createJobRecord = (jobId: string) =>
+    ctx.queue.redis.hset(ctx.queue.toKey(jobId), 'name', ctx.job.name);
+  const markSuperseded = (jobId: string, supersededBy: string) =>
+    ctx.queue.redis.hset(ctx.queue.toKey(jobId), 'supersededBy', supersededBy);
 
-  beforeEach(() => {
-    ctx = makeTestWorker();
+  beforeEach(async () => {
+    ctx = makeTestWorker({ id: Bun.randomUUIDv7() });
+    await createJobRecord(ctx.job.id!);
   });
 
   afterEach(async () => {
     const redis = ctx.queue.redis;
-    const keys = await redis.keys('lane:*');
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
+    const keys = [...(await redis.keys('lane:*')), ...(await redis.keys(ctx.queue.toKey('*')))];
+    if (keys.length > 0) await redis.del(...keys);
   });
 
-  test('should complete normally when not superseded', async () => {
+  test('completes normally when not superseded', async () => {
     let result = 0;
     const innerHandler = mock(async (_ctx: WorkerContext, payload: { value: number }) => {
       result = payload.value * 2;
     });
 
-    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
-    await handler(ctx, { value: 5 });
+    await makeSupersedingJob(innerHandler, (p) => `test-${p.value}`)(ctx, { value: 5 });
 
     expect(innerHandler).toHaveBeenCalledTimes(1);
     expect(result).toBe(10);
   });
 
-  test('a job that parks waiting on its children keeps its lane for as long as a superseded mark lives', async () => {
+  test('a job that parks waiting on its children keeps its lane for three hours', async () => {
     const handler = makeSupersedingJob<Record<string, never>>(
       async () => {
         throw new WaitingChildrenError();
@@ -53,14 +50,16 @@ describe('makeSupersedingJob', () => {
     await expect(handler(ctx, {})).rejects.toBeInstanceOf(WaitingChildrenError);
 
     expect(await ctx.queue.redis.get(lane)).toBe(ctx.job.id ?? null);
-    expect(await ctx.queue.redis.ttl(lane)).toBeGreaterThan(24 * 60 * 60);
+    const ttl = await ctx.queue.redis.ttl(lane);
+    expect(ttl).toBeGreaterThan(2 * 60 * 60);
+    expect(ttl).toBeLessThanOrEqual(3 * 60 * 60);
   });
 
   test('a parked job that was already replaced leaves the newer holder alone', async () => {
     const lane = laneKey(ctx.job.name, 'replaced-lane');
     const handler = makeSupersedingJob<Record<string, never>>(
       async () => {
-        await claimLane(lane, 'newer-job');
+        await claimLane(jobLaneStore, lane, 'newer-job');
         throw new WaitingChildrenError();
       },
       () => 'replaced-lane',
@@ -72,227 +71,157 @@ describe('makeSupersedingJob', () => {
     expect(await ctx.queue.redis.ttl(lane)).toBeLessThanOrEqual(300);
   });
 
-  test('a child of a superseded parent exits at start, leaving no mark of its own and the parent mark in place', async () => {
-    const innerHandler = mock(async () => {});
-    const handler = makeSupersedingJob<Record<string, never>>(innerHandler, () => 'child-lane');
-    ctx.job.parent = { id: 'old-parent', queueKey: 'bull:jobs' };
-    await markJobSupersededBy('old-parent', 'new-parent');
-
-    await handler(ctx, {});
-
-    expect(innerHandler).toHaveBeenCalledTimes(0);
-    expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBeNull();
-    expect(await fetchJobSupersededBy('old-parent')).toBe('new-parent');
-    expect(await ctx.queue.redis.ttl(supersededKey('old-parent'))).toBeGreaterThan(3600);
-  });
-
-  test('a job redelivered with unfinished children keeps its superseded mark so they still stop', async () => {
-    ctx = makeTestWorker({
-      getDependenciesCount: mock(() => Promise.resolve({ unprocessed: 2 })),
-    });
-    const lane = laneKey(ctx.job.name, 'test-1');
-    await claimLane(lane, ctx.job.id!);
-    await claimLane(lane, 'newer');
-
+  test('a job whose own record says it was superseded exits at start, even after its lane expired', async () => {
+    await markSuperseded(ctx.job.id!, Bun.randomUUIDv7());
     const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {});
-    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
-    await handler(ctx, { value: 1 });
+
+    await makeSupersedingJob(innerHandler, (p) => `test-${p.value}`)(ctx, { value: 1 });
 
     expect(innerHandler).not.toHaveBeenCalled();
-    expect(await fetchJobSupersededBy(ctx.job.id!)).toBe('newer');
+    expect(await ctx.queue.redis.get(laneKey(ctx.job.name, 'test-1'))).toBeNull();
   });
 
-  test('a child of a superseded parent that has children of its own passes the superseded mark down at start', async () => {
-    ctx = makeTestWorker({
-      getDependenciesCount: mock(() => Promise.resolve({ unprocessed: 1 })),
-    });
+  test('a child of a superseded parent exits at start', async () => {
+    const parentId = Bun.randomUUIDv7();
+    await createJobRecord(parentId);
+    await markSuperseded(parentId, Bun.randomUUIDv7());
+    ctx.job.parent = { id: parentId, queueKey: 'bull:jobs' };
     const innerHandler = mock(async () => {});
-    const handler = makeSupersedingJob<Record<string, never>>(innerHandler, () => 'child-lane');
-    ctx.job.parent = { id: 'old-parent', queueKey: 'bull:jobs' };
-    await markJobSupersededBy('old-parent', 'new-parent');
 
-    await handler(ctx, {});
+    await makeSupersedingJob<Record<string, never>>(innerHandler, () => 'child-lane')(ctx, {});
 
-    expect(innerHandler).toHaveBeenCalledTimes(0);
-    expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
+    expect(innerHandler).not.toHaveBeenCalled();
   });
 
-  test('a running child aborts when its parent is superseded, and passes the superseded mark down', async () => {
-    let handlerFinished = false;
-    const handler = makeSupersedingJob<Record<string, never>>(
-      async () => {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        handlerFinished = true;
-      },
-      () => 'running-child-lane',
-    );
-    ctx.job.parent = { id: 'running-parent', queueKey: 'bull:jobs' };
-    const handlerPromise = handler(ctx, {});
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  test('a job whose lane a newer existing job holds exits at start', async () => {
+    const newer = Bun.randomUUIDv7();
+    await createJobRecord(newer);
+    await claimLane(jobLaneStore, laneKey(ctx.job.name, 'test-1'), newer);
+    const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {});
 
-    await markJobSupersededBy('running-parent', 'new-parent');
-    const startTime = Date.now();
-    await handlerPromise;
+    await makeSupersedingJob(innerHandler, (p) => `test-${p.value}`)(ctx, { value: 1 });
 
-    expect(Date.now() - startTime).toBeLessThan(1000);
-    expect(handlerFinished).toBe(false);
-    expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBe('new-parent');
+    expect(innerHandler).not.toHaveBeenCalled();
   });
 
-  test('should abort when superseded during execution', async () => {
-    let handlerStarted = false;
-    let handlerFinished = false;
-
-    const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {
-      handlerStarted = true;
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      handlerFinished = true;
+  test('a job that starts over an older holder takes the lane and marks the older one', async () => {
+    const older = Bun.randomUUIDv7();
+    ctx = makeTestWorker({ id: Bun.randomUUIDv7() });
+    await createJobRecord(ctx.job.id!);
+    await createJobRecord(older);
+    const lane = laneKey(ctx.job.name, 'test-1');
+    await claimLane(jobLaneStore, lane, older);
+    const holdersDuringRun: (string | null)[] = [];
+    const innerHandler = mock(async (handlerCtx: WorkerContext) => {
+      holdersDuringRun.push(await handlerCtx.queue.redis.get(lane));
     });
 
-    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
-    const handlerPromise = handler(ctx, { value: 1 });
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(handlerStarted).toBe(true);
-
-    await claimLane(laneKey(ctx.job.name, 'test-1'), 'newer');
-
-    const startTime = Date.now();
-    await handlerPromise;
-    const elapsed = Date.now() - startTime;
-
-    expect(elapsed).toBeLessThan(1000);
-    expect(handlerFinished).toBe(false);
-  });
-
-  test('should pass signal to handler context', async () => {
-    let receivedSignal: AbortSignal | undefined;
-
-    const innerHandler = mock(async (handlerCtx: WorkerContext, _payload: { value: number }) => {
-      receivedSignal = handlerCtx.signal;
+    await makeSupersedingJob(innerHandler, (p: { value: number }) => `test-${p.value}`)(ctx, {
+      value: 1,
     });
 
-    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
-    await handler(ctx, { value: 1 });
-
-    expect(receivedSignal).toBeDefined();
-    expect(receivedSignal).toBeInstanceOf(AbortSignal);
-    expect(receivedSignal?.aborted).toBe(false);
+    expect(holdersDuringRun).toEqual([ctx.job.id!]);
+    expect(await fetchSupersededBy(jobLaneStore, older)).toBe(ctx.job.id!);
   });
 
-  test('should abort signal when superseded', async () => {
+  test('a running job stops when a newer existing job takes its lane, and its record is marked', async () => {
     let signalAborted = false;
-
+    let handlerFinished = false;
     const innerHandler = mock(async (handlerCtx: WorkerContext, _payload: { value: number }) => {
       handlerCtx.signal?.addEventListener('abort', () => {
         signalAborted = true;
       });
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await sleep(2000);
+      handlerFinished = true;
+    });
+    const handlerPromise = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`)(ctx, {
+      value: 1,
     });
 
-    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
-    const handlerPromise = handler(ctx, { value: 1 });
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    await claimLane(laneKey(ctx.job.name, 'test-1'), 'newer');
-
+    await sleep(100);
+    const newer = Bun.randomUUIDv7();
+    await createJobRecord(newer);
+    await claimLane(jobLaneStore, laneKey(ctx.job.name, 'test-1'), newer);
+    const startedAt = Date.now();
     await handlerPromise;
 
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+    expect(handlerFinished).toBe(false);
     expect(signalAborted).toBe(true);
+    expect(await fetchSupersededBy(jobLaneStore, ctx.job.id!)).toBe(newer);
   });
 
-  test('should not run when the job was displaced while queued (marked superseded before start)', async () => {
-    const lane = laneKey(ctx.job.name, 'test-1');
-    await claimLane(lane, ctx.job.id!);
-    await claimLane(lane, 'newer'); // displaces this job → superseded mark survives even if the lane expires
-
-    const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {});
-    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
-    await handler(ctx, { value: 1 });
-
-    expect(innerHandler).not.toHaveBeenCalled();
-    expect(await fetchJobSupersededBy(ctx.job.id!)).toBe('newer');
-    expect(await ctx.queue.redis.ttl(supersededKey(ctx.job.id!))).toBeLessThanOrEqual(3600);
-    expect(await ctx.queue.redis.get(lane)).toBe('newer');
-  });
-
-  test('a superseded job whose skip cleanup fails throws instead of running', async () => {
-    ctx = makeTestWorker({
-      getDependenciesCount: mock(() => Promise.reject(new Error('redis down'))),
+  test('a running job keeps going while its lane names a job that never existed (a failed add)', async () => {
+    let handlerFinished = false;
+    const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {
+      await sleep(900);
+      handlerFinished = true;
     });
-    const lane = laneKey(ctx.job.name, 'test-1');
-    await claimLane(lane, ctx.job.id!);
-    await claimLane(lane, 'newer');
-
-    const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {});
-    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
-
-    await expect(handler(ctx, { value: 1 })).rejects.toThrow('redis down');
-    expect(innerHandler).not.toHaveBeenCalled();
-  });
-
-  test('should re-assert a lapsed baton at start so the run is visible to lane reads', async () => {
-    const holdersDuringRun: (string | null)[] = [];
-    const innerHandler = mock(async (handlerCtx: WorkerContext, payload: { value: number }) => {
-      holdersDuringRun.push(
-        await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`)),
-      );
+    const handlerPromise = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`)(ctx, {
+      value: 1,
     });
 
-    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
-    await handler(ctx, { value: 1 }); // no enqueue-time claim — the baton lapsed while queued
+    await sleep(100);
+    await claimLane(jobLaneStore, laneKey(ctx.job.name, 'test-1'), Bun.randomUUIDv7());
+    await handlerPromise;
 
-    expect(holdersDuringRun).toEqual([ctx.job.id!]);
+    expect(handlerFinished).toBe(true);
   });
 
-  test('should displace an older holder at start — newest wins after both batons lapse', async () => {
-    // Both batons lapsed under congestion; the OLDER job started first and re-asserted the vacant
-    // lane. Starting now, this (newer) job must take the baton back and usurp the older run —
-    // otherwise last-wins flips to stale-wins.
-    const lane = laneKey(ctx.job.name, 'test-1');
-    await reclaimLane(lane, '0-older');
-    let olderUsurped = false;
-    const stopOlder = watchLane(lane, '0-older', () => {
-      olderUsurped = true;
-    });
+  test('a running child stops when its parent is superseded, and passes the superseder to itself', async () => {
+    const parentId = Bun.randomUUIDv7();
+    const newerParent = Bun.randomUUIDv7();
+    await createJobRecord(parentId);
+    ctx.job.parent = { id: parentId, queueKey: 'bull:jobs' };
+    let handlerFinished = false;
+    const handlerPromise = makeSupersedingJob<Record<string, never>>(
+      async () => {
+        await sleep(2000);
+        handlerFinished = true;
+      },
+      () => 'running-child-lane',
+    )(ctx, {});
 
-    const holdersDuringRun: (string | null)[] = [];
-    const innerHandler = mock(async (handlerCtx: WorkerContext, payload: { value: number }) => {
-      holdersDuringRun.push(
-        await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`)),
-      );
-    });
-    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
-    await handler(ctx, { value: 1 });
+    await sleep(100);
+    await markSuperseded(parentId, newerParent);
+    const startedAt = Date.now();
+    await handlerPromise;
 
-    await new Promise((r) => setTimeout(r, 700));
-    stopOlder();
-
-    expect(holdersDuringRun).toEqual([ctx.job.id!]);
-    expect(await fetchJobSupersededBy('0-older')).toBe(ctx.job.id!);
-    expect(olderUsurped).toBe(true);
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+    expect(handlerFinished).toBe(false);
+    expect(await fetchSupersededBy(jobLaneStore, ctx.job.id!)).toBe(newerParent);
   });
 
-  test('should attach dedupeKeyFn to handler', () => {
+  test('passes an unaborted signal to the handler', async () => {
+    let receivedSignal: AbortSignal | undefined;
+    const innerHandler = mock(async (handlerCtx: WorkerContext, _payload: { value: number }) => {
+      receivedSignal = handlerCtx.signal;
+    });
+
+    await makeSupersedingJob(innerHandler, (p) => `test-${p.value}`)(ctx, { value: 1 });
+
+    expect(receivedSignal).toBeInstanceOf(AbortSignal);
+    expect(receivedSignal?.aborted).toBe(false);
+  });
+
+  test('attaches dedupeKeyFn to the handler', () => {
     const dedupeKeyFn = (p: { id: string }) => `dedupe-${p.id}`;
-    const innerHandler = mock(async () => {});
-
-    const handler = makeSupersedingJob(innerHandler, dedupeKeyFn) as SupersedingJobHandler<{
-      id: string;
-    }>;
+    const handler = makeSupersedingJob(
+      mock(async () => {}),
+      dedupeKeyFn,
+    ) as SupersedingJobHandler<{ id: string }>;
 
     expect(handler.dedupeKeyFn).toBe(dedupeKeyFn);
     expect(handler.dedupeKeyFn?.({ id: 'abc' })).toBe('dedupe-abc');
   });
 
-  test('should propagate non-supersession errors', async () => {
-    const testError = new Error('Test error');
-
-    const innerHandler = mock(async () => {
-      throw testError;
-    });
-
-    const handler = makeSupersedingJob(innerHandler, () => 'test-key');
+  test('propagates errors that are not supersession', async () => {
+    const handler = makeSupersedingJob(
+      mock(async () => {
+        throw new Error('Test error');
+      }),
+      () => 'test-key',
+    );
 
     await expect(handler(ctx)).rejects.toThrow('Test error');
   });

@@ -1,181 +1,185 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   claimLane,
-  fetchJobSupersededBy,
+  claimLaneUnlessNewerHolder,
+  fetchSupersededBy,
   holdLaneWhileParked,
+  type LaneStore,
   laneKey,
-  markJobSupersededBy,
-  reclaimLane,
-  releaseLane,
+  markDisplacedHolder,
   watchLane,
 } from '@template/db/lanes/lanes';
 import { redisClient } from '@template/db/redis/client';
 
-// The supersede lane "baton": one Redis key per lane = its current holder (a jobId). Latest claim wins
-// and marks the displaced job superseded; a running job watchLanes its lane and is usurped the moment a
-// different jobId holds it. SET/GET plus small Lua evals, so it runs on ioredis-mock.
 const redis = redisClient();
+const store: LaneStore = { redis, holderKeyPrefix: 'holder:', supersededField: 'supersededBy' };
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+const createHolderRecord = (holderId: string) => redis.hset(`holder:${holderId}`, 'name', holderId);
 
 const wipe = async (): Promise<void> => {
-  const keys = await redis.keys('lane:*');
+  const keys = [...(await redis.keys('lane:*')), ...(await redis.keys('holder:*'))];
   if (keys.length) await redis.del(...keys);
 };
 
-describe('supersede lane baton', () => {
+describe('supersede lanes', () => {
   beforeEach(wipe);
   afterEach(wipe);
 
   test('laneKey is handler-scoped: the same dedupeKey under two handlers is two lanes', () => {
     expect(laneKey('handlerA', 'shared')).not.toBe(laneKey('handlerB', 'shared'));
-    expect(laneKey('h', 'k')).toBe(laneKey('h', 'k')); // stable for the same pair
+    expect(laneKey('h', 'k')).toBe(laneKey('h', 'k'));
   });
 
-  test('claimLane records the holder; the latest claim wins and marks the displaced job superseded', async () => {
+  test('claimLane records the holder and returns the one it displaced, writing no other key', async () => {
     const lane = laneKey('h', 'k');
-    expect(await claimLane(lane, 'job-a')).toBeNull();
-    expect(await redis.get(lane)).toBe('job-a');
-    expect(await claimLane(lane, 'job-b')).toBe('job-a');
-    expect(await redis.get(lane)).toBe('job-b'); // last-claim-wins
-    expect(await fetchJobSupersededBy('job-a')).toBe('job-b');
+    expect(await claimLane(store, lane, 'job-a')).toBeNull();
+    expect(await claimLane(store, lane, 'job-b')).toBe('job-a');
+    expect(await redis.get(lane)).toBe('job-b');
+    expect(await redis.keys('*superseded*')).toEqual([]);
   });
 
-  test('claimLane stretches the TTL by the job delay (the baton must outlive a scheduled delay)', async () => {
-    // A delayed job is only picked up after `delay`, and only a RUNNING job refreshes its lane via
-    // watchLane — with a fixed TTL the baton would expire mid-delay and the usurp would be missed.
+  test('claimLane stretches the TTL by the job delay', async () => {
     const lane = laneKey('h', 'delayed');
-    await claimLane(lane, 'job-a', 60_000);
+    await claimLane(store, lane, 'job-a', 60_000);
     const ttl = await redis.ttl(lane);
-    expect(ttl).toBeGreaterThan(300); // base 300s + 60s delay
+    expect(ttl).toBeGreaterThan(300);
     expect(ttl).toBeLessThanOrEqual(360);
-
-    await claimLane(lane, 'job-a'); // no delay → base TTL only
-    expect(await redis.ttl(lane)).toBeLessThanOrEqual(300);
   });
 
-  test('holdLaneWhileParked stretches a lane it still holds to the lifetime of its superseded mark, and leaves a newer holder alone', async () => {
-    const lane = laneKey('h', 'parked');
-    await claimLane(lane, 'job-a');
-    expect(await holdLaneWhileParked(lane, 'job-a')).toBe(true);
-    expect(await redis.ttl(lane)).toBeGreaterThan(24 * 60 * 60);
-
-    await claimLane(lane, 'job-b');
-    expect(await holdLaneWhileParked(lane, 'job-a')).toBe(false);
-    expect(await redis.get(lane)).toBe('job-b');
-    expect(await redis.ttl(lane)).toBeLessThanOrEqual(300);
+  test('markDisplacedHolder marks the displaced holder on its own record once the new holder exists', async () => {
+    const lane = laneKey('h', 'mark');
+    await createHolderRecord('job-a');
+    await claimLane(store, lane, 'job-a');
+    const previous = await claimLane(store, lane, 'job-b');
+    await createHolderRecord('job-b');
+    await markDisplacedHolder(store, lane, 'job-b', previous);
+    expect(await fetchSupersededBy(store, 'job-a')).toBe('job-b');
+    expect(await fetchSupersededBy(store, 'job-b')).toBeNull();
   });
 
-  test('watchLane with a parentId: a superseded mark on the parent usurps the child and marks it superseded too', async () => {
-    const lane = laneKey('h', 'child');
-    await claimLane(lane, 'child-job');
-    let usurped = false;
-    const stop = watchLane(
-      lane,
-      'child-job',
-      () => {
-        usurped = true;
-      },
-      'parent-job',
-    );
-
-    await markJobSupersededBy('parent-job', 'newer-parent');
-    await sleep(700);
-    stop();
-
-    expect(usurped).toBe(true);
-    expect(await fetchJobSupersededBy('child-job')).toBe('newer-parent');
-    expect(await redis.get(lane)).toBe('child-job');
+  test('markDisplacedHolder never creates a record for a holder that has none', async () => {
+    const lane = laneKey('h', 'gone');
+    await claimLane(store, lane, 'job-a');
+    const previous = await claimLane(store, lane, 'job-b');
+    await markDisplacedHolder(store, lane, 'job-b', previous);
+    expect(await redis.exists('holder:job-a')).toBe(0);
   });
 
-  test('reclaimLane restores a lapsed baton but never steals from a newer holder', async () => {
+  test('a newer claim that lands before the add: the new holder marks itself superseded', async () => {
+    const lane = laneKey('h', 'race');
+    const previous = await claimLane(store, lane, 'job-b');
+    await claimLane(store, lane, 'job-c');
+    await createHolderRecord('job-b');
+    await markDisplacedHolder(store, lane, 'job-b', previous);
+    expect(await fetchSupersededBy(store, 'job-b')).toBe('job-c');
+  });
+
+  test('claimLaneUnlessNewerHolder takes a vacant lane or one held by an older holder', async () => {
     const lane = laneKey('h', 'reclaim');
-    // Vacant (expired while the job sat queued) → the starting job re-asserts itself.
-    await reclaimLane(lane, 'job-b');
-    expect(await redis.get(lane)).toBe('job-b');
-    // Held by a NEWER job (uuidv7 ids are time-ordered: 'job-a' < 'job-b') → no-op: the newer
-    // claimant keeps the baton, so it still usurps the reclaimer via its watch.
-    await reclaimLane(lane, 'job-a');
-    expect(await redis.get(lane)).toBe('job-b');
-    expect(await fetchJobSupersededBy('job-b')).toBeNull();
+    expect(await claimLaneUnlessNewerHolder(store, lane, 'job-b')).toEqual({
+      claimed: true,
+      previous: null,
+    });
+    expect(await claimLaneUnlessNewerHolder(store, lane, 'job-c')).toEqual({
+      claimed: true,
+      previous: 'job-b',
+    });
   });
 
-  test('reclaimLane displaces an OLDER holder and marks it superseded (no stale-wins inversion)', async () => {
-    // Both batons lapsed under congestion; the older job started first and re-asserted a vacant lane.
-    // The newer job must take the baton back at start — otherwise last-wins flips to stale-wins.
-    const lane = laneKey('h', 'reclaim-inversion');
-    await reclaimLane(lane, 'job-a');
-    await reclaimLane(lane, 'job-b');
-    expect(await redis.get(lane)).toBe('job-b');
-    expect(await fetchJobSupersededBy('job-a')).toBe('job-b');
+  test('claimLaneUnlessNewerHolder refuses a lane held by a newer holder that exists', async () => {
+    const lane = laneKey('h', 'newer');
+    await createHolderRecord('job-c');
+    await claimLane(store, lane, 'job-c');
+    expect(await claimLaneUnlessNewerHolder(store, lane, 'job-a')).toEqual({
+      claimed: false,
+      previous: 'job-c',
+    });
+    expect(await redis.get(lane)).toBe('job-c');
   });
 
-  test('watchLane fires onUsurped once a different job claims the lane', async () => {
+  test('claimLaneUnlessNewerHolder treats a newer holder with no record (a failed add) as no holder', async () => {
+    const lane = laneKey('h', 'phantom');
+    await claimLane(store, lane, 'job-c');
+    expect((await claimLaneUnlessNewerHolder(store, lane, 'job-a')).claimed).toBe(true);
+    expect(await redis.get(lane)).toBe('job-a');
+  });
+
+  test('holdLaneWhileParked stretches a lane it still holds to three hours, and leaves a newer holder alone', async () => {
+    const lane = laneKey('h', 'parked');
+    await claimLane(store, lane, 'job-a');
+    expect(await holdLaneWhileParked(store, lane, 'job-a')).toBe(true);
+    const ttl = await redis.ttl(lane);
+    expect(ttl).toBeGreaterThan(2 * 60 * 60);
+    expect(ttl).toBeLessThanOrEqual(3 * 60 * 60);
+
+    await claimLane(store, lane, 'job-b');
+    expect(await holdLaneWhileParked(store, lane, 'job-a')).toBe(false);
+  });
+
+  test('watchLane stops a holder whose lane another existing holder took, and marks it', async () => {
     const lane = laneKey('h', 'usurp');
-    await claimLane(lane, 'job-a');
-    let usurped = false;
-    const stop = watchLane(lane, 'job-a', () => {
-      usurped = true;
+    await createHolderRecord('job-a');
+    await claimLane(store, lane, 'job-a');
+    let supersededBy = null as string | null;
+    const stop = watchLane(store, { lane, holderId: 'job-a' }, (by) => {
+      supersededBy = by;
     });
-    await claimLane(lane, 'job-b'); // a newer job takes the baton
-    await sleep(700); // > one poll interval (500ms)
-    stop();
-    expect(usurped).toBe(true);
-  });
-
-  test('watchLane does NOT fire while this job still holds the lane (absent == still held)', async () => {
-    const lane = laneKey('h', 'hold');
-    await claimLane(lane, 'job-a');
-    let usurped = false;
-    const stop = watchLane(lane, 'job-a', () => {
-      usurped = true;
-    });
-    await sleep(700); // still job-a's
-    await redis.del(lane); // simulate TTL expiry — an absent lane counts as still held, not usurped
+    await createHolderRecord('job-b');
+    await claimLane(store, lane, 'job-b');
     await sleep(700);
     stop();
-    expect(usurped).toBe(false);
+    expect(supersededBy).toBe('job-b');
+    expect(await fetchSupersededBy(store, 'job-a')).toBe('job-b');
   });
 
-  test('releaseLane drops the baton only if we still hold it (fenced)', async () => {
-    const lane = laneKey('h', 'release');
-    await claimLane(lane, 'job-a');
-    await releaseLane(lane, 'job-b'); // not the holder — must NOT delete job-a's baton
-    expect(await redis.get(lane)).toBe('job-a');
-    await releaseLane(lane, 'job-a'); // the holder — drops it
-    expect(await redis.get(lane)).toBeNull();
-  });
-
-  test('releaseLane rolls back both this claim and the superseded mark it created', async () => {
-    const lane = laneKey('h', 'rollback');
-    await claimLane(lane, 'job-a');
-    const previousHolder = await claimLane(lane, 'job-b');
-
-    await releaseLane(lane, 'job-b', previousHolder);
-
-    expect(await redis.get(lane)).toBeNull();
-    expect(await fetchJobSupersededBy('job-a')).toBeNull();
-  });
-
-  test('releaseLane does not clear a newer claimant or its superseded mark', async () => {
-    const lane = laneKey('h', 'rollback-race');
-    await claimLane(lane, 'job-a');
-    const previousHolder = await claimLane(lane, 'job-b');
-    await claimLane(lane, 'job-c');
-
-    await releaseLane(lane, 'job-b', previousHolder);
-
-    expect(await redis.get(lane)).toBe('job-c');
-    expect(await fetchJobSupersededBy('job-a')).toBe('job-b');
-    expect(await fetchJobSupersededBy('job-b')).toBe('job-c');
-  });
-
-  test('watchLane refreshes the TTL while this job still holds the lane', async () => {
-    const lane = laneKey('h', 'refresh');
-    await claimLane(lane, 'job-a');
-    await redis.pexpire(lane, 2000); // would lapse soon without a refresh
-    const stop = watchLane(lane, 'job-a', () => {});
-    await sleep(1200); // > two polls (500ms) — a poll while we hold refreshes the TTL back up
+  test('watchLane keeps running while the lane names a job that never existed', async () => {
+    const lane = laneKey('h', 'phantom-watch');
+    await claimLane(store, lane, 'job-a');
+    let supersededBy = null as string | null;
+    const stop = watchLane(store, { lane, holderId: 'job-a' }, (by) => {
+      supersededBy = by;
+    });
+    await claimLane(store, lane, 'job-b');
+    await sleep(700);
     stop();
-    expect(await redis.pttl(lane)).toBeGreaterThan(5000); // refreshed well past the original 2s
+    expect(supersededBy).toBeNull();
+  });
+
+  test('watchLane stops a child whose parent is superseded, and passes the superseder to the child', async () => {
+    const lane = laneKey('h', 'child');
+    await createHolderRecord('child-job');
+    await createHolderRecord('parent-job');
+    await claimLane(store, lane, 'child-job');
+    let supersededBy = null as string | null;
+    const stop = watchLane(
+      store,
+      { lane, holderId: 'child-job', parent: { holderId: 'parent-job' } },
+      (by) => {
+        supersededBy = by;
+      },
+    );
+    await redis.hset('holder:parent-job', 'supersededBy', 'newer-parent');
+    await sleep(700);
+    stop();
+    expect(supersededBy).toBe('newer-parent');
+    expect(await fetchSupersededBy(store, 'child-job')).toBe('newer-parent');
+  });
+
+  test('watchLane refreshes its own lane, and its parked parent lane while the parent still holds it', async () => {
+    const lane = laneKey('h', 'refresh');
+    const parentLane = laneKey('parent', 'refresh');
+    await claimLane(store, lane, 'child-job');
+    await claimLane(store, parentLane, 'parent-job');
+    await redis.pexpire(lane, 2000);
+    await redis.pexpire(parentLane, 2000);
+    const stop = watchLane(
+      store,
+      { lane, holderId: 'child-job', parent: { holderId: 'parent-job', lane: parentLane } },
+      () => {},
+    );
+    await sleep(1200);
+    stop();
+    expect(await redis.pttl(lane)).toBeGreaterThan(5000);
+    expect(await redis.pttl(parentLane)).toBeGreaterThan(60 * 60 * 1000);
   });
 });
