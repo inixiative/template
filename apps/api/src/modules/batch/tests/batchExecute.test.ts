@@ -522,6 +522,31 @@ describe('POST /api/v1/batch/execute', () => {
       expect(await refused('/api/<<0.0.body.data.id>>/sign-in/email')).toBe(400);
     });
 
+    it('re-checks a path after interpolation, so a resolved value cannot climb into an unbatchable route', async () => {
+      const reference = '<<0.0.body.data.name>>';
+      const secondRequestOf = async (name: string, path: string) => {
+        const { entity } = await createUser({ name });
+        const response = await createTestApp({ mockUser: entity, mount: routers }).fetch(
+          post('/api/v1/batch/execute', {
+            requests: [[{ method: 'GET', path: '/api/v1/me' }], [{ method: 'POST', path }]],
+            strategy: 'allowFailures',
+          }),
+        );
+        const { data } = await parseSuccessBody<BatchExecuteResponse>(response);
+        const after = await db.user.findUniqueOrThrow({ where: { id: entity.id } });
+        expect(after.jwtVersion).toBe(entity.jwtVersion);
+        return data.batch[1][0];
+      };
+      for (const path of [
+        `/api/v1/token/${reference}/me/rotateJwts`,
+        `/api/v1/token/${reference}\\me\\rotateJwts`,
+        `/api/v1/token/${reference}\t/me/rotateJwts`,
+      ])
+        expect((await secondRequestOf('..', path)).error).toContain("resolved to '..'");
+      const climbed = await secondRequestOf('', `/api/v1/token/${reference}..\\me\\rotateJwts`);
+      expect(climbed.error).toContain('cannot run in a batch');
+    });
+
     it('rejects malformed interpolation syntax', async () => {
       const response = await fetch(
         post('/api/v1/batch/execute', {
