@@ -14,9 +14,10 @@
 import { applyExemptionsAndBaselineThenExit, lineAt, type Violation } from './ciRuleRunner';
 import { readPolymorphicSides, readPrismaModels, readSoftDeleteModels } from './schemaSources';
 
-const sidesByModel = Map.groupBy(readPolymorphicSides(), (side) => side.model);
+const { sides: registeredSides, unreadable } = readPolymorphicSides();
+const sidesByModel = Map.groupBy(registeredSides, (side) => side.model);
 const neverHardDeleted = readSoftDeleteModels();
-const violations: Violation[] = [];
+const violations: Violation[] = [...unreadable];
 
 for (const { file, source, name: model, body, bodyOffset } of readPrismaModels()) {
   const sides = sidesByModel.get(model);

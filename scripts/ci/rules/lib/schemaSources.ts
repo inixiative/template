@@ -3,7 +3,7 @@
  * soft-delete models. One reader, so no detector parses them its own way.
  */
 import ts from 'typescript';
-import { fetchSource, lineAt, listFiles } from './ciRuleRunner';
+import { fetchSource, lineAt, listFiles, type Violation } from './ciRuleRunner';
 
 export const POLYMORPHISM_REGISTRY = 'packages/db/src/registries/falsePolymorphism.ts';
 const SOFT_DELETE_MODELS = 'packages/db/src/registries/softDeleteModels.ts';
@@ -69,14 +69,22 @@ const initializerOf = (source: ts.SourceFile, name: string): ts.Expression | und
   return found;
 };
 
-/** Every side the registry declares. Throws when it finds none: a detector reading no sides passes vacuously. */
-export const readPolymorphicSides = (): PolymorphicSide[] => {
+const registryUnreadable = (detail: string): { sides: []; unreadable: Violation[] } => ({
+  sides: [],
+  unreadable: [{ file: POLYMORPHISM_REGISTRY, line: 1, key: 'PolymorphismRegistry', detail }],
+});
+
+/**
+ * Every side the registry declares. A registry this reader cannot read, or one with no sides, is a
+ * violation: a detector reading no sides would pass vacuously.
+ */
+export const readPolymorphicSides = (): { sides: PolymorphicSide[]; unreadable: Violation[] } => {
   const text = fetchSource(POLYMORPHISM_REGISTRY);
   const source = parse(POLYMORPHISM_REGISTRY, text);
   const registry = initializerOf(source, 'PolymorphismRegistry');
   if (!registry || !ts.isObjectLiteralExpression(registry))
-    throw new Error(
-      `${POLYMORPHISM_REGISTRY}: PolymorphismRegistry is not an object literal this reader understands`,
+    return registryUnreadable(
+      'PolymorphismRegistry is not an object literal (optionally `as const satisfies`) this reader understands',
     );
   const sides = registry.properties.flatMap((entry) => {
     if (!ts.isPropertyAssignment(entry) || !ts.isObjectLiteralExpression(entry.initializer))
@@ -102,8 +110,9 @@ export const readPolymorphicSides = (): PolymorphicSide[] => {
       };
     });
   });
-  if (sides.length === 0) throw new Error(`${POLYMORPHISM_REGISTRY}: read no polymorphic sides`);
-  return sides;
+  if (sides.length === 0)
+    return registryUnreadable('PolymorphismRegistry declares no polymorphic sides');
+  return { sides, unreadable: [] };
 };
 
 const sourceIfPresent = (file: string): string | undefined => {

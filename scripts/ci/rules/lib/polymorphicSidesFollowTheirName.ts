@@ -36,10 +36,11 @@ const prismaColumnsByModel = (): Map<string, Set<string>> =>
 
 const capitalize = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
-const violations: Violation[] = [];
+const { sides: registeredSides, unreadable } = readPolymorphicSides();
+const violations: Violation[] = [...unreadable];
 const columnsByModel = prismaColumnsByModel();
 
-for (const side of readPolymorphicSides()) {
+for (const side of registeredSides) {
   const report = (key: string, detail: string) =>
     violations.push({
       file: POLYMORPHISM_REGISTRY,
