@@ -246,6 +246,8 @@ const email = `user-${seq}@test.com`;  // Guaranteed unique
 // Factories use this internally for default values
 ```
 
+A factory default for a column in a unique key (`@unique`, `@@unique`, `@id`) carries the sequence as well as faker's randomness: `` `${faker.word.noun()}-${nextFactorySequenceNumber()}` ``. Faker alone collides by chance once a test makes enough rows, and the failure shows up as a red main, not in the PR that wrote the factory. Randomness from outside faker (`randomBytes`, `Math.random`) is the same risk: build the value from the sequence and faker. A key the factory fills with a constant, a NULL or a uuid is fine. `packages/db/src/test/everyFactory.test.ts` (every factory against the unique keys) reads every unique key from the generated map and fails on a default that changes with faker's seed but not with the sequence, or that changes on an exact replay. It skips foreign keys, which come from the dependency, and constant keys, which fail on the second row every time instead of by chance.
+
 ### TypedBuildResult (Type Safety)
 
 When writing custom factories, use `TypedBuildResult` for type-safe context:

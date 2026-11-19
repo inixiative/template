@@ -6,11 +6,11 @@
  */
 import { faker } from '@faker-js/faker';
 import { SegmentType } from '@template/db/generated/client/enums';
-import { registerFactory } from '@template/db/test/factory';
+import { nextFactorySequenceNumber, registerFactory } from '@template/db/test/factory';
 
 const segmentFactory = registerFactory('Segment', {
   defaults: () => ({
-    name: `${faker.word.adjective()}-${faker.string.alphanumeric(6).toLowerCase()}`,
+    name: `${faker.word.adjective()}-${faker.string.alphanumeric(6).toLowerCase()}-${nextFactorySequenceNumber()}`,
     type: SegmentType.static,
     conditions: { all: [] },
   }),
