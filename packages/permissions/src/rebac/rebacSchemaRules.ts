@@ -213,12 +213,6 @@ export const chainedStandardActions = ({ own, manage, operate, read }: StandardR
   read: { any: ['operate', read] },
 });
 
-export const actionsThroughParent = (parent: string) => ({
-  manage: { rel: parent, action: 'manage' },
-  operate: { any: ['manage', { rel: parent, action: 'operate' }] },
-  read: { any: ['operate', { rel: parent, action: 'read' }] },
-});
-
 export const ownerActions = (
   rels: readonly string[] = ['user', 'organization', 'space'],
 ): ResourcePermission['actions'] => {

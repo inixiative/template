@@ -105,7 +105,7 @@ describe('integration resources', () => {
       }),
     );
 
-    expect([403, 404]).toContain(response.status);
+    expect(response.status).toBe(403);
   });
 
   it('lists the live resources of the integration', async () => {

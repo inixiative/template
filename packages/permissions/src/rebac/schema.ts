@@ -9,7 +9,6 @@ import { ContactSource } from '@template/db/generated/client/enums';
 import { inquiryResourcePermission } from '@template/permissions/rebac/inquiryResourcePermission';
 import {
   actionsForRecordOwnedByAnyOwnerModel,
-  actionsThroughParent,
   actorIsDelegateOfUser,
   actorIsUser,
   actorMayCreateTokenAtOwnerWithRole,
@@ -108,7 +107,15 @@ export const rebacSchema: RebacSchema = {
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
     'db:integrationResource': {
-      actions: { ...actionsThroughParent('integration'), create: 'manage' },
+      actions: {
+        ...chainedStandardActions({
+          own: { rel: 'integration', action: 'own' },
+          manage: { rel: 'integration', action: 'manage' },
+          operate: { rel: 'integration', action: 'operate' },
+          read: { rel: 'integration', action: 'read' },
+        }),
+        create: 'manage',
+      },
     },
     'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
     'db:projectIntegrationResource': {

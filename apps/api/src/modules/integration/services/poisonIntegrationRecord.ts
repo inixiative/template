@@ -21,6 +21,13 @@ export const poisonIntegrationRecord = (input: {
       [integrationRecordForeignKeyForModel(input.model)]: input.resourceId,
     };
     const poison = { poisonedAt: new Date(), poisonedReason: input.reason };
+    if (
+      !(await db.integration.findUnique({
+        where: { id: input.integrationId },
+        select: { id: true },
+      }))
+    )
+      throw new Error(`Integration ${input.integrationId} is gone; its records cannot be poisoned`);
 
     const held = await db.findForUpdate<IntegrationRecord>('IntegrationRecord', recordKey, {
       upserting: true,

@@ -93,6 +93,28 @@ describe('poisonIntegrationRecord', () => {
     });
   });
 
+  it('refuses a deleted integration, so its revive never meets a live record it did not own', async () => {
+    const { customerRelationship, integration } = await setup();
+    await poisonIntegrationRecord({
+      integrationId: integration.id,
+      model: WebhookModel.CustomerRelationship,
+      resourceId: customerRelationship.id,
+      reason: 'HTTP 400: Bad Request',
+    });
+    await db.integration.update({ where: { id: integration.id }, data: { deletedAt: new Date() } });
+
+    await expect(
+      poisonIntegrationRecord({
+        integrationId: integration.id,
+        model: WebhookModel.CustomerRelationship,
+        resourceId: customerRelationship.id,
+        reason: 'HTTP 500',
+      }),
+    ).rejects.toThrow('is gone');
+    await revive(db.integration, { id: integration.id });
+    expect(await db.integrationRecord.count({ where: { integrationId: integration.id } })).toBe(1);
+  });
+
   it('poisons a new record when the one before it was removed', async () => {
     const { customerRelationship, integration } = await setup();
     const input = {
