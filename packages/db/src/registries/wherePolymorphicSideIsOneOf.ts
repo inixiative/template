@@ -5,20 +5,18 @@
  * @uses none
  */
 import { polymorphicAxis } from '@template/db/registries/falsePolymorphism';
-import {
-  type PointedAtRecord,
-  polymorphicKeyColumnOrThrow,
-} from '@template/db/registries/polymorphicAxisPointsAt';
+import { polymorphicKeyColumnOrThrow } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 
 export const wherePolymorphicSideIsOneOf = (
   model: ModelName,
   sideField: string,
-  targets: PointedAtRecord[],
+  targets: ModelRow[],
 ): { OR: Record<string, unknown>[] } => {
   const axis = polymorphicAxis(model, sideField);
   const idsByKind = new Map<string, Set<string>>();
-  for (const { kind, id } of targets)
+  for (const { model: kind, id } of targets)
     idsByKind.set(kind, (idsByKind.get(kind) ?? new Set()).add(id));
   return {
     OR: [...idsByKind].map(([kind, ids]) => {

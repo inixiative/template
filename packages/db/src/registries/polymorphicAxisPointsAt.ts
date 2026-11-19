@@ -8,6 +8,7 @@ import { type Condition, Operator } from '@inixiative/json-rules';
 import { type PolymorphicAxis, polymorphicAxis } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { polymorphicArmColumns } from '@template/db/utils/polymorphicArmKeys';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 
 export const BIND_NAME_BY_OWNER_MODEL = {
   User: 'userId',
@@ -79,8 +80,6 @@ export const axisTargetIdColumn = (
   value: string,
 ): string | null => axis.dualPolymorphismId ?? polymorphicKeyColumn(model, axis.field, value);
 
-export type PointedAtRecord = { kind: string; id: string };
-
 /**
  * The row a false-polymorphic axis points at, its kind and id, or null when it points at nobody.
  * A dual axis names it by its dual polymorphism id, and by the typed FK until that id is written.
@@ -89,14 +88,14 @@ export const rowPolymorphicAxisPointsAt = (
   row: Record<string, unknown>,
   model: ModelName,
   axisField: string,
-): PointedAtRecord | null => {
+): ModelRow | null => {
   const kind = row[axisField];
   if (typeof kind !== 'string') return null;
   const { dualPolymorphismId } = polymorphicAxis(model, axisField);
   const dualId = dualPolymorphismId ? row[dualPolymorphismId] : null;
   const keyColumn = dualId == null ? polymorphicKeyColumn(model, axisField, kind) : null;
   const id = dualId ?? (keyColumn ? row[keyColumn] : null);
-  return typeof id === 'string' ? { kind, id } : null;
+  return typeof id === 'string' ? { model: kind, id } : null;
 };
 
 export const polymorphicBindings = (

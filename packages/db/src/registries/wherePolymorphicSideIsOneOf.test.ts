@@ -5,10 +5,10 @@ describe('wherePolymorphicSideIsOneOf', () => {
   it('one arm per kind, each with that kind’s own key column and its ids once', () => {
     expect(
       wherePolymorphicSideIsOneOf('CustomerRelationship', 'customerModel', [
-        { kind: 'User', id: 'u1' },
-        { kind: 'Organization', id: 'o1' },
-        { kind: 'User', id: 'u2' },
-        { kind: 'User', id: 'u1' },
+        { model: 'User', id: 'u1' },
+        { model: 'Organization', id: 'o1' },
+        { model: 'User', id: 'u2' },
+        { model: 'User', id: 'u1' },
       ]),
     ).toEqual({
       OR: [
@@ -27,7 +27,7 @@ describe('wherePolymorphicSideIsOneOf', () => {
   it('throws on a kind the side has no arm for', () => {
     expect(() =>
       wherePolymorphicSideIsOneOf('CustomerRelationship', 'customerModel', [
-        { kind: 'Tag', id: 't1' },
+        { model: 'Tag', id: 't1' },
       ]),
     ).toThrow('CustomerRelationship.customerModel has no Tag arm');
   });
@@ -35,7 +35,7 @@ describe('wherePolymorphicSideIsOneOf', () => {
   it('a dual side matches on its dual id, not the typed foreign key a hard delete nulls', () => {
     expect(
       wherePolymorphicSideIsOneOf('RuleReference', 'sourceModel', [
-        { kind: 'EmailTemplate', id: 't1' },
+        { model: 'EmailTemplate', id: 't1' },
       ]),
     ).toEqual({ OR: [{ sourceModel: 'EmailTemplate', sourceId: { in: ['t1'] } }] });
   });

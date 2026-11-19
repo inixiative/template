@@ -13,9 +13,10 @@ import {
 } from '@template/db/utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 import { groupBy } from 'lodash-es';
 
-export type RuleReferenceSource = { model: ModelName; id: string };
+export type RuleReferenceSource = ModelRow<ModelName>;
 
 type Edge = {
   id: string;

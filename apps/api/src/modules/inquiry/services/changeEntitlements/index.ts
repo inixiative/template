@@ -33,7 +33,7 @@ const validate = async (_inquiry: Partial<Inquiry>, content: ChangeEntitlementsC
 
 const holderOf = async (inquiry: Inquiry) => {
   const target = rowPolymorphicAxisPointsAt(inquiry, 'Inquiry', 'targetModel');
-  const model = holderModels.find((holderModel) => holderModel === target?.kind);
+  const model = holderModels.find((holderModel) => holderModel === target?.model);
   const holder =
     target && model ? await db.delegate(model).findUnique({ where: { id: target.id } }) : null;
   if (!model || !holder)

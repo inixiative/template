@@ -17,7 +17,7 @@ export const customerSideOfRow = (
   row: Record<string, unknown>,
 ): CustomerSide | null => {
   const target = rowPolymorphicAxisPointsAt(row, model, axis);
-  return target ? { customerModel: target.kind as CustomerModel, customerId: target.id } : null;
+  return target ? { customerModel: target.model as CustomerModel, customerId: target.id } : null;
 };
 
 export const providerSideOfCustomerRelationship = (
@@ -28,5 +28,5 @@ export const providerSideOfCustomerRelationship = (
     'CustomerRelationship',
     'providerModel',
   );
-  return target ? { providerModel: target.kind as ProviderModel, providerId: target.id } : null;
+  return target ? { providerModel: target.model as ProviderModel, providerId: target.id } : null;
 };
