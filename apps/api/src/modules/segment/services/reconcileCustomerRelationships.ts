@@ -9,7 +9,8 @@ import { rowPolymorphicAxisPointsAt } from '@template/db';
 import type { CustomerRelationship, Segment } from '@template/db/generated/client/client';
 import { type ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import { branchOnRuleHealth } from '@template/shared/rules';
-import { chunk } from 'lodash-es';
+import { chunk, groupBy } from 'lodash-es';
+import type { ProviderSide } from '#/modules/customerRelationship/lib/customerRelationshipSides';
 import { ownedSegments } from '#/modules/customerRelationship/lib/ownedSegments';
 import { resolvedCustomerRelationshipLens } from '#/modules/customerRelationship/lib/resolvedCustomerRelationshipLens';
 import { applyMembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
@@ -27,15 +28,13 @@ import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth'
 
 const PAGE_SIZE = 500;
 
-const providerOf = (
-  customerRelationship: CustomerRelationship,
-): { ownerModel: ProviderModel; ownerId: string } | null => {
+const providerSideOfRow = (customerRelationship: CustomerRelationship): ProviderSide | null => {
   const target = rowPolymorphicAxisPointsAt(
     customerRelationship,
     'CustomerRelationship',
     'providerModel',
   );
-  return target ? { ownerModel: target.kind as ProviderModel, ownerId: target.id } : null;
+  return target ? { providerModel: target.kind as ProviderModel, providerId: target.id } : null;
 };
 
 export const dynamicSegmentsOf = async (
@@ -58,20 +57,14 @@ const recordDecision = (
 
 const customerRelationshipIdsByProvider = (
   customerRelationships: CustomerRelationship[],
-): Map<string, { ownerModel: ProviderModel; ownerId: string; ids: string[] }> => {
-  const byProvider = new Map<
-    string,
-    { ownerModel: ProviderModel; ownerId: string; ids: string[] }
-  >();
-  for (const customerRelationship of customerRelationships) {
-    const provider = providerOf(customerRelationship);
-    if (!provider) continue;
-    const key = `${provider.ownerModel}:${provider.ownerId}`;
-    const held = byProvider.get(key) ?? { ...provider, ids: [] };
-    held.ids.push(customerRelationship.id);
-    byProvider.set(key, held);
-  }
-  return byProvider;
+): (ProviderSide & { ids: string[] })[] => {
+  const withProvider = customerRelationships.flatMap((customerRelationship) => {
+    const provider = providerSideOfRow(customerRelationship);
+    return provider ? [{ provider, id: customerRelationship.id }] : [];
+  });
+  return Object.values(
+    groupBy(withProvider, ({ provider }) => `${provider.providerModel}:${provider.providerId}`),
+  ).map((group) => ({ ...group[0]!.provider, ids: group.map(({ id }) => id) }));
 };
 
 const reconcileProviderPage = async (
@@ -106,9 +99,11 @@ export const reconcileCustomerRelationships = async (
   customerRelationships: CustomerRelationship[],
 ): Promise<MembershipChange[]> => {
   const changes: MembershipChange[] = [];
-  for (const { ownerModel, ownerId, ids } of customerRelationshipIdsByProvider(
-    customerRelationships,
-  ).values()) {
+  for (const {
+    providerModel: ownerModel,
+    providerId: ownerId,
+    ids,
+  } of customerRelationshipIdsByProvider(customerRelationships)) {
     const segments = (await dynamicSegmentsOf(ownerModel, ownerId)).filter(
       isReconcilableDynamicSegment,
     );

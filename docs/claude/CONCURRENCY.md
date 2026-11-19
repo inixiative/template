@@ -170,24 +170,28 @@ Use when multiple processes can race for the same resource (multiple golem insta
 
 ## Supersede Lanes (`claimLane` / `watchLane`)
 
-`packages/db/src/lanes/lanes.ts` (exported from `@template/db`). A Redis baton scoped to `(handlerName, dedupeKey)`: the newest claimant wins, and an in-flight older job learns it's been usurped and bows out. Cross-process, the inverse of a lock — a lock keeps the *first* holder and rejects late-comers; a lane hands the baton to the *latest* and evicts the incumbent.
+`packages/db/src/lanes/lanes.ts` (exported from `@template/db`). A Redis baton scoped to `(handlerName, dedupeKey)`: the newest claimant wins, and an in-flight older holder learns it has been superseded and bows out. Cross-process, the inverse of a lock: a lock keeps the *first* holder and rejects late-comers; a lane hands the baton to the *latest* and evicts the incumbent.
+
+Every call takes a `LaneStore`: the Redis connection, where each holder's own record lives (`holderKeyPrefix`), and the field on that record that says who superseded it (`supersededField`). The lane writes no key of its own beyond the baton. The superseded fact goes on the displaced holder's record and is deleted with it, so nothing outlives the holder. Jobs use `jobLaneStore` (`apps/api/src/jobs/jobLaneStore.ts`): the queue's Redis, BullMQ job hashes, field `supersededBy`. The lane must run on the same Redis as the records it marks; a lane script cannot see a key on another instance.
 
 ```ts
-import { claimLane, watchLane, laneKey } from '@template/db';
+import { claimLane, laneKey, markDisplacedHolder, watchLane } from '@template/db';
 
 const lane = laneKey(handlerName, dedupeKey);
-await claimLane(lane, jobId);                 // take the baton (last claim wins)
-const stop = watchLane(lane, jobId, () => {   // bow out once a newer job claims it
-  abortThisJob();
-});
-try {
-  /* work */
-} finally {
-  stop();
-}
+const previous = await claimLane(store, lane, jobId);    // take the baton (last claim wins)
+await queue.add(handlerName, data, { jobId });          // the new holder must exist first
+await markDisplacedHolder(store, lane, jobId, previous); // then mark the one it displaced
+const stop = watchLane(store, { lane, holderId: jobId }, () => abortThisJob());
 ```
 
-`claimLane` writes `jobId` with a TTL (`LANE_TTL_SEC`). `watchLane` polls (`LANE_POLL_MS`, via `startHeartbeat`) and fires `onUsurped` only when a *different* holder appears — an expired/absent key counts as still held, so a momentary Redis blip doesn't false-trigger. Use for "only the most recent enqueue for this key should finish" (debounced/superseding jobs); see [JOBS.md](./JOBS.md) for the supersede pattern this backs.
+- `claimLane` only takes the baton, with a TTL covering the job's delay (`LANE_TTL_SEC` plus the delay).
+- `markDisplacedHolder` runs once the new holder exists. While the lane still names it, the displaced holder's record gets the field; if a newer claim got there first, the new holder marks itself. It never creates a record that does not exist.
+- A failed add throws and leaves nothing to undo: no mark was written, and a baton naming a holder with no record counts as no holder.
+- `claimLaneUnlessNewerHolder` takes the baton unless a newer holder that exists holds it (holder ids are uuidv7, so a string compare is an age compare). A job's start and the outbox drain use it.
+- `watchLane` polls (`LANE_POLL_MS`) in one script: it fires when the holder's record says it was superseded, when its parent's record does (copying the superseder onto its own record so its own children stop), or when another holder with a record takes the lane. Otherwise it refreshes its own baton, and its parent's while the parent still holds it.
+- `holdLaneWhileParked` stretches a parked holder's baton to `PARKED_LANE_TTL_SEC` (3 hours). Nothing in a lane lives longer without a refresh.
+
+Use it for "only the most recent enqueue for this key should finish". Jobs that use it must be safe to re-run: see [JOBS.md § Superseding Job](./JOBS.md#superseding-job). Lane scripts touch the holder's record without declaring it, so they need a standalone Redis, not Redis Cluster.
 
 ---
 

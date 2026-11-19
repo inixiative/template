@@ -4,30 +4,24 @@
  * @partOf primitive:jobs
  * @uses feature:segment, primitive:appEvents
  */
-import { db } from '@template/db';
-import type { CustomerModel } from '@template/db/generated/client/enums';
-import { groupBy } from 'lodash-es';
+import { db, wherePolymorphicSideIsOneOf } from '@template/db';
 import { makeJob } from '#/jobs/makeJob';
-import type { CustomerReference } from '#/modules/customerRelationship/lib/customerReference';
-import { customerRelationshipCustomerFk } from '#/modules/segment/lib/segmentOwner';
+import type { CustomerSide } from '#/modules/customerRelationship/lib/customerRelationshipSides';
 import {
   type MembershipChange,
   publishMembershipChanges,
 } from '#/modules/segment/services/publishMembershipChanges';
 import { reconcileCustomerRelationships } from '#/modules/segment/services/reconcileCustomerRelationships';
 
-export type ReconcileCustomerRelationshipSegmentsPayload = { customers: CustomerReference[] };
+export type ReconcileCustomerRelationshipSegmentsPayload = { customers: CustomerSide[] };
 
-const fetchCustomerRelationshipsOfCustomers = (customers: CustomerReference[]) =>
+const fetchCustomerRelationshipsOfCustomers = (customers: CustomerSide[]) =>
   db.customerRelationship.findMany({
-    where: {
-      OR: Object.entries(groupBy(customers, 'customerModel')).map(([customerModel, group]) => ({
-        customerModel: customerModel as CustomerModel,
-        [customerRelationshipCustomerFk(customerModel as CustomerModel)]: {
-          in: group.map(({ customerId }) => customerId),
-        },
-      })),
-    },
+    where: wherePolymorphicSideIsOneOf(
+      'CustomerRelationship',
+      'customerModel',
+      customers.map(({ customerModel, customerId }) => ({ kind: customerModel, id: customerId })),
+    ),
   });
 
 const changesOnLiveSegments = async (changes: MembershipChange[]): Promise<MembershipChange[]> => {

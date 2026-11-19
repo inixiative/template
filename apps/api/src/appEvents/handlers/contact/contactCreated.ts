@@ -8,7 +8,7 @@ import type { Contact } from '@template/db/generated/client/client';
 import { organizationContactUpsert } from '#/appEvents/handlers/contact/organizationContactsStream';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import {
-  customerReferenceOfRow,
+  customerSideOfRow,
   enqueueSegmentReconcileForCustomers,
 } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
@@ -19,7 +19,7 @@ export const contactCreated = makeAppEvent<ContactCreatedPayload>({
   cb: [
     ({ contact }) =>
       enqueueSegmentReconcileForCustomers([
-        customerReferenceOfRow({ model: 'Contact', axis: 'ownerModel' }, contact),
+        customerSideOfRow({ model: 'Contact', axis: 'ownerModel' }, contact),
       ]),
   ],
 });

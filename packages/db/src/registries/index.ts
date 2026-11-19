@@ -24,3 +24,4 @@ export * from './sensitiveFields';
 export * from './skipRevive';
 export * from './softDeleteModels';
 export * from './webhook';
+export * from './wherePolymorphicSideIsOneOf';

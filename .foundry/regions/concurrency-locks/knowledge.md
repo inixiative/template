@@ -214,7 +214,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 
-**Job: hold, watch or give up a supersede lane inside a job** (Lane calls: claimLane vs reclaimLane vs releaseLane vs watchLane) — docs/claude/CONCURRENCY.md § Supersede Lanes; catalog lanes.ts
+**Job: hold, watch or give up a supersede lane inside a job** (Lane calls: claimLane vs markDisplacedHolder vs claimLaneUnlessNewerHolder vs watchLane) — docs/claude/CONCURRENCY.md § Supersede Lanes; catalog lanes.ts
 
 *Said as:* "take the baton, watch it, give it back", "how does the job know it was replaced", "take over from a holder that died", "end the run without stomping the newer claim"
 
@@ -225,8 +225,8 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 |---|---|---|---|
 | start the run and take the baton, last claim wins; mark this job as the current holder for the key; a newer enqueue for the same key should evict the older one; I'll write my job id to redis so later jobs know I'm newest; re-claim the lane when draining a spilled superseding job | **claimLane** · primitive `packages/db/src/lanes/lanes.ts#claimLane` — Newest-wins across processes: claimLane/watchLane; exclusive critical section: makeLock; in-process ordering: makeSerializedQueue. | docs/claude/CONCURRENCY.md § Supersede Lanes (`claimLane` / `watchLane`); docs/claude/CONCURRENCY.md § (preface) | storing a 'latest job id' in Redis by hand and comparing it inside the job to decide whether to stop (docs/claude/CONCURRENCY.md § Supersede Lanes (claimLane / watchLane)) |
 | a burst of edits should collapse into one run; only the latest run for this key matters, older ones should stop; debounce this job so repeated triggers don't all run; I'll remove the pending job by id and re-add it to debounce; re-index after save, but newer saves cancel the older indexing; keyed per source so each source only runs its newest sync | **makeSupersedingJob** · primitive `apps/api/src/jobs/makeSupersedingJob.ts#makeSupersedingJob` — Recomputations where only latest result matters; old run keeps executing cooperatively. Skip duplicates: makeSingletonJob; all runs matter: makeJob. | docs/claude/JOBS.md § Handler Patterns › Superseding Job; docs/claude/JOBS.md § Handler Patterns | BullMQ jobs removed or delayed by id to debounce, or a custom dedupe key check, so only the newest enqueue finishes (docs/claude/CONCURRENCY.md § Supersede Lanes (debounced/superseding jobs); docs/claude/JOBS.md § Superseding Job) |
-| take the lane back after the current holder has gone stale; the holder died, let someone else pick up the key; an aged-out claim should be takeable without evicting a live one; I'll check the TTL myself and overwrite the holder if it's old | **reclaimLane** · primitive `packages/db/src/lanes/lanes.ts#reclaimLane` — Stale-holder takeover; use claimLane to start fresh and evict older jobs. | — | — |
-| let go of the lane when the job finishes; release only if I'm still the holder; I'll delete the lane key at the end of the job; end the hold without stomping a newer claimant | **releaseLane** · primitive `packages/db/src/lanes/lanes.ts#releaseLane` — Ends a claimLane/reclaimLane hold; for one-off critical sections use makeLock instead. | — | — |
+| take the lane at job start or in the outbox drain without evicting a newer job; a holder whose add failed should not block me; I'll check the TTL myself and overwrite the holder if it's old | **claimLaneUnlessNewerHolder** · primitive `packages/db/src/lanes/lanes.ts#claimLaneUnlessNewerHolder` — Takes the lane unless a newer holder that exists holds it; use claimLane for a fresh enqueue. | — | — |
+| tell the job I displaced that it was superseded; mark the old job once the new one exists; I'll write a superseded key myself after adding the job | **markDisplacedHolder** · primitive `packages/db/src/lanes/lanes.ts#markDisplacedHolder` — After a successful add: marks the displaced holder's own record (or this job, if a newer claim won). | docs/claude/CONCURRENCY.md § Supersede Lanes | writing a separate superseded key |
 | the job got replaced by a newer one, don't count it as a failure; a superseded run should exit cleanly, not show as failed; I'll just return early when the signal fires; throw something that marks the run as superseded, not errored | **SupersededError** · primitive `apps/api/src/jobs/types.ts#SupersededError` — Job superseded by newer lane work: throw this rather than a generic Error so it isn't treated as failure. | — | a superseded job throwing a generic Error or returning silently mid-way (catalog: SupersededError (throw this rather than a generic Error so it isn't treated as failure)). error class `off-request-path` (Raised where no live HTTP request is being served (job workers, app bootstrap, scripts, tests, frontend): plain Error is fine and nothing maps it to a status.) |
 | while working, notice if a newer job took over and stop; poll for a different holder and bow out; I'll check redis every few seconds inside the loop to see if I'm still newest; detect that this run was usurped mid-way; a momentary redis blip shouldn't make the job think it lost | **watchLane** · primitive `packages/db/src/lanes/lanes.ts#watchLane` — Newest-wins across processes: claimLane/watchLane; mutual exclusion: makeLock; in-process ordering: makeSerializedQueue. | docs/claude/CONCURRENCY.md § Supersede Lanes (`claimLane` / `watchLane`); docs/claude/CONCURRENCY.md § (preface) | — |
 | forbid requeueing jobs with moveToDelayed or DelayedError to handle collisions | **no-job-parking** · rule `scripts/ci/rules/no-job-parking.sh` — Collisions: singleton or superseding job. Slow-lane capacity waits: claimSlotOrRequeue.ts, the only sanctioned parking. | docs/claude/JOBS.md § Handler Patterns; FEATURES.md § Background Jobs & Cron | — |
@@ -236,7 +236,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | how long a lane claim lives in redis; the claim expiry on a supersede lane | **LANE_TTL_SEC** · primitive packages/db/src/lanes/lanes.ts — set how long a lane claim persists in Redis | part 4 | — |
 | don't use a bare interval for an async recurring task; a slow run overlapped the next tick of the interval; I'll set up an interval that calls the async function | **Use heartbeat over setInterval** · rule docs/claude/CONCURRENCY.md § Recurring Beat — Any in-process recurring async task. | part 4 | — |
 
-- *Also here, by name:* ageGatedReclaim (`packages/db/src/lanes/queries/ageGatedReclaim.ts`); evictingClaim (`packages/db/src/lanes/queries/evictingClaim.ts`); fencedRelease (`packages/db/src/lanes/queries/fencedRelease.ts`); fetchJobSupersededBy (`packages/db/src/lanes/lanes.ts`); holdLaneWhileParked (`packages/db/src/lanes/lanes.ts`); laneKey (`packages/db/src/lanes/lanes.ts`); supersededKey (`packages/db/src/lanes/lanes.ts`); markJobSupersededBy (`packages/db/src/lanes/lanes.ts`)
+- *Also here, by name:* claimLaneUnlessNewerHolder (`packages/db/src/lanes/queries/claimLaneUnlessNewerHolder.ts`); evictingClaim (`packages/db/src/lanes/queries/evictingClaim.ts`); markDisplacedHolder (`packages/db/src/lanes/queries/markDisplacedHolder.ts`); pollLane (`packages/db/src/lanes/queries/pollLane.ts`); fetchSupersededBy (`packages/db/src/lanes/lanes.ts`); holdLaneWhileParked (`packages/db/src/lanes/lanes.ts`); laneKey (`packages/db/src/lanes/lanes.ts`); LaneStore (`packages/db/src/lanes/lanes.ts`); jobLaneStore (`apps/api/src/jobs/jobLaneStore.ts`)
 
 ### Class `recurring-timers`: Non-overlapping in-process recurring work: heartbeat, unref intervals
 
@@ -533,24 +533,28 @@ No cap (or cap ≥ length) → degrades to a plain `Promise.all`. `minimumConcur
 
 #### Supersede Lanes (`claimLane` / `watchLane`)
 
-`packages/db/src/lanes/lanes.ts` (exported from `@template/db`). A Redis baton scoped to `(handlerName, dedupeKey)`: the newest claimant wins, and an in-flight older job learns it's been usurped and bows out. Cross-process, the inverse of a lock — a lock keeps the *first* holder and rejects late-comers; a lane hands the baton to the *latest* and evicts the incumbent.
+`packages/db/src/lanes/lanes.ts` (exported from `@template/db`). A Redis baton scoped to `(handlerName, dedupeKey)`: the newest claimant wins, and an in-flight older holder learns it has been superseded and bows out. Cross-process, the inverse of a lock: a lock keeps the *first* holder and rejects late-comers; a lane hands the baton to the *latest* and evicts the incumbent.
+
+Every call takes a `LaneStore`: the Redis connection, where each holder's own record lives (`holderKeyPrefix`), and the field on that record that says who superseded it (`supersededField`). The lane writes no key of its own beyond the baton. The superseded fact goes on the displaced holder's record and is deleted with it, so nothing outlives the holder. Jobs use `jobLaneStore` (`apps/api/src/jobs/jobLaneStore.ts`): the queue's Redis, BullMQ job hashes, field `supersededBy`. The lane must run on the same Redis as the records it marks; a lane script cannot see a key on another instance.
 
 ```ts
-import { claimLane, watchLane, laneKey } from '@template/db';
+import { claimLane, laneKey, markDisplacedHolder, watchLane } from '@template/db';
 
 const lane = laneKey(handlerName, dedupeKey);
-await claimLane(lane, jobId);                 // take the baton (last claim wins)
-const stop = watchLane(lane, jobId, () => {   // bow out once a newer job claims it
-  abortThisJob();
-});
-try {
-  /* work */
-} finally {
-  stop();
-}
+const previous = await claimLane(store, lane, jobId);    // take the baton (last claim wins)
+await queue.add(handlerName, data, { jobId });          // the new holder must exist first
+await markDisplacedHolder(store, lane, jobId, previous); // then mark the one it displaced
+const stop = watchLane(store, { lane, holderId: jobId }, () => abortThisJob());
 ```
 
-`claimLane` writes `jobId` with a TTL (`LANE_TTL_SEC`). `watchLane` polls (`LANE_POLL_MS`, via `startHeartbeat`) and fires `onUsurped` only when a *different* holder appears — an expired/absent key counts as still held, so a momentary Redis blip doesn't false-trigger. Use for "only the most recent enqueue for this key should finish" (debounced/superseding jobs); see [JOBS.md](./JOBS.md) for the supersede pattern this backs.
+- `claimLane` only takes the baton, with a TTL covering the job's delay (`LANE_TTL_SEC` plus the delay).
+- `markDisplacedHolder` runs once the new holder exists. While the lane still names it, the displaced holder's record gets the field; if a newer claim got there first, the new holder marks itself. It never creates a record that does not exist.
+- A failed add throws and leaves nothing to undo: no mark was written, and a baton naming a holder with no record counts as no holder.
+- `claimLaneUnlessNewerHolder` takes the baton unless a newer holder that exists holds it (holder ids are uuidv7, so a string compare is an age compare). A job's start and the outbox drain use it.
+- `watchLane` polls (`LANE_POLL_MS`) in one script: it fires when the holder's record says it was superseded, when its parent's record does (copying the superseder onto its own record so its own children stop), or when another holder with a record takes the lane. Otherwise it refreshes its own baton, and its parent's while the parent still holds it.
+- `holdLaneWhileParked` stretches a parked holder's baton to `PARKED_LANE_TTL_SEC` (3 hours). Nothing in a lane lives longer without a refresh.
+
+Use it for "only the most recent enqueue for this key should finish". Jobs that use it must be safe to re-run: see [JOBS.md § Superseding Job](./JOBS.md#superseding-job). Lane scripts touch the holder's record without declaring it, so they need a standalone Redis, not Redis Cluster.
 
 ---
 
@@ -598,13 +602,10 @@ export const syncData = makeSupersedingJob(
 ```
 
 How it works:
-1. Enqueue/drain claims the lane: `claimLane(job:lane:{handler}:{dedupeKey}, jobId)` (last claim wins)
-2. The running job's `watchLane` polls its lane (~500ms); a different holder means it was usurped
-3. Usurped jobs abort via `ctx.signal` and exit gracefully
-
-4. A staged superseding job's children listen to their parent too: a superseded mark on the parent stops them
-   at start or on their next poll, and they mark themselves superseded so their own children stop (see
-   [Staged Job](#staged-job-fan-out-and-wait)).
+1. A direct enqueue takes the lane (`claimLane`, last claim wins), adds the job, then marks the job it displaced (`markDisplacedHolder`): a `supersededBy` field on that job's own BullMQ hash, deleted with the job. A spill takes no lane; the outbox drain takes it when it re-adds the row (`claimLaneUnlessNewerHolder`), and drops a row a newer job displaced.
+2. At start, a job exits if its own record or its parent's says it was superseded, or if a newer job that exists holds its lane; otherwise it takes the lane.
+3. While it runs, `watchLane` polls (~500ms) and aborts it through `ctx.signal` when it is superseded.
+4. A staged superseding job's children read their parent's record too, and a child that finds its parent superseded marks itself, so its own children stop (see [Staged Job](#staged-job-fan-out-and-wait)).
 
 **Superseding does not kill.** `makeSupersedingJob` stops *waiting* for the old run; it does not stop it. Workers run handlers in-process, so the superseded handler's promise keeps running to the end. The signal is cooperative: `fetch`, timers and your own loops can honour it, Prisma queries cannot. A superseded run must therefore never write: check `ctx.signal.aborted` before every write, or fence the write against the lane.
 
@@ -683,12 +684,12 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **runAllWithConcurrencyLimit** `packages/shared/src/utils/runAllWithConcurrencyLimit.ts#runAllWithConcurrencyLimit` [primitive] run async thunks with a concurrency cap and return ordered results Use: const results = await runAllWithConcurrencyLimit(items.map((i) => () => work(i)), minimumConcurrencyLimitFor())
 
 #### Class `supersede-lanes`
-- **claimLane** `packages/db/src/lanes/lanes.ts#claimLane` [primitive] claim a Redis lane for a job so the newest job for a key wins Use: const prev = await claimLane(lane, jobId, delayMs)
+- **claimLane** `packages/db/src/lanes/lanes.ts#claimLane` [primitive] claim a Redis lane for a job so the newest job for a key wins Use: const previous = await claimLane(jobLaneStore, lane, jobId, delayMs)
 - **makeSupersedingJob** `apps/api/src/jobs/makeSupersedingJob.ts#makeSupersedingJob` [primitive] define a job where a newer run with the same key replaces older waiting Use: export const recompute = makeSupersedingJob<Payload>(handler, (p) => p.id)
-- **reclaimLane** `packages/db/src/lanes/lanes.ts#reclaimLane` [primitive] take back a lane for a job once the current holder has aged out Use: await reclaimLane(lane, jobId);
-- **releaseLane** `packages/db/src/lanes/lanes.ts#releaseLane` [primitive] release a lane only if this job still holds it Use: await releaseLane(lane, jobId, previousHolder);
+- **claimLaneUnlessNewerHolder** `packages/db/src/lanes/lanes.ts#claimLaneUnlessNewerHolder` [primitive] take a lane unless a newer existing holder has it Use: const { claimed, previous } = await claimLaneUnlessNewerHolder(jobLaneStore, lane, jobId)
+- **markDisplacedHolder** `packages/db/src/lanes/lanes.ts#markDisplacedHolder` [primitive] mark the holder a claim displaced, once the new holder exists Use: await markDisplacedHolder(jobLaneStore, lane, jobId, previous)
 - **SupersededError** `apps/api/src/jobs/types.ts#SupersededError` [primitive] signal that a running job was replaced by newer work and should stop Use: throw new SupersededError(job.id)
-- **watchLane** `packages/db/src/lanes/lanes.ts#watchLane` [primitive] notify a running job when a newer job claims its lane across processes Use: watchLane(lane, jobId, () => abort())
+- **watchLane** `packages/db/src/lanes/lanes.ts#watchLane` [primitive] notify a running job when a newer job claims its lane across processes Use: watchLane(jobLaneStore, { lane, holderId: jobId }, () => abort())
 - **no-job-parking** `scripts/ci/rules/no-job-parking.sh` [rule] forbid requeueing jobs with moveToDelayed or DelayedError to handle collisions Use: On collision, use a singleton job (skip the new run) or makeSupersedingJob (take over); never park
 
 #### Class `recurring-timers`

@@ -6,27 +6,29 @@
  */
 import { type ModelName, rowPolymorphicAxisPointsAt } from '@template/db';
 import type { CustomerModel } from '@template/db/generated/client/enums';
-import { uniqBy } from 'lodash-es';
+import { chunk, uniqBy } from 'lodash-es';
 import { enqueueJob } from '#/jobs/enqueue';
-import type { CustomerReference } from '#/modules/customerRelationship/lib/customerReference';
+import type { CustomerSide } from '#/modules/customerRelationship/lib/customerRelationshipSides';
 
 type Polymorphic = { model: ModelName; axis: string };
 
-export const customerReferenceOfRow = (
+const CUSTOMERS_PER_JOB = 2000;
+
+export const customerSideOfRow = (
   { model, axis }: Polymorphic,
   row: Record<string, unknown>,
-): CustomerReference | null => {
+): CustomerSide | null => {
   const target = rowPolymorphicAxisPointsAt(row, model, axis);
   return target ? { customerModel: target.kind as CustomerModel, customerId: target.id } : null;
 };
 
 export const enqueueSegmentReconcileForCustomers = async (
-  customers: (CustomerReference | null)[],
+  customers: (CustomerSide | null)[],
 ): Promise<void> => {
   const present = uniqBy(
-    customers.filter((customer): customer is CustomerReference => customer !== null),
+    customers.filter((customer): customer is CustomerSide => customer !== null),
     ({ customerModel, customerId }) => `${customerModel}:${customerId}`,
   );
-  if (!present.length) return;
-  await enqueueJob('reconcileCustomerRelationshipSegments', { customers: present });
+  for (const customers of chunk(present, CUSTOMERS_PER_JOB))
+    await enqueueJob('reconcileCustomerRelationshipSegments', { customers });
 };

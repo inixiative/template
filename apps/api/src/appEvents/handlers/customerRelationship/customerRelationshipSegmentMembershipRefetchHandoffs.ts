@@ -7,10 +7,10 @@
 import { refetchQueryEvent, WS_CHANNELS } from '@template/shared/ws';
 import { lowerFirst } from 'lodash-es';
 import type { WSHandoff } from '#/appEvents/types';
-import type { CustomerReference } from '#/modules/customerRelationship/lib/customerReference';
+import type { CustomerSide } from '#/modules/customerRelationship/lib/customerRelationshipSides';
 import { meChannel } from '#/ws/meChannel';
 
-const channelOf = ({ customerModel, customerId }: CustomerReference): WSHandoff => {
+const channelOf = ({ customerModel, customerId }: CustomerSide): WSHandoff => {
   if (customerModel === 'User') {
     const _id = 'meReadManySegmentMemberships';
     return {
@@ -28,5 +28,5 @@ const channelOf = ({ customerModel, customerId }: CustomerReference): WSHandoff 
 };
 
 export const customerRelationshipSegmentMembershipRefetchHandoffs = (
-  customer: CustomerReference,
+  customer: CustomerSide,
 ): WSHandoff[] => [channelOf(customer)];

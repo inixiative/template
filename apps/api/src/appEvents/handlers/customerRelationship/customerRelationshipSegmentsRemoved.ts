@@ -6,9 +6,9 @@
  */
 import { customerRelationshipSegmentMembershipRefetchHandoffs } from '#/appEvents/handlers/customerRelationship/customerRelationshipSegmentMembershipRefetchHandoffs';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import type { CustomerReference } from '#/modules/customerRelationship/lib/customerReference';
+import type { CustomerSide } from '#/modules/customerRelationship/lib/customerRelationshipSides';
 
-export type CustomerRelationshipSegmentsRemovedPayload = CustomerReference & {
+export type CustomerRelationshipSegmentsRemovedPayload = CustomerSide & {
   customerRelationshipId: string;
   segmentIds: string[];
 };

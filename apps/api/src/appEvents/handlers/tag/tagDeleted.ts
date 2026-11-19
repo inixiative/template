@@ -7,7 +7,7 @@
 import type { Tag, TagAttachment } from '@template/db/generated/client/client';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import {
-  customerReferenceOfRow,
+  customerSideOfRow,
   enqueueSegmentReconcileForCustomers,
 } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
@@ -18,7 +18,7 @@ export const tagDeleted = makeAppEvent<TagDeletedPayload>({
     ({ tagAttachments }) =>
       enqueueSegmentReconcileForCustomers(
         tagAttachments.map((attachment) =>
-          customerReferenceOfRow({ model: 'TagAttachment', axis: 'resourceModel' }, attachment),
+          customerSideOfRow({ model: 'TagAttachment', axis: 'resourceModel' }, attachment),
         ),
       ),
   ],

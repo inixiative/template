@@ -103,7 +103,7 @@ const key = `cache:User:${id}`;  // Don't do this
 | `session` | `session:*` | BetterAuth sign-in handshake sessions and one-time tokens (via secondaryStorage) |
 | `limit` | `limit:*` | Rate limiting counters |
 | `lock` | `lock:*` | Distributed locks via `makeLock`: `lock:<service>:<identifier>`, one key per identifier for a lock set (`identifiers: [...]`, e.g. upserting `findForUpdate`'s `lock:find-for-update:<Model:hash>`) |
-| `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
+| `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, on the queue's Redis; the superseded fact lives on the job's own hash, not under `lane:` |
 | `cacheWritten` | `cachewritten:*` | When the value under a `cache:` key was written (epoch ms); set and cleared with the value, read by `checkCache` |
 | `cacheGeneration` | `cachegeneration:*` | A `cache:` key's generation (`cachegeneration:<key>`); a clear moves it so a compute in flight skips its publish |
 | `cacheQueued` | `cachequeued:*` | A rolling-cache target whose refresh is enqueued and has not taken its lock; read by `checkCache` as `queued` |

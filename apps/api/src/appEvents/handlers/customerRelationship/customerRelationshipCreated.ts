@@ -7,7 +7,7 @@
 import type { CustomerRelationship } from '@template/db/generated/client/client';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import {
-  customerReferenceOfRow,
+  customerSideOfRow,
   enqueueSegmentReconcileForCustomers,
 } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
@@ -17,7 +17,7 @@ export const customerRelationshipCreated = makeAppEvent<CustomerRelationshipCrea
   cb: [
     ({ customerRelationship }) =>
       enqueueSegmentReconcileForCustomers([
-        customerReferenceOfRow(
+        customerSideOfRow(
           { model: 'CustomerRelationship', axis: 'customerModel' },
           customerRelationship,
         ),
