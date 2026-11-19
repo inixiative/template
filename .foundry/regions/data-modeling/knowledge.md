@@ -661,7 +661,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 
 #### Class `data-modeling`
 - **Tag** `packages/db/prisma/schema/tag.prisma` [model] label users, organizations or spaces with named tags grouped by category Use: prisma.tag.create({ data: { name, tagCategoryId, ownerModel: 'Organization', organizationId } })
-- **TagAttachment** `packages/db/prisma/schema/tagAttachment.prisma` [model] attach a tag to one user, organization or space, unique per owner Use: db.tagAttachment.create({ data: { tagId, resourceModel: 'Organization', organizationId } })
+- **TagAttachment** `packages/db/prisma/schema/tagAttachment.prisma` [model] attach a tag to one user, organization or space, unique per owner Use: db.tagAttachment.create({ data: { tagId, resourceModel: 'Organization', resourceOrganizationId } })
 - **TagCategory** `packages/db/prisma/schema/tagCategory.prisma` [model] group tags under a named category scoped to a platform, user, organization or space owner Use: prisma.tagCategory.create({ data: { name, ownerModel: 'Space', spaceId } })
 - **polymorphismConfigForModel** `packages/db/src/registries/falsePolymorphism.ts#polymorphismConfigForModel` [primitive] look up a model's polymorphic config, or null if not polymorphic Use: const config = polymorphismConfigForModel(model);
 - **polymorphicAxis** `packages/db/src/registries/falsePolymorphism.ts#polymorphicAxis` [primitive] look up one false-polymorphic axis config for a model, throwing on unknown model or axis Use: const axis = polymorphicAxis('Model', 'ownerModel')

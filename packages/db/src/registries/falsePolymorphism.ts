@@ -29,9 +29,6 @@ export type PolymorphicAxis = {
 
 export type PolymorphicConfig = {
   axes: readonly PolymorphicAxis[];
-  // If multiple axes, which combinations are valid (axis0Value → allowed axis1Values)
-  // Only needed when there are restrictions
-  allowedCombinations?: Partial<Record<PolymorphicValue, readonly PolymorphicValue[]>>;
 };
 
 // ============================================================================
@@ -166,12 +163,6 @@ export const PolymorphismRegistry = {
         },
       },
     ],
-    // All owner types can subscribe to CustomerRelationship
-    allowedCombinations: {
-      User: ['CustomerRelationship'],
-      Organization: ['CustomerRelationship'],
-      Space: ['CustomerRelationship'],
-    },
   },
 
   CustomerRelationship: {
@@ -193,11 +184,6 @@ export const PolymorphismRegistry = {
         },
       },
     ],
-    allowedCombinations: {
-      User: ['User', 'Organization', 'Space'],
-      Organization: ['User', 'Organization', 'Space'],
-      Space: ['User', 'Organization', 'Space'],
-    },
   },
 
   RuleReference: {

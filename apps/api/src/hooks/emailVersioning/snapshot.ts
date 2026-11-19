@@ -10,7 +10,7 @@ import { auditActorContext } from '@template/db/lib/auditActorContext';
 import {
   auditActorColumns,
   buildContextFkFields,
-  buildSubjectFkFields,
+  buildSubjectColumns,
   maskSensitiveAndOmitNoopFieldsForAudit,
 } from '#/hooks/auditLog/utils';
 
@@ -25,14 +25,13 @@ export const createVersionBumpSnapshot = async (
   const entry: Prisma.AuditLogCreateManyInput = {
     action: AuditAction.update,
     subjectModel: model,
-    subjectId: typeof record.id === 'string' ? record.id : null,
     before: processed,
     after: processed,
     changes: Prisma.JsonNull,
     componentVersions: componentVersions as Prisma.InputJsonValue,
     ...auditActorColumns(actor),
     ...buildContextFkFields(model, record),
-    ...buildSubjectFkFields(model, record),
+    ...buildSubjectColumns(model, record),
   };
 
   const [created] = await db.auditLog.createManyAndReturn({ data: [entry] });

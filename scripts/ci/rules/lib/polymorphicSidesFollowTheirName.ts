@@ -15,16 +15,9 @@
  * Why (Aron 2026-11-19): one rule for every side, so a reader and the side adapter can derive a side's
  * columns from its name instead of learning each model's exceptions.
  */
-import ts from 'typescript';
-import {
-  applyExemptionsAndBaselineThenExit,
-  fetchSource,
-  lineAt,
-  listFiles,
-  type Violation,
-} from './ciRuleRunner';
+import { applyExemptionsAndBaselineThenExit, type Violation } from './ciRuleRunner';
+import { POLYMORPHISM_REGISTRY, readPolymorphicSides, readPrismaModels } from './schemaSources';
 
-const REGISTRY = 'packages/db/src/registries/falsePolymorphism.ts';
 const TENANCY_COLUMNS = new Set([
   'organizationId',
   'spaceId',
@@ -32,98 +25,21 @@ const TENANCY_COLUMNS = new Set([
   'integrationId',
   'projectId',
 ]);
-const MODEL = /^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm;
 
-type Side = {
-  model: string;
-  field: string;
-  dualPolymorphismId?: string;
-  arms: { value: string; keys: string[] }[];
-  line: number;
-};
-
-const unwrapExpression = (node: ts.Expression): ts.Expression =>
-  ts.isSatisfiesExpression(node) || ts.isAsExpression(node) || ts.isParenthesizedExpression(node)
-    ? unwrapExpression(node.expression)
-    : node;
-
-const propertyOf = (node: ts.ObjectLiteralExpression, name: string) =>
-  node.properties.find(
-    (p): p is ts.PropertyAssignment =>
-      ts.isPropertyAssignment(p) &&
-      (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) &&
-      p.name.text === name,
-  )?.initializer;
-
-const stringLiteral = (node: ts.Node | undefined): string | undefined =>
-  node && ts.isStringLiteral(node) ? node.text : undefined;
-
-const registeredSides = (): Side[] => {
-  const text = fetchSource(REGISTRY);
-  const source = ts.createSourceFile(REGISTRY, text, ts.ScriptTarget.Latest, true);
-  const sides: Side[] = [];
-  const visit = (node: ts.Node) => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === 'PolymorphismRegistry' &&
-      node.initializer
-    ) {
-      const registry = unwrapExpression(node.initializer);
-      if (!ts.isObjectLiteralExpression(registry)) return;
-      for (const entry of registry.properties) {
-        if (!ts.isPropertyAssignment(entry) || !ts.isObjectLiteralExpression(entry.initializer))
-          continue;
-        const axes = propertyOf(entry.initializer, 'axes');
-        if (!axes || !ts.isArrayLiteralExpression(axes)) continue;
-        for (const axis of axes.elements.filter(ts.isObjectLiteralExpression)) {
-          const fkMap = propertyOf(axis, 'fkMap');
-          sides.push({
-            model: entry.name.getText(source),
-            field: stringLiteral(propertyOf(axis, 'field')) ?? '',
-            dualPolymorphismId: stringLiteral(propertyOf(axis, 'dualPolymorphismId')),
-            arms:
-              fkMap && ts.isObjectLiteralExpression(fkMap)
-                ? fkMap.properties.filter(ts.isPropertyAssignment).map((arm) => ({
-                    value: arm.name.getText(source).replace(/^['"]|['"]$/g, ''),
-                    keys: ts.isArrayLiteralExpression(arm.initializer)
-                      ? arm.initializer.elements.flatMap((key) => stringLiteral(key) ?? [])
-                      : [],
-                  }))
-                : [],
-            line: lineAt(text, axis.getStart(source)),
-          });
-        }
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return sides;
-};
-
-const prismaColumnsByModel = (): Map<string, Set<string>> => {
-  const columns = new Map<string, Set<string>>();
-  for (const file of listFiles(['packages'], /\.prisma$/)) {
-    const source = fetchSource(file);
-    MODEL.lastIndex = 0;
-    for (let m = MODEL.exec(source); m !== null; m = MODEL.exec(source)) {
-      const [, model, body] = m;
-      columns.set(
-        model,
-        new Set([...body.matchAll(/^[ \t]*(\w+)[ \t]+\w/gm)].map(([, column]) => column)),
-      );
-    }
-  }
-  return columns;
-};
+const prismaColumnsByModel = (): Map<string, Set<string>> =>
+  new Map(
+    readPrismaModels().map(({ name, body }) => [
+      name,
+      new Set([...body.matchAll(/^[ \t]*(\w+)[ \t]+\w/gm)].map(([, column]) => column ?? '')),
+    ]),
+  );
 
 const capitalize = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
 const violations: Violation[] = [];
 const columnsByModel = prismaColumnsByModel();
 
-for (const side of registeredSides()) {
+for (const side of readPolymorphicSides()) {
   const report = (key: string, detail: string) =>
     violations.push({
       file: REGISTRY,
