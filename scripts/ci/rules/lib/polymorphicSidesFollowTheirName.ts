@@ -42,7 +42,7 @@ const columnsByModel = prismaColumnsByModel();
 for (const side of readPolymorphicSides()) {
   const report = (key: string, detail: string) =>
     violations.push({
-      file: REGISTRY,
+      file: POLYMORPHISM_REGISTRY,
       line: side.line,
       key: `${side.model}.${side.field}${key}`,
       detail,
