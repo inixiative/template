@@ -22,10 +22,7 @@ import { useState } from 'react';
 
 export type UserMenuProps = {
   className?: string;
-  // Spoofing impersonates a non-superadmin user. The superadmin app is for
-  // platform management as the superadmin themselves — spoofing in there
-  // would mean "view superadmin as a non-superadmin", which is a 403 by
-  // design. Hide the controls in the superadmin app; they belong in admin/web.
+  // why: the superadmin app is used as the superadmin themselves; spoof controls belong in admin and web.
   showSpoofControls?: boolean;
 };
 

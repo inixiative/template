@@ -97,7 +97,7 @@ describe('spoofMiddleware via token auth', () => {
     expect(body.superadmin).toBe(false);
     expect(body.grants).toEqual([`db:user:${target.id}`]);
   });
-  it('a superadmin cannot spoof another superadmin', async () => {
+  it('a superadmin spoofs another superadmin and acts as them', async () => {
     const { entity: admin } = await createUser({ platformRole: 'superadmin' });
     const { entity: other } = await createUser({ platformRole: 'superadmin' });
 
@@ -105,16 +105,26 @@ describe('spoofMiddleware via token auth', () => {
       new Request('http://test/echo', { headers: { 'x-spoof-user-email': other.email } }),
     );
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect((await res.json()) as Echo).toEqual({
+      userId: other.id,
+      spoofedById: admin.id,
+      tokenId: null,
+    });
   });
 
-  it('a superadmin cannot spoof themselves', async () => {
+  it('a superadmin naming themselves is no spoof', async () => {
     const { entity: admin } = await createUser({ platformRole: 'superadmin' });
 
     const res = await buildApp({ user: admin }).fetch(
       new Request('http://test/echo', { headers: { 'x-spoof-user-email': admin.email } }),
     );
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect((await res.json()) as Echo).toEqual({
+      userId: admin.id,
+      spoofedById: null,
+      tokenId: null,
+    });
   });
 });

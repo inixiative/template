@@ -212,7 +212,7 @@ Why not let the browser hold a short-lived session for one call (the first desig
 
 `POST /api/v1/me/changePassword` (`modules/me/routes/meChangePassword.ts`), body `{ currentPassword, newPassword }`, response `{ token, expiresAt }`:
 
-- **Who:** a user. `validatePermission(UserAction.changePassword)` on the user, `actorIsUser` in the schema: an API token cannot change its user's password, whatever it holds. A superadmin passes on any credential. A superadmin spoofing a user can change that user's password like any other action (no spoof guard: a superadmin passes every check, on any credential); the response is then `{ token: null, expiresAt: null }`, so the spoofed user's new JWT never leaves the API, and the UI keeps its own JWT while spoofing or when the answer has no JWT. A superadmin cannot be spoofed ([Spoof Middleware](#spoof-middleware)), so a superadmin never changes their own password through a spoof.
+- **Who:** a user. `validatePermission(UserAction.changePassword)` on the user, `actorIsUser` in the schema: an API token cannot change its user's password, whatever it holds. A superadmin passes on any credential. A superadmin spoofing a user can change that user's password like any other action (no spoof guard: a superadmin passes every check, on any credential); the response is then `{ token: null, expiresAt: null }`, so the spoofed user's new JWT never leaves the API, and the UI keeps its own JWT while spoofing or when the answer has no JWT.
 - **Not in a batch:** the route is `'x-batch': false`; a batch that reaches it is refused before anything runs ([BATCH.md](./BATCH.md#routes-that-cannot-batch)).
 - **Limits:** `newPassword` length comes from `passwordLength` (`packages/shared/src/auth/passwordLength.ts`, also used by the web form), the same constants `auth.ts` gives BetterAuth as `minPasswordLength`/`maxPasswordLength`; outside them is a 422 before BetterAuth runs. Rate limits: the `/api/auth` IP bucket (`authRateLimit`, 60 a minute) first, and a per-user bucket (`credentialChangeRateLimit`, 5 a minute) after the permission checks, so a stolen JWT can't guess the current password from rotating IPs and a refused token can't use up its person's attempts.
 - **What runs:** `withThrowawaySession(user.id, (headers) => auth.api.changePassword({ body: { currentPassword, newPassword, revokeOtherSessions: true }, headers }))`. BetterAuth verifies the current password and hashes the new one; a wrong current password is its 400 `Invalid password`, and nothing changes. `revokeOtherSessions` deletes every BetterAuth session of the user and creates a new one; `jwtHandoffPlugin` sees `/change-password`, calls `rotateUserJwts` before signing (every older JWT is a 401 from now on), signs the new JWT through the same path sign-in uses, stamps `lastLoginAt` (the person just proved the password) and deletes that session.
@@ -564,7 +564,6 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const spoofEmail = normalizeEmail(rawEmail);
   const spoofedBasic = await findUserByEmail(spoofEmail);
   if (!spoofedBasic) return next();
-  if (isSuperadminUser(spoofedBasic)) throw makeError({ status: 403, message: 'A superadmin cannot be spoofed' });
   const spoofedUser = await findUserWithRelations(spoofedBasic.id);
   if (!spoofedUser) return next();
 
@@ -589,7 +588,7 @@ curl -H "Authorization: Bearer <jwt>" \
 
 - Caller must be authenticated as superadmin
 - Target user must exist
-- Target must not be a superadmin, the caller included (403)
+- Any user, a superadmin included; naming yourself is no spoof
 - Original admin tracked in `spoofedBy` for audit
 
 ---
