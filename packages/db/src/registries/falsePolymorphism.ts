@@ -412,3 +412,12 @@ export const polymorphicAxis = (model: ModelName, axisField: string): Polymorphi
   if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
   return axis;
 };
+
+/** Every key column a side uses, across all its values, once each. */
+export const sideKeyColumns = (axis: PolymorphicAxis): string[] => [
+  ...new Set(Object.values(axis.fkMap).flatMap((keys) => [...(keys ?? [])])),
+];
+
+/** Every key column of a side, null: the base a writer sets one value's keys over. */
+export const emptySideKeyColumns = (axis: PolymorphicAxis): Record<string, null> =>
+  Object.fromEntries(sideKeyColumns(axis).map((column) => [column, null]));

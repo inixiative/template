@@ -4,19 +4,13 @@
  * @partOf feature:inquiry
  * @uses infrastructure:prisma, feature:tenancy, feature:users
  */
+import { emptySideKeyColumns, polymorphicAxis } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { type ValidatedContext, validatedBody } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
-const nullTargetFields = {
-  targetUserId: null,
-  targetOrganizationId: null,
-  targetSpaceId: null,
-  targetIntegrationId: null,
-  targetTokenId: null,
-  targetProjectId: null,
-};
+const nullTargetFields = emptySideKeyColumns(polymorphicAxis('Inquiry', 'targetModel'));
 export type InquiryTargetBody = {
   targetModel: InquiryResourceModel;
   targetUserId?: string;

@@ -3,6 +3,7 @@ export * from './carriedOwnerKeys';
 export * from './discriminatorDefaults';
 export * from './dualPolymorphismIds';
 export {
+  emptySideKeyColumns,
   type FalsePolymorphismRef,
   type FlexibleRef,
   isFalsePolymorphismRef,
@@ -12,6 +13,7 @@ export {
   PolymorphismRegistry,
   polymorphicAxis,
   polymorphismConfigForModel,
+  sideKeyColumns,
 } from './falsePolymorphism';
 export * from './fieldRegistry';
 export * from './hardDeleteOnTombstone';

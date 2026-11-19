@@ -6,12 +6,13 @@
  */
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
-import { polymorphicKeyColumnOrThrow } from '@template/db/registries/polymorphicAxisPointsAt';
+import { wherePolymorphicSideIsOneOf } from '@template/db/registries/wherePolymorphicSideIsOneOf';
 import {
   fetchRuleReferenceTargetsDeletedAtForUpdate,
   type RuleReferenceTargetDeletedState,
 } from '@template/db/utils/fetchRuleReferenceTargetsDeletedAtForUpdate';
 import type { ModelName } from '@template/db/utils/modelNames';
+import { polymorphicArmKeys } from '@template/db/utils/polymorphicArmKeys';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 import type { ModelRow } from '@template/shared/utils/modelRow';
 import { groupBy } from 'lodash-es';
@@ -25,9 +26,6 @@ type Edge = {
   targetDeletedAt: Date | null;
 };
 
-const fkColumn = (axis: 'sourceModel' | 'targetModel', model: string): string =>
-  polymorphicKeyColumnOrThrow('RuleReference', axis, model);
-
 const edgeKey = (edge: Edge): string =>
   referenceKey({ model: edge.targetModel, id: edge.targetId });
 
@@ -37,9 +35,9 @@ const edgeData = (
   state: RuleReferenceTargetDeletedState,
 ) => ({
   sourceModel: source.model,
-  [fkColumn('sourceModel', source.model)]: source.id,
+  ...polymorphicArmKeys('RuleReference', 'sourceModel', source.model, { id: source.id }),
   targetModel: ref.model,
-  [fkColumn('targetModel', ref.model)]: ref.id,
+  ...polymorphicArmKeys('RuleReference', 'targetModel', ref.model, { id: ref.id }),
   targetDeletedAt: state.deletedAt,
 });
 
@@ -52,7 +50,9 @@ export const syncRuleReferenceEdges = async (
   references: RuleReference[],
 ): Promise<void> => {
   const existing = (await db.ruleReference.findMany({
-    where: { sourceModel: source.model, sourceId: source.id } as Prisma.RuleReferenceWhereInput,
+    where: wherePolymorphicSideIsOneOf('RuleReference', 'sourceModel', [
+      source,
+    ]) as Prisma.RuleReferenceWhereInput,
   })) as Edge[];
 
   const referenced = new Map(references.map((ref) => [referenceKey(ref), ref]));

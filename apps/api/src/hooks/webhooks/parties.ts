@@ -14,6 +14,7 @@ import {
   rowPolymorphicAxisPointsAt,
   webhookEnabledModels,
   webhookRelatedModels,
+  wherePolymorphicSideIsOneOf,
 } from '@template/db';
 import type { WebhookModel } from '@template/db/generated/client/client';
 import type { ModelRow } from '@template/shared/utils/modelRow';
@@ -61,9 +62,14 @@ export const fetchWebhookPartiesThroughRelation = async (
   );
   const relations = await db.delegate(ref.model).findMany({
     where: {
-      [ref.axis]: ref.value,
-      [column]: { in: rows.map((row) => row.id) },
-      OR: [{ deletedAt: null }, { deletedAt: { in: tombstones } }],
+      AND: [
+        wherePolymorphicSideIsOneOf(
+          ref.model,
+          ref.axis,
+          rows.map((row) => ({ model: ref.value, id: row.id })),
+        ),
+        { OR: [{ deletedAt: null }, { deletedAt: { in: tombstones } }] },
+      ],
     },
   });
   const rowsById = keyBy(rows, 'id');

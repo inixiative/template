@@ -5,7 +5,7 @@
  * @uses feature:email
  */
 import { projectRows } from '@inixiative/json-rules';
-import { db, polymorphicArmKeys } from '@template/db';
+import { db, emptySideKeyColumns, polymorphicArmKeys, polymorphicAxis } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
@@ -45,8 +45,6 @@ export type PlanEmailDeliveriesPayload = {
   data: Record<string, unknown>;
 };
 
-const SENDER_COLUMNS = { senderUserId: null, senderOrganizationId: null, senderSpaceId: null };
-
 const senderRow = (sender: Sender): Record<string, unknown> | null => {
   switch (sender.type) {
     case 'User':
@@ -72,7 +70,7 @@ const senderColumns = (sender: Sender) => {
   const row = senderRow(sender);
   return {
     senderModel: sender.type,
-    ...SENDER_COLUMNS,
+    ...emptySideKeyColumns(polymorphicAxis('CommunicationLog', 'senderModel')),
     ...(row ? polymorphicArmKeys('CommunicationLog', 'senderModel', sender.type, row) : {}),
   };
 };

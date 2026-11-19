@@ -5,7 +5,11 @@
  * @uses none
  */
 import { type Condition, Operator } from '@inixiative/json-rules';
-import { type PolymorphicAxis, polymorphicAxis } from '@template/db/registries/falsePolymorphism';
+import {
+  type PolymorphicAxis,
+  polymorphicAxis,
+  sideKeyColumns,
+} from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { polymorphicArmColumns } from '@template/db/utils/polymorphicArmKeys';
 import type { ModelRow } from '@template/shared/utils/modelRow';
@@ -129,7 +133,7 @@ export const conditionPolymorphicAxisPointsAtBoundRow = (
       ([value, fks]) =>
         isBindableOwnerModel(value) && fks.length > 0 && idColumnOf(value, fks) === fk,
     )?.[0] as BindableOwnerModel | undefined;
-  const columns = [...new Set(entries.flatMap(([, fks]) => fks))];
+  const columns = sideKeyColumns(polymorphicAxis(model, axisField));
   for (const [value, fks] of entries) {
     if (fks.length && !fks.every((fk) => kindOf(fk))) {
       throw new Error(
