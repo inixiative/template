@@ -4,14 +4,12 @@
  * @partOf primitive:appEvents
  * @uses primitive:websockets
  */
-import type { CustomerModel } from '@template/db/generated/client/enums';
 import { customerRelationshipSegmentMembershipRefetchHandoffs } from '#/appEvents/handlers/customerRelationship/customerRelationshipSegmentMembershipRefetchHandoffs';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
+import type { CustomerReference } from '#/modules/customerRelationship/lib/customerReference';
 
-export type CustomerRelationshipSegmentsRemovedPayload = {
+export type CustomerRelationshipSegmentsRemovedPayload = CustomerReference & {
   customerRelationshipId: string;
-  customerModel: CustomerModel;
-  customerId: string;
   segmentIds: string[];
 };
 

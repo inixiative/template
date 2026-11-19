@@ -6,12 +6,12 @@
  * @constructs jobHandler
  */
 import {
-  deleteJobSupersededMark,
   fetchJobSupersededBy,
   holdLaneWhileParked,
   laneKey,
   markJobSupersededBy,
   reclaimLane,
+  shortenJobSupersededMark,
   watchLane,
 } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
@@ -33,11 +33,10 @@ export type SupersedingJobHandler<TPayload = void> = JobHandler<TPayload> & {
 // children (validateChildJobHandler). A child listens to its parent as well as to itself: at start, and
 // on every lane poll (watchLane), a superseded mark on its parent stops it exactly as its own would, and a
 // child that has children of its own marks itself superseded with the same superseder so they stop in turn,
-// at any depth. Only
-// superseding jobs are ever marked superseded, so a child of a singleton or plain parent never sees one.
+// at any depth. Only superseding jobs are ever marked superseded, so a child of a singleton or plain parent never sees one.
 // Nothing evicts children: when a newer copy replaces the parent, the claimLane superseded mark is all the
-// children need. Once they have ended, the old parent wakes, finds its superseded mark at start, deletes it,
-// and exits without `finish`. A job that exits at start while it still has unfinished children (a staged
+// children need. Once they have ended, the old parent wakes, finds its superseded mark at start, cuts it to an
+// hour, and exits without `finish`. A job that exits at start while it still has unfinished children (a staged
 // job redelivered mid-stage) keeps its mark instead, so those children still stop.
 export const makeSupersedingJob = <TPayload = void>(
   definition: JobHandler<TPayload> | StagedJob<TPayload>,
@@ -59,24 +58,25 @@ export const makeSupersedingJob = <TPayload = void>(
     // a vacant lane or an OLDER holder (which gets marked superseded and usurped via its own watch), never a
     // newer one, so a newer claimant still usurps us via the first poll below.
     const parentId = job.parent?.id;
+    let supersededBy: string | null = null;
     try {
-      const supersededBy =
-        job.id &&
-        ((await fetchJobSupersededBy(job.id)) ??
-          (parentId ? await fetchJobSupersededBy(parentId) : null));
-      if (job.id && supersededBy) {
-        if (await hasUnfinishedChildren(job)) await markJobSupersededBy(job.id, supersededBy);
-        else await deleteJobSupersededMark(job.id);
-        log.info(`Job ${job.id} already superseded before start`, LogScope.job);
-        return;
-      }
-      await reclaimLane(lane, job.id!);
+      if (job.id)
+        supersededBy =
+          (await fetchJobSupersededBy(job.id)) ??
+          (parentId ? await fetchJobSupersededBy(parentId) : null);
+      if (!supersededBy) await reclaimLane(lane, job.id!);
     } catch (err) {
       log.error(
         `Supersession check failed at job start (${job.id}) — continuing`,
         err,
         LogScope.job,
       );
+    }
+    if (job.id && supersededBy) {
+      if (await hasUnfinishedChildren(job)) await markJobSupersededBy(job.id, supersededBy);
+      else await shortenJobSupersededMark(job.id);
+      log.info(`Job ${job.id} already superseded before start`, LogScope.job);
+      return;
     }
 
     const stopWatch = watchLane(

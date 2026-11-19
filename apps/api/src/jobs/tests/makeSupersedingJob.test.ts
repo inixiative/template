@@ -5,6 +5,7 @@ import {
   laneKey,
   markJobSupersededBy,
   reclaimLane,
+  supersededKey,
   watchLane,
 } from '@template/db';
 import { WaitingChildrenError } from 'bullmq';
@@ -82,6 +83,7 @@ describe('makeSupersedingJob', () => {
     expect(innerHandler).toHaveBeenCalledTimes(0);
     expect(await fetchJobSupersededBy(ctx.job.id ?? '')).toBeNull();
     expect(await fetchJobSupersededBy('old-parent')).toBe('new-parent');
+    expect(await ctx.queue.redis.ttl(supersededKey('old-parent'))).toBeGreaterThan(3600);
   });
 
   test('a job redelivered with unfinished children keeps its superseded mark so they still stop', async () => {
@@ -209,8 +211,24 @@ describe('makeSupersedingJob', () => {
     await handler(ctx, { value: 1 });
 
     expect(innerHandler).not.toHaveBeenCalled();
-    expect(await fetchJobSupersededBy(ctx.job.id!)).toBeNull();
+    expect(await fetchJobSupersededBy(ctx.job.id!)).toBe('newer');
+    expect(await ctx.queue.redis.ttl(supersededKey(ctx.job.id!))).toBeLessThanOrEqual(3600);
     expect(await ctx.queue.redis.get(lane)).toBe('newer');
+  });
+
+  test('a superseded job whose skip cleanup fails throws instead of running', async () => {
+    ctx = makeTestWorker({
+      getDependenciesCount: mock(() => Promise.reject(new Error('redis down'))),
+    });
+    const lane = laneKey(ctx.job.name, 'test-1');
+    await claimLane(lane, ctx.job.id!);
+    await claimLane(lane, 'newer');
+
+    const innerHandler = mock(async (_ctx: WorkerContext, _payload: { value: number }) => {});
+    const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
+
+    await expect(handler(ctx, { value: 1 })).rejects.toThrow('redis down');
+    expect(innerHandler).not.toHaveBeenCalled();
   });
 
   test('should re-assert a lapsed baton at start so the run is visible to lane reads', async () => {

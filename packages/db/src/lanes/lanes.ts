@@ -14,6 +14,7 @@ import { startHeartbeat } from '@template/shared/utils';
 
 const LANE_TTL_SEC = 300;
 const SUPERSEDED_TTL_SEC = 7 * 24 * 60 * 60;
+const SKIPPED_SUPERSEDED_TTL_SEC = 60 * 60;
 const LANE_POLL_MS = 500;
 const SUPERSEDED_PREFIX = `${redisNamespace.lane}:superseded:`;
 
@@ -43,8 +44,9 @@ export const markJobSupersededBy = async (jobId: string, supersededBy: string): 
   await redisClient().set(supersededKey(jobId), supersededBy, 'EX', SUPERSEDED_TTL_SEC);
 };
 
-export const deleteJobSupersededMark = async (jobId: string): Promise<void> => {
-  await redisClient().del(supersededKey(jobId));
+// why: kept an hour, not deleted: a worker that dies before BullMQ records the skip redelivers the job after its lock lapses.
+export const shortenJobSupersededMark = async (jobId: string): Promise<void> => {
+  await redisClient().expire(supersededKey(jobId), SKIPPED_SUPERSEDED_TTL_SEC);
 };
 
 // A superseding staged job parked in `waiting-children` is not running, so nothing refreshes its lane
