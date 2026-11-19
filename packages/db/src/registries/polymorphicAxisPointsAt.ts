@@ -112,56 +112,84 @@ export const polymorphicBindings = (
 export const isBindableOwnerModel = (value: string): value is BindableOwnerModel =>
   value in BIND_NAME_BY_OWNER_MODEL;
 
+const axisEntries = (model: ModelName, axisField: string) =>
+  Object.entries(polymorphicAxis(model, axisField).fkMap) as [string, readonly string[]][];
+
+const kindWhoseRowTheColumnNames = (
+  model: ModelName,
+  axisField: string,
+  column: string,
+): BindableOwnerModel | undefined =>
+  axisEntries(model, axisField).find(
+    ([value, keys]) =>
+      isBindableOwnerModel(value) &&
+      keys.length > 0 &&
+      (keys.length === 1 ? keys[0] : polymorphicArmColumns(model, axisField, value).id) === column,
+  )?.[0] as BindableOwnerModel | undefined;
+
+/**
+ * The owner kinds a value's arm identifies, each with its column: every key column except one that is
+ * the owner chain of a narrower kind the arm also carries. `Space` identifies Space (its organizationId
+ * is its chain); `SpaceUser` identifies Space and User; `OrganizationUser` identifies Organization and User.
+ */
+export const ownerKindsTheArmIdentifies = (
+  model: ModelName,
+  axisField: string,
+  value: string,
+): { kind: BindableOwnerModel; column: string }[] => {
+  const keyed = polymorphicKeyColumns(model, axisField, value).map((column) => ({
+    column,
+    kind: kindWhoseRowTheColumnNames(model, axisField, column),
+  }));
+  return keyed.flatMap(({ column, kind }) => {
+    if (!kind) return [];
+    const isOwnerChain = keyed.some(
+      (other) =>
+        other.column !== column &&
+        other.kind !== undefined &&
+        polymorphicKeyColumns(model, axisField, other.kind).includes(column),
+    );
+    return isOwnerChain ? [] : [{ kind, column }];
+  });
+};
+
 /**
  * "This row's false-polymorphic axis points at the bound row": one arm per key column, each pairing
- * the discriminator with an optional bind named for the kind. A column that is a narrower kind's owner
- * chain (a Space sender's organizationId) binds nothing, so an organization does not read its spaces. The axis may be an owner, a provider,
- * a resource, a sender — the shape is the same. An unbound kind compiles to `key equals null`, which
- * no row of that kind has (the polymorphism rule makes the key required), so the arm matches nothing.
+ * the discriminator with an optional bind named for the kind, over the values whose arm identifies that
+ * kind (`ownerKindsTheArmIdentifies`), so an organization does not read what is on its spaces. The axis
+ * may be an owner, a provider, a resource, a sender — the shape is the same. An unbound kind compiles to
+ * `key equals null`, which no row of that kind has (the polymorphism rule makes the key required), so
+ * the arm matches nothing.
  */
 export const conditionPolymorphicAxisPointsAtBoundRow = (
   model: ModelName,
   axisField: string,
 ): Condition => {
-  const entries = Object.entries(polymorphicAxis(model, axisField).fkMap) as [
-    string,
-    readonly string[],
-  ][];
-  const idColumnOf = (value: string, fks: readonly string[]): string | undefined =>
-    fks.length === 1 ? fks[0] : polymorphicArmColumns(model, axisField, value).id;
-  const kindOf = (fk: string): BindableOwnerModel | undefined =>
-    entries.find(
-      ([value, fks]) =>
-        isBindableOwnerModel(value) && fks.length > 0 && idColumnOf(value, fks) === fk,
-    )?.[0] as BindableOwnerModel | undefined;
-  const columns = sideKeyColumns(polymorphicAxis(model, axisField));
-  const keysOfKind = (kind: string): readonly string[] =>
-    entries.find(([value]) => value === kind)?.[1] ?? [];
-  const isOwnerChainOfNarrowerKind = (fk: string, fks: readonly string[]): boolean =>
-    fks.some((other) => {
-      const otherKind = other === fk ? undefined : kindOf(other);
-      return otherKind !== undefined && keysOfKind(otherKind).includes(fk);
-    });
-  for (const [value, fks] of entries) {
-    if (fks.length && !fks.every((fk) => kindOf(fk))) {
+  const entries = axisEntries(model, axisField);
+  for (const [value, keys] of entries) {
+    if (keys.some((column) => !kindWhoseRowTheColumnNames(model, axisField, column))) {
       throw new Error(
-        `${model}.${axisField} value ${value} keys on ${fks.join('+')}, which no single kind binds`,
+        `${model}.${axisField} value ${value} keys on ${keys.join('+')}, which no single kind binds`,
       );
     }
   }
   return {
-    any: columns.flatMap((fk) => {
-      const kind = kindOf(fk);
+    any: sideKeyColumns(polymorphicAxis(model, axisField)).flatMap((column) => {
+      const kind = kindWhoseRowTheColumnNames(model, axisField, column);
       if (!kind) return [];
       const values = entries
-        .filter(([, fks]) => fks.includes(fk) && !isOwnerChainOfNarrowerKind(fk, fks))
+        .filter(([value]) =>
+          ownerKindsTheArmIdentifies(model, axisField, value).some(
+            (identified) => identified.column === column,
+          ),
+        )
         .map(([value]) => value);
       return [
         {
           all: [
             { field: axisField, operator: Operator.in, value: values },
             {
-              field: fk,
+              field: column,
               operator: Operator.equals,
               bind: BIND_NAME_BY_OWNER_MODEL[kind],
               bindOptional: true,

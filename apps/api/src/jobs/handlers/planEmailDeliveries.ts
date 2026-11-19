@@ -5,7 +5,15 @@
  * @uses feature:email
  */
 import { projectRows } from '@inixiative/json-rules';
-import { db, emptySideKeyColumns, polymorphicArmKeys, polymorphicAxis } from '@template/db';
+import {
+  BIND_NAME_BY_OWNER_MODEL,
+  db,
+  emptySideKeyColumns,
+  isBindableOwnerModel,
+  polymorphicArmKeys,
+  polymorphicAxis,
+  polymorphicKeyColumns,
+} from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
@@ -46,24 +54,10 @@ export type PlanEmailDeliveriesPayload = {
 };
 
 const senderRow = (sender: Sender): Record<string, unknown> | null => {
-  switch (sender.type) {
-    case 'User':
-      return { id: sender.userId };
-    case 'Organization':
-      return { id: sender.organizationId };
-    case 'Space':
-      return { id: sender.spaceId, organizationId: sender.organizationId };
-    case 'OrganizationUser':
-      return { organizationId: sender.organizationId, userId: sender.userId };
-    case 'SpaceUser':
-      return {
-        organizationId: sender.organizationId,
-        spaceId: sender.spaceId,
-        userId: sender.userId,
-      };
-    default:
-      return null;
-  }
+  const { type, ...keys } = sender;
+  if (!polymorphicKeyColumns('CommunicationLog', 'senderModel', type).length) return null;
+  const row: Record<string, unknown> = keys;
+  return isBindableOwnerModel(type) ? { ...row, id: row[BIND_NAME_BY_OWNER_MODEL[type]] } : row;
 };
 
 const senderColumns = (sender: Sender) => {
