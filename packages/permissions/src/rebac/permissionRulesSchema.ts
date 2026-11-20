@@ -7,10 +7,7 @@
 import { validateActionRule } from '@inixiative/permissions';
 import type { AccessorName, BindableOwnerModel } from '@template/db';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import {
-  tenantMayExtend,
-  tenantPermissionRulesLens,
-} from '@template/permissions/rebac/tenantPermissionRulesLens';
+import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { z } from 'zod';
 
 const actionRuleBase: z.ZodType = z.lazy(() =>
@@ -66,14 +63,13 @@ export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly 
  * A tenant's `tenantPermissionRules`: rules for the resources and actions its lens shows
  * (`tenantPermissionRulesLens`), each resource's validated as a row's `permissionRules` are.
  */
-export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) => {
-  const lens = tenantPermissionRulesLens(tenantModel);
-  return z
+export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) =>
+  z
     .record(z.string(), z.record(z.string(), z.unknown()))
     .superRefine((byResource, ctx) => {
       for (const [resource, rules] of Object.entries(byResource)) {
         const hidden = Object.keys(rules).filter(
-          (action) => !tenantMayExtend(lens, resource, action),
+          (action) => !actionsTenantMayExtend(tenantModel, resource).includes(action),
         );
         for (const action of hidden)
           ctx.addIssue({
@@ -94,4 +90,3 @@ export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) => 
       }
     })
     .nullable();
-};

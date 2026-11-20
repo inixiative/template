@@ -165,6 +165,20 @@ describe('tenantPermissionRules', () => {
     expect(await user({ 'db:contact': { read: true } })).toBe(false);
   });
 
+  it('reads a stored rule through the lens too: one it hides widens nothing', async () => {
+    const { entity: contact } = await createContact({
+      organizationId: org.id,
+      ownerModel: 'Organization',
+      ...website(),
+    });
+    await db.organization.update({
+      where: { id: org.id },
+      data: { tenantPermissionRules: { 'db:contact': { own: true, read: true } } },
+    });
+    expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(200);
+    expect((await asStranger(del(`/api/v1/contact/${contact.id}`))).status).toBe(403);
+  });
+
   it('works the same on a space and on a user', async () => {
     const { entity: space } = await createSpace({}, { organization: org });
     const { entity: inSpace } = await createContact({

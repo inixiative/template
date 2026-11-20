@@ -7,9 +7,14 @@ describe('tenantRowsAbove', () => {
   const space = { id: 'space', organization };
 
   it('names the space, then the organization, and the user only when neither holds the record', () => {
-    expect(tenantRowsAbove({ space, user })).toEqual([space, organization]);
-    expect(tenantRowsAbove({ organization, user })).toEqual([organization]);
-    expect(tenantRowsAbove({ user })).toEqual([user]);
+    expect(tenantRowsAbove({ space, user })).toEqual([
+      { model: 'Space', row: space },
+      { model: 'Organization', row: organization },
+    ]);
+    expect(tenantRowsAbove({ organization, user })).toEqual([
+      { model: 'Organization', row: organization },
+    ]);
+    expect(tenantRowsAbove({ user })).toEqual([{ model: 'User', row: user }]);
   });
 
   it('never reads the user of a record an organization or space holds but did not load', () => {

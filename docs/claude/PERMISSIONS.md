@@ -830,7 +830,7 @@ Every contact under this organization is now readable by anyone signed in. A rul
 
 **A user's rules reach only what no organization or space holds.** A member row, and a project, token or integration a member row owns, carry `userId` too. They belong to the organization, so they read its rules and never the member's personal ones. Otherwise a member could open what they hold for an organization to people outside it.
 
-`tenantPermissionRulesAbove` (`packages/permissions/src/rebac/tenantPermissionRules.ts`) reads each of those rows' rules for the record's resource and hands them to the library as `additionalRules`. The library ORs them in, in the [one merge](#how-check-merges) a row rule uses, for every record a check reaches. The library knows nothing about tenants.
+`tenantPermissionRulesAbove` (`packages/permissions/src/rebac/tenantPermissionRules.ts`) reads each of those rows' rules for the record's resource and hands them, cut to what that tenant's lens shows, to the library as `additionalRules`. The library ORs them in, in the [one merge](#how-check-merges) a row rule uses, for every record a check reaches. The library knows nothing about tenants.
 
 A stored rule the library would refuse (not positive, a loop back to its own action, a read outside the lens) widens nothing. It never throws.
 
@@ -865,7 +865,7 @@ The default lens:
 
 Still open, on purpose: `manage` on a shown resource goes around a lock the schema sets (`"db:contact": { "manage": true }` opens the login-mirror contact), and whoever a rule covers can hand that access to their own tokens as an entitlement. An app that wants less narrows the lens.
 
-A rule already stored for a hidden resource is still read at check time: the lens is checked when the rules are written.
+The lens applies twice: when the rules are written (a hidden resource or action is a 422), and when they are read (`tenantPermissionRulesAbove` cuts each tenant's stored rules to the actions its lens shows, so a rule stored before the lens narrowed widens nothing).
 
 ---
 

@@ -13,7 +13,7 @@ import {
   toAccessor,
 } from '@template/db';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import { mapValues } from 'lodash-es';
+import { mapValues, memoize } from 'lodash-es';
 
 const root = 'TenantPermissionRules';
 
@@ -40,32 +40,43 @@ const everyResourceAndAction = createLens({
 });
 
 /**
- * The resources a tenant may extend: product records only. Never the permission system's own
- * (a tenant, a member row, a token, an integration, an inquiry, a sign-in provider): an action
- * there is a gate on handing authority on, and a rule on it would open that gate.
+ * The resources a tenant may extend, each with its narrowing: product records only, never `own`.
+ * Never the permission system's own (a tenant, a member row, a token, an integration, an inquiry,
+ * a sign-in provider): an action there is a gate on handing authority on, and a rule on it would
+ * open that gate.
  */
-const resourcesATenantMayExtend: ModelName[] = [
-  'Contact',
-  'Segment',
+const resourcesATenantMayExtend: Partial<
+  Record<ModelName, { picks?: string[]; omits?: string[] }>
+> = {
+  Contact: { omits: ['own'] },
+  Segment: { omits: ['own'] },
 
-  // ==========================================================================
+  // ========================================================================
   // TEMPLATE ABOVE — Add app-specific product resources below
-  // ==========================================================================
-];
+  // ========================================================================
+};
 
-/** What a tenant of this kind may extend: the listed resources it can hold, never `own`. */
+/** What a tenant of this kind may extend: the listed resources it can hold. */
 export const tenantPermissionRulesLens = (tenantModel: BindableOwnerModel): LensNarrowing => ({
   parent: everyResourceAndAction,
   root: {
     relations: Object.fromEntries(
-      modelsHeldUnderTenant(tenantModel)
-        .filter((model) => resourcesATenantMayExtend.includes(model))
-        .map((model) => [`db:${toAccessor(model)}`, { omits: ['own'] }]),
+      modelsHeldUnderTenant(tenantModel).flatMap((model) => {
+        const narrowing = resourcesATenantMayExtend[model];
+        return narrowing ? [[`db:${toAccessor(model)}`, narrowing]] : [];
+      }),
     ),
   },
 });
 
-export const tenantMayExtend = (lens: LensNarrowing, resource: string, action: string): boolean => {
-  const walk = walkLensPath(lens, `${resource}.${action}`);
-  return walk.outcome === 'resolved' && walk.terminal.entry.kind === 'scalar';
-};
+/** The actions of a resource a tenant of this kind may extend, as its lens shows them. */
+export const actionsTenantMayExtend = memoize(
+  (tenantModel: BindableOwnerModel, resource: string): string[] => {
+    const lens = tenantPermissionRulesLens(tenantModel);
+    return Object.keys(rebacSchema.permissions[resource]?.actions ?? {}).filter((action) => {
+      const walk = walkLensPath(lens, `${resource}.${action}`);
+      return walk.outcome === 'resolved' && walk.terminal.entry.kind === 'scalar';
+    });
+  },
+  (tenantModel, resource) => `${tenantModel} ${resource}`,
+);

@@ -23,13 +23,16 @@ const loaded = (value: unknown): Row | undefined =>
  * and what it owns carry `userId` too, and belong to the organization. The id columns say who holds
  * it, so a record whose organization or space is not loaded never reads its user's.
  */
-export const tenantRowsAbove = (record: Row): Row[] => {
+export const tenantRowsAbove = (record: Row): { model: BindableOwnerModel; row: Row }[] => {
   const space = loaded(record.space);
   const organization = loaded(record.organization) ?? loaded(space?.organization);
-  const tenants = [space, organization].filter((row) => row !== undefined);
+  const tenants = [
+    ...(space ? [{ model: 'Space' as const, row: space }] : []),
+    ...(organization ? [{ model: 'Organization' as const, row: organization }] : []),
+  ];
   if (tenants.length || record.organizationId || record.spaceId) return tenants;
   const user = loaded(record.user);
-  return user ? [user] : [];
+  return user ? [{ model: 'User', row: user }] : [];
 };
 
 /**
