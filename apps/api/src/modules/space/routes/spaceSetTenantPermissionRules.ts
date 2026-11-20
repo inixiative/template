@@ -14,7 +14,7 @@ import { Modules } from '#/modules/modules';
 export const spaceSetTenantPermissionRulesRoute = actionRoute({
   model: Modules.space,
   action: 'setTenantPermissionRules',
-  bodySchema: z.object({ tenantPermissionRules: tenantPermissionRulesSchema }),
+  bodySchema: z.object({ tenantPermissionRules: tenantPermissionRulesSchema('Space') }),
   responseSchema: SpaceScalarSchema,
   middleware: [validatePermission('own')],
   description:

@@ -71,7 +71,7 @@
   - [Which tenants a record reads](#which-tenants-a-record-reads)
   - [Writing it](#writing-it)
   - [Limits to know](#limits-to-know)
-  - [What is not limited](#what-is-not-limited)
+  - [What a tenant may extend](#what-a-tenant-may-extend)
 - [Space Permissions](#space-permissions)
 - [Validation Middleware](#validation-middleware)
   - [validatePermission](#validatepermission)
@@ -826,7 +826,7 @@ Every contact under this organization is now readable by anyone signed in. A rul
 
 ### Which tenants a record reads
 
-`tenantRowsAbove(record)` (`@template/db`) names them from the hydrated record: its space, then the organization (its own, or the space's). So an organization's rule reaches the records of its spaces, and a space's rule reaches only that space.
+`tenantRowsAbove(record)` (`@template/db`) names them from the hydrated record: its space, then the organization (its own, or the space's). So an organization's rule reaches the records of its spaces, and a space's rule reaches only that space. The id columns say who holds the record: one with `organizationId` or `spaceId` set whose tenant row did not load (a deleted organization) reads no rules, and never falls to its user's.
 
 **A user's rules reach only what no organization or space holds.** A member row, and a project, token or integration a member row owns, carry `userId` too. They belong to the organization, so they read its rules and never the member's personal ones. Otherwise a member could open what they hold for an organization to people outside it.
 
@@ -842,7 +842,7 @@ Only the tenant's owner writes it, through one route per tenant, gated on `own`:
 - `POST /space/{id}/setTenantPermissionRules`
 - `POST /me/setTenantPermissionRules`
 
-The body is `{ tenantPermissionRules }`; `null` clears it. `tenantPermissionRulesSchema` validates each resource's rules with `buildPermissionRulesSchema`, the builder a row's `permissionRules` uses: an unknown resource, an unknown action, a rule that is not positive or one that loops back to its own action is a 422.
+The body is `{ tenantPermissionRules }`; `null` clears it. `tenantPermissionRulesSchema(tenantModel)` refuses what the tenant's lens hides ([What a tenant may extend](#what-a-tenant-may-extend)), then validates each resource's rules with `buildPermissionRulesSchema`, the builder a row's `permissionRules` uses: an unknown resource, an unknown action, a rule that is not positive or one that loops back to its own action is a 422.
 
 ### Limits to know
 
@@ -852,9 +852,17 @@ The body is `{ tenantPermissionRules }`; `null` clears it. `tenantPermissionRule
 - **The rules are part of the tenant row.** Whoever can read an organization, space or user row reads its `tenantPermissionRules`.
 - **Two stored rules that delegate to each other are both dropped.**
 
-### What is not limited
+### What a tenant may extend
 
-**Every action on every resource is open, `own` included.** An owner can set `"db:token": { "delete": true }` and anyone can delete that tenant's tokens. It also goes around a lock the schema sets on purpose: `"db:contact": { "manage": true }` opens the login-mirror contact that the schema keeps from being edited. This is deliberate for now: the template does not decide which actions an app lets its tenants open. A limit, when it comes, is a lens over the schema that says what a tenant may extend, checked in `tenantPermissionRulesSchema` (`buildPermissionRulesSchema` already takes a `pick` of actions).
+`tenantPermissionRulesLens(tenantModel)` (`packages/permissions/src/rebac/tenantPermissionRulesLens.ts`) says it, as a json-rules lens over the schema itself: the schema is read as a field map (a resource is a model, an action a column), and the lens turns on the resources and shows the actions a tenant of that kind may extend. `tenantPermissionRulesSchema(tenantModel)` walks every `resource.action` in a body with `walkLensPath` and refuses one the lens hides (422). Why a lens: an app narrows it with the functions it already has (`picks`, `omits`, a layer on top), and layers only get darker.
+
+The default lens:
+
+- **The resources the tenant can hold**, read off the tenant columns (`modelsHeldUnderTenant`, beside `tenantRowsAbove`): a space names what has `spaceId`; an organization that and what has `organizationId`, so its tenancy and everything below it; a user what has `userId` and no organization or space is required to hold. No tenant names its own kind of row.
+- **Never a resource that holds entitlements** (`EntitlementTargetModel`: a token, an integration, a member row). Their actions are the permission system's own gates: `create` on a token caps the role at the one the minter holds, `delegateFull` and `operate` on a member row guard `full`. A rule there would hand out the authority to delegate, not access to a record.
+- **Never `own` on a tenant below it** (`db:space` in an organization's rules).
+
+Still open, on purpose: every other action on the resources shown, `own` on a record included. An owner can set `"db:contact": { "manage": true }`, which opens the login-mirror contact the schema keeps from being edited, and `"db:authProvider": { "create": true }`, which lets anyone add a sign-in provider to the organization. An app that wants less narrows the lens.
 
 ---
 

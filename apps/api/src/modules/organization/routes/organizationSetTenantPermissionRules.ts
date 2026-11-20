@@ -14,7 +14,7 @@ import { Modules } from '#/modules/modules';
 export const organizationSetTenantPermissionRulesRoute = actionRoute({
   model: Modules.organization,
   action: 'setTenantPermissionRules',
-  bodySchema: z.object({ tenantPermissionRules: tenantPermissionRulesSchema }),
+  bodySchema: z.object({ tenantPermissionRules: tenantPermissionRulesSchema('Organization') }),
   responseSchema: OrganizationScalarSchema,
   middleware: [validatePermission('own')],
   description:

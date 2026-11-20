@@ -5,8 +5,12 @@
  * @uses none
  */
 import { validateActionRule } from '@inixiative/permissions';
-import type { AccessorName } from '@template/db';
+import type { AccessorName, BindableOwnerModel } from '@template/db';
 import { rebacSchema } from '@template/permissions/rebac/schema';
+import {
+  tenantMayExtend,
+  tenantPermissionRulesLens,
+} from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { z } from 'zod';
 
 const actionRuleBase: z.ZodType = z.lazy(() =>
@@ -58,22 +62,36 @@ export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly 
     .optional();
 };
 
-/** A tenant's `tenantPermissionRules`: each resource the schema has, with rules for the actions it already has. */
-export const tenantPermissionRulesSchema = z
-  .record(z.string(), z.unknown())
-  .superRefine((byResource, ctx) => {
-    for (const [resource, rules] of Object.entries(byResource)) {
-      const model = resource.slice('db:'.length) as AccessorName;
-      const known = resource.startsWith('db:') && rebacSchema.permissions[resource] !== undefined;
-      const parsed = known
-        ? buildPermissionRulesSchema(model).safeParse(rules)
-        : {
-            success: false as const,
-            error: { issues: [{ path: [], message: 'not a resource in the schema' }] },
-          };
-      if (!parsed.success)
-        for (const issue of parsed.error.issues)
-          ctx.addIssue({ code: 'custom', path: [resource, ...issue.path], message: issue.message });
-    }
-  })
-  .nullable();
+/**
+ * A tenant's `tenantPermissionRules`: rules for the resources and actions its lens shows
+ * (`tenantPermissionRulesLens`), each resource's validated as a row's `permissionRules` are.
+ */
+export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) => {
+  const lens = tenantPermissionRulesLens(tenantModel);
+  return z
+    .record(z.string(), z.record(z.string(), z.unknown()))
+    .superRefine((byResource, ctx) => {
+      for (const [resource, rules] of Object.entries(byResource)) {
+        const hidden = Object.keys(rules).filter(
+          (action) => !tenantMayExtend(lens, resource, action),
+        );
+        for (const action of hidden)
+          ctx.addIssue({
+            code: 'custom',
+            path: [resource, action],
+            message: `not something a ${tenantModel} may extend`,
+          });
+        if (hidden.length) continue;
+        const model = resource.slice('db:'.length) as AccessorName;
+        const parsed = buildPermissionRulesSchema(model).safeParse(rules);
+        if (!parsed.success)
+          for (const issue of parsed.error.issues)
+            ctx.addIssue({
+              code: 'custom',
+              path: [resource, ...issue.path],
+              message: issue.message,
+            });
+      }
+    })
+    .nullable();
+};

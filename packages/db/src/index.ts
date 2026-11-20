@@ -191,7 +191,11 @@ export {
 } from './utils/sourceQueryValues';
 export { sourceQueryWhere } from './utils/sourceQueryWhere';
 export { type RuleReferenceSource, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
-export { TENANT_COLUMNS, tenantRowsAbove } from './utils/tenantRowsAbove';
+export {
+  modelsHeldUnderTenant,
+  TENANT_COLUMNS,
+  tenantRowsAbove,
+} from './utils/tenantRowsAbove';
 export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
 export { assertRuleReferencesExist } from './validations/assertRuleReferencesExist';
 export {

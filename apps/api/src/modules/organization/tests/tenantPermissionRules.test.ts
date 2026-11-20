@@ -140,6 +140,32 @@ describe('tenantPermissionRules', () => {
       expect((await open(rules)).status).toBe(422);
   });
 
+  it("extends only what the tenant holds, never an entitlement holder, never a tenant's own", async () => {
+    const { entity: space } = await createSpace({}, { organization: org });
+    const at = (path: string) => (rules: unknown) =>
+      asOwner(post(path, { tenantPermissionRules: rules }));
+    const asOrganization = at(`/api/v1/organization/${org.id}/setTenantPermissionRules`);
+    const asSpace = at(`/api/v1/space/${space.id}/setTenantPermissionRules`);
+    const asUser = at('/api/v1/me/setTenantPermissionRules');
+
+    for (const rules of [
+      { 'db:token': { create: true } },
+      { 'db:organizationUser': { operate: true } },
+      { 'db:integration': { delegateFull: true } },
+      { 'db:space': { own: true } },
+      { 'db:organization': { read: true } },
+      { 'db:flow': { read: true } },
+    ])
+      expect((await asOrganization(rules)).status).toBe(422);
+    expect((await asOrganization({ 'db:space': { manage: true } })).status).toBe(200);
+
+    expect((await asSpace({ 'db:space': { read: true } })).status).toBe(422);
+    expect((await asSpace({ 'db:spaceUser': { operate: true } })).status).toBe(422);
+    expect((await asUser({ 'db:space': { read: true } })).status).toBe(422);
+    expect((await asUser({ 'db:token': { delete: true } })).status).toBe(422);
+    expect((await asUser({ 'db:flow': { read: true } })).status).toBe(200);
+  });
+
   it('works the same on a space and on a user', async () => {
     const { entity: space } = await createSpace({}, { organization: org });
     const { entity: inSpace } = await createContact({

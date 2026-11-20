@@ -16,7 +16,7 @@ export const meSetTenantPermissionRulesRoute = actionRoute({
   model: Modules.me,
   action: 'setTenantPermissionRules',
   skipId: true,
-  bodySchema: z.object({ tenantPermissionRules: tenantPermissionRulesSchema }),
+  bodySchema: z.object({ tenantPermissionRules: tenantPermissionRulesSchema('User') }),
   responseSchema: userResponseSchema,
   middleware: [validatePermission('own')],
   description:
