@@ -70,7 +70,7 @@ describe('wherePolymorphicSideIsOneOf', () => {
         { ownerKeys: { User: 'u1' } },
       ]),
     ).toEqual({
-      OR: [{ targetModel: 'Token', targetTokenId: { in: ['t1'] } }, { targetUserId: 'u1' }],
+      OR: [{ targetModel: 'Token', targetId: { in: ['t1'] } }, { targetUserId: 'u1' }],
     });
   });
 });
