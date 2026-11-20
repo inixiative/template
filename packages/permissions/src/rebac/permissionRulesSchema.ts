@@ -15,6 +15,9 @@ const actionRuleBase: z.ZodType = z.lazy(() =>
     z.boolean(),
     z.null(),
     z.object({ rel: z.string(), action: z.string() }).strict(),
+    z
+      .object({ rel: z.string(), arrayOperator: z.literal('any'), condition: actionRuleBase })
+      .strict(),
     z.object({ rule: z.unknown() }).strict(),
     z.object({ any: z.array(actionRuleBase) }).strict(),
     z.object({ all: z.array(actionRuleBase) }).strict(),
@@ -36,7 +39,7 @@ export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly 
   if (allowed.length === 0) return z.never().nullable().optional();
   const resource = `db:${model}`;
   return z
-    .record(z.enum(allowed as [string, ...string[]]), actionRuleSchema)
+    .partialRecord(z.enum(allowed as [string, ...string[]]), actionRuleSchema)
     .superRefine((rowRules, ctx) => {
       for (const [action, rule] of Object.entries(rowRules))
         for (const issue of validateActionRule(rule, {
@@ -54,3 +57,23 @@ export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly 
     .nullable()
     .optional();
 };
+
+/** A tenant's `tenantPermissionRules`: each resource the schema has, with rules for the actions it already has. */
+export const tenantPermissionRulesSchema = z
+  .record(z.string(), z.unknown())
+  .superRefine((byResource, ctx) => {
+    for (const [resource, rules] of Object.entries(byResource)) {
+      const model = resource.slice('db:'.length) as AccessorName;
+      const known = resource.startsWith('db:') && rebacSchema.permissions[resource] !== undefined;
+      const parsed = known
+        ? buildPermissionRulesSchema(model).safeParse(rules)
+        : {
+            success: false as const,
+            error: { issues: [{ path: [], message: 'not a resource in the schema' }] },
+          };
+      if (!parsed.success)
+        for (const issue of parsed.error.issues)
+          ctx.addIssue({ code: 'custom', path: [resource, ...issue.path], message: issue.message });
+    }
+  })
+  .nullable();

@@ -7,6 +7,7 @@
 
 import { Icon } from '@iconify/react';
 import { useQuery } from '@tanstack/react-query';
+import type { HydratedRecord } from '@template/db';
 import {
   type MeReadManyOrganizationsResponse,
   meReadManyOrganizations,
@@ -119,7 +120,12 @@ export const OrganizationsPage = () => {
                   e.stopPropagation();
                   deleteMutation.mutate({ path: { id: org.id } });
                 }}
-                show={canActOnRecordIfPresent(permissions, 'organization', org, 'own')}
+                show={canActOnRecordIfPresent(
+                  permissions,
+                  'organization',
+                  org as unknown as HydratedRecord,
+                  'own',
+                )}
               >
                 <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
               </Button>

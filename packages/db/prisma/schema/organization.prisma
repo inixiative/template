@@ -9,6 +9,11 @@ model Organization {
   updatedAt          DateTime      @updatedAt
   deletedAt          DateTime?
 
+  // The tenant's own additions to the permission schema for the records under it.
+  // Shape: Record<Resource, Record<Action, ActionRule>> ('db:contact' → read → rule). check() ORs each
+  // rule with the schema's for that resource and action. Null = schema-only.
+  tenantPermissionRules Json?
+
   name String
   slug String @unique
 

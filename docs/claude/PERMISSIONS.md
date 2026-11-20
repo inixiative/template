@@ -66,6 +66,12 @@
   - [How `check()` merges](#how-check-merges)
   - [Boundary validation](#boundary-validation)
   - [When to use it](#when-to-use-it)
+- [Tenant Rules](#tenant-rules)
+  - [Shape](#shape)
+  - [Which tenants a record reads](#which-tenants-a-record-reads)
+  - [Writing it](#writing-it)
+  - [Limits to know](#limits-to-know)
+  - [What is not limited](#what-is-not-limited)
 - [Space Permissions](#space-permissions)
 - [Validation Middleware](#validation-middleware)
   - [validatePermission](#validatepermission)
@@ -765,13 +771,14 @@ model Contact {
 Inside the library's rebac check (`createRebacCheck` in `@inixiative/permissions`, bound by `packages/permissions/src/rebac/check.ts`), when resolving an action by name:
 
 ```typescript
-const schemaRule = schema[model]?.actions[actionOrRule] ?? null;
-const rowRule    = record.permissionRules?.[actionOrRule];
-const merged: ActionRule = rowRule !== undefined
-  ? { any: [schemaRule, rowRule] }
-  : schemaRule;
+const schemaRule  = schema[model]?.actions[actionOrRule] ?? null;
+const rowRule     = record.permissionRules?.[actionOrRule];
+const tenantRules = /* each tenant up the owner chain: tenantPermissionRules[model][actionOrRule] */;
+const merged: ActionRule = { any: [schemaRule, rowRule, ...tenantRules] };
 return check(permix, schema, model, record, merged, visited);
 ```
+
+A rule that is absent is left out. [Tenant rules](#tenant-rules) come in through the same merge.
 
 **Additive only.** Row rules grant additional paths and never restrict; the schema rule is the floor. `read: { all: [] }` opens the row to any authenticated requester; `read: null` does not take `read` from the owner.
 
@@ -790,7 +797,64 @@ The schema validates the `ActionRule` envelope and passes the inner json-rules `
 
 ### When to use it
 
-Use it for opt-in sharing of individual records (sharing a contact, publishing an asset), with a narrow set of overridable actions, typically `read` only. If every row needs the same override, it belongs in the schema rule.
+Use it for opt-in sharing of individual records (sharing a contact, publishing an asset), with a narrow set of overridable actions, typically `read` only. If every row of one tenant needs the same override, it belongs in that tenant's [`tenantPermissionRules`](#tenant-rules). If every row everywhere needs it, it belongs in the schema rule.
+
+---
+
+## Tenant Rules
+
+The schema is code, and every tenant gets the same one. A tenant can add its own ways to qualify for an action, stored as data: `tenantPermissionRules` on `User`, `Organization` and `Space`. It is the tenant's own extension of the schema for the records under it.
+
+**It only widens.** `check()` ORs a tenant's rule with the schema rule, so a tenant can open an action and can never make one stricter. It cannot add an action either: the keys are the resources and actions the schema already has.
+
+**It is not an entitlement.** An entitlement gives one named holder an action. A tenant rule changes what the schema accepts, for anyone who matches it.
+
+### Shape
+
+```prisma
+model Organization {
+  // ...
+  tenantPermissionRules Json?  // Record<Resource, Record<Action, ActionRule>> | null
+}
+```
+
+```json
+{ "db:contact": { "read": true } }
+```
+
+Every contact under this organization is now readable by anyone signed in. A rule can be any `ActionRule`: `true`, a relation walk, a json-rules condition on the record and on who is acting, or `any` / `all` of those. Per resource it is the same shape as a row's `permissionRules`.
+
+### Which tenants a record reads
+
+`tenantRowsAbove(record)` (`@template/db`) names them from the hydrated record: its space, then the organization (its own, or the space's). So an organization's rule reaches the records of its spaces, and a space's rule reaches only that space.
+
+**A user's rules reach only what no organization or space holds.** A member row, and a project, token or integration a member row owns, carry `userId` too. They belong to the organization, so they read its rules and never the member's personal ones. Otherwise a member could open what they hold for an organization to people outside it.
+
+`tenantPermissionRulesAbove` (`packages/permissions/src/rebac/tenantPermissionRules.ts`) reads each of those rows' rules for the record's resource and hands them to the library as `additionalRules`. The library ORs them in, in the [one merge](#how-check-merges) a row rule uses, for every record a check reaches. The library knows nothing about tenants.
+
+A stored rule the library would refuse (not positive, a loop back to its own action, a read outside the lens) widens nothing. It never throws.
+
+### Writing it
+
+Only the tenant's owner writes it, through one route per tenant, gated on `own`:
+
+- `POST /organization/{id}/setTenantPermissionRules`
+- `POST /space/{id}/setTenantPermissionRules`
+- `POST /me/setTenantPermissionRules`
+
+The body is `{ tenantPermissionRules }`; `null` clears it. `tenantPermissionRulesSchema` validates each resource's rules with `buildPermissionRulesSchema`, the builder a row's `permissionRules` uses: an unknown resource, an unknown action, a rule that is not positive or one that loops back to its own action is a 422.
+
+### Limits to know
+
+- **Lists are authorised once, on a stand-in record** that carries the owner keys and no other column. A rule with no condition on the record opens the list as well as each record. A rule with a condition on the record (`label equals 'public'`) opens the single records that match and leaves the list at 403: the list is not filtered row by row.
+- **A null comparison in a rule would open a whole list**, because it holds on the stand-in. The library refuses one in a stored rule from the release that carries the actor model (`permissions` #38). Tenant rules must not ship on a build without it.
+- **The frontend does not see tenant rules.** `canActOnRecordIfPresent` checks the record the API returned, which does not carry its tenant rows. The UI can hide an action the API allows.
+- **The rules are part of the tenant row.** Whoever can read an organization, space or user row reads its `tenantPermissionRules`.
+- **Two stored rules that delegate to each other are both dropped.**
+
+### What is not limited
+
+**Every action on every resource is open, `own` included.** An owner can set `"db:token": { "delete": true }` and anyone can delete that tenant's tokens. It also goes around a lock the schema sets on purpose: `"db:contact": { "manage": true }` opens the login-mirror contact that the schema keeps from being edited. This is deliberate for now: the template does not decide which actions an app lets its tenants open. A limit, when it comes, is a lens over the schema that says what a tenant may extend, checked in `tenantPermissionRulesSchema` (`buildPermissionRulesSchema` already takes a `pick` of actions).
 
 ---
 
