@@ -178,7 +178,7 @@ export const actorMayCreateTokenAtOwnerWithRole: ActionRule = {
       all: [
         ownerModelIsOneOf(notIntegration),
         ownedByYouOrOrganizationOrSpaceYouManage(),
-        { any: [ownerModelIsOneOf(['User', ...members]), roleHeldAtOwner()] },
+        { any: [ownerModelIsOneOf(['User', ...members]), roleHeldAtOwner('', notIntegration)] },
       ],
     },
     {
