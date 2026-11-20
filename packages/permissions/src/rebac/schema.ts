@@ -106,17 +106,7 @@ export const rebacSchema: RebacSchema = {
       }),
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
-    'db:integrationResource': {
-      actions: {
-        ...chainedStandardActions({
-          own: { rel: 'integration', action: 'own' },
-          manage: { rel: 'integration', action: 'manage' },
-          operate: { rel: 'integration', action: 'operate' },
-          read: { rel: 'integration', action: 'read' },
-        }),
-        create: 'manage',
-      },
-    },
+    'db:integrationResource': { actions: { ...ownerActions(['integration']), create: 'manage' } },
     'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
     'db:projectIntegrationResource': {
       actions: {

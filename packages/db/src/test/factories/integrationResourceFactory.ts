@@ -14,13 +14,6 @@ const integrationResourceFactory = registerFactory('IntegrationResource', {
     externalId: `${faker.string.alphanumeric(12)}-${nextFactorySequenceNumber()}`,
     metadata: {},
   }),
-  dependencies: {
-    integration: {
-      modelName: 'Integration',
-      foreignKey: { id: 'integrationId' },
-      required: true,
-    },
-  },
 });
 
 export const buildIntegrationResource = integrationResourceFactory.build;

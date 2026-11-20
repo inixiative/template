@@ -10,8 +10,8 @@ import {
 } from '@template/db';
 import { uuidV7Schema } from '@template/shared/utils';
 
-export const integrationResourceCreateBodySchema = IntegrationResourceScalarInputSchema.pick({
-  id: true,
+export const integrationResourceCreateBodySchema = IntegrationResourceScalarInputSchema.omit({
+  integrationId: true,
 }).extend({
   name: z.string().trim().min(1).max(120),
   kind: z.string().min(1).max(80),
@@ -20,7 +20,7 @@ export const integrationResourceCreateBodySchema = IntegrationResourceScalarInpu
     .min(1)
     .max(250)
     .openapi({ description: "The provider's identifier for the resource." }),
-  metadata: z.record(z.string(), z.unknown()).default({}),
+  metadata: IntegrationResourceScalarInputSchema.shape.metadata.default({}),
   projectId: uuidV7Schema.optional().openapi({
     description:
       'A Project to link the resource to. Needs `manage` on the project and `operate` on the resource.',

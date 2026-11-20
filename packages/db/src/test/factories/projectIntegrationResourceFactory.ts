@@ -8,18 +8,6 @@ import { registerFactory } from '@template/db/test/factory';
 
 const projectIntegrationResourceFactory = registerFactory('ProjectIntegrationResource', {
   defaults: () => ({}),
-  dependencies: {
-    project: {
-      modelName: 'Project',
-      foreignKey: { id: 'projectId' },
-      required: true,
-    },
-    integrationResource: {
-      modelName: 'IntegrationResource',
-      foreignKey: { id: 'integrationResourceId' },
-      required: true,
-    },
-  },
 });
 
 export const buildProjectIntegrationResource = projectIntegrationResourceFactory.build;

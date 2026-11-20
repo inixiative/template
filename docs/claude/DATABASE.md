@@ -610,6 +610,8 @@ await db.txn(async () => {
 });
 ```
 
+`findForUpdate` is raw SQL and is not soft-delete scoped: on a model with `deletedAt` it returns tombstones too, so `[existing]` may be a tombstone. A find-then-create on such a model picks the live row out of what it locked (`poisonIntegrationRecord`, `linkProjectResource`).
+
 `upserting: true` takes a Redis lock (`makeLock`, service `find-for-update`, keyed on the model
 plus the where entries sorted by key, hashed) **before** the `SELECT`, and holds it until the
 transaction ends, the same way `db.withLockUntilSettled` does. The where must be scalar
@@ -689,8 +691,6 @@ One bypass, `db.withDeleted(fn)`: it runs `fn` with scoping off (revive, redacti
 The extension is the only soft-delete scoping layer — no middleware, `paginate` or lens code adds `deletedAt: null` by hand. It covers the root `where` (including relation filters like `some`/`every`/`is`), nested `include`/`select` trees, `_count` relation counts, `count`/`aggregate`/`groupBy` (the lens count plans). Its engine (`liveWhere` / `liveIncludes`, `packages/db/src/extensions/softDeleteScope.ts`) lives beside it in `packages/db`. It is not a mutation-lifecycle hook and needs no registration: the client composes it (`client.ts`, `.$extends(softDeleteScopeExtension())`), so every process and every test sees what production sees. A test that inspects a tombstone wraps the read in `db.withDeleted`.
 
 Write `where`s are scoped too, so a soft-deleted row can't be mutated without a bypass. Cascade revive is exempt automatically: it matches on an explicit `deletedAt` value, and an explicit `deletedAt` mention in a `where` opts that query out of injection.
-
-`db.findForUpdate` is raw SQL and is not scoped: on a soft-delete model it returns tombstones too, so a find-then-create picks the live row out of what it locked (`poisonIntegrationRecord`, `linkProjectResource`).
 
 ### Soft-delete cascade: every child is classified
 
