@@ -20,12 +20,11 @@ import {
   createUser,
 } from '@template/db/test';
 import { app } from '#/app';
-import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 import { entitlementInputFor } from '#tests/utils/entitlementInputFor';
 
 type Headers = Record<string, string>;
-type Person = { user: User; row?: OrganizationUser; spaceRow?: SpaceUser };
+type Person = { user: User; row: OrganizationUser };
 
 const jwt = async (user: User): Promise<Headers> => ({
   authorization: (await createUserJwt(user)).authorization,
@@ -142,7 +141,7 @@ describe('minting a token owned by a tenant or by its integration takes manage o
 
   it('a member still mints on their own member row and their own user', async () => {
     const viewer = await jwt(people.viewer.user);
-    const rowPath = `/organizationUser/${people.viewer.row!.id}/tokens`;
+    const rowPath = `/organizationUser/${people.viewer.row.id}/tokens`;
     expect((await mint(viewer, rowPath, { role: 'viewer' })).status).toBe(201);
     expect((await mint(viewer, '/me/tokens', { role: 'viewer' })).status).toBe(201);
   });
@@ -157,7 +156,7 @@ describe('minting a token owned by a tenant or by its integration takes manage o
     ).entity;
     const entry = entitlementInputFor('db:project', ['db:project', project.id], ['manage']);
     const owner = await jwt(people.owner.user);
-    const rowPath = `/organizationUser/${people.viewer.row!.id}`;
+    const rowPath = `/organizationUser/${people.viewer.row.id}`;
     expect((await send(owner, 'POST', `${rowPath}/entitlements`, [entry])).status).toBe(201);
     const viewer = await jwt(people.viewer.user);
     const organizationToken = await mint(viewer, `/organization/${organization.id}/tokens`, {
@@ -186,7 +185,7 @@ describe('minting a token owned by a tenant or by its integration takes manage o
     const admin = await jwt(people.admin.user);
     const token = await mint(admin, `/organization/${organization.id}/tokens`, { role: 'admin' });
     const owner = await jwt(people.owner.user);
-    expect((await send(owner, 'DELETE', `/organizationUser/${people.admin.row!.id}`)).status).toBe(
+    expect((await send(owner, 'DELETE', `/organizationUser/${people.admin.row.id}`)).status).toBe(
       204,
     );
     const rename = (headers: Headers) =>
@@ -206,7 +205,7 @@ describe('minting a token owned by a tenant or by its integration takes manage o
     const entry = entitlementInputFor('db:project', ['db:project', project.id], ['manage']);
     const owner = await jwt(people.owner.user);
     const admin = await jwt(people.admin.user);
-    const rowPath = `/organizationUser/${people.admin.row!.id}`;
+    const rowPath = `/organizationUser/${people.admin.row.id}`;
     const rename = (headers: Headers) =>
       send(headers, 'PATCH', `/project/${project.id}`, { name: 'renamed' });
     expect((await rename(admin)).status).toBe(403);
@@ -219,7 +218,7 @@ describe('minting a token owned by a tenant or by its integration takes manage o
     const held = await db.entitlement.findMany({
       where: {
         targetModel: 'OrganizationUser',
-        targetId: people.admin.row!.id,
+        targetId: people.admin.row.id,
         resource: 'Project',
         deletedAt: null,
       },

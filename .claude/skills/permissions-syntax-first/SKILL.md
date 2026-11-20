@@ -71,7 +71,7 @@ Shared pieces already in `schema.ts` — reuse, don't re-derive:
 - `integrationAdministering` / `integrationAccess`, `actorMayCreateTokenAtOwnerWithRole` / `tokenAdministering`: integrations and tokens administered by their owner's kind (tenant: the tenant's roles; member: `operate` on the member row, the tenant owner reads and deletes; user: the user);
 - `delegateFull`: the person-only action on a delegate's owner that lets you set `full` (`validateFullGrant` checks it);
 - `actorManagesRecordUser(at)`: `{ rel: `${at}user`, action: 'manage' }` — the user, or a delegate of the user at manage or above;
-- `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `actorManagesRecordUser(at)`;
+- `ownedByYouOrOrganizationOrSpaceYouManage(at)`: owned by an organization or space you may `manage`, or `actorManagesRecordUser(at)`;
 - `ownerModelIsOneOf(owners, at)` and `actorMayPerformActionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
 
 Other parts of the system (use them, don't parallel them):
@@ -101,7 +101,7 @@ An action on something that does not exist yet, or on a collection, is checked o
 |---|---|
 | `token.create` copied onto six owner models | `create` on a pseudo record `db:token` |
 | actions named after other models (`organization.create` on user) | each action on its own model (test: a dotted action is named after its model) |
-| a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpace('integration.')` |
+| a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpaceYouManage('integration.')` |
 | `leave` as an alternative that skipped the role check | the role check always runs; "yours" is an extra requirement |
 | `full` arms in the schema | `full` is inheritance: skipped at install (`narrowOwnerPermissionsToDelegate`); setting it takes `delegateFull` on the owner (`validateFullGrant`). CI rule `rebac-schema-never-reads-full` |
 | deciding who is related to what by comparing `__actor` ids | an action on the record: acting as a member is `operate` on the member row; actor rules only gate person-only actions |
