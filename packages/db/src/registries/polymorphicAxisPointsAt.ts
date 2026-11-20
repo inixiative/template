@@ -59,12 +59,27 @@ export const polymorphicKeyColumn = (
   return idColumn;
 };
 
+export const polymorphicKeyColumnOrThrow = (
+  model: ModelName,
+  axisField: string,
+  value: string,
+): string => {
+  const column = polymorphicKeyColumn(model, axisField, value);
+  if (!column)
+    throw new Error(
+      `${model}.${axisField} has no ${value} arm — add its key column to the schema and to PolymorphismRegistry`,
+    );
+  return column;
+};
+
 /** The column naming the row an axis points at: its dual polymorphism id when it has one, else the arm's id column. */
 export const axisTargetIdColumn = (
   model: ModelName,
   axis: PolymorphicAxis,
   value: string,
 ): string | null => axis.dualPolymorphismId ?? polymorphicKeyColumn(model, axis.field, value);
+
+export type PointedAtRecord = { kind: string; id: string };
 
 /**
  * The row a false-polymorphic axis points at, its kind and id, or null when it points at nobody.
@@ -74,7 +89,7 @@ export const rowPolymorphicAxisPointsAt = (
   row: Record<string, unknown>,
   model: ModelName,
   axisField: string,
-): { kind: string; id: string } | null => {
+): PointedAtRecord | null => {
   const kind = row[axisField];
   if (typeof kind !== 'string') return null;
   const { dualPolymorphismId } = polymorphicAxis(model, axisField);

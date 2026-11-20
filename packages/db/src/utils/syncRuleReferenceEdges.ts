@@ -6,7 +6,7 @@
  */
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
-import { polymorphicKeyColumn } from '@template/db/registries/polymorphicAxisPointsAt';
+import { polymorphicKeyColumnOrThrow } from '@template/db/registries/polymorphicAxisPointsAt';
 import {
   fetchRuleReferenceTargetsDeletedAtForUpdate,
   type RuleReferenceTargetDeletedState,
@@ -24,15 +24,8 @@ type Edge = {
   targetDeletedAt: Date | null;
 };
 
-const fkColumn = (axis: 'sourceModel' | 'targetModel', model: string): string => {
-  const column = polymorphicKeyColumn('RuleReference', axis, model);
-  if (!column) {
-    throw new Error(
-      `RuleReference has no ${axis} FK for ${model} — add the column to ruleReference.prisma and PolymorphismRegistry`,
-    );
-  }
-  return column;
-};
+const fkColumn = (axis: 'sourceModel' | 'targetModel', model: string): string =>
+  polymorphicKeyColumnOrThrow('RuleReference', axis, model);
 
 const edgeKey = (edge: Edge): string =>
   referenceKey({ model: edge.targetModel, id: edge.targetId });

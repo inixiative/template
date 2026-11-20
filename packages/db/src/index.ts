@@ -29,13 +29,14 @@ export { fetchCachedRecordWithTargetEntitlements, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
 export {
   claimLane,
-  fetchJobSupersededBy,
+  claimLaneUnlessNewerHolder,
+  fetchSupersededBy,
   holdLaneWhileParked,
+  type LaneClaim,
+  type LaneStore,
   laneKey,
-  markJobSupersededBy,
-  reclaimLane,
-  releaseLane,
-  supersededKey,
+  markDisplacedHolder,
+  type WatchedLane,
   watchLane,
 } from './lanes';
 // Distributed lock
@@ -104,8 +105,10 @@ export {
   conditionPolymorphicAxisPointsAtBoundRow,
   isArmColumns,
   isBindableOwnerModel,
+  type PointedAtRecord,
   polymorphicBindings,
   polymorphicKeyColumn,
+  polymorphicKeyColumnOrThrow,
   polymorphicKeyColumns,
   rowPolymorphicAxisPointsAt,
 } from './registries/polymorphicAxisPointsAt';

@@ -12,6 +12,7 @@ import {
 import { cleanupTouchedTables, createOrganization } from '@template/db/test';
 import { enqueueJob } from '#/jobs/enqueue';
 import { refreshRollingCacheTarget } from '#/jobs/handlers/refreshRollingCacheTarget';
+import { jobLaneStore } from '#/jobs/jobLaneStore';
 import { makeTestWorker } from '#tests/makeTestWorker';
 
 const registered: string[] = [];
@@ -189,7 +190,8 @@ describe('refreshRollingCacheTarget', () => {
 
     const superseded = refreshRollingCacheTarget(ctx, { name, key, target: null });
     while ((await redisClient().get(lane)) !== ctx.job.id) await Bun.sleep(10);
-    await claimLane(lane, 'newer-job');
+    await ctx.queue.redis.hset(ctx.queue.toKey('newer-job'), 'name', ctx.job.name);
+    await claimLane(jobLaneStore, lane, 'newer-job');
     await superseded.catch(() => {});
     await aborted;
     await Bun.sleep(50);

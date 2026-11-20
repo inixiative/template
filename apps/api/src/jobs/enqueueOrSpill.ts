@@ -4,9 +4,10 @@
  * @partOf primitive:jobs
  * @uses infrastructure:redis, infrastructure:prisma
  */
-import { claimLane, laneKey, releaseLane } from '@template/db';
+import { claimLane, laneKey, markDisplacedHolder } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isSlowJobData } from '#/jobs/buildJobData';
+import { jobLaneStore } from '#/jobs/jobLaneStore';
 import { withLanePriority } from '#/jobs/lanePriority';
 import {
   isLaneOverflowing,
@@ -59,23 +60,16 @@ export const enqueueOrSpill = async ({
   const isFlowChild = options.parent !== undefined;
   const canSpill = data.type === JobType.adhoc && !bypass && !isFlowChild;
 
+  // A spill does not take the lane: the drain takes it when it re-adds the row (claimLaneUnlessNewerHolder),
+  // so a lane only ever names a job BullMQ holds.
   const spill = async (): Promise<EnqueueOrSpillResult> => {
-    // Claim at SPILL time too, not just at drain: the newest enqueue must hold the baton even while
-    // buffered, so an older in-flight run aborts now instead of finishing with stale data during the
-    // outbox dwell. The drain re-claims under the same jobId when it re-adds (self-claim, no-op).
-    const previousHolder = baton ? await claimLane(baton, jobId, jobOptions.delay) : null;
-    try {
-      await spillToOutbox({
-        handlerName,
-        jobId,
-        dedupeKey: data.dedupeKey ?? null,
-        data,
-        options: jobOptions,
-      });
-    } catch (err) {
-      if (baton) await releaseLane(baton, jobId, previousHolder);
-      throw err;
-    }
+    await spillToOutbox({
+      handlerName,
+      jobId,
+      dedupeKey: data.dedupeKey ?? null,
+      data,
+      options: jobOptions,
+    });
     log.info(`Spilled job ${handlerName} to outbox (${jobId}, ${lane} lane over pressure)`);
     return { jobId, outboxed: true };
   };
@@ -83,24 +77,21 @@ export const enqueueOrSpill = async ({
   const overflowing = canSpill && (await isLaneOverflowing(lane));
   if (shouldSpill(data.type, bypass, overflowing)) return spill();
 
-  // Claim the lane BEFORE adding so the job holds the baton the instant it starts. If the add then
-  // fails, no job exists to hold the baton — roll the claim back (fenced, so a concurrent claim isn't
-  // clobbered) rather than leaving the prior job superseded by a phantom that never ran. The claim's
-  // TTL stretches by the job's `delay` — the baton must survive until the job actually runs.
+  // The claim comes before the add so the job holds its lane the moment it starts; the job it displaced
+  // is marked only once this one exists. A failed add throws and leaves nothing to undo: no mark was
+  // written, and a lane naming a job that never existed counts as no holder.
   let previousHolder: string | null = null;
   let placedId = jobId;
   try {
-    if (baton) previousHolder = await claimLane(baton, jobId, jobOptions.delay);
+    if (baton) previousHolder = await claimLane(jobLaneStore, baton, jobId, jobOptions.delay);
     const added = await queue.add(handlerName, data, { ...jobOptions, jobId });
     placedId = added?.id ?? jobId;
   } catch (err) {
-    if (baton) await releaseLane(baton, jobId, previousHolder);
-    // A full Redis (noeviction) refuses the add: spill instead of failing the caller. A superseding
-    // job's lane release or claim can itself be refused under a full Redis; that error surfaces.
     if (!canSpill || !isRedisOutOfMemory(err)) throw err;
     log.warn(`Redis refused ${handlerName} (out of memory); spilling to the outbox (${jobId})`);
     return spill();
   }
+  if (baton) await markDisplacedHolder(jobLaneStore, baton, jobId, previousHolder);
   if (placedId !== jobId) {
     log.info(`Deduplicated job ${handlerName}: ${placedId} already holds its singleton key`);
     return { jobId: placedId };

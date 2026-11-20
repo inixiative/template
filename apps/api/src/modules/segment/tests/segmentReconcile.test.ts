@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { db, type Prisma } from '@template/db';
 import type {
@@ -33,10 +33,11 @@ import {
 import { emitAppEvent } from '#/appEvents/emit';
 import { enqueueJob } from '#/jobs/enqueue';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
+import * as reconcileCustomerRelationshipsModule from '#/modules/segment/services/reconcileCustomerRelationships';
 import {
   dynamicSegmentsOf,
-  reconcileCustomerRelationship,
-} from '#/modules/segment/services/reconcileCustomerRelationship';
+  reconcileCustomerRelationships,
+} from '#/modules/segment/services/reconcileCustomerRelationships';
 import {
   acmeEmailDomainRule,
   segmentMemberCustomerRelationshipIds,
@@ -65,8 +66,7 @@ const updateSegment = async (
 const setEmail = async (user: User, email: string): Promise<void> => {
   await db.user.update({ where: { id: user.id }, data: { email } });
   await enqueueJob('reconcileCustomerRelationshipSegments', {
-    customerModel: 'User',
-    customerId: user.id,
+    customers: [{ customerModel: 'User', customerId: user.id }],
   });
 };
 
@@ -166,7 +166,7 @@ describe('segment reconcile', () => {
       { space },
     );
     expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
-    expect(await reconcileCustomerRelationship(acmeRelationship.id)).toEqual([]);
+    expect(await reconcileCustomerRelationships([acmeRelationship])).toEqual([]);
 
     const mine = (
       await createTag(
@@ -202,7 +202,7 @@ describe('segment reconcile', () => {
 
     await setEmail(picked, `picked-${nextFactorySequenceNumber()}@acme.test`);
     expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
-    expect(await reconcileCustomerRelationship(pickedRelationship.id)).toEqual([]);
+    expect(await reconcileCustomerRelationships([pickedRelationship])).toEqual([]);
 
     const repicked = await updateSegment(segment, {
       conditions: idsRule([pickedRelationship.id, otherRelationship.id]),
@@ -366,7 +366,7 @@ describe('segment reconcile', () => {
     );
     expect(await segmentMemberCustomerRelationshipIds(derived.id)).toEqual([acmeRelationship.id]);
 
-    const changes = await reconcileCustomerRelationship(acmeRelationship.id);
+    const changes = await reconcileCustomerRelationships([acmeRelationship]);
     expect(changes).toEqual([]);
 
     await updateSegment(base, {
@@ -473,8 +473,7 @@ describe('segment reconcile', () => {
     ).entity;
     const newcomerRelationship = await customerOf(newcomer);
     await enqueueJob('reconcileCustomerRelationshipSegments', {
-      customerModel: 'User',
-      customerId: newcomer.id,
+      customers: [{ customerModel: 'User', customerId: newcomer.id }],
     });
     expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([acmeRelationship.id]);
 
@@ -497,5 +496,55 @@ describe('segment reconcile', () => {
     const ids = (await dynamicSegmentsOf(ProviderModel.Space, space.id)).map(({ id }) => id);
     expect(ids).toContain(live.id);
     expect(ids).not.toContain(frozen.id);
+  });
+  it('one job over several customers reconciles each of them, adding and removing together', async () => {
+    const segment = await saveSegment(
+      {
+        ownerModel: ProviderModel.Space,
+        type: SegmentType.dynamic,
+        conditions: acmeEmailDomainRule,
+      },
+      { space },
+    );
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([acmeRelationship.id]);
+
+    await db.user.update({
+      where: { id: acme.id },
+      data: { email: `left-${nextFactorySequenceNumber()}@example.test` },
+    });
+    await db.user.update({
+      where: { id: other.id },
+      data: { email: `joined-${nextFactorySequenceNumber()}@acme.test` },
+    });
+    await enqueueJob('reconcileCustomerRelationshipSegments', {
+      customers: [
+        { customerModel: 'User', customerId: acme.id },
+        { customerModel: 'User', customerId: other.id },
+      ],
+    });
+
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([otherRelationship.id]);
+  });
+
+  it('deleting a tag on several customers reconciles them in one job', async () => {
+    const tagCategory = (await createTagCategory({ ownerModel: 'Space' }, { space })).entity;
+    const tag = (await createTag({ name: 'vip', ownerModel: 'Space' }, { space, tagCategory }))
+      .entity;
+    const tagAttachments = [
+      (await createTagAttachment({ resourceModel: 'User' }, { user: acme, tag })).entity,
+      (await createTagAttachment({ resourceModel: 'User' }, { user: other, tag })).entity,
+    ];
+    const reconciled = spyOn(
+      reconcileCustomerRelationshipsModule,
+      'reconcileCustomerRelationships',
+    );
+
+    await emitAppEvent('tag.deleted', { tag, tagAttachments });
+
+    expect(reconciled).toHaveBeenCalledTimes(1);
+    expect(reconciled.mock.calls[0]?.[0].map(({ id }) => id).sort()).toEqual(
+      [acmeRelationship.id, otherRelationship.id].sort(),
+    );
+    reconciled.mockRestore();
   });
 });

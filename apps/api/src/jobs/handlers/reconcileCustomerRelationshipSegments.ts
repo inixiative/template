@@ -4,37 +4,44 @@
  * @partOf primitive:jobs
  * @uses feature:segment, primitive:appEvents
  */
-import { db } from '@template/db';
-import type { CustomerModel } from '@template/db/generated/client/enums';
-import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
-import { customerRelationshipCustomerFk } from '#/modules/segment/lib/segmentOwner';
+import { db, wherePolymorphicSideIsOneOf } from '@template/db';
+import { makeJob } from '#/jobs/makeJob';
+import type { CustomerSide } from '#/modules/customerRelationship/lib/customerRelationshipSides';
 import {
   type MembershipChange,
   publishMembershipChanges,
 } from '#/modules/segment/services/publishMembershipChanges';
-import { reconcileCustomerRelationship } from '#/modules/segment/services/reconcileCustomerRelationship';
+import { reconcileCustomerRelationships } from '#/modules/segment/services/reconcileCustomerRelationships';
 
-export type ReconcileCustomerRelationshipSegmentsPayload = {
-  customerModel: CustomerModel;
-  customerId: string;
+export type ReconcileCustomerRelationshipSegmentsPayload = { customers: CustomerSide[] };
+
+const fetchCustomerRelationshipsOfCustomers = (customers: CustomerSide[]) =>
+  db.customerRelationship.findMany({
+    where: wherePolymorphicSideIsOneOf(
+      'CustomerRelationship',
+      'customerModel',
+      customers.map(({ customerModel, customerId }) => ({ kind: customerModel, id: customerId })),
+    ),
+  });
+
+const changesOnLiveSegments = async (changes: MembershipChange[]): Promise<MembershipChange[]> => {
+  const live = new Map(
+    (
+      await db.segment.findMany({ where: { id: { in: changes.map(({ segment }) => segment.id) } } })
+    ).map((segment) => [segment.id, segment]),
+  );
+  return changes.flatMap(({ segment, diff }) => {
+    const current = live.get(segment.id);
+    return current ? [{ segment: current, diff }] : [];
+  });
 };
 
 export const reconcileCustomerRelationshipSegments =
-  makeSupersedingJob<ReconcileCustomerRelationshipSegmentsPayload>(
-    async (_ctx, { customerModel, customerId }) => {
-      const customerRelationships = await db.customerRelationship.findMany({
-        where: { customerModel, [customerRelationshipCustomerFk(customerModel)]: customerId },
-      });
-      const changes: MembershipChange[] = [];
-      for (const customerRelationship of customerRelationships) {
-        for (const { segmentId, diff } of await reconcileCustomerRelationship(
-          customerRelationship.id,
-        )) {
-          const segment = await db.segment.findUnique({ where: { id: segmentId } });
-          if (segment) changes.push({ segment, diff });
-        }
-      }
-      await publishMembershipChanges(changes);
-    },
-    ({ customerModel, customerId }) => `customer:${customerModel}:${customerId}`,
-  );
+  makeJob<ReconcileCustomerRelationshipSegmentsPayload>(async (_ctx, { customers }) => {
+    if (!customers.length) return;
+    const changes = await reconcileCustomerRelationships(
+      await fetchCustomerRelationshipsOfCustomers(customers),
+    );
+    if (!changes.length) return;
+    await publishMembershipChanges(await changesOnLiveSegments(changes));
+  });

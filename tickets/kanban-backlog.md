@@ -91,6 +91,7 @@ kanban
 - [INFRA-048: Lock sets from Zealot ZLT-5949](./archived/INFRA-048-lock-sets-from-zealot.md) ✅ - one token, one heartbeat, one release over many keys; findForUpdate takes one lock set; verify() answers from Redis; the key-lock timeout is a 409
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
+- [INFRA-049: Version Sequence Primitives](./INFRA-049-version-sequence-primitives.md) - generation, sequence and version as named styles in one module, existing callers moved onto it
 - [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - json-rules `clockUnit` with the `clock.finestUnit` engine floor; `Segment.clockUnit` derived at save, `lastComputedAt` on what was computed; one cron row per unit, looking one unit ahead
 - [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
 - [INFRA-040: WS Content Channels](./INFRA-040-ws-content-channels.md) - Every delivery is a channel named by content and authorized by its route; drops per-user addressing
@@ -98,6 +99,7 @@ kanban
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
 - [FEAT-019: Extensible Actor Attribution](./FEAT-019-extensible-actor-attribution.md) - actorMeta extension point + on-behalf-of for integration tokens; attribution-only, never authz
+- [FEAT-024: Backfilled Audit History](./FEAT-024-backfilled-audit-history.md) - Sketch, discuss before starting: imported, reconstructed and backdated history with provenance
 
 **Security & Encryption:**
 - [AUTH-006: Webhook Tenant Isolation](./AUTH-006-webhook-tenant-isolation.md) - High-priority confirmed defect: scope recipients and payloads to the subscription owner's authorized records

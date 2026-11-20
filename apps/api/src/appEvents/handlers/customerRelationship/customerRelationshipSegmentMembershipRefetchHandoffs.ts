@@ -4,15 +4,13 @@
  * @partOf primitive:appEvents
  * @uses primitive:websockets
  */
-import type { CustomerModel } from '@template/db/generated/client/enums';
 import { refetchQueryEvent, WS_CHANNELS } from '@template/shared/ws';
 import { lowerFirst } from 'lodash-es';
 import type { WSHandoff } from '#/appEvents/types';
+import type { CustomerSide } from '#/modules/customerRelationship/lib/customerRelationshipSides';
 import { meChannel } from '#/ws/meChannel';
 
-type Customer = { customerModel: CustomerModel; customerId: string };
-
-const channelOf = ({ customerModel, customerId }: Customer): WSHandoff => {
+const channelOf = ({ customerModel, customerId }: CustomerSide): WSHandoff => {
   if (customerModel === 'User') {
     const _id = 'meReadManySegmentMemberships';
     return {
@@ -30,5 +28,5 @@ const channelOf = ({ customerModel, customerId }: Customer): WSHandoff => {
 };
 
 export const customerRelationshipSegmentMembershipRefetchHandoffs = (
-  customer: Customer,
+  customer: CustomerSide,
 ): WSHandoff[] => [channelOf(customer)];

@@ -1,11 +1,12 @@
 export {
   claimLane,
-  fetchJobSupersededBy,
+  claimLaneUnlessNewerHolder,
+  fetchSupersededBy,
   holdLaneWhileParked,
+  type LaneClaim,
+  type LaneStore,
   laneKey,
-  markJobSupersededBy,
-  reclaimLane,
-  releaseLane,
-  supersededKey,
+  markDisplacedHolder,
+  type WatchedLane,
   watchLane,
 } from './lanes';
