@@ -4,7 +4,7 @@
 **Assignee**: Aron
 **Priority**: Medium (ambitious; the payoff is query-level authz that scales)
 **Created**: 2026-07-02
-**Updated**: 2026-10-31
+**Updated**: 2026-11-19
 
 `@inixiative/permissions` today only **evaluates** — `check(permix, schema, subject, action)` walks a hydrated object graph for one record and returns allow/deny. To answer *"which records can this actor `<action>`?"* you must fetch candidates and `check()` each. This ticket is to **compile** the permission algebra to a query predicate — a Prisma/SQL `WHERE` that selects exactly the authorized rows — so authorization becomes indexable, paginatable, and one round-trip, the same way json-rules compiles a rule to `toPrisma`/`toSql`. This is the authorization analogue of "author once, run three ways," and it's what makes authz scale (no fetch-all-then-filter).
 
@@ -29,6 +29,23 @@ The permission algebra is positive: a rule can only widen, and the things Prisma
 Query-level authorization / row-level security: *"list the documents this user can edit, page 2, ordered by updatedAt"* becomes one indexable query instead of fetch-all-then-`check()`-each. It composes with the lens's tenant `where`, and it's the piece that makes authorization scale past small candidate sets.
 
 The same compiled rules answer the reverse question too, *"who can read this record?"*, which recipient targeting (COMM-005) and audits need. And because tenants' rules are stored data, every rule a tenant has already written gains both answers without new code. Unlocks: AUTH-008 (collections filtered by what you can read), COMM-005 (recipients), FEAT-008 (permissions builder previews at scale).
+
+## Another reflection to consider: hydrate only what the checked action reads
+
+Added 2026-11-19 (Aron: "this is another type of reflection that we might want to consider"). A note, not a commitment. Full text and open questions: `inixiative/permissions` issue #39.
+
+`createHydrator` takes a resource and a record, with neither the actor nor the action. It loads every to-one of every row it reaches and every list declared `/// @permissions(down: [...])`, wherever that model is hydrated. That is deliberate (the README: "hydration does not know which check comes next"), and it has a cost, seen in Zealot's move to permissions 0.23 (`Conversation.participants` on the list arm):
+
+- A check whose rule never reads the list still loads it. A `manage` check to rename a conversation loads every participant and the rows under each.
+- A list arm that asks "is the actor one of the items" loads the whole list to find one item. Measured locally on 2026-11-19: one query plus two cache reads per participant on every check (102 reads at 50 participants).
+
+The rules are data, so the library can read from an action's rule what the check needs loaded:
+
+- **Hydrate what the action reads.** Given the resource and the action, load only the relations and lists its rule reaches, through the actions it delegates to.
+- **Narrow a list arm by its own condition.** With the actor bound, the arm's `condition` compiles to a filter on the items: the same mapping as "relation walk → nested relation filter" above, applied to one list of one record. Nothing is declared twice. An annotation naming the membership key was rejected: it restates the rule, and it silently changes what the hydrated list means to any other rule.
+- **A generated type for a hydrated record**, from the schema map and its `down` declarations, so a consumer that reads the hydrated record after the check does not hand-write its shape. The generated map holds `down` as literal types; `SchemaMap` widens them before the library sees them.
+
+Why it matters: the cost of every check on that resource, and on records below it, grows with the length of the list. For large lists a consumer has a route that needs nothing from the library: a grant installed from the membership row, for an action only a grant gives (Zealot's `forumGroup.member`).
 
 ## Open questions
 
