@@ -188,8 +188,17 @@ describe('tenantPermissionRules', () => {
       asStranger(post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role }));
     expect((await members()).status).toBe(403);
 
+    const viewerRow = await createOrganizationUser({ role: 'viewer' }, { organization: org });
+    const asOrganizationViewer = appFor({
+      mockUser: viewerRow.context.user,
+      mockOrganizationUsers: [viewerRow.entity],
+    }).fetch;
+    const membersFor = (fetch: typeof asOwner) =>
+      fetch(get(`/api/v1/space/${space.id}/spaceUsers`));
+    expect((await membersFor(asOrganizationViewer)).status).toBe(403);
     const toOrganizationReaders = { rel: 'organization', action: 'read' };
     expect((await open({ 'db:space': { read: toOrganizationReaders } })).status).toBe(200);
+    expect((await membersFor(asOrganizationViewer)).status).toBe(200);
     expect((await members()).status).toBe(403);
 
     expect((await open({ 'db:space': { operate: true } })).status).toBe(200);

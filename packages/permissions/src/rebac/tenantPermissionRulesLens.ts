@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import type { FieldMap } from '@inixiative/field-map';
-import { createLens, type LensNarrowing, walkLensPath } from '@inixiative/json-rules';
+import { createLens, type LensNarrowing, lensVisit } from '@inixiative/json-rules';
 import {
   type BindableOwnerModel,
   type ModelName,
@@ -74,12 +74,7 @@ export const tenantPermissionRulesLens = (tenantModel: BindableOwnerModel): Lens
 
 /** The actions of a resource a tenant of this kind may extend, as its lens shows them. */
 export const actionsTenantMayExtend = memoize(
-  (tenantModel: BindableOwnerModel, resource: string): string[] => {
-    const lens = tenantPermissionRulesLens(tenantModel);
-    return Object.keys(rebacSchema.permissions[resource]?.actions ?? {}).filter((action) => {
-      const walk = walkLensPath(lens, `${resource}.${action}`);
-      return walk.outcome === 'resolved' && walk.terminal.entry.kind === 'scalar';
-    });
-  },
+  (tenantModel: BindableOwnerModel, resource: string): string[] =>
+    Object.keys(lensVisit(tenantPermissionRulesLens(tenantModel), resource)?.fields ?? {}),
   (tenantModel, resource) => `${tenantModel} ${resource}`,
 );
