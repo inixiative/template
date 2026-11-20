@@ -4,7 +4,7 @@
 **Assignee**: Aron
 **Priority**: Medium (ambitious; the payoff is query-level authz that scales)
 **Created**: 2026-07-02
-**Updated**: 2026-11-19
+**Updated**: 2026-11-20
 
 `@inixiative/permissions` today only **evaluates** — `check(permix, schema, subject, action)` walks a hydrated object graph for one record and returns allow/deny. To answer *"which records can this actor `<action>`?"* you must fetch candidates and `check()` each. This ticket is to **compile** the permission algebra to a query predicate — a Prisma/SQL `WHERE` that selects exactly the authorized rows — so authorization becomes indexable, paginatable, and one round-trip, the same way json-rules compiles a rule to `toPrisma`/`toSql`. This is the authorization analogue of "author once, run three ways," and it's what makes authz scale (no fetch-all-then-filter).
 
@@ -46,6 +46,19 @@ The rules are data, so the library can read from an action's rule what the check
 - **A generated type for a hydrated record**, from the schema map and its `down` declarations, so a consumer that reads the hydrated record after the check does not hand-write its shape. The generated map holds `down` as literal types; `SchemaMap` widens them before the library sees them.
 
 Why it matters: the cost of every check on that resource, and on records below it, grows with the length of the list. For large lists a consumer has a route that needs nothing from the library: a grant installed from the membership row, for an action only a grant gives (Zealot's `forumGroup.member`).
+
+**Landed since (permissions #40, 2026-11-20):** `load` is given `down` (the resource's declared lists and the paths under each) and returns the row with them, so a list is part of its parent's row and is read once with it; `loadMany` is gone, and `prismaIncludeOfDown` turns `down` into a Prisma `include`. The per-row reads above no longer happen; a check still loads the list whether or not its rule reads it.
+
+### More than one jump down
+
+A note, not a plan (Aron, 2026-11-20: "I'm not saying we need to build it now, but I think there's nothing really preventing this... it's usually not probably the right way of approaching it, but we should leave the note"). A declared list may cross one list today: each segment of a `down` path is a to-one. What a second list under an item would take:
+
+- **Already there:** the `down` value nests (`{ participants: { forumUser: { memberships: { group: {} } } } }`), and `prismaIncludeOfDown` gives a nested include Prisma accepts. It fans out: items times nested items, counted against the row budget.
+- **Needs the map to say which segment is a list and which a to-one** (Aron: "a little bit of schema map awareness"): the declaration reader refuses a list segment today.
+- **Needs the engine:** a list arm met under an item denies by design, so the rule form for "some item of some item", the lens at a list item and schema validation all change with it.
+- **Open:** which item a grant held on a nested item is judged on, and how paths are reported; whether "a list never passes on a stand-in record" still holds at both levels; cache clears that reach back through two lists.
+
+Why it has not been needed: permissions walk up, so "some member of some team of this project" is usually one jump when asked at the team; and a large fan-out wants a grant installed from the membership row, which loads no list.
 
 ## Open questions
 
