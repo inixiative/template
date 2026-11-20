@@ -4,7 +4,6 @@ import {
   cleanupTouchedTables,
   createContact,
   createOrganizationUser,
-  createProject,
   createSpace,
   createUser,
   nextFactorySequenceNumber,
@@ -12,7 +11,6 @@ import {
 import { contactRouter } from '#/modules/contact';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
-import { projectRouter } from '#/modules/project';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { del, get, post } from '#tests/utils/request';
@@ -26,7 +24,6 @@ const appFor = (options: AppOptions) =>
       (app) => app.route('/api/v1/contact', contactRouter),
       (app) => app.route('/api/v1/me', meRouter),
       (app) => app.route('/api/v1/organization', organizationRouter),
-      (app) => app.route('/api/v1/project', projectRouter),
       (app) => app.route('/api/v1/space', spaceRouter),
     ],
   });
@@ -140,30 +137,32 @@ describe('tenantPermissionRules', () => {
       expect((await open(rules)).status).toBe(422);
   });
 
-  it("extends only what the tenant holds, never an entitlement holder, never a tenant's own", async () => {
+  it("extends product records the tenant holds: never the permission system's own, never own", async () => {
     const { entity: space } = await createSpace({}, { organization: org });
-    const at = (path: string) => (rules: unknown) =>
-      asOwner(post(path, { tenantPermissionRules: rules }));
-    const asOrganization = at(`/api/v1/organization/${org.id}/setTenantPermissionRules`);
-    const asSpace = at(`/api/v1/space/${space.id}/setTenantPermissionRules`);
-    const asUser = at('/api/v1/me/setTenantPermissionRules');
+    const refusedFor = (path: string) => async (rules: unknown) => {
+      const response = await asOwner(post(path, { tenantPermissionRules: rules }));
+      return response.status === 422 && (await response.text()).includes('may extend');
+    };
+    const organization = refusedFor(`/api/v1/organization/${org.id}/setTenantPermissionRules`);
+    const atSpace = refusedFor(`/api/v1/space/${space.id}/setTenantPermissionRules`);
+    const user = refusedFor('/api/v1/me/setTenantPermissionRules');
 
     for (const rules of [
       { 'db:token': { create: true } },
       { 'db:organizationUser': { operate: true } },
       { 'db:integration': { delegateFull: true } },
-      { 'db:space': { own: true } },
+      { 'db:authProvider': { create: true } },
+      { 'db:space': { manage: true } },
+      { 'db:project': { read: true } },
       { 'db:organization': { read: true } },
-      { 'db:flow': { read: true } },
+      { 'db:contact': { own: true } },
     ])
-      expect((await asOrganization(rules)).status).toBe(422);
-    expect((await asOrganization({ 'db:space': { manage: true } })).status).toBe(200);
+      expect(await organization(rules)).toBe(true);
+    expect(await organization({ 'db:segment': { read: true } })).toBe(false);
 
-    expect((await asSpace({ 'db:space': { read: true } })).status).toBe(422);
-    expect((await asSpace({ 'db:spaceUser': { operate: true } })).status).toBe(422);
-    expect((await asUser({ 'db:space': { read: true } })).status).toBe(422);
-    expect((await asUser({ 'db:token': { delete: true } })).status).toBe(422);
-    expect((await asUser({ 'db:flow': { read: true } })).status).toBe(200);
+    expect(await atSpace({ 'db:spaceUser': { operate: true } })).toBe(true);
+    expect(await user({ 'db:flow': { read: true } })).toBe(true);
+    expect(await user({ 'db:contact': { read: true } })).toBe(false);
   });
 
   it('works the same on a space and on a user', async () => {
@@ -188,23 +187,6 @@ describe('tenantPermissionRules', () => {
     expect((await asStranger(get(`/api/v1/contact/${mine.id}`))).status).toBe(403);
     expect((await asOwner(post('/api/v1/me/setTenantPermissionRules', rules))).status).toBe(200);
     expect((await asStranger(get(`/api/v1/contact/${mine.id}`))).status).toBe(200);
-  });
-
-  it("a user's rules open what the user owns, never what their membership holds", async () => {
-    const { entity: mine } = await createProject({ ownerModel: 'User', userId: owner.id });
-    const { entity: heldAsMember } = await createProject({
-      ownerModel: 'OrganizationUser',
-      organizationId: org.id,
-      userId: owner.id,
-    });
-    const rules = { tenantPermissionRules: { 'db:project': { read: true } } };
-    expect((await asOwner(post('/api/v1/me/setTenantPermissionRules', rules))).status).toBe(200);
-
-    expect((await asStranger(get(`/api/v1/project/${mine.id}`))).status).toBe(200);
-    expect((await asStranger(get(`/api/v1/project/${heldAsMember.id}`))).status).toBe(403);
-
-    expect((await open({ 'db:project': { read: true } })).status).toBe(200);
-    expect((await asStranger(get(`/api/v1/project/${heldAsMember.id}`))).status).toBe(200);
   });
 
   it('a condition on the record opens single records, not the list under the owner', async () => {

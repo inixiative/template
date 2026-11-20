@@ -39,10 +39,13 @@ export const tenantRowsAbove = (record: Row): Row[] => {
  */
 export const modelsHeldUnderTenant = (tenantModel: BindableOwnerModel): ModelName[] =>
   modelNames.filter((model) => {
-    const [organizationId, spaceId, userId] = TENANT_COLUMNS.map((column) =>
-      fieldAtPath(prismaMap, model, column),
+    const column = (name: (typeof TENANT_COLUMNS)[number]) => fieldAtPath(prismaMap, model, name);
+    if (tenantModel === 'Space') return Boolean(column('spaceId'));
+    if (tenantModel === 'Organization')
+      return Boolean(column('organizationId') || column('spaceId'));
+    return (
+      Boolean(column('userId')) &&
+      !column('organizationId')?.isRequired &&
+      !column('spaceId')?.isRequired
     );
-    if (tenantModel === 'Space') return Boolean(spaceId);
-    if (tenantModel === 'Organization') return Boolean(organizationId || spaceId);
-    return Boolean(userId) && !organizationId?.isRequired && !spaceId?.isRequired;
   });

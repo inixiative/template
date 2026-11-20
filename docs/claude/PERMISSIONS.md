@@ -858,11 +858,14 @@ The body is `{ tenantPermissionRules }`; `null` clears it. `tenantPermissionRule
 
 The default lens:
 
-- **The resources the tenant can hold**, read off the tenant columns (`modelsHeldUnderTenant`, beside `tenantRowsAbove`): a space names what has `spaceId`; an organization that and what has `organizationId`, so its tenancy and everything below it; a user what has `userId` and no organization or space is required to hold. No tenant names its own kind of row.
-- **Never a resource that holds entitlements** (`EntitlementTargetModel`: a token, an integration, a member row). Their actions are the permission system's own gates: `create` on a token caps the role at the one the minter holds, `delegateFull` and `operate` on a member row guard `full`. A rule there would hand out the authority to delegate, not access to a record.
-- **Never `own` on a tenant below it** (`db:space` in an organization's rules).
+- **Product records only**, from a short list in that file (`resourcesATenantMayExtend`: contacts and segments; an app adds its own below the template line). Why a list: a resource added later is closed until someone turns it on.
+- **Never the permission system's own**: a tenant, a member row, a token, an integration, an inquiry, a sign-in provider. An action there is a gate on handing authority on (`create` on a token caps the role at the one the minter holds; `manage` on a space is what minting its tokens, writing its members' roles and resolving its inquiries ask). Rules are read at every row a check walks through, so a rule on a space would open those gates through the space even with tokens left out by name. A token minted that way would outlive the rule.
+- **Only what the tenant can hold**, read off the tenant columns (`modelsHeldUnderTenant`, beside `tenantRowsAbove`): a space names what has `spaceId`; an organization that and what has `organizationId`, so its tenancy and everything below it; a user what has `userId` and no organization or space is required to hold.
+- **Never `own`**, on any resource.
 
-Still open, on purpose: every other action on the resources shown, `own` on a record included. An owner can set `"db:contact": { "manage": true }`, which opens the login-mirror contact the schema keeps from being edited, and `"db:authProvider": { "create": true }`, which lets anyone add a sign-in provider to the organization. An app that wants less narrows the lens.
+Still open, on purpose: `manage` on a shown resource goes around a lock the schema sets (`"db:contact": { "manage": true }` opens the login-mirror contact), and whoever a rule covers can hand that access to their own tokens as an entitlement. An app that wants less narrows the lens.
+
+A rule already stored for a hidden resource is still read at check time: the lens is checked when the rules are written.
 
 ---
 
