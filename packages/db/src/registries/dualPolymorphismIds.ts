@@ -6,6 +6,7 @@
  */
 import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
+import { polymorphicArmColumns } from '@template/db/utils/polymorphicArmKeys';
 
 type Row = Record<string, unknown>;
 
@@ -14,16 +15,21 @@ const dualPolymorphicAxes = (model: ModelName) =>
     axis.dualPolymorphismId ? [{ ...axis, dualPolymorphismId: axis.dualPolymorphismId }] : [],
   );
 
-const armKeys = (
-  axis: ReturnType<typeof dualPolymorphicAxes>[number],
-  row: Row,
-): readonly string[] =>
+type DualAxis = ReturnType<typeof dualPolymorphicAxes>[number];
+
+const armKeys = (axis: DualAxis, row: Row): readonly string[] =>
   (axis.fkMap as Partial<Record<string, readonly string[]>>)[String(row[axis.field])] ?? [];
 
-// why: a composite arm (a member's owner chain) holds no single id, so its dual polymorphism id is the writer's to give.
-const setTypedId = (axis: ReturnType<typeof dualPolymorphicAxes>[number], row: Row): unknown => {
+const idColumnOfArm = (model: ModelName, axis: DualAxis, row: Row): string | undefined => {
   const keys = armKeys(axis, row);
-  return keys.length === 1 && keys[0] ? row[keys[0]] : undefined;
+  if (keys.length <= 1) return keys[0];
+  return polymorphicArmColumns(model, axis.field, String(row[axis.field])).id;
+};
+
+// why: a member arm holds no single id, so its dual polymorphism id is the writer's to give.
+const setTypedId = (model: ModelName, axis: DualAxis, row: Row): unknown => {
+  const column = idColumnOfArm(model, axis, row);
+  return column ? row[column] : undefined;
 };
 
 /** Each dual polymorphism id written without its typed FK, or holding an id other than the one it points at. */
@@ -31,13 +37,13 @@ export const dualPolymorphismIdConflicts = (model: ModelName, row: Row): string[
   dualPolymorphicAxes(model).flatMap((axis) => {
     const written = row[axis.dualPolymorphismId];
     const keys = armKeys(axis, row);
-    if (keys.length > 1)
+    if (!idColumnOfArm(model, axis, row) && keys.length > 1)
       return written != null && keys.some((key) => row[key] == null)
         ? [
             `${model}.${axis.dualPolymorphismId} names a ${String(row[axis.field])}; pass ${keys.join(', ')}`,
           ]
         : [];
-    const id = setTypedId(axis, row);
+    const id = setTypedId(model, axis, row);
     if (written != null && id == null)
       return [`${model}.${axis.dualPolymorphismId} is set from its typed FK; pass the FK`];
     return id != null && written != null && written !== id
@@ -51,7 +57,7 @@ export const dualPolymorphismIdConflicts = (model: ModelName, row: Row): string[
 export const withDualPolymorphismIds = <T extends Row>(model: ModelName, row: T): T => {
   const filled: Row = { ...row };
   for (const axis of dualPolymorphicAxes(model)) {
-    const id = setTypedId(axis, row);
+    const id = setTypedId(model, axis, row);
     if (id != null) filled[axis.dualPolymorphismId] = id;
   }
   return filled as T;

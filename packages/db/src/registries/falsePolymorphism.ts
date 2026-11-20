@@ -263,6 +263,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'sourceModel',
+        dualPolymorphismId: 'sourceId',
         fkMap: {
           admin: [],
           User: ['sourceUserId'],
@@ -278,6 +279,7 @@ export const PolymorphismRegistry = {
       },
       {
         field: 'targetModel',
+        dualPolymorphismId: 'targetId',
         fkMap: {
           admin: [],
           User: ['targetUserId'],
