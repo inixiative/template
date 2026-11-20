@@ -348,13 +348,15 @@ So U1 adds I1 on M1 as a member of O1; a viewer of O1 adds none, and a role toke
 
 Every create-token route calls `createToken` (`apps/api/src/modules/me/services/createToken.ts`), which checks `create` on a pseudo token. The rule is `actorIsUser` and `actorMayCreateTokenAtOwnerWithRole`:
 
-- the owner is a tenant, or a user you manage (a token on M1 carries U1, so only U1 mints on M1);
+- the owner is an organization or space you may `manage` (admin and above), or a user you manage (a token on M1 carries U1, so only U1 mints on M1). A member below admin mints on their own user, member row and integrations, and those tokens end with the membership; a tenant's token is durable, and outlasts the admin who minted it;
 - for a token on an integration, the same is asked of the integration's owner;
 - the role is any role when the chain ends at a user or a member row (it is capped at use), and otherwise a role you hold at the owner (`roleHeldAtOwner`; for an integration's token, at the integration's owner).
 
 Then `validateDelegateRole` refuses a role on a token whose integration has no role and is not `full` (422: the role would narrow nothing), `validateFullGrant` runs when the body sets `full` ([Full and delegateFull](#full-and-delegatefull)). The token row and its entitlements are written in one transaction: the token first, then the body's entries through the one writer, `changeEntitlements` ([Changing Entitlements](#changing-entitlements)), which checks every entry. A token with no role and no entitlements is minted and holds nothing. Creating an integration does the same (`apps/api/src/modules/integration/services/createIntegration.ts`).
 
-`PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`. A token never changes itself.
+`PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`, so changing a tenant's token takes `manage` on the tenant too. A token never changes itself.
+
+An entitlement on a token is its own row, anchored at the resource: one an admin copied onto a tenant's token stays when the admin's own row is revoked. Revoke it on the token.
 
 ---
 

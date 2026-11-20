@@ -64,7 +64,7 @@ describe('POST /api/v1/space/:id/tokens', () => {
     expect(data.key).toBeDefined();
   });
 
-  it('a member mints a member token and nothing above it', async () => {
+  it('a member below admin mints no token for the space', async () => {
     const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
       { role: 'member' },
       { organization: org },
@@ -83,7 +83,7 @@ describe('POST /api/v1/space/:id/tokens', () => {
 
     const asMember = (role: string) =>
       memberHarness.fetch(post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role }));
-    expect((await asMember('member')).status).toBe(201);
-    expect((await asMember('admin')).status).toBe(403);
+    expect((await asMember('viewer')).status).toBe(403);
+    expect((await asMember('member')).status).toBe(403);
   });
 });
