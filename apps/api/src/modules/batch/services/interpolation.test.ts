@@ -333,5 +333,43 @@ describe('interpolation', () => {
       );
       expect(request.path).toBe('/api/v1/organization/org-1/users?q=a%2Fb%20c');
     });
+
+    const pathFor = (id: string, path = '/api/v1/organization/<<0.0.id>>/users') =>
+      interpolateRequest({ method: 'GET', path }, { results: [[{ id }]], currentRound: 1 }).path;
+
+    it('encodes a resolved value so it stays one path segment', () => {
+      expect(pathFor('a/b')).toBe('/api/v1/organization/a%2Fb/users');
+      expect(pathFor('x?admin=1')).toBe('/api/v1/organization/x%3Fadmin%3D1/users');
+      expect(pathFor('y#z')).toBe('/api/v1/organization/y%23z/users');
+      expect(pathFor('q r')).toBe('/api/v1/organization/q%20r/users');
+    });
+
+    it('encodes a resolved value in the query so it stays one value', () => {
+      expect(pathFor('a&admin=1', '/api/v1/search?q=<<0.0.id>>')).toBe(
+        '/api/v1/search?q=a%26admin%3D1',
+      );
+    });
+
+    it('refuses a resolved value that would be a dot segment', () => {
+      expect(() => pathFor('..')).toThrow("resolved to '..'");
+      expect(() => pathFor('.')).toThrow("resolved to '.'");
+      expect(pathFor('%2e%2e')).toBe('/api/v1/organization/%252e%252e/users');
+      expect(pathFor('..\t')).toBe('/api/v1/organization/..%09/users');
+    });
+
+    it('leaves dots inside a segment and resolved values in headers and bodies alone', () => {
+      expect(pathFor('v1..2')).toBe('/api/v1/organization/v1..2/users');
+      const request = interpolateRequest(
+        {
+          method: 'POST',
+          path: '/api/v1/me',
+          headers: { 'x-note': '<<0.0.id>>' },
+          body: { name: '<<0.0.id>>' },
+        },
+        { results: [[{ id: 'a/b?c' }]], currentRound: 1 },
+      );
+      expect(request.headers?.['x-note']).toBe('a/b?c');
+      expect(request.body).toEqual({ name: 'a/b?c' });
+    });
   });
 });
