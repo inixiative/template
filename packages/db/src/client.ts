@@ -46,6 +46,7 @@ import {
 import { publishKey } from '@template/db/redis/cache/transactionOverlay/publishKey';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import { hasDeletedAt } from '@template/db/utils/fieldMetadata';
 import {
   type AccessorName,
   isAccessorName,
@@ -305,7 +306,8 @@ const dbMethods = {
 
   cacheOverlay: (): CacheOverlay | null => store.getStore()?.openTransaction?.cacheOverlay ?? null,
 
-  // Raw SELECT * FOR NO KEY UPDATE (the lock an UPDATE takes): other lockers, updaters and deleters of
+  // Raw SELECT * FOR NO KEY UPDATE (the lock an UPDATE takes), live rows only on a soft-delete model
+  // as every other read (`db.withDeleted` or a `deletedAt` predicate sees tombstones).: other lockers, updaters and deleters of
   // the row wait, inserts of rows that reference it do not. `changesKey: true` takes FOR UPDATE.
   // Scalar columns only, no relations/includes; load related data separately.
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
@@ -350,6 +352,12 @@ const dbMethods = {
       }
       return Prisma.sql`${column} = ${value}`;
     });
+    if (
+      hasDeletedAt(modelName) &&
+      !('deletedAt' in where) &&
+      !auditActorContext.isSoftDeleteBypassed()
+    )
+      conds.push(Prisma.sql`${Prisma.raw(`"${columnFor('deletedAt')}"`)} IS NULL`);
     if (options?.upserting)
       await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
     return db.$queryRaw<T[]>(

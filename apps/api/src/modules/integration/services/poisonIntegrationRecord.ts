@@ -29,10 +29,9 @@ export const poisonIntegrationRecord = (input: {
     )
       throw new Error(`Integration ${input.integrationId} is gone; its records cannot be poisoned`);
 
-    const held = await db.findForUpdate<IntegrationRecord>('IntegrationRecord', recordKey, {
+    const [existing] = await db.findForUpdate<IntegrationRecord>('IntegrationRecord', recordKey, {
       upserting: true,
     });
-    const existing = held.find((row) => row.deletedAt === null);
     if (existing?.poisonedAt) return existing;
     if (existing) return db.integrationRecord.update({ where: { id: existing.id }, data: poison });
     return db.integrationRecord.create({ data: { ...recordKey, model: input.model, ...poison } });

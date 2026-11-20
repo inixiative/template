@@ -610,7 +610,7 @@ await db.txn(async () => {
 });
 ```
 
-`findForUpdate` is raw SQL and is not soft-delete scoped: on a model with `deletedAt` it returns tombstones too, so `[existing]` may be a tombstone. A find-then-create on such a model picks the live row out of what it locked (`poisonIntegrationRecord`, `linkProjectResource`).
+`findForUpdate` is scoped like every other read: on a model with `deletedAt` it locks and returns live rows only, unless it runs inside `db.withDeleted` or its `where` names `deletedAt` (`fetchRuleReferenceTargetsDeletedAtForUpdate` reads tombstones that way). The `upserting` fence is keyed on the `where` alone, so a tombstone never blocks re-adding its key.
 
 `upserting: true` takes a Redis lock (`makeLock`, service `find-for-update`, keyed on the model
 plus the where entries sorted by key, hashed) **before** the `SELECT`, and holds it until the
@@ -688,7 +688,7 @@ A Prisma client extension (`packages/db/src/extensions/softDeleteScopeExtension.
 
 One bypass, `db.withDeleted(fn)`: it runs `fn` with scoping off (revive, redaction/GDPR, inspecting tombstones). Must be `await`ed inside the callback. Who the caller is never unscopes anything — **the endpoint decides**. `validateSuperadmin`, mounted on `adminRouter`, runs the rest of the request inside `db.withDeleted`, so superadmin endpoints read and write tombstones; every other route is scoped for every caller, superadmin included.
 
-The extension is the only soft-delete scoping layer — no middleware, `paginate` or lens code adds `deletedAt: null` by hand. It covers the root `where` (including relation filters like `some`/`every`/`is`), nested `include`/`select` trees, `_count` relation counts, `count`/`aggregate`/`groupBy` (the lens count plans). Its engine (`liveWhere` / `liveIncludes`, `packages/db/src/extensions/softDeleteScope.ts`) lives beside it in `packages/db`. It is not a mutation-lifecycle hook and needs no registration: the client composes it (`client.ts`, `.$extends(softDeleteScopeExtension())`), so every process and every test sees what production sees. A test that inspects a tombstone wraps the read in `db.withDeleted`.
+The extension is the only soft-delete scoping layer for Prisma reads (`db.findForUpdate`, raw SQL, applies the same rule itself) — no middleware, `paginate` or lens code adds `deletedAt: null` by hand. It covers the root `where` (including relation filters like `some`/`every`/`is`), nested `include`/`select` trees, `_count` relation counts, `count`/`aggregate`/`groupBy` (the lens count plans). Its engine (`liveWhere` / `liveIncludes`, `packages/db/src/extensions/softDeleteScope.ts`) lives beside it in `packages/db`. It is not a mutation-lifecycle hook and needs no registration: the client composes it (`client.ts`, `.$extends(softDeleteScopeExtension())`), so every process and every test sees what production sees. A test that inspects a tombstone wraps the read in `db.withDeleted`.
 
 Write `where`s are scoped too, so a soft-deleted row can't be mutated without a bypass. Cascade revive is exempt automatically: it matches on an explicit `deletedAt` value, and an explicit `deletedAt` mention in a `where` opts that query out of injection.
 

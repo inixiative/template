@@ -20,12 +20,11 @@ export const linkProjectResource = async (
   pair: { projectId: string; integrationResourceId: string },
 ) =>
   db.txn(async () => {
-    const held = await db.findForUpdate<ProjectIntegrationResource>(
+    const [live] = await db.findForUpdate<ProjectIntegrationResource>(
       'ProjectIntegrationResource',
       pair,
       { upserting: true },
     );
-    const live = held.find((row) => row.deletedAt === null);
     if (live) return live;
     if (!(await holdsOnRecord(permix, 'projectIntegrationResource', { id: '', ...pair }, 'create')))
       throw makeError({ status: 403, message: 'Access denied' });
