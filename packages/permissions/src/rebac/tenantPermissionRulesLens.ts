@@ -40,16 +40,19 @@ const everyResourceAndAction = createLens({
 });
 
 /**
- * The resources a tenant may extend, each with its narrowing: product records only, never `own`.
- * Never the permission system's own (a tenant, a member row, a token, an integration, an inquiry,
- * a sign-in provider): an action there is a gate on handing authority on, and a rule on it would
- * open that gate.
+ * The resources a tenant may extend, each with its narrowing: product records, never `own`, and
+ * reading or operating a space. Never the rest of the permission system's own (a member row, a
+ * token, an integration, an inquiry, a sign-in provider): an action there is a gate on handing
+ * authority on, and a rule on it would open that gate.
  */
 const resourcesATenantMayExtend: Partial<
   Record<ModelName, { picks?: string[]; omits?: string[] }>
 > = {
   Contact: { omits: ['own'] },
   Segment: { omits: ['own'] },
+  // why: an organization opens its spaces to read or operate; `manage` is what minting a space's
+  // tokens, writing its members' roles and creating its integrations ask
+  Space: { picks: ['read', 'operate'] },
 
   // ========================================================================
   // TEMPLATE ABOVE — Add app-specific product resources below

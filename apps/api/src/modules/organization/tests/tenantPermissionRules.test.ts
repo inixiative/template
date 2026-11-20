@@ -153,6 +153,7 @@ describe('tenantPermissionRules', () => {
       { 'db:integration': { delegateFull: true } },
       { 'db:authProvider': { create: true } },
       { 'db:space': { manage: true } },
+      { 'db:space': { own: true } },
       { 'db:project': { read: true } },
       { 'db:organization': { read: true } },
       { 'db:contact': { own: true } },
@@ -161,6 +162,7 @@ describe('tenantPermissionRules', () => {
     expect(await organization({ 'db:segment': { read: true } })).toBe(false);
 
     expect(await atSpace({ 'db:spaceUser': { operate: true } })).toBe(true);
+    expect(await atSpace({ 'db:space': { read: true } })).toBe(true);
     expect(await user({ 'db:flow': { read: true } })).toBe(true);
     expect(await user({ 'db:contact': { read: true } })).toBe(false);
   });
@@ -177,6 +179,22 @@ describe('tenantPermissionRules', () => {
     });
     expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(200);
     expect((await asStranger(del(`/api/v1/contact/${contact.id}`))).status).toBe(403);
+  });
+
+  it('opens its spaces to read or operate, never to minting their tokens', async () => {
+    const { entity: space } = await createSpace({}, { organization: org });
+    const members = () => asStranger(get(`/api/v1/space/${space.id}/spaceUsers`));
+    const mint = (role: string | null) =>
+      asStranger(post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role }));
+    expect((await members()).status).toBe(403);
+
+    const toOrganizationReaders = { rel: 'organization', action: 'read' };
+    expect((await open({ 'db:space': { read: toOrganizationReaders } })).status).toBe(200);
+    expect((await members()).status).toBe(403);
+
+    expect((await open({ 'db:space': { operate: true } })).status).toBe(200);
+    expect((await members()).status).toBe(200);
+    for (const role of [null, 'viewer', 'member']) expect((await mint(role)).status).toBe(403);
   });
 
   it('works the same on a space and on a user', async () => {
