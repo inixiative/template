@@ -44,6 +44,17 @@ export const isArmColumns = (
   return keys.length === columns.length && keys.every((key) => columns.includes(key));
 };
 
+/** The column holding the id of the row an arm points at: null when the arm carries no key, undefined for a member arm, which has none. */
+export const armIdColumn = (
+  model: ModelName,
+  axisField: string,
+  value: string,
+): string | null | undefined => {
+  const columns = polymorphicKeyColumns(model, axisField, value);
+  if (columns.length <= 1) return columns[0] ?? null;
+  return polymorphicArmColumns(model, axisField, value).id;
+};
+
 /**
  * The column holding the id of the `value` row an axis points at, or null when the value carries no
  * key (platform, admin). A composite arm answers through its relation (`Inquiry.targetSpace` on
@@ -54,14 +65,11 @@ export const polymorphicKeyColumn = (
   axisField: string,
   value: string,
 ): string | null => {
-  const columns = polymorphicKeyColumns(model, axisField, value);
-  if (columns.length <= 1) return columns[0] ?? null;
-  const idColumn = polymorphicArmColumns(model, axisField, value).id;
-  if (!idColumn)
-    throw new Error(
-      `${model}.${axisField} value ${value} keys on ${columns.join('+')} and no single id; ask for polymorphicKeyColumns, or give the axis a dualPolymorphismId`,
-    );
-  return idColumn;
+  const idColumn = armIdColumn(model, axisField, value);
+  if (idColumn !== undefined) return idColumn;
+  throw new Error(
+    `${model}.${axisField} value ${value} keys on ${polymorphicKeyColumns(model, axisField, value).join('+')} and no single id; ask for polymorphicKeyColumns, or give the axis a dualPolymorphismId`,
+  );
 };
 
 export const polymorphicKeyColumnOrThrow = (
@@ -121,10 +129,7 @@ const kindWhoseRowTheColumnNames = (
   column: string,
 ): BindableOwnerModel | undefined =>
   axisEntries(model, axisField).find(
-    ([value, keys]) =>
-      isBindableOwnerModel(value) &&
-      keys.length > 0 &&
-      (keys.length === 1 ? keys[0] : polymorphicArmColumns(model, axisField, value).id) === column,
+    ([value]) => isBindableOwnerModel(value) && armIdColumn(model, axisField, value) === column,
   )?.[0] as BindableOwnerModel | undefined;
 
 /**

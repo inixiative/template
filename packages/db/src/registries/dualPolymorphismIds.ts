@@ -5,8 +5,8 @@
  * @uses none
  */
 import { polymorphismConfigForModel } from '@template/db/registries/falsePolymorphism';
+import { armIdColumn } from '@template/db/registries/polymorphicAxisPointsAt';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { polymorphicArmColumns } from '@template/db/utils/polymorphicArmKeys';
 
 type Row = Record<string, unknown>;
 
@@ -20,11 +20,8 @@ type DualAxis = ReturnType<typeof dualPolymorphicAxes>[number];
 const armKeys = (axis: DualAxis, row: Row): readonly string[] =>
   (axis.fkMap as Partial<Record<string, readonly string[]>>)[String(row[axis.field])] ?? [];
 
-const idColumnOfArm = (model: ModelName, axis: DualAxis, row: Row): string | undefined => {
-  const keys = armKeys(axis, row);
-  if (keys.length <= 1) return keys[0];
-  return polymorphicArmColumns(model, axis.field, String(row[axis.field])).id;
-};
+const idColumnOfArm = (model: ModelName, axis: DualAxis, row: Row): string | null | undefined =>
+  armKeys(axis, row).length === 0 ? null : armIdColumn(model, axis.field, String(row[axis.field]));
 
 // why: a member arm holds no single id, so its dual polymorphism id is the writer's to give.
 const setTypedId = (model: ModelName, axis: DualAxis, row: Row): unknown => {

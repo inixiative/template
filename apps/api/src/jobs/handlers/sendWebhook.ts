@@ -39,7 +39,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     (await isIntegrationRecordPoisoned({
       integrationId: subscription.integrationId,
       recordModel: subscription.resourceModel,
-      resourceId,
+      recordId: resourceId,
     }))
   ) {
     log.info(
@@ -127,7 +127,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     await poisonIntegrationRecord({
       integrationId: subscription.integrationId,
       recordModel: subscription.resourceModel,
-      resourceId,
+      recordId: resourceId,
       reason: error ?? 'rejected by the integration',
     });
     log.info(`Webhook record ${resourceId} poisoned for integration ${subscription.integrationId}`);

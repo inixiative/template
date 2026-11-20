@@ -4,21 +4,21 @@
  * @partOf feature:integrations, feature:webhooks
  * @uses infrastructure:prisma, infrastructure:redis
  */
-import { db } from '@template/db';
+import { db, polymorphicKeyColumnOrThrow } from '@template/db';
 import type { IntegrationRecord } from '@template/db/generated/client/client';
 import type { WebhookModel } from '@template/db/generated/client/enums';
-import { integrationRecordForeignKeyForModel } from '#/modules/integration/services/integrationRecordForeignKeyForModel';
 
 export const poisonIntegrationRecord = (input: {
   integrationId: string;
   recordModel: WebhookModel;
-  resourceId: string;
+  recordId: string;
   reason: string;
 }): Promise<IntegrationRecord> =>
   db.txn(async () => {
     const recordKey = {
       integrationId: input.integrationId,
-      [integrationRecordForeignKeyForModel(input.recordModel)]: input.resourceId,
+      [polymorphicKeyColumnOrThrow('IntegrationRecord', 'recordModel', input.recordModel)]:
+        input.recordId,
     };
     const poison = { poisonedAt: new Date(), poisonedReason: input.reason };
 

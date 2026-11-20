@@ -36,7 +36,7 @@ describe('poisonIntegrationRecord', () => {
     const input = {
       integrationId: integration.id,
       recordModel: WebhookModel.CustomerRelationship,
-      resourceId: customerRelationship.id,
+      recordId: customerRelationship.id,
     };
 
     const first = await poisonIntegrationRecord({ ...input, reason: 'HTTP 400: first' });
@@ -56,7 +56,7 @@ describe('poisonIntegrationRecord', () => {
     const poisoned = await poisonIntegrationRecord({
       integrationId: integration.id,
       recordModel: WebhookModel.CustomerRelationship,
-      resourceId: customerRelationship.id,
+      recordId: customerRelationship.id,
       reason: 'HTTP 422: Unprocessable Entity',
     });
 
