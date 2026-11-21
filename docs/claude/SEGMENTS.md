@@ -99,7 +99,9 @@ Membership diffs publish two event pairs: `segment.membersAdded` / `segment.memb
 for the owner, and `customerRelationship.segmentsAdded` / `customerRelationship.segmentsRemoved` for the customer.
 Owner events refetch the segment's member-list channel. For User customers, customer events
 send a targeted `meReadManySegmentMemberships` refetch to that user's sockets. Segment deletion
-captures member IDs before the junction is removed and publishes the removals too.
+captures member IDs before the members are tombstoned with it and publishes the removals too. A
+removed member is tombstoned, not deleted, so the rules naming it are degraded; one that comes
+back is a new live row.
 
 The email recipient lens exposes `customerRelationshipsAsCustomer.segmentMembers.segment`. Its owner scoping,
 reference admission and degraded-segment filtering constrain which memberships a template

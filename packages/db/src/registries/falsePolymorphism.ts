@@ -238,6 +238,8 @@ export const PolymorphismRegistry = {
           Flow: ['targetFlowId'],
           AuthProvider: ['targetAuthProviderId'],
           WebhookSubscription: ['targetWebhookSubscriptionId'],
+          IntegrationResource: ['targetIntegrationResourceId'],
+          ProjectIntegrationResource: ['targetProjectIntegrationResourceId'],
         },
       },
     ],
@@ -264,6 +266,8 @@ export const PolymorphismRegistry = {
           Flow: ['sourceFlowId'],
           AuthProvider: ['sourceAuthProviderId'],
           WebhookSubscription: ['sourceWebhookSubscriptionId'],
+          IntegrationResource: ['sourceIntegrationResourceId'],
+          ProjectIntegrationResource: ['sourceProjectIntegrationResourceId'],
         },
       },
       {

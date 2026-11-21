@@ -26,7 +26,8 @@ model Project {
   space            Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
   spaceUser        SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
 
-  tagAttachments TagAttachment[]
+  tagAttachments              TagAttachment[]
+  projectIntegrationResources ProjectIntegrationResource[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

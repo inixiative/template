@@ -1,0 +1,34 @@
+// ============================================================================
+// INTEGRATION RESOURCE - One thing in the external system an integration reaches
+// ============================================================================
+// A channel, a repository, a model: the provider's own resource, named by `kind` and the provider's
+// `externalId`. Soft-deleted with its integration and revived with it, so the entitlements anchored
+// at it and the rules naming it are degraded (sourceDeletedAt, targetDeletedAt), never left
+// pointing at a live row under a dead integration. A removed resource can be registered again: the
+// unique holds over live rows only.
+
+model IntegrationResource {
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+
+  name       String
+  kind       String
+  externalId String
+  metadata   Json
+
+  integrationId String      @db.VarChar(36)
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  projectIntegrationResources ProjectIntegrationResource[]
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([integrationId, kind, externalId], where: raw("\"deletedAt\" IS NULL"), map: "IntegrationResource_integration_kind_externalId_key")
+  @@index([integrationId])
+}

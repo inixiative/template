@@ -9,7 +9,7 @@ import {
   toModelName,
 } from '@template/db';
 
-// why: a hard-deleted source (SegmentMember, Flow, WebhookSubscription) nulls its SetNull FK; the plain id still names it.
+// why: a hard-deleted source (Flow, WebhookSubscription) nulls its SetNull FK; the plain id still names it.
 const requiredForeignKey = (
   model: ModelName,
   axis: PolymorphicAxis,

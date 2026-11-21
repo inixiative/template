@@ -49,8 +49,9 @@ export const applyMembershipDiff = async ({
       added = written.map((member) => member.customerRelationshipId);
     }
     if (toRemove.length)
-      await db.segmentMember.deleteMany({
+      await db.segmentMember.updateManyAndReturn({
         where: { segmentId, customerRelationshipId: { in: toRemove } },
+        data: { deletedAt: new Date() },
       });
   });
 
