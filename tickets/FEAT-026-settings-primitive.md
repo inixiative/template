@@ -1,4 +1,4 @@
-# FEAT-024: Settings Primitive (Lightweight False-Polymorphic Configuration)
+# FEAT-026: Settings Primitive (Lightweight False-Polymorphic Configuration)
 
 **Status**: 🆕 Not Started
 **Assignee**: Unassigned
@@ -44,7 +44,7 @@ model Setting {
   key      String  @db.VarChar(120)
   disabled Boolean @default(false)
 
-  // Typed value columns (matching FEAT-003 and FEAT-020; exactly one matches definition.valueType)
+  // Typed value columns (matches FEAT-003 FeatureFlagVariant and follows FEAT-020's Decimal(38, 10) typed-column discipline; FEAT-020 carries valueDate instead of valueBoolean)
   valueBoolean Boolean?
   valueText    String?
   valueNumber  Decimal? @db.Decimal(38, 10)
@@ -84,7 +84,7 @@ enum SettingResourceModel {
    - Moving a key from one category to another becomes a data migration if categories live in SQL, instead of a one-line code edit.
    - Carrying 30 to 100+ setting keys across Template, Kingdom, and Tribe in Postgres enums causes constant enum churn and `ALTER TYPE` migrations.
    - Emitting OpenAPI `z.enum(...)` from the registry alongside `GET /api/v1/setting/info` gives `@template/sdk` strict key unions and automatic frontend category grouping with zero DB migrations.
-3. **Typed value columns (`valueBoolean | valueText | valueNumber | valueJson`).** Matching `FEAT-003` (`FeatureFlagVariant`) and `FEAT-020` (Zealot `enrichments`), storing values in typed columns allows `json-rules` lenses and database queries to compare numbers and booleans directly without lexicographic text comparisons or JSON casting. The `disabled` boolean lets an owner disable an override row without deleting its configured payload.
+3. **Typed value columns (`valueBoolean | valueText | valueNumber | valueJson`).** Matching `FEAT-003` (`FeatureFlagVariant`) and following `FEAT-020`'s typed-column discipline (`Decimal(38, 10)`; note `FEAT-020` carries `valueDate` instead of `valueBoolean`), storing values in typed columns allows `json-rules` lenses and database queries to compare numbers and booleans directly without lexicographic text comparisons or JSON casting. The `disabled` boolean lets an owner disable an override row without deleting its configured payload.
 4. **Generic `AuditLog` rail.** Every setting create, update, disable, and delete writes to `AuditLog` through the standard audit hook. No bespoke setting-history table is added.
 
 ---
@@ -109,7 +109,7 @@ The registry follows the same pattern as Template's `Inquiry` registry (`/api/v1
     permission: Action;           // required ReBAC action on the target resource
   }
   ```
-- **Discovery endpoint (`GET /api/v1/setting/info`):** Uses `infoResponseSchema` (mirroring `apps/api/src/modules/inquiry/routes/inquiryInfo.ts` and Kingdom's `integrationInfo.ts`) to expose categories, definitions, applicable `resourceModels`, defaults, and JSON Schemas derived from each entry's Zod `schema`. Frontend settings screens render grouped forms directly from this endpoint without duplicating validation rules.
+- **Discovery endpoint (`GET /api/v1/setting/info`):** Uses `apps/api/src/lib/jsonSchema/infoResponseSchema.ts` (mirroring `apps/api/src/modules/inquiry/routes/inquiryInfo.ts` and Kingdom's `apps/api/src/modules/integration/routes/integrationInfo.ts`) to expose categories, definitions, applicable `resourceModels`, defaults, and JSON Schemas derived from each entry's Zod `schema`. Frontend settings screens render grouped forms directly from this endpoint without duplicating validation rules.
 - **DB write hook:** Validates every create and update against `SETTING_DEFINITIONS` inside the write transaction:
   1. `key` exists in `SETTING_DEFINITIONS`.
   2. `resourceModel` is listed in `definition.resourceModels`.
@@ -124,13 +124,13 @@ In Kingdom, project-level Chorus, Oracle, and Hosting configuration dials (such 
 
 - **Why not `ProjectIntegrationResource`:** `ProjectIntegrationResource` links a project to fine-grained sub-objects such as individual GitHub repositories or Foundry threads (`packages/db/prisma/schema/projectIntegrationResource.prisma`). Hosting providers like `railway` and `render` do not register `IntegrationResource` rows, and project-wide policy dials do not belong to a single sub-resource.
 - **Why not a new `ProjectIntegration` join table:** Under dual hosting (`R-2026-11-21-02`), inixiative-managed workloads have no customer hosting `Integration` row at all. Hanging settings off a `ProjectIntegration` row breaks for managed hosting and orphans settings whenever a project switches providers (for example from Railway to Fly.io or from BYO to managed).
-- **Strict EAV guardrail (`FEAT-020` §1):** Real foreign-key pointers (`Project.poolId`, `CloudWorkload.hostingIntegrationId`) and runtime provisioning state (`CloudWorkload`, `ArchiveHosting`) stay real columns with `onDelete: Restrict` and dedicated write services. They are never stored inside `Setting`. A `Setting` row holds configuration intent; relational tables hold referential integrity and live state.
+- **Strict EAV guardrail (`FEAT-020` §1):** Real foreign-key pointers (`Project.poolId`, `CloudWorkload.hostingIntegrationId` (planned in `INTEG-005`)) and runtime provisioning state (`CloudWorkload` (planned in `INTEG-005`), `ArchiveHosting`) stay real columns with `onDelete: Restrict` and dedicated write services. They are never stored inside `Setting`. A `Setting` row holds configuration intent; relational tables hold referential integrity and live state.
 
 ---
 
 ## Relationship to Zealot `enrichments` / `FEAT-020` and a lightweight EAV helper
 
-`FEAT-024` borrows four specific patterns from `FEAT-020` (Zealot `enrichments`) and leaves the rest out:
+`FEAT-026` borrows four specific patterns from `FEAT-020` (Zealot `enrichments`) and leaves the rest out:
 
 - **Borrowed:** Exclusive-arc false polymorphism, typed value columns (`valueBoolean | valueText | valueNumber | valueJson`), generic `AuditLog` instead of custom history tables, and the strict when-to-EAV boundary (app workflows and foreign keys stay real columns).
 - **Left behind:** `IntegrationSource`, `IntegrationMap`, multi-source contribution precedence, materialized read tables, `EnrichmentVocabulary`, and DB-stored `CustomFieldDefinition` rows. Settings have one authoritative value per `(resource, key)` and are defined in code.
@@ -146,12 +146,12 @@ Carde.io carried a `SettingKey` database table because tenant games needed to de
 
 ## Unblocks parked Member Settings
 
-`TRACKING.md` tracks **Member settings: how you interact with your org (auto-accept, rules)** (parked 2026-11-14): per-membership settings on `OrganizationUser` and `SpaceUser` for conversation request auto-accept, host selection, and org interaction rules. Because `SettingResourceModel` includes `OrganizationUser` and `SpaceUser` with composite-FK partial unique indexes, `FEAT-024` supplies the storage, registry, audit, and `/api/v1/setting/info` surface those member settings need when Aron picks that design back up.
+`TRACKING.md` tracks **Member settings: how you interact with your org (auto-accept, rules)** (parked 2026-11-14): per-membership settings on `OrganizationUser` and `SpaceUser` for conversation request auto-accept, host selection, and org interaction rules. Because `SettingResourceModel` includes `OrganizationUser` and `SpaceUser` with composite-FK partial unique indexes, `FEAT-026` supplies the storage, registry, audit, and `/api/v1/setting/info` surface those member settings need when Aron picks that design back up.
 
 ---
 
 ## Open decisions for Aron before coding
 
-1. **Typed value columns vs. single `value: Json` column:** Keep the four typed columns (`valueBoolean | valueText | valueNumber | valueJson`, matching `FEAT-003` and `FEAT-020` so `json-rules` lenses can filter settings directly) or store a single `value: Json` column and accept JSON-only filtering?
+1. **Typed value columns vs. single `value: Json` column:** Keep the four typed columns (`valueBoolean | valueText | valueNumber | valueJson`, matching `FEAT-003` and following `FEAT-020`'s typed-column discipline so `json-rules` lenses can filter settings directly) or store a single `value: Json` column and accept JSON-only filtering?
 2. **Overlap with Kingdom's `Integration.configuration` (`packages/db/prisma/schema/integration.prisma:37`):** Keep `Integration.configuration` for provider connection parameters (omitting `Integration` from `SettingResourceModel` for now), or migrate integration settings onto `Setting`?
 3. **Shared EAV helper timing:** Keep the typed-column validation and upsert helpers local to the `Setting` module and extract on the second lightweight EAV caller, or introduce a tiny shared EAV helper in `packages/db` immediately?

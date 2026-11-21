@@ -14,7 +14,7 @@ kanban
     FEAT-017-audit-log-hardening-lineage-and-explorer
     FEAT-019-extensible-actor-attribution
     FEAT-016-inquiry-lineage-and-nesting
-    FEAT-024-settings-primitive
+    FEAT-026-settings-primitive
     API-001-idempotency-and-safe-retries
     API-003-cursor-pagination-mode
     API-005-route-permission-tags
@@ -95,7 +95,7 @@ kanban
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
 - [INFRA-049: Version Sequence Primitives](./INFRA-049-version-sequence-primitives.md) - generation, sequence and version as named styles in one module, existing callers moved onto it
 - [INFRA-050: Signet and KCP-Backed Init Provisioning](./INFRA-050-signet-kcp-init.md) - optional Kingdom Signet / KCP transport for `init/` over shared `@inixiative/infra` drivers; standalone direct token mode stays default
-- [FEAT-024: Settings Primitive](./FEAT-024-settings-primitive.md) - lightweight false-polymorphic `Setting` model, code-first registry, typed value columns, and `/api/v1/setting/info` discovery for app-owned configuration dials
+- [FEAT-026: Settings Primitive](./FEAT-026-settings-primitive.md) - lightweight false-polymorphic `Setting` model, code-first registry, typed value columns, and `/api/v1/setting/info` discovery for app-owned configuration dials
 - [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - json-rules `clockUnit` with the `clock.finestUnit` engine floor; `Segment.clockUnit` derived at save, `lastComputedAt` on what was computed; one cron row per unit, looking one unit ahead
 - [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
 - [INFRA-040: WS Content Channels](./INFRA-040-ws-content-channels.md) - Every delivery is a channel named by content and authorized by its route; drops per-user addressing
