@@ -44,7 +44,7 @@ model Setting {
   key      String  @db.VarChar(120)
   disabled Boolean @default(false)
 
-  // Typed value columns (matches FEAT-003 FeatureFlagVariant and follows FEAT-020's Decimal(38, 10) typed-column discipline; FEAT-020 carries valueDate instead of valueBoolean)
+  // Typed value columns (R-2026-11-21-11; multi-select uses deduplicated string[] in valueJson per R-2026-11-21-14)
   valueBoolean Boolean?
   valueText    String?
   valueNumber  Decimal? @db.Decimal(38, 10)
@@ -64,6 +64,7 @@ model Setting {
   @@index([organizationId])
   @@index([spaceId])
   @@index([projectId])
+  @@index([valueJson], type: Gin)
 }
 
 enum SettingResourceModel {
@@ -84,8 +85,9 @@ enum SettingResourceModel {
    - Moving a key from one category to another becomes a data migration if categories live in SQL, instead of a one-line code edit.
    - Carrying 30 to 100+ setting keys across Template, Kingdom, and Tribe in Postgres enums causes constant enum churn and `ALTER TYPE` migrations.
    - Emitting OpenAPI `z.enum(...)` from the registry alongside `GET /api/v1/setting/info` gives `@template/sdk` strict key unions and automatic frontend category grouping with zero DB migrations.
-3. **Typed value columns (`valueBoolean | valueText | valueNumber | valueJson`).** Matching `FEAT-003` (`FeatureFlagVariant`) and following `FEAT-020`'s typed-column discipline (`Decimal(38, 10)`; note `FEAT-020` carries `valueDate` instead of `valueBoolean`), storing values in typed columns allows `json-rules` lenses and database queries to compare numbers and booleans directly without lexicographic text comparisons or JSON casting. The `disabled` boolean lets an owner disable an override row without deleting its configured payload.
-4. **Generic `AuditLog` rail.** Every setting create, update, disable, and delete writes to `AuditLog` through the standard audit hook. No bespoke setting-history table is added.
+3. **Typed value columns (`valueBoolean | valueText | valueNumber | valueJson`, locked by `R-2026-11-21-11`).** Matching `FEAT-003` (`FeatureFlagVariant`) and following `FEAT-020`'s typed-column discipline (`Decimal(38, 10)`; note `FEAT-020` carries `valueDate` instead of `valueBoolean`), storing values in typed columns allows `json-rules` lenses and database queries to compare numbers and booleans directly without lexicographic text comparisons or JSON casting. The `disabled` boolean lets an owner disable an override row without deleting its configured payload.
+4. **Multi-select representation (`R-2026-11-21-14`).** Multi-select values on `Setting` (and Postgres EAVs in `FEAT-020`) are stored as a deduplicated `string[]` inside `valueJson` (`jsonb`) with a Postgres `GIN` index (`@@index([valueJson], type: Gin)`) and `array_contains` query support (`@>`). No multi-row or join table is added: preserving 1-row-per-`(resource, key)` atomicity keeps upserts and single-row `AuditLog` diffs straightforward without multi-table audit machinery.
+5. **Generic `AuditLog` rail.** Every setting create, update, disable, and delete writes to `AuditLog` through the standard audit hook. No bespoke setting-history table is added.
 
 ---
 
@@ -100,7 +102,7 @@ The registry follows the same pattern as Template's `Inquiry` registry (`/api/v1
     key: string;                  // namespaced dot key, e.g. "hosting.idleSuspendMinutes"
     category: SettingCategoryKey;
     resourceModels: readonly SettingResourceModel[];
-    valueType: 'boolean' | 'text' | 'number' | 'json';
+    valueType: 'boolean' | 'text' | 'number' | 'json' | 'multiSelect'; // multiSelect stores deduplicated string[] in valueJson
     schema: z.ZodType;            // exact runtime validator (bounds, enums, object shape)
     defaultValue: unknown;
     label: string;
@@ -113,7 +115,7 @@ The registry follows the same pattern as Template's `Inquiry` registry (`/api/v1
 - **DB write hook:** Validates every create and update against `SETTING_DEFINITIONS` inside the write transaction:
   1. `key` exists in `SETTING_DEFINITIONS`.
   2. `resourceModel` is listed in `definition.resourceModels`.
-  3. Exactly the typed column matching `definition.valueType` is populated (the other three are `null`).
+  3. Exactly the typed column matching `definition.valueType` is populated (with `multiSelect` storing a deduplicated `string[]` in `valueJson`), and the other three are `null`.
   4. The value parses cleanly against `definition.schema`.
 
 ---
@@ -128,13 +130,13 @@ In Kingdom, project-level Chorus, Oracle, and Hosting configuration dials (such 
 
 ---
 
-## Relationship to Zealot `enrichments` / `FEAT-020` and a lightweight EAV helper
+## Lightweight EAV abstraction and relationship to `FEAT-020`
 
-`FEAT-026` borrows four specific patterns from `FEAT-020` (Zealot `enrichments`) and leaves the rest out:
+`FEAT-026` borrows four specific patterns from `FEAT-020` and leaves the rest out:
 
-- **Borrowed:** Exclusive-arc false polymorphism, typed value columns (`valueBoolean | valueText | valueNumber | valueJson`), generic `AuditLog` instead of custom history tables, and the strict when-to-EAV boundary (app workflows and foreign keys stay real columns).
+- **Borrowed:** Exclusive-arc false polymorphism, typed value columns (`valueBoolean | valueText | valueNumber | valueJson`, with `multiSelect` as deduplicated `string[]` in `valueJson` + `GIN` index + `array_contains`), generic `AuditLog` instead of custom history tables, and the strict when-to-EAV boundary (app workflows and foreign keys stay real columns).
 - **Left behind:** `IntegrationSource`, `IntegrationMap`, multi-source contribution precedence, materialized read tables, `EnrichmentVocabulary`, and DB-stored `CustomFieldDefinition` rows. Settings have one authoritative value per `(resource, key)` and are defined in code.
-- **Optional EAV helper:** Keep the typed-column validation and read/write helpers local to the `Setting` module initially. If a second lightweight EAV consumer appears later, extract the typed-column assertion and upsert helper into a thin shared utility under `packages/db` without overbuilding upfront.
+- **EAV as a clean protocol (`R-2026-11-21-14`):** Structure the lightweight EAV pattern as a clean protocol (typed value columns, `valueJson` array convention for multi-select, exclusive-arc polymorphism, single-row `AuditLog` tracking, and validation/upsert contract) rather than naming it `enrichment` in Template or Kingdom unless a consumer specifically warrants that name. Keep the protocol's validation and upsert helpers local to the `Setting` module initially, or extract them into a thin shared utility under `packages/db` (see Open Decision #3).
 
 ---
 
@@ -152,6 +154,6 @@ Carde.io carried a `SettingKey` database table because tenant games needed to de
 
 ## Open decisions for Aron before coding
 
-1. **Typed value columns vs. single `value: Json` column:** Keep the four typed columns (`valueBoolean | valueText | valueNumber | valueJson`, matching `FEAT-003` and following `FEAT-020`'s typed-column discipline so `json-rules` lenses can filter settings directly) or store a single `value: Json` column and accept JSON-only filtering?
+1. **Value storage (DECIDED, `R-2026-11-21-11`):** Typed columns (`valueBoolean | valueText | valueNumber | valueJson`), matching `FEAT-003` and following `FEAT-020`'s typed-column discipline so `json-rules` lenses and database queries filter directly without JSON casting. **Multi-select representation (DECIDED, `R-2026-11-21-14`):** Stored as a deduplicated `string[]` in `valueJson` (`jsonb`) with a Postgres `GIN` index (`@@index([valueJson], type: Gin)`) and `array_contains` query support, preserving 1-row-per-`(resource, key)` atomicity and single-row `AuditLog` diffs (no multi-table join).
 2. **Overlap with Kingdom's `Integration.configuration` (`packages/db/prisma/schema/integration.prisma:37`):** Keep `Integration.configuration` for provider connection parameters (omitting `Integration` from `SettingResourceModel` for now), or migrate integration settings onto `Setting`?
-3. **Shared EAV helper timing:** Keep the typed-column validation and upsert helpers local to the `Setting` module and extract on the second lightweight EAV caller, or introduce a tiny shared EAV helper in `packages/db` immediately?
+3. **EAV protocol extraction timing:** Keep the EAV protocol's typed-column validation and upsert helpers local to the `Setting` module and extract on the second lightweight EAV caller, or introduce the shared EAV protocol utility in `packages/db` immediately?
