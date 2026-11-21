@@ -1,3 +1,4 @@
+import { registerAttributeValidationHook } from '@template/db';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
@@ -23,6 +24,7 @@ import { registerUserEmailAddressValidationHook } from '#/hooks/userEmail/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { registerWebhookSubscriptionUrlHook } from '#/hooks/webhookSubscriptionUrl/hook';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
+import { makeError } from '#/lib/errors';
 
 export const registerHooks = () => {
   registerCarriedOwnerKeysHook();
@@ -31,6 +33,9 @@ export const registerHooks = () => {
   registerEntitlementChangeRequestsHook();
   registerMemberSelfGrantHook();
   registerRulesHook();
+  registerAttributeValidationHook({
+    makeValidationError: (message) => makeError({ status: 422, message }),
+  });
   registerAuditLogHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();

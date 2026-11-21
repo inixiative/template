@@ -3,7 +3,7 @@
  * @kind registry
  * @uses infrastructure:prisma
  */
-import { type ModelName, relationsOfModel } from '@template/db';
+import { ATTRIBUTE_MODELS, type ModelName, relationsOfModel, toModelName } from '@template/db';
 import { polymorphismImmutableFields } from '#/hooks/falsePolymorphism/toImmutableFields';
 
 // Fields that should never be modified on any model
@@ -42,6 +42,19 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
     ...polymorphismImmutableFields.WebhookSubscription,
     include: [...(polymorphismImmutableFields.WebhookSubscription?.include ?? []), 'resourceModel'],
   },
+  ...Object.fromEntries(
+    Object.entries(ATTRIBUTE_MODELS).map(([accessor, config]) => {
+      const modelName = toModelName(accessor);
+      const poly = polymorphismImmutableFields[modelName];
+      return [
+        modelName,
+        {
+          ...poly,
+          refuse: [...(poly?.refuse ?? []), ...(config.locatorField ? [config.locatorField] : [])],
+        },
+      ];
+    }),
+  ),
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {

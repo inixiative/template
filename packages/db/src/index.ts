@@ -39,6 +39,8 @@ export {
   type WatchedLane,
   watchLane,
 } from './lanes';
+// Attribute model capability (registry, DMMF/index validation, typed codec, operators, hook, utils)
+export * from './lib/attributes';
 // Distributed lock
 export {
   type AcquireOptions,

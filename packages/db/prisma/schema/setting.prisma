@@ -1,0 +1,85 @@
+// ============================================================================
+// SETTING - Lightweight false-polymorphic configuration primitive
+// ============================================================================
+// App-owned configuration dials attached to User, Organization, Space,
+// OrganizationUser, SpaceUser, or Project. Keys and validation schemas live
+// in code (`@template/shared/settings`), not a Prisma enum or DB table.
+// Registered in `ATTRIBUTE_MODELS` (`packages/db/src/lib/attributes/registry.ts`)
+// with the standard 5 typed value columns (`valueBoolean`, `valueText`,
+// `valueNumber`, `valueDate`, `valueJson`), with `multiSelect` stored as a
+// deduplicated `string[]` in `valueJson` (GIN-indexed for `array_contains`).
+
+model Setting {
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+
+  // Resource: dual polymorphism (enforced by falsePolymorphism hook + registry).
+  // `resourceId` is the dual polymorphism id (auto-filled from typed FKs on create,
+  // supplied by writer for composite member arms) so ParentEdgeRegistry can traverse
+  // Setting → parent for AuditLog tenancy context and parent audit history streams.
+  resourceModel          SettingResourceModel
+  resourceId             String?              @db.VarChar(36)
+  resourceUserId         String?              @db.VarChar(36)
+  resourceOrganizationId String?              @db.VarChar(36)
+  resourceSpaceId        String?              @db.VarChar(36)
+  resourceProjectId      String?              @db.VarChar(36)
+
+  resourceUser             User?             @relation(fields: [resourceUserId], references: [id], onDelete: Cascade)
+  resourceOrganization     Organization?     @relation(fields: [resourceOrganizationId], references: [id], onDelete: Cascade)
+  resourceOrganizationUser OrganizationUser? @relation(fields: [resourceOrganizationId, resourceUserId], references: [organizationId, userId], onDelete: Cascade)
+  resourceSpace            Space?            @relation(fields: [resourceOrganizationId, resourceSpaceId], references: [organizationId, id], onDelete: Cascade)
+  resourceSpaceUser        SpaceUser?        @relation(fields: [resourceOrganizationId, resourceSpaceId, resourceUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  resourceProject          Project?          @relation(fields: [resourceProjectId], references: [id], onDelete: Cascade)
+
+  // Registry key (plain String, NOT a Prisma enum; validated against SETTING_DEFINITIONS)
+  key      String  @db.VarChar(120)
+  disabled Boolean @default(false)
+
+  // Standard 5-column Attribute capability contract (multiSelect stores deduplicated string[] in valueJson)
+  valueBoolean Boolean?
+  valueText    String?
+  valueNumber  Float?
+  valueDate    DateTime?
+  valueJson    Json?
+
+  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectSetting")
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([resourceUserId, key], where: raw("\"resourceModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "Setting_user_key_unique")
+  @@unique([resourceOrganizationId, key], where: raw("\"resourceModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "Setting_organization_key_unique")
+  @@unique([resourceOrganizationId, resourceUserId, key], where: raw("\"resourceModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "Setting_orguser_key_unique")
+  @@unique([resourceOrganizationId, resourceSpaceId, key], where: raw("\"resourceModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "Setting_space_key_unique")
+  @@unique([resourceOrganizationId, resourceSpaceId, resourceUserId, key], where: raw("\"resourceModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "Setting_spaceuser_key_unique")
+  @@unique([resourceProjectId, key], where: raw("\"resourceModel\" = 'Project' AND \"deletedAt\" IS NULL"), map: "Setting_project_key_unique")
+  @@index([resourceModel, resourceId])
+  @@index([resourceModel, key])
+  @@index([key, valueBoolean])
+  @@index([key, valueText])
+  @@index([key, valueNumber])
+  @@index([key, valueDate])
+  @@index([resourceUserId])
+  @@index([resourceOrganizationId])
+  @@index([resourceSpaceId])
+  @@index([resourceProjectId])
+  @@index([valueJson], type: Gin)
+}
+
+enum SettingResourceModel {
+  User
+  Organization
+  Space
+  OrganizationUser
+  SpaceUser
+  Project
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific attachable models below
+  // ==========================================================================
+}

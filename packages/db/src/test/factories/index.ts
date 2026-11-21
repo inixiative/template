@@ -23,6 +23,7 @@ export * from './ruleReferenceFactory';
 export * from './segmentFactory';
 export * from './segmentMemberFactory';
 export * from './sessionFactory';
+export * from './settingFactory';
 export * from './spaceFactory';
 export * from './spaceUserFactory';
 export * from './tagAttachmentFactory';

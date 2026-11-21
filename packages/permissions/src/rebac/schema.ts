@@ -20,6 +20,7 @@ import {
   memberRowActions,
   ownerActions,
   rowIsThereAnd,
+  settingResourceActions,
   tokenAdministering,
 } from '@template/permissions/rebac/rebacSchemaRules';
 import type { RebacSchema } from '@template/permissions/rebac/types';
@@ -109,6 +110,7 @@ export const rebacSchema: RebacSchema = {
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
     'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
+    'db:setting': { actions: settingResourceActions },
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:organizationUser': { actions: memberRowActions('organization') },

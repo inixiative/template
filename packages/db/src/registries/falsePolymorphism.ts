@@ -218,6 +218,7 @@ export const PolymorphismRegistry = {
           Flow: ['targetFlowId'],
           AuthProvider: ['targetAuthProviderId'],
           WebhookSubscription: ['targetWebhookSubscriptionId'],
+          Setting: ['targetSettingId'],
         },
       },
     ],
@@ -244,6 +245,7 @@ export const PolymorphismRegistry = {
           Flow: ['sourceFlowId'],
           AuthProvider: ['sourceAuthProviderId'],
           WebhookSubscription: ['sourceWebhookSubscriptionId'],
+          Setting: ['sourceSettingId'],
         },
       },
       {
@@ -354,6 +356,24 @@ export const PolymorphismRegistry = {
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
           Entitlement: ['subjectEntitlementId'],
+          Setting: ['subjectSettingId'],
+        },
+      },
+    ],
+  },
+
+  Setting: {
+    axes: [
+      {
+        field: 'resourceModel',
+        dualPolymorphismId: 'resourceId',
+        fkMap: {
+          User: ['resourceUserId'],
+          Organization: ['resourceOrganizationId'],
+          OrganizationUser: ['resourceOrganizationId', 'resourceUserId'],
+          Space: ['resourceOrganizationId', 'resourceSpaceId'],
+          SpaceUser: ['resourceOrganizationId', 'resourceSpaceId', 'resourceUserId'],
+          Project: ['resourceProjectId'],
         },
       },
     ],

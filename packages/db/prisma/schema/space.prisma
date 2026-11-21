@@ -50,6 +50,7 @@ model Space {
   auditLogsAsSubject              AuditLog[]             @relation("AuditLogSubjectSpace")
   communicationsSent              CommunicationLog[]     @relation("CommunicationSenderSpace")
   segments                        Segment[]
+  settings                        Setting[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

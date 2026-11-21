@@ -18,6 +18,7 @@ export type ParentEdge = { axis: string } | { parent: ModelName; foreignKey: str
 
 export const ParentEdgeRegistry = {
   Entitlement: { axis: 'targetModel' },
+  Setting: { axis: 'resourceModel' },
 } as const satisfies Partial<Record<ModelName, ParentEdge>>;
 
 const parentEdges: Partial<Record<ModelName, ParentEdge>> = ParentEdgeRegistry;
