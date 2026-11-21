@@ -12,6 +12,7 @@ import {
   type RuleValue,
   validateRuleInLens,
 } from '@inixiative/json-rules';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 
 export type RuleLens = Lens | LensNarrowing;
 
@@ -19,7 +20,7 @@ export type RuleLens = Lens | LensNarrowing;
 export type RuleVocabulary = { vocabularyIssues: (rule: Condition) => string[] };
 
 /** A row a stored rule names by id. `model` is the lens's model name for that source. */
-export type RuleReference = { model: string; id: string };
+export type RuleReference = ModelRow;
 
 export const referenceKey = (reference: RuleReference): string =>
   `${reference.model}|${reference.id}`;

@@ -9,22 +9,25 @@ import {
   type FalsePolymorphismRef,
   isBindableOwnerModel,
   isFalsePolymorphismRef,
-  type PointedAtRecord,
   polymorphicKeyColumn,
   polymorphismConfigForModel,
   rowPolymorphicAxisPointsAt,
   webhookEnabledModels,
   webhookRelatedModels,
+  wherePolymorphicSideIsOneOf,
 } from '@template/db';
 import type { WebhookModel } from '@template/db/generated/client/client';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 import { groupBy, keyBy, mergeWith } from 'lodash-es';
 
 export type WebhookRow = Record<string, unknown> & { id: string };
-export type Party = PointedAtRecord & { kind: BindableOwnerModel };
+export type Party = ModelRow<BindableOwnerModel>;
 
 const axisParty = (model: WebhookModel, row: Record<string, unknown>, axis: string): Party[] => {
   const target = rowPolymorphicAxisPointsAt(row, model, axis);
-  return target && isBindableOwnerModel(target.kind) ? [{ kind: target.kind, id: target.id }] : [];
+  return target && isBindableOwnerModel(target.model)
+    ? [{ model: target.model, id: target.id }]
+    : [];
 };
 
 const partyAxes = (model: WebhookModel) =>
@@ -59,9 +62,14 @@ export const fetchWebhookPartiesThroughRelation = async (
   );
   const relations = await db.delegate(ref.model).findMany({
     where: {
-      [ref.axis]: ref.value,
-      [column]: { in: rows.map((row) => row.id) },
-      OR: [{ deletedAt: null }, { deletedAt: { in: tombstones } }],
+      AND: [
+        wherePolymorphicSideIsOneOf(
+          ref.model,
+          ref.axis,
+          rows.map((row) => ({ model: ref.value, id: row.id })),
+        ),
+        { OR: [{ deletedAt: null }, { deletedAt: { in: tombstones } }] },
+      ],
     },
   });
   const rowsById = keyBy(rows, 'id');

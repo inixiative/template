@@ -81,7 +81,7 @@ describe('partial unique constraints', () => {
     });
   });
 
-  describe('TagAttachment: per-(userId, tagId)', () => {
+  describe('TagAttachment: per-(resourceUserId, tagId)', () => {
     it('blocks two attachments of the same tag to the same user', async () => {
       const { entity: user } = await createUser();
       const cat = await createTagCategory({ ownerModel: TagOwnerModel.platform });
@@ -164,17 +164,25 @@ describe('partial unique constraints', () => {
     });
   });
 
-  describe('WebhookSubscription: per-(userId, model, url)', () => {
-    it('blocks two subscriptions with the same model+url on the same user', async () => {
+  describe('WebhookSubscription: per-(userId, resourceModel, url)', () => {
+    it('blocks two subscriptions with the same resourceModel+url on the same user', async () => {
       const { entity: user } = await createUser();
       const url = `https://example.com/${seq('hook')}`;
       await createWebhookSubscription(
-        { ownerModel: WebhookOwnerModel.User, model: WebhookModel.CustomerRelationship, url },
+        {
+          ownerModel: WebhookOwnerModel.User,
+          resourceModel: WebhookModel.CustomerRelationship,
+          url,
+        },
         { user },
       );
       const dupe = async () =>
         createWebhookSubscription(
-          { ownerModel: WebhookOwnerModel.User, model: WebhookModel.CustomerRelationship, url },
+          {
+            ownerModel: WebhookOwnerModel.User,
+            resourceModel: WebhookModel.CustomerRelationship,
+            url,
+          },
           { user },
         );
       await expect(dupe()).rejects.toThrow();

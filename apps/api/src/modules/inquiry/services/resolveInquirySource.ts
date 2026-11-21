@@ -4,20 +4,14 @@
  * @partOf feature:inquiry
  * @uses feature:tenancy, feature:users
  */
+import { emptySideKeyColumns, polymorphicAxis } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { actingUser } from '#/lib/context/actingUser';
 import { contextResource, contextResourceType } from '#/lib/context/contextResource';
 import type { AppEnv } from '#/types/appEnv';
 
-const nullSourceFields = {
-  sourceUserId: null,
-  sourceOrganizationId: null,
-  sourceSpaceId: null,
-  sourceIntegrationId: null,
-  sourceTokenId: null,
-  sourceProjectId: null,
-};
+const nullSourceFields = emptySideKeyColumns(polymorphicAxis('Inquiry', 'sourceModel'));
 
 export type InquirySourceFields =
   | { sourceModel: (typeof InquiryResourceModel)['User']; sourceUserId: string }

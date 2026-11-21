@@ -20,7 +20,7 @@ const fetchCustomerRelationshipsOfCustomers = (customers: CustomerSide[]) =>
     where: wherePolymorphicSideIsOneOf(
       'CustomerRelationship',
       'customerModel',
-      customers.map(({ customerModel, customerId }) => ({ kind: customerModel, id: customerId })),
+      customers.map(({ customerModel, customerId }) => ({ model: customerModel, id: customerId })),
     ),
   });
 

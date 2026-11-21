@@ -402,6 +402,7 @@ describe('segment reconcile', () => {
       kind: CommunicationKind.marketing,
       senderModel: CommunicationLogSenderModel.Space,
       recipientUserId: other.id,
+      senderOrganizationId: organization.id,
       senderSpaceId: elsewhere.id,
     });
     await emitAppEvent('communication.outcomeRecorded', { communicationLog: foreign.entity });
@@ -411,6 +412,7 @@ describe('segment reconcile', () => {
       kind: CommunicationKind.marketing,
       senderModel: CommunicationLogSenderModel.Space,
       recipientUserId: other.id,
+      senderOrganizationId: organization.id,
       senderSpaceId: space.id,
     });
     await emitAppEvent('communication.outcomeRecorded', { communicationLog: ours.entity });

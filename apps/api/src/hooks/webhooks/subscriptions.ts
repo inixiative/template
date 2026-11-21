@@ -10,7 +10,7 @@ import type { Party } from '#/hooks/webhooks/parties';
 export const findPartySubscriptions = (model: WebhookModel, parties: Party[]) =>
   db.webhookSubscription.findMany({
     where: {
-      model,
+      resourceModel: model,
       isActive: true,
       ...wherePolymorphicSideIsOneOf('WebhookSubscription', 'ownerModel', parties),
     },
@@ -18,5 +18,5 @@ export const findPartySubscriptions = (model: WebhookModel, parties: Party[]) =>
 
 export const isPartyTo = (subscription: WebhookSubscription, parties: Party[]) => {
   const owner = rowPolymorphicAxisPointsAt(subscription, 'WebhookSubscription', 'ownerModel');
-  return !!owner && parties.some((party) => party.kind === owner.kind && party.id === owner.id);
+  return !!owner && parties.some((party) => party.model === owner.model && party.id === owner.id);
 };

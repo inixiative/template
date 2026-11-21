@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { maskSensitiveFieldsInChangeDiff } from '@template/db';
 import {
   buildContextFkFields,
-  buildSubjectFkFields,
+  buildSubjectColumns,
   computeDiff,
   maskSensitiveAndOmitNoopFieldsForAudit,
 } from '#/hooks/auditLog/utils';
@@ -80,29 +80,33 @@ describe('auditLog/utils', () => {
     });
   });
 
-  describe('buildSubjectFkFields', () => {
+  describe('buildSubjectColumns', () => {
     it('returns subjectUserId for User model', () => {
       const record = { id: 'user-123', email: 'test@example.com' };
-      const result = buildSubjectFkFields('User', record);
-      expect(result).toEqual({ subjectUserId: 'user-123' });
+      const result = buildSubjectColumns('User', record);
+      expect(result).toEqual({ subjectId: 'user-123', subjectUserId: 'user-123' });
     });
 
     it('returns subjectOrganizationId for Organization model using record.id', () => {
       const record = { id: 'org-123', name: 'Acme' };
-      const result = buildSubjectFkFields('Organization', record);
-      expect(result).toEqual({ subjectOrganizationId: 'org-123' });
+      const result = buildSubjectColumns('Organization', record);
+      expect(result).toEqual({ subjectId: 'org-123', subjectOrganizationId: 'org-123' });
     });
 
     it('returns subjectSpaceId for Space model using record.id', () => {
       const record = { id: 'space-123', name: 'My Space', organizationId: 'org-456' };
-      const result = buildSubjectFkFields('Space', record);
-      expect(result).toEqual({ subjectSpaceId: 'space-123' });
+      const result = buildSubjectColumns('Space', record);
+      expect(result).toEqual({ subjectId: 'space-123', subjectSpaceId: 'space-123' });
     });
 
     it('returns composite FK fields for OrganizationUser', () => {
       const record = { id: 'ou-123', organizationId: 'org-456', userId: 'user-789' };
-      const result = buildSubjectFkFields('OrganizationUser', record);
-      expect(result).toEqual({ subjectOrganizationId: 'org-456', subjectUserId: 'user-789' });
+      const result = buildSubjectColumns('OrganizationUser', record);
+      expect(result).toEqual({
+        subjectId: 'ou-123',
+        subjectOrganizationId: 'org-456',
+        subjectUserId: 'user-789',
+      });
     });
 
     it('returns composite FK fields for SpaceUser', () => {
@@ -112,8 +116,9 @@ describe('auditLog/utils', () => {
         spaceId: 'space-789',
         userId: 'user-321',
       };
-      const result = buildSubjectFkFields('SpaceUser', record);
+      const result = buildSubjectColumns('SpaceUser', record);
       expect(result).toEqual({
+        subjectId: 'su-123',
         subjectOrganizationId: 'org-456',
         subjectSpaceId: 'space-789',
         subjectUserId: 'user-321',
@@ -122,26 +127,32 @@ describe('auditLog/utils', () => {
 
     it('returns subjectTokenId for Token model', () => {
       const record = { id: 'tok-123', name: 'API Key' };
-      const result = buildSubjectFkFields('Token', record);
-      expect(result).toEqual({ subjectTokenId: 'tok-123' });
+      const result = buildSubjectColumns('Token', record);
+      expect(result).toEqual({ subjectId: 'tok-123', subjectTokenId: 'tok-123' });
     });
 
     it('returns subjectInquiryId for Inquiry model', () => {
       const record = { id: 'inq-123' };
-      const result = buildSubjectFkFields('Inquiry', record);
-      expect(result).toEqual({ subjectInquiryId: 'inq-123' });
+      const result = buildSubjectColumns('Inquiry', record);
+      expect(result).toEqual({ subjectId: 'inq-123', subjectInquiryId: 'inq-123' });
     });
 
     it('returns subjectAuthProviderId for AuthProvider model', () => {
       const record = { id: 'ap-123' };
-      const result = buildSubjectFkFields('AuthProvider', record);
-      expect(result).toEqual({ subjectAuthProviderId: 'ap-123' });
+      const result = buildSubjectColumns('AuthProvider', record);
+      expect(result).toEqual({ subjectId: 'ap-123', subjectAuthProviderId: 'ap-123' });
     });
 
     it('returns empty object for unknown model', () => {
       const record = { id: 'x-123' };
-      const result = buildSubjectFkFields('UnknownModel', record);
-      expect(result).toEqual({});
+      const result = buildSubjectColumns('UnknownModel', record);
+      expect(result).toEqual({ subjectId: 'x-123' });
+    });
+
+    it('a gone subject keeps its dual id and drops its typed keys', () => {
+      expect(buildSubjectColumns('Session', { id: 'sess-1' }, { withKeys: false })).toEqual({
+        subjectId: 'sess-1',
+      });
     });
   });
 

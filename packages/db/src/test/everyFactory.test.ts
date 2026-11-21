@@ -166,7 +166,7 @@ describe('every factory against the unique keys', () => {
       string,
       unknown
     >;
-    expect(valueAsCreated('WebhookSubscription', webhookDefaults, 'model')).toBe(
+    expect(valueAsCreated('WebhookSubscription', webhookDefaults, 'resourceModel')).toBe(
       PASSED_BY_THE_CALLER,
     );
     expect(valueAsCreated('WebhookSubscription', webhookDefaults, 'isActive')).toBe(true);

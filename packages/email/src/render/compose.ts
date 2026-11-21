@@ -50,8 +50,8 @@ const existingTargetsOf = async (
 ): Promise<RuleReference[]> => {
   const edges = (await db.ruleReference.findMany({
     where: wherePolymorphicSideIsOneOf('RuleReference', 'sourceModel', [
-      { kind: 'EmailTemplate', id: templateId },
-      ...componentIds.map((id) => ({ kind: 'EmailComponent', id })),
+      { model: 'EmailTemplate', id: templateId },
+      ...componentIds.map((id) => ({ model: 'EmailComponent', id })),
     ]),
   })) as RuleReferenceRow[];
   return uniqBy(

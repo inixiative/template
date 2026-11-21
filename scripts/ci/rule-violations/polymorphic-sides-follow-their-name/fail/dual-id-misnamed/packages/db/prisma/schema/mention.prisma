@@ -1,0 +1,5 @@
+model Mention {
+  id            String  @id
+  subjectModel  String
+  subjectUserId String?
+}

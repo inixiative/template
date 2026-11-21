@@ -5,7 +5,15 @@
  * @uses feature:email
  */
 import { projectRows } from '@inixiative/json-rules';
-import { db } from '@template/db';
+import {
+  BIND_NAME_BY_OWNER_MODEL,
+  db,
+  emptySideKeyColumns,
+  isBindableOwnerModel,
+  polymorphicArmKeys,
+  polymorphicAxis,
+  polymorphicKeyColumns,
+} from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
@@ -45,51 +53,20 @@ export type PlanEmailDeliveriesPayload = {
   data: Record<string, unknown>;
 };
 
+const senderRow = (sender: Sender): Record<string, unknown> | null => {
+  const { type, ...keys } = sender;
+  if (!polymorphicKeyColumns('CommunicationLog', 'senderModel', type).length) return null;
+  const row: Record<string, unknown> = keys;
+  return isBindableOwnerModel(type) ? { ...row, id: row[BIND_NAME_BY_OWNER_MODEL[type]] } : row;
+};
+
 const senderColumns = (sender: Sender) => {
-  switch (sender.type) {
-    case 'User':
-      return {
-        senderModel: sender.type,
-        senderUserId: sender.userId,
-        senderOrganizationId: null,
-        senderSpaceId: null,
-      };
-    case 'Organization':
-      return {
-        senderModel: sender.type,
-        senderUserId: null,
-        senderOrganizationId: sender.organizationId,
-        senderSpaceId: null,
-      };
-    case 'Space':
-      return {
-        senderModel: sender.type,
-        senderUserId: null,
-        senderOrganizationId: null,
-        senderSpaceId: sender.spaceId,
-      };
-    case 'OrganizationUser':
-      return {
-        senderModel: sender.type,
-        senderUserId: sender.userId,
-        senderOrganizationId: sender.organizationId,
-        senderSpaceId: null,
-      };
-    case 'SpaceUser':
-      return {
-        senderModel: sender.type,
-        senderUserId: sender.userId,
-        senderOrganizationId: null,
-        senderSpaceId: sender.spaceId,
-      };
-    default:
-      return {
-        senderModel: sender.type,
-        senderUserId: null,
-        senderOrganizationId: null,
-        senderSpaceId: null,
-      };
-  }
+  const row = senderRow(sender);
+  return {
+    senderModel: sender.type,
+    ...emptySideKeyColumns(polymorphicAxis('CommunicationLog', 'senderModel')),
+    ...(row ? polymorphicArmKeys('CommunicationLog', 'senderModel', sender.type, row) : {}),
+  };
 };
 
 export const planEmailDeliveries = makeJob<PlanEmailDeliveriesPayload>(async (_ctx, payload) => {

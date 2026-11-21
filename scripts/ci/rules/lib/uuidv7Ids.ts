@@ -22,9 +22,9 @@ import {
   listFiles,
   type Violation,
 } from './ciRuleRunner';
+import { readPrismaModels } from './schemaSources';
 
 const REQUIRED = ['@id', '@default(dbgenerated("uuidv7()"))', '@db.VarChar(36)'];
-const MODEL = /^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm;
 
 const attributesOf = (rest: string): string[] => {
   const attributes: string[] = [];
@@ -56,44 +56,40 @@ const exemptions = fetchExemptions('uuidv7-ids');
 const usedExemptions = new Set<string>();
 const violations: Violation[] = [];
 
-for (const file of listFiles(['apps', 'packages'], /\.prisma$/)) {
-  const source = fetchSource(file);
-  MODEL.lastIndex = 0;
-  for (let m = MODEL.exec(source); m !== null; m = MODEL.exec(source)) {
-    const [, model, body] = m;
-    const bodyOffset = m.index + m[0].indexOf('{') + 1;
-    const report = (offset: number, detail: string) =>
-      violations.push({
-        file,
-        line: lineAt(source, offset),
-        key: model,
-        detail: `${model}: ${detail}`,
-      });
+for (const { file, source, name: model, body, offset: modelOffset, bodyOffset } of readPrismaModels(
+  ['apps', 'packages'],
+)) {
+  const report = (offset: number, detail: string) =>
+    violations.push({
+      file,
+      line: lineAt(source, offset),
+      key: model,
+      detail: `${model}: ${detail}`,
+    });
 
-    if (/^\s*@@id\b/m.test(body)) {
-      report(
-        bodyOffset + body.search(/@@id\b/),
-        'composite @@id; give it a uuidv7 id and a @@unique',
-      );
-      continue;
-    }
-    const fields = [...body.matchAll(/^[ \t]*(\w+)[ \t]+(\S+)([^\n]*)$/gm)].filter(
-      (f) => !f[1].startsWith('@@'),
+  if (/^\s*@@id\b/m.test(body)) {
+    report(
+      bodyOffset + body.search(/@@id\b/),
+      'composite @@id; give it a uuidv7 id and a @@unique',
     );
-    const idField = fields.find((f) => attributesOf(f[3].replace(/\/\/.*$/, '')).includes('@id'));
-    if (!idField) {
-      report(m.index, 'no @id field');
-      continue;
-    }
-    const attributes = attributesOf(idField[3].replace(/\/\/.*$/, ''));
-    const missing = REQUIRED.filter((a) => !attributes.includes(a));
-    const offset = bodyOffset + (idField.index ?? 0);
-    if (idField[1] !== 'id' || idField[2] !== 'String' || missing.length > 0)
-      report(
-        offset,
-        `id must be \`id String ${REQUIRED.join(' ')}\` (found \`${idField[0].trim().replace(/\s+/g, ' ')}\`)`,
-      );
+    continue;
   }
+  const fields = [...body.matchAll(/^[ \t]*(\w+)[ \t]+(\S+)([^\n]*)$/gm)].filter(
+    (f) => !f[1].startsWith('@@'),
+  );
+  const idField = fields.find((f) => attributesOf(f[3].replace(/\/\/.*$/, '')).includes('@id'));
+  if (!idField) {
+    report(modelOffset, 'no @id field');
+    continue;
+  }
+  const attributes = attributesOf(idField[3].replace(/\/\/.*$/, ''));
+  const missing = REQUIRED.filter((a) => !attributes.includes(a));
+  const offset = bodyOffset + (idField.index ?? 0);
+  if (idField[1] !== 'id' || idField[2] !== 'String' || missing.length > 0)
+    report(
+      offset,
+      `id must be \`id String ${REQUIRED.join(' ')}\` (found \`${idField[0].trim().replace(/\s+/g, ' ')}\`)`,
+    );
 }
 
 for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
