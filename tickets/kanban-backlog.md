@@ -43,6 +43,7 @@ kanban
     INFRA-036-clock-sensitive-rule-tick
     INFRA-038-ws-channel-tenancy
     INFRA-040-ws-content-channels
+    INFRA-050-signet-kcp-init
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
@@ -92,6 +93,7 @@ kanban
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
 - [INFRA-049: Version Sequence Primitives](./INFRA-049-version-sequence-primitives.md) - generation, sequence and version as named styles in one module, existing callers moved onto it
+- [INFRA-050: Signet and KCP-Backed Init Provisioning](./INFRA-050-signet-kcp-init.md) - optional Kingdom Signet / KCP transport for `init/` over shared `@inixiative/infra` drivers; standalone direct token mode stays default
 - [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - json-rules `clockUnit` with the `clock.finestUnit` engine floor; `Segment.clockUnit` derived at save, `lastComputedAt` on what was computed; one cron row per unit, looking one unit ahead
 - [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
 - [INFRA-040: WS Content Channels](./INFRA-040-ws-content-channels.md) - Every delivery is a channel named by content and authorized by its route; drops per-user addressing
@@ -185,4 +187,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-11-10_
+_Last Updated: 2026-11-21_
