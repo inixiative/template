@@ -75,4 +75,41 @@ describe('db.findForUpdate on a soft-delete model', () => {
 
     expect(again.id).not.toBe(removed.id);
   });
+
+  it('waits on a revive in flight on the key and returns the revived row', async () => {
+    const { entity: removed } = await createResource();
+    await db.integrationResource.update({
+      where: { id: removed.id },
+      data: { deletedAt: new Date() },
+    });
+    let reviving!: () => void;
+    const revived = new Promise<void>((resolve) => {
+      reviving = resolve;
+    });
+
+    const [, found] = await Promise.all([
+      db.txn(async () => {
+        await db.withDeleted(() =>
+          db.integrationResource.update({ where: { id: removed.id }, data: { deletedAt: null } }),
+        );
+        reviving();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }),
+      revived.then(() => lockResource(removed.id)),
+    ]);
+
+    expect(found.map((row) => row.id)).toEqual([removed.id]);
+  });
+
+  it('reads a deletedAt: null predicate as IS NULL', async () => {
+    const { entity: live } = await createResource();
+    expect(
+      await db.txn(() =>
+        db.findForUpdate<IntegrationResource>('IntegrationResource', {
+          id: live.id,
+          deletedAt: null,
+        }),
+      ),
+    ).toHaveLength(1);
+  });
 });

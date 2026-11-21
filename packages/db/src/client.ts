@@ -306,14 +306,14 @@ const dbMethods = {
 
   cacheOverlay: (): CacheOverlay | null => store.getStore()?.openTransaction?.cacheOverlay ?? null,
 
-  // Raw SELECT * FOR NO KEY UPDATE (the lock an UPDATE takes), live rows only on a soft-delete model
-  // as every other read (`db.withDeleted` or a `deletedAt` predicate sees tombstones).: other lockers, updaters and deleters of
+  // Raw SELECT * FOR NO KEY UPDATE (the lock an UPDATE takes): other lockers, updaters and deleters of
   // the row wait, inserts of rows that reference it do not. `changesKey: true` takes FOR UPDATE.
   // Scalar columns only, no relations/includes; load related data separately.
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
   // the where-key itself (see acquireFindForUpdateLock) and returns the rows it currently names. One
   // field may list values as `{ in: [...] }` to fence a batch of such rows, each under the key a
-  // single-row fence on it takes.
+  // single-row fence on it takes. On a soft-delete model tombstones are locked but only live rows
+  // return, unless inside db.withDeleted or the where names deletedAt.
   findForUpdate: async <T = unknown>(
     model: string,
     where: Record<string, unknown>,
@@ -350,19 +350,21 @@ const dbMethods = {
         if (!list.length) return Prisma.sql`1 = 0`;
         return Prisma.sql`${column} IN (${Prisma.join(list)})`;
       }
-      return Prisma.sql`${column} = ${value}`;
+      return value === null ? Prisma.sql`${column} IS NULL` : Prisma.sql`${column} = ${value}`;
     });
-    if (
+    const liveOnly =
       hasDeletedAt(modelName) &&
       !('deletedAt' in where) &&
-      !auditActorContext.isSoftDeleteBypassed()
-    )
-      conds.push(Prisma.sql`${Prisma.raw(`"${columnFor('deletedAt')}"`)} IS NULL`);
+      !auditActorContext.isSoftDeleteBypassed();
     if (options?.upserting)
       await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
-    return db.$queryRaw<T[]>(
+    const locked = await db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} ${Prisma.raw(options?.changesKey ? 'FOR UPDATE' : 'FOR NO KEY UPDATE')}`,
     );
+    // why: tombstones are locked too, so a revive in flight on the key is waited on, not raced
+    if (!liveOnly) return locked;
+    const deletedAtColumn = columnFor('deletedAt');
+    return locked.filter((row) => (row as Record<string, unknown>)[deletedAtColumn] == null);
   },
 
   withLockUntilSettled: async <T>(

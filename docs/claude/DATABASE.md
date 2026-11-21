@@ -610,7 +610,7 @@ await db.txn(async () => {
 });
 ```
 
-`findForUpdate` is scoped like every other read: on a model with `deletedAt` it locks and returns live rows only, unless it runs inside `db.withDeleted` or its `where` names `deletedAt` (`fetchRuleReferenceTargetsDeletedAtForUpdate` reads tombstones that way). The `upserting` fence is keyed on the `where` alone, so a tombstone never blocks re-adding its key.
+`findForUpdate` is scoped like every other read: on a model with `deletedAt` it returns live rows only, unless it runs inside `db.withDeleted` or its `where` names `deletedAt` (`deletedAt: null` is `IS NULL`; `fetchRuleReferenceTargetsDeletedAtForUpdate` reads tombstones through `withDeleted`). Tombstones on the key are still locked, so a revive in flight is waited on rather than raced into the unique. Inside `withDeleted`, `[existing]` may be a tombstone: a find-or-create there picks the live row itself. The `upserting` fence is keyed on the `where` alone.
 
 `upserting: true` takes a Redis lock (`makeLock`, service `find-for-update`, keyed on the model
 plus the where entries sorted by key, hashed) **before** the `SELECT`, and holds it until the
