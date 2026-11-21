@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { db, Prisma } from '@template/db';
 import {
   attributeOrderBy,
   attributeWhereEquals,
@@ -12,6 +12,7 @@ import {
   decodeAttributeValue,
   decodeStoredAttributeValue,
   encodeAttributeColumns,
+  inspectAttributeWrite,
   packAttributeValue,
   resolveEffectiveAttributeValues,
   unpackAttributeValue,
@@ -34,11 +35,11 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
   });
 
   describe('codec, pack/unpack, and write validation', () => {
-    it('packs and unpacks all 6 valueTypes with sibling columns explicitly nulled', () => {
+    it('packs and unpacks all 6 valueTypes with sibling columns explicitly nulled and canonical sorted multiSelect', () => {
       const multi = encodeAttributeColumns('setting', 'notifications.topics', [
-        'billing',
         'security',
         'billing',
+        'security',
       ]);
       expect(multi.valueBoolean).toBeNull();
       expect(multi.valueText).toBeNull();
@@ -52,9 +53,17 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
       expect(packedDate.valueDate).toBeInstanceOf(Date);
       expect(packedDate.valueDate?.toISOString()).toBe(dateIso);
       expect((unpackAttributeValue(packedDate) as Date).toISOString()).toBe(dateIso);
+
+      // Accepts both accessor ('setting') and PascalCase ('Setting') uniformly
+      expect(encodeAttributeColumns('Setting', 'general.defaultTimezone', 'UTC').valueText).toBe(
+        'UTC',
+      );
+      expect(buildAttributeUpsertData('Setting', 'general.defaultTimezone', 'UTC').valueText).toBe(
+        'UTC',
+      );
     });
 
-    it('rejects unknown locators, invalid schemas, mixed columns, and disallowed resourceModels', () => {
+    it('rejects unknown locators, invalid schemas, mixed columns, Prisma.JsonNull, and disallowed resourceModels', () => {
       expect(() => encodeAttributeColumns('setting', 'unknown.key', true)).toThrow(
         'Unknown attribute locator',
       );
@@ -62,20 +71,93 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
         encodeAttributeColumns('setting', 'general.defaultTimezone', 'Not/A_Zone'),
       ).toThrow('Invalid value');
 
-      const disallowed = validateAttributeWrite('setting', {
+      const disallowed = inspectAttributeWrite('setting', {
         resourceModel: 'Project',
         key: 'member.autoAcceptInquiries',
         valueBoolean: true,
       });
       expect(disallowed.ok).toBe(false);
+      expect(() =>
+        validateAttributeWrite('setting', {
+          resourceModel: 'Project',
+          key: 'member.autoAcceptInquiries',
+          valueBoolean: true,
+        }),
+      ).toThrow(/not valid for resourceModel='Project'/);
 
-      const mixed = validateAttributeWrite('setting', {
+      const mixed = inspectAttributeWrite('setting', {
         resourceModel: 'User',
         key: 'general.defaultTimezone',
         valueText: 'UTC',
         valueDate: new Date('2026-01-01T00:00:00.000Z'),
       });
       expect(mixed.ok).toBe(false);
+
+      const mixedWithJsonNull = inspectAttributeWrite('setting', {
+        resourceModel: 'User',
+        key: 'general.defaultTimezone',
+        valueText: 'UTC',
+        valueJson: Prisma.JsonNull,
+      });
+      expect(mixedWithJsonNull.ok).toBe(false);
+      if (!mixedWithJsonNull.ok) {
+        expect(mixedWithJsonNull.errors.some((e) => e.includes('Prisma.JsonNull'))).toBe(true);
+      }
+
+      const standaloneJsonNull = inspectAttributeWrite('setting', {
+        resourceModel: 'User',
+        key: 'notifications.quietHours',
+        valueJson: Prisma.JsonNull,
+      });
+      expect(standaloneJsonNull.ok).toBe(false);
+    });
+
+    it('preserves plain json string[] payloads verbatim while canonicalizing multiSelect arrays', () => {
+      const jsonPacked = packAttributeValue('json', ['b', 'a', 'b']);
+      expect(jsonPacked.valueJson).toEqual(['b', 'a', 'b']);
+      expect(unpackAttributeValue(jsonPacked, 'json')).toEqual(['b', 'a', 'b']);
+
+      const multiPacked = packAttributeValue('multiSelect', ['b', 'a', 'b']);
+      expect(multiPacked.valueJson).toEqual(['a', 'b']);
+      expect(unpackAttributeValue(multiPacked, 'multiSelect')).toEqual(['a', 'b']);
+
+      const inspectedMulti = validateAttributeWrite('setting', {
+        resourceModel: 'User',
+        key: 'notifications.topics',
+        valueJson: ['security', 'billing', 'security'],
+      });
+      expect(inspectedMulti.normalizedValueJson).toEqual(['billing', 'security']);
+    });
+
+    it('validates runtime operand types and finite numbers in attributeWhereEquals and attributeWhereIn', () => {
+      expect(() => attributeWhereEquals('Setting', 'member.maxActiveTasks', Number.NaN)).toThrow(
+        /finite number/,
+      );
+      expect(() =>
+        attributeWhereEquals('setting', 'member.maxActiveTasks', Number.POSITIVE_INFINITY),
+      ).toThrow(/finite number/);
+      expect(() => attributeWhereEquals('setting', 'member.maxActiveTasks', '25')).toThrow(
+        /finite number/,
+      );
+      expect(() => attributeWhereEquals('setting', 'member.autoAcceptInquiries', 'true')).toThrow(
+        /boolean/,
+      );
+      expect(() => attributeWhereEquals('setting', 'general.defaultTimezone', 123)).toThrow(
+        /string/,
+      );
+      expect(() => attributeWhereEquals('setting', 'notifications.quietHours', null)).toThrow(
+        /non-null JSON/,
+      );
+      expect(() =>
+        attributeWhereEquals('setting', 'notifications.quietHours', Prisma.JsonNull),
+      ).toThrow(/non-null JSON/);
+
+      expect(() => attributeWhereIn('Setting', 'member.maxActiveTasks', [10, Number.NaN])).toThrow(
+        /finite number/,
+      );
+      expect(() =>
+        attributeWhereIn('setting', 'general.defaultTimezone', ['UTC', 42 as unknown as string]),
+      ).toThrow(/string/);
     });
 
     it('decodes stored values and falls back to defaultValue when disabled', async () => {
@@ -93,14 +175,14 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
       expect(decodeStoredAttributeValue('setting', setting)).toBe(42);
       expect(decodeAttributeValue('setting', setting)).toBe(10); // defaultValue when disabled
 
-      const effective = resolveEffectiveAttributeValues('setting', 'OrganizationUser', [setting]);
+      const effective = resolveEffectiveAttributeValues('Setting', 'OrganizationUser', [setting]);
       const entry = effective.items.find((item) => item.key === 'member.maxActiveTasks');
       expect(entry).toMatchObject({
         value: 10,
         storedValue: 42,
         disabled: true,
         isDefault: true,
-        settingId: setting.id,
+        recordId: setting.id,
       });
       expect(effective.byCategory.membership?.some((i) => i.key === 'member.maxActiveTasks')).toBe(
         true,
@@ -109,7 +191,7 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
   });
 
   describe('typed Attribute operators against live Postgres (number, date, and GIN array_contains)', () => {
-    it('queries numbers, dates, ranges, ordering, and multiSelect array_contains via GIN', async () => {
+    it('queries numbers, dates, ranges, ordering, canonical multiSelect equals, and GIN array_contains', async () => {
       const { entity: org } = await createOrganization();
       const { entity: memberA, context: ctxA } = await createOrganizationUser(
         {},
@@ -151,8 +233,8 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
       });
 
       const inRange = await db.setting.findMany({
-        where: attributeWhereRange('setting', 'member.maxActiveTasks', { gte: 10, lte: 90 }),
-        orderBy: attributeOrderBy('setting', 'member.maxActiveTasks', 'desc'),
+        where: attributeWhereRange('Setting', 'member.maxActiveTasks', { gte: 10, lte: 90 }),
+        orderBy: attributeOrderBy('Setting', 'member.maxActiveTasks', 'desc'),
       });
       expect(inRange.map((row) => decodeStoredAttributeValue('setting', row))).toEqual([80, 25]);
 
@@ -212,12 +294,12 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
       });
       expect(dateInSet.map((row) => row.resourceUserId)).toEqual([ctxC.user.id, ctxA.user.id]);
 
-      // Multi-select GIN array_contains (@>) queries
+      // Multi-select canonical set equality + GIN array_contains (@>) queries
       await createSetting({
         resourceModel: 'User',
         resourceUserId: ctxA.user.id,
         key: 'notifications.topics',
-        ...encodeAttributeColumns('setting', 'notifications.topics', ['inquiries', 'security']),
+        ...encodeAttributeColumns('setting', 'notifications.topics', ['security', 'inquiries']),
       });
       await createSetting({
         resourceModel: 'User',
@@ -231,6 +313,16 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
         key: 'notifications.topics',
         ...encodeAttributeColumns('setting', 'notifications.topics', ['digest']),
       });
+
+      // Order-insensitive multiSelect exact match (['inquiries', 'security'] matches stored ['security', 'inquiries'])
+      const exactSetReversed = await db.setting.findMany({
+        where: attributeWhereEquals('setting', 'notifications.topics', [
+          'inquiries',
+          'security',
+          'inquiries',
+        ]),
+      });
+      expect(exactSetReversed.map((row) => row.resourceUserId)).toEqual([ctxA.user.id]);
 
       const hasSecurity = await db.setting.findMany({
         where: attributeWhereMultiSelectContains('setting', 'notifications.topics', 'security'),

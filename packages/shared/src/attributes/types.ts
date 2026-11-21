@@ -70,6 +70,7 @@ export type AttributeFieldDefinition<TKey extends string = string, TValue = unkn
   readonly order?: number;
   readonly resourceModels?: readonly string[];
   readonly permission?: string;
+  readonly readPermission?: string;
 };
 
 /** Declares a typed attribute field definition without side effects. */

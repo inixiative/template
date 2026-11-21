@@ -6,13 +6,14 @@
  */
 import {
   decodeStoredAttributeValue,
-  encodeAttributeColumns,
+  encodeResolvedAttributeColumns,
 } from '@template/db/lib/attributes/codec';
 import {
   type AttributeModelName,
   attributeModelConfig,
 } from '@template/db/lib/attributes/registry';
 import type { EffectiveAttributeEntry } from '@template/db/lib/attributes/types';
+import type { ModelName } from '@template/db/utils/modelNames';
 import type { AttributeValueType } from '@template/shared/attributes';
 
 type ResolveEffectiveOptions = {
@@ -30,7 +31,7 @@ export type ResolvedEffectiveAttributes = {
  * respecting `disabled` flags and optional `category`/`key` filters.
  */
 export const resolveEffectiveAttributeValues = (
-  model: AttributeModelName,
+  model: AttributeModelName | ModelName,
   resourceModel: string,
   rows: readonly Record<string, unknown>[],
   options: ResolveEffectiveOptions = {},
@@ -72,7 +73,7 @@ export const resolveEffectiveAttributeValues = (
       storedValue,
       disabled,
       isDefault,
-      settingId: typeof row?.id === 'string' ? row.id : null,
+      recordId: typeof row?.id === 'string' ? row.id : null,
       updatedAt: row?.updatedAt instanceof Date ? row.updatedAt : null,
     };
   });
@@ -99,7 +100,7 @@ export type BuildAttributeUpsertDataOptions = {
  * write payload for creating or updating an Attribute row.
  */
 export const buildAttributeUpsertData = (
-  model: AttributeModelName,
+  model: AttributeModelName | ModelName,
   locator: string,
   value: unknown,
   options: BuildAttributeUpsertDataOptions = {},
@@ -121,7 +122,9 @@ export const buildAttributeUpsertData = (
     );
   }
 
-  const columns = encodeAttributeColumns(model, locator, value, { valueType: options.valueType });
+  const columns = encodeResolvedAttributeColumns(config, locator, definition, value, {
+    valueType: options.valueType,
+  });
   return {
     ...columns,
     ...(config.disabledField && options.disabled !== undefined

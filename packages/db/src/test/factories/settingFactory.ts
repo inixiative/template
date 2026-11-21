@@ -24,7 +24,11 @@ const settingFactory = registerFactory('Setting', {
     },
     organizationUser: {
       modelName: 'OrganizationUser',
-      foreignKey: { organizationId: 'resourceOrganizationId', userId: 'resourceUserId' },
+      foreignKey: {
+        id: 'resourceId',
+        organizationId: 'resourceOrganizationId',
+        userId: 'resourceUserId',
+      },
       required: false,
     },
     space: {
@@ -35,6 +39,7 @@ const settingFactory = registerFactory('Setting', {
     spaceUser: {
       modelName: 'SpaceUser',
       foreignKey: {
+        id: 'resourceId',
         organizationId: 'resourceOrganizationId',
         spaceId: 'resourceSpaceId',
         userId: 'resourceUserId',

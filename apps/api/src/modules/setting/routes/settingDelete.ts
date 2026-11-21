@@ -10,7 +10,7 @@ import { Modules } from '#/modules/modules';
 
 export const settingDeleteRoute = deleteRoute({
   model: Modules.setting,
-  middleware: [validatePermission('delete')],
+  middleware: [validatePermission('manage')],
   description:
     'Soft-deletes a stored setting row, resetting the setting to its code-defined default.',
 });

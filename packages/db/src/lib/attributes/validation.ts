@@ -35,6 +35,9 @@ const DEFAULT_SCHEMA_DIR = resolve(
   '../../../prisma/schema',
 );
 
+const stripSchemaComments = (schemaBody: string): string =>
+  schemaBody.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
 const readModelSchemaBody = (modelName: string, schemaDir: string): string | null => {
   const files = readdirSync(schemaDir).filter((file) => file.endsWith('.prisma'));
   const pattern = new RegExp(`model\\s+${modelName}\\s*\\{([\\s\\S]*?)\\n\\}`);
@@ -47,29 +50,32 @@ const readModelSchemaBody = (modelName: string, schemaDir: string): string | nul
 };
 
 const hasGinIndexOnValueJson = (schemaBody: string): boolean =>
-  /@@index\(\s*\[\s*valueJson\s*\]\s*,\s*[^)]*type\s*:\s*Gin\b/.test(schemaBody);
+  /@@index\(\s*\[\s*valueJson(?:\s*\([^)]*\))?\s*\]\s*,\s*[^)]*type\s*:\s*Gin\b/.test(
+    stripSchemaComments(schemaBody),
+  );
 
-export type AttributeSchemaValidationResult = {
-  valid: boolean;
-  errors: string[];
-};
+const isLeadingScalarIndex = (
+  fields: readonly string[],
+  columnName: AttributeColumnName,
+  locatorField?: string,
+): boolean =>
+  fields[0] === columnName ||
+  Boolean(locatorField && fields[0] === locatorField && fields[1] === columnName);
 
 export type ValidateAttributeModelsOptions = {
   models?: Record<string, AttributeModelConfig>;
   schemaDir?: string;
   schemaBodyByModel?: Record<string, string>;
+  indexesByModel?: Record<string, readonly { fields: readonly string[] }[]>;
 };
 
 /**
- * Validates via Prisma's generated DMMF field map (`prismaMap`) and Prisma schema indexes that
- * every model registered in `ATTRIBUTE_MODELS` carries the uniform 5 nullable typed value columns
- * (`valueBoolean Boolean?`, `valueText String?`, `valueNumber Float?`, `valueDate DateTime?`,
- * `valueJson Json?`), optional configured locator/resource/disabled/valueType fields, scalar value
- * indexes, and a Postgres `GIN` index on `valueJson`.
+ * Collects every DMMF & schema-index contract violation across `ATTRIBUTE_MODELS` without throwing.
+ * Mirrors `hardDeleteOnTombstoneViolations` for tests and diagnostics.
  */
-export const validateAttributeModels = (
+export const attributeModelViolations = (
   options: ValidateAttributeModelsOptions = {},
-): AttributeSchemaValidationResult => {
+): string[] => {
   const models = options.models ?? ATTRIBUTE_MODELS;
   const schemaDir = options.schemaDir ?? DEFAULT_SCHEMA_DIR;
   const errors: string[] = [];
@@ -143,6 +149,11 @@ export const validateAttributeModels = (
           `${modelName}.${columnName}: expected Prisma type ${expectedType}?, got ${column.kind}:${column.type}`,
         );
       }
+      if (column.isList) {
+        errors.push(
+          `${modelName}.${columnName}: Attribute typed value column must be a single nullable scalar, not a list`,
+        );
+      }
       if (column.isRequired) {
         errors.push(
           `${modelName}.${columnName}: Attribute typed value column must be optional (nullable) so sibling value columns stay null`,
@@ -151,13 +162,16 @@ export const validateAttributeModels = (
     }
 
     const rawIndexes =
-      'indexes' in model && Array.isArray(model.indexes)
+      options.indexesByModel?.[modelName] ??
+      ('indexes' in model && Array.isArray(model.indexes)
         ? (model.indexes as readonly { fields: readonly string[] }[])
-        : [];
+        : []);
     const indexLists = rawIndexes.map((idx) => idx.fields);
 
     for (const columnName of SCALAR_INDEXED_COLUMNS) {
-      const hasScalarIndex = indexLists.some((fields) => fields.includes(columnName));
+      const hasScalarIndex = indexLists.some((fields) =>
+        isLeadingScalarIndex(fields, columnName, config.locatorField),
+      );
       if (!hasScalarIndex) {
         const suggested = config.locatorField
           ? `@@index([${config.locatorField}, ${columnName}])`
@@ -179,8 +193,16 @@ export const validateAttributeModels = (
     }
   }
 
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
+  return errors;
+};
+
+/**
+ * Validates every model registered in `ATTRIBUTE_MODELS` against Prisma DMMF (`prismaMap`) and
+ * required scalar + Postgres GIN indexes. Throws an Error listing all violations if any exist.
+ */
+export const validateAttributeModels = (options: ValidateAttributeModelsOptions = {}): void => {
+  const violations = attributeModelViolations(options);
+  if (violations.length > 0) {
+    throw new Error(`Invalid ATTRIBUTE_MODELS configuration:\n${violations.join('\n')}`);
+  }
 };

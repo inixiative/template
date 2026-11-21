@@ -5,7 +5,11 @@
  * @uses primitive:routeTemplates
  */
 import type { SettingResourceModel } from '@template/db/generated/client/enums';
-import { SETTING_CATEGORIES, SETTING_DEFINITIONS } from '@template/shared/settings';
+import {
+  SETTING_CATEGORIES,
+  SETTING_DEFINITIONS,
+  type SettingDefinition,
+} from '@template/shared/settings';
 import { mapValues } from 'lodash-es';
 import { descriptionsBySchemaFieldPath } from '#/lib/jsonSchema/descriptionsBySchemaFieldPath';
 import { toJsonSchema } from '#/lib/jsonSchema/toJsonSchema';
@@ -31,6 +35,7 @@ export const settingInfoController = makeController(settingInfoRoute, async (_c,
         defaultValue: definition.defaultValue,
         order: definition.order,
         permission: definition.permission,
+        readPermission: (definition as SettingDefinition).readPermission ?? 'read',
       })),
     },
   });

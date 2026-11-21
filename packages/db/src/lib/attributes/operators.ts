@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { Prisma } from '@template/db/generated/client/client';
 import {
   type AttributeModelName,
   attributeModelConfig,
@@ -13,15 +14,19 @@ import type {
   AttributeRange,
   AttributeSortDirection,
 } from '@template/db/lib/attributes/types';
+import type { ModelName } from '@template/db/utils/modelNames';
 import {
   type AttributeValueType,
   attributeColumnForValueType,
   deduplicateMultiSelect,
+  isStringArray,
   parseAttributeDate,
 } from '@template/shared/attributes';
 
+type AnyAttributeModel = AttributeModelName | ModelName;
+
 const resolveOperatorContext = (
-  model: AttributeModelName,
+  model: AnyAttributeModel,
   locator: string,
   options?: AttributeOperatorOptions,
 ): { locatorFilter: Record<string, string>; valueType: AttributeValueType } => {
@@ -43,9 +48,48 @@ const resolveOperatorContext = (
   return { locatorFilter, valueType };
 };
 
-/** Prisma `where` matching an exact attribute locator + typed column value (supports all 6 valueTypes). */
+const validateScalarOperand = (
+  opName: string,
+  model: AnyAttributeModel,
+  locator: string,
+  valueType: 'boolean' | 'text' | 'number' | 'date',
+  value: unknown,
+): boolean | string | number | Date => {
+  switch (valueType) {
+    case 'boolean':
+      if (typeof value !== 'boolean') {
+        throw new Error(`${opName}(${model}, '${locator}') requires a boolean value`);
+      }
+      return value;
+    case 'text':
+      if (typeof value !== 'string') {
+        throw new Error(`${opName}(${model}, '${locator}') requires a string value`);
+      }
+      return value;
+    case 'number':
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`${opName}(${model}, '${locator}') requires a finite number value`);
+      }
+      return value;
+    case 'date': {
+      const parsed = parseAttributeDate(value);
+      if (!parsed) {
+        throw new Error(
+          `${opName}(${model}, '${locator}') requires a valid Date or ISO date string`,
+        );
+      }
+      return parsed;
+    }
+  }
+};
+
+/**
+ * Prisma `where` matching an exact attribute locator + typed column value (supports all 6 valueTypes).
+ * For `multiSelect`, both stored values and query operands are canonically deduplicated and sorted,
+ * so `['b', 'a']` matches stored `['a', 'b']`.
+ */
 export const attributeWhereEquals = (
-  model: AttributeModelName,
+  model: AnyAttributeModel,
   locator: string,
   value: unknown,
   options?: AttributeOperatorOptions,
@@ -54,7 +98,7 @@ export const attributeWhereEquals = (
   const column = attributeColumnForValueType(valueType);
 
   if (valueType === 'multiSelect') {
-    if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+    if (!isStringArray(value)) {
       throw new Error(
         `attributeWhereEquals(${model}, '${locator}') requires a string[] for multiSelect`,
       );
@@ -62,26 +106,22 @@ export const attributeWhereEquals = (
     return { ...locatorFilter, [column]: { equals: deduplicateMultiSelect(value) } };
   }
 
-  if (valueType === 'date') {
-    const parsed = parseAttributeDate(value);
-    if (!parsed) {
+  if (valueType === 'json') {
+    if (value === null || value === undefined || value === Prisma.JsonNull) {
       throw new Error(
-        `attributeWhereEquals(${model}, '${locator}') requires a valid Date or ISO string for date`,
+        `attributeWhereEquals(${model}, '${locator}') requires a non-null JSON value`,
       );
     }
-    return { ...locatorFilter, [column]: parsed };
-  }
-
-  if (valueType === 'json') {
     return { ...locatorFilter, [column]: { equals: value } };
   }
 
-  return { ...locatorFilter, [column]: value };
+  const validated = validateScalarOperand('attributeWhereEquals', model, locator, valueType, value);
+  return { ...locatorFilter, [column]: validated };
 };
 
 /** Prisma `where` matching an attribute whose scalar value (`boolean`, `text`, `number`, `date`) is in `values`. */
 export const attributeWhereIn = (
-  model: AttributeModelName,
+  model: AnyAttributeModel,
   locator: string,
   values: readonly (boolean | string | number | Date)[],
   options?: AttributeOperatorOptions,
@@ -95,25 +135,15 @@ export const attributeWhereIn = (
   }
 
   const column = attributeColumnForValueType(valueType);
-  if (valueType === 'date') {
-    const parsedDates = values.map((item) => {
-      const parsed = parseAttributeDate(item);
-      if (!parsed) {
-        throw new Error(
-          `attributeWhereIn(${model}, '${locator}') received invalid date value '${String(item)}'`,
-        );
-      }
-      return parsed;
-    });
-    return { ...locatorFilter, [column]: { in: parsedDates } };
-  }
-
-  return { ...locatorFilter, [column]: { in: [...values] } };
+  const validated = values.map((item) =>
+    validateScalarOperand('attributeWhereIn', model, locator, valueType, item),
+  );
+  return { ...locatorFilter, [column]: { in: validated } };
 };
 
 /** Prisma `where` matching a `number` or `date` attribute within a `gt`/`gte`/`lt`/`lte` range. */
 export const attributeWhereRange = (
-  model: AttributeModelName,
+  model: AnyAttributeModel,
   locator: string,
   range: AttributeRange,
   options?: AttributeOperatorOptions,
@@ -132,22 +162,13 @@ export const attributeWhereRange = (
   for (const bound of ['gt', 'gte', 'lt', 'lte'] as const) {
     const raw = range[bound];
     if (raw === undefined) continue;
-    if (valueType === 'date') {
-      const parsed = parseAttributeDate(raw);
-      if (!parsed) {
-        throw new Error(
-          `attributeWhereRange(${model}, '${locator}') received invalid date for '${bound}'`,
-        );
-      }
-      filter[bound] = parsed;
-    } else {
-      if (typeof raw !== 'number' || !Number.isFinite(raw)) {
-        throw new Error(
-          `attributeWhereRange(${model}, '${locator}') requires finite number for '${bound}'`,
-        );
-      }
-      filter[bound] = raw;
-    }
+    filter[bound] = validateScalarOperand(
+      `attributeWhereRange.${bound}`,
+      model,
+      locator,
+      valueType,
+      raw,
+    ) as number | Date;
   }
 
   if (Object.keys(filter).length === 0) {
@@ -164,7 +185,7 @@ export const attributeWhereRange = (
  * (`@>`), utilizing the GIN index on `valueJson`.
  */
 export const attributeWhereMultiSelectContains = (
-  model: AttributeModelName,
+  model: AnyAttributeModel,
   locator: string,
   value: string,
   options?: AttributeOperatorOptions,
@@ -188,7 +209,7 @@ export const attributeWhereMultiSelectContains = (
  * `array_contains` (`@>`), utilizing the GIN index on `valueJson`.
  */
 export const attributeWhereMultiSelectContainsAll = (
-  model: AttributeModelName,
+  model: AnyAttributeModel,
   locator: string,
   values: readonly string[],
   options?: AttributeOperatorOptions,
@@ -212,7 +233,7 @@ export const attributeWhereMultiSelectContainsAll = (
  * `array_contains` (`@>`), each branch utilizing the GIN index on `valueJson`.
  */
 export const attributeWhereMultiSelectContainsAny = (
-  model: AttributeModelName,
+  model: AnyAttributeModel,
   locator: string,
   values: readonly string[],
   options?: AttributeOperatorOptions,
@@ -240,7 +261,7 @@ export const attributeWhereMultiSelectContainsAny = (
 
 /** Prisma `orderBy` for a scalar attribute (`boolean`, `text`, `number`, or `date`). */
 export const attributeOrderBy = (
-  model: AttributeModelName,
+  model: AnyAttributeModel,
   locator: string,
   direction: AttributeSortDirection = 'asc',
   options?: AttributeOperatorOptions,

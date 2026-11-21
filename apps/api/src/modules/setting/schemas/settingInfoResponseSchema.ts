@@ -37,7 +37,10 @@ export const settingDefinitionInfoSchema = z.object({
   defaultValue: z.unknown().describe('Effective default value when no active setting row exists.'),
   order: z.number().int().describe('Display order within its category.'),
   permission: SettingPermissionActionSchema.describe(
-    'ReBAC action required on the setting resource to write this setting.',
+    'ReBAC action required on the setting resource to manage (write/delete) this setting.',
+  ),
+  readPermission: SettingPermissionActionSchema.describe(
+    'ReBAC action required on the setting resource to read this setting.',
   ),
 });
 

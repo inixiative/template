@@ -36,10 +36,12 @@ export const EMPTY_ATTRIBUTE_COLUMNS: AttributeEncodedColumns = {
 export const attributeColumnForValueType = (valueType: AttributeValueType): AttributeColumnName =>
   COLUMN_BY_VALUE_TYPE[valueType];
 
-/** Deduplicates a multi-select string array while preserving first-occurrence order. */
-export const deduplicateMultiSelect = (values: readonly string[]): string[] => [...new Set(values)];
+/** Deduplicates and canonically sorts a multi-select string array for set-equality stability. */
+export const deduplicateMultiSelect = (values: readonly string[]): string[] =>
+  [...new Set(values)].sort();
 
-const isStringArray = (value: unknown): value is string[] =>
+/** Type guard for string[] (single source of truth across shared and db attribute layers). */
+export const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 /** Parses a Date or ISO-8601 date string into a valid Date, or returns null if invalid. */
@@ -131,11 +133,11 @@ export const populatedAttributeColumns = (
   ATTRIBUTE_COLUMN_NAMES.filter((column) => row[column] !== null && row[column] !== undefined);
 
 /**
- * Validates that a typed-column row has ONLY the column matching `valueType` populated,
+ * Checks that a typed-column row has ONLY the column matching `valueType` populated,
  * matches the runtime shape for `valueType`, and (when provided) satisfies `schema`.
- * Returns every issue found.
+ * Returns every issue found without throwing.
  */
-export const validateAttributeTypedColumns = <T = unknown>(
+export const attributeTypedColumnIssues = <T = unknown>(
   valueType: AttributeValueType,
   row: Partial<AttributeTypedColumns>,
   schema?: z.ZodType<T>,
@@ -232,7 +234,22 @@ export const validateAttributeTypedColumns = <T = unknown>(
 
   let finalValue: unknown = normalizedValue;
   if (schema) {
-    const parsed = schema.safeParse(normalizedValue);
+    let parsed: z.ZodSafeParseResult<T>;
+    if (valueType === 'date') {
+      const dateValue = normalizedValue as Date;
+      if (typeof rawValue === 'string') {
+        const stringAttempt = schema.safeParse(rawValue);
+        parsed = stringAttempt.success ? stringAttempt : schema.safeParse(dateValue);
+        if (!parsed.success) parsed = stringAttempt;
+      } else {
+        const dateAttempt = schema.safeParse(dateValue);
+        parsed = dateAttempt.success ? dateAttempt : schema.safeParse(dateValue.toISOString());
+        if (!parsed.success) parsed = dateAttempt;
+      }
+    } else {
+      parsed = schema.safeParse(normalizedValue);
+    }
+
     if (!parsed.success) {
       for (const zodIssue of parsed.error.issues) {
         issues.push({
@@ -243,10 +260,14 @@ export const validateAttributeTypedColumns = <T = unknown>(
       }
       return { ok: false, issues };
     }
-    finalValue =
-      valueType === 'multiSelect' && isStringArray(parsed.data)
-        ? deduplicateMultiSelect(parsed.data)
-        : parsed.data;
+
+    if (valueType === 'multiSelect' && isStringArray(parsed.data)) {
+      finalValue = deduplicateMultiSelect(parsed.data);
+    } else if (valueType === 'date') {
+      finalValue = parseAttributeDate(parsed.data) ?? normalizedValue;
+    } else {
+      finalValue = parsed.data;
+    }
   }
 
   return {
@@ -257,12 +278,12 @@ export const validateAttributeTypedColumns = <T = unknown>(
 };
 
 /** Validates typed columns and throws an Error listing all issues on failure. */
-export const assertAttributeValueMatchesType = <T = unknown>(
+export const validateAttributeTypedColumns = <T = unknown>(
   valueType: AttributeValueType,
   row: Partial<AttributeTypedColumns>,
   schema?: z.ZodType<T>,
 ): T => {
-  const result = validateAttributeTypedColumns(valueType, row, schema);
+  const result = attributeTypedColumnIssues(valueType, row, schema);
   if (!result.ok) {
     throw new Error(result.issues.map((issue) => issue.message).join('; '));
   }

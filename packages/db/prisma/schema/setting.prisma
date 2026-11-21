@@ -22,7 +22,7 @@ model Setting {
   // supplied by writer for composite member arms) so ParentEdgeRegistry can traverse
   // Setting → parent for AuditLog tenancy context and parent audit history streams.
   resourceModel          SettingResourceModel
-  resourceId             String?              @db.VarChar(36)
+  resourceId             String               @db.VarChar(36)
   resourceUserId         String?              @db.VarChar(36)
   resourceOrganizationId String?              @db.VarChar(36)
   resourceSpaceId        String?              @db.VarChar(36)

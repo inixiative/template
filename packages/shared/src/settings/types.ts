@@ -22,7 +22,10 @@ export type SettingDefinition<
   TKey extends string = string,
   TCategory extends string = string,
   TValue = unknown,
-> = AttributeFieldDefinition<TKey, TValue> & {
+> = Omit<
+  AttributeFieldDefinition<TKey, TValue>,
+  'category' | 'order' | 'resourceModels' | 'permission' | 'readPermission'
+> & {
   readonly key: TKey;
   readonly category: TCategory;
   readonly resourceModels: readonly SettingResourceModelName[];
@@ -33,6 +36,7 @@ export type SettingDefinition<
   readonly description: string;
   readonly order: number;
   readonly permission: SettingPermissionAction;
+  readonly readPermission?: SettingPermissionAction;
 };
 
 /** Declares a typed setting category definition without side effects. */

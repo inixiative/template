@@ -33,6 +33,12 @@ export const SETTING_CATEGORIES = {
     description: 'Notification topic subscriptions, quiet hours, and snooze windows.',
     order: 30,
   }),
+  security: defineSettingCategory({
+    key: 'security',
+    label: 'Security',
+    description: 'Organization-level access controls and authentication enforcement.',
+    order: 40,
+  }),
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific setting categories below
   // ==========================================================================
@@ -85,6 +91,7 @@ export const SETTING_DEFINITIONS = {
     defaultValue: false,
     order: 10,
     permission: 'operate',
+    readPermission: 'operate',
   }),
   'member.maxActiveTasks': defineSetting({
     key: 'member.maxActiveTasks',
@@ -97,6 +104,7 @@ export const SETTING_DEFINITIONS = {
     defaultValue: 10,
     order: 20,
     permission: 'operate',
+    readPermission: 'operate',
   }),
   'notifications.topics': defineSetting({
     key: 'notifications.topics',
@@ -133,10 +141,35 @@ export const SETTING_DEFINITIONS = {
     description: 'Timestamp until which non-urgent notifications are paused.',
     resourceModels: ['User', 'Organization', 'Space', 'Project'],
     valueType: 'date',
-    schema: z.coerce.date(),
+    schema: z.iso.datetime(),
     defaultValue: null,
     order: 30,
     permission: 'manage',
+  }),
+  'notifications.digestPaused': defineSetting({
+    key: 'notifications.digestPaused',
+    category: 'notifications',
+    label: 'Digest Paused',
+    description: 'Temporarily pause scheduled workspace digest notifications.',
+    resourceModels: ['Organization', 'Space', 'Project'],
+    valueType: 'boolean',
+    schema: z.boolean(),
+    defaultValue: false,
+    order: 40,
+    permission: 'operate',
+  }),
+  'security.requireSso': defineSetting({
+    key: 'security.requireSso',
+    category: 'security',
+    label: 'Require SSO',
+    description: 'Require members of this organization to sign in via single sign-on.',
+    resourceModels: ['Organization'],
+    valueType: 'boolean',
+    schema: z.boolean(),
+    defaultValue: false,
+    order: 10,
+    permission: 'own',
+    readPermission: 'manage',
   }),
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific setting definitions below

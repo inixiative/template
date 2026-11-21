@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { encodeAttributeValue, validateAttributeTypedColumns } from '@template/shared/attributes';
+import { attributeTypedColumnIssues, encodeAttributeValue } from '@template/shared/attributes';
 import {
   SETTING_CATEGORIES,
   SETTING_DEFINITIONS,
@@ -25,7 +25,7 @@ describe('SETTING_DEFINITIONS registry invariants', () => {
     for (const definition of Object.values(SETTING_DEFINITIONS)) {
       if (definition.defaultValue === null) continue;
       const encoded = encodeAttributeValue(definition.valueType, definition.defaultValue);
-      const checked = validateAttributeTypedColumns(
+      const checked = attributeTypedColumnIssues(
         definition.valueType,
         encoded,
         definition.schema as z.ZodType,

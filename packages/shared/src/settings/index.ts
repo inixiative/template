@@ -1,3 +1,3 @@
-export * from '@template/shared/settings/registry';
-export * from '@template/shared/settings/resourceModels';
-export * from '@template/shared/settings/types';
+export * from './registry';
+export * from './resourceModels';
+export * from './types';

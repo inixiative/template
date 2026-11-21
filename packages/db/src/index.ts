@@ -131,6 +131,10 @@ export type {
 } from './types/userWithRelations';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
+export {
+  type ApplyWriteDataOptions,
+  applyWriteDataOverPreviousRow,
+} from './utils/applyWriteDataOverPreviousRow';
 export { carryOwnerKeys } from './utils/carryOwnerKeys';
 // Type-safe delegate helpers (pass-the-delegate pattern)
 export {
@@ -172,7 +176,11 @@ export {
   toModelName,
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
-export { polymorphicArmKeys, polymorphicArmRelation } from './utils/polymorphicArmKeys';
+export {
+  polymorphicArmColumns,
+  polymorphicArmKeys,
+  polymorphicArmRelation,
+} from './utils/polymorphicArmKeys';
 export { relationsOfModel } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';

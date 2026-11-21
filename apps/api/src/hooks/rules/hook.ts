@@ -1,5 +1,6 @@
 import { type Condition, check } from '@inixiative/json-rules';
 import {
+  applyWriteDataOverPreviousRow,
   DbAction,
   dualPolymorphismIdColumns,
   dualPolymorphismIdConflicts,
@@ -13,7 +14,6 @@ import {
   withDualPolymorphismIds,
 } from '@template/db';
 import { castArray, without } from 'lodash-es';
-import { applyWriteDataOverPreviousRow } from '#/hooks/rules/applyWriteDataOverPreviousRow';
 import { RulesRegistry, ruleForModel } from '#/hooks/rules/registry';
 import { makeError } from '#/lib/errors';
 
@@ -61,7 +61,7 @@ const processUpdateArgs = (
   const data = ((args as Record<string, unknown>)?.data ??
     (args as Record<string, unknown>)?.update) as Record<string, unknown> | undefined;
   if (data && typeof data === 'object' && !Array.isArray(data))
-    validateRules(applyWriteDataOverPreviousRow(previous, data), model);
+    validateRules(applyWriteDataOverPreviousRow(previous, data, { model }), model);
 };
 
 export const registerRulesHook = () => {

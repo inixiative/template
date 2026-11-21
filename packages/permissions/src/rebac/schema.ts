@@ -20,9 +20,9 @@ import {
   memberRowActions,
   ownerActions,
   rowIsThereAnd,
-  settingResourceActions,
   tokenAdministering,
 } from '@template/permissions/rebac/rebacSchemaRules';
+import { settingResourcePermission } from '@template/permissions/rebac/settingResourcePermission';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 import { omit } from 'lodash-es';
 
@@ -110,7 +110,7 @@ export const rebacSchema: RebacSchema = {
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
     'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
-    'db:setting': { actions: settingResourceActions },
+    'db:setting': settingResourcePermission,
     'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:organizationUser': { actions: memberRowActions('organization') },

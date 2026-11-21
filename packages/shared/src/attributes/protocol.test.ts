@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import {
-  assertAttributeValueMatchesType,
   attributeColumnForValueType,
+  attributeTypedColumnIssues,
   decodeAttributeColumnValue,
   deduplicateMultiSelect,
   encodeAttributeValue,
+  isStringArray,
   populatedAttributeColumns,
   validateAttributeTypedColumns,
 } from '@template/shared/attributes';
@@ -20,9 +21,12 @@ describe('attribute protocol', () => {
     expect(attributeColumnForValueType('multiSelect')).toBe('valueJson');
   });
 
-  it('deduplicates multiSelect arrays while preserving first-occurrence order', () => {
-    expect(deduplicateMultiSelect(['b', 'a', 'b', 'c', 'a'])).toEqual(['b', 'a', 'c']);
+  it('deduplicates and canonically sorts multiSelect arrays for set-equality stability', () => {
+    expect(deduplicateMultiSelect(['b', 'a', 'b', 'c', 'a'])).toEqual(['a', 'b', 'c']);
+    expect(deduplicateMultiSelect(['c', 'a'])).toEqual(deduplicateMultiSelect(['a', 'c']));
     expect(deduplicateMultiSelect([])).toEqual([]);
+    expect(isStringArray(['a', 'b'])).toBe(true);
+    expect(isStringArray(['a', 1])).toBe(false);
   });
 
   it('encodes and decodes all 6 valueTypes with all 4 sibling columns cleared to null', () => {
@@ -58,8 +62,8 @@ describe('attribute protocol', () => {
     expect(decodeAttributeColumnValue('json', jsonCols)).toEqual({ enabled: true, startHour: 22 });
 
     const multiCols = encodeAttributeValue('multiSelect', ['security', 'inquiries', 'security']);
-    expect(multiCols.valueJson).toEqual(['security', 'inquiries']);
-    expect(decodeAttributeColumnValue('multiSelect', multiCols)).toEqual(['security', 'inquiries']);
+    expect(multiCols.valueJson).toEqual(['inquiries', 'security']);
+    expect(decodeAttributeColumnValue('multiSelect', multiCols)).toEqual(['inquiries', 'security']);
   });
 
   it('rejects wrong JS types in encodeAttributeValue', () => {
@@ -74,7 +78,7 @@ describe('attribute protocol', () => {
   });
 
   it('collects every issue when multiple columns are populated or the target column is missing', () => {
-    const missingAndWrong = validateAttributeTypedColumns('boolean', {
+    const missingAndWrong = attributeTypedColumnIssues('boolean', {
       valueText: 'oops',
       valueNumber: 5,
       valueDate: new Date('2026-01-01T00:00:00.000Z'),
@@ -90,20 +94,20 @@ describe('attribute protocol', () => {
     }
   });
 
-  it('validates against an optional Zod schema and deduplicates multiSelect values', () => {
+  it('validates against an optional Zod schema (including z.iso.datetime) and canonicalizes multiSelect', () => {
     const topicSchema = z.array(z.enum(['inquiries', 'security', 'billing']));
-    const valid = validateAttributeTypedColumns(
+    const valid = attributeTypedColumnIssues(
       'multiSelect',
       { valueJson: ['security', 'inquiries', 'security'] },
       topicSchema,
     );
     expect(valid.ok).toBe(true);
     if (valid.ok) {
-      expect(valid.value).toEqual(['security', 'inquiries']);
-      expect(valid.columns.valueJson).toEqual(['security', 'inquiries']);
+      expect(valid.value).toEqual(['inquiries', 'security']);
+      expect(valid.columns.valueJson).toEqual(['inquiries', 'security']);
     }
 
-    const invalid = validateAttributeTypedColumns(
+    const invalid = attributeTypedColumnIssues(
       'multiSelect',
       { valueJson: ['unknown-topic'] },
       topicSchema,
@@ -113,11 +117,36 @@ describe('attribute protocol', () => {
       expect(invalid.issues[0]?.code).toBe('schema_validation_failed');
     }
 
+    const isoDate = attributeTypedColumnIssues(
+      'date',
+      { valueDate: '2026-12-01T12:00:00.000Z' },
+      z.iso.datetime(),
+    );
+    expect(isoDate.ok).toBe(true);
+    if (isoDate.ok) {
+      expect(isoDate.columns.valueDate).toBeInstanceOf(Date);
+      expect(isoDate.columns.valueDate?.toISOString()).toBe('2026-12-01T12:00:00.000Z');
+    }
+
+    const dateObjWithIsoSchema = attributeTypedColumnIssues(
+      'date',
+      { valueDate: new Date('2026-12-01T12:00:00.000Z') },
+      z.iso.datetime(),
+    );
+    expect(dateObjWithIsoSchema.ok).toBe(true);
+
+    const nonIsoString = attributeTypedColumnIssues(
+      'date',
+      { valueDate: 'Dec 1, 2026' },
+      z.iso.datetime(),
+    );
+    expect(nonIsoString.ok).toBe(false);
+
     expect(() =>
-      assertAttributeValueMatchesType('number', { valueNumber: 500 }, z.number().max(100)),
+      validateAttributeTypedColumns('number', { valueNumber: 500 }, z.number().max(100)),
     ).toThrow();
-    expect(
-      assertAttributeValueMatchesType('number', { valueNumber: 25 }, z.number().max(100)),
-    ).toBe(25);
+    expect(validateAttributeTypedColumns('number', { valueNumber: 25 }, z.number().max(100))).toBe(
+      25,
+    );
   });
 });

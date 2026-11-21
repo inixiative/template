@@ -15,7 +15,7 @@ type ImmutableFieldsOverride = {
   refuse?: string[];
 };
 
-export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
+const baseImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
   ...polymorphismImmutableFields,
   Space: { exclude: ['organizationId'] },
   // A changed entitlement is a removed row and a new one; only its tombstones move.
@@ -42,15 +42,24 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
     ...polymorphismImmutableFields.WebhookSubscription,
     include: [...(polymorphismImmutableFields.WebhookSubscription?.include ?? []), 'resourceModel'],
   },
+};
+
+export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
+  ...baseImmutableFieldsOverrides,
   ...Object.fromEntries(
     Object.entries(ATTRIBUTE_MODELS).map(([accessor, config]) => {
       const modelName = toModelName(accessor);
-      const poly = polymorphismImmutableFields[modelName];
+      const existing = baseImmutableFieldsOverrides[modelName];
       return [
         modelName,
         {
-          ...poly,
-          refuse: [...(poly?.refuse ?? []), ...(config.locatorField ? [config.locatorField] : [])],
+          ...existing,
+          refuse: [
+            ...new Set([
+              ...(existing?.refuse ?? []),
+              ...(config.locatorField ? [config.locatorField] : []),
+            ]),
+          ],
         },
       ];
     }),

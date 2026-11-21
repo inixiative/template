@@ -176,58 +176,6 @@ export const actionsForRecordOwnedByAnyOwnerModel = {
   ...integrationAccess,
 } satisfies Record<string, ActionRule>;
 
-const settingResourceRelations = [
-  ['User', 'resourceUser'],
-  ['Organization', 'resourceOrganization'],
-  ['OrganizationUser', 'resourceOrganizationUser'],
-  ['Space', 'resourceSpace'],
-  ['SpaceUser', 'resourceSpaceUser'],
-  ['Project', 'resourceProject'],
-] as const;
-
-type SettingResourceModel = (typeof settingResourceRelations)[number][0];
-
-const settingMembers: SettingResourceModel[] = ['OrganizationUser', 'SpaceUser'];
-const settingNonMembers: SettingResourceModel[] = ['User', 'Organization', 'Space', 'Project'];
-
-const settingResourceModelIsOneOf = (models: SettingResourceModel[]): ActionRule => ({
-  rule: { field: 'resourceModel', operator: Operator.in, value: models },
-});
-
-const actorMayPerformActionOnSettingResource = (
-  action: string,
-  models: SettingResourceModel[],
-): ActionRule => ({
-  any: settingResourceRelations
-    .filter(([model]) => models.includes(model))
-    .map(([model, rel]) => ({
-      all: [settingResourceModelIsOneOf([model]), { rel, action }],
-    })),
-});
-
-export const settingResourceActions = {
-  manage: {
-    any: [
-      actorMayPerformActionOnSettingResource('manage', settingNonMembers),
-      actorMayPerformActionOnSettingResource('operate', settingMembers),
-    ],
-  },
-  operate: {
-    any: ['manage', actorMayPerformActionOnSettingResource('operate', settingNonMembers)],
-  },
-  read: {
-    any: [
-      'operate',
-      actorMayPerformActionOnSettingResource('read', settingNonMembers),
-      actorMayPerformActionOnSettingResource('own', settingMembers),
-    ],
-  },
-  create: 'manage',
-  delete: {
-    any: ['manage', actorMayPerformActionOnSettingResource('own', settingMembers)],
-  },
-} satisfies Record<string, ActionRule>;
-
 // Read on an integration row, whose owner is never another integration.
 export const integrationRoleWrite: ActionRule = {
   any: [

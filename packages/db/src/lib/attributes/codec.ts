@@ -9,32 +9,34 @@ import {
   type AttributeModelName,
   attributeModelConfig,
 } from '@template/db/lib/attributes/registry';
+import type { AttributeModelConfig } from '@template/db/lib/attributes/types';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { isPrismaNull } from '@template/db/utils/prismaNull';
 import {
   ATTRIBUTE_COLUMN_NAMES,
   ATTRIBUTE_VALUE_TYPES,
   type AttributeFieldDefinition,
   type AttributeTypedColumns,
   type AttributeValueType,
+  attributeColumnForValueType,
+  attributeTypedColumnIssues,
   decodeAttributeColumnValue,
   deduplicateMultiSelect,
   encodeAttributeValue,
   populatedAttributeColumns,
-  validateAttributeTypedColumns,
 } from '@template/shared/attributes';
 
-const unwrapPrismaValue = (value: unknown): unknown => (isPrismaNull(value) ? null : value);
+// Only Prisma.DbNull represents SQL NULL; Prisma.JsonNull is a populated JSONB null value.
+const unwrapPrismaDbNull = (value: unknown): unknown => (value === Prisma.DbNull ? null : value);
 
 const isAttributeValueType = (value: unknown): value is AttributeValueType =>
   typeof value === 'string' && (ATTRIBUTE_VALUE_TYPES as readonly string[]).includes(value);
 
 const toProtocolColumns = (row: Record<string, unknown>): Partial<AttributeTypedColumns> => ({
-  valueBoolean: unwrapPrismaValue(row.valueBoolean) as boolean | null,
-  valueText: unwrapPrismaValue(row.valueText) as string | null,
-  valueNumber: unwrapPrismaValue(row.valueNumber) as number | null,
-  valueDate: unwrapPrismaValue(row.valueDate) as Date | string | null,
-  valueJson: unwrapPrismaValue(row.valueJson),
+  valueBoolean: unwrapPrismaDbNull(row.valueBoolean) as boolean | null,
+  valueText: unwrapPrismaDbNull(row.valueText) as string | null,
+  valueNumber: unwrapPrismaDbNull(row.valueNumber) as number | null,
+  valueDate: unwrapPrismaDbNull(row.valueDate) as Date | string | null,
+  valueJson: unwrapPrismaDbNull(row.valueJson),
 });
 
 export type PrismaAttributeColumnPayload = {
@@ -90,6 +92,35 @@ export const unpackAttributeValue = (
   }
 };
 
+/** Internal helper encoding a value when the config & definition have already been resolved. */
+export const encodeResolvedAttributeColumns = (
+  config: AttributeModelConfig,
+  locator: string,
+  definition: AttributeFieldDefinition | undefined,
+  value: unknown,
+  options?: { valueType?: AttributeValueType },
+): PrismaAttributeColumnPayload => {
+  const valueType = definition?.valueType ?? options?.valueType;
+  if (!valueType) {
+    throw new Error(
+      `encodeAttributeColumns(${config.model}, '${locator}') requires a registered definition or explicit valueType`,
+    );
+  }
+
+  const targetColumn = attributeColumnForValueType(valueType);
+  const checked = attributeTypedColumnIssues(
+    valueType,
+    { [targetColumn]: value },
+    definition?.schema,
+  );
+  if (!checked.ok) {
+    throw new Error(
+      `Invalid value for ${config.model}.${locator}: ${checked.issues.map((issue) => issue.message).join('; ')}`,
+    );
+  }
+  return toPrismaColumnPayload(checked.columns);
+};
+
 /**
  * Validates `value` against the model's registered definition (when present) or explicit
  * `valueType`, deduplicates `multiSelect` arrays, and returns the 5-column Prisma payload.
@@ -107,21 +138,7 @@ export const encodeAttributeColumns = (
     throw new Error(`Unknown attribute locator '${locator}' for model '${config.model}'`);
   }
 
-  const valueType = definition?.valueType ?? options?.valueType;
-  if (!valueType) {
-    throw new Error(
-      `encodeAttributeColumns(${config.model}, '${locator}') requires a registered definition or explicit valueType`,
-    );
-  }
-
-  const encoded = encodeAttributeValue(valueType, value);
-  const checked = validateAttributeTypedColumns(valueType, encoded, definition?.schema);
-  if (!checked.ok) {
-    throw new Error(
-      `Invalid value for ${config.model}.${locator}: ${checked.issues.map((issue) => issue.message).join('; ')}`,
-    );
-  }
-  return toPrismaColumnPayload(checked.columns);
+  return encodeResolvedAttributeColumns(config, locator, definition, value, options);
 };
 
 /**
@@ -175,31 +192,37 @@ export const decodeAttributeValue = (
   return stored === null ? (definition?.defaultValue ?? null) : stored;
 };
 
-export type AttributeWriteValidationResult =
-  | {
-      ok: true;
-      value: unknown;
-      definition?: AttributeFieldDefinition;
-      normalizedValueJson?: string[];
-      normalizedValueDate?: Date;
-    }
-  | { ok: false; errors: string[] };
+export type AttributeWriteInspectionOk = {
+  ok: true;
+  value: unknown;
+  definition?: AttributeFieldDefinition;
+  normalizedValueJson?: string[];
+  normalizedValueDate?: Date;
+};
+
+export type AttributeWriteInspection = AttributeWriteInspectionOk | { ok: false; errors: string[] };
 
 /**
- * Validates an Attribute row write (create or merged update):
- * - Always enforces the Layer 1 invariant (at most one of the 5 typed columns populated).
- * - If `resolveDefinition` is configured on the model (e.g. `Setting`), validates locator,
+ * Inspects an Attribute row write (create or merged update) without throwing:
+ * - Always enforces the Layer 1 invariant (at most one of the 5 typed columns populated; never Prisma.JsonNull).
+ * - If `resolveDefinition` is configured on the model (e.g. `Setting`), checks locator,
  *   `resourceModel`, exact typed column match, Zod `schema`, and normalizes `multiSelect`/`date`.
- * - If `valueTypeField` is configured without a code registry, validates against that `valueType`.
- * Returns every error found.
+ * - If `valueTypeField` is configured without a code registry, checks against that `valueType`.
+ * - Never mutates or deduplicates plain `json` arrays or generic Layer 1 `valueJson` payloads.
  */
-export const validateAttributeWrite = (
+export const inspectAttributeWrite = (
   model: AttributeModelName | ModelName,
   row: Record<string, unknown>,
-): AttributeWriteValidationResult => {
+): AttributeWriteInspection => {
   const config = attributeModelConfig(model);
   const columns = toProtocolColumns(row);
   const errors: string[] = [];
+
+  if (columns.valueJson === Prisma.JsonNull) {
+    errors.push(
+      `${config.model}.valueJson: Prisma.JsonNull is not allowed; use Prisma.DbNull to store SQL NULL`,
+    );
+  }
 
   let definition: AttributeFieldDefinition | undefined;
   if (config.locatorField) {
@@ -246,11 +269,7 @@ export const validateAttributeWrite = (
     (isAttributeValueType(rowValueType) ? (rowValueType as AttributeValueType) : undefined);
 
   if (effectiveValueType) {
-    const typedResult = validateAttributeTypedColumns(
-      effectiveValueType,
-      columns,
-      definition?.schema,
-    );
+    const typedResult = attributeTypedColumnIssues(effectiveValueType, columns, definition?.schema);
     if (!typedResult.ok) {
       for (const issue of typedResult.issues) errors.push(issue.message);
     }
@@ -269,7 +288,7 @@ export const validateAttributeWrite = (
   }
 
   // Layer 1 generic values-table invariant (no code registry & no valueTypeField):
-  // enforce at most one populated typed column across all 5 standard columns.
+  // enforce at most one populated typed column across all 5 standard columns without mutating JSON payloads.
   const populated = populatedAttributeColumns(columns);
   if (populated.length > 1) {
     errors.push(
@@ -279,17 +298,20 @@ export const validateAttributeWrite = (
 
   if (errors.length > 0) return { ok: false, errors };
 
-  const value = unpackAttributeValue(row);
-  const normalizedValueJson =
-    populated[0] === 'valueJson' &&
-    Array.isArray(columns.valueJson) &&
-    columns.valueJson.every((item) => typeof item === 'string')
-      ? deduplicateMultiSelect(columns.valueJson)
-      : undefined;
-
   return {
     ok: true,
-    value: normalizedValueJson ?? value,
-    ...(normalizedValueJson ? { normalizedValueJson } : {}),
+    value: unpackAttributeValue(row),
   };
+};
+
+/** Validates an Attribute row write and throws an Error listing all issues on failure. */
+export const validateAttributeWrite = (
+  model: AttributeModelName | ModelName,
+  row: Record<string, unknown>,
+): AttributeWriteInspectionOk => {
+  const result = inspectAttributeWrite(model, row);
+  if (!result.ok) {
+    throw new Error(result.errors.join('; '));
+  }
+  return result;
 };

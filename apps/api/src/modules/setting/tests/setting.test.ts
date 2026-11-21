@@ -43,7 +43,7 @@ type EffectiveSetting = {
 type SettingRowResponse = {
   id: string;
   resourceModel: string;
-  resourceId: string | null;
+  resourceId: string;
   key: string;
   disabled: boolean;
   valueBoolean: boolean | null;
@@ -87,7 +87,7 @@ describe('Setting API module', () => {
   });
 
   describe('GET /api/v1/setting/info', () => {
-    it('returns guide, categories, and definitions covering all 6 attribute valueTypes with JSON Schemas', async () => {
+    it('returns guide, categories, and definitions covering all 6 attribute valueTypes with JSON Schemas (including date-time)', async () => {
       const response = await ownerApp.fetch(get('/api/v1/setting/info'));
       expect(response.status).toBe(200);
       const { data } = await parseSuccessBody<{
@@ -101,6 +101,8 @@ describe('Setting API module', () => {
               valueType: string;
               schema: Record<string, unknown>;
               defaultValue: unknown;
+              permission: string;
+              readPermission: string;
             }
           >;
         };
@@ -110,6 +112,7 @@ describe('Setting API module', () => {
       expect(data.types.categories.general?.key).toBe('general');
       expect(data.types.categories.membership?.key).toBe('membership');
       expect(data.types.categories.notifications?.key).toBe('notifications');
+      expect(data.types.categories.security?.key).toBe('security');
 
       expect(data.types.definitions['general.defaultTimezone']?.valueType).toBe('text');
       expect(data.types.definitions['member.autoAcceptInquiries']?.valueType).toBe('boolean');
@@ -117,8 +120,16 @@ describe('Setting API module', () => {
       expect(data.types.definitions['notifications.topics']?.valueType).toBe('multiSelect');
       expect(data.types.definitions['notifications.quietHours']?.valueType).toBe('json');
       expect(data.types.definitions['notifications.snoozeUntil']?.valueType).toBe('date');
+      expect(data.types.definitions['notifications.snoozeUntil']?.schema).toMatchObject({
+        type: 'string',
+        format: 'date-time',
+      });
       expect(data.types.definitions['notifications.quietHours']?.schema).toMatchObject({
         type: 'object',
+      });
+      expect(data.types.definitions['security.requireSso']).toMatchObject({
+        permission: 'own',
+        readPermission: 'manage',
       });
     });
   });
@@ -163,13 +174,13 @@ describe('Setting API module', () => {
         disabled: false,
       });
 
-      // Upsert multiSelect setting with duplicate entries -> stored deduplicated in valueJson
+      // Upsert multiSelect setting with duplicate & unsorted entries -> canonically sorted & deduplicated in valueJson
       const upsertTopics = await ownerApp.fetch(
         patch('/api/v1/setting', {
           resourceModel: 'Project',
           resourceProjectId: orgProject.id,
           key: 'notifications.topics',
-          value: ['billing', 'security', 'billing'],
+          value: ['security', 'billing', 'security'],
         }),
       );
       expect(upsertTopics.status).toBe(200);
@@ -235,6 +246,7 @@ describe('Setting API module', () => {
         'notifications.topics',
         'notifications.quietHours',
         'notifications.snoozeUntil',
+        'notifications.digestPaused',
       ]);
       expect(notifItems[0]).toMatchObject({
         value: ['billing', 'security'],
@@ -293,7 +305,7 @@ describe('Setting API module', () => {
       expect(auditLogs[0]?.contextOrganizationId).toBe(organization.id);
     });
 
-    it('supports OrganizationUser boolean + number settings with composite FK targeting', async () => {
+    it('supports OrganizationUser boolean + number settings with composite FK targeting and AuditLog tenancy', async () => {
       const setBool = await ownerApp.fetch(
         patch('/api/v1/setting', {
           resourceModel: 'OrganizationUser',
@@ -308,6 +320,12 @@ describe('Setting API module', () => {
       expect(boolRow.resourceId).toBe(ownerMember.id);
       expect(boolRow.valueBoolean).toBe(true);
       expect(boolRow.value).toBe(true);
+
+      const memberAuditLogs = await ownerApp.db.auditLog.findMany({
+        where: { subjectModel: AuditSubjectModel.Setting, subjectSettingId: boolRow.id },
+      });
+      expect(memberAuditLogs).toHaveLength(1);
+      expect(memberAuditLogs[0]?.contextOrganizationId).toBe(organization.id);
 
       const setNum = await ownerApp.fetch(
         patch('/api/v1/setting', {
@@ -324,7 +342,7 @@ describe('Setting API module', () => {
       expect(numRow.value).toBe(25);
     });
 
-    it('rejects invalid key, wrong value type, invalid date, out-of-range value, disallowed resourceModel, and mismatched FKs with 422', async () => {
+    it('rejects invalid key, wrong value type, invalid/non-ISO date, out-of-range value, disallowed resourceModel, and mismatched FKs with 422', async () => {
       expect(
         (
           await ownerApp.fetch(
@@ -368,6 +386,19 @@ describe('Setting API module', () => {
         (
           await ownerApp.fetch(
             patch('/api/v1/setting', {
+              resourceModel: 'User',
+              resourceUserId: owner.id,
+              key: 'notifications.snoozeUntil',
+              value: 'Dec 1, 2026',
+            }),
+          )
+        ).status,
+      ).toBe(422);
+
+      expect(
+        (
+          await ownerApp.fetch(
+            patch('/api/v1/setting', {
               resourceModel: 'OrganizationUser',
               resourceOrganizationId: organization.id,
               resourceUserId: owner.id,
@@ -394,7 +425,7 @@ describe('Setting API module', () => {
     });
   });
 
-  describe('ReBAC enforcement across roles and tenants', () => {
+  describe('ReBAC enforcement via settingResourcePermission (manage + read)', () => {
     const memberOf = async (role: Role) => {
       const created = await createOrganizationUser({ role }, { organization });
       return {
@@ -403,19 +434,110 @@ describe('Setting API module', () => {
       };
     };
 
-    it('allows org member to read org/project settings but denies writing manage-gated settings (403)', async () => {
-      const member = await memberOf(Role.member);
+    it('enforces own-gated setting with restricted readPermission (security.requireSso): owner writes/deletes, admin reads only, member hidden & 403', async () => {
       const admin = await memberOf(Role.admin);
+      const member = await memberOf(Role.member);
 
+      // Admin cannot PATCH an own-gated setting
+      expect(
+        (
+          await admin.app.fetch(
+            patch('/api/v1/setting', {
+              resourceModel: 'Organization',
+              resourceOrganizationId: organization.id,
+              key: 'security.requireSso',
+              value: true,
+            }),
+          )
+        ).status,
+      ).toBe(403);
+
+      // Owner can PATCH it
+      const created = await ownerApp.fetch(
+        patch('/api/v1/setting', {
+          resourceModel: 'Organization',
+          resourceOrganizationId: organization.id,
+          key: 'security.requireSso',
+          value: true,
+        }),
+      );
+      expect(created.status).toBe(200);
+      const { data: ssoRow } = await parseSuccessBody<SettingRowResponse>(created);
+
+      // Admin sees security.requireSso in list and single read, but gets 403 on DELETE
+      const adminList = await admin.app.fetch(
+        get(`/api/v1/setting?resourceModel=Organization&resourceOrganizationId=${organization.id}`),
+      );
+      expect(adminList.status).toBe(200);
+      const { data: adminItems } = await parseSuccessBody<EffectiveSetting[]>(adminList);
+      expect(adminItems.some((item) => item.key === 'security.requireSso')).toBe(true);
+      expect((await admin.app.fetch(get(`/api/v1/setting/${ssoRow.id}`))).status).toBe(200);
+      expect((await admin.app.fetch(del(`/api/v1/setting/${ssoRow.id}`))).status).toBe(403);
+
+      // Member does NOT see security.requireSso in org list and gets 403 on single key / single ID / DELETE
+      const memberList = await member.app.fetch(
+        get(`/api/v1/setting?resourceModel=Organization&resourceOrganizationId=${organization.id}`),
+      );
+      expect(memberList.status).toBe(200);
+      const { data: memberItems } = await parseSuccessBody<EffectiveSetting[]>(memberList);
+      expect(memberItems.some((item) => item.key === 'security.requireSso')).toBe(false);
       expect(
         (
           await member.app.fetch(
             get(
-              `/api/v1/setting?resourceModel=Organization&resourceOrganizationId=${organization.id}`,
+              `/api/v1/setting?resourceModel=Organization&resourceOrganizationId=${organization.id}&key=security.requireSso`,
             ),
           )
         ).status,
-      ).toBe(200);
+      ).toBe(403);
+      expect((await member.app.fetch(get(`/api/v1/setting/${ssoRow.id}`))).status).toBe(403);
+      expect((await member.app.fetch(del(`/api/v1/setting/${ssoRow.id}`))).status).toBe(403);
+
+      // Owner deletes cleanly
+      expect((await ownerApp.fetch(del(`/api/v1/setting/${ssoRow.id}`))).status).toBe(204);
+    });
+
+    it('enforces operate-gated setting (notifications.digestPaused): member writes & deletes, viewer reads only', async () => {
+      const member = await memberOf(Role.member);
+      const viewer = await memberOf(Role.viewer);
+
+      // Viewer cannot write
+      expect(
+        (
+          await viewer.app.fetch(
+            patch('/api/v1/setting', {
+              resourceModel: 'Organization',
+              resourceOrganizationId: organization.id,
+              key: 'notifications.digestPaused',
+              value: true,
+            }),
+          )
+        ).status,
+      ).toBe(403);
+
+      // Member can write
+      const memberWrite = await member.app.fetch(
+        patch('/api/v1/setting', {
+          resourceModel: 'Organization',
+          resourceOrganizationId: organization.id,
+          key: 'notifications.digestPaused',
+          value: true,
+        }),
+      );
+      expect(memberWrite.status).toBe(200);
+      const { data: digestRow } = await parseSuccessBody<SettingRowResponse>(memberWrite);
+
+      // Viewer can read, cannot delete
+      expect((await viewer.app.fetch(get(`/api/v1/setting/${digestRow.id}`))).status).toBe(200);
+      expect((await viewer.app.fetch(del(`/api/v1/setting/${digestRow.id}`))).status).toBe(403);
+
+      // Member can delete (same `manage` action as PATCH!)
+      expect((await member.app.fetch(del(`/api/v1/setting/${digestRow.id}`))).status).toBe(204);
+    });
+
+    it('allows org admin to write manage-gated settings while denying org member (403)', async () => {
+      const member = await memberOf(Role.member);
+      const admin = await memberOf(Role.admin);
 
       expect(
         (
@@ -444,7 +566,7 @@ describe('Setting API module', () => {
       ).toBe(200);
     });
 
-    it('protects member settings: member writes own, org admin gets 403, org owner reads/deletes but cannot overwrite', async () => {
+    it('protects personal member settings (member.autoAcceptInquiries): private to the member themselves; admin and owner get 403', async () => {
       const member = await memberOf(Role.member);
       const admin = await memberOf(Role.admin);
 
@@ -460,44 +582,36 @@ describe('Setting API module', () => {
       expect(writeOwn.status).toBe(200);
       const { data: memberSetting } = await parseSuccessBody<SettingRowResponse>(writeOwn);
 
-      expect(
-        (
-          await admin.app.fetch(
-            get(
-              `/api/v1/setting?resourceModel=OrganizationUser&resourceOrganizationId=${organization.id}&resourceUserId=${member.context.user.id}`,
-            ),
-          )
-        ).status,
-      ).toBe(403);
-      expect(
-        (
-          await admin.app.fetch(
-            patch('/api/v1/setting', {
-              resourceModel: 'OrganizationUser',
-              resourceOrganizationId: organization.id,
-              resourceUserId: member.context.user.id,
-              key: 'member.autoAcceptInquiries',
-              value: false,
-            }),
-          )
-        ).status,
-      ).toBe(403);
+      for (const otherApp of [admin.app, ownerApp]) {
+        expect(
+          (
+            await otherApp.fetch(
+              get(
+                `/api/v1/setting?resourceModel=OrganizationUser&resourceOrganizationId=${organization.id}&resourceUserId=${member.context.user.id}&key=member.autoAcceptInquiries`,
+              ),
+            )
+          ).status,
+        ).toBe(403);
+        expect((await otherApp.fetch(get(`/api/v1/setting/${memberSetting.id}`))).status).toBe(403);
+        expect(
+          (
+            await otherApp.fetch(
+              patch('/api/v1/setting', {
+                resourceModel: 'OrganizationUser',
+                resourceOrganizationId: organization.id,
+                resourceUserId: member.context.user.id,
+                key: 'member.autoAcceptInquiries',
+                value: false,
+              }),
+            )
+          ).status,
+        ).toBe(403);
+        expect((await otherApp.fetch(del(`/api/v1/setting/${memberSetting.id}`))).status).toBe(403);
+      }
 
-      expect((await ownerApp.fetch(get(`/api/v1/setting/${memberSetting.id}`))).status).toBe(200);
-      expect(
-        (
-          await ownerApp.fetch(
-            patch('/api/v1/setting', {
-              resourceModel: 'OrganizationUser',
-              resourceOrganizationId: organization.id,
-              resourceUserId: member.context.user.id,
-              key: 'member.autoAcceptInquiries',
-              value: false,
-            }),
-          )
-        ).status,
-      ).toBe(403);
-      expect((await ownerApp.fetch(del(`/api/v1/setting/${memberSetting.id}`))).status).toBe(204);
+      // Member reads and resets their own preference cleanly
+      expect((await member.app.fetch(get(`/api/v1/setting/${memberSetting.id}`))).status).toBe(200);
+      expect((await member.app.fetch(del(`/api/v1/setting/${memberSetting.id}`))).status).toBe(204);
     });
 
     it('blocks another user from reading or writing personal settings (403)', async () => {

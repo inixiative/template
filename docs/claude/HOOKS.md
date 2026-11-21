@@ -119,6 +119,7 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 
 | Hook | Purpose |
 |------|---------|
+| `attributes` | Enforces the 5-column Attribute write invariant, definition schema, and canonical sorted `multiSelect` deduplication on every model in `ATTRIBUTE_MODELS` (`registerAttributeValidationHook`, `packages/db/src/lib/attributes/hook.ts`; skips tombstone-only `{ deletedAt }` updates; see [SETTINGS.md](SETTINGS.md)) |
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
 | `cache` | Marks the keys a mutation invalidates in the transaction's cache overlay; cleared at commit |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |

@@ -51,6 +51,6 @@ export type EffectiveAttributeEntry = {
   storedValue: unknown;
   disabled: boolean;
   isDefault: boolean;
-  settingId: string | null;
+  recordId: string | null;
   updatedAt: Date | null;
 };

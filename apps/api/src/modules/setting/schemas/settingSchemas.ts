@@ -14,8 +14,8 @@ import type { Setting } from '@template/db/generated/client/client';
 import { SettingResourceModel } from '@template/db/generated/client/enums';
 import {
   AttributeValueTypeSchema,
-  encodeAttributeValue,
-  validateAttributeTypedColumns,
+  attributeColumnForValueType,
+  attributeTypedColumnIssues,
 } from '@template/shared/attributes';
 import {
   SettingCategoryKeySchema,
@@ -86,19 +86,12 @@ export const settingUpsertBodyRefinement = (
     return;
   }
 
-  let encoded: ReturnType<typeof encodeAttributeValue>;
-  try {
-    encoded = encodeAttributeValue(definition.valueType, body.value);
-  } catch (error) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['value'],
-      message: error instanceof Error ? error.message : String(error),
-    });
-    return;
-  }
-
-  const checked = validateAttributeTypedColumns(definition.valueType, encoded, definition.schema);
+  const targetColumn = attributeColumnForValueType(definition.valueType);
+  const checked = attributeTypedColumnIssues(
+    definition.valueType,
+    { [targetColumn]: body.value },
+    definition.schema,
+  );
   if (!checked.ok) {
     for (const issue of checked.issues) {
       ctx.addIssue({
