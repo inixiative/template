@@ -26,3 +26,21 @@ export const SETTING_PERMISSION_ACTIONS = ['read', 'operate', 'manage', 'own'] a
 export type SettingPermissionAction = (typeof SETTING_PERMISSION_ACTIONS)[number];
 
 export const SettingPermissionActionSchema = z.enum(SETTING_PERMISSION_ACTIONS);
+
+export type SettingPermissionSpec =
+  | SettingPermissionAction
+  | ({ readonly default?: SettingPermissionAction } & Partial<
+      Record<SettingResourceModelName, SettingPermissionAction>
+    >);
+
+export const SettingPermissionSpecSchema = z.union([
+  SettingPermissionActionSchema,
+  z
+    .object({
+      default: SettingPermissionActionSchema.optional(),
+      ...(Object.fromEntries(
+        SETTING_RESOURCE_MODELS.map((model) => [model, SettingPermissionActionSchema.optional()]),
+      ) as Record<SettingResourceModelName, z.ZodOptional<typeof SettingPermissionActionSchema>>),
+    })
+    .strict(),
+]);

@@ -12,6 +12,7 @@ import {
   type SettingDefinition,
   type SettingPermissionAction,
   type SettingResourceModelName,
+  settingPermissionForModel,
 } from '@template/shared/settings';
 
 const isKey = (key: string): ActionRule => ({
@@ -32,34 +33,43 @@ export const settingResourceModelRule = (
 
 const perDefinition = (
   definitions: Record<string, SettingDefinition>,
-  actionFor: (definition: SettingDefinition) => SettingPermissionAction,
+  actionFor: (
+    definition: SettingDefinition,
+    model: SettingResourceModelName,
+  ) => SettingPermissionAction,
 ): ActionRule => ({
-  any: Object.entries(definitions).map(([key, definition]) => {
-    const action = actionFor(definition);
-    return {
-      all: [
-        isKey(key),
-        { any: definition.resourceModels.map((model) => settingResourceModelRule(model, action)) },
-      ],
-    };
-  }),
+  any: Object.entries(definitions).map(([key, definition]) => ({
+    all: [
+      isKey(key),
+      {
+        any: definition.resourceModels.map((model) =>
+          settingResourceModelRule(model, actionFor(definition, model)),
+        ),
+      },
+    ],
+  })),
 });
 
 /**
  * Compiles `db:setting` ReBAC rules directly from `SETTING_DEFINITIONS`.
  * Exactly two actions exist on `db:setting`:
- * - `manage`: per-key write/delete authority, delegating `definition.permission` to each allowed `resource${model}`.
- * - `read`: anyone who can `manage` the setting, OR holds `definition.readPermission ?? 'read'` on `resource${model}`.
+ * - `manage`: per-key, per-resourceModel write/delete authority resolved from `definition.permission`.
+ * - `read`: anyone who can `manage` the setting, OR holds the resolved `definition.readPermission`
+ *   (defaulting to `'read'`) on `resource${model}`.
  */
 export const settingResourcePermissionFromDefinitions = (
   definitions: Record<string, SettingDefinition>,
 ): ResourcePermission => ({
   actions: {
-    manage: perDefinition(definitions, (definition) => definition.permission),
+    manage: perDefinition(definitions, (definition, model) =>
+      settingPermissionForModel(definition.permission, model),
+    ),
     read: {
       any: [
         'manage',
-        perDefinition(definitions, (definition) => definition.readPermission ?? 'read'),
+        perDefinition(definitions, (definition, model) =>
+          settingPermissionForModel(definition.readPermission, model, 'read'),
+        ),
       ],
     },
   },

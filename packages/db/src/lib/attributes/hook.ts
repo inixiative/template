@@ -11,7 +11,7 @@ import {
   registerDbHook,
   type SingleAction,
 } from '@template/db/extensions/hookRegistry';
-import { inspectAttributeWrite } from '@template/db/lib/attributes/codec';
+import { attributeWriteInspection } from '@template/db/lib/attributes/codec';
 import {
   ATTRIBUTE_MODELS,
   type AttributeModelName,
@@ -65,7 +65,7 @@ export const registerAttributeValidationHook = (
 
   const validateAndNormalizeRow = (model: ModelName, mergedRow: Row, writableData?: Row): void => {
     const accessor = toAccessor(model) as AttributeModelName;
-    const result = inspectAttributeWrite(accessor, mergedRow);
+    const result = attributeWriteInspection(accessor, mergedRow);
     if (!result.ok) {
       throw toError(result.errors.join('; '));
     }

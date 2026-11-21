@@ -4,8 +4,13 @@
  * @partOf primitive:shared
  * @uses none
  */
+import { attributePermissionForModel } from '@template/shared/attributes';
 import { LanguageCodeSchema, TimezoneIdSchema } from '@template/shared/reference';
-import type { SettingResourceModelName } from '@template/shared/settings/resourceModels';
+import type {
+  SettingPermissionAction,
+  SettingPermissionSpec,
+  SettingResourceModelName,
+} from '@template/shared/settings/resourceModels';
 import {
   defineSetting,
   defineSettingCategory,
@@ -116,7 +121,8 @@ export const SETTING_DEFINITIONS = {
     schema: z.array(z.enum(NOTIFICATION_TOPICS)),
     defaultValue: ['inquiries', 'security'] as (typeof NOTIFICATION_TOPICS)[number][],
     order: 10,
-    permission: 'manage',
+    permission: { default: 'manage', OrganizationUser: 'operate', SpaceUser: 'operate' },
+    readPermission: { default: 'read', OrganizationUser: 'operate', SpaceUser: 'operate' },
   }),
   'notifications.quietHours': defineSetting({
     key: 'notifications.quietHours',
@@ -197,6 +203,21 @@ export const settingDefinitionForKeyOrThrow = (key: string): SettingDefinition =
 
 export const settingCategoryForKey = (key: string): SettingCategoryDefinition | undefined =>
   settingCategoriesByKey[key];
+
+/** Resolves the concrete ReBAC action for `resourceModel` from a single action or per-model map. */
+export const settingPermissionForModel = (
+  spec: SettingPermissionSpec | undefined,
+  resourceModel: SettingResourceModelName,
+  fallback?: SettingPermissionAction,
+): SettingPermissionAction => {
+  const resolved = attributePermissionForModel(spec, resourceModel, fallback);
+  if (!resolved) {
+    throw new Error(
+      `Setting permission spec has no action or default for resourceModel '${resourceModel}'`,
+    );
+  }
+  return resolved;
+};
 
 /** All setting definitions applicable to `resourceModel`, sorted by category order then setting order. */
 export const settingDefinitionsForResourceModel = (

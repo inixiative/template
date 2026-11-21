@@ -10,7 +10,7 @@ import { AttributeValueTypeSchema } from '@template/shared/attributes';
 import {
   SettingCategoryKeySchema,
   SettingKeySchema,
-  SettingPermissionActionSchema,
+  SettingPermissionSpecSchema,
 } from '@template/shared/settings';
 import { infoResponseSchema } from '#/lib/jsonSchema/infoResponseSchema';
 import { jsonSchemaResponseSchema } from '#/lib/jsonSchema/jsonSchemaResponseSchema';
@@ -36,11 +36,11 @@ export const settingDefinitionInfoSchema = z.object({
   schema: jsonSchemaResponseSchema.describe('JSON Schema of `value` accepted for this setting.'),
   defaultValue: z.unknown().describe('Effective default value when no active setting row exists.'),
   order: z.number().int().describe('Display order within its category.'),
-  permission: SettingPermissionActionSchema.describe(
-    'ReBAC action required on the setting resource to manage (write/delete) this setting.',
+  permission: SettingPermissionSpecSchema.describe(
+    'ReBAC action (or per-resourceModel map) required on the setting resource to manage (write/delete) this setting.',
   ),
-  readPermission: SettingPermissionActionSchema.describe(
-    'ReBAC action required on the setting resource to read this setting.',
+  readPermission: SettingPermissionSpecSchema.describe(
+    'ReBAC action (or per-resourceModel map) required on the setting resource to read this setting.',
   ),
 });
 

@@ -6,7 +6,7 @@
  */
 import type { AttributeFieldDefinition, AttributeValueType } from '@template/shared/attributes';
 import type {
-  SettingPermissionAction,
+  SettingPermissionSpec,
   SettingResourceModelName,
 } from '@template/shared/settings/resourceModels';
 import type { z } from 'zod';
@@ -35,8 +35,8 @@ export type SettingDefinition<
   readonly label: string;
   readonly description: string;
   readonly order: number;
-  readonly permission: SettingPermissionAction;
-  readonly readPermission?: SettingPermissionAction;
+  readonly permission: SettingPermissionSpec;
+  readonly readPermission?: SettingPermissionSpec;
 };
 
 /** Declares a typed setting category definition without side effects. */

@@ -101,8 +101,8 @@ describe('Setting API module', () => {
               valueType: string;
               schema: Record<string, unknown>;
               defaultValue: unknown;
-              permission: string;
-              readPermission: string;
+              permission: unknown;
+              readPermission: unknown;
             }
           >;
         };
@@ -130,6 +130,10 @@ describe('Setting API module', () => {
       expect(data.types.definitions['security.requireSso']).toMatchObject({
         permission: 'own',
         readPermission: 'manage',
+      });
+      expect(data.types.definitions['notifications.topics']).toMatchObject({
+        permission: { default: 'manage', OrganizationUser: 'operate', SpaceUser: 'operate' },
+        readPermission: { default: 'read', OrganizationUser: 'operate', SpaceUser: 'operate' },
       });
     });
   });
@@ -566,9 +570,22 @@ describe('Setting API module', () => {
       ).toBe(200);
     });
 
-    it('protects personal member settings (member.autoAcceptInquiries): private to the member themselves; admin and owner get 403', async () => {
+    it('protects personal member settings (member.autoAcceptInquiries & notifications.topics): private to the member themselves; admin, owner, and viewer get 403 even on unfiltered list', async () => {
       const member = await memberOf(Role.member);
       const admin = await memberOf(Role.admin);
+      const viewer = await memberOf(Role.viewer);
+      const memberSpace = (
+        await createSpaceUser(
+          { role: Role.member },
+          {
+            organization,
+            user: member.context.user,
+            organizationUser: member.entity,
+            space,
+          },
+        )
+      ).entity;
+      const memberWithSpaceApp = appFor(member.context.user, [member.entity], [memberSpace]);
 
       const writeOwn = await member.app.fetch(
         patch('/api/v1/setting', {
@@ -582,7 +599,58 @@ describe('Setting API module', () => {
       expect(writeOwn.status).toBe(200);
       const { data: memberSetting } = await parseSuccessBody<SettingRowResponse>(writeOwn);
 
-      for (const otherApp of [admin.app, ownerApp]) {
+      // Member reads & manages their own notifications.topics on OrganizationUser and SpaceUser
+      const writeMemberTopics = await memberWithSpaceApp.fetch(
+        patch('/api/v1/setting', {
+          resourceModel: 'OrganizationUser',
+          resourceOrganizationId: organization.id,
+          resourceUserId: member.context.user.id,
+          key: 'notifications.topics',
+          value: ['security', 'digest'],
+        }),
+      );
+      expect(writeMemberTopics.status).toBe(200);
+      const { data: memberTopicsRow } =
+        await parseSuccessBody<SettingRowResponse>(writeMemberTopics);
+      expect(memberTopicsRow.value).toEqual(['digest', 'security']);
+
+      const writeSpaceMemberTopics = await memberWithSpaceApp.fetch(
+        patch('/api/v1/setting', {
+          resourceModel: 'SpaceUser',
+          resourceOrganizationId: organization.id,
+          resourceSpaceId: space.id,
+          resourceUserId: member.context.user.id,
+          key: 'notifications.topics',
+          value: ['billing'],
+        }),
+      );
+      expect(writeSpaceMemberTopics.status).toBe(200);
+
+      // Member's unfiltered OrganizationUser list succeeds and resolves permission='operate' for notifications.topics
+      const memberList = await member.app.fetch(
+        get(
+          `/api/v1/setting?resourceModel=OrganizationUser&resourceOrganizationId=${organization.id}&resourceUserId=${member.context.user.id}`,
+        ),
+      );
+      expect(memberList.status).toBe(200);
+      const { data: memberListItems } =
+        await parseSuccessBody<(EffectiveSetting & { permission: string })[]>(memberList);
+      expect(memberListItems.find((i) => i.key === 'notifications.topics')).toMatchObject({
+        value: ['digest', 'security'],
+        permission: 'operate',
+      });
+
+      // Org admin, org owner, and org viewer get 403 on unfiltered list, single ID read, PATCH, and DELETE
+      for (const otherApp of [admin.app, ownerApp, viewer.app]) {
+        expect(
+          (
+            await otherApp.fetch(
+              get(
+                `/api/v1/setting?resourceModel=OrganizationUser&resourceOrganizationId=${organization.id}&resourceUserId=${member.context.user.id}`,
+              ),
+            )
+          ).status,
+        ).toBe(403);
         expect(
           (
             await otherApp.fetch(
@@ -593,6 +661,9 @@ describe('Setting API module', () => {
           ).status,
         ).toBe(403);
         expect((await otherApp.fetch(get(`/api/v1/setting/${memberSetting.id}`))).status).toBe(403);
+        expect((await otherApp.fetch(get(`/api/v1/setting/${memberTopicsRow.id}`))).status).toBe(
+          403,
+        );
         expect(
           (
             await otherApp.fetch(
@@ -606,12 +677,31 @@ describe('Setting API module', () => {
             )
           ).status,
         ).toBe(403);
+        expect(
+          (
+            await otherApp.fetch(
+              patch('/api/v1/setting', {
+                resourceModel: 'OrganizationUser',
+                resourceOrganizationId: organization.id,
+                resourceUserId: member.context.user.id,
+                key: 'notifications.topics',
+                value: ['inquiries'],
+              }),
+            )
+          ).status,
+        ).toBe(403);
         expect((await otherApp.fetch(del(`/api/v1/setting/${memberSetting.id}`))).status).toBe(403);
+        expect((await otherApp.fetch(del(`/api/v1/setting/${memberTopicsRow.id}`))).status).toBe(
+          403,
+        );
       }
 
-      // Member reads and resets their own preference cleanly
+      // Member reads and resets their own preferences cleanly
       expect((await member.app.fetch(get(`/api/v1/setting/${memberSetting.id}`))).status).toBe(200);
       expect((await member.app.fetch(del(`/api/v1/setting/${memberSetting.id}`))).status).toBe(204);
+      expect((await member.app.fetch(del(`/api/v1/setting/${memberTopicsRow.id}`))).status).toBe(
+        204,
+      );
     });
 
     it('blocks another user from reading or writing personal settings (403)', async () => {

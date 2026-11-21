@@ -210,7 +210,7 @@ export type AttributeWriteInspection = AttributeWriteInspectionOk | { ok: false;
  * - If `valueTypeField` is configured without a code registry, checks against that `valueType`.
  * - Never mutates or deduplicates plain `json` arrays or generic Layer 1 `valueJson` payloads.
  */
-export const inspectAttributeWrite = (
+export const attributeWriteInspection = (
   model: AttributeModelName | ModelName,
   row: Record<string, unknown>,
 ): AttributeWriteInspection => {
@@ -309,7 +309,7 @@ export const validateAttributeWrite = (
   model: AttributeModelName | ModelName,
   row: Record<string, unknown>,
 ): AttributeWriteInspectionOk => {
-  const result = inspectAttributeWrite(model, row);
+  const result = attributeWriteInspection(model, row);
   if (!result.ok) {
     throw new Error(result.errors.join('; '));
   }

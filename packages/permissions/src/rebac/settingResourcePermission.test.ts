@@ -237,7 +237,7 @@ describe('settingResourcePermissionFromDefinitions through the real check', () =
     expect(can(orgAdmin, record, 'read')).toBe(false);
   });
 
-  it('OrganizationUser & SpaceUser personal settings (member.autoAcceptInquiries): private to the member themselves', async () => {
+  it('OrganizationUser & SpaceUser personal settings (member.autoAcceptInquiries & notifications.topics): private to the member themselves', async () => {
     const orgMemberRecord = {
       key: 'member.autoAcceptInquiries',
       resourceModel: 'OrganizationUser',
@@ -253,12 +253,28 @@ describe('settingResourcePermissionFromDefinitions through the real check', () =
       resourceUserId: u1.id,
       resourceSpaceUser: spaceMember,
     };
+    const orgMemberTopics = {
+      key: 'notifications.topics',
+      resourceModel: 'OrganizationUser',
+      resourceOrganizationId: organization.id,
+      resourceUserId: u1.id,
+      resourceOrganizationUser: orgMember,
+    };
+    const spaceMemberTopics = {
+      key: 'notifications.topics',
+      resourceModel: 'SpaceUser',
+      resourceOrganizationId: organization.id,
+      resourceSpaceId: space.id,
+      resourceUserId: u1.id,
+      resourceSpaceUser: spaceMember,
+    };
 
     const memberSelf = await principal({ organization: Role.member }, u1.id);
     const orgAdmin = await principal({ organization: Role.admin }, u2.id);
     const orgOwner = await principal({ organization: Role.owner }, u2.id);
+    const orgViewer = await principal({ organization: Role.viewer }, 'u3');
 
-    for (const record of [orgMemberRecord, spaceMemberRecord]) {
+    for (const record of [orgMemberRecord, spaceMemberRecord, orgMemberTopics, spaceMemberTopics]) {
       expect(can(memberSelf, record, 'read')).toBe(true);
       expect(can(memberSelf, record, 'manage')).toBe(true);
 
@@ -267,7 +283,21 @@ describe('settingResourcePermissionFromDefinitions through the real check', () =
 
       expect(can(orgOwner, record, 'read')).toBe(false);
       expect(can(orgOwner, record, 'manage')).toBe(false);
+
+      expect(can(orgViewer, record, 'read')).toBe(false);
+      expect(can(orgViewer, record, 'manage')).toBe(false);
     }
+
+    // Same key (notifications.topics) on Organization uses the default manage/read levels
+    const orgTopics = {
+      key: 'notifications.topics',
+      resourceModel: 'Organization',
+      resourceOrganizationId: organization.id,
+      resourceOrganization: organization,
+    };
+    expect(can(orgAdmin, orgTopics, 'manage')).toBe(true);
+    expect(can(orgViewer, orgTopics, 'read')).toBe(true);
+    expect(can(orgViewer, orgTopics, 'manage')).toBe(false);
   });
 
   it('Project settings delegate through resourceProject for both org-owned and member-owned projects', async () => {

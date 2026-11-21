@@ -8,11 +8,11 @@ import {
   attributeWhereMultiSelectContainsAll,
   attributeWhereMultiSelectContainsAny,
   attributeWhereRange,
+  attributeWriteInspection,
   buildAttributeUpsertData,
   decodeAttributeValue,
   decodeStoredAttributeValue,
   encodeAttributeColumns,
-  inspectAttributeWrite,
   packAttributeValue,
   resolveEffectiveAttributeValues,
   unpackAttributeValue,
@@ -71,7 +71,7 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
         encodeAttributeColumns('setting', 'general.defaultTimezone', 'Not/A_Zone'),
       ).toThrow('Invalid value');
 
-      const disallowed = inspectAttributeWrite('setting', {
+      const disallowed = attributeWriteInspection('setting', {
         resourceModel: 'Project',
         key: 'member.autoAcceptInquiries',
         valueBoolean: true,
@@ -85,7 +85,7 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
         }),
       ).toThrow(/not valid for resourceModel='Project'/);
 
-      const mixed = inspectAttributeWrite('setting', {
+      const mixed = attributeWriteInspection('setting', {
         resourceModel: 'User',
         key: 'general.defaultTimezone',
         valueText: 'UTC',
@@ -93,7 +93,7 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
       });
       expect(mixed.ok).toBe(false);
 
-      const mixedWithJsonNull = inspectAttributeWrite('setting', {
+      const mixedWithJsonNull = attributeWriteInspection('setting', {
         resourceModel: 'User',
         key: 'general.defaultTimezone',
         valueText: 'UTC',
@@ -104,7 +104,7 @@ describe('Attribute model capability (5-column codec, operators, utils, Postgres
         expect(mixedWithJsonNull.errors.some((e) => e.includes('Prisma.JsonNull'))).toBe(true);
       }
 
-      const standaloneJsonNull = inspectAttributeWrite('setting', {
+      const standaloneJsonNull = attributeWriteInspection('setting', {
         resourceModel: 'User',
         key: 'notifications.quietHours',
         valueJson: Prisma.JsonNull,

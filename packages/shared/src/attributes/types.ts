@@ -58,6 +58,11 @@ export type AttributeValidationResult<T = unknown> =
   | { ok: true; value: T; columns: AttributeEncodedColumns }
   | { ok: false; issues: AttributeValidationIssue[] };
 
+/** Single permission action or per-resourceModel permission map with optional `default`. */
+export type AttributePermissionSpec<TAction extends string = string> =
+  | TAction
+  | ({ readonly default?: TAction } & Partial<Record<string, TAction>>);
+
 /** Base definition contract shared by any code-defined attribute field (Settings, etc.). */
 export type AttributeFieldDefinition<TKey extends string = string, TValue = unknown> = {
   readonly key: TKey;
@@ -69,8 +74,8 @@ export type AttributeFieldDefinition<TKey extends string = string, TValue = unkn
   readonly category?: string;
   readonly order?: number;
   readonly resourceModels?: readonly string[];
-  readonly permission?: string;
-  readonly readPermission?: string;
+  readonly permission?: AttributePermissionSpec;
+  readonly readPermission?: AttributePermissionSpec;
 };
 
 /** Declares a typed attribute field definition without side effects. */

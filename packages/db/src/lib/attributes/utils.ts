@@ -14,7 +14,7 @@ import {
 } from '@template/db/lib/attributes/registry';
 import type { EffectiveAttributeEntry } from '@template/db/lib/attributes/types';
 import type { ModelName } from '@template/db/utils/modelNames';
-import type { AttributeValueType } from '@template/shared/attributes';
+import { type AttributeValueType, attributePermissionForModel } from '@template/shared/attributes';
 
 type ResolveEffectiveOptions = {
   category?: string;
@@ -67,7 +67,7 @@ export const resolveEffectiveAttributeValues = (
       label: definition.label,
       description: definition.description,
       order: definition.order ?? 0,
-      permission: definition.permission ?? null,
+      permission: attributePermissionForModel(definition.permission, resourceModel) ?? null,
       defaultValue: definition.defaultValue,
       value,
       storedValue,

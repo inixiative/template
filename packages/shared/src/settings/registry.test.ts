@@ -5,20 +5,54 @@ import {
   SETTING_DEFINITIONS,
   SETTING_KEYS,
   SETTING_RESOURCE_MODELS,
+  SettingPermissionSpecSchema,
   settingCategoryForKey,
   settingDefinitionForKey,
   settingDefinitionForKeyOrThrow,
   settingDefinitionsForResourceModel,
+  settingPermissionForModel,
 } from '@template/shared/settings';
 import type { z } from 'zod';
 
 describe('SETTING_DEFINITIONS registry invariants', () => {
-  it('every definition key matches its map key and points at a registered category', () => {
+  it('every definition key matches its map key, points at a registered category, and resolves permissions for every listed resourceModel', () => {
     for (const [key, definition] of Object.entries(SETTING_DEFINITIONS)) {
       expect(definition.key as string).toBe(key);
       expect(settingCategoryForKey(definition.category)).toBeDefined();
       expect(definition.resourceModels.length).toBeGreaterThan(0);
+      expect(SettingPermissionSpecSchema.safeParse(definition.permission).success).toBe(true);
+      const readPerm = 'readPermission' in definition ? definition.readPermission : undefined;
+      if (readPerm !== undefined) {
+        expect(SettingPermissionSpecSchema.safeParse(readPerm).success).toBe(true);
+      }
+      for (const model of definition.resourceModels) {
+        expect(settingPermissionForModel(definition.permission, model)).toBeTruthy();
+        expect(settingPermissionForModel(readPerm, model, 'read')).toBeTruthy();
+      }
     }
+
+    expect(
+      settingPermissionForModel(
+        SETTING_DEFINITIONS['notifications.topics'].permission,
+        'OrganizationUser',
+      ),
+    ).toBe('operate');
+    expect(
+      settingPermissionForModel(
+        SETTING_DEFINITIONS['notifications.topics'].permission,
+        'Organization',
+      ),
+    ).toBe('manage');
+    expect(
+      settingPermissionForModel(
+        SETTING_DEFINITIONS['notifications.topics'].readPermission,
+        'SpaceUser',
+        'read',
+      ),
+    ).toBe('operate');
+    expect(() => settingPermissionForModel({ User: 'manage' }, 'Organization')).toThrow(
+      /no action or default/,
+    );
   });
 
   it('every non-null defaultValue validates cleanly under its valueType and Zod schema', () => {

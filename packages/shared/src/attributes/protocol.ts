@@ -8,6 +8,7 @@ import {
   ATTRIBUTE_COLUMN_NAMES,
   type AttributeColumnName,
   type AttributeEncodedColumns,
+  type AttributePermissionSpec,
   type AttributeTypedColumns,
   type AttributeValidationIssue,
   type AttributeValidationResult,
@@ -30,6 +31,17 @@ export const EMPTY_ATTRIBUTE_COLUMNS: AttributeEncodedColumns = {
   valueNumber: null,
   valueDate: null,
   valueJson: null,
+};
+
+/** Resolves a single action or per-resourceModel permission map for `resourceModel`. */
+export const attributePermissionForModel = <TAction extends string>(
+  spec: AttributePermissionSpec<TAction> | undefined,
+  resourceModel: string,
+  fallback?: TAction,
+): TAction | undefined => {
+  if (spec === undefined) return fallback;
+  if (typeof spec === 'string') return spec;
+  return spec[resourceModel] ?? spec.default ?? fallback;
 };
 
 /** The physical typed column holding values of `valueType`. */
