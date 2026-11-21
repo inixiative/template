@@ -549,4 +549,32 @@ describe('segment reconcile', () => {
     );
     reconciled.mockRestore();
   });
+
+  it('segmentMemberOwner hook validates createManyAndReturn batches and rejects mismatched owners', async () => {
+    const elsewhere = (await createSpace({}, { organization })).entity;
+    const outsider = (
+      await createUser({ email: `outsider-${nextFactorySequenceNumber()}@example.test` })
+    ).entity;
+    const outsiderRelationship = await customerOf(outsider, elsewhere);
+    const { entity: segment } = await createSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.static },
+      { space },
+    );
+
+    await db.segmentMember.createManyAndReturn({
+      data: [
+        { segmentId: segment.id, customerRelationshipId: acmeRelationship.id },
+        { segmentId: segment.id, customerRelationshipId: otherRelationship.id },
+      ],
+    });
+    expect((await segmentMemberCustomerRelationshipIds(segment.id)).sort()).toEqual(
+      [acmeRelationship.id, otherRelationship.id].sort(),
+    );
+
+    await expect(
+      db.segmentMember.createManyAndReturn({
+        data: [{ segmentId: segment.id, customerRelationshipId: outsiderRelationship.id }],
+      }),
+    ).rejects.toThrow(/is not a customer of the segment's Space/);
+  });
 });

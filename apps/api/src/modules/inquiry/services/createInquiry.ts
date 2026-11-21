@@ -7,7 +7,7 @@
 import type { z } from '@hono/zod-openapi';
 import type { HydratedRecord, Prisma } from '@template/db';
 import { hydrate } from '@template/db';
-import { InquiryStatus } from '@template/db/generated/client/enums';
+import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import type { ValidatedContext } from '#/lib/context/validatedRequestData';
 import { makeError } from '#/lib/errors';
@@ -39,17 +39,23 @@ export const createInquiry = async (
   const service = inquiryServices[body.type];
   const content = service.contentSchema.parse(body.content);
   validateInquiryTypeAcceptsSourceAndTargetModels(body.type, source.sourceModel, body.targetModel);
-  const target = await resolveInquiryTarget(c);
+  // why: resolve read-only before permission check so unauthorized callers cannot create guest users
+  const preAuthTarget = await resolveInquiryTarget(c, { allowCreateGuest: false });
 
   const partial = await hydrate('inquiry', {
     id: '',
     type: body.type,
     content,
     ...source,
-    ...target,
+    ...preAuthTarget,
   } as HydratedRecord);
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
+
+  const target =
+    preAuthTarget.targetModel === InquiryResourceModel.User && !preAuthTarget.targetUserId
+      ? await resolveInquiryTarget(c, { allowCreateGuest: true })
+      : preAuthTarget;
 
   await validateInquiryPreCreate(service, body.type, source, target, content);
 

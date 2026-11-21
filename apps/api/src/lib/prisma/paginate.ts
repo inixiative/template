@@ -63,18 +63,51 @@ type FindManyCursor<T extends AnyDelegate> =
   FindManyArgs<T> extends { cursor?: infer C } ? C : never;
 type FindManyDistinct<T extends AnyDelegate> =
   FindManyArgs<T> extends { distinct?: infer D } ? D : never;
-type PaginateOptions<T extends AnyDelegate> = {
+type PaginateOptions<
+  T extends AnyDelegate,
+  Include extends FindManyInclude<T> | undefined = FindManyInclude<T> | undefined,
+  Select extends FindManySelect<T> | undefined = FindManySelect<T> | undefined,
+  OmitOpt extends FindManyOmit<T> | undefined = FindManyOmit<T> | undefined,
+> = {
   orNullFields?: string[];
   searchPaths?: string[];
   bindings?: Record<string, RuleValue>;
   where?: FindManyWhere<T>;
   orderBy?: FindManyOrderBy<T>;
-  include?: FindManyInclude<T>;
-  omit?: FindManyOmit<T>;
-  select?: FindManySelect<T>;
+  include?: Include;
+  omit?: OmitOpt;
+  select?: Select;
   cursor?: FindManyCursor<T>;
   distinct?: FindManyDistinct<T>;
 };
+
+type PaginateResultItem<
+  T extends AnyDelegate,
+  TItem,
+  Include,
+  Select,
+  OmitOpt,
+> = unknown extends TItem
+  ? Result<
+      T,
+      ([Include] extends [undefined]
+        ? unknown
+        : FindManyInclude<T> extends Include
+          ? unknown
+          : { include: Include }) &
+        ([Select] extends [undefined]
+          ? unknown
+          : FindManySelect<T> extends Select
+            ? unknown
+            : { select: Select }) &
+        ([OmitOpt] extends [undefined]
+          ? unknown
+          : FindManyOmit<T> extends OmitOpt
+            ? unknown
+            : { omit: OmitOpt }),
+      'findMany'
+    >[number]
+  : TItem;
 
 type PaginationResult = {
   page: number;
@@ -153,15 +186,21 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
 
 export const paginate = async <
   T extends AnyDelegate,
-  TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
+  TItem = unknown,
   C extends ValidatedContext<'query', PaginationQuery> = ValidatedContext<'query', PaginationQuery>,
+  const Include extends FindManyInclude<T> | undefined = FindManyInclude<T> | undefined,
+  const Select extends FindManySelect<T> | undefined = FindManySelect<T> | undefined,
+  const OmitOpt extends FindManyOmit<T> | undefined = FindManyOmit<T> | undefined,
 >(
   c: C,
   delegate: T,
-  options?: PaginateOptions<T>,
-): Promise<PaginatedResult<TItem>> => {
+  options?: PaginateOptions<T, Include, Select, OmitOpt>,
+): Promise<PaginatedResult<PaginateResultItem<T, TItem, Include, Select, OmitOpt>>> => {
   const { page = 1, pageSize = 20, orderBy: rawOrderBy } = validatedQuery(c);
-  const { where, findManyOptions, callerOrderByOption } = await composeScopedFindMany(c, options);
+  const { where, findManyOptions, callerOrderByOption } = await composeScopedFindMany(
+    c,
+    options as PaginateOptions<T> | undefined,
+  );
 
   const orderBy = buildOrderBy({
     callerOrderBy: callerOrderByOption,
@@ -182,7 +221,7 @@ export const paginate = async <
   ]);
 
   return {
-    data,
+    data: data as PaginateResultItem<T, TItem, Include, Select, OmitOpt>[],
     pagination: {
       page,
       pageSize,
@@ -241,20 +280,23 @@ type CursorPaginatedResult<T> = {
 // writes. No count() is issued — `hasMore` comes from fetching one row past the page.
 export const cursorPaginate = async <
   T extends AnyDelegate,
-  TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
+  TItem = unknown,
   C extends ValidatedContext<'query', CursorPaginationQuery> = ValidatedContext<
     'query',
     CursorPaginationQuery
   >,
+  const Include extends FindManyInclude<T> | undefined = FindManyInclude<T> | undefined,
+  const Select extends FindManySelect<T> | undefined = FindManySelect<T> | undefined,
+  const OmitOpt extends FindManyOmit<T> | undefined = FindManyOmit<T> | undefined,
 >(
   c: C,
   delegate: T,
-  options?: PaginateOptions<T>,
-): Promise<CursorPaginatedResult<TItem>> => {
+  options?: PaginateOptions<T, Include, Select, OmitOpt>,
+): Promise<CursorPaginatedResult<PaginateResultItem<T, TItem, Include, Select, OmitOpt>>> => {
   const { pageSize = DEFAULT_CURSOR_PAGE_SIZE, cursor } = validatedQuery(c);
   const { where, model, findManyOptions, callerOrderByOption } = await composeScopedFindMany(
     c as unknown as ValidatedContext<'query', PaginationQuery>,
-    options,
+    options as PaginateOptions<T> | undefined,
   );
   const chain = withTotalOrder(model, normalizeChain(callerOrderByOption));
   // The token binds to the composed filter — lens narrowing, search, live scope and the caller's
@@ -292,5 +334,8 @@ export const cursorPaginate = async <
         )
       : null;
 
-  return { data, pagination: { pageSize, hasMore, nextCursor } };
+  return {
+    data: data as PaginateResultItem<T, TItem, Include, Select, OmitOpt>[],
+    pagination: { pageSize, hasMore, nextCursor },
+  };
 };

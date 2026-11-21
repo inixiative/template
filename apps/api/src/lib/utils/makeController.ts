@@ -7,11 +7,8 @@
  */
 import type { RouteConfig, RouteHandler } from '@hono/zod-openapi';
 import type { Env, TypedResponse } from 'hono';
-import { ZodError, type ZodSchema, z } from 'zod';
-import {
-  type ResponseMetadata,
-  ResponseMetadataSchema,
-} from '#/lib/routeTemplates/responseMetadata';
+import { ZodError, type ZodType, z } from 'zod';
+import type { ResponseMetadata } from '#/lib/routeTemplates/responseMetadata';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import { isAuthProbe } from '#/lib/utils/authProbe';
 import type { AppEnv } from '#/types/appEnv';
@@ -21,23 +18,46 @@ type StatusCodesFromRoute<TRoute extends RouteConfig> = TRoute extends { respons
   ? keyof R & number
   : never;
 
-type TypedResponders<TRoute extends RouteConfig, T> = (200 extends StatusCodesFromRoute<TRoute>
-  ? { ok: (data: T, metadata?: ResponseMetadata) => TypedResponse }
-  : EmptyRecord) &
+type ResponseSchemaFor<TRoute extends RouteConfig, S extends number> = TRoute extends {
+  responses: Record<S, { content: { 'application/json': { schema: infer Schema } } }>;
+}
+  ? Schema
+  : never;
+
+type ResponseDataFor<TRoute extends RouteConfig, S extends number> =
+  ResponseSchemaFor<TRoute, S> extends z.ZodObject<{ data: infer D extends ZodType }>
+    ? z.input<D>
+    : unknown;
+
+type PaginationMetadataFor<TRoute extends RouteConfig> =
+  ResponseSchemaFor<TRoute, 200> extends z.ZodObject<{ pagination: infer P extends ZodType }>
+    ? { pagination: z.input<P> }
+    : never;
+
+type OkResponder<TRoute extends RouteConfig, T> = [PaginationMetadataFor<TRoute>] extends [never]
+  ? { ok: (data: T) => TypedResponse }
+  : { ok: (data: T, metadata: PaginationMetadataFor<TRoute>) => TypedResponse };
+
+type TypedResponders<
+  TRoute extends RouteConfig,
+  T200,
+  T201,
+> = (200 extends StatusCodesFromRoute<TRoute> ? OkResponder<TRoute, T200> : EmptyRecord) &
   (201 extends StatusCodesFromRoute<TRoute>
-    ? { created: (data: T, location?: string) => TypedResponse }
+    ? { created: (data: T201, location?: string) => TypedResponse }
     : EmptyRecord) &
   (204 extends StatusCodesFromRoute<TRoute> ? { noContent: () => TypedResponse } : EmptyRecord);
 
-type ResponderBag<T> = {
-  ok?: (data: T, metadata?: ResponseMetadata) => TypedResponse;
-  created?: (data: T, location?: string) => TypedResponse;
+type ResponderBag = {
+  ok?: (data: unknown, metadata?: ResponseMetadata) => TypedResponse;
+  created?: (data: unknown, location?: string) => TypedResponse;
   noContent?: () => TypedResponse;
 };
 
 type JsonResponseSchema = {
   shape: {
-    data: ZodSchema<unknown>;
+    data: ZodType<unknown>;
+    pagination?: ZodType<unknown>;
   };
 };
 
@@ -51,7 +71,7 @@ type JsonResponseDefinition = {
 
 type JsonResponseBody = {
   data: unknown;
-  pagination?: ResponseMetadata['pagination'];
+  pagination?: unknown;
 };
 
 type RefinableRoute = Pick<RouteArgs, 'bodyRefinement' | 'queryRefinement' | 'paramsRefinement'>;
@@ -61,11 +81,15 @@ type ValidatedRequest = { valid: (target: 'json' | 'query' | 'param') => unknown
 // Extract the context type from RouteHandler
 type RouteContext<R extends RouteConfig, E extends Env> = Parameters<RouteHandler<R, E>>[0];
 
-export const makeController = <R extends RouteConfig, T>(
+export const makeController = <
+  R extends RouteConfig,
+  T200 = ResponseDataFor<R, 200>,
+  T201 = ResponseDataFor<R, 201>,
+>(
   route: R,
   handler: (
     c: RouteContext<R, AppEnv>,
-    respond: TypedResponders<R, T>,
+    respond: TypedResponders<R, T200, T201>,
   ) => TypedResponse | Promise<TypedResponse>,
 ): RouteHandler<R, AppEnv> => {
   const { bodyRefinement, queryRefinement, paramsRefinement } = route as RefinableRoute;
@@ -94,24 +118,23 @@ export const makeController = <R extends RouteConfig, T>(
     }
 
     const statusCodes = Object.keys(route.responses || {}).map(Number);
-    const responders: ResponderBag<T> = {};
+    const responders: ResponderBag = {};
 
     if (statusCodes.includes(200) && route.responses?.[200]) {
       const response = route.responses[200] as unknown as JsonResponseDefinition;
       const responseSchema = response.content['application/json'].schema;
       if (!responseSchema) throw new Error('Route declares 200 response but missing schema');
-      responders.ok = (data: T, metadata?: ResponseMetadata) => {
-        const dataSchema = responseSchema.shape.data;
-        const validatedData = parseResponseOrThrow500(dataSchema, data);
-
+      responders.ok = (data: unknown, metadata?: ResponseMetadata) => {
+        const validatedData = parseResponseOrThrow500(responseSchema.shape.data, data);
         const responseObj: JsonResponseBody = { data: validatedData };
 
-        if (metadata) {
-          const validatedMetadata = parseResponseOrThrow500(ResponseMetadataSchema, metadata);
-
-          if (validatedMetadata.pagination) {
-            responseObj.pagination = validatedMetadata.pagination;
-          }
+        if (responseSchema.shape.pagination) {
+          responseObj.pagination = parseResponseOrThrow500(
+            responseSchema.shape.pagination,
+            metadata?.pagination,
+          );
+        } else if (metadata?.pagination !== undefined) {
+          throw new Error('Route does not declare pagination metadata');
         }
 
         return c.json(responseObj, 200);
@@ -122,10 +145,9 @@ export const makeController = <R extends RouteConfig, T>(
       const response = route.responses[201] as unknown as JsonResponseDefinition;
       const responseSchema = response.content['application/json'].schema;
       if (!responseSchema) throw new Error('Route declares 201 response but missing schema');
-      responders.created = (data: T, location?: string) => {
+      responders.created = (data: unknown, location?: string) => {
         if (location) c.header('Location', location);
-        const dataSchema = responseSchema.shape.data;
-        const validatedData = parseResponseOrThrow500(dataSchema, data);
+        const validatedData = parseResponseOrThrow500(responseSchema.shape.data, data);
         return c.json({ data: validatedData }, 201);
       };
     }
@@ -134,7 +156,7 @@ export const makeController = <R extends RouteConfig, T>(
       responders.noContent = () => c.body(null, 204);
     }
 
-    const typedResponders = responders as unknown as TypedResponders<R, T>;
+    const typedResponders = responders as unknown as TypedResponders<R, T200, T201>;
 
     return handler(c, typedResponders);
   };
@@ -152,7 +174,7 @@ export class ResponseValidationError extends Error {
   }
 }
 
-const parseResponseOrThrow500 = <T>(schema: ZodSchema<T>, data: unknown): T => {
+const parseResponseOrThrow500 = <T>(schema: ZodType<T>, data: unknown): T => {
   try {
     return schema.parse(data);
   } catch (error) {

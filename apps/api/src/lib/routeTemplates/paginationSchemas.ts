@@ -32,10 +32,10 @@ export const paginateRequestSchema = z
 
 export const paginateResponseSchema = z
   .object({
-    page: z.number().min(1).default(1).openapi({ example: 1 }),
-    pageSize: z.number().min(1).max(10_000).default(10).openapi({ example: 10 }),
-    total: z.number().min(0).default(0).openapi({ example: 100 }),
-    totalPages: z.number().min(0).default(0).openapi({ example: 10 }),
+    page: z.number().min(1).openapi({ example: 1 }),
+    pageSize: z.number().min(1).max(10_000).openapi({ example: 10 }),
+    total: z.number().min(0).openapi({ example: 100 }),
+    totalPages: z.number().min(0).openapi({ example: 10 }),
   })
   .openapi('PaginateResponse');
 

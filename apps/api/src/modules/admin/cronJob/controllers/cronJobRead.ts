@@ -9,6 +9,6 @@ import { makeController } from '#/lib/utils/makeController';
 import { cronJobReadRoute } from '#/modules/admin/cronJob/routes/cronJobRead';
 
 export const cronJobReadController = makeController(cronJobReadRoute, async (c, respond) => {
-  const cronJob = contextResource(c);
+  const cronJob = contextResource<'cronJob'>(c);
   return respond.ok(cronJob);
 });

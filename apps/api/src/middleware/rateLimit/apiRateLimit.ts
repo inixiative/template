@@ -5,6 +5,7 @@
  * @uses primitive:requestContext, primitive:batch
  */
 import type { Context, MiddlewareHandler, Next } from 'hono';
+import { isBatchSubRequest } from '#/lib/context/isBatchSubRequest';
 import { isSystemProbe } from '#/lib/utils/authProbe';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { rateLimit } from '#/middleware/rateLimit/rateLimit';
@@ -35,10 +36,6 @@ const limiter = rateLimit([
     key: organizationRateLimitKey,
   },
 ]);
-
-// A batch's sub-requests were paid for by the batch request. The x-batch-id header alone is spoofable; the
-// transaction prepareRequestMiddleware resolves from the batch registry is not.
-const isBatchSubRequest = (c: Context<AppEnv>): boolean => c.get('txn') !== undefined;
 
 // Server-initiated re-authorization probes spend no caller budget; client-driven probes and reads still do.
 export const apiRateLimit: MiddlewareHandler<AppEnv> = (c: Context<AppEnv>, next: Next) =>

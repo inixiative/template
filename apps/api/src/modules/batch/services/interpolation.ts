@@ -8,6 +8,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import {
   type BatchInterpolationReference,
+  type BatchInterpolationToken,
   decodePercentEncodedBatchReferences,
   tokenizeBatchInterpolation,
 } from '@template/shared/batchInterpolation';
@@ -42,10 +43,10 @@ const navigateFieldPath = (value: unknown, path: string): unknown => {
   return result;
 };
 
-const resolveReference = (
+const referenceValue = (
   { raw, round, request, fieldPath }: BatchInterpolationReference,
   context: InterpolationContext,
-): string => {
+): unknown => {
   if (!isValidPathNotation(fieldPath)) {
     throw new Error(`Invalid interpolation path: ${raw}`);
   }
@@ -84,19 +85,30 @@ const resolveReference = (
     );
   }
 
-  return String(result);
+  return result;
 };
+
+const referenceString = (
+  reference: BatchInterpolationReference,
+  context: InterpolationContext,
+): string => String(referenceValue(reference, context));
+
+const renderTokens = (
+  tokens: BatchInterpolationToken[],
+  context: InterpolationContext,
+  encodeResolved: (resolved: string) => string = (resolved) => resolved,
+): string =>
+  tokens
+    .map((token) =>
+      token.kind === 'text' ? token.value : encodeResolved(referenceString(token, context)),
+    )
+    .join('');
 
 const interpolateString = (
   value: string,
   context: InterpolationContext,
-  encodeResolved: (resolved: string) => string = (resolved) => resolved,
-): string =>
-  tokenizeBatchInterpolation(value)
-    .map((token) =>
-      token.kind === 'text' ? token.value : encodeResolved(resolveReference(token, context)),
-    )
-    .join('');
+  encodeResolved?: (resolved: string) => string,
+): string => renderTokens(tokenizeBatchInterpolation(value), context, encodeResolved);
 
 const DOT_SEGMENTS = ['.', '..'];
 
@@ -119,7 +131,11 @@ const interpolateHeaders = (
 
 export const interpolateValue = (value: unknown, context: InterpolationContext): unknown => {
   if (typeof value === 'string') {
-    return interpolateString(value, context);
+    const tokens = tokenizeBatchInterpolation(value);
+    if (tokens.length === 1 && tokens[0]?.kind === 'reference') {
+      return referenceValue(tokens[0], context);
+    }
+    return renderTokens(tokens, context);
   }
 
   if (Array.isArray(value)) {
@@ -144,7 +160,7 @@ export const interpolateRequest = (
   return {
     ...request,
     path: interpolatePath(request.path, context),
-    body: request.body ? interpolateValue(request.body, context) : undefined,
+    body: request.body !== undefined ? interpolateValue(request.body, context) : undefined,
     headers: request.headers ? interpolateHeaders(request.headers, context) : undefined,
   };
 };

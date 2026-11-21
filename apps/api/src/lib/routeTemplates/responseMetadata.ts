@@ -1,20 +1,14 @@
 /**
  * @atlas
- * @kind schema
+ * @kind type
  * @partOf primitive:routeTemplates
  * @uses none
  */
-import { z } from 'zod';
+import type {
+  CursorPaginationMetadata,
+  PaginationMetadata,
+} from '#/lib/routeTemplates/paginationSchemas';
 
-export const ResponseMetadataSchema = z.object({
-  pagination: z
-    .object({
-      page: z.number().optional(),
-      pageSize: z.number().optional(),
-      total: z.number(),
-      totalPages: z.number().optional(),
-    })
-    .optional(),
-});
-
-export type ResponseMetadata = z.infer<typeof ResponseMetadataSchema>;
+export type ResponseMetadata =
+  | { pagination: PaginationMetadata }
+  | { pagination: CursorPaginationMetadata };
