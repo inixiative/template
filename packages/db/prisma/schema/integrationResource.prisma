@@ -5,7 +5,9 @@
 // `externalId`. Soft-deleted with its integration and revived with it, so the entitlements anchored
 // at it and the rules naming it are degraded (sourceDeletedAt, targetDeletedAt), never left
 // pointing at a live row under a dead integration. A removed resource can be registered again: the
-// unique holds over live rows only.
+// unique holds over live rows only. `status` says whether we listen to it: `tracked`, `missing` (the
+// provider does not show it, now or yet) or `untracked` (the owner stopped caring: kept with its
+// grants, out of every list and flow, and never brought back by a sync).
 
 model IntegrationResource {
   id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
@@ -19,6 +21,7 @@ model IntegrationResource {
   kind       String
   externalId String
   metadata   Json
+  status     IntegrationResourceStatus @default(tracked)
 
   integrationId String      @db.VarChar(36)
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
@@ -31,4 +34,10 @@ model IntegrationResource {
 
   @@unique([integrationId, kind, externalId], where: raw("\"deletedAt\" IS NULL"), map: "IntegrationResource_integration_kind_externalId_key")
   @@index([integrationId])
+}
+
+enum IntegrationResourceStatus {
+  tracked
+  missing
+  untracked
 }
