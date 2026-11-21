@@ -12,6 +12,7 @@ import { uuidV7Schema } from '@template/shared/utils';
 
 export const integrationResourceCreateBodySchema = IntegrationResourceScalarInputSchema.omit({
   integrationId: true,
+  status: true,
 }).extend({
   name: z.string().trim().min(1).max(120),
   kind: z.string().min(1).max(80),

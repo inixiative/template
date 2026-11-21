@@ -106,7 +106,13 @@ export const rebacSchema: RebacSchema = {
       }),
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
-    'db:integrationResource': { actions: { ...ownerActions(['integration']), create: 'manage' } },
+    'db:integrationResource': {
+      actions: {
+        ...ownerActions(['integration']),
+        create: 'manage',
+        delete: { any: ['manage', { rel: 'integration', action: 'delete' }] },
+      },
+    },
     'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
     'db:projectIntegrationResource': {
       actions: {

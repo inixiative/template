@@ -2,7 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:integrations
- * @uses primitive:routeTemplates
+ * @uses primitive:routeTemplates, primitive:authz
  */
 import { updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
