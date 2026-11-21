@@ -17,7 +17,6 @@ import { validateTokenWrite } from '#/modules/token/validations/validateTokenWri
 type Holder = Record<string, unknown>;
 type Changes = Required<{ [K in keyof EntitlementChanges]: unknown[] }>;
 
-// why: minting on a tenant needs only access to it; taking a token's row away is administering the token
 const validateTokenWriter = async (writer: Permix, token: Holder, { add, remove }: Changes) => {
   const row = await hydrate('token', token as HydratedRecord);
   if (add.length) {

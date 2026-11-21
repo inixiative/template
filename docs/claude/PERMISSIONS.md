@@ -66,6 +66,12 @@
   - [How `check()` merges](#how-check-merges)
   - [Boundary validation](#boundary-validation)
   - [When to use it](#when-to-use-it)
+- [Tenant Rules](#tenant-rules)
+  - [Shape](#shape)
+  - [Which tenants a record reads](#which-tenants-a-record-reads)
+  - [Writing it](#writing-it)
+  - [Limits to know](#limits-to-know)
+  - [What a tenant may extend](#what-a-tenant-may-extend)
 - [Space Permissions](#space-permissions)
 - [Validation Middleware](#validation-middleware)
   - [validatePermission](#validatepermission)
@@ -348,13 +354,15 @@ So U1 adds I1 on M1 as a member of O1; a viewer of O1 adds none, and a role toke
 
 Every create-token route calls `createToken` (`apps/api/src/modules/me/services/createToken.ts`), which checks `create` on a pseudo token. The rule is `actorIsUser` and `actorMayCreateTokenAtOwnerWithRole`:
 
-- the owner is a tenant, or a user you manage (a token on M1 carries U1, so only U1 mints on M1);
+- the owner is an organization or space you may `manage` (admin and above), or a user you manage (a token on M1 carries U1, so only U1 mints on M1). A member below admin mints on their own user, member row and integrations, and a token on a member row or its integration ends with the membership; a tenant's token is durable, and outlasts the admin who minted it;
 - for a token on an integration, the same is asked of the integration's owner;
 - the role is any role when the chain ends at a user or a member row (it is capped at use), and otherwise a role you hold at the owner (`roleHeldAtOwner`; for an integration's token, at the integration's owner).
 
 Then `validateDelegateRole` refuses a role on a token whose integration has no role and is not `full` (422: the role would narrow nothing), `validateFullGrant` runs when the body sets `full` ([Full and delegateFull](#full-and-delegatefull)). The token row and its entitlements are written in one transaction: the token first, then the body's entries through the one writer, `changeEntitlements` ([Changing Entitlements](#changing-entitlements)), which checks every entry. A token with no role and no entitlements is minted and holds nothing. Creating an integration does the same (`apps/api/src/modules/integration/services/createIntegration.ts`).
 
-`PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`. A token never changes itself.
+`PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`, so changing a tenant's token takes `manage` on the tenant too. A token never changes itself.
+
+An entitlement on a token is its own row, anchored at the resource: one an admin copied onto a tenant's token stays when the admin's own row is revoked. Revoke it on the token.
 
 ---
 
@@ -526,7 +534,7 @@ An entitlement held with no `where` and no lens grants below its record, as a ro
 
 Situations: `apps/api/src/lib/permissions/memberGrantsBelowItself.test.ts`.
 
-Every added entry goes through this check, whoever writes it and whatever delegate it lands on. A removal does not: it takes administering the record that holds the row (the check each remove route runs on the holder), not the right to grant it, so an admin who manages a member removes what an owner granted that member. On a token that check is `delete` (administering it), not the `create` check its add route runs: minting on a tenant needs only access to the tenant, and that must not be enough to strip a token's rows. Why: taking away never hands on authority, and whoever administers a holder could already remove it whole (Aron, 2026-11-16: "Removal takes slightly fewer permissions than granting. It just takes ownership over the record, not necessarily over the entitlement"). A malformed entry or an anchor that does not exist is 422; a refusal is 403.
+Every added entry goes through this check, whoever writes it and whatever delegate it lands on. A removal does not: it takes administering the record that holds the row (the check each remove route runs on the holder), not the right to grant it, so an admin who manages a member removes what an owner granted that member. On a token that check is `delete` (administering it), not the `create` check its add route runs. Why: taking away never hands on authority, and whoever administers a holder could already remove it whole (Aron, 2026-11-16: "Removal takes slightly fewer permissions than granting. It just takes ownership over the record, not necessarily over the entitlement"). A malformed entry or an anchor that does not exist is 422; a refusal is 403.
 
 Each pseudo record is built from the anchor down the path: the foreign keys the parent knows, one record per kind the step admits, each with its owner placed under the anchor, ids below the anchor unknown, plus the `where`'s exact `equals` values. The `where`'s root leaves (the `where` itself, or each leaf of its top `all`; nothing nested) on the kind field are checked on each kind the first step admits, and a kind a leaf fails is dropped. So, for the owner and an admin of O1:
 
@@ -765,13 +773,14 @@ model Contact {
 Inside the library's rebac check (`createRebacCheck` in `@inixiative/permissions`, bound by `packages/permissions/src/rebac/check.ts`), when resolving an action by name:
 
 ```typescript
-const schemaRule = schema[model]?.actions[actionOrRule] ?? null;
-const rowRule    = record.permissionRules?.[actionOrRule];
-const merged: ActionRule = rowRule !== undefined
-  ? { any: [schemaRule, rowRule] }
-  : schemaRule;
+const schemaRule  = schema[model]?.actions[actionOrRule] ?? null;
+const rowRule     = record.permissionRules?.[actionOrRule];
+const tenantRules = /* each tenant up the owner chain: tenantPermissionRules[model][actionOrRule] */;
+const merged: ActionRule = { any: [schemaRule, rowRule, ...tenantRules] };
 return check(permix, schema, model, record, merged, visited);
 ```
+
+A rule that is absent is left out. [Tenant rules](#tenant-rules) come in through the same merge.
 
 **Additive only.** Row rules grant additional paths and never restrict; the schema rule is the floor. `read: { all: [] }` opens the row to any authenticated requester; `read: null` does not take `read` from the owner.
 
@@ -790,7 +799,80 @@ The schema validates the `ActionRule` envelope and passes the inner json-rules `
 
 ### When to use it
 
-Use it for opt-in sharing of individual records (sharing a contact, publishing an asset), with a narrow set of overridable actions, typically `read` only. If every row needs the same override, it belongs in the schema rule.
+Use it for opt-in sharing of individual records (sharing a contact, publishing an asset), with a narrow set of overridable actions, typically `read` only. If every row of one tenant needs the same override, it belongs in that tenant's [`tenantPermissionRules`](#tenant-rules). If every row everywhere needs it, it belongs in the schema rule.
+
+---
+
+## Tenant Rules
+
+The schema is code, and every tenant gets the same one. A tenant can add its own ways to qualify for an action, stored as data: `tenantPermissionRules` on `User`, `Organization` and `Space`. It is the tenant's own extension of the schema for the records under it.
+
+**It only widens.** `check()` ORs a tenant's rule with the schema rule, so a tenant can open an action and can never make one stricter. It cannot add an action either: the keys are the resources and actions the schema already has.
+
+**It is not an entitlement.** An entitlement gives one named holder an action. A tenant rule changes what the schema accepts, for anyone who matches it.
+
+### Shape
+
+```prisma
+model Organization {
+  // ...
+  tenantPermissionRules Json?  // Record<Resource, Record<Action, ActionRule>> | null
+}
+```
+
+```json
+{ "db:contact": { "read": true } }
+```
+
+Every contact under this organization is now readable by anyone signed in. A rule can be any `ActionRule`: `true`, a relation walk, a json-rules condition on the record and on who is acting, or `any` / `all` of those. Per resource it is the same shape as a row's `permissionRules`.
+
+### Which tenants a record reads
+
+`tenantRowsAbove(record)` (`@template/db`) names them from the hydrated record: its space, then the organization (its own, or the space's). So an organization's rule reaches the records of its spaces, and a space's rule reaches only that space. The id columns say who holds the record: one with `organizationId` or `spaceId` set whose tenant row did not load (a deleted organization) reads no rules, and never falls to its user's.
+
+**A user's rules reach only what no organization or space holds.** A member row, and a project, token or integration a member row owns, carry `userId` too. They belong to the organization, so they read its rules and never the member's personal ones. Otherwise a member could open what they hold for an organization to people outside it.
+
+`tenantPermissionRulesAbove` (`packages/permissions/src/rebac/tenantPermissionRules.ts`) reads each of those rows' rules for the record's resource and hands them, cut to what that tenant's lens shows, to the library as `additionalRules`. The library ORs them in, in the [one merge](#how-check-merges) a row rule uses, for every record a check reaches. The library knows nothing about tenants.
+
+A stored rule the library would refuse (not positive, a loop back to its own action, a read outside the lens) widens nothing. It never throws.
+
+### Writing it
+
+Only the tenant's owner writes it, through one route per tenant, gated on `own`:
+
+- `POST /organization/{id}/setTenantPermissionRules`
+- `POST /space/{id}/setTenantPermissionRules`
+- `POST /me/setTenantPermissionRules`
+
+The body is `{ tenantPermissionRules }`; `null` clears it. `tenantPermissionRulesSchema(tenantModel)` refuses what the tenant's lens hides ([What a tenant may extend](#what-a-tenant-may-extend)), then validates each resource's rules with `buildPermissionRulesSchema`, the builder a row's `permissionRules` uses: an unknown resource, an unknown action, a rule that is not positive or one that loops back to its own action is a 422.
+
+### Limits to know
+
+- **Lists are authorised once, on a stand-in record** that carries the owner keys and no other column. A rule with no condition on the record opens the list as well as each record. A rule with a condition on the record (`label equals 'public'`) opens the single records that match and leaves the list at 403: the list is not filtered row by row.
+- **A null comparison in a rule would open a whole list**, because it holds on the stand-in. The library refuses one in a stored rule from the release that carries the actor model (`permissions` #38). Tenant rules must not ship on a build without it.
+- **The frontend does not see tenant rules.** `canActOnRecordIfPresent` checks the record the API returned, which does not carry its tenant rows. The UI can hide an action the API allows.
+- **The rules are part of the tenant row.** Whoever can read an organization, space or user row reads its `tenantPermissionRules`.
+- **Two stored rules that delegate to each other are both dropped.**
+
+### What a tenant may extend
+
+`tenantPermissionRulesLens(tenantModel)` (`packages/permissions/src/rebac/tenantPermissionRulesLens.ts`) says it, as a json-rules lens over the schema itself: the schema is read as a field map (a resource is a model, an action a column), and the lens turns on the resources and shows the actions a tenant of that kind may extend. `tenantPermissionRulesSchema(tenantModel)` walks every `resource.action` in a body with `walkLensPath` and refuses one the lens hides (422). Why a lens: an app narrows it with the functions it already has (`picks`, `omits`, a layer on top), and layers only get darker.
+
+The default lens:
+
+- **Product records**, from a short list in that file (`resourcesATenantMayExtend`: contacts and segments; an app adds its own below the template line). Why a list: a resource added later is closed until someone turns it on.
+- **An organization's spaces, to `read` or `operate` only.** An organization that wants its spaces open says so once: `{ "db:space": { "read": { "rel": "organization", "action": "read" } } }` lets whoever reads the organization read every space (`true` would mean anyone signed in). `operate` makes them a member of each: they read its members and integrations and use its integrations.
+- **Never `manage` on a space, and never the rest of the permission system's own**: a member row, a token, an integration, an inquiry, a sign-in provider. An action there is a gate on handing authority on. `manage` on a space is what minting its tokens, writing its members' roles, creating its integrations and resolving its inquiries ask, and rules are read at every row a check walks through, so a `manage` rule would open all of them through the space; a token minted that way would outlive the rule. `read` and `operate` mint no token, write no role and resolve no inquiry: minting a tenant's token takes `manage` ([Minting a Token](#minting-a-token)).
+- **Only what the tenant can hold**, read off the tenant columns (`modelsHeldUnderTenant`, beside `tenantRowsAbove`): a space names what has `spaceId`; an organization that and what has `organizationId`, so its tenancy and everything below it; a user what has `userId` and no organization or space is required to hold.
+- **Never `own`**, on any resource.
+
+**What a rule on a space reaches beyond the space row.** Everything that asks the space: `read` reads its member rows, its integrations and its webhook subscriptions (URLs included) as well as its records. `operate` also uses the space's integrations (their stored credentials) and creates or changes its webhook subscriptions, which keep delivering after the rule is cleared. Under `operate`, a member below it also creates integrations and projects on their own member row.
+
+**A rule counts as something its reader holds when they grant.** The grant check reads tenant rules too, so whoever a rule covers can put that access on a holder as an entitlement. On a token or an integration it is live only: it stops when the rule is cleared. On a member row it outlasts the rule, because a member row's entitlements are backed by the tenant's owner.
+
+Still open, on purpose: `manage` on a shown resource goes around a lock the schema sets (`"db:contact": { "manage": true }` opens the login-mirror contact), and whoever a rule covers can hand that access to their own tokens as an entitlement. An app that wants less narrows the lens.
+
+The lens applies twice: when the rules are written (a hidden resource or action is a 422), and when they are read (`tenantPermissionRulesAbove` cuts each tenant's stored rules to the actions its lens shows, so a rule stored before the lens narrowed widens nothing).
 
 ---
 
