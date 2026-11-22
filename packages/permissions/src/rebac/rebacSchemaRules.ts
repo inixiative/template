@@ -90,8 +90,11 @@ export const memberRowActions = (tenant: 'organization' | 'space') => ({
   delegateFull: { all: [actorIsUser, 'operate'] },
 });
 
-export const ownedByYouOrOrganizationOrSpace = (at = ''): ActionRule => ({
-  any: [ownerModelIsOneOf(organizationOrSpace, at), actorManagesRecordUser(at)],
+export const ownedByYouOrOrganizationOrSpaceYouManage = (at = ''): ActionRule => ({
+  any: [
+    actorMayPerformActionOnOwner('manage', at, organizationOrSpace),
+    actorManagesRecordUser(at),
+  ],
 });
 
 export const actorOperatesOwnerUserOrManagesOwnerTenant: ActionRule = {
@@ -174,14 +177,14 @@ export const actorMayCreateTokenAtOwnerWithRole: ActionRule = {
     {
       all: [
         ownerModelIsOneOf(notIntegration),
-        ownedByYouOrOrganizationOrSpace(),
+        ownedByYouOrOrganizationOrSpaceYouManage(),
         { any: [ownerModelIsOneOf(['User', ...members]), roleHeldAtOwner('', notIntegration)] },
       ],
     },
     {
       all: [
         ownerModelIsOneOf(['Integration']),
-        ownedByYouOrOrganizationOrSpace('integration.'),
+        ownedByYouOrOrganizationOrSpaceYouManage('integration.'),
         {
           any: [
             ownerModelIsOneOf(['User', ...members], 'integration.'),

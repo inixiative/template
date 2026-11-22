@@ -348,13 +348,15 @@ So U1 adds I1 on M1 as a member of O1; a viewer of O1 adds none, and a role toke
 
 Every create-token route calls `createToken` (`apps/api/src/modules/me/services/createToken.ts`), which checks `create` on a pseudo token. The rule is `actorIsUser` and `actorMayCreateTokenAtOwnerWithRole`:
 
-- the owner is a tenant, or a user you manage (a token on M1 carries U1, so only U1 mints on M1);
+- the owner is an organization or space you may `manage` (admin and above), or a user you manage (a token on M1 carries U1, so only U1 mints on M1). A member below admin mints on their own user, member row and integrations, and a token on a member row or its integration ends with the membership; a tenant's token is durable, and outlasts the admin who minted it;
 - for a token on an integration, the same is asked of the integration's owner;
 - the role is any role when the chain ends at a user or a member row (it is capped at use), and otherwise a role you hold at the owner (`roleHeldAtOwner`; for an integration's token, at the integration's owner).
 
 Then `validateDelegateRole` refuses a role on a token whose integration has no role and is not `full` (422: the role would narrow nothing), `validateFullGrant` runs when the body sets `full` ([Full and delegateFull](#full-and-delegatefull)). The token row and its entitlements are written in one transaction: the token first, then the body's entries through the one writer, `changeEntitlements` ([Changing Entitlements](#changing-entitlements)), which checks every entry. A token with no role and no entitlements is minted and holds nothing. Creating an integration does the same (`apps/api/src/modules/integration/services/createIntegration.ts`).
 
-`PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`. A token never changes itself.
+`PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`, so changing a tenant's token takes `manage` on the tenant too. A token never changes itself.
+
+An entitlement on a token is its own row, anchored at the resource: one an admin copied onto a tenant's token stays when the admin's own row is revoked. Revoke it on the token.
 
 ---
 
@@ -526,7 +528,7 @@ An entitlement held with no `where` and no lens grants below its record, as a ro
 
 Situations: `apps/api/src/lib/permissions/memberGrantsBelowItself.test.ts`.
 
-Every added entry goes through this check, whoever writes it and whatever delegate it lands on. A removal does not: it takes administering the record that holds the row (the check each remove route runs on the holder), not the right to grant it, so an admin who manages a member removes what an owner granted that member. On a token that check is `delete` (administering it), not the `create` check its add route runs: minting on a tenant needs only access to the tenant, and that must not be enough to strip a token's rows. Why: taking away never hands on authority, and whoever administers a holder could already remove it whole (Aron, 2026-11-16: "Removal takes slightly fewer permissions than granting. It just takes ownership over the record, not necessarily over the entitlement"). A malformed entry or an anchor that does not exist is 422; a refusal is 403.
+Every added entry goes through this check, whoever writes it and whatever delegate it lands on. A removal does not: it takes administering the record that holds the row (the check each remove route runs on the holder), not the right to grant it, so an admin who manages a member removes what an owner granted that member. On a token that check is `delete` (administering it), not the `create` check its add route runs. Why: taking away never hands on authority, and whoever administers a holder could already remove it whole (Aron, 2026-11-16: "Removal takes slightly fewer permissions than granting. It just takes ownership over the record, not necessarily over the entitlement"). A malformed entry or an anchor that does not exist is 422; a refusal is 403.
 
 Each pseudo record is built from the anchor down the path: the foreign keys the parent knows, one record per kind the step admits, each with its owner placed under the anchor, ids below the anchor unknown, plus the `where`'s exact `equals` values. The `where`'s root leaves (the `where` itself, or each leaf of its top `all`; nothing nested) on the kind field are checked on each kind the first step admits, and a kind a leaf fails is dropped. So, for the owner and an admin of O1:
 
