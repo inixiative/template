@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { type Bridge, Operator } from '@inixiative/json-rules';
+import { type JoinedBridge, Operator } from '@inixiative/json-rules';
 import { createRebacCheck } from '@inixiative/permissions';
 import type { AccessorName } from '@template/db';
 import { createPermissions, type Permix } from '@template/permissions/client';
@@ -477,9 +477,9 @@ describe('rebac check', () => {
     });
   });
 
-  describe('a rule on __actor and the user relation', () => {
+  describe('a rule on who is acting and the user relation', () => {
     const isUser: ActionRule = {
-      rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
+      rule: { field: 'actor:Acting.model', operator: Operator.equals, value: 'User' },
     };
     const schema: RebacSchema = {
       permissions: {
@@ -957,7 +957,7 @@ describe('rebac check', () => {
 
   describe('cross-source bridge walks', () => {
     // crm:account (the "one") ↔ db:user (the "many"); db:user.accountId joins crm:account.id.
-    const bridges: Bridge[] = [
+    const bridges: JoinedBridge[] = [
       {
         endpoints: [
           { fieldMap: 'crm', model: 'account', on: 'id' },

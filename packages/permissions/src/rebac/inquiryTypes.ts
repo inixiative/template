@@ -44,7 +44,7 @@ export const INQUIRY_READ_LEVELS: Partial<
   Space: { action: 'manage', clear: ['UserId'] },
 };
 
-const role = (operator: Operator, value: string[] | null): ActionRule => ({
+const role = (operator: Operator, value: string[]): ActionRule => ({
   rule: { field: 'content.role', operator, value },
 });
 
@@ -65,7 +65,7 @@ export const INQUIRY_TYPES = {
             },
             {
               all: [
-                { any: [role(Operator.in, unprivilegedRoles), role(Operator.equals, null)] },
+                role(Operator.in, unprivilegedRoles),
                 { rel: 'sourceOrganization', action: 'manage' },
               ],
             },

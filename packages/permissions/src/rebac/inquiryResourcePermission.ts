@@ -15,6 +15,7 @@ import {
   type InquiryTypeParties,
   type PartyLevel,
 } from '@template/permissions/rebac/inquiryTypes';
+import { isNull, rowIsThereAnd } from '@template/permissions/rebac/rebacSchemaRules';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 
 export type InquirySide = 'source' | 'target';
@@ -58,21 +59,17 @@ const perType = (
   })),
 });
 
+// why: the kind arm is what a grant's stand-in can pass; the empty keys also admit what the party's own integrations, tokens and projects hold
 const rulesGrantingRead = (side: InquirySide, model: InquiryPartyModel): ActionRule[] => {
   const level = INQUIRY_READ_LEVELS[model];
   if (!level) return [];
   const rel: ActionRule = { rel: `${side}${model}`, action: level.action };
   if (!level.clear.length) return [rel];
-  return [
-    {
-      all: [
-        ...level.clear.map((key) => ({
-          rule: { field: `${side}${key}`, operator: Operator.equals, value: null },
-        })),
-        rel,
-      ],
-    },
-  ];
+  const sideKeysAreEmpty = rowIsThereAnd(
+    'id',
+    ...level.clear.map((key) => isNull(`${side}${key}`)),
+  );
+  return [{ all: [{ any: [isPartyModel(side, model), sideKeysAreEmpty] }, rel] }];
 };
 
 // db:inquiry, built from the party declarations: send is a source party's level for that type,
