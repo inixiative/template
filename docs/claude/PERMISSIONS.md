@@ -19,6 +19,7 @@
   - [Actions on Their Own Models](#actions-on-their-own-models)
   - [Person-Only Actions](#person-only-actions)
   - [The Actor](#the-actor)
+  - [Transitions](#transitions)
 - [Member Rows](#member-rows)
   - [The Member Self-Grant](#the-member-self-grant)
   - [Role Assignment](#role-assignment)
@@ -239,9 +240,27 @@ Some actions are for a person, not a token: minting and updating a token (`creat
 
 ### The Actor
 
-The table says what a principal holds. The actor says only who is acting: `permix.setActor(actorFromRecordOmittingSensitiveFields(model, record))` (`packages/permissions/src/actorFromRecordOmittingSensitiveFields.ts`) gives `{ model, record }`, with `model` `User` for a JWT or spoof and `Token` for any API token, and `record` the row's columns with its sensitive fields omitted. The check hands its rows to every rule as the supplied `actor` map (`packages/db/src/schemaMap.ts`): `actor:Acting.model` says which kind is acting, and `actor:User` or `actor:Token` is that kind's row. A token request gives no `actor:User` row, so a rule on one never passes for a token. Actor rules only gate person-only actions; who is related to what is decided by walking relations. With nobody acting, an actor rule denies and the table still answers everything else.
+The table says what a principal holds. The actor says only who is acting: `permix.setActor(actorFromRecordOmittingSensitiveFields(model, record))` (`packages/permissions/src/actorFromRecordOmittingSensitiveFields.ts`) gives `{ model, record }`, with `model` `User` for a JWT or spoof and `Token` for any API token, and `record` the row's columns with its sensitive fields omitted. The check hands its rows to every rule as the supplied `actor` map (`packages/db/src/schemaMap.ts`): `actor:Acting.model` says which kind is acting, and `actor:User` or `actor:Token` is that kind's row. A token request gives no `actor:User` row, so a rule on one never passes for a token. Actor rules gate person-only actions and say which kind of party a [transition](#transitions) allows (`actingAsAPerson`, `actingAsTheRecordsIntegration`); who is related to what is decided by walking relations. With nobody acting, an actor rule denies and the table still answers everything else.
 
 ---
+
+### Transitions
+
+Some writes are legal only from one state to another, and only for some parties: a member's role, an integration resource's status, registering a resource that was removed. They are `@inixiative/transitions` actions (`packages/permissions/src/transitions/`, keyed by the same `db:<model>` resources as the rebac schema). A transition's `from` side is checked against the row as it is, its `to` side against the row with the change merged; each side has a predicate (is this move legal) and a permission (an `ActionRule`, as anywhere in the schema).
+
+`assertTransition(permix, model, action, record, changes)` (`apps/api/src/lib/permissions/assertTransition.ts`) hydrates the row, runs `checkTransition` and evaluates each permission with template's own `check` (`packages/permissions/src/rebac/check.ts`, which supplies the actor rows). It throws 403 when a path's predicates held and only its permission failed, and 409 when no path's state allows the change. The library's `createAuthorize` is not used: it evaluates with a permix that holds nothing, so a `{ rel }` walk through the caller's grants never passes.
+
+Integration resource status (`changeStatus`; `PATCH /integrationResource/:id`). A person is a user, or a token owned by anything but an integration (`actingAsAPerson`); the resource's own integration is a token owned by an integration whose `integrationId` is the resource's (`actingAsTheRecordsIntegration`). Both need `manage` on the resource as well.
+
+| From → to | A person | The resource's own integration |
+|---|---|---|
+| unchanged | yes | yes |
+| tracked → untracked, untracked → tracked, missing → untracked | yes | no |
+| tracked → missing, missing → tracked | no | yes |
+
+Aron, 2026-11-22: "integration resources should be able to move missing to tracked, but should not be able to touch untracked." A token of a different integration fails even when granted `manage` on this one.
+
+Registering (`register`; `POST /integration/:id/integrationResources`) is the same moves crossed with whether the row exists: a new key is created tracked (`create`), a live row may make any move above, and a removed row may make any move above except staying untracked. So a removed untracked resource comes back only when a person registers it with `status: 'tracked'`; otherwise the answer is 409 (Aron, 2026-11-22: "You have to track it to revive it"), and an integration re-registering its resources never undoes a person's untrack.
 
 ## Member Rows
 
@@ -280,11 +299,10 @@ Who holds `operate` on M1, then: U1 through the walk; a `full` delegate of M1 (o
 
 ### Role Assignment
 
-Writing a member's role is `memberRoleWrite(tenant)`: `manage` at the tenant, and hold there the role being set (`owner` needs `own`, `admin` `manage`, `member` `operate`, `viewer` `read`). Controllers check it on the row as it is and as it will be:
+Writing a member's role is `memberRoleWrite(tenant)`: `manage` at the tenant, and hold there the role being set (`owner` needs `own`, `admin` `manage`, `member` `operate`, `viewer` `read`). It is the `changeRole` transition (`packages/permissions/src/transitions/memberRoleTransitions.ts`), checked on the row as it is and as it will be ([Transitions](#transitions)):
 
 ```typescript
-check(permix, rebacSchema, 'organizationUser', before, memberRoleWrite('organization')) &&
-  check(permix, rebacSchema, 'organizationUser', after, memberRoleWrite('organization'));
+await assertTransition(permix, 'organizationUser', 'changeRole', orgUser, { role: body.role ?? orgUser.role });
 ```
 
 | Assigner role | Can assign |

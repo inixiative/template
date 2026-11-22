@@ -26,6 +26,7 @@
     "@hono/zod-openapi": "^1.6.3",
     "@inixiative/field-map": "^0.1.2",
     "@inixiative/json-rules": "^4.6.0",
+    "@inixiative/transitions": "^0.9.0",
     "@sentry/bun": "^10.42.0",
     "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",
