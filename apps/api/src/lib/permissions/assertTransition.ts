@@ -27,5 +27,9 @@ export const assertTransition = async (
   });
   if (result === true) return;
   if (failsOnlyOnPermission(result)) throw makeError({ status: 403, message: 'Access denied' });
-  throw makeError({ status: 409, message: `This ${action} is not allowed: ${describe(result)}` });
+  throw makeError({
+    status: 409,
+    message: `${action} is not allowed from this ${model}'s current state`,
+    details: [{ reason: describe(result) }],
+  });
 };

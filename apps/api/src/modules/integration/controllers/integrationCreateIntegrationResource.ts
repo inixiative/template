@@ -25,7 +25,7 @@ export const integrationCreateIntegrationResourceController = makeController(
     const fields = { ...body, metadata: metadata as Prisma.InputJsonValue };
     const resource = await db.txn(async () => {
       const [existing] = await db.withDeleted(() =>
-        db.findForUpdate<IntegrationResource>('IntegrationResource', key),
+        db.findForUpdate<IntegrationResource>('IntegrationResource', key, { upserting: true }),
       );
       const registering = {
         ...fields,

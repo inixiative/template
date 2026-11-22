@@ -8,6 +8,7 @@ import { db, Prisma } from '@template/db';
 import type { Contact } from '@template/db/generated/client/client';
 import { CommunicationKind, type ContactType } from '@template/db/generated/client/enums';
 import { normalizeContactValue } from '#/hooks/contactRules/normalizeContactValue';
+import { makeError } from '#/lib/errors';
 
 type ContactOwner =
   | { ownerModel: 'User'; userId: string }
@@ -47,15 +48,19 @@ export const addContact = async <B extends ContactCreateBody>(owner: ContactOwne
   const { valueKey } = normalizeContactValue(body.type, body.value);
   return db.txn(async () => {
     const [existing] = await db.withDeleted(() =>
-      db.findForUpdate<Contact>('Contact', { ...owner, type: body.type, valueKey }),
+      db.findForUpdate<Contact>(
+        'Contact',
+        { ...owner, type: body.type, valueKey },
+        { upserting: true },
+      ),
     );
+    if (existing && !existing.deletedAt)
+      throw makeError({ status: 409, message: 'This contact already exists' });
     return db.withDeleted(() =>
       db.contact.upsert({
         where: contactUniqueKey(owner, body.type, valueKey),
         create: { ...body, ...owner } as Prisma.ContactUncheckedCreateInput,
-        update: (existing?.deletedAt
-          ? { ...freshContact, ...body }
-          : body) as Prisma.ContactUncheckedUpdateInput,
+        update: { ...freshContact, ...body } as Prisma.ContactUncheckedUpdateInput,
       }),
     );
   });

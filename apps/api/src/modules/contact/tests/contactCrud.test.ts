@@ -341,6 +341,26 @@ describe('Contact CRUD', () => {
     });
   });
 
+  describe('adding a contact that is already live', () => {
+    it('answers 409 and leaves the live contact as it was', async () => {
+      const address = `live${nextFactorySequenceNumber()}@example.com`;
+      const first = await parseSuccessBody<Contact>(
+        await fetch(
+          post('/api/v1/me/contacts', { type: 'email', value: { address }, label: 'Kept' }),
+        ),
+      );
+
+      const again = await fetch(
+        post('/api/v1/me/contacts', { type: 'email', value: { address }, label: 'Hijacked' }),
+      );
+
+      expect(again.status).toBe(409);
+      expect(await db.contact.findUniqueOrThrow({ where: { id: first.data.id } })).toMatchObject({
+        label: 'Kept',
+      });
+    });
+  });
+
   describe('re-adding a deleted contact', () => {
     const readd = async (fetchFor: typeof fetch, createPath: string) => {
       const address = `readd${nextFactorySequenceNumber()}@example.com`;

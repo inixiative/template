@@ -20,7 +20,7 @@ export const organizationCreateAuthProviderController = makeController(
     const provider = await db.txn(async () => {
       const key = { organizationId: org.id, provider: body.provider, type: body.type };
       const [existing] = await db.withDeleted(() =>
-        db.findForUpdate<AuthProvider>('AuthProvider', key),
+        db.findForUpdate<AuthProvider>('AuthProvider', key, { upserting: true }),
       );
       const data = {
         enabled: true,
@@ -34,7 +34,9 @@ export const organizationCreateAuthProviderController = makeController(
         db.authProvider.upsert({
           where: { organizationId_provider_type: key },
           create: { ...data, ...encryptedData },
-          update: { enabled: data.enabled, ...body, ...encryptedData, deletedAt: null },
+          update: existing?.deletedAt
+            ? { enabled: data.enabled, ...body, ...encryptedData, deletedAt: null }
+            : { ...body, ...encryptedData },
         }),
       );
     });

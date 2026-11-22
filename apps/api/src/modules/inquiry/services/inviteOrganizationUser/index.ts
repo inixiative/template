@@ -1,4 +1,5 @@
 import { db } from '@template/db';
+import type { OrganizationUser } from '@template/db/generated/client/client';
 import {
   baseResolutionInputSchema,
   type InviteOrganizationUserContent,
@@ -32,13 +33,24 @@ export const inviteOrganizationUserService: InquiryService<InviteOrganizationUse
   handleApprove: async (_c, inquiry: Inquiry, content: InviteOrganizationUserContent) => {
     const organizationId = inquiry.sourceOrganizationId!;
     const userId = inquiry.targetUserId!;
-    await db.withDeleted(() =>
-      db.organizationUser.upsert({
-        where: { organizationId_userId: { organizationId, userId } },
-        create: { organizationId, userId, role: content.role },
-        update: { role: content.role, deletedAt: null },
-      }),
-    );
+    await db.txn(async () => {
+      const [existing] = await db.withDeleted(() =>
+        db.findForUpdate<OrganizationUser>(
+          'OrganizationUser',
+          { organizationId, userId },
+          { upserting: true },
+        ),
+      );
+      if (existing && !existing.deletedAt)
+        throw makeError({ status: 409, message: 'User is already a member of this organization' });
+      await db.withDeleted(() =>
+        db.organizationUser.upsert({
+          where: { organizationId_userId: { organizationId, userId } },
+          create: { organizationId, userId, role: content.role },
+          update: { role: content.role, deletedAt: null },
+        }),
+      );
+    });
   },
 
   appEvents: inviteOrganizationUserAppEvents,
