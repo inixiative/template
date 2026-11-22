@@ -9,8 +9,8 @@ import {
   db,
   type HookOptions,
   HookTiming,
-  polymorphicKeyColumn,
   registerDbHook,
+  wherePolymorphicSideIsOneOf,
 } from '@template/db';
 import type { Entitlement, Prisma } from '@template/db/generated/client/client';
 import { InquiryType } from '@template/db/generated/client/enums';
@@ -57,8 +57,7 @@ export const registerEntitlementChangeRequestsHook = () => {
           where: {
             type: InquiryType.changeEntitlements,
             status: { notIn: inquiryTerminalStatuses },
-            targetModel: model,
-            [polymorphicKeyColumn('Inquiry', 'targetModel', model) as string]: targetId,
+            ...wherePolymorphicSideIsOneOf('Inquiry', 'targetModel', [{ model, id: targetId }]),
             ...(resolving ? { id: { not: resolving } } : {}),
           },
         });

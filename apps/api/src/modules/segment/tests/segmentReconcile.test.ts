@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { db, type Prisma } from '@template/db';
 import type {
@@ -32,11 +32,16 @@ import {
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { enqueueJob } from '#/jobs/enqueue';
+import {
+  applyMembershipDiff,
+  PartialMembershipDiffError,
+} from '#/modules/segment/services/applyMembershipDiff';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
+import * as reconcileCustomerRelationshipsModule from '#/modules/segment/services/reconcileCustomerRelationships';
 import {
   dynamicSegmentsOf,
-  reconcileCustomerRelationship,
-} from '#/modules/segment/services/reconcileCustomerRelationship';
+  reconcileCustomerRelationships,
+} from '#/modules/segment/services/reconcileCustomerRelationships';
 import {
   acmeEmailDomainRule,
   segmentMemberCustomerRelationshipIds,
@@ -65,8 +70,7 @@ const updateSegment = async (
 const setEmail = async (user: User, email: string): Promise<void> => {
   await db.user.update({ where: { id: user.id }, data: { email } });
   await enqueueJob('reconcileCustomerRelationshipSegments', {
-    customerModel: 'User',
-    customerId: user.id,
+    customers: [{ customerModel: 'User', customerId: user.id }],
   });
 };
 
@@ -166,7 +170,7 @@ describe('segment reconcile', () => {
       { space },
     );
     expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
-    expect(await reconcileCustomerRelationship(acmeRelationship.id)).toEqual([]);
+    expect(await reconcileCustomerRelationships([acmeRelationship])).toEqual([]);
 
     const mine = (
       await createTag(
@@ -202,7 +206,7 @@ describe('segment reconcile', () => {
 
     await setEmail(picked, `picked-${nextFactorySequenceNumber()}@acme.test`);
     expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
-    expect(await reconcileCustomerRelationship(pickedRelationship.id)).toEqual([]);
+    expect(await reconcileCustomerRelationships([pickedRelationship])).toEqual([]);
 
     const repicked = await updateSegment(segment, {
       conditions: idsRule([pickedRelationship.id, otherRelationship.id]),
@@ -366,7 +370,7 @@ describe('segment reconcile', () => {
     );
     expect(await segmentMemberCustomerRelationshipIds(derived.id)).toEqual([acmeRelationship.id]);
 
-    const changes = await reconcileCustomerRelationship(acmeRelationship.id);
+    const changes = await reconcileCustomerRelationships([acmeRelationship]);
     expect(changes).toEqual([]);
 
     await updateSegment(base, {
@@ -402,6 +406,7 @@ describe('segment reconcile', () => {
       kind: CommunicationKind.marketing,
       senderModel: CommunicationLogSenderModel.Space,
       recipientUserId: other.id,
+      senderOrganizationId: organization.id,
       senderSpaceId: elsewhere.id,
     });
     await emitAppEvent('communication.outcomeRecorded', { communicationLog: foreign.entity });
@@ -411,6 +416,7 @@ describe('segment reconcile', () => {
       kind: CommunicationKind.marketing,
       senderModel: CommunicationLogSenderModel.Space,
       recipientUserId: other.id,
+      senderOrganizationId: organization.id,
       senderSpaceId: space.id,
     });
     await emitAppEvent('communication.outcomeRecorded', { communicationLog: ours.entity });
@@ -473,8 +479,7 @@ describe('segment reconcile', () => {
     ).entity;
     const newcomerRelationship = await customerOf(newcomer);
     await enqueueJob('reconcileCustomerRelationshipSegments', {
-      customerModel: 'User',
-      customerId: newcomer.id,
+      customers: [{ customerModel: 'User', customerId: newcomer.id }],
     });
     expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([acmeRelationship.id]);
 
@@ -497,5 +502,123 @@ describe('segment reconcile', () => {
     const ids = (await dynamicSegmentsOf(ProviderModel.Space, space.id)).map(({ id }) => id);
     expect(ids).toContain(live.id);
     expect(ids).not.toContain(frozen.id);
+  });
+  it('one job over several customers reconciles each of them, adding and removing together', async () => {
+    const segment = await saveSegment(
+      {
+        ownerModel: ProviderModel.Space,
+        type: SegmentType.dynamic,
+        conditions: acmeEmailDomainRule,
+      },
+      { space },
+    );
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([acmeRelationship.id]);
+
+    await db.user.update({
+      where: { id: acme.id },
+      data: { email: `left-${nextFactorySequenceNumber()}@example.test` },
+    });
+    await db.user.update({
+      where: { id: other.id },
+      data: { email: `joined-${nextFactorySequenceNumber()}@acme.test` },
+    });
+    await enqueueJob('reconcileCustomerRelationshipSegments', {
+      customers: [
+        { customerModel: 'User', customerId: acme.id },
+        { customerModel: 'User', customerId: other.id },
+      ],
+    });
+
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([otherRelationship.id]);
+  });
+
+  it('deleting a tag on several customers reconciles them in one job', async () => {
+    const tagCategory = (await createTagCategory({ ownerModel: 'Space' }, { space })).entity;
+    const tag = (await createTag({ name: 'vip', ownerModel: 'Space' }, { space, tagCategory }))
+      .entity;
+    const tagAttachments = [
+      (await createTagAttachment({ resourceModel: 'User' }, { user: acme, tag })).entity,
+      (await createTagAttachment({ resourceModel: 'User' }, { user: other, tag })).entity,
+    ];
+    const reconciled = spyOn(
+      reconcileCustomerRelationshipsModule,
+      'reconcileCustomerRelationships',
+    );
+
+    await emitAppEvent('tag.deleted', { tag, tagAttachments });
+
+    expect(reconciled).toHaveBeenCalledTimes(1);
+    expect(reconciled.mock.calls[0]?.[0].map(({ id }) => id).sort()).toEqual(
+      [acmeRelationship.id, otherRelationship.id].sort(),
+    );
+    reconciled.mockRestore();
+  });
+
+  it('segmentMemberOwner hook validates createManyAndReturn batches and rejects mismatched owners', async () => {
+    const elsewhere = (await createSpace({}, { organization })).entity;
+    const outsider = (
+      await createUser({ email: `outsider-${nextFactorySequenceNumber()}@example.test` })
+    ).entity;
+    const outsiderRelationship = await customerOf(outsider, elsewhere);
+    const { entity: segment } = await createSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.static },
+      { space },
+    );
+
+    await db.segmentMember.createManyAndReturn({
+      data: [
+        { segmentId: segment.id, customerRelationshipId: acmeRelationship.id },
+        { segmentId: segment.id, customerRelationshipId: otherRelationship.id },
+      ],
+    });
+    expect((await segmentMemberCustomerRelationshipIds(segment.id)).sort()).toEqual(
+      [acmeRelationship.id, otherRelationship.id].sort(),
+    );
+
+    await expect(
+      db.segmentMember.createManyAndReturn({
+        data: [{ segmentId: segment.id, customerRelationshipId: outsiderRelationship.id }],
+      }),
+    ).rejects.toThrow(/is not a customer of the segment's Space/);
+  });
+
+  it('full applyMembershipDiff runs chunked writes via db.parallel and reports committed changes on partial failure', async () => {
+    const { entity: segment } = await createSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.static },
+      { space },
+    );
+    await createSegmentMember({}, { segment, customerRelationship: acmeRelationship });
+
+    const diff = await applyMembershipDiff({
+      segmentId: segment.id,
+      matching: [otherRelationship.id],
+    });
+    expect(diff).toEqual({ added: [otherRelationship.id], removed: [acmeRelationship.id] });
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([otherRelationship.id]);
+
+    const elsewhere = (await createSpace({}, { organization })).entity;
+    const outsider = (
+      await createUser({ email: `partial-outsider-${nextFactorySequenceNumber()}@example.test` })
+    ).entity;
+    const outsiderRelationship = await customerOf(outsider, elsewhere);
+
+    let caught: unknown;
+    try {
+      await applyMembershipDiff({
+        segmentId: segment.id,
+        matching: [outsiderRelationship.id],
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(PartialMembershipDiffError);
+    const partial = caught as PartialMembershipDiffError;
+    expect(partial.committed).toEqual({
+      added: [],
+      removed: [otherRelationship.id],
+    });
+    expect(String(partial.cause)).toContain("is not a customer of the segment's Space");
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
   });
 });

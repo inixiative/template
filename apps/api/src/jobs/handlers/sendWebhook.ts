@@ -38,8 +38,8 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     subscription.integrationId &&
     (await isIntegrationRecordPoisoned({
       integrationId: subscription.integrationId,
-      model: subscription.model,
-      resourceId,
+      recordModel: subscription.resourceModel,
+      recordId: resourceId,
     }))
   ) {
     log.info(
@@ -50,7 +50,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
 
   // Columns only; a shape needing related rows (CustomerRelationship + its parties) fetches them fresh here.
   // timestamp (event time, carried from the hook) is inside the signed body so receivers can reject replays
-  const body = { model: subscription.model, action, payload: data, timestamp };
+  const body = { model: subscription.resourceModel, action, payload: data, timestamp };
   const bodyJson = JSON.stringify(body);
 
   // Sign payload with RSA-SHA256
@@ -126,8 +126,8 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   ) {
     await poisonIntegrationRecord({
       integrationId: subscription.integrationId,
-      model: subscription.model,
-      resourceId,
+      recordModel: subscription.resourceModel,
+      recordId: resourceId,
       reason: error ?? 'rejected by the integration',
     });
     log.info(`Webhook record ${resourceId} poisoned for integration ${subscription.integrationId}`);

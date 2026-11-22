@@ -12,12 +12,40 @@ import {
 } from '#/lib/routeTemplates/paginationSchemas';
 import type { RouteArgs, ZodResponseSchema } from '#/lib/routeTemplates/types';
 
-type SuccessResponse<T extends ZodResponseSchema> = {
-  content: { 'application/json': { schema: z.ZodObject<{ data: T }> } };
+type ResponseDataSchema<T extends RouteArgs> = T['many'] extends true
+  ? z.ZodArray<NonNullable<T['responseSchema']>>
+  : NonNullable<T['responseSchema']>;
+
+type ResponseBodySchema<T extends RouteArgs> = T['many'] extends true
+  ? T['paginate'] extends 'cursor'
+    ? z.ZodObject<{
+        data: ResponseDataSchema<T>;
+        pagination: typeof cursorPaginateResponseSchema;
+      }>
+    : T['paginate'] extends true
+      ? z.ZodObject<{
+          data: ResponseDataSchema<T>;
+          pagination: typeof paginateResponseSchema;
+        }>
+      : z.ZodObject<{ data: ResponseDataSchema<T> }>
+  : z.ZodObject<{ data: ResponseDataSchema<T> }>;
+
+type SuccessResponse<Schema extends z.ZodType> = {
+  content: { 'application/json': { schema: Schema } };
   description: string;
 };
 
-export const buildResponses = <const T extends RouteArgs>(args: T, statusCode: 200 | 201 = 200) => {
+type BuiltResponses<
+  T extends RouteArgs,
+  S extends 200 | 201,
+> = T['responseSchema'] extends ZodResponseSchema
+  ? { [K in S]: SuccessResponse<ResponseBodySchema<T>> } & typeof errorResponses
+  : { 204: { description: string } } & typeof errorResponses;
+
+export const buildResponses = <const T extends RouteArgs, const S extends 200 | 201 = 200>(
+  args: T,
+  statusCode: S = 200 as S,
+): BuiltResponses<T, S> => {
   const { responseSchema, many = false, paginate = false } = args;
 
   if (responseSchema) {
@@ -37,13 +65,11 @@ export const buildResponses = <const T extends RouteArgs>(args: T, statusCode: 2
         description: 'Success',
       },
       ...errorResponses,
-    } as {
-      [K in typeof statusCode]: SuccessResponse<NonNullable<T['responseSchema']>>;
-    } & typeof errorResponses;
+    } as unknown as BuiltResponses<T, S>;
   }
 
   return {
     204: { description: 'Success' },
     ...errorResponses,
-  } as { 204: { description: string } } & typeof errorResponses;
+  } as unknown as BuiltResponses<T, S>;
 };

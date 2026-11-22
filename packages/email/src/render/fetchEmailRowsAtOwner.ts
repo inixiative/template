@@ -28,15 +28,15 @@ export const fetchEmailRowsAtOwner = async (
   ctx: OwnerScope,
   tier: EmailOwnerModel = ctx.ownerModel,
 ): Promise<TemplateAndComponentsAtOwner> => {
-  const where = ownerWhere(ctx, tier);
-
   const [comps, template] = await Promise.all([
     componentSlugs.length
-      ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...where } })
+      ? db.emailComponent.findMany({
+          where: { slug: { in: componentSlugs }, ...ownerWhere('EmailComponent', ctx, tier) },
+        })
       : Promise.resolve([]),
     templateSlug
       ? db.emailTemplate.findFirst({
-          where: { slug: templateSlug, ...where },
+          where: { slug: templateSlug, ...ownerWhere('EmailTemplate', ctx, tier) },
           include: latestSnapshotInclude,
         })
       : Promise.resolve(null),

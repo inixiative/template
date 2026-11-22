@@ -1,7 +1,7 @@
 // ============================================================================
 // INTEGRATION RECORD - One record's standing in one integration
 // ============================================================================
-// Record is false-polymorphic over WebhookModel: `model` names the record's
+// Record is false-polymorphic over WebhookModel: `recordModel` names the record's
 // model and exactly one typed FK is set to match it
 // (PolymorphismRegistry.IntegrationRecord). The only standing today is
 // poisoned: the integration rejected this record terminally while its
@@ -19,10 +19,10 @@ model IntegrationRecord {
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   // Record — false polymorphism, exactly one FK matches the discriminator.
-  model                  WebhookModel
-  customerRelationshipId String?      @db.VarChar(36)
+  recordModel                  WebhookModel
+  recordCustomerRelationshipId String?      @db.VarChar(36)
 
-  customerRelationship CustomerRelationship? @relation(fields: [customerRelationshipId], references: [id], onDelete: Cascade)
+  recordCustomerRelationship CustomerRelationship? @relation(fields: [recordCustomerRelationshipId], references: [id], onDelete: Cascade)
 
   poisonedAt     DateTime?
   poisonedReason String?
@@ -34,7 +34,7 @@ model IntegrationRecord {
   // Per-record uniqueness, one composite per record column (see Contact): plain, so NULLS DISTINCT
   // leaves the other arms unconstrained, tombstones keep their key and `upsert` revives them. Each
   // doubles as the lookup index for that record column.
-  @@unique([integrationId, customerRelationshipId], map: "IntegrationRecord_integration_customerRelationship_key")
+  @@unique([integrationId, recordCustomerRelationshipId], map: "IntegrationRecord_integration_recordCustomerRelationship_key")
   @@index([integrationId])
-  @@index([customerRelationshipId])
+  @@index([recordCustomerRelationshipId])
 }

@@ -4,29 +4,31 @@
  * @partOf feature:integrations, feature:webhooks
  * @uses infrastructure:prisma
  */
-import { db } from '@template/db';
+import { db, polymorphicKeyColumnOrThrow } from '@template/db';
 import type { IntegrationRecord, Prisma } from '@template/db/generated/client/client';
 import type { WebhookModel } from '@template/db/generated/client/enums';
-import { integrationRecordForeignKeyForModel } from '#/modules/integration/services/integrationRecordForeignKeyForModel';
 
 const recordUniqueKeyForModel: Record<
   WebhookModel,
-  (integrationId: string, resourceId: string) => Prisma.IntegrationRecordWhereUniqueInput
+  (integrationId: string, recordId: string) => Prisma.IntegrationRecordWhereUniqueInput
 > = {
-  CustomerRelationship: (integrationId, customerRelationshipId) => ({
-    integrationId_customerRelationshipId: { integrationId, customerRelationshipId },
+  CustomerRelationship: (integrationId, recordCustomerRelationshipId) => ({
+    integrationId_recordCustomerRelationshipId: { integrationId, recordCustomerRelationshipId },
   }),
 };
 
 export const poisonIntegrationRecord = (input: {
   integrationId: string;
-  model: WebhookModel;
-  resourceId: string;
+  recordModel: WebhookModel;
+  recordId: string;
   reason: string;
 }): Promise<IntegrationRecord> =>
   db.txn(async () => {
-    const recordForeignKey = integrationRecordForeignKeyForModel(input.model);
-    const recordKey = { integrationId: input.integrationId, [recordForeignKey]: input.resourceId };
+    const recordKey = {
+      integrationId: input.integrationId,
+      [polymorphicKeyColumnOrThrow('IntegrationRecord', 'recordModel', input.recordModel)]:
+        input.recordId,
+    };
     const poison = { poisonedAt: new Date(), poisonedReason: input.reason };
     if (
       !(await db.integration.findUnique({
@@ -38,8 +40,8 @@ export const poisonIntegrationRecord = (input: {
 
     const record = await db.withDeleted(() =>
       db.integrationRecord.upsert({
-        where: recordUniqueKeyForModel[input.model](input.integrationId, input.resourceId),
-        create: { ...recordKey, model: input.model, ...poison },
+        where: recordUniqueKeyForModel[input.recordModel](input.integrationId, input.recordId),
+        create: { ...recordKey, recordModel: input.recordModel, ...poison },
         update: { deletedAt: null },
       }),
     );

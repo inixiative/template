@@ -61,14 +61,14 @@ describe('organization/webhookSubscriptions', () => {
       const seq = nextFactorySequenceNumber();
       const response = await fetch(
         post(`/api/v1/organization/${org.id}/webhookSubscriptions`, {
-          model: 'CustomerRelationship',
+          resourceModel: 'CustomerRelationship',
           url: `https://example.com/org-webhook-${seq}`,
         }),
       );
       const { data } = await parseSuccessBody<WebhookSubscription>(response);
 
       expect(response.status).toBe(201);
-      expect(data.model).toBe('CustomerRelationship');
+      expect(data.resourceModel).toBe('CustomerRelationship');
       expect(data.ownerModel).toBe('Organization');
       expect(data.organizationId).toBe(org.id);
       expect(data.isActive).toBe(true);
@@ -88,7 +88,7 @@ describe('organization/webhookSubscriptions', () => {
       const seq = nextFactorySequenceNumber();
       const response = await viewerHarness.fetch(
         post(`/api/v1/organization/${viewerOrg.id}/webhookSubscriptions`, {
-          model: 'CustomerRelationship',
+          resourceModel: 'CustomerRelationship',
           url: `https://example.com/viewer-webhook-${seq}`,
         }),
       );
@@ -101,7 +101,7 @@ describe('organization/webhookSubscriptions', () => {
     it('returns org webhooks', async () => {
       const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'Organization',
         organizationId: org.id,
         url: `https://example.com/org-list-${seq}`,
@@ -120,7 +120,7 @@ describe('organization/webhookSubscriptions', () => {
       const otherOrg = otherContext.organization;
       const seq = nextFactorySequenceNumber();
       await createWebhookSubscription({
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
         ownerModel: 'Organization',
         organizationId: otherOrg.id,
         url: `https://example.com/other-org-${seq}`,

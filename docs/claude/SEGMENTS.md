@@ -33,9 +33,14 @@ change; a dynamic segment also reacts to customer changes. A hand-picked audienc
 static rule over customer-relationship IDs. There is no direct member add/remove API.
 
 - `reconcileSegment` evaluates the whole set through `toPrisma` and applies a membership diff.
-- `reconcileCustomerRelationshipSegments` accepts `{ customerModel, customerId }`, finds that customer's
-  references, hydrates each through `fetchLens`, and evaluates dynamic segments with `check()`
-  in dependency order. Its superseding key is the customer model and ID.
+- `reconcileCustomerRelationshipSegments` accepts `{ customers: [{ customerModel, customerId }] }`, finds
+  those customers' relationships in one query, and reconciles them a provider at a time: one
+  `fetchLens` hydrate per page of relationships, `check()` per dynamic segment in dependency order,
+  and one membership diff per segment for the whole page. It is a plain job, not superseding: two runs
+  over the same customer read live rows, so the second only repeats work. Enqueue it through
+  `enqueueSegmentReconcileForCustomers` (`modules/segment/lib/enqueueSegmentReconcileForCustomers.ts`),
+  which drops duplicates and sends every customer it is given in one job: an event that carries many
+  rows (`tag.deleted`) makes one job, not one per row.
 - `reconcileEveryHealthyDynamicSegment`, seeded for 04:00 UTC, queues healthy dynamic segments in dependency order.
   It is the backstop for writes that do not emit business events.
 

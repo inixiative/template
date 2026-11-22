@@ -35,8 +35,8 @@ describe('poisonIntegrationRecord', () => {
     const { customerRelationship, integration } = await setup();
     const input = {
       integrationId: integration.id,
-      model: WebhookModel.CustomerRelationship,
-      resourceId: customerRelationship.id,
+      recordModel: WebhookModel.CustomerRelationship,
+      recordId: customerRelationship.id,
     };
 
     const first = await poisonIntegrationRecord({ ...input, reason: 'HTTP 400: first' });
@@ -49,14 +49,14 @@ describe('poisonIntegrationRecord', () => {
   it('stamps an existing record that is not poisoned yet', async () => {
     const { customerRelationship, integration } = await setup();
     const { entity: existing } = await createIntegrationRecord(
-      { model: 'CustomerRelationship' },
+      { recordModel: 'CustomerRelationship' },
       { integration, customerRelationship },
     );
 
     const poisoned = await poisonIntegrationRecord({
       integrationId: integration.id,
-      model: WebhookModel.CustomerRelationship,
-      resourceId: customerRelationship.id,
+      recordModel: WebhookModel.CustomerRelationship,
+      recordId: customerRelationship.id,
       reason: 'HTTP 422: Unprocessable Entity',
     });
 
@@ -69,8 +69,8 @@ describe('poisonIntegrationRecord', () => {
     const { customerRelationship, integration } = await setup();
     const poisoned = await poisonIntegrationRecord({
       integrationId: integration.id,
-      model: WebhookModel.CustomerRelationship,
-      resourceId: customerRelationship.id,
+      recordModel: WebhookModel.CustomerRelationship,
+      recordId: customerRelationship.id,
       reason: 'HTTP 400: Bad Request',
     });
 
@@ -97,8 +97,8 @@ describe('poisonIntegrationRecord', () => {
     const { customerRelationship, integration } = await setup();
     await poisonIntegrationRecord({
       integrationId: integration.id,
-      model: WebhookModel.CustomerRelationship,
-      resourceId: customerRelationship.id,
+      recordModel: WebhookModel.CustomerRelationship,
+      recordId: customerRelationship.id,
       reason: 'HTTP 400: Bad Request',
     });
     await db.integration.update({ where: { id: integration.id }, data: { deletedAt: new Date() } });
@@ -106,8 +106,8 @@ describe('poisonIntegrationRecord', () => {
     await expect(
       poisonIntegrationRecord({
         integrationId: integration.id,
-        model: WebhookModel.CustomerRelationship,
-        resourceId: customerRelationship.id,
+        recordModel: WebhookModel.CustomerRelationship,
+        recordId: customerRelationship.id,
         reason: 'HTTP 500',
       }),
     ).rejects.toThrow('is gone');
@@ -119,8 +119,8 @@ describe('poisonIntegrationRecord', () => {
     const { customerRelationship, integration } = await setup();
     const input = {
       integrationId: integration.id,
-      model: WebhookModel.CustomerRelationship,
-      resourceId: customerRelationship.id,
+      recordModel: WebhookModel.CustomerRelationship,
+      recordId: customerRelationship.id,
     };
     const first = await poisonIntegrationRecord({ ...input, reason: 'HTTP 400: first' });
     await db.integrationRecord.update({ where: { id: first.id }, data: { deletedAt: new Date() } });

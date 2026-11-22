@@ -302,6 +302,8 @@ Each bracket is escaped on its own: `\<<0.0.id>>` leaves the `>>` unescaped and 
 
 The SDK percent-encodes path and query values, so a reference written into a path param arrives as `%3C%3C0.0.body.data.id%3E%3E`. Before interpolating a path, the server decodes exactly that shape, with any encoded backslashes (`%5C`) directly before its brackets (`decodePercentEncodedBatchReferences`), and no other encoding, so `%2F`, `%20` and the rest keep their meaning. An escaped reference sent through a URL (`encodeURIComponent(escapeBatchInterpolation(text))`) therefore arrives as literal text, while an unescaped value shaped like a reference resolves: a client putting user text into a batched path escapes it first.
 
+A resolved value is encoded where it lands in the path or query (`encodeURIComponent`), so one reference fills exactly one segment or one query value: an id of `a/b`, `x?y=1` or `y#z` cannot move the request to another route or add a parameter. A value of exactly `.` or `..` is refused, since encoding leaves dots alone and the URL parser would treat it as a dot segment. Headers and the body take the value raw. After interpolation each request runs through `assertBatchable` again (`interpolateBatchableRequest`): the first check reads the path before any reference resolves, and the URL parser also reads `\` as `/` and drops tabs and newlines, so literal text around a reference could otherwise still climb into an unbatchable route. Why: a reference may point at any field of an earlier response, including text another user wrote.
+
 ---
 
 ## Status Tracking

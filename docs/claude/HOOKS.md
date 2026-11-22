@@ -292,7 +292,7 @@ instead of tripping the circuit. A rejection is an `error` event with `httpStatu
 Other failures such as redirects, 401, 403 or 429 do not count, and neither do `unreachable` or
 `retrying`. When a record has 3 rejections since its own last
 success, and some other record has delivered since the first of them, `poisonIntegrationRecord`
-stamps `IntegrationRecord.poisonedAt`. `isIntegrationRecordPoisoned({ integrationId, model, resourceId })`
+stamps `IntegrationRecord.poisonedAt`. `isIntegrationRecordPoisoned({ integrationId, recordModel, resourceId })`
 (`apps/api/src/modules/integration/services/isIntegrationRecordPoisoned.ts`) is the check: `sendWebhook`
 calls it first, and later deliveries of that record are skipped before signing,
 with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp yet. See

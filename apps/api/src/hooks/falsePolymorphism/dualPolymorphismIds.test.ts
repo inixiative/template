@@ -89,6 +89,20 @@ describe('dual polymorphism ids', () => {
     ]);
   });
 
+  it('a composite arm with its own id column takes its dual polymorphism id from it: an Inquiry Space party', () => {
+    const row = {
+      sourceModel: 'Space',
+      sourceOrganizationId: 'o-1',
+      sourceSpaceId: 's-1',
+      targetModel: 'admin',
+    };
+    expect(withDualPolymorphismIds('Inquiry', row)).toMatchObject({ sourceId: 's-1' });
+    expect(withDualPolymorphismIds('Inquiry', row)).not.toHaveProperty('targetId');
+    expect(dualPolymorphismIdConflicts('Inquiry', { ...row, sourceId: 'o-1' })).toEqual([
+      'Inquiry.sourceId must equal the Space id s-1',
+    ]);
+  });
+
   it('an axis without a dual polymorphism id is left as written', () => {
     const row = { ownerModel: 'User', userId: 'u-1', name: 'token' };
     expect(withDualPolymorphismIds('Token', row)).toEqual(row);

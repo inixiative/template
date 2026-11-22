@@ -230,6 +230,44 @@ describe('validateUniqueInquiry', () => {
         ),
       ).resolves.toBeUndefined();
     });
+
+    it('passes when the only matching open inquiry has expired, and still throws when unexpired', async () => {
+      const { entity: source, context: sourceCtx } = await createUser();
+      const { entity: target } = await createUser();
+      const { entity: expired } = await createInquiry(
+        {
+          type: InquiryType.inviteOrganizationUser,
+          status: InquiryStatus.sent,
+          expiresAt: new Date(Date.now() - 60_000),
+          sourceModel: InquiryResourceModel.User,
+          sourceUserId: source.id,
+          targetModel: InquiryResourceModel.User,
+          targetUserId: target.id,
+        },
+        sourceCtx,
+      );
+
+      const candidate = {
+        type: InquiryType.inviteOrganizationUser,
+        sourceModel: InquiryResourceModel.User,
+        sourceUserId: source.id,
+        sourceOrganizationId: null,
+        sourceSpaceId: null,
+        targetModel: InquiryResourceModel.User,
+        targetUserId: target.id,
+        targetOrganizationId: null,
+        targetSpaceId: null,
+      };
+
+      await expect(validateUniqueInquiry(candidate, 'targeted')).resolves.toBeUndefined();
+
+      await db.inquiry.update({
+        where: { id: expired.id },
+        data: { expiresAt: new Date(Date.now() + 60_000) },
+      });
+
+      await expect(validateUniqueInquiry(candidate, 'targeted')).rejects.toThrow(/already exists/);
+    });
   });
 
   describe('self-collision exclusion', () => {

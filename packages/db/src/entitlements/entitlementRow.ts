@@ -12,8 +12,9 @@ import type {
   EntitlementTargetModel,
 } from '@template/db/generated/client/enums';
 import { polymorphicArmKeys } from '@template/db/utils/polymorphicArmKeys';
+import type { ModelRow } from '@template/shared/utils/modelRow';
 
-export type EntitlementTarget = { model: EntitlementTargetModel; id: string };
+export type EntitlementTarget = ModelRow<EntitlementTargetModel>;
 
 /** What a writer gives for one row: the target and the typed foreign keys are filled in. */
 export type EntitlementInput = {

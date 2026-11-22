@@ -16,8 +16,10 @@ import {
   chainedStandardActions,
   integrationAccess,
   integrationAdministering,
+  isNull,
   memberRowActions,
   ownerActions,
+  rowIsThereAnd,
   tokenAdministering,
 } from '@template/permissions/rebac/rebacSchemaRules';
 import type { RebacSchema } from '@template/permissions/rebac/types';
@@ -71,7 +73,7 @@ export const rebacSchema: RebacSchema = {
           all: [
             {
               any: [
-                { rule: { field: 'source', operator: Operator.equals, value: null } },
+                rowIsThereAnd('id', isNull('source')),
                 {
                   rule: {
                     field: 'source',

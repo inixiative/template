@@ -4,20 +4,32 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { Operator } from '@inixiative/json-rules';
+import { type Condition, Operator } from '@inixiative/json-rules';
+import { makeKindRules } from '@inixiative/permissions';
+import { schemaMap } from '@template/db/schemaMap';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
 import { omit } from 'lodash-es';
 
 export const privilegedRoles = ['owner', 'admin'];
 export const unprivilegedRoles = roleHierarchy.filter((role) => !privilegedRoles.includes(role));
-export const actorIsUser: ActionRule = {
-  rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
-};
+const kind = makeKindRules(schemaMap);
 
-export const actorIsDelegateOfUser: ActionRule = {
-  rule: { field: '__actor.record.ownerModel', operator: Operator.equals, value: 'User' },
-};
+export const isNull = (field: string): Condition => ({
+  field,
+  operator: Operator.equals,
+  value: null,
+});
+
+export const rowIsThereAnd = (rowKey: string, ...conditions: Condition[]): ActionRule => ({
+  rule: { all: [{ field: rowKey, operator: Operator.exists }, ...conditions] },
+});
+
+export const actorIsUser: ActionRule = kind.ruleKindIsOneOf('actor:Acting', 'model', ['User']);
+
+export const actorIsDelegateOfUser: ActionRule = kind.ruleForEachKind('actor:Acting', 'model', {
+  Token: kind.ruleKindIsOneOf('actor:Token', 'ownerModel', ['User']),
+});
 
 export const ownerRelations = [
   ['User', 'user'],
@@ -58,7 +70,7 @@ export const actorManagesRecordUser = (at = ''): ActionRule => ({
 
 const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   any: [
-    { all: [{ rule: { field: 'role', operator: Operator.equals, value: null } }, heldAt('read')] },
+    { all: [rowIsThereAnd('id', isNull('role')), heldAt('read')] },
     ...roleHierarchy.map((role) => ({
       all: [
         { rule: { field: 'role', operator: Operator.equals, value: role } },
@@ -90,8 +102,11 @@ export const memberRowActions = (tenant: 'organization' | 'space') => ({
   delegateFull: { all: [actorIsUser, 'operate'] },
 });
 
-export const ownedByYouOrOrganizationOrSpace = (at = ''): ActionRule => ({
-  any: [ownerModelIsOneOf(organizationOrSpace, at), actorManagesRecordUser(at)],
+export const ownedByYouOrOrganizationOrSpaceYouManage = (at = ''): ActionRule => ({
+  any: [
+    actorMayPerformActionOnOwner('manage', at, organizationOrSpace),
+    actorManagesRecordUser(at),
+  ],
 });
 
 export const actorOperatesOwnerUserOrManagesOwnerTenant: ActionRule = {
@@ -174,14 +189,14 @@ export const actorMayCreateTokenAtOwnerWithRole: ActionRule = {
     {
       all: [
         ownerModelIsOneOf(notIntegration),
-        ownedByYouOrOrganizationOrSpace(),
-        { any: [ownerModelIsOneOf(['User', ...members]), roleHeldAtOwner()] },
+        ownedByYouOrOrganizationOrSpaceYouManage(),
+        { any: [ownerModelIsOneOf(['User', ...members]), roleHeldAtOwner('', notIntegration)] },
       ],
     },
     {
       all: [
         ownerModelIsOneOf(['Integration']),
-        ownedByYouOrOrganizationOrSpace('integration.'),
+        ownedByYouOrOrganizationOrSpaceYouManage('integration.'),
         {
           any: [
             ownerModelIsOneOf(['User', ...members], 'integration.'),

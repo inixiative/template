@@ -24,6 +24,7 @@ model AuditLog {
   // What happened
   action       AuditAction
   subjectModel AuditSubjectModel
+  subjectId    String?           @db.VarChar(36)
 
   // State before/after — after filtering and masking
   before  Json?
@@ -100,6 +101,7 @@ model AuditLog {
   @@index([actorSpoofUserId])
   @@index([actorTokenId])
   @@index([subjectModel])
+  @@index([subjectModel, subjectId])
   @@index([createdAt])
   @@index([contextOrganizationId])
   @@index([contextSpaceId])

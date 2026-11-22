@@ -13,7 +13,7 @@ import {
 } from '@template/db';
 import type { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
-import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
+import { openInquiryWhere } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 // Inquiry shape sufficient for uniqueness lookup. We accept any subset of
 // Inquiry fields — the FKs we actually filter on are derived from the
@@ -45,7 +45,7 @@ export const validateUniqueInquiry = async (
 
   const where: Prisma.InquiryWhereInput = {
     type: inquiry.type,
-    status: { notIn: inquiryTerminalStatuses },
+    ...openInquiryWhere(),
     sourceModel: inquiry.sourceModel,
     ...pickValues(fkFieldsFor('sourceModel')),
   };

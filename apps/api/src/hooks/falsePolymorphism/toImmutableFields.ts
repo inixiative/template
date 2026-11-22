@@ -2,6 +2,7 @@ import {
   dualPolymorphismIdColumns,
   type ModelName,
   PolymorphismRegistry,
+  sideKeyColumns,
   toModelName,
 } from '@template/db';
 
@@ -19,12 +20,7 @@ for (const [model, config] of Object.entries(PolymorphismRegistry)) {
   const typeFields = config.axes.map((axis) => axis.field);
   const dualPolymorphismIds = dualPolymorphismIdColumns(modelName);
   const refuse = dualPolymorphismIds.length
-    ? [
-        ...new Set([
-          ...config.axes.flatMap((axis) => Object.values(axis.fkMap).flat() as string[]),
-          ...dualPolymorphismIds,
-        ]),
-      ]
+    ? [...new Set([...config.axes.flatMap(sideKeyColumns), ...dualPolymorphismIds])]
     : [];
   if (typeFields.length)
     polymorphismImmutableFields[modelName] = {

@@ -37,7 +37,7 @@ describe('hardDeleteRecordsPastRetention handler', () => {
       ownerModel: 'User',
       userId: user.id,
       url: 'https://example.com/1',
-      model: 'CustomerRelationship',
+      resourceModel: 'CustomerRelationship',
     });
     const { entity: oldEvent } = await createWebhookEvent(
       { status: 'success', action: 'create', resourceId: user.id, createdAt: daysAgo(91) },
@@ -75,7 +75,7 @@ describe('hardDeleteRecordsPastRetention handler', () => {
       ownerModel: 'User',
       userId: user.id,
       url: 'https://example.com/2',
-      model: 'CustomerRelationship',
+      resourceModel: 'CustomerRelationship',
     });
     const { entity: recent } = await createWebhookEvent(
       { status: 'success', action: 'create', resourceId: user.id, createdAt: daysAgo(89) },
@@ -92,7 +92,7 @@ describe('hardDeleteRecordsPastRetention handler', () => {
       ownerModel: 'User',
       userId: user.id,
       url: 'https://example.com/3',
-      model: 'CustomerRelationship',
+      resourceModel: 'CustomerRelationship',
     });
     const { entity: oldSuccess } = await createWebhookEvent(
       { status: 'success', action: 'create', resourceId: user.id, createdAt: daysAgo(100) },
@@ -135,7 +135,7 @@ describe('hardDeleteRecordsPastRetention handler', () => {
       ownerModel: 'User',
       userId: user.id,
       url: 'https://example.com/4',
-      model: 'CustomerRelationship',
+      resourceModel: 'CustomerRelationship',
     });
     await createWebhookEvent(
       { status: 'success', action: 'create', resourceId: user.id, createdAt: daysAgo(100) },

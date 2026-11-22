@@ -2,8 +2,6 @@ import { db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
 import {
-  type BaseResolution,
-  baseResolutionInputSchema,
   type TransferSpaceContent,
   type TransferSpaceResolutionInput,
   transferSpaceContentSchema,
@@ -17,12 +15,12 @@ import { validateSpaceSlugFree } from '#/modules/inquiry/validations/validateSpa
 
 export const transferSpaceService: InquiryService<
   TransferSpaceContent,
-  BaseResolution,
+  TransferSpaceResolutionInput,
   TransferSpaceResolutionInput
 > = {
   contentSchema: transferSpaceContentSchema,
   resolutionInputSchema: transferSpaceResolutionInputSchema,
-  resolutionSchema: baseResolutionInputSchema,
+  resolutionSchema: transferSpaceResolutionInputSchema,
   unique: 'untargeted',
   defaultExpirationDays: 30,
   autoApprove: async () => false,
@@ -62,5 +60,6 @@ export const transferSpaceService: InquiryService<
     await clearSpaceRowCaches(spaceId, organizationId);
     const moved = await db.space.update({ where: { id: spaceId }, data: { organizationId, slug } });
     await emitAppEvent('space.updated', { space: moved });
+    return { slug };
   },
 };

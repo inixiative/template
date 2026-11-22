@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { fieldOf, relationTarget } from '@inixiative/field-map';
-import { Operator } from '@inixiative/json-rules';
+import { type Condition, Operator } from '@inixiative/json-rules';
 import type { HydratedRecord } from '@template/db';
 import { InquiryType, Role } from '@template/db/generated/client/enums';
 import { prismaMap } from '@template/db/generated/prismaMap';
@@ -16,6 +16,7 @@ import {
   inquiryResourcePermissionFromParties,
 } from '@template/permissions/rebac/inquiryResourcePermission';
 import { INQUIRY_TYPES } from '@template/permissions/rebac/inquiryTypes';
+import { isNull, rowIsThereAnd } from '@template/permissions/rebac/rebacSchemaRules';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import type { ActionRule } from '@template/permissions/rebac/types';
 import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
@@ -28,6 +29,13 @@ const modelAt = (path: string): string | undefined =>
 const actionsOf = (model: string) =>
   Object.keys(rebacSchema.permissions[`db:${lowerFirst(model)}`]?.actions ?? {});
 
+const leaves = (condition: Condition): Condition[] => {
+  if (typeof condition !== 'object') return [];
+  if ('all' in condition) return condition.all.flatMap(leaves);
+  if ('any' in condition) return condition.any.flatMap(leaves);
+  return [condition];
+};
+
 const leafNames = (rule: ActionRule): string[] => {
   if (rule === null || typeof rule === 'boolean') return [];
   if (typeof rule === 'string') return [`:${rule}`];
@@ -35,12 +43,12 @@ const leafNames = (rule: ActionRule): string[] => {
   if ('all' in rule) return rule.all.flatMap(leafNames);
   if ('arrayOperator' in rule) return [`${rule.rel}[]`];
   if ('rel' in rule) return [`${rule.rel}:${rule.action}`];
-  return [(rule.rule as { field: string }).field];
+  return leaves(rule.rule as Condition).map((leaf) => (leaf as { field: string }).field);
 };
 
 const isKnown = (name: string) => {
-  // why: `__actor` is the credential the check runs for, not a column of the inquiry
-  if (name.startsWith('__actor.')) return true;
+  // why: `actor:` rows are who the check runs for, not columns of the inquiry
+  if (name.startsWith('actor:')) return true;
   if (!name.includes(':')) return fieldOf(prismaMap, 'Inquiry', name.split('.')[0]) !== undefined;
   const [rel, action] = name.split(':');
   const model = rel ? modelAt(rel) : 'Inquiry';
@@ -121,9 +129,12 @@ describe('inquiryResourcePermissionFromParties', () => {
   it('reads party-wide, whatever the type, each party on its own channel: a person the sides that name them, an organization the sides on it alone, a space the sides with no person', () => {
     const channel = (side: string, model: string, clear: string[]) => ({
       all: [
-        ...clear.map((key) => ({
-          rule: { field: `${side}${key}`, operator: Operator.equals, value: null },
-        })),
+        {
+          any: [
+            { rule: { field: `${side}Model`, operator: Operator.equals, value: model } },
+            rowIsThereAnd('id', ...clear.map((key) => isNull(`${side}${key}`))),
+          ],
+        },
         { rel: `${side}${model}`, action: 'manage' },
       ],
     });
@@ -180,7 +191,7 @@ describe('inquiryResourcePermissionFromParties through the real check, per inqui
   const can = (permix: Permix, record: object, action: 'send' | 'resolve') =>
     check(permix, rebacSchema, 'inquiry', record as HydratedRecord, action);
 
-  const invite = (role: Role | null) => ({
+  const invite = (role: Role) => ({
     type: 'inviteOrganizationUser',
     sourceModel: 'Organization',
     sourceOrganizationId: organization.id,
@@ -217,16 +228,16 @@ describe('inquiryResourcePermissionFromParties through the real check, per inqui
     targetOrganization: otherOrganization,
   };
 
-  const roles = [...Object.values(Role), null];
+  const roles = Object.values(Role);
 
-  it('inviteOrganizationUser: an owner sends every role, an admin the low roles and none, a member nothing', async () => {
+  it('inviteOrganizationUser: an owner sends every role, an admin the low roles, a member nothing', async () => {
     const sendable = async (seat: Seat) => {
       const permix = await principal(seat);
       return roles.filter((role) => can(permix, invite(role), 'send'));
     };
 
     expect(await sendable({ organization: 'owner' })).toEqual(roles);
-    expect(await sendable({ organization: 'admin' })).toEqual(['member', 'viewer', null]);
+    expect(await sendable({ organization: 'admin' })).toEqual(['member', 'viewer']);
     expect(await sendable({ organization: 'member' })).toEqual([]);
     expect(await sendable({ otherOrganization: 'owner' })).toEqual([]);
   });
@@ -264,6 +275,27 @@ describe('inquiryResourcePermissionFromParties through the real check, per inqui
       false,
     );
     expect(can(await principal({ organization: 'owner' }), transferSpace, 'resolve')).toBe(false);
+  });
+
+  it("an organization reads what its token received after the token is deleted, and never a member's", async () => {
+    const reads = async (seat: Seat, record: object) =>
+      check(await principal(seat), rebacSchema, 'inquiry', record as HydratedRecord, 'read');
+    const toToken = {
+      id: 'i1',
+      type: 'inviteOrganizationUser',
+      sourceModel: 'User',
+      sourceUserId: 'u9',
+      targetModel: 'Token',
+      targetTokenId: 't1',
+      targetOrganizationId: organization.id,
+      targetOrganization: organization,
+      targetSpaceId: null,
+      targetUserId: null,
+    };
+    expect(await reads({ organization: 'admin' }, toToken)).toBe(true);
+    expect(await reads({ organization: 'member' }, toToken)).toBe(false);
+    expect(await reads({ organization: 'admin' }, { ...toToken, targetUserId: 'u8' })).toBe(false);
+    expect(await reads({ otherOrganization: 'owner' }, toToken)).toBe(false);
   });
 
   it('an inquiry targeting the platform (admin) is resolved by a superadmin only', async () => {

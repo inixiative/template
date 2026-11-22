@@ -159,6 +159,7 @@ const dbMethods = {
               client: transactionClient as Db,
               prismaTransactionId: null,
               afterCommitBatches: [],
+              commitCollectors: new Map(),
               finallyFns: [],
               heldLocks: new Map(),
               settled: false,
@@ -254,6 +255,19 @@ const dbMethods = {
       concurrency: minimumConcurrencyLimitFor(typeList),
       types: typeList,
     });
+  },
+
+  onCommitCollect: <T>(key: string, item: T, flush: (items: T[]) => Promise<void> | void): void => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.onCommitCollect() requires db.txn()');
+    const held = openTransaction.commitCollectors.get(key);
+    if (held) {
+      held.push(item);
+      return;
+    }
+    const items: unknown[] = [item];
+    openTransaction.commitCollectors.set(key, items);
+    db.onCommit(() => flush(items as T[]));
   },
 
   onFinally: (callbacks: FinallyFn | FinallyFn[]): void => {

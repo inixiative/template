@@ -20,6 +20,7 @@ model Inquiry {
 
   // Source (who creates/sends) - fake polymorphism
   sourceModel          InquiryResourceModel
+  sourceId             String?              @db.VarChar(36)
   sourceUserId         String?              @db.VarChar(36)
   sourceOrganizationId String?              @db.VarChar(36)
   sourceSpaceId        String?              @db.VarChar(36)
@@ -38,6 +39,7 @@ model Inquiry {
 
   // Target (who receives/resolves) - fake polymorphism
   targetModel          InquiryResourceModel
+  targetId             String?              @db.VarChar(36)
   targetUserId         String?              @db.VarChar(36)
   targetOrganizationId String?              @db.VarChar(36)
   targetSpaceId        String?              @db.VarChar(36)
@@ -60,14 +62,14 @@ model Inquiry {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@index([sourceModel])
+  @@index([sourceModel, sourceId])
   @@index([sourceUserId])
   @@index([sourceOrganizationId])
   @@index([sourceSpaceId])
   @@index([sourceIntegrationId])
   @@index([sourceTokenId])
   @@index([sourceProjectId])
-  @@index([targetModel])
+  @@index([targetModel, targetId])
   @@index([targetUserId])
   @@index([targetOrganizationId])
   @@index([targetSpaceId])

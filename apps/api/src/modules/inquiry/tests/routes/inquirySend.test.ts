@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import type {
   Inquiry,
   Organization,
@@ -17,6 +17,7 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
+import * as emitModule from '#/appEvents/emit';
 import { inquiryRouter } from '#/modules/inquiry';
 import { inquiryServices } from '#/modules/inquiry/services';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
@@ -377,5 +378,62 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
     expect(data.updatedAt).toBe(record.updatedAt.toISOString());
     expect(data.auditLogsAsSubject?.length).toBe(record.auditLogsAsSubject.length);
     expect(data.targetUser).toBeDefined();
+  });
+
+  it('rejects re-sending an expired changesRequested inquiry with 410', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.changesRequested,
+      expiresAt: new Date(Date.now() - 60_000),
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
+
+    expect(response.status).toBe(410);
+  });
+
+  it('auto-approve emits inquiry.sent before inquiry.resolved', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.draft,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const emitted: string[] = [];
+    const originalEmit = emitModule.emitAppEvent;
+    const orderSpy = spyOn(emitModule, 'emitAppEvent').mockImplementation((async (name, data) => {
+      emitted.push(name);
+      return originalEmit(name, data);
+    }) as typeof emitModule.emitAppEvent);
+
+    try {
+      const response = await fetch(
+        post(`/api/v1/inquiry/${inquiry.id}/send`, {
+          expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect(emitted.filter((e) => e === 'inquiry.sent' || e === 'inquiry.resolved')).toEqual([
+        'inquiry.sent',
+        'inquiry.resolved',
+      ]);
+    } finally {
+      orderSpy.mockRestore();
+    }
   });
 });

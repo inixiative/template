@@ -229,11 +229,11 @@ Creating checks `create` on a pseudo record of the model being created (token cr
 
 ### Person-Only Actions
 
-Some actions are for a person, not a token: minting and updating a token (`create` on `db:token`), deleting an organization, `user.redact`, `user.rotateJwts`, `user.changePassword`, and `delegateFull` on every model that has it. Their rules include `actorIsUser` (`__actor.model equals User`). Creating an organization takes a user behind the actor: `actorIsUser` or `actorIsDelegateOfUser` (a token owned by a user). A token holding `own` still cannot take a person-only action, and because the grant check runs with no actor, a person-only action can never be granted as an entitlement.
+Some actions are for a person, not a token: minting and updating a token (`create` on `db:token`), deleting an organization, `user.redact`, `user.rotateJwts`, `user.changePassword`, and `delegateFull` on every model that has it. Their rules include `actorIsUser` (`actor:Acting.model equals User`). Creating an organization takes a user behind the actor: `actorIsUser` or `actorIsDelegateOfUser` (a token owned by a user). A token holding `own` still cannot take a person-only action, and because the grant check runs with no actor, a person-only action can never be granted as an entitlement.
 
 ### The Actor
 
-The table says what a principal holds. The actor says only who is acting: `permix.setActor(actorFromRecordOmittingSensitiveFields(model, record))` (`packages/permissions/src/actorFromRecordOmittingSensitiveFields.ts`) gives `{ model, record }`, with `model` `User` for a JWT or spoof and `Token` for any API token, and `record` the row's columns with its sensitive fields omitted. Rules read it as `__actor` in a json-rules condition. Actor rules only gate person-only actions; who is related to what is decided by walking relations. With nobody acting, an actor rule denies and the table still answers everything else.
+The table says what a principal holds. The actor says only who is acting: `permix.setActor(actorFromRecordOmittingSensitiveFields(model, record))` (`packages/permissions/src/actorFromRecordOmittingSensitiveFields.ts`) gives `{ model, record }`, with `model` `User` for a JWT or spoof and `Token` for any API token, and `record` the row's columns with its sensitive fields omitted. The check hands its rows to every rule as the supplied `actor` map (`packages/db/src/schemaMap.ts`): `actor:Acting.model` says which kind is acting, and `actor:User` or `actor:Token` is that kind's row. A token request gives no `actor:User` row, so a rule on one never passes for a token. Actor rules only gate person-only actions; who is related to what is decided by walking relations. With nobody acting, an actor rule denies and the table still answers everything else.
 
 ---
 
@@ -348,13 +348,15 @@ So U1 adds I1 on M1 as a member of O1; a viewer of O1 adds none, and a role toke
 
 Every create-token route calls `createToken` (`apps/api/src/modules/me/services/createToken.ts`), which checks `create` on a pseudo token. The rule is `actorIsUser` and `actorMayCreateTokenAtOwnerWithRole`:
 
-- the owner is a tenant, or a user you manage (a token on M1 carries U1, so only U1 mints on M1);
+- the owner is an organization or space you may `manage` (admin and above), or a user you manage (a token on M1 carries U1, so only U1 mints on M1). A member below admin mints on their own user, member row and integrations, and a token on a member row or its integration ends with the membership; a tenant's token is durable, and outlasts the admin who minted it;
 - for a token on an integration, the same is asked of the integration's owner;
 - the role is any role when the chain ends at a user or a member row (it is capped at use), and otherwise a role you hold at the owner (`roleHeldAtOwner`; for an integration's token, at the integration's owner).
 
 Then `validateDelegateRole` refuses a role on a token whose integration has no role and is not `full` (422: the role would narrow nothing), `validateFullGrant` runs when the body sets `full` ([Full and delegateFull](#full-and-delegatefull)). The token row and its entitlements are written in one transaction: the token first, then the body's entries through the one writer, `changeEntitlements` ([Changing Entitlements](#changing-entitlements)), which checks every entry. A token with no role and no entitlements is minted and holds nothing. Creating an integration does the same (`apps/api/src/modules/integration/services/createIntegration.ts`).
 
-`PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`. A token never changes itself.
+`PATCH /token/:id` changes `name`, `role` and `full`; `validateTokenWrite` checks `create` on the token as it is and as it will be, plus `validateFullGrant` when it will be `full`, so changing a tenant's token takes `manage` on the tenant too. A token never changes itself.
+
+An entitlement on a token is its own row, anchored at the resource: one an admin copied onto a tenant's token stays when the admin's own row is revoked. Revoke it on the token.
 
 ---
 
@@ -512,7 +514,7 @@ Create runs it once; `PATCH /integration/:id` with `role` or `full` runs it on t
 
 A grant is an action: the writer must be able to take every action the delegate would hold, on every record the entitlement reaches. `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`) fetches and hydrates the anchor, `placeEntitlement` (the library's, over `schemaMap`) builds one pseudo record per kind the entry reaches, and `canGrantEntitlement` judges every one in two passes:
 
-1. **The writer's role table, and what it holds outright above the record.** The writer's table (no actor) takes each action on the pseudo record, with fields the record does not carry read as unknown. A rule on `__actor` never passes, so a person-only action is never grantable. An entitlement the writer holds counts here too, like a role on its record, when it is marked `grantsBelow` and sits on a real row above the pseudo record ([Granting below a held row](#granting-below-a-held-row)).
+1. **The writer's role table, and what it holds outright above the record.** The writer's table (no actor) takes each action on the pseudo record, and a field the record does not carry fails every rule on it. The pseudo record never carries its own key, so a rule that rests on an empty column (a null check beside `id exists`) is not grantable over many records. A rule on `actor:` rows never passes, so a person-only action is never grantable. An entitlement the writer holds counts here too, like a role on its record, when it is marked `grantsBelow` and sits on a real row above the pseudo record ([Granting below a held row](#granting-below-a-held-row)).
 2. **One held entitlement.** Failing that, the entry is one entitlement the writer holds, passed on whole: same resource and anchor, each action held or reached by pure delegation (holding `manage` grants `read`), its `where` copied or narrowed (an `all` holding every conjunct of the held `where` plus more: held `C`, granted `all: [A, B, C]`), and its granter still backing each action. The lens is never copied: lenses compose down the chain ([the lens](../../packages/permissions/src/rebac/ENTITLEMENTS.md#the-lens)). Held entitlements never combine: to pass on two, grant two.
 
 #### Granting below a held row
@@ -526,7 +528,7 @@ An entitlement held with no `where` and no lens grants below its record, as a ro
 
 Situations: `apps/api/src/lib/permissions/memberGrantsBelowItself.test.ts`.
 
-Every added entry goes through this check, whoever writes it and whatever delegate it lands on. A removal does not: it takes administering the record that holds the row (the check each remove route runs on the holder), not the right to grant it, so an admin who manages a member removes what an owner granted that member. On a token that check is `delete` (administering it), not the `create` check its add route runs: minting on a tenant needs only access to the tenant, and that must not be enough to strip a token's rows. Why: taking away never hands on authority, and whoever administers a holder could already remove it whole (Aron, 2026-11-16: "Removal takes slightly fewer permissions than granting. It just takes ownership over the record, not necessarily over the entitlement"). A malformed entry or an anchor that does not exist is 422; a refusal is 403.
+Every added entry goes through this check, whoever writes it and whatever delegate it lands on. A removal does not: it takes administering the record that holds the row (the check each remove route runs on the holder), not the right to grant it, so an admin who manages a member removes what an owner granted that member. On a token that check is `delete` (administering it), not the `create` check its add route runs. Why: taking away never hands on authority, and whoever administers a holder could already remove it whole (Aron, 2026-11-16: "Removal takes slightly fewer permissions than granting. It just takes ownership over the record, not necessarily over the entitlement"). A malformed entry or an anchor that does not exist is 422; a refusal is 403.
 
 Each pseudo record is built from the anchor down the path: the foreign keys the parent knows, one record per kind the step admits, each with its owner placed under the anchor, ids below the anchor unknown, plus the `where`'s exact `equals` values. The `where`'s root leaves (the `where` itself, or each leaf of its top `all`; nothing nested) on the kind field are checked on each kind the first step admits, and a kind a leaf fails is dropped. So, for the owner and an admin of O1:
 
@@ -550,7 +552,7 @@ Grants beyond a role. Each is one row of the `Entitlement` table (`packages/db/p
 An entitlement applies to a record when all three hold:
 
 - **its anchor is reached along its path**, each polymorphic step being a kind that carries the step's keys;
-- **its `where` holds** on the record (positive json-rules; "no value" is `equals null`);
+- **its `where` holds** on the record (positive json-rules; a null check takes an `exists` on its row's key beside it: `all: [id exists, role equals null]`);
 - **its owner still allows the action** on that record through the normal walk, so a grant never outlives or outreaches whoever backs it.
 
 The action is checked on the record, never asked of the anchor. Who backs it: for a delegate, its owner's permissions; for a member row, the tenant's owner, except the member self-grant, backed by the member's user.
@@ -646,7 +648,7 @@ The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`, keyed
 |------|---------|---------|
 | `string` | another action on the same record | `manage: 'own'` |
 | `{ rel, action }` | the action on a related record (dot-paths walk further) | `{ rel: 'organization', action: 'own' }` |
-| `{ rule: Condition }` | a json-rules condition over the record and `__actor` | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
+| `{ rule: Condition }` | a json-rules condition over the record and the supplied `actor:` rows | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
 | `{ rel, arrayOperator: 'any', condition }` | some item of a declared list passes `condition`, judged on the item ([Crossing a List](#crossing-a-list-down)) | `{ rel: 'participants', arrayOperator: 'any', condition: { rel: 'user', action: 'operate' } }` |
 | `{ any: ActionRule[] }` | at least one passes | `{ any: [{ rel: 'user', action: 'read' }, 'read'] }` |
 | `{ all: ActionRule[] }` | all pass | `{ all: [actorIsUser, 'own'] }` |
@@ -720,7 +722,7 @@ In the inquiry schema, `updateSpace` uses single-hop and `transferSpace` uses th
 
 `db:inquiry` is the `inquiryResourcePermission` object `inquiryResourcePermission.ts` builds from `INQUIRY_TYPES`; the schema imports it like any other resource. Each inquiry type declares, in `INQUIRY_TYPES` (`inquiryTypes.ts`), the party models that may stand on each side and the level each needs: `send` for a source, `resolve` for a target. A level is an action of that party model's own resource; `inquiryResourcePermission.test.ts` walks every send, resolve and read rule and fails when a relation, action or field it names, in a plain action or inside a rule-form level, does not exist. A level can instead be a plain rebac rule in the schema's own vocabulary, used as written, for a case one action cannot say: `transferSpace` is `{ rel: 'sourceSpace.organization', action: 'own' }`, and an invite picks `own` or `manage` with `any`/`all` over its role.
 
-- **`read`** is party-wide, whatever the type, each party on its own ownership channel (`INQUIRY_READ_LEVELS`): a person reads the sides that name them (`read` on that user): what belongs to a member, or chains through one, is the member's and never the organization's; `manage` on an organization reads the sides on the organization alone (the side's space and user keys are null), which includes its own integrations, tokens and projects; `manage` on a space reads the sides on the space with no user. Why: an inquiry carries its delegates' owner keys, so the organization is on every row beneath it; a member's own integration stays the member's and a space's inquiries the space's (Aron, 2026-11-16). See [INQUIRIES.md](INQUIRIES.md#permissions-rebac).
+- **`read`** is party-wide, whatever the type, each party on its own ownership channel (`INQUIRY_READ_LEVELS`): a person reads the sides that name them (`read` on that user): what belongs to a member, or chains through one, is the member's and never the organization's; `manage` on an organization reads the sides on the organization alone (the side is the organization, or its space and user keys are empty), which includes its own integrations, tokens and projects; an entitlement over what the organization received is granted on the first form (`targetModel equals 'Organization'`), since a rule resting on empty keys is not grantable over many records; `manage` on a space reads the sides on the space with no user. Why: an inquiry carries its delegates' owner keys, so the organization is on every row beneath it; a member's own integration stays the member's and a space's inquiries the space's (Aron, 2026-11-16). See [INQUIRIES.md](INQUIRIES.md#permissions-rebac).
 - **`send`** and **`resolve`** are one branch per type, each gated on the type and on the party model, asking the declared action on the relation named for the side and model (`sourceOrganization`, `targetUser`).
 - A platform (`admin`) party has no relation, so only a superadmin acts for it.
 

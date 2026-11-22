@@ -114,7 +114,9 @@ describe('changeEntitlements: a request addressed to the record whose entitlemen
     expect((await parseSuccessBody<Inquiry>(response)).data).toMatchObject({
       status: 'sent',
       sourceUserId: requester.user.id,
+      sourceId: requester.user.id,
       targetTokenId: token.id,
+      targetId: token.id,
       targetOrganizationId: organization.id,
     });
     expect((await ask(requester, target)).status).toBe(409);

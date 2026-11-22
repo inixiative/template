@@ -13,6 +13,8 @@
  * top level (depth 1) — so a nested relation-write `select` and a nearby read's
  * `select` are not flagged. Prints `file:line` violations; exits 1 if any.
  */
+import './exitTwoWhenDetectorCrashes';
+
 const WRITE = /\.(create|update|upsert|delete|createManyAndReturn|updateManyAndReturn)\s*\(/g;
 const KEY_AT = /^\s*['"]?(select|omit)['"]?\s*:/;
 
@@ -76,10 +78,7 @@ const scanFile = (file: string, src: string): Violation[] => {
 const files = process.argv.slice(2);
 const all: Violation[] = [];
 for (const file of files) {
-  const src = await Bun.file(file)
-    .text()
-    .catch(() => '');
-  if (src) all.push(...scanFile(file, src));
+  all.push(...scanFile(file, await Bun.file(file).text()));
 }
 
 if (all.length > 0) {

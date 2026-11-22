@@ -21,6 +21,7 @@
 - [Form Helpers](#form-helpers)
   - [useDebounce](#usedebounce)
   - [useValidateUniqueness](#usevalidateuniqueness)
+  - [Batch Query Transport & Master-Data Preloading (`executeBatchQueries`, `MasterDataPreloader`)](#batch-query-transport--master-data-preloading-executebatchqueries-masterdatapreloader)
 - [Testing](#testing)
 - [Key Files](#key-files)
 
@@ -331,6 +332,16 @@ const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug'
 
 `CreateOrganizationModal` combines both: it derives the slug from the name until edited, debounces it, and shows checking / available / taken.
 
+### Batch Query Transport & Master-Data Preloading (`executeBatchQueries`, `MasterDataPreloader`)
+
+**Location:** `packages/ui/src/lib/batch/executeBatchQueries.ts` and `packages/ui/src/lib/masterData/` (`registry.ts`, `preloadMasterData.ts`, `useMasterData.ts`)
+
+`executeBatchQueries(queryClient, entries, options)` is the shared React Query batch transport over `POST /api/v1/batch/execute` (`strategy: 'allowFailures'`). Each entry keeps its own SDK `queryKey` and fallback `apiQuery` fetch function; successful sub-responses (`{ data: object | array }`) are seeded directly into their individual React Query cache keys while failed entries stay unseeded for normal hook fallback (reusable for master-data preloading and summary/dashboard batching boundaries).
+
+Static-per-deploy `/api/v1/<model>/info` catalogs declared in `MASTER_DATA_ENTRIES` (`contact`, `inquiry`, `segment`, `webhookSubscription`, with a `TEMPLATE ABOVE` extension marker) use `executeBatchQueries` via `preloadMasterData` once on authenticated mount with infinite `staleTime` and `gcTime`. Each reader hook (`useContactInfo`, `useInquiryInfo`, `useSegmentInfo`, `useWebhookSubscriptionInfo`) awaits an in-flight preload before falling back to its individual `GET /api/v1/<model>/info` endpoint on cache miss, partial failure, or anonymous access.
+
+Mount `<MasterDataPreloader />` as a sibling before `<Outlet />` inside authenticated layouts (`apps/{web,admin,superadmin}/app/routes/_authenticated.tsx`).
+
 ## Testing
 
 Run from `packages/ui` (requires `bunfig.toml` for happy-dom preload):
@@ -339,12 +350,14 @@ Run from `packages/ui` (requires `bunfig.toml` for happy-dom preload):
 cd packages/ui && bun run test
 ```
 
-Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `queryCapabilitiesFromOpenApi.test.ts`, `buildFilterQuery.test.ts`, `dataStatePersistence.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `makeAuthenticatedApiFetch.test.ts`; bracket encoding in `@template/shared/bracketQuery`.
+Or via root: `bun run test:fe`. Data hook coverage lives next to the code: `queryCapabilitiesFromOpenApi.test.ts`, `buildFilterQuery.test.ts`, `dataStatePersistence.test.ts`, `useInfiniteDataQuery.test.ts`, `useInfiniteScrollTrigger.test.ts`, `Pagination.test.ts`, `useOptimisticMutation.test.ts`, `makeAuthenticatedApiFetch.test.ts`, `masterData.test.tsx`; bracket encoding in `@template/shared/bracketQuery`.
 
 ## Key Files
 
 - `packages/sdk/src/` — generated client
 - `packages/ui/src/lib/{apiQuery,apiMutation,makeAuthenticatedApiFetch,makeContextQueries,queryCapabilitiesFromOpenApi}.ts`
+- `packages/ui/src/lib/batch/executeBatchQueries.ts`
+- `packages/ui/src/lib/masterData/{registry,preloadMasterData,useMasterData}.ts`
 - `packages/ui/src/hooks/useOptimisticMutation.ts`
 - `packages/ui/src/hooks/{useListSearchFilterAndOrderState,usePaginatedData,useInfiniteData,useInfiniteDataQuery,useInfiniteScrollTrigger,useScrollState,useSectionHash}.ts`
 - `packages/ui/src/hooks/{useDebounce,useValidateUniqueness}.ts`
