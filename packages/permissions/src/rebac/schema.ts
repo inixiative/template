@@ -110,7 +110,9 @@ export const rebacSchema: RebacSchema = {
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
     'db:integrationResource': {
       actions: {
-        ...ownerActions(['integration']),
+        manage: { rel: 'integration', action: 'manage' },
+        operate: { any: ['manage', { rel: 'integration', action: 'operate' }] },
+        read: { any: ['operate', { rel: 'integration', action: 'read' }] },
         create: 'manage',
         delete: { any: ['manage', { rel: 'integration', action: 'delete' }] },
       },
