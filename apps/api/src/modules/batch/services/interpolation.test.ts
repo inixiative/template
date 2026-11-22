@@ -256,6 +256,37 @@ describe('interpolation', () => {
       });
     });
 
+    it('preserves raw JSON types when a body value is a single interpolation token', () => {
+      const context = {
+        results: [
+          [{ count: 42, active: true, empty: null, tags: ['a', 'b'], meta: { nested: 1 } }],
+        ],
+      };
+
+      const request = {
+        method: 'POST',
+        path: '/api/v1/items',
+        body: {
+          count: '<<0.0.count>>',
+          active: '<<0.0.active>>',
+          empty: '<<0.0.empty>>',
+          tags: '<<0.0.tags>>',
+          meta: '<<0.0.meta>>',
+          mixed: 'count=<<0.0.count>>',
+        },
+      };
+
+      const result = interpolateRequest(request, context);
+      expect(result.body).toEqual({
+        count: 42,
+        active: true,
+        empty: null,
+        tags: ['a', 'b'],
+        meta: { nested: 1 },
+        mixed: 'count=42',
+      });
+    });
+
     it('interpolates headers', () => {
       const context = {
         results: [[{ token: 'secret-token' }]],

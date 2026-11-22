@@ -34,7 +34,7 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  if (!c.get('user')) {
+  if (!c.get('user') && !c.get('token')) {
     try {
       await authenticateToken(c);
     } catch (err) {

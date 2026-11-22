@@ -39,11 +39,27 @@ const segmentWhere = async (segment: Segment): Promise<Record<string, unknown>> 
   });
 };
 
+const EVALUATE_PAGE_SIZE = 2_000;
+
 export const evaluateSegment = async (segment: Segment): Promise<string[]> => {
   try {
     const where = await segmentWhere(segment);
-    const rows = await db.customerRelationship.findMany({ where, select: { id: true } });
-    return rows.map((row) => row.id);
+    const ids: string[] = [];
+    let cursor: string | undefined;
+
+    for (;;) {
+      const rows = await db.customerRelationship.findMany({
+        where: cursor ? andWhere([where, { id: { gt: cursor } }]) : where,
+        select: { id: true },
+        orderBy: { id: 'asc' },
+        take: EVALUATE_PAGE_SIZE,
+      });
+      for (const row of rows) ids.push(row.id);
+      if (rows.length < EVALUATE_PAGE_SIZE) break;
+      cursor = rows[rows.length - 1]?.id;
+    }
+
+    return ids;
   } catch (error) {
     if (error instanceof RuleDegradedError || isInfrastructureFault(error)) throw error;
     throw new RuleEvaluationError(error);

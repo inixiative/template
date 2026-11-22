@@ -480,6 +480,8 @@ describe('handler: transferSpace', () => {
       organizationId: targetOrg2.id,
       slug,
     });
+    const body = (await response.json()) as { data: { resolution: Record<string, unknown> } };
+    expect(body.data.resolution).toMatchObject({ slug });
   });
 
   it('refuses a rename onto a slug the target org already holds', async () => {

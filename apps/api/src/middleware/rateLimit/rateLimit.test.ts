@@ -123,4 +123,29 @@ describe('rateLimit', () => {
       evalSpy.mockRestore();
     }
   });
+
+  it('charges custom per-request cost against the window', async () => {
+    const { fetch } = createTestApp({
+      mount: [
+        (app) => {
+          app.get('/rl', rateLimit([ipRule({ max: 5 })], { cost: 3 }), (c) => c.text('ok'));
+        },
+      ],
+    });
+
+    expect((await hit(fetch, '11.11.11.11')).status).toBe(200);
+    expect((await hit(fetch, '11.11.11.11')).status).toBe(429);
+  });
+
+  it('rejects non-integer or negative cost instead of failing open', async () => {
+    const { fetch } = createTestApp({
+      mount: [
+        (app) => {
+          app.get('/rl', rateLimit([ipRule({ max: 5 })], { cost: 1.5 }), (c) => c.text('ok'));
+        },
+      ],
+    });
+
+    expect((await hit(fetch, '12.12.12.12')).status).toBe(500);
+  });
 });

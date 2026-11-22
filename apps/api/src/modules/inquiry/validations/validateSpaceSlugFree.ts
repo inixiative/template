@@ -7,7 +7,7 @@
 import { db } from '@template/db';
 import { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
-import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
+import { openInquiryWhere } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 type SpaceSlugClaim = {
   organizationId: string;
@@ -22,7 +22,7 @@ export const validateSpaceSlugFree = async ({
   spaceId,
   inquiryId,
 }: SpaceSlugClaim): Promise<void> => {
-  const [existingSpace, pendingCreate] = await Promise.all([
+  const [existingSpace, pendingClaim] = await Promise.all([
     db.withDeleted(() =>
       db.space.findFirst({
         where: { organizationId, slug, ...(spaceId && { id: { not: spaceId } }) },
@@ -31,9 +31,9 @@ export const validateSpaceSlugFree = async ({
     ),
     db.inquiry.findFirst({
       where: {
-        type: InquiryType.createSpace,
+        type: { in: [InquiryType.createSpace, InquiryType.updateSpace] },
         sourceOrganizationId: organizationId,
-        status: { notIn: inquiryTerminalStatuses },
+        ...openInquiryWhere(),
         content: { path: ['slug'], equals: slug },
         ...(inquiryId && { id: { not: inquiryId } }),
       },
@@ -43,9 +43,9 @@ export const validateSpaceSlugFree = async ({
 
   if (existingSpace)
     throw makeError({ status: 409, message: 'A space with this slug already exists' });
-  if (pendingCreate)
+  if (pendingClaim)
     throw makeError({
       status: 409,
-      message: 'An open request to create a space with this slug already exists',
+      message: 'An open request for a space with this slug already exists',
     });
 };

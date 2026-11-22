@@ -82,11 +82,7 @@ export const failOnRound: StrategyExecutor = async (
     }
 
     const status =
-      failedRequests === 0
-        ? 'success'
-        : failedRequests === totalRequests
-          ? 'failed'
-          : 'partialSuccess';
+      failedRequests === 0 ? 'success' : successfulRequests === 0 ? 'failed' : 'partialSuccess';
 
     return {
       batch: results,

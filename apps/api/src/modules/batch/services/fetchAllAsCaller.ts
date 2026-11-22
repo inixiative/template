@@ -34,7 +34,11 @@ export const fetchAllAsCaller = async (
       else if (page > 1) params.set('page', String(page));
 
       const { status, body } = await fetchAsCaller(c, `${pathname}?${params}`);
-      if (status < 200 || status >= 300) throw new Error(`GET ${path} answered ${status}`);
+      if (status < 200 || status >= 300) {
+        const err = new Error(`GET ${path} answered ${status}`) as Error & { status: number };
+        err.status = status;
+        throw err;
+      }
       return body as PageBody;
     },
     {
@@ -45,7 +49,9 @@ export const fetchAllAsCaller = async (
         single = body.data;
       },
       onCapped: ({ reason }) => {
-        throw new Error(`GET ${path} hit its ${reason} cap`);
+        const err = new Error(`GET ${path} hit its ${reason} cap`) as Error & { capped: true };
+        err.capped = true;
+        throw err;
       },
     },
   );

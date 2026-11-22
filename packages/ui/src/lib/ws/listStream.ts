@@ -25,7 +25,9 @@ const withTotal = (
   return {
     ...pagination,
     total,
-    totalPages: pagination.pageSize ? Math.ceil(total / pagination.pageSize) : undefined,
+    totalPages: pagination.pageSize
+      ? Math.ceil(total / pagination.pageSize)
+      : pagination.totalPages,
   };
 };
 

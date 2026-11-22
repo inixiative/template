@@ -15,6 +15,14 @@ import type { FlowStep } from '#/modules/flow/schemas/flowSchemas';
 import type { AppEnv } from '#/types/appEnv';
 
 const READ_ALL = { pageSize: 1000, maxPages: 10 };
+const TERMINAL_STEP_STATUSES = new Set([401, 403, 404]);
+
+const isTerminalFlowStepError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const typed = error as { status?: unknown; capped?: unknown };
+  if (typeof typed.status === 'number') return TERMINAL_STEP_STATUSES.has(typed.status);
+  return typed.capped === true;
+};
 
 export const advanceFlowAndDeleteWhenFinished = async (c: Context<AppEnv>, flow: Flow) => {
   const db = c.get('db');
@@ -23,12 +31,18 @@ export const advanceFlowAndDeleteWhenFinished = async (c: Context<AppEnv>, flow:
   let currentStep = 0;
 
   try {
+    const dataByPath = new Map<string, unknown>();
     for (const step of steps) {
-      const data = await fetchAllAsCaller(c, step.readPath, READ_ALL);
+      let data = dataByPath.get(step.readPath);
+      if (!dataByPath.has(step.readPath)) {
+        data = await fetchAllAsCaller(c, step.readPath, READ_ALL);
+        dataByPath.set(step.readPath, data);
+      }
       if (check(step.rule, { data }) !== true) break;
       stepStates[currentStep++] = FlowStepState.done;
     }
   } catch (error) {
+    if (!isTerminalFlowStepError(error)) throw error;
     log.warn(`flow ${flow.id} dropped: ${String(error)}`);
     await db.flow.delete({ where: { id: flow.id } });
     throw makeError({ status: 404, message: 'Flow ended' });

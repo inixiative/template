@@ -16,6 +16,7 @@ import {
   createUser,
 } from '@template/db/test';
 import type { z } from 'zod';
+import * as fetchAllAsCallerModule from '#/modules/batch/services/fetchAllAsCaller';
 import { flowRouter } from '#/modules/flow';
 import { flowRegistry } from '#/modules/flow/registry/flowRegistry';
 import type { flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
@@ -225,6 +226,42 @@ describe('flows', () => {
     expect(response.status).toBe(404);
     expect(await harness.db.flow.findUnique({ where: { id: flow.id } })).toBeNull();
     expect((await app.fetch(get(`/api/v1/flow/${flow.id}`))).status).toBe(404);
+  });
+
+  it('rethrows 5xx step read failures without deleting the flow', async () => {
+    const { organization, app } = await ownedOrganization();
+    const flow = await started(app, organization.id);
+    const serverError = Object.assign(new Error('upstream 500'), { status: 500 });
+    const spy = spyOn(fetchAllAsCallerModule, 'fetchAllAsCaller').mockRejectedValue(serverError);
+
+    try {
+      const response = await app.fetch(get(`/api/v1/flow/${flow.id}`));
+      expect(response.status).toBe(500);
+      expect(await harness.db.flow.findUnique({ where: { id: flow.id } })).not.toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('stops fetching later step readPaths once an earlier step is incomplete', async () => {
+    const { organization, app } = await ownedOrganization();
+    const flow = await started(app, organization.id);
+    const original = fetchAllAsCallerModule.fetchAllAsCaller;
+    const seenPaths: string[] = [];
+    const spy = spyOn(fetchAllAsCallerModule, 'fetchAllAsCaller').mockImplementation(
+      async (c, path, opts) => {
+        seenPaths.push(path);
+        return original(c, path, opts);
+      },
+    );
+
+    try {
+      const checked = await fetchFlowThroughApp(app, flow.id);
+      expect(checked.currentStep).toBe(0);
+      expect(seenPaths).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('answers 404 to the losing tab when two reads finish the flow at once', async () => {
