@@ -950,7 +950,7 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `flow.prisma` - `Flow`: one user's short-lived walk through a registered flow (`flowKey`, resolved `steps`, optional `returnUrl`); deleted after 15 idle minutes. See [FLOWS.md](FLOWS.md)
 - `contact.prisma` - Unified contact-info entries (phone/email/social handles), false-polymorphic owner (User/Organization/Space), per-type validation registry, per-owner uniqueness on `(ownerModel, …, type, valueKey)`, optional row-level `permissionRules` for sharing
 - `setting.prisma` - `Setting`: dual-polymorphic typed key/value settings across `User`, `Organization`, `Space`, `OrganizationUser`, `SpaceUser`, `Project`, `Integration`, and `ProjectIntegration`, backed by the reusable 5-column Attribute model capability (`ATTRIBUTE_MODELS`), code-first `SETTING_DEFINITIONS`, Postgres `GIN` index on `valueJson`, and per-key compiled ReBAC (`settingResourcePermission`). See [SETTINGS.md](SETTINGS.md)
-- `projectIntegration.prisma` - `ProjectIntegration`: links a `Project` to an `Integration` within the same tenant boundary (`projectIntegrationOwner` hook + cross-org space transfer tombstoning), parent-edged to `Project`, audited and soft-deleted. See [SETTINGS.md](SETTINGS.md)
+- `projectIntegration.prisma` - `ProjectIntegration`: links a `Project` to an `Integration` within the same tenant boundary (`projectIntegrationOwner` hook + cross-org space transfer tombstoning), parent-edged to `Project`, audited and soft-deleted; a plain unique on `(projectId, integrationId)`, so linking again revives the link (upsert inside `db.withDeleted`). See [SETTINGS.md](SETTINGS.md)
 
 **Communications:**
 - See [COMMUNICATIONS.md](COMMUNICATIONS.md#database-models) for email template models

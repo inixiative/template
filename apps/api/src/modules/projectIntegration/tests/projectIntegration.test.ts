@@ -90,7 +90,7 @@ describe('ProjectIntegration CRUD, tenant boundary hook, ReBAC, AuditLog, and sp
     await cleanupTouchedTables(ownerApp.db);
   });
 
-  it('creates, lists, reads, admin-lists, rejects duplicates (409), soft-deletes, and audits ProjectIntegration with parent tenancy', async () => {
+  it('creates, lists, reads, admin-lists, links twice to the same row, soft-deletes, revives on re-link, and audits ProjectIntegration with parent tenancy', async () => {
     const createdRes = await ownerApp.fetch(
       post(`/api/v1/project/${orgProject.id}/projectIntegrations`, {
         integrationId: orgIntegration.id,
@@ -101,13 +101,12 @@ describe('ProjectIntegration CRUD, tenant boundary hook, ReBAC, AuditLog, and sp
     expect(link.projectId).toBe(orgProject.id);
     expect(link.integrationId).toBe(orgIntegration.id);
 
-    // Duplicate link returns 409
-    const duplicate = await ownerApp.fetch(
+    const twice = await ownerApp.fetch(
       post(`/api/v1/project/${orgProject.id}/projectIntegrations`, {
         integrationId: orgIntegration.id,
       }),
     );
-    expect(duplicate.status).toBe(409);
+    expect((await parseSuccessBody<ProjectIntegration>(twice)).data.id).toBe(link.id);
 
     // List under project
     const listRes = await ownerApp.fetch(
@@ -128,10 +127,19 @@ describe('ProjectIntegration CRUD, tenant boundary hook, ReBAC, AuditLog, and sp
     const { data: adminRows } = await parseSuccessBody<ProjectIntegration[]>(adminList);
     expect(adminRows.some((r) => r.id === link.id)).toBe(true);
 
-    // Soft-delete frees the unique constraint
     const delRes = await ownerApp.fetch(del(`/api/v1/projectIntegration/${link.id}`));
     expect(delRes.status).toBe(204);
     expect((await ownerApp.fetch(get(`/api/v1/projectIntegration/${link.id}`))).status).toBe(404);
+
+    const relinked = await ownerApp.fetch(
+      post(`/api/v1/project/${orgProject.id}/projectIntegrations`, {
+        integrationId: orgIntegration.id,
+      }),
+    );
+    expect((await parseSuccessBody<ProjectIntegration>(relinked)).data).toMatchObject({
+      id: link.id,
+      deletedAt: null,
+    });
 
     // AuditLog recorded create & delete with contextOrganizationId resolved through ProjectIntegration -> Project
     const logs = await ownerApp.db.auditLog.findMany({
@@ -141,7 +149,11 @@ describe('ProjectIntegration CRUD, tenant boundary hook, ReBAC, AuditLog, and sp
       },
       orderBy: { createdAt: 'asc' },
     });
-    expect(logs.map((l) => l.action)).toEqual([AuditAction.create, AuditAction.delete]);
+    expect(logs.map((l) => l.action)).toEqual([
+      AuditAction.create,
+      AuditAction.delete,
+      AuditAction.update,
+    ]);
     expect(logs[0]?.contextOrganizationId).toBe(organization.id);
   });
 
