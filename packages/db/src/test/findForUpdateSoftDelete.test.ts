@@ -52,7 +52,7 @@ describe('db.findForUpdate on a soft-delete model', () => {
     ).toHaveLength(1);
   });
 
-  it('re-adds a removed key under the upserting fence', async () => {
+  it('an upsert on a removed key revives the tombstone', async () => {
     const { entity: removed } = await createResource();
     await db.integrationResource.update({
       where: { id: removed.id },
@@ -64,16 +64,15 @@ describe('db.findForUpdate on a soft-delete model', () => {
       externalId: removed.externalId,
     };
 
-    const again = await db.txn(async () => {
-      const [existing] = await db.findForUpdate<IntegrationResource>('IntegrationResource', key, {
-        upserting: true,
-      });
-      return (
-        existing ?? db.integrationResource.create({ data: { ...key, name: 'Again', metadata: {} } })
-      );
-    });
+    const again = await db.withDeleted(() =>
+      db.integrationResource.upsert({
+        where: { integrationId_kind_externalId: key },
+        create: { ...key, name: 'Again', metadata: {} },
+        update: { deletedAt: null },
+      }),
+    );
 
-    expect(again.id).not.toBe(removed.id);
+    expect(again).toMatchObject({ id: removed.id, deletedAt: null });
   });
 
   it('waits on a revive in flight on the key and returns the revived row', async () => {

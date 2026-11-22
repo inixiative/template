@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { db } from '@template/db';
+import { db, revive } from '@template/db';
 import { log } from '@template/shared/logger';
 
 export type MembershipDiff = { added: string[]; removed: string[] };
@@ -42,11 +42,15 @@ export const applyMembershipDiff = async ({
 
   await db.txn(async () => {
     if (toAdd.length) {
+      const revived = await revive(db.segmentMember, {
+        segmentId,
+        customerRelationshipId: { in: toAdd },
+      });
       const written = await db.segmentMember.createManyAndReturn({
         data: toAdd.map((customerRelationshipId) => ({ segmentId, customerRelationshipId })),
         skipDuplicates: true,
       });
-      added = written.map((member) => member.customerRelationshipId);
+      added = [...revived, ...written].map((member) => member.customerRelationshipId);
     }
     if (toRemove.length)
       await db.segmentMember.updateManyAndReturn({

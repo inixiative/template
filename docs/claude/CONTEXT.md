@@ -485,14 +485,11 @@ soft-delete extension scopes it (see DATABASE.md → Soft-delete read scoping). 
 decides visibility, not the actor.** On every ordinary route a soft-deleted resource 404s for
 everyone — a superadmin calling `/api/v1/organization/:id` included. Superadmin endpoints (mounted
 on `adminRouter`, behind `validateSuperadmin`) run inside `db.withDeleted`, so there the lookup
-resolves tombstones too. Revival is a create path, never load-the-deleted-row-by-id: inside
-`db.txn`, `db.findForUpdate(model, where, { upserting: true })` on the unique key fences it and
-returns the tombstone if there is one (raw SQL, so the soft-delete scope doesn't hide it); then an
-update whose `where` names `deletedAt` clears it, or a create follows (DATABASE.md → Row Locks and
-Create-If-Missing). No bare `upsert` and no caught unique violation: the `find-or-create-uses-find-for-update-upserting`
-rule ratchets both down per file. The JobOutbox flush (`apps/api/src/jobs/outbox/accumulator.ts`,
-superseding lanes keyed on `handlerName_dedupeKey`) is the standing pre-rule upsert the ratchet
-grandfathers. Models without `deletedAt` are unaffected.
+resolves tombstones too. Revival is a create path, never load-the-deleted-row-by-id: an `upsert` on the plain unique inside
+`db.withDeleted` finds the tombstone and `update: { deletedAt: null }` revives it, or `revive` on
+the key followed by a create (DATABASE.md → Row Locks and Create-If-Missing). No caught unique
+violation: the `no-unique-violation-catches` rule ratchets them down per file. Models without
+`deletedAt` are unaffected.
 
 ### Lookup Parameter
 

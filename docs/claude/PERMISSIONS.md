@@ -597,7 +597,7 @@ A holder can be admitted along several delegation paths, each with its own lens 
 
 ## Adding a Model
 
-1. **Schema entry.** Add `db:<model>` to `rebacSchema.permissions` with its actions. A model owned through `user`/`organization`/`space` relations uses `ownerActions()` (or `ownerActions(['user'])` for a subset); a child of another model walks to its parent (`db:segmentMember` asks the same action of its `segment`). Build the four standard actions with `chainedStandardActions` so each implies the one below.
+1. **Schema entry.** Add `db:<model>` to `rebacSchema.permissions` with its actions. A model owned through `user`/`organization`/`space` relations uses `ownerActions()` (or `ownerActions(['user'])` for a subset); a child of another model walks to its parent (`db:segmentMember` asks the same action of its `segment`). An action may also hold a condition on the record itself: `db:projectIntegrationResource` `create` is `all` of `manage` on the project, `operate` on the resource, and `{ rule: { field: 'integrationResource.status', operator: 'in', value: ['tracked', 'missing'] } }`, so an untracked resource cannot be linked. Build the four standard actions with `chainedStandardActions` so each implies the one below.
 2. **Every action is on the record.** Name what a caller does to this model (`create`, `delete`, `send`), never what the model does elsewhere. A create rule goes on the created model and is checked on a pseudo record.
 3. **Person-only acts** add `actorIsUser` to their rule. Never use the actor to decide relationships.
 4. **Declare deviations.** If the model does not chain all four standard actions, list exactly which links it misses in `notStandard` in `standardActionsChain.test.ts`.

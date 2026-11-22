@@ -2,12 +2,21 @@
  * @atlas
  * @kind service
  * @partOf feature:integrations, feature:webhooks
- * @uses infrastructure:prisma, infrastructure:redis
+ * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import type { IntegrationRecord } from '@template/db/generated/client/client';
+import type { IntegrationRecord, Prisma } from '@template/db/generated/client/client';
 import type { WebhookModel } from '@template/db/generated/client/enums';
 import { integrationRecordForeignKeyForModel } from '#/modules/integration/services/integrationRecordForeignKeyForModel';
+
+const recordUniqueKeyForModel: Record<
+  WebhookModel,
+  (integrationId: string, resourceId: string) => Prisma.IntegrationRecordWhereUniqueInput
+> = {
+  CustomerRelationship: (integrationId, customerRelationshipId) => ({
+    integrationId_customerRelationshipId: { integrationId, customerRelationshipId },
+  }),
+};
 
 export const poisonIntegrationRecord = (input: {
   integrationId: string;
@@ -16,10 +25,8 @@ export const poisonIntegrationRecord = (input: {
   reason: string;
 }): Promise<IntegrationRecord> =>
   db.txn(async () => {
-    const recordKey = {
-      integrationId: input.integrationId,
-      [integrationRecordForeignKeyForModel(input.model)]: input.resourceId,
-    };
+    const recordForeignKey = integrationRecordForeignKeyForModel(input.model);
+    const recordKey = { integrationId: input.integrationId, [recordForeignKey]: input.resourceId };
     const poison = { poisonedAt: new Date(), poisonedReason: input.reason };
     if (
       !(await db.integration.findUnique({
@@ -29,10 +36,13 @@ export const poisonIntegrationRecord = (input: {
     )
       throw new Error(`Integration ${input.integrationId} is gone; its records cannot be poisoned`);
 
-    const [existing] = await db.findForUpdate<IntegrationRecord>('IntegrationRecord', recordKey, {
-      upserting: true,
-    });
-    if (existing?.poisonedAt) return existing;
-    if (existing) return db.integrationRecord.update({ where: { id: existing.id }, data: poison });
-    return db.integrationRecord.create({ data: { ...recordKey, model: input.model, ...poison } });
+    const record = await db.withDeleted(() =>
+      db.integrationRecord.upsert({
+        where: recordUniqueKeyForModel[input.model](input.integrationId, input.resourceId),
+        create: { ...recordKey, model: input.model, ...poison },
+        update: { deletedAt: null },
+      }),
+    );
+    if (record.poisonedAt) return record;
+    return db.integrationRecord.update({ where: { id: record.id }, data: poison });
   });

@@ -55,9 +55,10 @@ describe('integration resources', () => {
     });
   });
 
-  it('refuses a live resource registered twice, and registers a removed one again', async () => {
+  it('registering a resource twice refreshes it, and registering a removed one revives it', async () => {
     const first = await parseSuccessBody<IntegrationResource>(await register({}));
-    expect((await register({})).status).toBe(409);
+    const twice = await parseSuccessBody<IntegrationResource>(await register({ name: 'renamed' }));
+    expect(twice.data).toMatchObject({ id: first.data.id, name: 'renamed' });
 
     await db.integrationResource.update({
       where: { id: first.data.id },
@@ -66,7 +67,10 @@ describe('integration resources', () => {
     const again = await register({});
 
     expect(again.status).toBe(201);
-    expect((await parseSuccessBody<IntegrationResource>(again)).data.id).not.toBe(first.data.id);
+    expect((await parseSuccessBody<IntegrationResource>(again)).data).toMatchObject({
+      id: first.data.id,
+      deletedAt: null,
+    });
   });
 
   it('links the resource to a project the caller manages', async () => {

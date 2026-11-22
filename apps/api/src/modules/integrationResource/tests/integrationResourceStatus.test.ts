@@ -9,10 +9,8 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { fetchPermixForUser } from '#/lib/permissions/userPermissions';
 import { integrationRouter } from '#/modules/integration';
 import { integrationResourceRouter } from '#/modules/integrationResource';
-import { linkProjectResource } from '#/modules/project/services/linkProjectResource';
 import { createTestApp } from '#tests/createTestApp';
 import { del, get, parseSuccessBody, patch, post } from '#tests/utils/request';
 
@@ -117,14 +115,19 @@ describe('integration resource status and removal', () => {
       { integration },
     );
     const { entity: project } = await createProject({ ownerModel: 'User' }, { user });
-    await expect(
-      db.txn(async () =>
-        linkProjectResource((await fetchPermixForUser(user.id))!, {
-          projectId: project.id,
-          integrationResourceId: resource.id,
-        }),
-      ),
-    ).rejects.toThrow('Access denied');
+    const response = await fetch(
+      post(`/api/v1/integration/${integration.id}/integrationResources`, {
+        name: resource.name,
+        kind: resource.kind,
+        externalId: resource.externalId,
+        projectId: project.id,
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(
+      await db.projectIntegrationResource.count({ where: { integrationResourceId: resource.id } }),
+    ).toBe(0);
   });
 
   it('refuses a caller setting missing, which only the system sets', async () => {
@@ -170,6 +173,32 @@ describe('integration resource status and removal', () => {
         )
       ).deletedAt,
     ).toBeInstanceOf(Date);
+  });
+
+  it('registering a deleted resource again revives it, with its project link', async () => {
+    const { entity: project } = await createProject({ ownerModel: 'User' }, { user });
+    const body = { name: 'general', kind: 'channel', externalId: 'C1', projectId: project.id };
+    const first = await parseSuccessBody<IntegrationResource>(
+      await fetch(post(`/api/v1/integration/${integration.id}/integrationResources`, body)),
+    );
+    await fetch(del(`/api/v1/integrationResource/${first.data.id}`));
+
+    const again = await parseSuccessBody<IntegrationResource>(
+      await fetch(
+        post(`/api/v1/integration/${integration.id}/integrationResources`, {
+          ...body,
+          name: 'renamed',
+        }),
+      ),
+    );
+
+    expect(again.data).toMatchObject({ id: first.data.id, name: 'renamed', deletedAt: null });
+    expect(await listed()).toEqual([first.data.id]);
+    expect(
+      await db.projectIntegrationResource.count({
+        where: { integrationResourceId: first.data.id },
+      }),
+    ).toBe(1);
   });
 
   it('deleting one resource degrades the entitlements anchored at it', async () => {

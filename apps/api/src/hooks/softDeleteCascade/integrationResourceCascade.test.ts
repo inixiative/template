@@ -141,20 +141,30 @@ describe('an integration resource dies and revives with its integration (Aron, 2
     ).toEqual(deletedAt);
   });
 
-  it('a removed resource can be registered again under the same kind and externalId', async () => {
-    const { integration, resource } = await createIntegrationWithLinkedResource();
+  it('registering a removed resource again revives it and the links that died with it', async () => {
+    const { integration, resource, link } = await createIntegrationWithLinkedResource();
     await db.integrationResource.update({
       where: { id: resource.id },
       data: { deletedAt: new Date() },
     });
+    expect(await linkStamp(link.id)).not.toBeNull();
 
-    const { entity: again } = await createIntegrationResource(
-      { kind: resource.kind, externalId: resource.externalId },
-      { integration },
+    const key = {
+      integrationId: integration.id,
+      kind: resource.kind,
+      externalId: resource.externalId,
+    };
+    const again = await db.withDeleted(() =>
+      db.integrationResource.upsert({
+        where: { integrationId_kind_externalId: key },
+        create: { ...key, name: resource.name, metadata: {} },
+        update: { deletedAt: null },
+      }),
     );
 
-    expect(again.id).not.toBe(resource.id);
-    expect(await resourceStamp(again.id)).toBeNull();
+    expect(again.id).toBe(resource.id);
+    expect(await resourceStamp(resource.id)).toBeNull();
+    expect(await linkStamp(link.id)).toBeNull();
   });
 
   it('refuses a hard delete of a resource', async () => {

@@ -19,5 +19,5 @@ export const integrationCreateIntegrationResourceRoute = createRoute({
   bodySchema: integrationResourceCreateBodySchema,
   responseSchema: integrationResourceReadResponseSchema,
   description:
-    'Registers a provider resource on this integration, named by its `kind` and `externalId`, and links it to `projectId` when one is named. A live resource with the same kind and externalId is a 409; a removed one can be registered again.',
+    'Registers a provider resource on this integration, named by its `kind` and `externalId`, and links it to `projectId` when one is named. Registering a kind and externalId the integration already holds refreshes its name and metadata; a removed one is revived, with the project links that were removed with it.',
 });

@@ -115,7 +115,7 @@ describe('poisonIntegrationRecord', () => {
     expect(await db.integrationRecord.count({ where: { integrationId: integration.id } })).toBe(1);
   });
 
-  it('poisons a new record when the one before it was removed', async () => {
+  it('revives a removed record, poisoned as it was', async () => {
     const { customerRelationship, integration } = await setup();
     const input = {
       integrationId: integration.id,
@@ -127,7 +127,10 @@ describe('poisonIntegrationRecord', () => {
 
     const second = await poisonIntegrationRecord({ ...input, reason: 'HTTP 422: second' });
 
-    expect(second.id).not.toBe(first.id);
-    expect(second.poisonedReason).toBe('HTTP 422: second');
+    expect(second).toMatchObject({
+      id: first.id,
+      deletedAt: null,
+      poisonedReason: 'HTTP 400: first',
+    });
   });
 });

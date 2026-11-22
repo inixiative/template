@@ -2,7 +2,7 @@
 // PROJECT INTEGRATION RESOURCE - One integration resource linked to one project
 // ============================================================================
 // Soft-deleted with either end and revived with it. Unlinking is a soft delete too; linking the
-// pair again writes a new live row (the unique holds over live rows only).
+// pair again revives the row (the unique holds tombstones too, so `upsert` finds it).
 
 model ProjectIntegrationResource {
   id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
@@ -23,7 +23,7 @@ model ProjectIntegrationResource {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@unique([projectId, integrationResourceId], where: raw("\"deletedAt\" IS NULL"), map: "ProjectIntegrationResource_project_integrationResource_key")
+  @@unique([projectId, integrationResourceId], map: "ProjectIntegrationResource_project_integrationResource_key")
   @@index([projectId])
   @@index([integrationResourceId])
 }

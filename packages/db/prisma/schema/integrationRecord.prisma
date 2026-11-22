@@ -31,9 +31,10 @@ model IntegrationRecord {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  // Per-record uniqueness — partial uniques (see Contact for rationale). Each
-  // partial doubles as the lookup index for that record column.
-  @@unique([integrationId, customerRelationshipId], where: raw("\"customerRelationshipId\" IS NOT NULL AND \"deletedAt\" IS NULL"), map: "IntegrationRecord_integration_customerRelationship_key")
+  // Per-record uniqueness, one composite per record column (see Contact): plain, so NULLS DISTINCT
+  // leaves the other arms unconstrained, tombstones keep their key and `upsert` revives them. Each
+  // doubles as the lookup index for that record column.
+  @@unique([integrationId, customerRelationshipId], map: "IntegrationRecord_integration_customerRelationship_key")
   @@index([integrationId])
   @@index([customerRelationshipId])
 }

@@ -45,7 +45,7 @@ describe('segment members are soft-deleted (Aron, 2026-11-19)', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('a removed member is tombstoned, and coming back writes a new live row', async () => {
+  it('a removed member is tombstoned, and coming back revives it', async () => {
     await applyMembershipDiff({ segmentId: segment.id, matching: [relationship.id] });
     const removed = await applyMembershipDiff({ segmentId: segment.id, matching: [] });
     expect(removed.removed).toEqual([relationship.id]);
@@ -55,9 +55,7 @@ describe('segment members are soft-deleted (Aron, 2026-11-19)', () => {
 
     expect(added.added).toEqual([relationship.id]);
     expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([relationship.id]);
-    const [first, second] = await memberStamps(segment.id);
-    expect(first).not.toBeNull();
-    expect(second).toBeNull();
+    expect(await memberStamps(segment.id)).toEqual([null]);
   });
 
   it('removing a member stamps the rule references naming it', async () => {
