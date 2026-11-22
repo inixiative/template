@@ -13,6 +13,7 @@ export * from './inquiries';
 export * from './makeContextQueries';
 export * from './masterData';
 export { permissionCheckTargetForTenantContext } from './permissionCheckTargetForTenantContext';
+export * from './projectContextQueries';
 export * from './queryCapabilitiesFromOpenApi';
 export * from './resolveSectionTarget';
 export * from './routeRedirect';

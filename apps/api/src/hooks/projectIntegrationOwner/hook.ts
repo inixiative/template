@@ -6,8 +6,17 @@
  */
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import type { ProjectIntegration } from '@template/db/generated/client/client';
-import { castArray } from 'lodash-es';
+import { castArray, chunk } from 'lodash-es';
 import { makeError } from '#/lib/errors';
+
+const VALIDATION_CHUNK_SIZE = 2_000;
+
+type OwnerBoundaryRow = {
+  id: string;
+  organizationId: string | null;
+  spaceId: string | null;
+  userId: string | null;
+};
 
 type RelationConnectInput = {
   connect?: { id?: string };
@@ -42,20 +51,38 @@ const extractRelationId = (
   });
 };
 
-const validateProjectIntegrationBoundary = async (
-  projectId: string | undefined,
-  integrationId: string | undefined,
-): Promise<void> => {
-  if (!projectId || !integrationId) return;
+const fetchBoundaryMap = async (
+  model: 'project' | 'integration',
+  ids: string[],
+): Promise<Map<string, OwnerBoundaryRow>> => {
+  const byId = new Map<string, OwnerBoundaryRow>();
+  for (const batch of chunk(ids, VALIDATION_CHUNK_SIZE)) {
+    const rows =
+      model === 'project'
+        ? await db.project.findMany({
+            where: { id: { in: batch }, deletedAt: null },
+            select: { id: true, organizationId: true, spaceId: true, userId: true },
+          })
+        : await db.integration.findMany({
+            where: { id: { in: batch }, deletedAt: null },
+            select: { id: true, organizationId: true, spaceId: true, userId: true },
+          });
+    for (const row of rows) byId.set(row.id, row);
+  }
+  return byId;
+};
 
-  const [project, integration] = await Promise.all([
-    db.project.findFirst({ where: { id: projectId, deletedAt: null } }),
-    db.integration.findFirst({ where: { id: integrationId, deletedAt: null } }),
-  ]);
-
+const validateProjectIntegrationPair = (
+  projectId: string,
+  integrationId: string,
+  projectsById: Map<string, OwnerBoundaryRow>,
+  integrationsById: Map<string, OwnerBoundaryRow>,
+): void => {
+  const project = projectsById.get(projectId);
   if (!project) {
     throw makeError({ status: 422, message: `Project ${projectId} not found` });
   }
+  const integration = integrationsById.get(integrationId);
   if (!integration) {
     throw makeError({ status: 422, message: `Integration ${integrationId} not found` });
   }
@@ -89,10 +116,26 @@ const validateProjectIntegrationBoundary = async (
   }
 };
 
-const validateCreateRow = async (row: LinkRow): Promise<void> => {
-  const projectId = extractRelationId(row.projectId, row.project, 'projectId');
-  const integrationId = extractRelationId(row.integrationId, row.integration, 'integrationId');
-  await validateProjectIntegrationBoundary(projectId, integrationId);
+const validateCreateRows = async (rows: LinkRow[]): Promise<void> => {
+  const pending: { projectId: string; integrationId: string }[] = [];
+  for (const row of rows) {
+    const projectId = extractRelationId(row.projectId, row.project, 'projectId');
+    const integrationId = extractRelationId(row.integrationId, row.integration, 'integrationId');
+    if (projectId && integrationId) pending.push({ projectId, integrationId });
+  }
+  if (!pending.length) return;
+
+  const uniqueProjectIds = [...new Set(pending.map((row) => row.projectId))];
+  const uniqueIntegrationIds = [...new Set(pending.map((row) => row.integrationId))];
+
+  const [projectsById, integrationsById] = await Promise.all([
+    fetchBoundaryMap('project', uniqueProjectIds),
+    fetchBoundaryMap('integration', uniqueIntegrationIds),
+  ]);
+
+  for (const { projectId, integrationId } of pending) {
+    validateProjectIntegrationPair(projectId, integrationId, projectsById, integrationsById);
+  }
 };
 
 export const registerProjectIntegrationOwnerHook = () => {
@@ -102,9 +145,7 @@ export const registerProjectIntegrationOwnerHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ args }) => {
-      for (const row of castArray((args as { data: LinkRow | LinkRow[] }).data)) {
-        await validateCreateRow(row);
-      }
+      await validateCreateRows(castArray((args as { data: LinkRow | LinkRow[] }).data));
     },
   );
 
@@ -115,7 +156,7 @@ export const registerProjectIntegrationOwnerHook = () => {
     [DbAction.upsert],
     async ({ args }) => {
       const a = args as { create?: LinkRow; update?: LinkRow };
-      if (a.create) await validateCreateRow(a.create);
+      if (a.create) await validateCreateRows([a.create]);
       if (
         a.update &&
         (a.update.projectId !== undefined ||

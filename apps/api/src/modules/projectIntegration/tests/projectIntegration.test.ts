@@ -305,6 +305,28 @@ describe('ProjectIntegration CRUD, tenant boundary hook, ReBAC, AuditLog, and sp
         data: { integrationId: spaceAIntegration.id },
       }),
     ).rejects.toMatchObject({ status: 422 });
+
+    // Batched createManyAndReturn validates one project with many integrations via IN queries
+    const { entity: secondOrgIntegration } = await createIntegration({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+    });
+    const bulkCreated = await ownerApp.db.projectIntegration.createManyAndReturn({
+      data: [
+        { projectId: orgProject.id, integrationId: orgIntegration.id },
+        { projectId: orgProject.id, integrationId: secondOrgIntegration.id },
+      ],
+    });
+    expect(bulkCreated).toHaveLength(2);
+
+    await expect(
+      ownerApp.db.projectIntegration.createManyAndReturn({
+        data: [
+          { projectId: spaceAProject.id, integrationId: secondOrgIntegration.id },
+          { projectId: spaceAProject.id, integrationId: otherOrgIntegration.id },
+        ],
+      }),
+    ).rejects.toThrow(/same organization/);
   });
 
   it('enforces ReBAC: member cannot link org project, member can link own member project to org integration, and org admin can delete that link', async () => {
