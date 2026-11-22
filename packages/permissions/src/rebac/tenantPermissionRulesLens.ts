@@ -6,12 +6,9 @@
  */
 import type { FieldMap } from '@inixiative/field-map';
 import { createLens, type LensNarrowing, lensVisit } from '@inixiative/json-rules';
-import {
-  type BindableOwnerModel,
-  type ModelName,
-  modelsHeldUnderTenant,
-  toAccessor,
-} from '@template/db';
+import type { BindableOwnerModel } from '@template/db/registries/polymorphicAxisPointsAt';
+import { type ModelName, toAccessor } from '@template/db/utils/modelNames';
+import { modelsHeldUnderTenant } from '@template/db/utils/tenantRowsAbove';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { mapValues, memoize } from 'lodash-es';
 
