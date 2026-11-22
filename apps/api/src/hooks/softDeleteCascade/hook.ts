@@ -5,6 +5,7 @@
  * @uses none
  */
 import {
+  applyWriteDataOverPreviousRow,
   DbAction,
   type HookOptions,
   HookTiming,
@@ -12,7 +13,6 @@ import {
   SOFT_DELETE_MODELS,
 } from '@template/db';
 import { castArray } from 'lodash-es';
-import { applyWriteDataOverPreviousRow } from '#/hooks/rules/applyWriteDataOverPreviousRow';
 import { reviveChildren, tombstoneChildren } from '#/hooks/softDeleteCascade/cascade';
 import { validateDeleteBehavior } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
 

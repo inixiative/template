@@ -40,6 +40,8 @@ model Integration {
   auditLogsAsOrigin    AuditLog[]            @relation("AuditLogOriginIntegration")
   auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectIntegration")
   integrationRecords   IntegrationRecord[]
+  projectIntegrations  ProjectIntegration[]
+  settings             Setting[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

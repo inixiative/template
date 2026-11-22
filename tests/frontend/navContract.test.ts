@@ -2,7 +2,9 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { navConfig as adminNavConfig } from '../../apps/admin/app/config/nav';
+import { navConfig as superadminNavConfig } from '../../apps/superadmin/app/config/nav';
 import { navConfig as webNavConfig } from '../../apps/web/app/config/nav';
+import { findRoute } from '../../packages/ui/src/lib/findRoute';
 
 const fetchRouteTargetsFromRouteTree = (filePath: string): Set<string> => {
   const source = readFileSync(filePath, 'utf8');
@@ -36,9 +38,8 @@ const flattenNavPaths = (items: FlatNavItem[]): string[] => {
   return paths;
 };
 
-const normalizeNavPath = (path: string): string => {
-  return path.replaceAll(':organizationId', '$organizationId').replaceAll(':spaceId', '$spaceId');
-};
+const normalizeNavPath = (path: string): string =>
+  path.replace(/:([A-Za-z0-9_]+)/g, (_, param: string) => `$${param}`);
 
 describe('frontend nav contract', () => {
   it('web nav paths resolve to generated route targets', () => {
@@ -71,5 +72,36 @@ describe('frontend nav contract', () => {
     const uniquePaths = [...new Set(navPaths)];
     const invalid = uniquePaths.filter((path) => !routeTargets.has(normalizeNavPath(path)));
     expect(invalid).toEqual([]);
+  });
+
+  it('findRoute resolves /projects, /projects/:id, /projects/:id/settings, and /projects/:id/integrations across web, admin, and superadmin', () => {
+    const projectPaths = [
+      '/projects',
+      '/projects/123',
+      '/projects/123/settings',
+      '/projects/123/integrations',
+    ];
+
+    for (const navConfig of [webNavConfig, adminNavConfig]) {
+      for (const contextType of ['user', 'organization', 'space'] as const) {
+        for (const path of projectPaths) {
+          const match = findRoute(path, navConfig, contextType);
+          expect(match).not.toBeNull();
+          if (path !== '/projects') {
+            expect(match?.params.id).toBe('123');
+            expect(match?.item.alias).toBe(true);
+          }
+        }
+      }
+    }
+
+    for (const path of projectPaths) {
+      const match = findRoute(path, superadminNavConfig, 'user');
+      expect(match).not.toBeNull();
+      if (path !== '/projects') {
+        expect(match?.params.id).toBe('123');
+        expect(match?.item.alias).toBe(true);
+      }
+    }
   });
 });

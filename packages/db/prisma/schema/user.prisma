@@ -56,6 +56,7 @@ model User {
   communicationsReceived          CommunicationLog[]     @relation("CommunicationRecipientUser")
   segments                        Segment[]
   flows                           Flow[]
+  settings                        Setting[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

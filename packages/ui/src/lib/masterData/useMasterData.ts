@@ -5,7 +5,14 @@
  * @uses primitive:sdk
  */
 import { type QueryFunctionContext, useQuery, useQueryClient } from '@tanstack/react-query';
-import { contactInfo, inquiryInfo, segmentInfo, webhookSubscriptionInfo } from '@template/sdk';
+import {
+  contactInfo,
+  inquiryInfo,
+  segmentInfo,
+  settingInfo,
+  webhookSubscriptionInfo,
+} from '@template/sdk';
+import type { SettingCatalog } from '@template/shared/settings';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import {
   inFlightMasterDataPreload,
@@ -73,6 +80,15 @@ export const useInquiryInfo = () =>
 
 export const useSegmentInfo = () =>
   useMasterDataQuery('segment', (opts: Parameters<typeof segmentInfo>[0]) => segmentInfo(opts));
+
+export const useSettingInfo = () =>
+  useMasterDataQuery('setting', (opts: Parameters<typeof settingInfo>[0]) => settingInfo(opts));
+
+export const useSettingCatalog = () => {
+  const query = useSettingInfo();
+  const catalog = query.data?.data?.types as SettingCatalog | undefined;
+  return { ...query, catalog };
+};
 
 export const useWebhookSubscriptionInfo = () =>
   useMasterDataQuery('webhookSubscription', (opts: Parameters<typeof webhookSubscriptionInfo>[0]) =>

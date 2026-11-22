@@ -6,7 +6,7 @@
  */
 import { Icon } from '@iconify/react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { IntegrationOwnerModel } from '@template/db';
+import type { HydratedRecord, IntegrationOwnerModel } from '@template/db';
 import type {
   MeCreateIntegrationData,
   MeReadManyIntegrationsResponse,
@@ -24,6 +24,7 @@ import {
   Page,
 } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
+import { ResourceSettingsSection } from '@template/ui/components/settings/ResourceSettingsSection';
 import {
   createOptimisticListTarget,
   useInfiniteDataQuery,
@@ -42,11 +43,12 @@ import {
   integrationProviders,
   integrationProviderValues,
 } from '@template/ui/lib/integrationProviders';
+import { useSettingCatalog } from '@template/ui/lib/masterData';
 import type { MyMembershipOwnership } from '@template/ui/lib/myMembership';
 import { permissionCheckTargetForTenantContext } from '@template/ui/lib/permissionCheckTargetForTenantContext';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 
 type Integration =
   | MeReadManyIntegrationsResponse['data'][number]
@@ -107,6 +109,7 @@ type IntegrationProviderSectionProps = {
   canConnect: boolean;
   showStatus: boolean;
   canManage: boolean;
+  hasIntegrationSettings: boolean;
   sectionId: string;
   renderConnect: (close: () => void) => ReactNode;
   onDelete: (integration: Integration) => void;
@@ -123,11 +126,13 @@ const IntegrationProviderSection = ({
   canConnect,
   showStatus,
   canManage,
+  hasIntegrationSettings,
   sectionId,
   renderConnect,
   onDelete,
 }: IntegrationProviderSectionProps) => {
   const [isConnectOpen, setConnectOpen] = useSectionOpen(sectionId);
+  const [openSettingsIntegrationId, setOpenSettingsIntegrationId] = useState<string | null>(null);
   const integrationQueries = integrationContextQueries(context, ownership);
   const providerListQuery = integrationListQueryForProvider(provider);
 
@@ -192,23 +197,53 @@ const IntegrationProviderSection = ({
         <div className="max-h-80 overflow-y-auto border-t" data-testid={`integrations-${slug}`}>
           <ul className="divide-y">
             {providerIntegrations.data.map((integration) => (
-              <li key={integration.id} className="flex items-center justify-between px-4 py-2">
-                <div>
-                  <p className="text-sm font-medium">{integration.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Added {new Date(integration.createdAt).toLocaleDateString()}
-                  </p>
+              <li key={integration.id} className="px-4 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">{integration.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Added {new Date(integration.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {hasIntegrationSettings ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Settings for ${integration.name}`}
+                        onClick={() =>
+                          setOpenSettingsIntegrationId((current) =>
+                            current === integration.id ? null : integration.id,
+                          )
+                        }
+                      >
+                        <Icon icon="lucide:settings" className="h-4 w-4" />
+                      </Button>
+                    ) : null}
+                    {canManage && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Delete ${integration.name}`}
+                        onClick={() => onDelete(integration)}
+                      >
+                        <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                {canManage && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Delete ${integration.name}`}
-                    onClick={() => onDelete(integration)}
-                  >
-                    <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
-                  </Button>
-                )}
+                {hasIntegrationSettings && openSettingsIntegrationId === integration.id ? (
+                  <div className="mt-3">
+                    <ResourceSettingsSection
+                      target={{
+                        model: 'Integration',
+                        id: integration.id,
+                        record: integration as unknown as HydratedRecord,
+                      }}
+                      title={`${integration.name} settings`}
+                    />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -244,6 +279,13 @@ const IntegrationOwnerSection = ({
 }: IntegrationOwnerSectionProps) => {
   const queryClient = useQueryClient();
   const permissions = useAppStore((state) => state.permissions);
+  const { catalog } = useSettingCatalog();
+  const hasIntegrationSettings = Boolean(
+    catalog &&
+      Object.values(catalog.definitions).some((definition) =>
+        definition.resourceModels.includes('Integration'),
+      ),
+  );
   const integrationQueries = integrationContextQueries(context, ownership);
   const canManage =
     ownership?.ownedByMyMembership ||
@@ -323,6 +365,7 @@ const IntegrationOwnerSection = ({
               canConnect={canConnectProvider(provider)}
               showStatus
               canManage={canManage}
+              hasIntegrationSettings={hasIntegrationSettings}
               sectionId={`${sectionIdPrefix}connect-${provider}`}
               renderConnect={renderConnect(provider)}
               onDelete={handleDelete}
@@ -340,6 +383,7 @@ const IntegrationOwnerSection = ({
         canConnect={canManage}
         showStatus={false}
         canManage={canManage}
+        hasIntegrationSettings={hasIntegrationSettings}
         sectionId={`${sectionIdPrefix}add-custom`}
         renderConnect={renderConnect(null)}
         onDelete={handleDelete}

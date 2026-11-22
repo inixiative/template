@@ -25,6 +25,7 @@ model OrganizationUser {
   tokens             Token[]
   integrations       Integration[]
   projects           Project[]
+  settings           Setting[]
   emailTemplates     EmailTemplate[]
   emailComponents    EmailComponent[]
   auditLogsAsSubject AuditLog[]       @relation("AuditLogSubjectOrganizationUser")

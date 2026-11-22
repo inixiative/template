@@ -168,6 +168,11 @@ beforeEach(async () => {
     const request = input as Request;
     const url = new URL(request.url);
     const path = url.pathname;
+    if (request.method === 'GET' && path === '/api/v1/setting/info') {
+      return Response.json({
+        data: { guide: {}, types: { categories: {}, definitions: {} } },
+      });
+    }
     if (request.method === 'GET' && path.endsWith('/integrations')) {
       const provider = providerFilterOf(url);
       const page = Number(url.searchParams.get('page') ?? 1);

@@ -12,7 +12,7 @@ import {
   organizationUpdate,
 } from '@template/sdk';
 import { Page } from '@template/ui/components';
-import { ProfileFormCard } from '@template/ui/components/settings';
+import { ProfileFormCard, ResourceSettingsSection } from '@template/ui/components/settings';
 import { useOptimisticMutation } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -23,6 +23,9 @@ import { useEffect, useState } from 'react';
 export const OrganizationProfilePage = () => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const organizationId = context.organization!.id;
+  const hasMembership = useAppStore((state) =>
+    Boolean(state.auth.organizationUsers?.[organizationId]),
+  );
   const detailQueryKey = organizationProtectedQueryKey({ path: { id: organizationId } });
 
   const { data, isLoading } = useQuery({
@@ -69,15 +72,27 @@ export const OrganizationProfilePage = () => {
       {isLoading ? (
         <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
       ) : (
-        <ProfileFormCard
-          name={name}
-          onNameChange={setName}
-          slug={slug}
-          onSlugChange={setSlug}
-          showSlug
-          onSave={handleSave}
-          isSaving={updateMutation.isPending}
-        />
+        <div className="max-w-2xl space-y-6">
+          <ProfileFormCard
+            name={name}
+            onNameChange={setName}
+            slug={slug}
+            onSlugChange={setSlug}
+            showSlug
+            onSave={handleSave}
+            isSaving={updateMutation.isPending}
+          />
+          <ResourceSettingsSection context={context} category="general" />
+          {hasMembership ? (
+            <ResourceSettingsSection
+              context={context}
+              ownership={{ ownedByMyMembership: true }}
+              category="general"
+              title={`Your preferences in ${profile?.name ?? context.organization?.name ?? 'this organization'}`}
+              description="Personal overrides scoped to your membership in this organization."
+            />
+          ) : null}
+        </div>
       )}
     </Page>
   );

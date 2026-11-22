@@ -40,6 +40,29 @@ describe('modelCapabilities', () => {
 
     const contact = byModel.get('Contact');
     expect(contact?.orderedList).toBe(true);
+
+    const setting = byModel.get('Setting');
+    expect(setting).toEqual(
+      expect.objectContaining({
+        model: 'Setting',
+        attribute: true,
+        audit: true,
+        cached: true,
+        rebac: true,
+        parentEdge: 'axis: resourceModel',
+        polymorphicAxes: ['resourceModel'],
+      }),
+    );
+
+    const projectIntegration = byModel.get('ProjectIntegration');
+    expect(projectIntegration).toEqual(
+      expect.objectContaining({
+        model: 'ProjectIntegration',
+        audit: true,
+        rebac: true,
+        parentEdge: 'Project (projectId)',
+      }),
+    );
   });
 
   it('replaces content strictly between capability markers', () => {

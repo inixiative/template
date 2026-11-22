@@ -18,5 +18,7 @@ export {
   useInquiryInfo,
   usePreloadMasterData,
   useSegmentInfo,
+  useSettingCatalog,
+  useSettingInfo,
   useWebhookSubscriptionInfo,
 } from './useMasterData';
