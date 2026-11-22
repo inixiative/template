@@ -12,7 +12,7 @@ import { StandardAction } from '@template/permissions/client';
 import { issuesWithStoredRule } from '@template/permissions/rebac/issuesWithStoredRule';
 import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
-import { isPlainObject, pick, pickBy } from 'lodash-es';
+import { castArray, isPlainObject, pick, pickBy } from 'lodash-es';
 
 type RulesByAction = Record<string, ActionRule>;
 type SideCheck = { rel: string; action: string };
@@ -27,7 +27,7 @@ const isSideCheck = (part: unknown): part is SideCheck =>
 /** The check on a side that a rule holds: `{ rel, action }` asking read, operate, manage or own, alone or in the rule's own `all`. */
 export const sideCheckHeldBy = (rule: unknown): SideCheck | undefined => {
   const all = isPlainObject(rule) ? (rule as { all?: unknown }).all : undefined;
-  return (Array.isArray(all) ? all : [rule]).find(isSideCheck);
+  return castArray(all ?? rule).find(isSideCheck);
 };
 
 /** Why a tenant's rule for a record with sides is refused: it holds no check on one of that tenant's own sides. Undefined when it does, or the record has none. */
