@@ -17,7 +17,7 @@ The examples use one cast: user U1, organization O1, space S1 under O1, M1 U1's 
 
 - **`resource`** is the model the action is checked on. The action is always checked on that record, never asked of the anchor.
 - **`anchor`** is the record the entitlement acts from. `path` names the relations from the entitled record up to the anchor, following the Prisma relation names (`'organization'`, `'space.organization'`, `'user'`). A record anchored at itself has no `path`. Only the anchor's id is fixed: a record that moves inside the anchor stays reached, one that moves out stops.
-- **`where`** is a positive json-rules condition over the record: no negation, `isEmpty`, `notExists`, `if`/`then`/`else`, array or aggregate rule. "No value" is `equals null`. A single row is `where: { field: 'id', … }`, never an `id` beside the anchor.
+- **`where`** is a positive json-rules condition over the record: no negation, `isEmpty`, `notExists`, `if`/`then`/`else`, array or aggregate rule. "No value" is `equals null` beside an `exists` on the row's key (`all: [id exists, spaceId equals null]`); a bare null check is refused. A single row is `where: { field: 'id', … }`, never an `id` beside the anchor.
 - **`actions`** are booleans; a row stores the names of the ones held. Readers prune entries to the well-formed ones, and an entry another one already covers is dropped; the writer skips adding an entry a held row with no lens, or the same lens, already covers.
 
 ## The lens

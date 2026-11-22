@@ -13,6 +13,7 @@ import {
   type Permix as EnginePermix,
   type PermixLike,
 } from '@inixiative/permissions';
+import { ActorModel } from '@template/db/schemaMap';
 
 export {
   coversEntitlement,
@@ -62,10 +63,8 @@ export type InquiryAction = (typeof InquiryAction)[keyof typeof InquiryAction];
 
 export type Action = UserAction | OrganizationAction | SpaceAction | TokenAction | InquiryAction;
 
-export const ActorModel = { User: 'User', Token: 'Token' } as const;
-export type ActorModel = (typeof ActorModel)[keyof typeof ActorModel];
+export { ActorModel };
 
-// Who is acting: a user or a token, and its row. A rule reads it as `__actor`.
 export type Actor = { model: ActorModel; record: Record<string, unknown> };
 
 export type ActionState = EngineActionState<Action>;
@@ -73,6 +72,15 @@ export type PermissionEntry = EnginePermissionEntry<Action>;
 export type EntitlementEntry = EngineEntitlementEntry<Action>;
 export type Permissions = EnginePermissions<Action>;
 // The engine reads any permix back through PermixLike (string actions); ours narrows them to Action.
-export type Permix = EnginePermix<Action, Actor> & PermixLike;
+export type Permix = EnginePermix<Action> &
+  PermixLike & { setActor: (actor: Actor | null) => void; getActor: () => Actor | null };
 
-export const createPermissions = (): Permix => createEnginePermissions<Action, Actor>() as Permix;
+export const createPermissions = (): Permix => {
+  let acting: Actor | null = null;
+  return Object.assign(createEnginePermissions<Action>(), {
+    setActor: (actor: Actor | null) => {
+      acting = actor;
+    },
+    getActor: () => acting,
+  }) as Permix;
+};

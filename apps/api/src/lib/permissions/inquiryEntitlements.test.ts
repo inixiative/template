@@ -48,12 +48,13 @@ const entitledKey = async (entitlements: EntitlementInput[]) => {
   ).rawKey;
 };
 
-// why: a path admits every kind that carries its keys (R81); the where keeps the grant to the tenant's own channel
+// why: a path admits every kind that carries its keys (R81); the where keeps the grant to the tenant's own side
 const inquiries = (path: string, actions: string[] = ['read']) => {
   const side = path.startsWith('source') ? 'source' : 'target';
-  const clear = path.includes('Space') ? ['UserId'] : ['SpaceId', 'UserId'];
   return entitlementInputFor('db:inquiry', ['db:organization', organization.id, path], actions, {
-    all: clear.map((key) => ({ field: `${side}${key}`, operator: Operator.equals, value: null })),
+    field: `${side}Model`,
+    operator: Operator.equals,
+    value: path.includes('Space') ? 'Space' : 'Organization',
   });
 };
 

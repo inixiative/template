@@ -12,6 +12,13 @@ import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types'
 
 const rebacCheck = createRebacCheck(schemaMap);
 
+const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> => {
+  const actor = permix.getActor();
+  return actor
+    ? { 'actor:Acting': [{ model: actor.model }], [`actor:${actor.model}`]: [actor.record] }
+    : {};
+};
+
 export const check = (
   permix: Permix,
   schema: RebacSchema,
@@ -19,4 +26,10 @@ export const check = (
   record: HydratedRecord,
   actionOrRule: ActionRule,
   data?: Record<string, HydratedRecord[]>,
-): boolean => rebacCheck(permix, schema, { resource: `db:${model}`, record, data }, actionOrRule);
+): boolean =>
+  rebacCheck(
+    permix,
+    schema,
+    { resource: `db:${model}`, record, data: { ...data, ...rowsOfActor(permix) } },
+    actionOrRule,
+  );
