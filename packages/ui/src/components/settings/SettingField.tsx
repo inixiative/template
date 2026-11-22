@@ -19,7 +19,7 @@ import {
   Select,
 } from '@template/ui/components/primitives';
 import { cn } from '@template/ui/lib/utils';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 const SEARCHABLE_SELECT_THRESHOLD = 12;
 
@@ -27,7 +27,9 @@ export type SettingFieldProps = {
   item: AssembledSettingItem;
   value: unknown;
   onChange: (nextValue: unknown) => void;
+  onValidityChange?: (isValid: boolean) => void;
   onReset?: () => void;
+  resetVersion?: number;
   isResetting?: boolean;
   disabled?: boolean;
   disabledText?: string;
@@ -48,6 +50,18 @@ const extractMultiSelectOptions = (schema: Record<string, unknown>): string[] =>
   return [];
 };
 
+const schemaAllowsNull = (schema: Record<string, unknown>): boolean => {
+  if (schema.type === 'null') return true;
+  if (Array.isArray(schema.type) && schema.type.includes('null')) return true;
+  if (Array.isArray(schema.anyOf)) {
+    return schema.anyOf.some(
+      (branch) =>
+        branch && typeof branch === 'object' && (branch as Record<string, unknown>).type === 'null',
+    );
+  }
+  return false;
+};
+
 const formatDateTimeLocal = (value: unknown): string => {
   const parsed = parseAttributeDate(value);
   if (!parsed) return '';
@@ -55,28 +69,61 @@ const formatDateTimeLocal = (value: unknown): string => {
   return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
 };
 
+const formatNumberText = (value: unknown): string =>
+  typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
+
+const formatJsonText = (value: unknown): string =>
+  value !== null && value !== undefined ? JSON.stringify(value, null, 2) : '';
+
 export const SettingField = ({
   item,
   value,
   onChange,
+  onValidityChange,
   onReset,
+  resetVersion = 0,
   isResetting = false,
   disabled = false,
   disabledText,
 }: SettingFieldProps) => {
   const inputId = useId();
+  const [numberText, setNumberText] = useState(() =>
+    item.valueType === 'number' ? formatNumberText(value) : '',
+  );
+  const [numberError, setNumberError] = useState<string | null>(null);
+  const lastEmittedNumberRef = useRef<unknown>(value);
+  const lastNumberResetVersionRef = useRef(resetVersion);
+
   const [jsonText, setJsonText] = useState(() =>
-    item.valueType === 'json' && value !== null && value !== undefined
-      ? JSON.stringify(value, null, 2)
-      : '',
+    item.valueType === 'json' ? formatJsonText(value) : '',
   );
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const lastEmittedJsonRef = useRef<unknown>(value);
+  const lastJsonResetVersionRef = useRef(resetVersion);
+  const onValidityChangeRef = useRef(onValidityChange);
+  onValidityChangeRef.current = onValidityChange;
+
+  useEffect(() => {
+    if (item.valueType !== 'number') return;
+    const isReset = resetVersion !== lastNumberResetVersionRef.current;
+    lastNumberResetVersionRef.current = resetVersion;
+    if (!isReset && Object.is(value, lastEmittedNumberRef.current)) return;
+    lastEmittedNumberRef.current = value;
+    setNumberText(formatNumberText(value));
+    setNumberError(null);
+    onValidityChangeRef.current?.(true);
+  }, [item.valueType, value, resetVersion]);
 
   useEffect(() => {
     if (item.valueType !== 'json') return;
-    setJsonText(value !== null && value !== undefined ? JSON.stringify(value, null, 2) : '');
+    const isReset = resetVersion !== lastJsonResetVersionRef.current;
+    lastJsonResetVersionRef.current = resetVersion;
+    if (!isReset && Object.is(value, lastEmittedJsonRef.current)) return;
+    lastEmittedJsonRef.current = value;
+    setJsonText(formatJsonText(value));
     setJsonError(null);
-  }, [item.valueType, value]);
+    onValidityChangeRef.current?.(true);
+  }, [item.valueType, value, resetVersion]);
 
   const renderControl = () => {
     switch (item.valueType) {
@@ -139,18 +186,45 @@ export const SettingField = ({
 
       case 'number':
         return (
-          <Input
-            id={inputId}
-            type="number"
-            value={typeof value === 'number' && Number.isFinite(value) ? String(value) : ''}
-            disabled={disabled}
-            onChange={(event) => {
-              const raw = event.target.value;
-              if (raw === '') return;
-              const parsed = Number(raw);
-              if (Number.isFinite(parsed)) onChange(parsed);
-            }}
-          />
+          <div className="space-y-1">
+            <Input
+              id={inputId}
+              type="number"
+              value={numberText}
+              disabled={disabled}
+              onChange={(event) => {
+                const raw = event.target.value;
+                setNumberText(raw);
+                if (raw.trim() === '') {
+                  if (schemaAllowsNull(item.schema)) {
+                    lastEmittedNumberRef.current = null;
+                    setNumberError(null);
+                    onValidityChange?.(true);
+                    onChange(null);
+                  } else {
+                    setNumberError('Enter a valid number');
+                    onValidityChange?.(false);
+                  }
+                  return;
+                }
+                const parsed = Number(raw);
+                if (Number.isFinite(parsed)) {
+                  lastEmittedNumberRef.current = parsed;
+                  setNumberError(null);
+                  onValidityChange?.(true);
+                  onChange(parsed);
+                } else {
+                  setNumberError('Enter a valid number');
+                  onValidityChange?.(false);
+                }
+              }}
+            />
+            {numberError ? (
+              <p role="alert" className="text-xs text-destructive">
+                {numberError}
+              </p>
+            ) : null}
+          </div>
         );
 
       case 'date':
@@ -225,10 +299,13 @@ export const SettingField = ({
                 setJsonText(nextText);
                 try {
                   const parsed: unknown = JSON.parse(nextText);
+                  lastEmittedJsonRef.current = parsed;
                   setJsonError(null);
+                  onValidityChange?.(true);
                   onChange(parsed);
                 } catch {
                   setJsonError('Invalid JSON syntax');
+                  onValidityChange?.(false);
                 }
               }}
               className={cn(

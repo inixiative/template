@@ -8,6 +8,7 @@ export * from './describeError';
 export * from './enumOptions';
 export * from './findFirstTenantContextThatCanOpenPath';
 export * from './findRoute';
+export * from './hydrateRecordForPermissions';
 export * from './inquiries';
 export * from './makeContextQueries';
 export * from './masterData';

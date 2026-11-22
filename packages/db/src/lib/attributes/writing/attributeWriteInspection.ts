@@ -15,16 +15,13 @@ import type { AttributeWriteInspection } from '@template/db/lib/attributes/types
 import type { ModelName } from '@template/db/utils/modelNames';
 import {
   ATTRIBUTE_COLUMN_NAMES,
-  ATTRIBUTE_VALUE_TYPES,
   type AttributeFieldDefinition,
   type AttributeValueType,
   attributeTypedColumnIssues,
   deduplicateMultiSelect,
+  isAttributeValueType,
   populatedAttributeColumns,
 } from '@template/shared/attributes';
-
-const isAttributeValueType = (value: unknown): value is AttributeValueType =>
-  typeof value === 'string' && (ATTRIBUTE_VALUE_TYPES as readonly string[]).includes(value);
 
 export type AttributeWriteInspectionOptions = {
   resolveDefinition?: (locator: string) => AttributeFieldDefinition | undefined;

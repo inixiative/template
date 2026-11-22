@@ -84,9 +84,10 @@ export const upsertResourceSettings = async (
       const locked = await db.findForUpdate<Setting>('Setting', whereKey, { upserting: true });
       const live = locked.find((row) => row.deletedAt === null);
 
+      const resolvedDisabled = item.disabled ?? (live?.disabled ? false : undefined);
       const payload = buildAttributeUpsertData('setting', item.key, item.value, {
         resourceModel,
-        disabled: item.disabled,
+        disabled: resolvedDisabled,
       });
 
       if (live) {

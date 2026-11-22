@@ -207,6 +207,104 @@ describe('ProjectIntegration CRUD, tenant boundary hook, ReBAC, AuditLog, and sp
     );
     expect(allowed.projectId).toBe(spaceAProject.id);
     expect(allowed.integrationId).toBe(orgIntegration.id);
+
+    // OrganizationUser integration cannot attach upward to Org project or sideways to another user's OrgUser project
+    const member1 = await createOrganizationUser({ role: Role.member }, { organization });
+    const member2 = await createOrganizationUser({ role: Role.member }, { organization });
+    const { entity: orgUser1Integration } = await createIntegration({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: member1.context.user.id,
+    });
+    const { entity: orgUser2Project } = await createProject({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: member2.context.user.id,
+    });
+    const { entity: orgUser1Project } = await createProject({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: member1.context.user.id,
+    });
+
+    await expect(
+      createProjectIntegration({}, { project: orgProject, integration: orgUser1Integration }),
+    ).rejects.toThrow(/same user/);
+    await expect(
+      createProjectIntegration({}, { project: orgUser2Project, integration: orgUser1Integration }),
+    ).rejects.toThrow(/same user/);
+    const { entity: sameOrgUserAllowed } = await createProjectIntegration(
+      {},
+      { project: orgUser1Project, integration: orgUser1Integration },
+    );
+    expect(sameOrgUserAllowed.projectId).toBe(orgUser1Project.id);
+
+    // SpaceUser integration cannot attach upward to Space project or sideways to another user's SpaceUser project
+    const spaceMember1 = await createSpaceUser(
+      { role: Role.member },
+      {
+        organization,
+        space,
+        user: member1.context.user,
+        organizationUser: member1.entity,
+      },
+    );
+    const spaceMember2 = await createSpaceUser(
+      { role: Role.member },
+      {
+        organization,
+        space,
+        user: member2.context.user,
+        organizationUser: member2.entity,
+      },
+    );
+    const { entity: spaceUser1Integration } = await createIntegration({
+      ownerModel: 'SpaceUser',
+      organizationId: organization.id,
+      spaceId: space.id,
+      userId: spaceMember1.context.user.id,
+    });
+    const { entity: spaceUser2Project } = await createProject({
+      ownerModel: 'SpaceUser',
+      organizationId: organization.id,
+      spaceId: space.id,
+      userId: spaceMember2.context.user.id,
+    });
+    const { entity: spaceUser1Project } = await createProject({
+      ownerModel: 'SpaceUser',
+      organizationId: organization.id,
+      spaceId: space.id,
+      userId: spaceMember1.context.user.id,
+    });
+
+    await expect(
+      createProjectIntegration({}, { project: spaceAProject, integration: spaceUser1Integration }),
+    ).rejects.toThrow(/same user/);
+    await expect(
+      createProjectIntegration(
+        {},
+        { project: spaceUser2Project, integration: spaceUser1Integration },
+      ),
+    ).rejects.toThrow(/same user/);
+    const { entity: sameSpaceUserAllowed } = await createProjectIntegration(
+      {},
+      { project: spaceUser1Project, integration: spaceUser1Integration },
+    );
+    expect(sameSpaceUserAllowed.projectId).toBe(spaceUser1Project.id);
+
+    // Updating projectId or integrationId on an existing ProjectIntegration is refused with 422
+    await expect(
+      ownerApp.db.projectIntegration.update({
+        where: { id: allowed.id },
+        data: { projectId: orgProject.id },
+      }),
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(
+      ownerApp.db.projectIntegration.update({
+        where: { id: allowed.id },
+        data: { integrationId: spaceAIntegration.id },
+      }),
+    ).rejects.toMatchObject({ status: 422 });
   });
 
   it('enforces ReBAC: member cannot link org project, member can link own member project to org integration, and org admin can delete that link', async () => {

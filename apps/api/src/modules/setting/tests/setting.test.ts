@@ -191,6 +191,16 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
       expect(updatedRows[0]?.valueText).toBe('Europe/London');
       expect(updatedRows[0]?.disabled).toBe(true);
 
+      // Saving a new value over a disabled row without passing disabled re-enables it (disabled: false)
+      const reenabledRes = await ownerApp.fetch(
+        patch('/api/v1/me/settings', [{ key: 'general.defaultTimezone', value: 'Europe/Paris' }]),
+      );
+      expect(reenabledRes.status).toBe(200);
+      const { data: reenabledRows } = await parseSuccessBody<Setting[]>(reenabledRes);
+      expect(reenabledRows[0]?.id).toBe(tzId);
+      expect(reenabledRows[0]?.valueText).toBe('Europe/Paris');
+      expect(reenabledRows[0]?.disabled).toBe(false);
+
       // Filter GET by key
       const filtered = await ownerApp.fetch(get('/api/v1/me/settings?key=general.defaultTimezone'));
       expect(filtered.status).toBe(200);
@@ -200,7 +210,7 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
       const single = await ownerApp.fetch(get(`/api/v1/setting/${tzId}`));
       expect(single.status).toBe(200);
       const { data: singleRow } = await parseSuccessBody<Setting>(single);
-      expect(singleRow.valueText).toBe('Europe/London');
+      expect(singleRow.valueText).toBe('Europe/Paris');
       expect('value' in (singleRow as Record<string, unknown>)).toBe(false);
 
       // Single DELETE /v1/setting/{id} soft-deletes to reset to default
@@ -215,13 +225,14 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
       const { data: freshRows } = await parseSuccessBody<Setting[]>(recreated);
       expect(freshRows[0]?.id).not.toBe(tzId);
 
-      // AuditLog recorded create, update, and delete
+      // AuditLog recorded create, updates, and delete
       const auditLogs = await ownerApp.db.auditLog.findMany({
         where: { subjectModel: AuditSubjectModel.Setting, subjectSettingId: tzId },
         orderBy: { createdAt: 'asc' },
       });
       expect(auditLogs.map((l) => l.action)).toEqual([
         AuditAction.create,
+        AuditAction.update,
         AuditAction.update,
         AuditAction.delete,
       ]);

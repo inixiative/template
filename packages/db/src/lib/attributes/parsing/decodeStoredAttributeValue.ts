@@ -11,13 +11,10 @@ import {
 } from '@template/db/lib/attributes/registry';
 import type { ModelName } from '@template/db/utils/modelNames';
 import {
-  ATTRIBUTE_VALUE_TYPES,
   type AttributeFieldDefinition,
   type AttributeValueType,
+  isAttributeValueType,
 } from '@template/shared/attributes';
-
-const isAttributeValueType = (value: unknown): value is AttributeValueType =>
-  typeof value === 'string' && (ATTRIBUTE_VALUE_TYPES as readonly string[]).includes(value);
 
 /**
  * Decodes the stored typed value from an Attribute row, ignoring `disabled` / `defaultValue`.

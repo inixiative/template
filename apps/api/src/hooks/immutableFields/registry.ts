@@ -34,6 +34,9 @@ const baseImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOve
     ...polymorphismImmutableFields.Tag,
     refuse: [...(polymorphismImmutableFields.Tag?.refuse ?? []), 'tagCategoryId'],
   },
+  ProjectIntegration: {
+    refuse: ['projectId', 'integrationId'],
+  },
   CommunicationLog: {
     ...polymorphismImmutableFields.CommunicationLog,
     exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],

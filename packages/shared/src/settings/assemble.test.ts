@@ -191,5 +191,28 @@ describe('assembleResourceSettings & diffSettingDrafts', () => {
       { key: 'advanced.topics', value: ['a', 'c'] },
       { key: 'advanced.snoozeUntil', value: '2027-01-01T00:00:00.000Z' },
     ]);
+
+    // Saving a new value over a disabled: true row explicitly re-enables it (disabled: false)
+    const disabledAssembled = assembleResourceSettings(
+      syntheticCatalog,
+      [
+        {
+          id: 'set-disabled-tz',
+          key: 'general.defaultTimezone',
+          disabled: true,
+          valueBoolean: null,
+          valueText: 'America/New_York',
+          valueNumber: null,
+          valueDate: null,
+          valueJson: null,
+        },
+      ],
+      'Organization',
+    );
+    expect(
+      diffSettingDrafts(disabledAssembled.items, {
+        'general.defaultTimezone': 'America/New_York',
+      }),
+    ).toEqual([{ key: 'general.defaultTimezone', value: 'America/New_York', disabled: false }]);
   });
 });

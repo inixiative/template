@@ -10,6 +10,7 @@ import {
   type AssembledSettingItem,
   assembleResourceSettings,
   diffSettingDrafts,
+  SETTING_DEFINITIONS,
 } from '@template/shared/settings';
 import {
   Button,
@@ -21,8 +22,8 @@ import {
 } from '@template/ui/components/primitives';
 import { SettingField } from '@template/ui/components/settings/SettingField';
 import { useSettingCatalog } from '@template/ui/hooks/settings/useSettingInfo';
+import { hydrateSettingTargetForPermissions } from '@template/ui/lib/hydrateRecordForPermissions';
 import type { MyMembershipOwnership } from '@template/ui/lib/myMembership';
-import { permissionCheckTargetForTenantContext } from '@template/ui/lib/permissionCheckTargetForTenantContext';
 import {
   type SettingExplicitTarget,
   type SettingListQueryParams,
@@ -32,7 +33,7 @@ import {
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { lowerFirst } from 'lodash-es';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export type ResourceSettingsSectionProps = (
   | { context: AuthenticatedContext; ownership?: MyMembershipOwnership; target?: undefined }
@@ -56,6 +57,8 @@ export const ResourceSettingsSection = ({
   hideWhenEmpty = true,
 }: ResourceSettingsSectionProps) => {
   const queryClient = useQueryClient();
+  const auth = useAppStore((state) => state.auth);
+  const tenantContext = useAppStore((state) => state.tenant.context);
   const permissions = useAppStore((state) => state.permissions);
   const { catalog, isLoading: isCatalogLoading } = useSettingCatalog();
 
@@ -96,35 +99,116 @@ export const ResourceSettingsSection = ({
   }, [catalog, settingsQuery.data?.data, queries.resourceModel, category]);
 
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
+  const [invalidKeys, setInvalidKeys] = useState<Record<string, boolean>>({});
+  const [resetVersion, setResetVersion] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const canManageItem = (item: AssembledSettingItem): boolean => {
+  const hydratedTarget = useMemo<HydratedRecord | null>(() => {
     if (target) {
-      if (!target.record) return true;
-      return permissions.check(
-        lowerFirst(target.model) as AccessorName,
-        target.record,
-        item.permission,
+      if (!target.record) return null;
+      return hydrateSettingTargetForPermissions(
+        target.model,
+        target.record as Record<string, unknown>,
+        auth,
+        tenantContext,
       );
     }
-    if (ownership?.ownedByMyMembership) {
-      return item.permission === 'operate';
+    if (!context) return null;
+    if (context.type === 'user') {
+      if (!auth.user) return null;
+      return hydrateSettingTargetForPermissions(
+        'User',
+        auth.user as unknown as Record<string, unknown>,
+        auth,
+        context,
+      );
     }
-    if (!context || context.type === 'user') return true;
-    const [model, record] = permissionCheckTargetForTenantContext(context);
-    return permissions.check(model, record as HydratedRecord, item.permission);
+    if (context.type === 'organization' && context.organization) {
+      if (ownership?.ownedByMyMembership) {
+        const myOrgUser = auth.organizationUsers?.[context.organization.id];
+        if (!myOrgUser) return null;
+        return hydrateSettingTargetForPermissions(
+          'OrganizationUser',
+          myOrgUser as unknown as Record<string, unknown>,
+          auth,
+          context,
+        );
+      }
+      return hydrateSettingTargetForPermissions(
+        'Organization',
+        context.organization as unknown as Record<string, unknown>,
+        auth,
+        context,
+      );
+    }
+    if (context.type === 'space' && context.space) {
+      if (ownership?.ownedByMyMembership) {
+        const mySpaceUser = auth.spaceUsers?.[context.space.id];
+        if (!mySpaceUser) return null;
+        return hydrateSettingTargetForPermissions(
+          'SpaceUser',
+          mySpaceUser as unknown as Record<string, unknown>,
+          auth,
+          context,
+        );
+      }
+      return hydrateSettingTargetForPermissions(
+        'Space',
+        context.space as unknown as Record<string, unknown>,
+        auth,
+        context,
+      );
+    }
+    return null;
+  }, [target, context, ownership?.ownedByMyMembership, auth, tenantContext]);
+
+  const canManageItem = (item: AssembledSettingItem): boolean => {
+    if (!hydratedTarget) return false;
+    if (item.key in SETTING_DEFINITIONS) {
+      return permissions.check(
+        'setting',
+        {
+          id: item.settingId ?? '',
+          resourceModel: queries.resourceModel,
+          resourceId: hydratedTarget.id,
+          key: item.key,
+          [`resource${queries.resourceModel}`]: hydratedTarget,
+        } as HydratedRecord,
+        'manage',
+      );
+    }
+    return permissions.check(
+      lowerFirst(queries.resourceModel) as AccessorName,
+      hydratedTarget,
+      item.permission,
+    );
   };
 
   const dirtyItems = useMemo(
     () => diffSettingDrafts(assembled.items, drafts),
     [assembled.items, drafts],
   );
+  const hasInvalidFields = useMemo(() => Object.values(invalidKeys).some(Boolean), [invalidKeys]);
+
+  const handleFieldValidityChange = useCallback((key: string, isValid: boolean) => {
+    setInvalidKeys((previous) => {
+      if (Boolean(previous[key]) === !isValid) return previous;
+      if (isValid) {
+        const next = { ...previous };
+        delete next[key];
+        return next;
+      }
+      return { ...previous, [key]: true };
+    });
+  }, []);
 
   const saveMutation = useMutation({
     mutationFn: (items: typeof dirtyItems) => queries.updateMany.mutationFn({ body: items }),
     onSuccess: () => {
       setDrafts({});
+      setInvalidKeys({});
+      setResetVersion((version) => version + 1);
       setErrorMessage(null);
       setStatusMessage('Settings saved');
       void queryClient.invalidateQueries({ queryKey });
@@ -144,6 +228,12 @@ export const ResourceSettingsSection = ({
         delete next[variables.key];
         return next;
       });
+      setInvalidKeys((previous) => {
+        const next = { ...previous };
+        delete next[variables.key];
+        return next;
+      });
+      setResetVersion((version) => version + 1);
       setErrorMessage(null);
       setStatusMessage('Setting reset to default');
       void queryClient.invalidateQueries({ queryKey });
@@ -187,9 +277,11 @@ export const ResourceSettingsSection = ({
                   key={item.key}
                   item={item}
                   value={currentValue}
+                  resetVersion={resetVersion}
                   disabled={!editable}
                   disabledText={!editable ? readOnlyMessage : undefined}
                   isResetting={resetMutation.isPending && resetMutation.variables?.key === item.key}
+                  onValidityChange={(isValid) => handleFieldValidityChange(item.key, isValid)}
                   onChange={(nextValue) => {
                     setStatusMessage(null);
                     setErrorMessage(null);
@@ -217,13 +309,18 @@ export const ResourceSettingsSection = ({
 
             {anyEditable ? (
               <div className="flex items-center justify-end gap-2 pt-2">
-                {dirtyItems.length > 0 ? (
+                {dirtyItems.length > 0 || hasInvalidFields ? (
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     disabled={saveMutation.isPending}
-                    onClick={() => setDrafts({})}
+                    onClick={() => {
+                      setDrafts({});
+                      setInvalidKeys({});
+                      setResetVersion((version) => version + 1);
+                      setErrorMessage(null);
+                    }}
                   >
                     Discard
                   </Button>
@@ -231,7 +328,7 @@ export const ResourceSettingsSection = ({
                 <Button
                   type="button"
                   size="sm"
-                  disabled={dirtyItems.length === 0 || saveMutation.isPending}
+                  disabled={dirtyItems.length === 0 || hasInvalidFields || saveMutation.isPending}
                   onClick={() => saveMutation.mutate(dirtyItems)}
                 >
                   {saveMutation.isPending ? 'Saving…' : 'Save settings'}

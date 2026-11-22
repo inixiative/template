@@ -89,6 +89,7 @@ export type AssembleResourceSettingsOptions = {
 export type SettingUpsertDraftItem = {
   key: string;
   value: unknown;
+  disabled?: boolean;
 };
 
 /**
@@ -196,6 +197,7 @@ export const diffSettingDrafts = (
             : item.valueType === 'date'
               ? (parseAttributeDate(draftValue)?.toISOString() ?? draftValue)
               : draftValue,
+        ...(item.disabled ? { disabled: false } : {}),
       });
     }
   }
