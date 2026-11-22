@@ -205,6 +205,8 @@ const awaitingClassification = [
   'AuditLog.subjectProjectId belongs to Project',
   'AuditLog.subjectIntegrationResourceId belongs to IntegrationResource',
   'AuditLog.subjectProjectIntegrationResourceId belongs to ProjectIntegrationResource',
+  'AuditLog.subjectSettingId belongs to Setting',
+  'AuditLog.subjectProjectIntegrationId belongs to ProjectIntegration',
   'CommunicationLog.recipientContactId belongs to Contact',
 ];
 
