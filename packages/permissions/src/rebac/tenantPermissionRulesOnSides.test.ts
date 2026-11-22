@@ -135,4 +135,34 @@ describe('a tenant rule on a two-sided record', () => {
     expect(accepts('Space', 'sourceSpace')).toBe(true);
     expect(accepts('Space', 'targetOrganization')).toBe(false);
   });
+
+  it('an action anyone holds on the tenant is not a way in: the walk asks read, operate, manage or own', async () => {
+    const anyoneCreates: ActionRule = { rel: 'targetOrganization', action: 'create' };
+    expect(
+      tenantPermissionRulesSchema('Organization').safeParse({
+        'db:inquiry': { read: anyoneCreates },
+      }).success,
+    ).toBe(false);
+    const opened = receiver({ 'db:inquiry': { read: anyoneCreates } });
+    expect(await reads({}, between(sender(), opened))).toBe(false);
+  });
+
+  it("what is addressed to a member or a space of the organization is not the organization's to open", async () => {
+    const opened = receiver({ 'db:inquiry': { read: whoeverReads('targetOrganization') } });
+    const toMember = {
+      ...between(sender(), opened),
+      targetModel: 'OrganizationUser',
+      targetUserId: 'u9',
+      targetUser: { id: 'u9' },
+    };
+    const toSpace = {
+      ...between(sender(), opened),
+      targetModel: 'Space',
+      targetSpaceId: 's2',
+      targetSpace: { id: 's2', organizationId: 'o2', organization: opened },
+    };
+    expect(await reads({ o2: 'viewer' }, toMember)).toBe(false);
+    expect(await reads({ o2: 'viewer' }, toSpace)).toBe(false);
+    expect(await reads({ o2: 'viewer' }, between(sender(), opened))).toBe(true);
+  });
 });

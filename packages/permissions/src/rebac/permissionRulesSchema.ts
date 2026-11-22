@@ -13,7 +13,7 @@ import {
 } from '@template/db';
 import { schemaMap } from '@template/db/schemaMap';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import { ruleWalksThroughRelation } from '@template/permissions/rebac/tenantPermissionRules';
+import { ruleAsksStandardActionThroughRelation } from '@template/permissions/rebac/tenantPermissionRules';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { z } from 'zod';
 
@@ -92,14 +92,16 @@ export const tenantPermissionRulesSchema = (tenantModel: BindableOwnerModel) =>
         const offItsSide = ownSides.length
           ? Object.keys(rules).filter(
               (action) =>
-                !ownSides.some((relation) => ruleWalksThroughRelation(rules[action], relation)),
+                !ownSides.some((relation) =>
+                  ruleAsksStandardActionThroughRelation(rules[action], relation),
+                ),
             )
           : [];
         for (const action of offItsSide)
           ctx.addIssue({
             code: 'custom',
             path: [resource, action],
-            message: `a ${tenantModel}'s rule here walks through its own side: ${ownSides.map((relation) => `{ rel: '${relation}', action }`).join(' or ')}`,
+            message: `a ${tenantModel}'s rule here asks read, operate, manage or own through its own side: ${ownSides.map((relation) => `{ rel: '${relation}', action }`).join(' or ')}`,
           });
         if (offItsSide.length) continue;
         const model = resource.slice('db:'.length) as AccessorName;
