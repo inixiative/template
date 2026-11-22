@@ -32,6 +32,10 @@ import {
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { enqueueJob } from '#/jobs/enqueue';
+import {
+  applyMembershipDiff,
+  PartialMembershipDiffError,
+} from '#/modules/segment/services/applyMembershipDiff';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import * as reconcileCustomerRelationshipsModule from '#/modules/segment/services/reconcileCustomerRelationships';
 import {
@@ -576,5 +580,45 @@ describe('segment reconcile', () => {
         data: [{ segmentId: segment.id, customerRelationshipId: outsiderRelationship.id }],
       }),
     ).rejects.toThrow(/is not a customer of the segment's Space/);
+  });
+
+  it('full applyMembershipDiff runs chunked writes via db.parallel and reports committed changes on partial failure', async () => {
+    const { entity: segment } = await createSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.static },
+      { space },
+    );
+    await createSegmentMember({}, { segment, customerRelationship: acmeRelationship });
+
+    const diff = await applyMembershipDiff({
+      segmentId: segment.id,
+      matching: [otherRelationship.id],
+    });
+    expect(diff).toEqual({ added: [otherRelationship.id], removed: [acmeRelationship.id] });
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([otherRelationship.id]);
+
+    const elsewhere = (await createSpace({}, { organization })).entity;
+    const outsider = (
+      await createUser({ email: `partial-outsider-${nextFactorySequenceNumber()}@example.test` })
+    ).entity;
+    const outsiderRelationship = await customerOf(outsider, elsewhere);
+
+    let caught: unknown;
+    try {
+      await applyMembershipDiff({
+        segmentId: segment.id,
+        matching: [outsiderRelationship.id],
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(PartialMembershipDiffError);
+    const partial = caught as PartialMembershipDiffError;
+    expect(partial.committed).toEqual({
+      added: [],
+      removed: [otherRelationship.id],
+    });
+    expect(String(partial.cause)).toContain("is not a customer of the segment's Space");
+    expect(await segmentMemberCustomerRelationshipIds(segment.id)).toEqual([]);
   });
 });
