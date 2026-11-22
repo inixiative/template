@@ -106,7 +106,7 @@ export const ArtifactKinds = {
 
 ### 3.4 ArtifactPermission (Access Layer — ABAC)
 
-A grant of a `role` (`Role`: viewer / member / admin / owner) on an artifact, and through `inherit` on everything inside it. The grantee is false-polymorphic with real FKs: `User`, `Organization`, `Space`, `OrganizationUser` (`granteeOrganizationId + granteeUserId`), `SpaceUser` (`granteeOrganizationId + granteeSpaceId + granteeUserId`), `CustomerRef`, `Integration`. Membership grantees cascade with the membership: a grant dies when the member leaves, the content does not. Fields carried over from FilePermission: `expiresAt`, `fromVersion`, `preserveOnRevoke`. One live grant per artifact × grantee (partial uniques over live rows). **Revoke = soft delete**: ArtifactPermission is audit-enabled, so who granted and revoked is in the audit log.
+A grant of a `role` (`Role`: viewer / member / admin / owner) on an artifact, and through `inherit` on everything inside it. The grantee is false-polymorphic with real FKs: `User`, `Organization`, `Space`, `OrganizationUser` (`granteeOrganizationId + granteeUserId`), `SpaceUser` (`granteeOrganizationId + granteeSpaceId + granteeUserId`), `CustomerRelationship`, `Integration`. Membership grantees cascade with the membership: a grant dies when the member leaves, the content does not. Fields carried over from FilePermission: `expiresAt`, `fromVersion`, `preserveOnRevoke`. One live grant per artifact × grantee (partial uniques over live rows). **Revoke = soft delete**: ArtifactPermission is audit-enabled, so who granted and revoked is in the audit log.
 
 An `Integration` grantee is not reachable by any presenting path in template yet: it is meant for an integration's own server credential, never for a user token bound to that integration.
 
@@ -157,11 +157,11 @@ model ResourceBinding {
   fileId           String? @db.VarChar(36)
   url              String?
 
-  resourceModel    ResourceBindingResource   // Organization | Space | User | CustomerRef
+  resourceModel    ResourceBindingResource   // Organization | Space | User | CustomerRelationship
   organizationId   String? @db.VarChar(36)
   spaceId          String? @db.VarChar(36)
   userId           String? @db.VarChar(36)
-  customerRefId    String? @db.VarChar(36)
+  resourceCustomerRelationshipId    String? @db.VarChar(36)
 
   bindingType      String                    // key into shared/resourceBinding
   order            Int      @default(0)       // ordering for many-cardinality types
@@ -186,7 +186,7 @@ model ResourceBinding {
   Organization: ['logo'],
   Space:        ['logo'],
   User:         ['avatar'],
-  CustomerRef:  ['avatar'],
+  CustomerRelationship:  ['avatar'],
 }
 ```
 
@@ -281,7 +281,7 @@ Implemented in `apps/api/src/modules/artifact/services/` — `resolveArtifactAcc
 | `Organization` / `Space` | it is a member | its effective role there (membership ∧ token) |
 | `OrganizationManager` / `SpaceManager` | its effective role there is admin or owner | that role |
 | `OrganizationUser` / `SpaceUser` | it is that user, acting as a member | the token's role, if any |
-| `CustomerRef` | it holds the CustomerRef's customer party | as above for that party |
+| `CustomerRelationship` | it holds the CustomerRelationship's customer party | as above for that party |
 | `Integration` | never yet (§3.4) | — |
 
 Roles map to actions as everywhere else: viewer → read, member → operate, admin → manage, owner → own. A superadmin holds everything. A caller with no read gets **404** (no id probing); read but not the action gets 403.
@@ -355,7 +355,7 @@ A query over ArtifactPermission where one of the user's principals is grantee (a
 | Today (§3.4, §6) | As an entitlement |
 |---|---|
 | `ArtifactPermission { artifactId, grantee*, role }` | `Entitlement { source: Artifact, target: grantee, actions }`; `Artifact` joins `EntitlementResourceModel` |
-| Grantees: User, Organization, Space, OrganizationUser, SpaceUser, CustomerRef, Integration | `EntitlementTargetModel`; whichever are missing are added there |
+| Grantees: User, Organization, Space, OrganizationUser, SpaceUser, CustomerRelationship, Integration | `EntitlementTargetModel`; whichever are missing are added there |
 | `role` (viewer / member / admin / owner) | the role's actions (read / operate / manage / own), as roles map everywhere else |
 | Implicit owner grant (`OrganizationManager`, `SpaceManager`, `OrganizationOwner` for org-user content) | ordinary ReBAC owner rules in the schema entry for `Artifact`; no rows |
 | Cap: the actor's role on the grantee; can't grant above your own role | the entitlement writer's grant check (`changeEntitlements`): you only hand on what you hold |
@@ -954,7 +954,7 @@ When a file stops resolving public (its own `access` changes, or its last public
 
 ### Webhooks (built)
 
-Artifact is a webhook model. A change to an `ArtifactPermission` or `ArtifactPlacement` row fires an **Artifact** `update` event for the parent artifact — the grant's artifact, and both ends of an edge — through `webhookRelatedModels` (direct-model refs; the CustomerRef party refs stay unread until AUTH-006). The audience is the artifact's owner and every party granted access to it, through containers too (`artifactWebhookAudience`), plus the grantee named by a changed grant, so a revoked grantee hears its revocation. Nobody else. The event names the node; receivers fan out to its descendants themselves (a container's change reaches its `inherit` members only through that fan-out). Delivery is lossy (bounded retries, auto-disable after 5 failures, poisoning on repeated 400/422), so a receiver that indexes artifacts also reconciles. Builds on the AUTH-006 stopgap (template #201).
+Artifact is a webhook model. A change to an `ArtifactPermission` or `ArtifactPlacement` row fires an **Artifact** `update` event for the parent artifact — the grant's artifact, and both ends of an edge — through `webhookRelatedModels` (direct-model refs; the CustomerRelationship party refs stay unread until AUTH-006). The audience is the artifact's owner and every party granted access to it, through containers too (`artifactWebhookAudience`), plus the grantee named by a changed grant, so a revoked grantee hears its revocation. Nobody else. The event names the node; receivers fan out to its descendants themselves (a container's change reaches its `inherit` members only through that fan-out). Delivery is lossy (bounded retries, auto-disable after 5 failures, poisoning on repeated 400/422), so a receiver that indexes artifacts also reconciles. Builds on the AUTH-006 stopgap (template #201).
 
 ### Edge-level access (deferred)
 

@@ -32,6 +32,8 @@ model CustomerRelationship {
   auditLogs          AuditLog[]
   segmentMembers     SegmentMember[]
   integrationRecords IntegrationRecord[]
+  artifactGrants     ArtifactPermission[] @relation("ArtifactPermissionGranteeCustomerRelationship")
+  resourceBindings   ResourceBinding[]    @relation("ResourceBindingCustomerRelationship")
 
   // Per-relationship communication-kind opt-ins. Gates messages alongside
   // the per-Contact list — both must accept the kind for delivery.
@@ -46,9 +48,6 @@ model CustomerRelationship {
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
-
-  artifactGrants   ArtifactPermission[] @relation("ArtifactPermissionGranteeCustomerRelationship")
-  resourceBindings ResourceBinding[] @relation("ResourceBindingCustomerRelationship")
 
   // (customer, provider) pair uniqueness — partial uniques across each
   // populated customer FK paired with each provider FK. Each partial doubles

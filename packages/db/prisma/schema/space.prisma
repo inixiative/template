@@ -51,14 +51,13 @@ model Space {
   communicationsSent              CommunicationLog[]     @relation("CommunicationSenderSpace")
   segments                        Segment[]
   settings                        Setting[]
+  ownedArtifacts                  Artifact[]             @relation("ArtifactOwnerSpace")
+  artifactGrants                  ArtifactPermission[]   @relation("ArtifactPermissionGranteeSpace")
+  resourceBindings                ResourceBinding[]      @relation("ResourceBindingSpace")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
-
-  ownedArtifacts   Artifact[]           @relation("ArtifactOwnerSpace")
-  artifactGrants   ArtifactPermission[] @relation("ArtifactPermissionGranteeSpace")
-  resourceBindings ResourceBinding[] @relation("ResourceBindingSpace")
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])

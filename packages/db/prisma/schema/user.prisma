@@ -57,6 +57,9 @@ model User {
   segments                        Segment[]
   flows                           Flow[]
   settings                        Setting[]
+  ownedArtifacts                  Artifact[]             @relation("ArtifactOwnerUser")
+  artifactGrants                  ArtifactPermission[]   @relation("ArtifactPermissionGranteeUser")
+  resourceBindings                ResourceBinding[]      @relation("ResourceBindingUser")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -64,10 +67,6 @@ model User {
 
   emailTemplates  EmailTemplate[]
   emailComponents EmailComponent[]
-
-  ownedArtifacts   Artifact[]           @relation("ArtifactOwnerUser")
-  artifactGrants   ArtifactPermission[] @relation("ArtifactPermissionGranteeUser")
-  resourceBindings ResourceBinding[] @relation("ResourceBindingUser")
 }
 
 enum PlatformRole {

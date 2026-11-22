@@ -429,5 +429,25 @@ describe('artifact actions', () => {
       const grants = await db.artifactPermission.findMany({ where: { artifactId: early?.id } });
       expect(grants.map((grant) => grant.granteeModel)).toEqual(['OrganizationUser']);
     });
+
+    it('skips tombstoned memberships (e.g. transferSpace key holders) and creates on revive', async () => {
+      const dropped = (await createUser()).entity;
+      const { entity: membership } = await createOrganizationUser(
+        { role: 'member', deletedAt: new Date() },
+        { organization, user: dropped },
+      );
+      expect(await findOrganizationUserFolder(organization.id, dropped.id)).toBeNull();
+
+      await db.withDeleted(() =>
+        db.organizationUser.update({
+          where: { id: membership.id },
+          data: { deletedAt: null },
+        }),
+      );
+      const revived = await findOrganizationUserFolder(organization.id, dropped.id);
+      expect(revived).not.toBeNull();
+      const grants = await db.artifactPermission.findMany({ where: { artifactId: revived?.id } });
+      expect(grants.map((grant) => grant.granteeModel)).toEqual(['OrganizationUser']);
+    });
   });
 });
