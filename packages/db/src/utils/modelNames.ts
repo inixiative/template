@@ -4,7 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { Prisma } from '@template/db/generated/client/client';
+import { Prisma as PrismaBrowser } from '@template/db/generated/client/browser';
+import type { Prisma } from '@template/db/generated/client/client';
 import { lowerFirst, upperFirst } from 'lodash-es';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,9 +24,9 @@ export type ModelNameFromAccessor<A extends AccessorName> = Extract<ModelName, C
 // PascalCase (ModelName) utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const ModelNames = Prisma.ModelName;
+export const ModelNames = PrismaBrowser.ModelName;
 
-export const modelNames = Object.values(Prisma.ModelName);
+export const modelNames = Object.values(PrismaBrowser.ModelName);
 
 const modelNameSet = new Set<string>(modelNames);
 
