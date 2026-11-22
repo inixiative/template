@@ -75,7 +75,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -113,7 +113,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -154,7 +154,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -188,7 +188,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -219,7 +219,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
       });
 
       await sendWebhook(worker, {
@@ -244,7 +244,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
         isActive: false,
       });
 
@@ -299,7 +299,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: uniqueWebhookUrl('/retries'),
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
       });
       return sub;
     };
@@ -439,7 +439,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
         isActive: true,
       });
 
@@ -479,7 +479,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
         isActive: true,
       });
 
@@ -527,7 +527,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
         isActive: true,
       });
 
@@ -584,7 +584,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: uniqueWebhookUrl('/integration'),
-        model: 'CustomerRelationship',
+        resourceModel: 'CustomerRelationship',
         integrationId: withIntegration ? integration.id : null,
       });
       receivedWebhooks.length = 0;
@@ -601,7 +601,9 @@ describe('sendWebhook handler', () => {
       });
 
     const findRecord = (integrationId: string, customerRelationshipId: string) =>
-      db.integrationRecord.findFirst({ where: { integrationId, customerRelationshipId } });
+      db.integrationRecord.findFirst({
+        where: { integrationId, recordCustomerRelationshipId: customerRelationshipId },
+      });
 
     const at = (ms: number) => new Date(Date.UTC(2026, 0, 1) + ms);
     // The delivery's id comes from Postgres uuidv7(); a host uuidv7 from "now" can sort either side of it.
@@ -623,7 +625,7 @@ describe('sendWebhook handler', () => {
       await deliver(sub.id, customerRelationship.id);
 
       const record = await findRecord(integration.id, customerRelationship.id);
-      expect(record?.model).toBe('CustomerRelationship');
+      expect(record?.recordModel).toBe('CustomerRelationship');
       expect(record?.poisonedAt).toBeInstanceOf(Date);
       expect(record?.poisonedReason).toBe('HTTP 400: Bad Request');
       const latest = await db.webhookEvent.findFirst({
@@ -783,7 +785,7 @@ describe('sendWebhook handler', () => {
       const { sub, integration, customerRelationship } = await createRecordSubscription();
       await createIntegrationRecord(
         {
-          model: 'CustomerRelationship',
+          recordModel: 'CustomerRelationship',
           poisonedAt: new Date(),
           poisonedReason: 'HTTP 400: Bad Request',
         },
@@ -823,7 +825,7 @@ describe('sendWebhook handler', () => {
 
       expect(
         await db.integrationRecord.count({
-          where: { customerRelationshipId: customerRelationship.id },
+          where: { recordCustomerRelationshipId: customerRelationship.id },
         }),
       ).toBe(0);
     });

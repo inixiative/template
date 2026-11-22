@@ -51,6 +51,8 @@ export const sendInquiry = async (
     const handler = inquiryServices[fresh.type];
     const autoApproved = await handler.autoApprove(sent);
 
+    await emitAppEvent('inquiry.sent', sent);
+
     if (autoApproved) {
       await resolveInquiry(
         c,
@@ -60,17 +62,11 @@ export const sendInquiry = async (
         sent.updatedAt,
       );
 
-      const approved = await db.inquiry.findUniqueOrThrow({
+      return db.inquiry.findUniqueOrThrow({
         where: { id: sent.id },
         include: includeInquiryResponse,
       });
-
-      await emitAppEvent('inquiry.sent', approved);
-
-      return approved;
     }
-
-    await emitAppEvent('inquiry.sent', sent);
 
     return sent;
   });

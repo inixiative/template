@@ -20,7 +20,9 @@ model CommunicationLog {
   senderSpaceId        String?                     @db.VarChar(36)
   senderUser           User?                       @relation("CommunicationSenderUser", fields: [senderUserId], references: [id], onDelete: SetNull)
   senderOrganization   Organization?               @relation("CommunicationSenderOrganization", fields: [senderOrganizationId], references: [id], onDelete: SetNull)
-  senderSpace          Space?                      @relation("CommunicationSenderSpace", fields: [senderSpaceId], references: [id], onDelete: SetNull)
+  senderSpace          Space?                      @relation("CommunicationSenderSpace", fields: [senderOrganizationId, senderSpaceId], references: [organizationId, id], onDelete: SetNull)
+  senderOrganizationUser OrganizationUser?         @relation("CommunicationSenderOrganizationUser", fields: [senderOrganizationId, senderUserId], references: [organizationId, userId], onDelete: SetNull)
+  senderSpaceUser      SpaceUser?                  @relation("CommunicationSenderSpaceUser", fields: [senderOrganizationId, senderSpaceId, senderUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
 
   recipientUserId    String?  @db.VarChar(36)
   recipientUser      User?    @relation("CommunicationRecipientUser", fields: [recipientUserId], references: [id], onDelete: SetNull)

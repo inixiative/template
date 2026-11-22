@@ -6,6 +6,7 @@
  */
 import { z } from '@hono/zod-openapi';
 import { actionRoute } from '#/lib/routeTemplates';
+import { validateAuthenticatedMiddleware } from '#/middleware/auth/validateAuthenticatedMiddleware';
 import { batchExecutionStrategyEnum, batchStatusEnum } from '#/modules/batch/constants';
 import { Modules } from '#/modules/modules';
 
@@ -45,6 +46,8 @@ export const batchExecuteRoute = actionRoute({
   model: Modules.batch,
   action: 'execute',
   skipId: true,
+  'x-batch': false,
+  middleware: [validateAuthenticatedMiddleware],
   bodySchema: batchExecuteBodySchema,
   bodyRefinement: ({ requests }: z.infer<typeof batchExecuteBodySchema>, ctx) => {
     if (requests.some((round) => round.length > 50))

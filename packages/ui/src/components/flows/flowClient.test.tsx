@@ -101,6 +101,7 @@ const Work = () => {
 };
 
 let withModal: boolean;
+let modalClosedCount: number;
 
 const Starter = () => {
   const { mutateAsync } = useStartFlow();
@@ -128,7 +129,13 @@ const Root = () => {
       <Work />
       <Starter />
       {withModal && (
-        <Modal isOpen onClose={() => undefined} title="Your key">
+        <Modal
+          isOpen
+          onClose={() => {
+            modalClosedCount += 1;
+          }}
+          title="Your key"
+        >
           key
         </Modal>
       )}
@@ -164,6 +171,7 @@ const doWork = async () => {
 beforeEach(() => {
   holding = 0;
   withModal = false;
+  modalClosedCount = 0;
   started = undefined;
   gone = false;
   requests = [];
@@ -245,6 +253,21 @@ describe('flow client', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/settings/tokens'));
     expect(router.state.location.hash).toBe('create-token');
+  });
+
+  it('Escape and backdrop click close an open modal without navigating to the next flow step', async () => {
+    holding = 1;
+    withModal = true;
+    const router = await renderInFlow();
+
+    await screen.findAllByRole('button', { name: 'Continue: Create an API token for CI' });
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(modalClosedCount).toBe(1);
+    expect(router.state.location.pathname).toBe('/users/members');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close modal' }));
+    expect(modalClosedCount).toBe(2);
+    expect(router.state.location.pathname).toBe('/users/members');
   });
 
   it('finishes on returnUrl once the last step is confirmed', async () => {

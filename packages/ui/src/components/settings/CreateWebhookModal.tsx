@@ -9,8 +9,8 @@ import { Button, Input, Label, Modal, Select } from '@template/ui/components';
 import { enumToSelectOptions } from '@template/ui/lib/enumOptions';
 import { memo, useState } from 'react';
 
-type CreateWebhookFormData = Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>;
-type WebhookModel = CreateWebhookFormData['model'];
+type CreateWebhookFormData = Pick<MeCreateWebhookSubscriptionData['body'], 'resourceModel' | 'url'>;
+type WebhookModel = CreateWebhookFormData['resourceModel'];
 
 const webhookModelValues = ['CustomerRelationship'] as const satisfies readonly WebhookModel[];
 const webhookModelOptions = enumToSelectOptions<WebhookModel>(webhookModelValues);
@@ -38,7 +38,7 @@ export const CreateWebhookModal = memo(({ isOpen, onClose, onSubmit }: CreateWeb
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    onSubmit({ url: trimmedUrl, model });
+    onSubmit({ url: trimmedUrl, resourceModel: model });
     setUrl('');
     setModel(webhookModelValues[0]);
     onClose();

@@ -6,33 +6,34 @@
  */
 import type { RouteConfig } from '@hono/zod-openapi';
 import { omit } from 'lodash-es';
+import type { RouteArgs } from '#/lib/routeTemplates/types';
 
-// Fields our route builders carry on the route object for internal use (handlers,
-// SDK lens, validation inputs) but that must never reach the OpenAPI document:
-// bodySchema/params/query are raw zod and serialize as zod internals — a recursive
-// one (z.lazy) is a cyclic object that breaks JSON.stringify. Strip at the
-// registration boundary so the full object stays available everywhere else.
-const BUILDER_ONLY_KEYS = [
-  'model',
-  'submodel',
-  'action',
-  'params',
-  'query',
-  'responseSchema',
-  'bodySchema',
-  'bodyRefinement',
-  'queryRefinement',
-  'paramsRefinement',
-  'sanitizeKeys',
-  'skipId',
-  'many',
-  'paginate',
-  'admin',
-  'internal',
-  'filterLens',
-] as const;
+type BuilderOnlyKey = Exclude<keyof RouteArgs, keyof RouteConfig>;
 
-export const toOpenApi = <T extends RouteConfig>(
-  route: T,
-): Omit<T, (typeof BUILDER_ONLY_KEYS)[number]> =>
-  omit(route, BUILDER_ONLY_KEYS) as Omit<T, (typeof BUILDER_ONLY_KEYS)[number]>;
+// why: exhaustive against RouteArgs so newly added builder options cannot leak into OpenAPI
+const BUILDER_ONLY_MAP = {
+  model: true,
+  submodel: true,
+  action: true,
+  params: true,
+  query: true,
+  responseSchema: true,
+  bodySchema: true,
+  bodyRequired: true,
+  bodyRefinement: true,
+  queryRefinement: true,
+  paramsRefinement: true,
+  sanitizeKeys: true,
+  skipId: true,
+  many: true,
+  paginate: true,
+  admin: true,
+  internal: true,
+  filterLens: true,
+  includeDeleted: true,
+} satisfies Record<BuilderOnlyKey, true>;
+
+const BUILDER_ONLY_KEYS = Object.keys(BUILDER_ONLY_MAP) as readonly BuilderOnlyKey[];
+
+export const toOpenApi = <T extends RouteConfig>(route: T): Omit<T, BuilderOnlyKey> =>
+  omit(route, BUILDER_ONLY_KEYS) as Omit<T, BuilderOnlyKey>;

@@ -23,7 +23,7 @@ const isKeysUnavailable = (err: unknown) =>
   (err instanceof errors.JOSEError && err.code === 'ERR_JOSE_GENERIC');
 
 export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  if (c.get('user')) return next();
+  if (c.get('user') || c.get('token')) return next();
 
   const authorization = c.req.header('authorization');
   const bearer = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;

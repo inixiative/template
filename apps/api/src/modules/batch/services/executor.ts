@@ -2,10 +2,11 @@
  * @atlas
  * @kind service
  * @partOf primitive:batch
- * @uses none
+ * @uses infrastructure:redis
  */
 import type { Context } from 'hono';
 import { validatedBody } from '#/lib/context/validatedRequestData';
+import { chargeAdditionalBatchApiRateLimit } from '#/middleware/rateLimit/apiRateLimit';
 import { assertBatchable } from '#/modules/batch/services/assertBatchable';
 import { allowFailures } from '#/modules/batch/services/strategies/allowFailures';
 import { failOnRound } from '#/modules/batch/services/strategies/failOnRound';
@@ -47,6 +48,7 @@ export const executeBatch = async (c: Context<AppEnv>): Promise<BatchResult> => 
 
   const app = c.get('app');
   assertBatchable(app, rounds);
+  await chargeAdditionalBatchApiRateLimit(c, totalRequests);
   const baseRequest = c.req.raw;
 
   const executor = batchExecutionStrategies[strategy as keyof typeof batchExecutionStrategies];

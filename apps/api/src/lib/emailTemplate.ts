@@ -27,40 +27,8 @@ import { renderForRecipient } from '#/lib/email/renderForRecipient';
 import type { Sender } from '#/lib/email/sender';
 
 export const senderToOwnerScope = (sender: Sender): OwnerScope => {
-  switch (sender.type) {
-    case 'Organization':
-      return { locale: 'en', ownerModel: 'Organization', organizationId: sender.organizationId };
-    case 'OrganizationUser':
-      return {
-        locale: 'en',
-        ownerModel: 'OrganizationUser',
-        organizationId: sender.organizationId,
-        userId: sender.userId,
-      };
-    case 'Space':
-      return {
-        locale: 'en',
-        ownerModel: 'Space',
-        spaceId: sender.spaceId,
-        organizationId: sender.organizationId,
-      };
-    case 'SpaceUser':
-      return {
-        locale: 'en',
-        ownerModel: 'SpaceUser',
-        spaceId: sender.spaceId,
-        organizationId: sender.organizationId,
-        userId: sender.userId,
-      };
-    case 'User':
-      return { locale: 'en', ownerModel: 'User', userId: sender.userId };
-    case 'admin':
-      return { locale: 'en', ownerModel: 'admin' };
-    case 'platform':
-      return { locale: 'en', ownerModel: 'default' };
-    default:
-      return { locale: 'en', ownerModel: 'default' };
-  }
+  const { type, ...keys } = sender;
+  return { locale: 'en', ownerModel: type === 'platform' ? 'default' : type, ...keys };
 };
 
 export type RenderedEmailTemplate = {

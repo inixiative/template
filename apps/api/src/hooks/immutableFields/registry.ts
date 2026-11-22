@@ -38,6 +38,10 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
     ...polymorphismImmutableFields.CommunicationLog,
     exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],
   },
+  WebhookSubscription: {
+    ...polymorphismImmutableFields.WebhookSubscription,
+    include: [...(polymorphismImmutableFields.WebhookSubscription?.include ?? []), 'resourceModel'],
+  },
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {

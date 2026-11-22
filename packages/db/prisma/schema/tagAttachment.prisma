@@ -17,28 +17,28 @@ model TagAttachment {
   // TagResource (the model names) are valid here; camelCase entries are
   // use-cases for Tag.resources.
   resourceModel  TagResource
-  userId         String?     @db.VarChar(36)
-  organizationId String?     @db.VarChar(36)
-  spaceId        String?     @db.VarChar(36)
-  projectId      String?     @db.VarChar(36)
+  resourceUserId         String?     @db.VarChar(36)
+  resourceOrganizationId String?     @db.VarChar(36)
+  resourceSpaceId        String?     @db.VarChar(36)
+  resourceProjectId      String?     @db.VarChar(36)
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific resource FKs below (e.g. chatGroupId)
   // ==========================================================================
 
   tagId String @db.VarChar(36)
 
-  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  resourceUser         User?         @relation(fields: [resourceUserId], references: [id], onDelete: Cascade)
+  resourceOrganization Organization? @relation(fields: [resourceOrganizationId], references: [id], onDelete: Cascade)
+  resourceSpace        Space?        @relation(fields: [resourceSpaceId], references: [id], onDelete: Cascade)
+  resourceProject      Project?      @relation(fields: [resourceProjectId], references: [id], onDelete: Cascade)
   tag          Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   // Per-resource uniqueness — partial uniques (see Contact for rationale).
   // Each partial doubles as a lookup index for that resource FK.
-  @@unique([userId, tagId], where: { userId: { not: null } })
-  @@unique([organizationId, tagId], where: { organizationId: { not: null } })
-  @@unique([spaceId, tagId], where: { spaceId: { not: null } })
-  @@unique([projectId, tagId], where: { projectId: { not: null } })
+  @@unique([resourceUserId, tagId], where: { resourceUserId: { not: null } })
+  @@unique([resourceOrganizationId, tagId], where: { resourceOrganizationId: { not: null } })
+  @@unique([resourceSpaceId, tagId], where: { resourceSpaceId: { not: null } })
+  @@unique([resourceProjectId, tagId], where: { resourceProjectId: { not: null } })
   @@index([tagId])
 }
 

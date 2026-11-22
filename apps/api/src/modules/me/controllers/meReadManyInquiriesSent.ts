@@ -3,7 +3,7 @@
  * @kind controller
  * @partOf feature:users
  */
-import { whereAxisCarriesOwnerKeys } from '@template/db';
+import { wherePolymorphicSideIsOneOf } from '@template/db';
 import { actingUser } from '#/lib/context/actingUser';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
@@ -16,7 +16,9 @@ export const meReadManyInquiriesSentController = makeController(
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        ...whereAxisCarriesOwnerKeys('Inquiry', 'sourceModel', { User: actingUser(c)!.id }),
+        ...wherePolymorphicSideIsOneOf('Inquiry', 'sourceModel', [
+          { ownerKeys: { User: actingUser(c)!.id } },
+        ]),
       },
       orNullFields: ['expiresAt'],
       orderBy: { createdAt: 'desc' },

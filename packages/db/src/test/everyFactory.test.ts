@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it, setSystemTime } from 'bun:test';
 import { faker } from '@faker-js/faker';
 import { fieldOf, relationsOf, uniqueKeysOf } from '@inixiative/field-map';
 import { db } from '@template/db/client';
@@ -113,7 +113,15 @@ const defaultsAt = (
   resetSequence();
   for (let i = 0; i < step; i++) nextFactorySequenceNumber();
   faker.seed(seed);
-  return withDiscriminatorDefaults(modelName, defaults() as Record<string, unknown>);
+  const random = Math.random;
+  Math.random = () => faker.number.float({ min: 0, max: 1 });
+  setSystemTime(faker.date.anytime());
+  try {
+    return withDiscriminatorDefaults(modelName, defaults() as Record<string, unknown>);
+  } finally {
+    Math.random = random;
+    setSystemTime();
+  }
 };
 
 const keyValue = (modelName: ModelName, row: Record<string, unknown>, key: string[]) =>
@@ -127,7 +135,6 @@ const collidingKeys = (): string[] =>
       const [first, ...otherSeeds] = SEEDS.map((seed) =>
         defaultsAt(modelName, defaults, { step: 0, seed }),
       );
-      const replay = defaultsAt(modelName, defaults, { step: 0, seed: SEEDS[0] });
       const nextStep = defaultsAt(modelName, defaults, { step: 1, seed: SEEDS[0] });
       const asCreated = (row: Record<string, unknown>, field: string) =>
         valueAsCreated(modelName, row, field);
@@ -139,10 +146,9 @@ const collidingKeys = (): string[] =>
         .filter((key) => !key.some((field) => UUID.test(String(asCreated(first, field)))))
         .filter((key) => {
           const value = keyValue(modelName, first, key);
-          const isOutsideFaker = value !== keyValue(modelName, replay, key);
           const isFromFaker = otherSeeds.some((row) => keyValue(modelName, row, key) !== value);
           const isFromSequence = value !== keyValue(modelName, nextStep, key);
-          return isOutsideFaker || (isFromFaker && !isFromSequence);
+          return isFromFaker && !isFromSequence;
         })
         .map((key) => `${modelName}.${key.join('+')}`);
     })
@@ -166,7 +172,7 @@ describe('every factory against the unique keys', () => {
       string,
       unknown
     >;
-    expect(valueAsCreated('WebhookSubscription', webhookDefaults, 'model')).toBe(
+    expect(valueAsCreated('WebhookSubscription', webhookDefaults, 'resourceModel')).toBe(
       PASSED_BY_THE_CALLER,
     );
     expect(valueAsCreated('WebhookSubscription', webhookDefaults, 'isActive')).toBe(true);

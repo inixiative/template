@@ -22,6 +22,7 @@ export const mockJob = (overrides?: Partial<Job>): Job =>
     finishedOn: undefined,
     processedOn: undefined,
     log: mock(() => Promise.resolve(1)),
+    getDependenciesCount: mock(() => Promise.resolve({ unprocessed: 0 })),
     ...overrides,
   }) as Job;
 

@@ -4,7 +4,12 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
+import {
+  db,
+  type RuleReferenceRow,
+  ruleReferenceTargets,
+  wherePolymorphicSideIsOneOf,
+} from '@template/db';
 import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
@@ -44,12 +49,10 @@ const existingTargetsOf = async (
   componentIds: string[],
 ): Promise<RuleReference[]> => {
   const edges = (await db.ruleReference.findMany({
-    where: {
-      OR: [
-        { sourceEmailTemplateId: templateId },
-        ...(componentIds.length ? [{ sourceEmailComponentId: { in: componentIds } }] : []),
-      ],
-    },
+    where: wherePolymorphicSideIsOneOf('RuleReference', 'sourceModel', [
+      { model: 'EmailTemplate', id: templateId },
+      ...componentIds.map((id) => ({ model: 'EmailComponent', id })),
+    ]),
   })) as RuleReferenceRow[];
   return uniqBy(
     ruleReferenceTargets(edges).filter((target) => target.state === 'existing'),

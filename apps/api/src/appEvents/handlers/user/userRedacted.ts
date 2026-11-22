@@ -5,17 +5,19 @@
  * @uses primitive:jobs
  */
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { enqueueJob } from '#/jobs/enqueue';
+import { enqueueSegmentReconcileForCustomers } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
 export type UserRedactedPayload = { userId: string };
 
 export const userRedacted = makeAppEvent<UserRedactedPayload>({
   cb: [
     async ({ userId }) => {
-      await enqueueJob('reconcileCustomerRelationshipSegments', {
-        customerModel: 'User',
-        customerId: userId,
-      });
+      await enqueueSegmentReconcileForCustomers([
+        {
+          customerModel: 'User',
+          customerId: userId,
+        },
+      ]);
     },
   ],
 });

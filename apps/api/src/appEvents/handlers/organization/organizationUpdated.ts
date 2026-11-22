@@ -6,17 +6,19 @@
  */
 import type { Organization } from '@template/db/generated/client/client';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import { enqueueJob } from '#/jobs/enqueue';
+import { enqueueSegmentReconcileForCustomers } from '#/modules/segment/lib/enqueueSegmentReconcileForCustomers';
 
 export type OrganizationUpdatedPayload = { organization: Organization };
 
 export const organizationUpdated = makeAppEvent<OrganizationUpdatedPayload>({
   cb: [
     async ({ organization }) => {
-      await enqueueJob('reconcileCustomerRelationshipSegments', {
-        customerModel: 'Organization',
-        customerId: organization.id,
-      });
+      await enqueueSegmentReconcileForCustomers([
+        {
+          customerModel: 'Organization',
+          customerId: organization.id,
+        },
+      ]);
     },
   ],
 });

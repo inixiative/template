@@ -6,6 +6,7 @@ import {
   type PolymorphicAxis,
   type PolymorphicValue,
   PolymorphismRegistry,
+  sideKeyColumns,
   toModelName,
 } from '@template/db';
 
@@ -30,7 +31,7 @@ const requiredForeignKey = (
 };
 
 const buildAxisRule = (model: ModelName, axis: PolymorphicAxis): Condition => {
-  const allFks = [...new Set(Object.values(axis.fkMap).flat())];
+  const allFks = sideKeyColumns(axis);
   const typeValues = Object.keys(axis.fkMap) as PolymorphicValue[];
 
   const branches = typeValues.map((typeValue) => {

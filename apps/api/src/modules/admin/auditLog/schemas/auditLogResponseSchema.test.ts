@@ -14,6 +14,7 @@ const baseAuditLog = {
   userAgent: null,
   action: 'create' as const,
   subjectModel: 'User' as const,
+  subjectId: null,
   before: null,
   after: null,
   changes: null,

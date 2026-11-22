@@ -19,6 +19,7 @@
  * WARN (git checkouts only, never fails) when the branch changes a file whose @atlas
  * @partOf names a concept with docs (.atlas/concepts.ts) without touching any of them.
  */
+import './exitTwoWhenDetectorCrashes';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import {

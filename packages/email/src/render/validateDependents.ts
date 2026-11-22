@@ -31,11 +31,13 @@ const embeddingTemplates = async (
       const [components, owned] = await Promise.all([
         db.emailComponent.findMany({
           where: {
-            OR: ownerCascade(ctx.ownerModel).map((tier) => ownerWhere(ctx, tier)),
+            OR: ownerCascade(ctx.ownerModel).map((tier) => ownerWhere('EmailComponent', ctx, tier)),
             componentSlugs: { has: slug },
           },
         }),
-        db.emailTemplate.findMany({ where: { ...ownerWhere(ctx), componentSlugs: { has: slug } } }),
+        db.emailTemplate.findMany({
+          where: { ...ownerWhere('EmailTemplate', ctx), componentSlugs: { has: slug } },
+        }),
       ]);
       next.push(...components.map((component) => component.slug));
       templates.push(...owned);

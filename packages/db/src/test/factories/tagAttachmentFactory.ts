@@ -11,22 +11,22 @@ const tagAttachmentFactory = registerFactory('TagAttachment', {
   dependencies: {
     user: {
       modelName: 'User',
-      foreignKey: { id: 'userId' },
+      foreignKey: { id: 'resourceUserId' },
       required: false,
     },
     organization: {
       modelName: 'Organization',
-      foreignKey: { id: 'organizationId' },
+      foreignKey: { id: 'resourceOrganizationId' },
       required: false,
     },
     space: {
       modelName: 'Space',
-      foreignKey: { id: 'spaceId' },
+      foreignKey: { id: 'resourceSpaceId' },
       required: false,
     },
     project: {
       modelName: 'Project',
-      foreignKey: { id: 'projectId' },
+      foreignKey: { id: 'resourceProjectId' },
       required: false,
     },
   },

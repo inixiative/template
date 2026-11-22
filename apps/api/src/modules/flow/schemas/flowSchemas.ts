@@ -17,7 +17,7 @@ export const flowStepSchema = z.object({
   to: appPathSchema.nullable(),
   advance: z.enum(FlowStepAdvance),
   readPath: z.string(),
-  rule: z.record(z.string(), z.unknown()),
+  rule: z.union([z.boolean(), z.record(z.string(), z.unknown())]),
 });
 
 export type FlowStep = Omit<z.infer<typeof flowStepSchema>, 'rule'> & { rule: Condition };

@@ -13,6 +13,7 @@
  * A key names the violation by content (model, mount path, function and parameter, SQL text), never
  * by line, so unrelated edits do not churn it and a new violation does not inherit a fixed one's key.
  */
+import './exitTwoWhenDetectorCrashes';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 

@@ -10,6 +10,7 @@
 model SpaceUser {
   inquiriesSent        Inquiry[]       @relation("InquirySource")
   inquiriesReceived    Inquiry[]       @relation("InquiryTarget")
+  communicationsSent   CommunicationLog[] @relation("CommunicationSenderSpaceUser")
   id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
   targetEntitlements   Entitlement[]   @relation("EntitlementTarget")

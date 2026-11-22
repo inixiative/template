@@ -35,5 +35,5 @@ export const reconcileSegment = async (
   if (!isReconcilable(segment)) return { added: [], removed: [] };
   const matching = await evaluateSegment(segment);
   if (signal?.aborted) return { added: [], removed: [] };
-  return applyMembershipDiff({ segmentId: segment.id, matching });
+  return applyMembershipDiff({ segmentId: segment.id, matching, signal });
 };

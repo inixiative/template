@@ -19,6 +19,6 @@ export const webhookSubscriptionUpdateRoute = updateRoute({
   bodySchema: WebhookSubscriptionScalarInputSchema.partial().extend({
     url: webhookUrlSchema.optional(),
   }),
-  sanitizeKeys: ['model', 'ownerModel', 'userId', 'organizationId'],
+  sanitizeKeys: ['resourceModel', 'ownerModel', 'userId', 'organizationId'],
   responseSchema: WebhookSubscriptionScalarSchema,
 });

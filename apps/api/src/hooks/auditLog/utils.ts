@@ -8,6 +8,7 @@ import {
   NOOP_FIELDS,
   omitRegisteredFields,
   Prisma,
+  polymorphicArmKeys,
   polymorphicKeyColumns,
 } from '@template/db';
 import type { AuditActor } from '@template/db/lib/auditActorContext';
@@ -24,23 +25,6 @@ export const auditActorColumns = (actor: AuditActor | null) => ({
   userAgent: actor?.userAgent ?? null,
   sourceInquiryId: actor?.sourceInquiryId ?? null,
 });
-
-const subjectFieldValueOfRecord = (
-  model: string,
-  field: string,
-  record: Record<string, unknown>,
-) => {
-  switch (field) {
-    case 'subjectOrganizationId':
-      return model === 'Organization' ? record.id : record.organizationId;
-    case 'subjectSpaceId':
-      return model === 'Space' ? record.id : record.spaceId;
-    case 'subjectUserId':
-      return model === 'User' ? record.id : record.userId;
-    default:
-      return record.id;
-  }
-};
 
 export const buildContextFkFields = (
   model: string,
@@ -65,20 +49,17 @@ export const buildContextFkFields = (
   };
 };
 
-export const buildSubjectFkFields = (
+/** The subject columns of an audit entry: its dual id always, its typed keys unless the subject is gone. */
+export const buildSubjectColumns = (
   model: string,
   record: Record<string, unknown>,
-): Record<string, unknown> => {
-  const fkFields = polymorphicKeyColumns('AuditLog', 'subjectModel', model);
-  if (!fkFields.length) return {};
-
-  const subjectFields: Record<string, unknown> = {};
-  for (const field of fkFields) {
-    const value = subjectFieldValueOfRecord(model, field, record);
-    if (value !== undefined) subjectFields[field] = value;
-  }
-  return subjectFields;
-};
+  { withKeys }: { withKeys: boolean } = { withKeys: true },
+): Record<string, unknown> => ({
+  subjectId: typeof record.id === 'string' ? record.id : null,
+  ...(withKeys && polymorphicKeyColumns('AuditLog', 'subjectModel', model).length
+    ? polymorphicArmKeys('AuditLog', 'subjectModel', model, record)
+    : {}),
+});
 
 export const omitNoopFieldsForAudit = (
   model: string,

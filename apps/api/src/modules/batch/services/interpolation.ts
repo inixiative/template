@@ -4,13 +4,18 @@
  * @partOf primitive:batch
  * @uses primitive:shared
  */
+
+import type { OpenAPIHono } from '@hono/zod-openapi';
 import {
   type BatchInterpolationReference,
+  type BatchInterpolationToken,
   decodePercentEncodedBatchReferences,
   tokenizeBatchInterpolation,
 } from '@template/shared/batchInterpolation';
 import { isValidPathNotation } from '#/lib/prisma/pathNotation';
+import { assertBatchable } from '#/modules/batch/services/assertBatchable';
 import type { BatchRequest } from '#/modules/batch/services/strategies/types';
+import type { AppEnv } from '#/types/appEnv';
 
 type InterpolationContext = {
   results: unknown[][];
@@ -38,10 +43,10 @@ const navigateFieldPath = (value: unknown, path: string): unknown => {
   return result;
 };
 
-const resolveReference = (
+const referenceValue = (
   { raw, round, request, fieldPath }: BatchInterpolationReference,
   context: InterpolationContext,
-): string => {
+): unknown => {
   if (!isValidPathNotation(fieldPath)) {
     throw new Error(`Invalid interpolation path: ${raw}`);
   }
@@ -80,13 +85,41 @@ const resolveReference = (
     );
   }
 
-  return String(result);
+  return result;
 };
 
-const interpolateString = (value: string, context: InterpolationContext): string =>
-  tokenizeBatchInterpolation(value)
-    .map((token) => (token.kind === 'text' ? token.value : resolveReference(token, context)))
+const referenceString = (
+  reference: BatchInterpolationReference,
+  context: InterpolationContext,
+): string => String(referenceValue(reference, context));
+
+const renderTokens = (
+  tokens: BatchInterpolationToken[],
+  context: InterpolationContext,
+  encodeResolved: (resolved: string) => string = (resolved) => resolved,
+): string =>
+  tokens
+    .map((token) =>
+      token.kind === 'text' ? token.value : encodeResolved(referenceString(token, context)),
+    )
     .join('');
+
+const interpolateString = (
+  value: string,
+  context: InterpolationContext,
+  encodeResolved?: (resolved: string) => string,
+): string => renderTokens(tokenizeBatchInterpolation(value), context, encodeResolved);
+
+const DOT_SEGMENTS = ['.', '..'];
+
+const encodeResolvedPathValue = (resolved: string): string => {
+  if (DOT_SEGMENTS.includes(resolved))
+    throw new Error(`Batch reference resolved to '${resolved}', which cannot fill a path`);
+  return encodeURIComponent(resolved);
+};
+
+const interpolatePath = (path: string, context: InterpolationContext): string =>
+  interpolateString(decodePercentEncodedBatchReferences(path), context, encodeResolvedPathValue);
 
 const interpolateHeaders = (
   headers: Record<string, string>,
@@ -98,7 +131,11 @@ const interpolateHeaders = (
 
 export const interpolateValue = (value: unknown, context: InterpolationContext): unknown => {
   if (typeof value === 'string') {
-    return interpolateString(value, context);
+    const tokens = tokenizeBatchInterpolation(value);
+    if (tokens.length === 1 && tokens[0]?.kind === 'reference') {
+      return referenceValue(tokens[0], context);
+    }
+    return renderTokens(tokens, context);
   }
 
   if (Array.isArray(value)) {
@@ -122,8 +159,18 @@ export const interpolateRequest = (
 ): BatchRequest => {
   return {
     ...request,
-    path: interpolateString(decodePercentEncodedBatchReferences(request.path), context),
-    body: request.body ? interpolateValue(request.body, context) : undefined,
+    path: interpolatePath(request.path, context),
+    body: request.body !== undefined ? interpolateValue(request.body, context) : undefined,
     headers: request.headers ? interpolateHeaders(request.headers, context) : undefined,
   };
+};
+
+export const interpolateBatchableRequest = (
+  app: OpenAPIHono<AppEnv>,
+  request: BatchRequest,
+  context: InterpolationContext,
+): BatchRequest => {
+  const interpolatedRequest = interpolateRequest(request, context);
+  assertBatchable(app, [[interpolatedRequest]]);
+  return interpolatedRequest;
 };

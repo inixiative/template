@@ -73,7 +73,7 @@ export const cacheKeysByModel: CacheKeysByModel = {
       }
     })();
     if (!ownerId) return [];
-    return [cacheKey('webhookSubscription', { [r.ownerModel]: ownerId }, [r.model])];
+    return [cacheKey('webhookSubscription', { [r.ownerModel]: ownerId }, [r.resourceModel])];
   },
 };
 

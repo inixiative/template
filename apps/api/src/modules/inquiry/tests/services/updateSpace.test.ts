@@ -109,4 +109,49 @@ describe('handler: updateSpace — validate', () => {
 
     expect(response.status).toBe(201);
   });
+
+  it('rejects when a sibling space in the same org has an open updateSpace inquiry claiming the slug', async () => {
+    await createInquiry({
+      type: InquiryType.updateSpace,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Space,
+      sourceOrganizationId: org.id,
+      sourceSpaceId: space.id,
+      targetModel: InquiryResourceModel.admin,
+      content: { slug: 'contested-sibling-slug' },
+    });
+
+    const response = await fetch(
+      post(`/api/v1/space/${freshSpace.id}/inquiries`, {
+        type: InquiryType.updateSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { slug: 'contested-sibling-slug' },
+      }),
+    );
+
+    expect(response.status).toBe(409);
+  });
+
+  it('ignores an expired updateSpace inquiry claiming the slug', async () => {
+    await createInquiry({
+      type: InquiryType.updateSpace,
+      status: InquiryStatus.sent,
+      expiresAt: new Date(Date.now() - 60_000),
+      sourceModel: InquiryResourceModel.Space,
+      sourceOrganizationId: org.id,
+      sourceSpaceId: space.id,
+      targetModel: InquiryResourceModel.admin,
+      content: { slug: 'expired-claim-slug' },
+    });
+
+    const response = await fetch(
+      post(`/api/v1/space/${freshSpace.id}/inquiries`, {
+        type: InquiryType.updateSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { slug: 'expired-claim-slug' },
+      }),
+    );
+
+    expect(response.status).toBe(201);
+  });
 });
