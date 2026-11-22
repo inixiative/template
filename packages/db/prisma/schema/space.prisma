@@ -51,6 +51,8 @@ model Space {
   communicationsSent              CommunicationLog[]     @relation("CommunicationSenderSpace")
   segments                        Segment[]
   settings                        Setting[]
+  billingAccounts                 BillingAccount[]
+  billingResources                BillingResource[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

@@ -18,6 +18,7 @@ export const CONCEPTS: ConceptRegistry = {
   'feature:integrations': { module: ['integration'] },
   'feature:project': { module: ['project'] },
   'feature:setting': { module: ['setting'], docs: ['SETTINGS.md'] },
+  'feature:billing': { module: ['billingAccount', 'billingResource'], docs: ['BILLING.md'] },
   'feature:email': { package: ['email'], docs: ['COMMUNICATIONS.md'] },
 
   // classless cross-cutting tag (derived): the BE admin surface IS superadmin.
@@ -60,6 +61,7 @@ export const CONCEPTS: ConceptRegistry = {
   'infrastructure:seed': {}, // canonical baseline data + the hook-aware runner that loads it (spans db + api)
   'infrastructure:redis': { docs: ['REDIS.md'] },
   'infrastructure:storage': { docs: ['ADAPTERS.md'] }, // object storage (s3)
+  'infrastructure:billing': { docs: ['BILLING.md', 'ADAPTERS.md'] },
   'infrastructure:observability': { docs: ['LOGGING.md'] }, // otel / sentry / error reporting
   'infrastructure:env': { docs: ['ENVIRONMENTS.md'] }, // env schema + validation
 

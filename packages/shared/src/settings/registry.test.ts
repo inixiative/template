@@ -68,9 +68,16 @@ describe('SETTING_DEFINITIONS registry invariants', () => {
     }
   });
 
-  it('ships the minimal clean starter catalog (general category with defaultTimezone and displayLocale)', () => {
-    expect(Object.keys(SETTING_CATEGORIES)).toEqual(['general']);
-    expect(SETTING_KEYS).toEqual(['general.defaultTimezone', 'general.displayLocale']);
+  it('ships the starter catalog (general and billing categories)', () => {
+    expect(Object.keys(SETTING_CATEGORIES)).toEqual(['general', 'billing']);
+    expect(SETTING_KEYS).toEqual([
+      'general.defaultTimezone',
+      'general.displayLocale',
+      'billing.allowSpaceBilling',
+      'billing.allowOrgUserBilling',
+      'billing.allowSpaceUserBilling',
+      'billing.shareAccountsWithMembers',
+    ]);
     expect(SETTING_RESOURCE_MODELS).toEqual([
       'User',
       'Organization',
@@ -86,6 +93,7 @@ describe('SETTING_DEFINITIONS registry invariants', () => {
   it('looks up definitions by key and filters by resourceModel in deterministic order', () => {
     expect(settingDefinitionForKey('general.defaultTimezone')?.valueType).toBe('text');
     expect(settingDefinitionForKey('general.displayLocale')?.valueType).toBe('text');
+    expect(settingDefinitionForKey('billing.allowSpaceBilling')?.valueType).toBe('boolean');
     expect(settingDefinitionForKey('does.not.exist')).toBeUndefined();
     expect(() => settingDefinitionForKeyOrThrow('does.not.exist')).toThrow('Unknown setting key');
 
@@ -95,11 +103,11 @@ describe('SETTING_DEFINITIONS registry invariants', () => {
     ]);
     expect(settingDefinitionsForResourceModel('OrganizationUser').map((d) => d.key)).toEqual([
       'general.displayLocale',
+      'billing.allowSpaceUserBilling',
     ]);
     expect(settingDefinitionsForResourceModel('Project').map((d) => d.key)).toEqual([
       'general.defaultTimezone',
     ]);
-    // Starter template has zero Integration/ProjectIntegration definitions until downstream apps add them
     expect(settingDefinitionsForResourceModel('Integration')).toEqual([]);
     expect(settingDefinitionsForResourceModel('ProjectIntegration')).toEqual([]);
   });

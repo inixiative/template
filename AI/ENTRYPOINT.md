@@ -253,6 +253,7 @@ Read docs based on task type:
 - Frontend: `docs/claude/FRONTEND.md` (index of `docs/claude/FRONTEND/*`), `docs/claude/ZUSTAND.md`
 - Flows (short-lived guided walks through app pages, server-checked steps): `docs/claude/FLOWS.md`
 - Settings & Attribute model capability: `docs/claude/SETTINGS.md`
+- Billing (fiat billing accounts, resources, governance, adapters, webhooks): `docs/claude/BILLING.md`
 - Jobs/Redis/logging/monitoring: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
 - Concurrency (serialized queue, locks, parallel caps): `docs/claude/CONCURRENCY.md`
 - App events: `docs/claude/APP_EVENTS.md`; email/messaging: `docs/claude/COMMUNICATIONS.md`

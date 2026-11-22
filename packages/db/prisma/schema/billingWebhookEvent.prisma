@@ -1,0 +1,30 @@
+model BillingWebhookEvent {
+  id               String                    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt        DateTime                  @default(now())
+  claimedAt        DateTime?
+  processedAt      DateTime?
+  attempts         Int                       @default(1)
+  provider         BillingProvider
+  externalEventId  String                    @db.VarChar(191)
+  eventType        String                    @db.VarChar(120)
+  status           BillingWebhookEventStatus @default(pending)
+  billingAccountId String?                   @db.VarChar(36)
+  billingAccount   BillingAccount?           @relation(fields: [billingAccountId], references: [id], onDelete: SetNull)
+  payload          Json
+  error            String?
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([provider, externalEventId], map: "BillingWebhookEvent_provider_externalEvent_unique")
+  @@index([billingAccountId, createdAt])
+  @@index([status, createdAt])
+}
+
+enum BillingWebhookEventStatus {
+  pending
+  processed
+  ignored
+  failed
+}

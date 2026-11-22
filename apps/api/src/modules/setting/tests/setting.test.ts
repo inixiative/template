@@ -125,8 +125,12 @@ describe('Setting API (parent-scoped GET, atomic batch PATCH, single DELETE, raw
       }>(response);
 
       expect(Object.keys(data.guide).length).toBeGreaterThan(0);
-      expect(Object.keys(data.types.categories)).toEqual(['general']);
+      expect(Object.keys(data.types.categories)).toEqual(['general', 'billing']);
       expect(Object.keys(data.types.definitions).sort()).toEqual([
+        'billing.allowOrgUserBilling',
+        'billing.allowSpaceBilling',
+        'billing.allowSpaceUserBilling',
+        'billing.shareAccountsWithMembers',
         'general.defaultTimezone',
         'general.displayLocale',
       ]);

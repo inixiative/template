@@ -37,6 +37,14 @@ const baseImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOve
   ProjectIntegration: {
     refuse: ['projectId', 'integrationId'],
   },
+  BillingAccount: {
+    ...polymorphismImmutableFields.BillingAccount,
+    include: [...(polymorphismImmutableFields.BillingAccount?.include ?? []), 'provider'],
+  },
+  BillingResource: {
+    ...polymorphismImmutableFields.BillingResource,
+    refuse: [...(polymorphismImmutableFields.BillingResource?.refuse ?? []), 'billingAccountId'],
+  },
   CommunicationLog: {
     ...polymorphismImmutableFields.CommunicationLog,
     exclude: ['emailTemplateId', 'emailTemplateAuditLogId'],

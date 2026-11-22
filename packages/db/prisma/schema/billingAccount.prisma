@@ -1,0 +1,86 @@
+model BillingAccount {
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+
+  ownerModel     BillingAccountOwnerModel
+  userId         String?                  @db.VarChar(36)
+  organizationId String?                  @db.VarChar(36)
+  spaceId        String?                  @db.VarChar(36)
+
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationUser OrganizationUser? @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  space            Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
+  spaceUser        SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+
+  name         String                @db.VarChar(120)
+  billingEmail String                @db.VarChar(320)
+  isDefault    Boolean               @default(false)
+  sharing      BillingAccountSharing @default(inherit)
+  isShared     Boolean               @default(false)
+  status       BillingAccountStatus  @default(incomplete)
+
+  provider               BillingProvider
+  externalCustomerId     String?         @db.VarChar(191)
+  externalSubscriptionId String?         @db.VarChar(191)
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean         @default(false)
+
+  paymentMethodType     String?   @db.VarChar(40)
+  paymentMethodBrand    String?   @db.VarChar(40)
+  paymentMethodLast4    String?   @db.VarChar(8)
+  paymentMethodExpMonth Int?
+  paymentMethodExpYear  Int?
+  lastSyncedAt          DateTime?
+
+  billingResources   BillingResource[]
+  webhookEvents      BillingWebhookEvent[]
+  auditLogsAsSubject AuditLog[]            @relation("AuditLogSubjectBillingAccount")
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([userId], where: raw("\"ownerModel\" = 'User' AND \"isDefault\" = true AND \"deletedAt\" IS NULL"), map: "BillingAccount_user_default_unique")
+  @@unique([organizationId], where: raw("\"ownerModel\" = 'Organization' AND \"isDefault\" = true AND \"deletedAt\" IS NULL"), map: "BillingAccount_organization_default_unique")
+  @@unique([organizationId, userId], where: raw("\"ownerModel\" = 'OrganizationUser' AND \"isDefault\" = true AND \"deletedAt\" IS NULL"), map: "BillingAccount_orguser_default_unique")
+  @@unique([organizationId, spaceId], where: raw("\"ownerModel\" = 'Space' AND \"isDefault\" = true AND \"deletedAt\" IS NULL"), map: "BillingAccount_space_default_unique")
+  @@unique([organizationId, spaceId, userId], where: raw("\"ownerModel\" = 'SpaceUser' AND \"isDefault\" = true AND \"deletedAt\" IS NULL"), map: "BillingAccount_spaceuser_default_unique")
+  @@unique([provider, externalCustomerId], where: raw("\"externalCustomerId\" IS NOT NULL"), map: "BillingAccount_provider_externalCustomer_unique")
+  @@index([ownerModel])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([status])
+}
+
+enum BillingAccountOwnerModel {
+  User
+  OrganizationUser
+  Organization
+  Space
+  SpaceUser
+}
+
+enum BillingAccountSharing {
+  inherit
+  off
+  on
+}
+
+enum BillingAccountStatus {
+  incomplete
+  active
+  pastDue
+  expired
+  canceled
+}
+
+enum BillingProvider {
+  polar
+}

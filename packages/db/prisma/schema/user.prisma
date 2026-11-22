@@ -57,6 +57,7 @@ model User {
   segments                        Segment[]
   flows                           Flow[]
   settings                        Setting[]
+  billingAccounts                 BillingAccount[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

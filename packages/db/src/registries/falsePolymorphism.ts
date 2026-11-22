@@ -220,6 +220,8 @@ export const PolymorphismRegistry = {
           WebhookSubscription: ['targetWebhookSubscriptionId'],
           Setting: ['targetSettingId'],
           ProjectIntegration: ['targetProjectIntegrationId'],
+          BillingAccount: ['targetBillingAccountId'],
+          BillingResource: ['targetBillingResourceId'],
         },
       },
     ],
@@ -248,6 +250,8 @@ export const PolymorphismRegistry = {
           WebhookSubscription: ['sourceWebhookSubscriptionId'],
           Setting: ['sourceSettingId'],
           ProjectIntegration: ['sourceProjectIntegrationId'],
+          BillingAccount: ['sourceBillingAccountId'],
+          BillingResource: ['sourceBillingResourceId'],
         },
       },
       {
@@ -360,6 +364,38 @@ export const PolymorphismRegistry = {
           Entitlement: ['subjectEntitlementId'],
           Setting: ['subjectSettingId'],
           ProjectIntegration: ['subjectProjectIntegrationId'],
+          BillingAccount: ['subjectBillingAccountId'],
+          BillingResource: ['subjectBillingResourceId'],
+        },
+      },
+    ],
+  },
+
+  BillingAccount: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
+          Organization: ['organizationId'],
+          Space: ['organizationId', 'spaceId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
+        },
+      },
+    ],
+  },
+
+  BillingResource: {
+    axes: [
+      {
+        field: 'resourceModel',
+        fkMap: {
+          OrganizationUser: ['resourceOrganizationId', 'resourceUserId'],
+          Space: ['resourceOrganizationId', 'resourceSpaceId'],
+          SpaceUser: ['resourceOrganizationId', 'resourceSpaceId', 'resourceUserId'],
+          Project: ['resourceProjectId'],
+          ProjectIntegration: ['resourceProjectIntegrationId'],
         },
       },
     ],

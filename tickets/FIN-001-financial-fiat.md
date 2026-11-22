@@ -1,46 +1,27 @@
-# FIN-001: Financial System - Fiat (BACKLOG)
+# FIN-001: Financial System — Fiat Billing
 
-**Status**: 🆕 Not Started
-**Assignee**: TBD
-**Priority**: Low (Backlog)
-**Created**: 2026-02-06
-**Updated**: 2026-02-06
+**Status**: 🚧 In Progress (Template implementation on `feat/billing-fiat`)
+**Priority**: High
+**Updated**: 2026-11-22
 
 ---
 
 ## Overview
 
-Implement traditional fiat payment processing with subscription management, usage metering, invoicing, and multi-currency support. Alternative to Stripe (user expressed :vomit: reaction).
+Pure fiat billing foundation in `template` (backported to `kingdom`): payment accounts, provider-agnostic adapter (`BillingClient`, Polar.sh first), granular resource-to-account bindings (`BillingResource`), governance & sharing `Setting`s, retry-safe inbound webhooks, and metered usage ingestion.
 
-## Potential Providers
+**Explicitly out of scope:** feature gating (waits for `FEAT-003` feature flags targeting billing state via segments), custom card forms, custom invoice PDFs, and delegated multi-seller Connect billing.
 
-- **Paddle**: Merchant of record, handles tax/VAT
-- **Lemon Squeezy**: Modern Paddle alternative
-- **PayPal Commerce**: Global reach
-- **Adyen**: Enterprise-grade, multi-currency
-- **Braintree**: PayPal-owned, developer-friendly
+## Settled Design Decisions
 
-## Key Components
+- **Generic adapter (`apps/api/src/lib/billing/`):** `BillingClient` behind `makeAdapterRegistry` (dispatch existing accounts/webhooks by `account.provider`) + `resolveAdapterForEnvironmentOrThrow` (pick default provider for new accounts).
+- **Polar.sh first adapter (`client/polar.ts`):** Merchant of Record, verified live against `sandbox-api.polar.sh`:
+  - Uses Polar `type: 'team'` customers (`owner: { email, name, external_id: '<accountId>:owner' }`), allowing multiple `BillingAccount`s to share one `billingEmail` without duplicate-email errors.
+  - Uses `$0` metered-only product checkout (`is_payment_setup_required: true`) for one-time card capture and `POST /v1/customer-sessions/` (`external_customer_id` + `external_member_id`) for zero-login Customer Portal access.
+  - Uses Standard Webhooks HMAC-SHA256 verification and `POST /v1/events/ingest` with `external_id` idempotency.
+- **5-owner `BillingAccount`:** Owned by `User | OrganizationUser | Organization | Space | SpaceUser`, N accounts per owner, exactly one `isDefault: true` while ≥ 1 live account exists. Deleting the very last account is allowed (soft-deleted + async `cancelBillingAccount` job + `billingAccount.statusChanged` event). All enums are camelCase (`incomplete | active | pastDue | expired | canceled`; `inherit | off | on`).
+- **Unified `BillingResource`:** Binds a `BillingAccount` to `Space | OrganizationUser | SpaceUser | Project | ProjectIntegration` (`resource*`-prefixed columns) with strict owner containment (no cross-org or `User → Organization` bindings).
+- **Visibility & sharing:** Accounts are private by default (`sharing: inherit | off | on` + owner `billing.shareAccountsWithMembers` setting synced into `isShared` for ReBAC/Prisma/UI). Private accounts can still be granted selectively via `Entitlement` (`operate`).
+- **Fixed resolution walk:** `ProjectIntegration → Project → SpaceUser → OrganizationUser → Space → Organization` (and `User` path), gated by 4 governance `Setting` edges (`billing.allowSpaceBilling`, `billing.allowOrgUserBilling`, `billing.allowSpaceUserBilling` on `Space` + `OrganizationUser`).
 
-- **Subscriptions**: Plan management, seat-based, usage-based
-- **One-time payments**: Credits, addons
-- **Invoicing**: Auto-generated, PDF download
-- **Tax handling**: Automatic tax calculation
-- **Multi-currency**: Support major currencies
-- **Payment methods**: Cards, bank transfers, wallets
-- **Dunning**: Failed payment recovery
-- **Webhooks**: Payment events
-
-## Reference
-
-- User note: "I know stripe is the go to but... :vomit:"
-- TODO.md: Line 22 (Missing Deps - `stripe`)
-
-## Related Tickets
-
-- **Blocked by**: None (backlog item)
-- **Blocks**: None
-
----
-
-_Backlog stub - research and prioritize later_
+See [docs/claude/BILLING.md](../docs/claude/BILLING.md) for the live implementation reference.

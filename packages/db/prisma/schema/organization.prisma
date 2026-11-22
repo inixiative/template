@@ -42,6 +42,7 @@ model Organization {
   communicationsSent              CommunicationLog[]     @relation("CommunicationSenderOrganization")
   segments                        Segment[]
   settings                        Setting[]
+  billingAccounts                 BillingAccount[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

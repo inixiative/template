@@ -1,5 +1,7 @@
 import { registerAttributeValidationHook } from '@template/db';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
+import { registerBillingAccountLifecycleHook } from '#/hooks/billingAccountLifecycle/hook';
+import { registerBillingResourceOwnerHook } from '#/hooks/billingResourceOwner/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
@@ -38,6 +40,8 @@ export const registerHooks = () => {
     makeValidationError: (message) => makeError({ status: 422, message }),
   });
   registerAuditLogHook();
+  registerBillingAccountLifecycleHook();
+  registerBillingResourceOwnerHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();
   registerClearCacheHook();

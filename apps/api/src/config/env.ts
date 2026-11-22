@@ -88,6 +88,12 @@ const baseEnvSchema = z
     AUDIT_LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(2555),
     ...jobEnvFields,
 
+    // Billing (Polar, optional integration)
+    POLAR_API_KEY: z.string().optional(),
+    POLAR_SANDBOX_API_KEY: z.string().optional(),
+    POLAR_WEBHOOK_SECRET: z.string().optional(),
+    POLAR_PAYG_PRODUCT_ID: z.string().optional(),
+
     // Stripe (optional integration)
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),

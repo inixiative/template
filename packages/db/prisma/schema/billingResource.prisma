@@ -1,0 +1,50 @@
+model BillingResource {
+  id                   String          @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  sourceEntitlements   Entitlement[]   @relation("EntitlementSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+
+  billingAccountId String         @db.VarChar(36)
+  billingAccount   BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  resourceModel                BillingResourceTargetModel
+  resourceOrganizationId       String?              @db.VarChar(36)
+  resourceSpaceId              String?              @db.VarChar(36)
+  resourceUserId               String?              @db.VarChar(36)
+  resourceProjectId            String?              @db.VarChar(36)
+  resourceProjectIntegrationId String?              @db.VarChar(36)
+
+  resourceOrganizationUser   OrganizationUser?   @relation(fields: [resourceOrganizationId, resourceUserId], references: [organizationId, userId], onDelete: Cascade)
+  resourceSpace              Space?              @relation(fields: [resourceOrganizationId, resourceSpaceId], references: [organizationId, id], onDelete: Cascade)
+  resourceSpaceUser          SpaceUser?          @relation(fields: [resourceOrganizationId, resourceSpaceId, resourceUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  resourceProject            Project?            @relation(fields: [resourceProjectId], references: [id], onDelete: Cascade)
+  resourceProjectIntegration ProjectIntegration? @relation(fields: [resourceProjectIntegrationId], references: [id], onDelete: Cascade)
+
+  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectBillingResource")
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([resourceOrganizationId, resourceUserId], where: raw("\"resourceModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "BillingResource_orguser_unique")
+  @@unique([resourceOrganizationId, resourceSpaceId], where: raw("\"resourceModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "BillingResource_space_unique")
+  @@unique([resourceOrganizationId, resourceSpaceId, resourceUserId], where: raw("\"resourceModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "BillingResource_spaceuser_unique")
+  @@unique([resourceProjectId], where: raw("\"resourceModel\" = 'Project' AND \"deletedAt\" IS NULL"), map: "BillingResource_project_unique")
+  @@unique([resourceProjectIntegrationId], where: raw("\"resourceModel\" = 'ProjectIntegration' AND \"deletedAt\" IS NULL"), map: "BillingResource_projectIntegration_unique")
+  @@index([billingAccountId])
+  @@index([resourceModel])
+  @@index([resourceOrganizationId])
+  @@index([resourceSpaceId])
+  @@index([resourceProjectId])
+  @@index([resourceProjectIntegrationId])
+}
+
+enum BillingResourceTargetModel {
+  OrganizationUser
+  Space
+  SpaceUser
+  Project
+  ProjectIntegration
+}

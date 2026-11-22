@@ -29,6 +29,7 @@ model Project {
   tagAttachments      TagAttachment[]
   settings            Setting[]
   projectIntegrations ProjectIntegration[]
+  billingResources    BillingResource[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
