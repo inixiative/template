@@ -4,11 +4,18 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import type { ActionRule, AdditionalRules } from '@inixiative/permissions';
+import {
+  type ActionRule,
+  type AdditionalRules,
+  issuesForRuleReadsOutsideLens,
+  validateActionRule,
+} from '@inixiative/permissions';
 import type { BindableOwnerModel, ModelName } from '@template/db';
 import { schemaMap } from '@template/db/schemaMap';
 import { tenantRowsAbove, tenantRowsOnSides } from '@template/db/utils/tenantRowsAbove';
 import { StandardAction } from '@template/permissions/client';
+import { rebacSchema } from '@template/permissions/rebac/schema';
+import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
 import { pick, pickBy } from 'lodash-es';
 
@@ -32,15 +39,50 @@ export const ruleAsksStandardActionThroughRelation = (rule: unknown, relation: s
   return false;
 };
 
-const rulesOf = (row: Record<string, unknown>, tenantModel: BindableOwnerModel, resource: string) =>
-  pick(
+const rulesAlreadyRead = new WeakMap<object, Map<string, Record<string, ActionRule>>>();
+
+const throwIfTheLibraryWouldRefuse = (
+  rules: Record<string, ActionRule>,
+  tenantModel: BindableOwnerModel,
+  resource: string,
+) => {
+  for (const [action, rule] of Object.entries(rules)) {
+    const [issue] = [
+      ...validateActionRule(rule, {
+        schema: rebacSchema,
+        resource,
+        action,
+        additionalRules: [rules],
+      }).errors,
+      ...issuesForRuleReadsOutsideLens(schemaMap, rebacSchema, resource, rule),
+    ];
+    if (issue)
+      throw new StoredPermissionRuleRefusedError(
+        `a ${tenantModel}'s stored rule for \`${resource}.${action}\` is refused: ${issue.path}: ${issue.message}`,
+      );
+  }
+};
+
+const rulesOf = (
+  row: Record<string, unknown>,
+  tenantModel: BindableOwnerModel,
+  resource: string,
+): Record<string, ActionRule> => {
+  const read = rulesAlreadyRead.get(row)?.get(resource);
+  if (read) return read;
+  const rules = pick(
     (row.tenantPermissionRules as RulesByResource | null | undefined)?.[resource] ?? {},
     actionsTenantMayExtend(tenantModel, resource),
   );
+  throwIfTheLibraryWouldRefuse(rules, tenantModel, resource);
+  rulesAlreadyRead.set(row, (rulesAlreadyRead.get(row) ?? new Map()).set(resource, rules));
+  return rules;
+};
 
 /**
  * The rules each tenant above a record holds for its resource (`tenantPermissionRules`), cut to
- * the actions that tenant's lens shows, for `check()` to OR in. A tenant on a side of a two-sided
+ * the actions that tenant's lens shows, for `check()` to OR in. One the library would refuse
+ * throws here, before the check. A tenant on a side of a two-sided
  * record gives only the rules that ask a standard action through its own side.
  */
 export const tenantPermissionRulesAbove: AdditionalRules = (resource, record) => [

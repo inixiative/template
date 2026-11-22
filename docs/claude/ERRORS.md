@@ -68,7 +68,7 @@ unless overridden.
 | `Prisma P2034` (`isWriteConflictError`) | 409 "Write conflict" (deadlock or serialization victim, rolled back whole) |
 | `FindForUpdateLockTimeoutError` (`@template/db`, from upserting `db.findForUpdate` past its `waitMs`) | 409 "Another request is writing this record; please retry" |
 | `LockLostError` (`@template/db`, from `lock.assertHeld()`) | 409 "Lost the lock guarding this write; please retry" |
-| `StoredPermissionRuleRefusedError` (`@template/permissions`, a stored row or tenant permission rule the library refuses) | 409 saying an owner sets the rules again; the reason is logged |
+| `StoredPermissionRuleRefusedError` (`@template/permissions`, a tenant's stored permission rule the library would refuse) | 409 saying an owner sets the rules again; the reason is logged |
 | `Prisma P2025` | 404 "Resource not found" |
 | `AppError` | its body |
 | plain `HTTPException` | `toAppError`: same status and message (status name when empty), label and guidance from `HTTP_ERROR_MAP` (by class, 400/500, for an unmapped status), its response headers kept, body always JSON |

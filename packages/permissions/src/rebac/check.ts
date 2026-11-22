@@ -8,7 +8,6 @@ import { createRebacCheck } from '@inixiative/permissions';
 import type { AccessorName, HydratedRecord } from '@template/db';
 import { schemaMap } from '@template/db/schemaMap';
 import type { Permix } from '@template/permissions/client';
-import { rethrowingARefusedStoredRule } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
 import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
 import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
 
@@ -29,11 +28,9 @@ export const check = (
   actionOrRule: ActionRule,
   data?: Record<string, HydratedRecord[]>,
 ): boolean =>
-  rethrowingARefusedStoredRule(() =>
-    rebacCheck(
-      permix,
-      schema,
-      { resource: `db:${model}`, record, data: { ...data, ...rowsOfActor(permix) } },
-      actionOrRule,
-    ),
+  rebacCheck(
+    permix,
+    schema,
+    { resource: `db:${model}`, record, data: { ...data, ...rowsOfActor(permix) } },
+    actionOrRule,
   );
