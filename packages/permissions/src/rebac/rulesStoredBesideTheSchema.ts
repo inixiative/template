@@ -27,10 +27,11 @@ const throwIfTheRecordsOwnRulesAreRefused = (resource: string, record: Record<st
 
 /**
  * What every engine entry is given as `additionalRules`: the rules of the tenants above a record,
- * after the record's own `permissionRules` and theirs are checked. A refused one throws
+ * after theirs and then the record's own `permissionRules` are checked. A refused one throws
  * `StoredPermissionRuleRefusedError` here, before the library reads it.
  */
 export const rulesStoredBesideTheSchema: AdditionalRules = (resource, record) => {
+  const rulesOfTenantsAbove = tenantPermissionRulesAbove(resource, record);
   throwIfTheRecordsOwnRulesAreRefused(resource, record);
-  return tenantPermissionRulesAbove(resource, record);
+  return rulesOfTenantsAbove;
 };
