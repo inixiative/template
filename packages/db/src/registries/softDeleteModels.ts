@@ -6,7 +6,14 @@
  */
 import { AUDIT_ENABLED_MODELS } from '@template/db/registries/auditEnabledModels';
 
-const SOFT_DELETE_ONLY = ['Contact', 'Project', 'Tag', 'TagAttachment', 'TagCategory'] as const;
+const SOFT_DELETE_ONLY = [
+  'Contact',
+  'IntegrationRecord',
+  'SegmentMember',
+  'Tag',
+  'TagAttachment',
+  'TagCategory',
+] as const;
 
 export const SOFT_DELETE_MODELS: readonly string[] = [...AUDIT_ENABLED_MODELS, ...SOFT_DELETE_ONLY];
 

@@ -41,7 +41,7 @@ Every named thing a doc introduces gets one row, in a table with these four colu
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| Exclusive access to a row, or a find-or-create race: "lock the row while I update it", "two workers grabbing the same thing", "avoid a double-apply" | **`db.findForUpdate`** · primitive `packages/db/src/client.ts` — inside `db.txn`; `upserting: true` for create-if-missing | DATABASE.md § Row Locks and Create-If-Missing | a bare `.upsert(`; a caught P2002 / unique violation then re-read; a raw `SELECT … FOR UPDATE` |
+| Exclusive access to a row, or a find-or-create race: "lock the row while I update it", "two workers grabbing the same thing", "avoid a double-apply" | **`db.findForUpdate`** · primitive `packages/db/src/client.ts` — inside `db.txn`; `upserting: true` for create-if-missing on a key no unique holds (an upsert where one does) | DATABASE.md § Row Locks and Create-If-Missing | a caught P2002 / unique violation then re-read; a raw `SELECT … FOR UPDATE` |
 
 A paragraph may introduce the thing; the table is what the Warden matches on. The shape is Grant's `docs/primitives/README.md` in Zealot, adopted for template, Kingdom and Tribe.
 
@@ -80,7 +80,7 @@ The Signs cell describes the code an agent writes when it rebuilds the thing ins
 - Good: `a module-level `let pending = Promise.resolve()` chain, a boolean busy flag, or an async-mutex dependency to order writes to one resource`
 - Bad: `not using makeSerializedQueue` (circular; names nothing an agent would recognise in its own code)
 
-Where a CI rule or lint catches the bypass, name it: `find-or-create-uses-find-for-update-upserting fails new .upsert( and P2002 catches`.
+Where a CI rule or lint catches the bypass, name it: `no-unique-violation-catches fails new P2002 and isUniqueConstraintError catches`.
 
 ---
 
@@ -120,7 +120,7 @@ Where the docs say when the job needs **no** primitive, that option is a row, so
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | *plain write in db.txn* | the write does not depend on a value read first; every mutation already runs in its own transaction | read-then-update or find-then-create (db.findForUpdate) |
-| *unique constraint, let the insert fail* | a duplicate is the caller's mistake: the global handler maps P2002 to 409 | create-if-missing must return the existing row (db.findForUpdate upserting: true) |
+| *unique constraint, let the insert fail* | a duplicate is the caller's mistake: the global handler maps P2002 to 409 | create-if-missing must return the existing row (upsert on the unique; db.findForUpdate upserting: true when no unique holds the key) |
 
 - Good: the row cites the doc or rule that says the primitive is not needed (CONCURRENCY.md § Serialized Queue › When NOT to use).
 - Bad: inventing a "just do it inline" row where no doc says so; the row is a claim and needs its source.

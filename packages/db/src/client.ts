@@ -46,6 +46,7 @@ import {
 import { publishKey } from '@template/db/redis/cache/transactionOverlay/publishKey';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import { hasDeletedAt } from '@template/db/utils/fieldMetadata';
 import {
   type AccessorName,
   isAccessorName,
@@ -325,7 +326,8 @@ const dbMethods = {
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
   // the where-key itself (see acquireFindForUpdateLock) and returns the rows it currently names. One
   // field may list values as `{ in: [...] }` to fence a batch of such rows, each under the key a
-  // single-row fence on it takes.
+  // single-row fence on it takes. On a soft-delete model tombstones are locked but only live rows
+  // return, unless inside db.withDeleted or the where names deletedAt.
   findForUpdate: async <T = unknown>(
     model: string,
     where: Record<string, unknown>,
@@ -362,13 +364,21 @@ const dbMethods = {
         if (!list.length) return Prisma.sql`1 = 0`;
         return Prisma.sql`${column} IN (${Prisma.join(list)})`;
       }
-      return Prisma.sql`${column} = ${value}`;
+      return value === null ? Prisma.sql`${column} IS NULL` : Prisma.sql`${column} = ${value}`;
     });
+    const liveOnly =
+      hasDeletedAt(modelName) &&
+      !('deletedAt' in where) &&
+      !auditActorContext.isSoftDeleteBypassed();
     if (options?.upserting)
       await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
-    return db.$queryRaw<T[]>(
+    const locked = await db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} ${Prisma.raw(options?.changesKey ? 'FOR UPDATE' : 'FOR NO KEY UPDATE')}`,
     );
+    // why: tombstones are locked too, so a revive in flight on the key is waited on, not raced
+    if (!liveOnly) return locked;
+    const deletedAtColumn = columnFor('deletedAt');
+    return locked.filter((row) => (row as Record<string, unknown>)[deletedAtColumn] == null);
   },
 
   withLockUntilSettled: async <T>(
