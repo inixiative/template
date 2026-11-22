@@ -9,6 +9,7 @@ export * from './findFirstTenantContextThatCanOpenPath';
 export * from './findRoute';
 export * from './inquiries';
 export * from './makeContextQueries';
+export * from './masterData';
 export { permissionCheckTargetForTenantContext } from './permissionCheckTargetForTenantContext';
 export * from './queryCapabilitiesFromOpenApi';
 export * from './resolveSectionTarget';
