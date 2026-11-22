@@ -5,14 +5,12 @@
  * @uses infrastructure:prisma
  */
 import { fieldAtPath } from '@inixiative/field-map';
-import { fetchParentRows, type ModelName, parentEdgeOf } from '@template/db';
+import { fetchParentRows, type ModelName, parentEdgeOf, TENANT_COLUMNS } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
 
 type Row = Record<string, unknown>;
 
 export type ContextRow = { model: ModelName; row: Row };
-
-const TENANT_COLUMNS = ['organizationId', 'spaceId', 'userId'] as const;
 
 const carriesTenant = (model: ModelName): boolean =>
   model === 'Organization' ||
