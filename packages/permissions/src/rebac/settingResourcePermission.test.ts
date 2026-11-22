@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { fieldOf, relationTarget } from '@inixiative/field-map';
+import type { Condition } from '@inixiative/json-rules';
 import type { HydratedRecord } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { prismaMap } from '@template/db/generated/prismaMap';
@@ -27,6 +28,13 @@ const modelAt = (path: string): string | undefined =>
 const actionsOf = (model: string) =>
   Object.keys(rebacSchema.permissions[`db:${lowerFirst(model)}`]?.actions ?? {});
 
+const leaves = (condition: Condition): Condition[] => {
+  if (typeof condition !== 'object') return [];
+  if ('all' in condition) return condition.all.flatMap(leaves);
+  if ('any' in condition) return condition.any.flatMap(leaves);
+  return [condition];
+};
+
 const leafNames = (rule: ActionRule): string[] => {
   if (rule === null || typeof rule === 'boolean') return [];
   if (typeof rule === 'string') return [`:${rule}`];
@@ -34,11 +42,11 @@ const leafNames = (rule: ActionRule): string[] => {
   if ('all' in rule) return rule.all.flatMap(leafNames);
   if ('arrayOperator' in rule) return [`${rule.rel}[]`];
   if ('rel' in rule) return [`${rule.rel}:${rule.action}`];
-  return [(rule.rule as { field: string }).field];
+  return leaves(rule.rule as Condition).map((leaf) => (leaf as { field: string }).field);
 };
 
 const isKnown = (name: string) => {
-  if (name.startsWith('__actor.')) return true;
+  if (name.startsWith('actor:')) return true;
   if (!name.includes(':')) return fieldOf(prismaMap, 'Setting', name.split('.')[0]) !== undefined;
   const [rel, action] = name.split(':');
   const model = rel ? modelAt(rel) : 'Setting';

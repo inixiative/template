@@ -31,7 +31,6 @@ import {
   useInfiniteScrollTrigger,
   useOptimisticMutation,
   useSectionOpen,
-  useSettingCatalog,
 } from '@template/ui/hooks';
 import { invalidateUnfinishedActiveFlow } from '@template/ui/lib/flows/invalidateUnfinishedActiveFlow';
 import {
@@ -44,6 +43,7 @@ import {
   integrationProviders,
   integrationProviderValues,
 } from '@template/ui/lib/integrationProviders';
+import { useSettingCatalog } from '@template/ui/lib/masterData';
 import type { MyMembershipOwnership } from '@template/ui/lib/myMembership';
 import { permissionCheckTargetForTenantContext } from '@template/ui/lib/permissionCheckTargetForTenantContext';
 import { useAppStore } from '@template/ui/store';

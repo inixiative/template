@@ -221,6 +221,7 @@
         "@inixiative/field-map": "^0.1.2",
         "@inixiative/permissions": "^0.27.0",
         "@template/db": "workspace:*",
+        "@template/shared": "workspace:*",
         "lodash-es": "^4.18.1",
         "zod": "^4.3.6",
       },

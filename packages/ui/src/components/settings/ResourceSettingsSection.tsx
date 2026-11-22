@@ -21,8 +21,8 @@ import {
   CardTitle,
 } from '@template/ui/components/primitives';
 import { SettingField } from '@template/ui/components/settings/SettingField';
-import { useSettingCatalog } from '@template/ui/hooks/settings/useSettingInfo';
 import { hydrateSettingTargetForPermissions } from '@template/ui/lib/hydrateRecordForPermissions';
+import { useSettingCatalog } from '@template/ui/lib/masterData';
 import type { MyMembershipOwnership } from '@template/ui/lib/myMembership';
 import {
   type SettingExplicitTarget,

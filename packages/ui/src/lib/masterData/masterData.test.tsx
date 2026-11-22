@@ -4,6 +4,7 @@ import {
   contactInfoQueryKey,
   inquiryInfoQueryKey,
   segmentInfoQueryKey,
+  settingInfoQueryKey,
   webhookSubscriptionInfoQueryKey,
 } from '@template/sdk';
 import {
@@ -14,6 +15,8 @@ import {
   useInquiryInfo,
   usePreloadMasterData,
   useSegmentInfo,
+  useSettingCatalog,
+  useSettingInfo,
   useWebhookSubscriptionInfo,
 } from '@template/ui/lib/masterData';
 import { render, renderHook, waitFor } from '@testing-library/react';
@@ -42,8 +45,40 @@ const samplePayloads = {
   contact: { types: { email: { input: { type: 'object' } } } },
   inquiry: { types: { invite: { content: { type: 'object' } } } },
   segment: { types: { CustomerRelationship: { operators: ['equals'] } } },
+  setting: {
+    types: {
+      categories: {
+        general: { key: 'general', label: 'General', description: 'Defaults', order: 10 },
+      },
+      definitions: {},
+    },
+  },
   webhookSubscription: { types: { CustomerRelationship: { events: ['create'] } } },
 };
+
+const allSuccessBatchResponse = () =>
+  jsonResponse({
+    data: {
+      batch: [
+        [
+          { status: 200, body: { data: samplePayloads.contact } },
+          { status: 200, body: { data: samplePayloads.inquiry } },
+          { status: 200, body: { data: samplePayloads.segment } },
+          { status: 200, body: { data: samplePayloads.setting } },
+          { status: 200, body: { data: samplePayloads.webhookSubscription } },
+        ],
+      ],
+      summary: {
+        totalRounds: 1,
+        completedRounds: 1,
+        totalRequests: 5,
+        successfulRequests: 5,
+        failedRequests: 0,
+        strategy: 'allowFailures',
+        status: 'success',
+      },
+    },
+  });
 
 describe('masterData batch preloader', () => {
   let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>> | undefined;
@@ -64,34 +99,14 @@ describe('masterData batch preloader', () => {
       const request = input instanceof Request ? input : new Request(input);
       requestedUrls.push(`${request.method} ${new URL(request.url).pathname}`);
       requestedBodies.push(await request.clone().json());
-      return jsonResponse({
-        data: {
-          batch: [
-            [
-              { status: 200, body: { data: samplePayloads.contact } },
-              { status: 200, body: { data: samplePayloads.inquiry } },
-              { status: 200, body: { data: samplePayloads.segment } },
-              { status: 200, body: { data: samplePayloads.webhookSubscription } },
-            ],
-          ],
-          summary: {
-            totalRounds: 1,
-            completedRounds: 1,
-            totalRequests: 4,
-            successfulRequests: 4,
-            failedRequests: 0,
-            strategy: 'allowFailures',
-            status: 'success',
-          },
-        },
-      });
+      return allSuccessBatchResponse();
     }) as unknown as typeof fetch);
 
     const queryClient = makeQueryClient();
     const result = await preloadMasterData(queryClient, { token: 'jwt-test' });
 
     expect(result).toEqual({
-      loaded: ['contact', 'inquiry', 'segment', 'webhookSubscription'],
+      loaded: ['contact', 'inquiry', 'segment', 'setting', 'webhookSubscription'],
       failed: [],
       skipped: [],
     });
@@ -112,6 +127,9 @@ describe('masterData batch preloader', () => {
     expect(queryClient.getQueryData(segmentInfoQueryKey())).toEqual({
       data: samplePayloads.segment,
     });
+    expect(queryClient.getQueryData(settingInfoQueryKey())).toEqual({
+      data: samplePayloads.setting,
+    });
     expect(queryClient.getQueryData(webhookSubscriptionInfoQueryKey())).toEqual({
       data: samplePayloads.webhookSubscription,
     });
@@ -126,6 +144,12 @@ describe('masterData batch preloader', () => {
     const { result: segmentHook } = renderHook(() => useSegmentInfo(), {
       wrapper: wrapperFor(queryClient),
     });
+    const { result: settingHook } = renderHook(() => useSettingInfo(), {
+      wrapper: wrapperFor(queryClient),
+    });
+    const { result: settingCatalogHook } = renderHook(() => useSettingCatalog(), {
+      wrapper: wrapperFor(queryClient),
+    });
     const { result: webhookHook } = renderHook(() => useWebhookSubscriptionInfo(), {
       wrapper: wrapperFor(queryClient),
     });
@@ -133,6 +157,8 @@ describe('masterData batch preloader', () => {
     expect(contactHook.current.data?.data).toEqual(samplePayloads.contact as never);
     expect(inquiryHook.current.data?.data).toEqual(samplePayloads.inquiry as never);
     expect(segmentHook.current.data?.data).toEqual(samplePayloads.segment as never);
+    expect(settingHook.current.data?.data).toEqual(samplePayloads.setting as never);
+    expect(settingCatalogHook.current.catalog).toEqual(samplePayloads.setting.types as never);
     expect(webhookHook.current.data?.data).toEqual(samplePayloads.webhookSubscription as never);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
@@ -146,6 +172,7 @@ describe('masterData batch preloader', () => {
     queryClient.setQueryData(contactInfoQueryKey(), { data: samplePayloads.contact });
     queryClient.setQueryData(inquiryInfoQueryKey(), { data: samplePayloads.inquiry });
     queryClient.setQueryData(segmentInfoQueryKey(), { data: samplePayloads.segment });
+    queryClient.setQueryData(settingInfoQueryKey(), { data: samplePayloads.setting });
     queryClient.setQueryData(webhookSubscriptionInfoQueryKey(), {
       data: samplePayloads.webhookSubscription,
     });
@@ -154,7 +181,7 @@ describe('masterData batch preloader', () => {
     expect(result).toEqual({
       loaded: [],
       failed: [],
-      skipped: ['contact', 'inquiry', 'segment', 'webhookSubscription'],
+      skipped: ['contact', 'inquiry', 'segment', 'setting', 'webhookSubscription'],
     });
     expect(fetchSpy).toHaveBeenCalledTimes(0);
   });
@@ -172,29 +199,7 @@ describe('masterData batch preloader', () => {
     const second = preloadMasterData(queryClient, { token: 'jwt-test' });
 
     await waitFor(() => expect(resolveBatch).toBeDefined());
-    resolveBatch?.(
-      jsonResponse({
-        data: {
-          batch: [
-            [
-              { status: 200, body: { data: samplePayloads.contact } },
-              { status: 200, body: { data: samplePayloads.inquiry } },
-              { status: 200, body: { data: samplePayloads.segment } },
-              { status: 200, body: { data: samplePayloads.webhookSubscription } },
-            ],
-          ],
-          summary: {
-            totalRounds: 1,
-            completedRounds: 1,
-            totalRequests: 4,
-            successfulRequests: 4,
-            failedRequests: 0,
-            strategy: 'allowFailures',
-            status: 'success',
-          },
-        },
-      }),
-    );
+    resolveBatch?.(allSuccessBatchResponse());
 
     const [r1, r2] = await Promise.all([first, second]);
     expect(r1).toEqual(r2);
@@ -216,14 +221,15 @@ describe('masterData batch preloader', () => {
                 { status: 200, body: { data: samplePayloads.contact } },
                 { status: 200, body: { data: samplePayloads.inquiry } },
                 { status: 500, body: { error: 'temporary failure' } },
+                { status: 200, body: { data: samplePayloads.setting } },
                 { status: 200, body: { data: samplePayloads.webhookSubscription } },
               ],
             ],
             summary: {
               totalRounds: 1,
               completedRounds: 1,
-              totalRequests: 4,
-              successfulRequests: 3,
+              totalRequests: 5,
+              successfulRequests: 4,
               failedRequests: 1,
               strategy: 'allowFailures',
               status: 'partialSuccess',
@@ -242,7 +248,7 @@ describe('masterData batch preloader', () => {
     const queryClient = makeQueryClient();
     const preloadResult = await preloadMasterData(queryClient, { token: 'jwt-test' });
     expect(preloadResult).toEqual({
-      loaded: ['contact', 'inquiry', 'webhookSubscription'],
+      loaded: ['contact', 'inquiry', 'setting', 'webhookSubscription'],
       failed: ['segment'],
       skipped: [],
     });
@@ -267,34 +273,14 @@ describe('masterData batch preloader', () => {
 
     expect(result).toEqual({
       loaded: [],
-      failed: ['contact', 'inquiry', 'segment', 'webhookSubscription'],
+      failed: ['contact', 'inquiry', 'segment', 'setting', 'webhookSubscription'],
       skipped: [],
     });
   });
 
   it('usePreloadMasterData skips network when enabled is false and fires once when enabled', async () => {
     fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () =>
-      jsonResponse({
-        data: {
-          batch: [
-            [
-              { status: 200, body: { data: samplePayloads.contact } },
-              { status: 200, body: { data: samplePayloads.inquiry } },
-              { status: 200, body: { data: samplePayloads.segment } },
-              { status: 200, body: { data: samplePayloads.webhookSubscription } },
-            ],
-          ],
-          summary: {
-            totalRounds: 1,
-            completedRounds: 1,
-            totalRequests: 4,
-            successfulRequests: 4,
-            failedRequests: 0,
-            strategy: 'allowFailures',
-            status: 'success',
-          },
-        },
-      })) as unknown as typeof fetch);
+      allSuccessBatchResponse()) as unknown as typeof fetch);
 
     const queryClient = makeQueryClient();
     const { rerender } = renderHook(({ enabled }) => usePreloadMasterData(enabled), {
@@ -318,27 +304,7 @@ describe('masterData batch preloader', () => {
     fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL) => {
       const request = input instanceof Request ? input : new Request(input);
       calls.push(`${request.method} ${new URL(request.url).pathname}`);
-      return jsonResponse({
-        data: {
-          batch: [
-            [
-              { status: 200, body: { data: samplePayloads.contact } },
-              { status: 200, body: { data: samplePayloads.inquiry } },
-              { status: 200, body: { data: samplePayloads.segment } },
-              { status: 200, body: { data: samplePayloads.webhookSubscription } },
-            ],
-          ],
-          summary: {
-            totalRounds: 1,
-            completedRounds: 1,
-            totalRequests: 4,
-            successfulRequests: 4,
-            failedRequests: 0,
-            strategy: 'allowFailures',
-            status: 'success',
-          },
-        },
-      });
+      return allSuccessBatchResponse();
     }) as unknown as typeof fetch);
 
     const ChildReader = () => {
@@ -367,14 +333,15 @@ describe('masterData batch preloader', () => {
               { status: 200, body: { data: null } },
               { status: 200, body: {} },
               { status: 200, body: { data: samplePayloads.segment } },
+              { status: 200, body: { data: samplePayloads.setting } },
               { status: 200, body: { data: samplePayloads.webhookSubscription } },
             ],
           ],
           summary: {
             totalRounds: 1,
             completedRounds: 1,
-            totalRequests: 4,
-            successfulRequests: 4,
+            totalRequests: 5,
+            successfulRequests: 5,
             failedRequests: 0,
             strategy: 'allowFailures',
             status: 'success',
@@ -386,7 +353,7 @@ describe('masterData batch preloader', () => {
     const result = await preloadMasterData(queryClient, { token: 'jwt-test' });
 
     expect(result).toEqual({
-      loaded: ['segment', 'webhookSubscription'],
+      loaded: ['segment', 'setting', 'webhookSubscription'],
       failed: ['contact', 'inquiry'],
       skipped: [],
     });
@@ -403,7 +370,7 @@ describe('masterData batch preloader', () => {
 
     expect(result).toEqual({
       loaded: [],
-      failed: ['contact', 'inquiry', 'segment', 'webhookSubscription'],
+      failed: ['contact', 'inquiry', 'segment', 'setting', 'webhookSubscription'],
       skipped: [],
     });
     expect(queryClient.getQueryData(contactInfoQueryKey())).toBeUndefined();
@@ -424,14 +391,15 @@ describe('masterData batch preloader', () => {
                 { status: 200, body: { data: samplePayloads.contact } },
                 { status: 200, body: { data: samplePayloads.inquiry } },
                 { status: 500, body: { error: 'segment error' } },
+                { status: 200, body: { data: samplePayloads.setting } },
                 { status: 200, body: { data: samplePayloads.webhookSubscription } },
               ],
             ],
             summary: {
               totalRounds: 1,
               completedRounds: 1,
-              totalRequests: 4,
-              successfulRequests: 3,
+              totalRequests: 5,
+              successfulRequests: 4,
               failedRequests: 1,
               strategy: 'allowFailures',
               status: 'partialSuccess',
@@ -468,27 +436,7 @@ describe('masterData batch preloader', () => {
 
   it('re-populates cleanly after queryClient.clear() (e.g. logout -> login)', async () => {
     fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () =>
-      jsonResponse({
-        data: {
-          batch: [
-            [
-              { status: 200, body: { data: samplePayloads.contact } },
-              { status: 200, body: { data: samplePayloads.inquiry } },
-              { status: 200, body: { data: samplePayloads.segment } },
-              { status: 200, body: { data: samplePayloads.webhookSubscription } },
-            ],
-          ],
-          summary: {
-            totalRounds: 1,
-            completedRounds: 1,
-            totalRequests: 4,
-            successfulRequests: 4,
-            failedRequests: 0,
-            strategy: 'allowFailures',
-            status: 'success',
-          },
-        },
-      })) as unknown as typeof fetch);
+      allSuccessBatchResponse()) as unknown as typeof fetch);
 
     const queryClient = makeQueryClient();
     await preloadMasterData(queryClient, { token: 'jwt-1' });
@@ -500,7 +448,13 @@ describe('masterData batch preloader', () => {
     expect(queryClient.getQueryData(contactInfoQueryKey())).toBeUndefined();
 
     const second = await preloadMasterData(queryClient, { token: 'jwt-2' });
-    expect(second.loaded).toEqual(['contact', 'inquiry', 'segment', 'webhookSubscription']);
+    expect(second.loaded).toEqual([
+      'contact',
+      'inquiry',
+      'segment',
+      'setting',
+      'webhookSubscription',
+    ]);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 

@@ -8,6 +8,7 @@ import {
   contactInfoQueryKey,
   inquiryInfoQueryKey,
   segmentInfoQueryKey,
+  settingInfoQueryKey,
   webhookSubscriptionInfoQueryKey,
 } from '@template/sdk';
 import type { BatchQueryDescriptor } from '@template/ui/lib/batch/executeBatchQueries';
@@ -37,6 +38,11 @@ export const MASTER_DATA_ENTRIES = [
     key: 'segment',
     path: '/api/v1/segment/info',
     queryKey: segmentInfoQueryKey(),
+  },
+  {
+    key: 'setting',
+    path: '/api/v1/setting/info',
+    queryKey: settingInfoQueryKey(),
   },
   {
     key: 'webhookSubscription',

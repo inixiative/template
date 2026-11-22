@@ -34,6 +34,7 @@ Every cross-cutting behavior in `template` (soft delete, auditing, polymorphism,
 | No-op fields (skip audit & webhook noise) | [noopFields.ts](../../packages/db/src/registries/noopFields.ts) | `NOOP_FIELDS`, `omitRegisteredFields` | `ModelName` (PascalCase) | [auditLog/hook.ts](../../apps/api/src/hooks/auditLog/hook.ts), [webhook/excludedFields.ts](../../packages/db/src/registries/webhook/excludedFields.ts) |
 | Webhook-enabled models & filters | [webhook/index.ts](../../packages/db/src/registries/webhook/index.ts) | `webhookEnabledModels`, `WEBHOOK_EXCLUDED_FIELDS`, `webhookOwnerAllowedModels`, `webhookRelatedModels` | `ModelName` (PascalCase) | [webhooks/hook.ts](../../apps/api/src/hooks/webhooks/hook.ts) |
 | Column encryption | [encryption/registry.ts](../../packages/db/src/lib/encryption/registry.ts) | `ENCRYPTED_MODELS`, `encryptedFieldsByModel` | camelCase accessor *(legacy; see standard below)* | [encryption/validation.ts](../../packages/db/src/lib/encryption/validation.ts), [sensitiveFields.ts](../../packages/db/src/registries/sensitiveFields.ts) |
+| Typed attributes (5-column + GIN) | [attributes/registry.ts](../../packages/db/src/lib/attributes/registry.ts) | `ATTRIBUTE_MODELS`, `isAttributeModel`, `attributeFieldsByModel` | camelCase accessor *(mirrors encryption)* | [attributes/hook.ts](../../packages/db/src/lib/attributes/hook.ts), [attributes/validation/validateAttributeModels.ts](../../packages/db/src/lib/attributes/validation/validateAttributeModels.ts) |
 
 ### API Hook & Permission Registries (`apps/api` & `packages/permissions`)
 
@@ -48,6 +49,7 @@ Every cross-cutting behavior in `template` (soft delete, auditing, polymorphism,
 | RuleReference source surfaces | [ruleReference/surfaces.ts](../../apps/api/src/hooks/ruleReference/surfaces.ts) | `RULE_REFERENCE_SURFACES`, `isRuleReferenceSourceModel` | `RuleReferenceSourceModel` (PascalCase) | [ruleReference/hook.ts](../../apps/api/src/hooks/ruleReference/hook.ts), [ruleReference/targetHook.ts](../../apps/api/src/hooks/ruleReference/targetHook.ts) |
 | ReBAC authorization schema | [schema.ts](../../packages/permissions/src/rebac/schema.ts) | `rebacSchema` | `db:<accessor>` (ReBAC namespace) | [validatePermission.ts](../../apps/api/src/middleware/validations/validatePermission.ts), [validateSubmodelPermission.ts](../../apps/api/src/middleware/validations/validateSubmodelPermission.ts) |
 | Inquiry party declarations | [inquiryTypes.ts](../../packages/permissions/src/rebac/inquiryTypes.ts) | `INQUIRY_TYPES`, `INQUIRY_READ_LEVELS` | `InquiryType` enum | [inquiryResourcePermission.ts](../../packages/permissions/src/rebac/inquiryResourcePermission.ts) |
+| Setting definitions & catalog | [settings/registry.ts](../../packages/shared/src/settings/registry.ts) | `SETTING_CATEGORIES`, `SETTING_DEFINITIONS` | Dotted setting key | [settingResourcePermission.ts](../../packages/permissions/src/rebac/settingResourcePermission.ts), [settingInfo.ts](../../apps/api/src/modules/setting/controllers/settingInfo.ts) |
 
 ---
 
@@ -57,43 +59,45 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 
 <!-- capabilities:start -->
 
-| Model | Delete lifecycle | Audit | Polymorphic axes | Parent edge | Encrypted | Ordered list | Field policies | Write rules | Rule ref source | Cached | Webhook | ReBAC |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Account | - | - | - | - | - | - | sensitive | - | - | - | - | - |
-| AppEvent | - | - | - | - | - | - | - | - | - | - | - | - |
-| AuditLog | - | - | subjectModel | - | - | - | immutable-override | yes | - | - | - | - |
-| AuthProvider | soft | yes | - | - | yes | - | sensitive | - | - | - | - | yes |
-| CommunicationComponentVersion | - | - | - | - | - | - | - | - | - | - | - | - |
-| CommunicationLog | - | - | senderModel | - | - | - | immutable-override | yes | - | - | - | - |
-| Contact | soft | - | ownerModel | - | - | yes | noop, immutable-override | yes | - | - | - | yes |
-| CronJob | - | - | - | - | - | - | - | - | - | - | - | - |
-| CustomerRelationship | soft, cascade-exempt | yes | customerModel, providerModel | - | - | - | immutable-override | yes | - | yes | yes | - |
-| EmailComponent | soft | yes | ownerModel | - | - | - | noop, immutable-override | yes | yes | - | - | - |
-| EmailTemplate | soft | yes | ownerModel | - | - | - | noop, immutable-override | yes | yes | - | - | - |
-| Entitlement | soft, cascade-exempt | yes | sourceModel, targetModel | axis: targetModel | - | - | immutable-override | yes | yes | - | - | - |
-| Flow | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | yes |
-| Inquiry | soft, close-on-parent-delete | yes | sourceModel, targetModel | - | - | - | immutable-override | yes | - | - | - | yes |
-| Integration | soft | yes | ownerModel | - | - | - | immutable-override | yes | - | yes | - | yes |
-| IntegrationRecord | - | - | recordModel | - | - | - | immutable-override | yes | - | - | - | - |
-| JobOutbox | - | - | - | - | - | - | - | - | - | - | - | - |
-| Jwks | - | - | - | - | yes | - | sensitive | - | - | - | - | - |
-| Organization | soft | yes | - | - | - | - | - | - | - | yes | - | yes |
-| OrganizationUser | soft | yes | - | - | - | - | - | - | - | yes | - | yes |
-| Project | soft | - | ownerModel | - | - | - | immutable-override | yes | - | - | - | yes |
-| RuleReference | hard-on-tombstone, regen-on-revive, cascade-exempt | - | sourceModel, targetModel | - | - | - | immutable-override | yes | - | - | - | - |
-| Segment | soft | yes | ownerModel | - | - | - | immutable-override | yes | yes | - | - | yes |
-| SegmentMember | - | - | - | - | - | - | - | - | - | - | - | yes |
-| Session | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - |
-| Space | soft | yes | - | - | - | - | immutable-override | - | - | yes | - | yes |
-| SpaceUser | soft | yes | - | - | - | - | - | - | - | yes | - | yes |
-| Tag | soft | - | ownerModel | - | - | - | immutable-override | yes | - | - | - | - |
-| TagAttachment | soft | - | resourceModel | - | - | - | immutable-override | yes | - | - | - | - |
-| TagCategory | soft | - | ownerModel | - | - | - | immutable-override | yes | - | - | - | - |
-| Token | soft, skip-revive | yes | ownerModel | - | - | - | sensitive, noop, immutable-override | yes | - | yes | - | yes |
-| User | soft | yes | - | - | - | - | internal, noop | - | - | yes | - | yes |
-| Verification | - | - | - | - | - | - | - | - | - | - | - | - |
-| WebhookEvent | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - |
-| WebhookSubscription | hard-on-tombstone | - | ownerModel | - | - | - | immutable-override | yes | - | yes | - | yes |
+| Model | Delete lifecycle | Audit | Polymorphic axes | Parent edge | Attribute | Encrypted | Ordered list | Field policies | Write rules | Rule ref source | Cached | Webhook | ReBAC |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Account | - | - | - | - | - | - | - | sensitive | - | - | - | - | - |
+| AppEvent | - | - | - | - | - | - | - | - | - | - | - | - | - |
+| AuditLog | - | - | subjectModel | - | - | - | - | immutable-override | yes | - | - | - | - |
+| AuthProvider | soft | yes | - | - | - | yes | - | sensitive | - | - | - | - | yes |
+| CommunicationComponentVersion | - | - | - | - | - | - | - | - | - | - | - | - | - |
+| CommunicationLog | - | - | senderModel | - | - | - | - | immutable-override | yes | - | - | - | - |
+| Contact | soft | - | ownerModel | - | - | - | yes | noop, immutable-override | yes | - | - | - | yes |
+| CronJob | - | - | - | - | - | - | - | - | - | - | - | - | - |
+| CustomerRelationship | soft, cascade-exempt | yes | customerModel, providerModel | - | - | - | - | immutable-override | yes | - | yes | yes | - |
+| EmailComponent | soft | yes | ownerModel | - | - | - | - | noop, immutable-override | yes | yes | - | - | - |
+| EmailTemplate | soft | yes | ownerModel | - | - | - | - | noop, immutable-override | yes | yes | - | - | - |
+| Entitlement | soft, cascade-exempt | yes | sourceModel, targetModel | axis: targetModel | - | - | - | immutable-override | yes | yes | - | - | - |
+| Flow | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | yes |
+| Inquiry | soft, close-on-parent-delete | yes | sourceModel, targetModel | - | - | - | - | immutable-override | yes | - | - | - | yes |
+| Integration | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | - | yes | - | yes |
+| IntegrationRecord | - | - | recordModel | - | - | - | - | immutable-override | yes | - | - | - | - |
+| JobOutbox | - | - | - | - | - | - | - | - | - | - | - | - | - |
+| Jwks | - | - | - | - | - | yes | - | sensitive | - | - | - | - | - |
+| Organization | soft | yes | - | - | - | - | - | - | - | - | yes | - | yes |
+| OrganizationUser | soft | yes | - | - | - | - | - | - | - | - | yes | - | yes |
+| Project | soft | - | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | yes |
+| ProjectIntegration | soft | yes | - | Project (projectId) | - | - | - | immutable-override | - | - | - | - | yes |
+| RuleReference | hard-on-tombstone, regen-on-revive, cascade-exempt | - | sourceModel, targetModel | - | - | - | - | immutable-override | yes | - | - | - | - |
+| Segment | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | yes | - | - | yes |
+| SegmentMember | - | - | - | - | - | - | - | - | - | - | - | - | yes |
+| Session | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | - |
+| Setting | soft | yes | resourceModel | axis: resourceModel | yes | - | - | immutable-override | yes | - | yes | - | yes |
+| Space | soft | yes | - | - | - | - | - | immutable-override | - | - | yes | - | yes |
+| SpaceUser | soft | yes | - | - | - | - | - | - | - | - | yes | - | yes |
+| Tag | soft | - | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | - |
+| TagAttachment | soft | - | resourceModel | - | - | - | - | immutable-override | yes | - | - | - | - |
+| TagCategory | soft | - | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | - |
+| Token | soft, skip-revive | yes | ownerModel | - | - | - | - | sensitive, noop, immutable-override | yes | - | yes | - | yes |
+| User | soft | yes | - | - | - | - | - | internal, noop | - | - | yes | - | yes |
+| Verification | - | - | - | - | - | - | - | - | - | - | - | - | - |
+| WebhookEvent | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | - |
+| WebhookSubscription | hard-on-tombstone | - | ownerModel | - | - | - | - | immutable-override | yes | - | yes | - | yes |
 
 <!-- capabilities:end -->
 
