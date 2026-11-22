@@ -109,6 +109,15 @@ export const ENCRYPTED_MODELS = {
       },
     },
   } satisfies EncryptedModelConfig<'jwks'>,
+  twoFactor: {
+    model: 'twoFactor',
+    keys: {
+      totpSecret: {
+        envPrefix: 'TWO_FACTOR_SECRET',
+        buildAAD: (r: Pick<TwoFactor, 'id' | 'userId'>) => `twoFactor:${r.id}:${r.userId}`,
+      },
+    },
+  } satisfies EncryptedModelConfig<'twoFactor'>,
 } as const;
 ```
 

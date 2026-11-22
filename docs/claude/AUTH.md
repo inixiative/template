@@ -18,6 +18,7 @@
 - [Account changes through BetterAuth (withThrowawaySession)](#account-changes-through-betterauth-withthrowawaysession)
   - [Change password](#change-password)
   - [The same pattern for the next account changes](#the-same-pattern-for-the-next-account-changes)
+- [Two-Factor Authentication (Passkey + TOTP)](#two-factor-authentication-passkey--totp)
 - [OAuth + One-Time Token](#oauth--one-time-token)
   - [OAuth Flow](#oauth-flow)
   - [One-Time Token Handoff](#one-time-token-handoff)
@@ -221,6 +222,24 @@ Why not let the browser hold a short-lived session for one call (the first desig
 - An account with no password (Google only) gets BetterAuth's 400 `Credential account not found`.
 
 ### The same pattern for the next account changes
+
+The same `withThrowawaySession` pattern is reused by `apps/api/src/lib/auth/verifyUserPassword.ts` to verify a user's current password before first-time 2FA enrollment on email/password accounts.
+
+---
+
+## Two-Factor Authentication (Passkey + TOTP)
+
+Strict second-factor authentication using WebAuthn passkeys and RFC 6238 TOTP authenticator apps (no SMS/phone/email OTP), controlled by `REQUIRE_TWO_FACTOR` (`false` in `template`, `true` in `kingdom`).
+
+- **Models:** `TwoFactor` (1:1 per user: AES-256-GCM encrypted `totpSecret` via `ENCRYPTED_MODELS`, `totpVerifiedAt`, scrypt-hashed 80-bit `backupCodeHashes`) and `Passkey` (1:N WebAuthn credentials scoped by `rpId`, `Float` `counter`). Both are audit-logged, never revived on user revive (`skipRevive`), and scrubbed/soft-deleted by `redactUser`.
+- **Pre-2FA sign-in handoff (`jwtHandoffPlugin`):** Both email/password (`/sign-in/email`) and Google OAuth (`/one-time-token/verify`) always exchange the BetterAuth handshake session for a User JWT and delete the session immediately. When `REQUIRE_TWO_FACTOR` is true or `user.twoFactorEnabled` is true, `jwtHandoffPlugin` issues a short-lived **15-minute** pre-2FA JWT (`PRE_TWO_FACTOR_JWT_TTL_SECONDS`, without `twoFactor: true`). There are no unauthenticated 2FA challenge routes.
+- **JWT claim & API enforcement (`requireTwoFactorSessionMiddleware`):** `issueUserJwt` stamps `twoFactor: true` (and `twoFactorVerifiedAt: iat` for a 5-minute recent-verification window) onto 30-day User JWTs issued after 2FA enrollment or verification. Any User JWT missing `twoFactor: true` (or missing active factors when `REQUIRE_TWO_FACTOR=true`) is restricted by `user.twoFactorEnabled`:
+  - Read-only `GET /api/v1/me` (returning `twoFactorAction: 'enroll' | 'verify' | null` with tenant rosters redacted while `twoFactorAction` is set) and `GET /api/v1/me/twoFactor` are allowed (except while spoofing).
+  - If `!user.twoFactorEnabled` and `REQUIRE_TWO_FACTOR=true`, only the 4 enrollment endpoints (`POST /api/v1/me/twoFactor/totp/{start,confirm}`, `POST /api/v1/me/twoFactor/passkey/{options,confirm}`) are allowed; everything else returns `403 TWO_FACTOR_ENROLLMENT_REQUIRED` with actionable `actions`.
+  - Once `user.twoFactorEnabled` is true, only the 2 verification endpoints (`POST /api/v1/me/twoFactor/verify`, `POST /api/v1/me/twoFactor/verify/passkey/options`) are allowed; enrollment endpoints and all other API routes return `403 TWO_FACTOR_VERIFICATION_REQUIRED` with actionable `actions`. Completing enrollment or verification trades the 15-minute pre-2FA JWT for a 30-day `twoFactor: true` JWT with `twoFactorVerifiedAt`.
+- **Self-service management:** `GET /api/v1/me/twoFactor` and `POST /api/v1/me/twoFactor/*` (including `passkey/rename` and `passkey/delete`), guarded by `forbidApiTokenMiddleware`, `forbidSpoofingMiddleware`, `twoFactorRateLimit`, and `UserAction.manageTwoFactor`. Pending TOTP secrets are encrypted in Redis via `encryptField`. When `REQUIRE_TWO_FACTOR` is enabled, removing the last remaining factor returns `422`.
+- **Recent 2FA re-verification (`requireRecentTwoFactorMiddleware` / `assertRecentTwoFactor`):** Sensitive mutations (`meChangePassword`, `meRedact`, `adminUserResetTwoFactor`, token creation/escalation via `createToken`/`tokenUpdate`/`tokenCreateManyEntitlements`, and 2FA/passkey mutations once 2FA is active) require a fresh `twoFactorVerifiedAt` claim (within 5 minutes) on the User JWT obtained via `POST /api/v1/me/twoFactor/verify` (`method: 'totp' | 'backupCode' | 'passkey'`). Missing/expired verification returns `403` with `details: [{ code: 'TWO_FACTOR_REVERIFY_REQUIRED', methods, actions }]`. Superadmin API tokens cannot bypass verification on 2FA-enabled accounts.
+- **Emergency superadmin reset:** `POST /api/admin/user/:id/resetTwoFactor` (requires signed-in superadmin JWT + recent 2FA verification) scrubs `TwoFactor` in-place, soft-deletes all user `Passkey` rows, clears pending Redis setups/challenges, sets `User.twoFactorEnabled = false`, and revokes every active JWT via `rotateUserJwts`.
 
 Not built; each is a JWT route plus one `withThrowawaySession` call, keeping BetterAuth's endpoint in `disabledPaths`:
 

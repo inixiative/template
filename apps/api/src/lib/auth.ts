@@ -70,6 +70,12 @@ export const auth = betterAuth({
         input: false,
         returned: false,
       },
+      twoFactorEnabled: {
+        type: 'boolean',
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
     },
   },
 

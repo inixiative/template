@@ -5,6 +5,7 @@
  * @uses none
  */
 import { Icon } from '@iconify/react';
+import { TwoFactorVerifyModal } from '@template/ui/components/auth/TwoFactorVerifyModal';
 import { AppIdentity } from '@template/ui/components/layout/AppIdentity';
 import { Header } from '@template/ui/components/layout/Header';
 import { Sidebar } from '@template/ui/components/layout/Sidebar';
@@ -75,6 +76,7 @@ export const AppShell = ({
         <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+      <TwoFactorVerifyModal />
     </div>
   );
 };

@@ -6,6 +6,7 @@
  */
 import { z } from '@hono/zod-openapi';
 import { OrganizationScalarSchema, SpaceScalarSchema } from '@template/db';
+import { TWO_FACTOR_ACTIONS } from '@template/shared/auth/twoFactor';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
@@ -19,6 +20,7 @@ const responseSchema = userResponseSchema.extend({
   spaceUsers: z.array(spaceUserReadResponseSchema),
   organizations: z.array(OrganizationScalarSchema),
   spaces: z.array(SpaceScalarSchema),
+  twoFactorAction: z.enum(TWO_FACTOR_ACTIONS).nullable(),
 });
 
 export const meReadRoute = readRoute({

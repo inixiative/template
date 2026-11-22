@@ -5,6 +5,10 @@
  * @uses primitive:shared
  */
 import type { ApiErrorBody } from '@template/shared/errors';
+import {
+  TwoFactorVerifyCancelledError,
+  twoFactorActionFromError,
+} from '@template/ui/lib/auth/twoFactor';
 import { formatFieldErrors } from '@template/ui/lib/formatFieldErrors';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { toast } from '@template/ui/lib/toast';
@@ -16,6 +20,8 @@ export const doesQueryMetaSkipErrorToast = (meta: unknown) => {
 };
 
 export const showApiErrorToast = (error: unknown) => {
+  if (error instanceof TwoFactorVerifyCancelledError || twoFactorActionFromError(error)) return;
+
   let message = 'An error occurred';
   let guidance: ApiErrorBody['guidance'] | undefined;
 

@@ -88,6 +88,10 @@ model AuditLog {
   subjectSetting                Setting?              @relation("AuditLogSubjectSetting", fields: [subjectSettingId], references: [id], onDelete: SetNull)
   subjectProjectIntegrationId   String?               @db.VarChar(36)
   subjectProjectIntegration     ProjectIntegration?   @relation("AuditLogSubjectProjectIntegration", fields: [subjectProjectIntegrationId], references: [id], onDelete: SetNull)
+  subjectTwoFactorId            String?               @db.VarChar(36)
+  subjectTwoFactor              TwoFactor?            @relation(fields: [subjectTwoFactorId], references: [id], onDelete: SetNull)
+  subjectPasskeyId              String?               @db.VarChar(36)
+  subjectPasskey                Passkey?              @relation(fields: [subjectPasskeyId], references: [id], onDelete: SetNull)
   // Composite FKs
   subjectOrganizationUser       OrganizationUser?     @relation("AuditLogSubjectOrganizationUser", fields: [subjectOrganizationId, subjectUserId], references: [organizationId, userId], onDelete: SetNull)
   subjectSpaceUser              SpaceUser?            @relation("AuditLogSubjectSpaceUser", fields: [subjectOrganizationId, subjectSpaceId, subjectUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
@@ -133,6 +137,8 @@ model AuditLog {
   @@index([subjectProjectIntegrationResourceId])
   @@index([subjectSettingId])
   @@index([subjectProjectIntegrationId])
+  @@index([subjectTwoFactorId])
+  @@index([subjectPasskeyId])
 }
 
 enum AuditAction {
@@ -165,4 +171,6 @@ enum AuditSubjectModel {
   ProjectIntegrationResource
   Setting
   ProjectIntegration
+  TwoFactor
+  Passkey
 }

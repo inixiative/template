@@ -6,6 +6,8 @@
  */
 import { UserAction } from '@template/permissions/client';
 import { actionRoute } from '#/lib/routeTemplates';
+import { forbidApiTokenMiddleware } from '#/middleware/auth/forbidApiTokenMiddleware';
+import { requireRecentTwoFactorMiddleware } from '#/middleware/auth/requireRecentTwoFactorMiddleware';
 import { authRateLimit } from '#/middleware/rateLimit/authRateLimit';
 import { credentialChangeRateLimit } from '#/middleware/rateLimit/credentialChangeRateLimit';
 import { validatePermission } from '#/middleware/validations/validatePermission';
@@ -23,9 +25,11 @@ export const meChangePasswordRoute = actionRoute({
   bodySchema: changePasswordBodySchema,
   responseSchema: changePasswordResponseSchema,
   middleware: [
+    forbidApiTokenMiddleware,
     authRateLimit,
     validatePermission(UserAction.changePassword),
     credentialChangeRateLimit,
+    requireRecentTwoFactorMiddleware(),
   ],
   description:
     'Changes your password after checking the current one. Every JWT signed for you before stops working; ' +

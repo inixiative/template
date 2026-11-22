@@ -5,6 +5,7 @@
  * @uses none
  */
 import { redirect } from '@tanstack/react-router';
+import { TWO_FACTOR_SETUP_PATH } from '@template/ui/lib/routeRedirect';
 import {
   buildPathWithSearch,
   pickSearchParams,
@@ -36,6 +37,18 @@ export const createAuthGuards = (currentAppStore: () => AppStore) => ({
       throw redirect({
         to: '/login',
         search: { redirectTo, ...loginParams },
+      });
+    }
+
+    if (
+      currentAppStore().auth.twoFactorAction &&
+      context?.location.pathname !== TWO_FACTOR_SETUP_PATH
+    ) {
+      const { pathname = '/dashboard', search, hash } = context?.location ?? {};
+      const redirectTo = buildPathWithSearch(pathname, search, hash);
+      throw redirect({
+        to: TWO_FACTOR_SETUP_PATH,
+        search: { redirectTo },
       });
     }
   },

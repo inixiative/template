@@ -11,7 +11,10 @@ import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 
 export const ProfilePage = () => {
+  const twoFactorAction = useAppStore((state) => state.auth.twoFactorAction);
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
+
+  if (twoFactorAction) return <UserProfilePage />;
 
   switch (context.type) {
     case 'organization':
