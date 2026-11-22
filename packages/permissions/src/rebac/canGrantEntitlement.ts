@@ -8,11 +8,11 @@ import { createCanGrantEntitlement, type EntitlementEntry } from '@inixiative/pe
 import type { HydratedRecord } from '@template/db';
 import { schemaMap } from '@template/db/schemaMap';
 import type { Permix } from '@template/permissions/client';
+import { rulesStoredBesideTheSchema } from '@template/permissions/rebac/rulesStoredBesideTheSchema';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
 
 const canGrant = createCanGrantEntitlement(schemaMap, {
-  additionalRules: tenantPermissionRulesAbove,
+  additionalRules: rulesStoredBesideTheSchema,
 });
 
 export const canGrantEntitlement = (

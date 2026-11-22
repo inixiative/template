@@ -85,6 +85,16 @@ describe('tenantPermissionRules', () => {
 
     expect((await open(null)).status).toBe(200);
     expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(403);
+
+    await db.contact.update({
+      where: { id: contact.id },
+      data: {
+        permissionRules: {
+          read: { rule: { field: 'columnThatWasRenamed', operator: 'equals', value: 'x' } },
+        },
+      },
+    });
+    expect((await asStranger(get(`/api/v1/contact/${contact.id}`))).status).toBe(409);
   });
 
   it("leaves another organization's records closed", async () => {
@@ -181,7 +191,7 @@ describe('tenantPermissionRules', () => {
     expect((await asStranger(del(`/api/v1/contact/${contact.id}`))).status).toBe(403);
   });
 
-  it('a stored rule the library refuses answers 409 and says how to fix it', async () => {
+  it("a stored rule the library refuses, a tenant's or the record's own, answers 409 and says how to fix it", async () => {
     const { entity: contact } = await createContact({
       organizationId: org.id,
       ownerModel: 'Organization',

@@ -8,10 +8,10 @@ import { createRebacCheck } from '@inixiative/permissions';
 import type { AccessorName, HydratedRecord } from '@template/db';
 import { schemaMap } from '@template/db/schemaMap';
 import type { Permix } from '@template/permissions/client';
-import { tenantPermissionRulesAbove } from '@template/permissions/rebac/tenantPermissionRules';
+import { rulesStoredBesideTheSchema } from '@template/permissions/rebac/rulesStoredBesideTheSchema';
 import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
 
-const rebacCheck = createRebacCheck(schemaMap, { additionalRules: tenantPermissionRulesAbove });
+const rebacCheck = createRebacCheck(schemaMap, { additionalRules: rulesStoredBesideTheSchema });
 
 const rowsOfActor = (permix: Permix): Record<string, Record<string, unknown>[]> => {
   const actor = permix.getActor();

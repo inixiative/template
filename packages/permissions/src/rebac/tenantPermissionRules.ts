@@ -4,93 +4,84 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import {
-  type ActionRule,
-  type AdditionalRules,
-  issuesForRuleReadsOutsideLens,
-  validateActionRule,
-} from '@inixiative/permissions';
-import type { BindableOwnerModel, ModelName } from '@template/db';
+import type { ActionRule, AdditionalRules } from '@inixiative/permissions';
+import { type BindableOwnerModel, type ModelName, relationsToTenantOnSides } from '@template/db';
 import { schemaMap } from '@template/db/schemaMap';
 import { tenantRowsAbove, tenantRowsOnSides } from '@template/db/utils/tenantRowsAbove';
 import { StandardAction } from '@template/permissions/client';
-import { rebacSchema } from '@template/permissions/rebac/schema';
+import { issuesWithStoredRule } from '@template/permissions/rebac/issuesWithStoredRule';
 import { StoredPermissionRuleRefusedError } from '@template/permissions/rebac/storedPermissionRuleRefusedError';
 import { actionsTenantMayExtend } from '@template/permissions/rebac/tenantPermissionRulesLens';
-import { pick, pickBy } from 'lodash-es';
+import { isPlainObject, pick, pickBy } from 'lodash-es';
 
-type RulesByResource = Record<string, Record<string, ActionRule>>;
+type RulesByAction = Record<string, ActionRule>;
+type SideCheck = { rel: string; action: string };
 
 const standardActions: readonly string[] = Object.values(StandardAction);
 
-/** Whether every way through `rule` asks a standard action on `relation`: the walk itself, an `all` holding one, or an `any` of nothing else. */
-export const ruleAsksStandardActionThroughRelation = (rule: unknown, relation: string): boolean => {
-  if (rule === null || typeof rule !== 'object') return false;
-  const node = rule as { rel?: unknown; action?: unknown; all?: unknown[]; any?: unknown[] };
-  if (typeof node.action === 'string')
-    return node.rel === relation && standardActions.includes(node.action);
-  if (Array.isArray(node.all))
-    return node.all.some((part) => ruleAsksStandardActionThroughRelation(part, relation));
-  if (Array.isArray(node.any))
-    return (
-      node.any.length > 0 &&
-      node.any.every((part) => ruleAsksStandardActionThroughRelation(part, relation))
-    );
-  return false;
+const isSideCheck = (part: unknown): part is SideCheck =>
+  isPlainObject(part) &&
+  typeof (part as SideCheck).rel === 'string' &&
+  standardActions.includes((part as SideCheck).action);
+
+/** The check on a side that a rule holds: `{ rel, action }` asking read, operate, manage or own, alone or in the rule's own `all`. */
+export const sideCheckHeldBy = (rule: unknown): SideCheck | undefined => {
+  const all = isPlainObject(rule) ? (rule as { all?: unknown }).all : undefined;
+  return (Array.isArray(all) ? all : [rule]).find(isSideCheck);
 };
 
-const rulesAlreadyRead = new WeakMap<object, Map<string, Record<string, ActionRule>>>();
-
-const throwIfTheLibraryWouldRefuse = (
-  rules: Record<string, ActionRule>,
+/** Why a tenant's rule for a record with sides is refused: it holds no check on one of that tenant's own sides. Undefined when it does, or the record has none. */
+export const reasonRuleIsOffItsOwnSide = (
   tenantModel: BindableOwnerModel,
   resource: string,
-) => {
-  for (const [action, rule] of Object.entries(rules)) {
-    const [issue] = [
-      ...validateActionRule(rule, {
-        schema: rebacSchema,
-        resource,
-        action,
-        additionalRules: [rules],
-      }).errors,
-      ...issuesForRuleReadsOutsideLens(schemaMap, rebacSchema, resource, rule),
-    ];
-    if (issue)
-      throw new StoredPermissionRuleRefusedError(
-        `a ${tenantModel}'s stored rule for \`${resource}.${action}\` is refused: ${issue.path}: ${issue.message}`,
-      );
-  }
+  rule: unknown,
+): string | undefined => {
+  const ownSides = relationsToTenantOnSides(
+    schemaMap.resources[resource] as ModelName,
+    tenantModel,
+  );
+  if (!ownSides.length || ownSides.includes(sideCheckHeldBy(rule)?.rel ?? '')) return undefined;
+  const checks = ownSides.map((relation) => `{ rel: '${relation}', action }`).join(' or ');
+  return `a ${tenantModel}'s rule here holds a check on its own side, asking read, operate, manage or own: ${checks}`;
 };
+
+const rulesAlreadyRead = new WeakMap<object, Map<string, RulesByAction>>();
 
 const rulesOf = (
   row: Record<string, unknown>,
   tenantModel: BindableOwnerModel,
   resource: string,
-): Record<string, ActionRule> => {
+): RulesByAction => {
   const read = rulesAlreadyRead.get(row)?.get(resource);
   if (read) return read;
   const rules = pick(
-    (row.tenantPermissionRules as RulesByResource | null | undefined)?.[resource] ?? {},
+    (row.tenantPermissionRules as Record<string, RulesByAction> | null | undefined)?.[resource] ??
+      {},
     actionsTenantMayExtend(tenantModel, resource),
   );
-  throwIfTheLibraryWouldRefuse(rules, tenantModel, resource);
+  for (const [action, rule] of Object.entries(rules)) {
+    const [issue] = issuesWithStoredRule(resource, action, rule, { additionalRules: [rules] });
+    const reason =
+      reasonRuleIsOffItsOwnSide(tenantModel, resource, rule) ??
+      (issue && `${issue.path}: ${issue.message}`);
+    if (reason)
+      throw new StoredPermissionRuleRefusedError(
+        `a ${tenantModel}'s stored rule for \`${resource}.${action}\` is refused: ${reason}`,
+      );
+  }
   rulesAlreadyRead.set(row, (rulesAlreadyRead.get(row) ?? new Map()).set(resource, rules));
   return rules;
 };
 
 /**
  * The rules each tenant above a record holds for its resource (`tenantPermissionRules`), cut to
- * the actions that tenant's lens shows, for `check()` to OR in. One the library would refuse
- * throws here, before the check. A tenant on a side of a two-sided
- * record gives only the rules that ask a standard action through its own side.
+ * the actions that tenant's lens shows, for `check()` to OR in. A tenant on a side of a record
+ * gives the rules whose side check is on that side. A stored rule that is refused throws.
  */
 export const tenantPermissionRulesAbove: AdditionalRules = (resource, record) => [
   ...tenantRowsAbove(record).map(({ model, row }) => rulesOf(row, model, resource)),
   ...tenantRowsOnSides(schemaMap.resources[resource] as ModelName, record).map(
     ({ model, row, relation }) =>
-      pickBy(rulesOf(row, model, resource), (rule) =>
-        ruleAsksStandardActionThroughRelation(rule, relation),
-      ),
+      pickBy(rulesOf(row, model, resource), (rule) => sideCheckHeldBy(rule)?.rel === relation),
   ),
 ];

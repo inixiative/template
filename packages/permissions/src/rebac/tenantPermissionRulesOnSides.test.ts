@@ -74,17 +74,24 @@ describe('a tenant rule on a two-sided record', () => {
     expect(await reads({ o1: 'viewer' }, sentByIt)).toBe(false);
   });
 
-  it('a stored rule that is not a walk through its own side widens nothing', async () => {
+  it('a stored rule with no check on one of its own sides is refused, for whoever asks', async () => {
     for (const rule of [
       true,
-      whoeverReads('sourceOrganization'),
       { rule: { field: 'type', operator: 'equals', value: 'transferSpace' } },
+      { rel: 'targetOrganization', action: 'create' },
+      { any: [whoeverReads('targetOrganization'), true] },
+      whoeverReads('targetUser'),
     ] as ActionRule[]) {
-      const opened = receiver({ 'db:inquiry': { read: rule } });
-      expect(await reads({}, between(sender(), opened))).toBe(false);
-      expect(await reads({ o1: 'viewer' }, between(sender(), opened))).toBe(false);
-      expect(await reads({ o2: 'viewer' }, between(sender(), opened))).toBe(false);
+      const inquiry = between(sender(), receiver({ 'db:inquiry': { read: rule } }));
+      for (const seat of [{}, { o1: 'viewer' }, { o2: 'viewer' }] as const)
+        await expect(reads(seat, inquiry)).rejects.toBeInstanceOf(StoredPermissionRuleRefusedError);
     }
+  });
+
+  it('a rule for the side the tenant is not on here does nothing', async () => {
+    const opened = receiver({ 'db:inquiry': { read: whoeverReads('sourceOrganization') } });
+    expect(await reads({ o2: 'viewer' }, between(sender(), opened))).toBe(false);
+    expect(await reads({ o1: 'viewer' }, between(sender(), opened))).toBe(false);
   });
 
   it('each party opens its own side only, to its own readers only', async () => {
@@ -96,21 +103,17 @@ describe('a tenant rule on a two-sided record', () => {
     expect(await reads({ o2: 'viewer' }, inquiry)).toBe(false);
   });
 
-  it('a walk narrowed by a condition still counts; an any with a free arm does not', async () => {
+  it('a side check narrowed by a condition still counts', async () => {
     const narrowed: ActionRule = {
       all: [
         whoeverReads('targetOrganization'),
         { rule: { field: 'type', operator: 'equals', value: 'transferSpace' } },
       ],
     };
-    expect(
-      await reads(
-        { o2: 'viewer' },
-        between(sender(), receiver({ 'db:inquiry': { read: narrowed } })),
-      ),
-    ).toBe(true);
-    const escaped: ActionRule = { any: [whoeverReads('targetOrganization'), true] };
-    expect(await reads({}, between(sender(), receiver({ 'db:inquiry': { read: escaped } })))).toBe(
+    const inquiry = between(sender(), receiver({ 'db:inquiry': { read: narrowed } }));
+    expect(await reads({ o2: 'viewer' }, inquiry)).toBe(true);
+    expect(await reads({}, inquiry)).toBe(false);
+    expect(await reads({ o2: 'viewer' }, { ...inquiry, type: 'inviteOrganizationUser' })).toBe(
       false,
     );
   });
@@ -138,15 +141,13 @@ describe('a tenant rule on a two-sided record', () => {
     expect(accepts('Space', 'targetOrganization')).toBe(false);
   });
 
-  it('an action anyone holds on the tenant is not a way in: the walk asks read, operate, manage or own', async () => {
-    const anyoneCreates: ActionRule = { rel: 'targetOrganization', action: 'create' };
-    expect(
-      tenantPermissionRulesSchema('Organization').safeParse({
-        'db:inquiry': { read: anyoneCreates },
-      }).success,
-    ).toBe(false);
-    const opened = receiver({ 'db:inquiry': { read: anyoneCreates } });
-    expect(await reads({}, between(sender(), opened))).toBe(false);
+  it('saving refuses a rule with no check on its own side: an action anyone holds, an any, true', () => {
+    const accepts = (read: unknown) =>
+      tenantPermissionRulesSchema('Organization').safeParse({ 'db:inquiry': { read } }).success;
+    expect(accepts({ rel: 'targetOrganization', action: 'create' })).toBe(false);
+    expect(accepts({ any: [whoeverReads('targetOrganization'), true] })).toBe(false);
+    expect(accepts(true)).toBe(false);
+    expect(accepts({ all: [whoeverReads('targetOrganization'), true] })).toBe(true);
   });
 
   it("an organization's rule reaches what its space received, and never what is addressed to a member", async () => {

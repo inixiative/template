@@ -108,16 +108,16 @@ describe("a tenant rule on an inquiry walks through the tenant's own side", () =
     expect(await holds(organizationViewer, 'inquiry', toSpace.id, 'read')).toBe(true);
   });
 
-  it('a stored rule off its side widens nothing', async () => {
+  it('a rule for the side the organization is not on here does nothing', async () => {
     const key = await viewerKeyAt(organization);
     const { entity: received } = await fromOrganization(other, { organization });
-    for (const read of [true, whoeverReads('sourceOrganization')]) {
-      await db.organization.update({
-        where: { id: organization.id },
-        data: { tenantPermissionRules: { 'db:inquiry': { read } } },
-      });
-      expect(await holds(key, 'inquiry', received.id, 'read')).toBe(false);
-    }
+    await db.organization.update({
+      where: { id: organization.id },
+      data: {
+        tenantPermissionRules: { 'db:inquiry': { read: whoeverReads('sourceOrganization') } },
+      },
+    });
+    expect(await holds(key, 'inquiry', received.id, 'read')).toBe(false);
   });
 
   it("is refused by the route unless it walks through one of the organization's sides", async () => {
