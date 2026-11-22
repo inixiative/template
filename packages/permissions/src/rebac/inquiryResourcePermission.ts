@@ -5,13 +5,8 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { type Condition, Operator } from '@inixiative/json-rules';
-import type { ModelName } from '@template/db';
+import { Operator } from '@inixiative/json-rules';
 import type { InquiryType } from '@template/db/generated/client/enums';
-import {
-  polymorphicAxis,
-  polymorphismConfigForModel,
-} from '@template/db/registries/falsePolymorphism';
 import {
   INQUIRY_READ_LEVELS,
   INQUIRY_TYPES,
@@ -20,8 +15,8 @@ import {
   type InquiryTypeParties,
   type PartyLevel,
 } from '@template/permissions/rebac/inquiryTypes';
+import { isNull, rowIsThereAnd } from '@template/permissions/rebac/rebacSchemaRules';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
-import { lowerFirst } from 'lodash-es';
 
 export type InquirySide = 'source' | 'target';
 type Verb = 'send' | 'resolve';
@@ -64,52 +59,17 @@ const perType = (
   })),
 });
 
-const kindIs = (field: string, kind: string): Condition => ({
-  field,
-  operator: Operator.equals,
-  value: kind,
-});
-
-const ownedDirectlyBy = (
-  delegate: ModelName,
-  at: string,
-  owner: InquiryPartyModel,
-): Condition[] => {
-  const axis = polymorphismConfigForModel(delegate)?.axes.find(
-    ({ field }) => field === 'ownerModel',
-  );
-  if (!axis) return [];
-  return [
-    ...(owner in axis.fkMap ? [kindIs(`${at}.ownerModel`, owner)] : []),
-    ...(axis.carriesOwnerKeysOf ?? []).flatMap((between) =>
-      ownedDirectlyBy(between, `${at}.${lowerFirst(between)}`, owner).map((owned) => ({
-        all: [kindIs(`${at}.ownerModel`, between), owned],
-      })),
-    ),
-  ];
-};
-
-export const sideIsHeldAloneBy = (side: InquirySide, owner: InquiryPartyModel): ActionRule => {
-  const delegates = polymorphicAxis('Inquiry', `${side}Model`).carriesOwnerKeysOf ?? [];
-  return {
-    rule: {
-      any: [
-        kindIs(`${side}Model`, owner),
-        ...delegates.flatMap((delegate) =>
-          ownedDirectlyBy(delegate, `${side}${delegate}`, owner).map((owned) => ({
-            all: [kindIs(`${side}Model`, delegate), owned],
-          })),
-        ),
-      ],
-    },
-  };
-};
-
+// why: the kind arm is what a grant's stand-in can pass; the empty keys also admit what the party's own integrations, tokens and projects hold
 const rulesGrantingRead = (side: InquirySide, model: InquiryPartyModel): ActionRule[] => {
   const level = INQUIRY_READ_LEVELS[model];
   if (!level) return [];
   const rel: ActionRule = { rel: `${side}${model}`, action: level.action };
-  return [level.heldAlone ? { all: [sideIsHeldAloneBy(side, model), rel] } : rel];
+  if (!level.clear.length) return [rel];
+  const sideKeysAreEmpty = rowIsThereAnd(
+    'id',
+    ...level.clear.map((key) => isNull(`${side}${key}`)),
+  );
+  return [{ all: [{ any: [isPartyModel(side, model), sideKeysAreEmpty] }, rel] }];
 };
 
 // db:inquiry, built from the party declarations: send is a source party's level for that type,

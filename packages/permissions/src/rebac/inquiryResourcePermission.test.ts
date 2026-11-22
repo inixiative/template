@@ -12,12 +12,11 @@ import {
 } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
 import {
-  type InquirySide,
   inquiryPartyRule,
   inquiryResourcePermissionFromParties,
-  sideIsHeldAloneBy,
 } from '@template/permissions/rebac/inquiryResourcePermission';
 import { INQUIRY_TYPES } from '@template/permissions/rebac/inquiryTypes';
+import { isNull, rowIsThereAnd } from '@template/permissions/rebac/rebacSchemaRules';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import type { ActionRule } from '@template/permissions/rebac/types';
 import { permissionsOfUser } from '@template/permissions/roles/permissionsOfUser';
@@ -128,42 +127,23 @@ describe('inquiryResourcePermissionFromParties', () => {
   });
 
   it('reads party-wide, whatever the type, each party on its own channel: a person the sides that name them, an organization the sides on it alone, a space the sides with no person', () => {
-    const channel = (side: InquirySide, model: 'Organization' | 'Space') => ({
-      all: [sideIsHeldAloneBy(side, model), { rel: `${side}${model}`, action: 'manage' }],
+    const channel = (side: string, model: string, clear: string[]) => ({
+      all: [
+        {
+          any: [
+            { rule: { field: `${side}Model`, operator: Operator.equals, value: model } },
+            rowIsThereAnd('id', ...clear.map((key) => isNull(`${side}${key}`))),
+          ],
+        },
+        { rel: `${side}${model}`, action: 'manage' },
+      ],
     });
     expect(inquiryResourcePermissionFromParties(INQUIRY_TYPES).actions.read).toEqual({
       any: (['source', 'target'] as const).flatMap((side) => [
         { rel: `${side}User`, action: 'read' },
-        channel(side, 'Organization'),
-        channel(side, 'Space'),
+        channel(side, 'Organization', ['SpaceId', 'UserId']),
+        channel(side, 'Space', ['UserId']),
       ]),
-    });
-    const is = (field: string, value: string) => ({ field, operator: Operator.equals, value });
-    expect(sideIsHeldAloneBy('target', 'Organization')).toEqual({
-      rule: {
-        any: [
-          is('targetModel', 'Organization'),
-          {
-            all: [
-              is('targetModel', 'Integration'),
-              is('targetIntegration.ownerModel', 'Organization'),
-            ],
-          },
-          { all: [is('targetModel', 'Token'), is('targetToken.ownerModel', 'Organization')] },
-          {
-            all: [
-              is('targetModel', 'Token'),
-              {
-                all: [
-                  is('targetToken.ownerModel', 'Integration'),
-                  is('targetToken.integration.ownerModel', 'Organization'),
-                ],
-              },
-            ],
-          },
-          { all: [is('targetModel', 'Project'), is('targetProject.ownerModel', 'Organization')] },
-        ],
-      },
     });
   });
 
@@ -295,6 +275,27 @@ describe('inquiryResourcePermissionFromParties through the real check, per inqui
       false,
     );
     expect(can(await principal({ organization: 'owner' }), transferSpace, 'resolve')).toBe(false);
+  });
+
+  it("an organization reads what its token received after the token is deleted, and never a member's", async () => {
+    const reads = async (seat: Seat, record: object) =>
+      check(await principal(seat), rebacSchema, 'inquiry', record as HydratedRecord, 'read');
+    const toToken = {
+      id: 'i1',
+      type: 'inviteOrganizationUser',
+      sourceModel: 'User',
+      sourceUserId: 'u9',
+      targetModel: 'Token',
+      targetTokenId: 't1',
+      targetOrganizationId: organization.id,
+      targetOrganization: organization,
+      targetSpaceId: null,
+      targetUserId: null,
+    };
+    expect(await reads({ organization: 'admin' }, toToken)).toBe(true);
+    expect(await reads({ organization: 'member' }, toToken)).toBe(false);
+    expect(await reads({ organization: 'admin' }, { ...toToken, targetUserId: 'u8' })).toBe(false);
+    expect(await reads({ otherOrganization: 'owner' }, toToken)).toBe(false);
   });
 
   it('an inquiry targeting the platform (admin) is resolved by a superadmin only', async () => {

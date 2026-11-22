@@ -34,15 +34,14 @@ export type InquiryTypeParties = {
 // Reading an inquiry is party-wide, whatever its type, and each party reads its own ownership
 // channel only: a person reads the sides that name them (their own, their memberships', and what
 // those hold); an organization reads, with manage, the sides on the organization alone (no space,
-// no person); a space the sides on the space with no person (Aron, 2026-11-16). `heldAlone` says the
-// side is the party itself or a delegate that party owns directly. Sending and resolving are per
-// type, below.
+// no person); a space the sides on the space with no person (Aron, 2026-11-16). `clear` lists the
+// side keys that must be empty. Sending and resolving are per type, below.
 export const INQUIRY_READ_LEVELS: Partial<
-  Record<InquiryPartyModel, { action: string; heldAlone: boolean }>
+  Record<InquiryPartyModel, { action: string; clear: readonly string[] }>
 > = {
-  User: { action: 'read', heldAlone: false },
-  Organization: { action: 'manage', heldAlone: true },
-  Space: { action: 'manage', heldAlone: true },
+  User: { action: 'read', clear: [] },
+  Organization: { action: 'manage', clear: ['SpaceId', 'UserId'] },
+  Space: { action: 'manage', clear: ['UserId'] },
 };
 
 const role = (operator: Operator, value: string[]): ActionRule => ({

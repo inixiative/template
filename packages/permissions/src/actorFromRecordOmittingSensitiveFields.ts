@@ -4,16 +4,11 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { pickColumns } from '@inixiative/field-map';
-import { prismaMap } from '@template/db/generated/prismaMap';
-import { sensitiveFieldsOf } from '@template/db/registries/sensitiveFields';
+import { columnsARuleReadsOfActor } from '@template/db/schemaMap';
 import type { Actor, ActorModel } from '@template/permissions/client';
-import { omit } from 'lodash-es';
+import { pick } from 'lodash-es';
 
 export const actorFromRecordOmittingSensitiveFields = (
   model: ActorModel,
   record: Record<string, unknown>,
-): Actor => ({
-  model,
-  record: omit(pickColumns(prismaMap, model, record), sensitiveFieldsOf(model)),
-});
+): Actor => ({ model, record: pick(record, columnsARuleReadsOfActor(model)) });
