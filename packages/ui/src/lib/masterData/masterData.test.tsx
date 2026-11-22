@@ -357,4 +357,168 @@ describe('masterData batch preloader', () => {
     await waitFor(() => expect(getByTestId('contact-keys').textContent).toBe('email'));
     expect(calls).toEqual(['POST /api/v1/batch/execute']);
   });
+
+  it('refuses to seed { data: null } or { data: undefined } into the infinite-staleTime cache', async () => {
+    fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () =>
+      jsonResponse({
+        data: {
+          batch: [
+            [
+              { status: 200, body: { data: null } },
+              { status: 200, body: {} },
+              { status: 200, body: { data: samplePayloads.segment } },
+              { status: 200, body: { data: samplePayloads.webhookSubscription } },
+            ],
+          ],
+          summary: {
+            totalRounds: 1,
+            completedRounds: 1,
+            totalRequests: 4,
+            successfulRequests: 4,
+            failedRequests: 0,
+            strategy: 'allowFailures',
+            status: 'success',
+          },
+        },
+      })) as unknown as typeof fetch);
+
+    const queryClient = makeQueryClient();
+    const result = await preloadMasterData(queryClient, { token: 'jwt-test' });
+
+    expect(result).toEqual({
+      loaded: ['segment', 'webhookSubscription'],
+      failed: ['contact', 'inquiry'],
+      skipped: [],
+    });
+    expect(queryClient.getQueryData(contactInfoQueryKey())).toBeUndefined();
+    expect(queryClient.getQueryData(inquiryInfoQueryKey())).toBeUndefined();
+  });
+
+  it('handles HTTP 401/500 JSON error responses from batch/execute without throwing or seeding', async () => {
+    fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () =>
+      jsonResponse({ error: 'Unauthorized' }, 401)) as unknown as typeof fetch);
+
+    const queryClient = makeQueryClient();
+    const result = await preloadMasterData(queryClient, { token: 'expired-jwt' });
+
+    expect(result).toEqual({
+      loaded: [],
+      failed: ['contact', 'inquiry', 'segment', 'webhookSubscription'],
+      skipped: [],
+    });
+    expect(queryClient.getQueryData(contactInfoQueryKey())).toBeUndefined();
+  });
+
+  it('concurrent child useSegmentInfo mounted during an in-flight partial failure falls back to GET /api/v1/segment/info', async () => {
+    const calls: string[] = [];
+    fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input);
+      const path = new URL(request.url).pathname;
+      calls.push(`${request.method} ${path}`);
+
+      if (path === '/api/v1/batch/execute') {
+        return jsonResponse({
+          data: {
+            batch: [
+              [
+                { status: 200, body: { data: samplePayloads.contact } },
+                { status: 200, body: { data: samplePayloads.inquiry } },
+                { status: 500, body: { error: 'segment error' } },
+                { status: 200, body: { data: samplePayloads.webhookSubscription } },
+              ],
+            ],
+            summary: {
+              totalRounds: 1,
+              completedRounds: 1,
+              totalRequests: 4,
+              successfulRequests: 3,
+              failedRequests: 1,
+              strategy: 'allowFailures',
+              status: 'partialSuccess',
+            },
+          },
+        });
+      }
+
+      if (path === '/api/v1/segment/info') {
+        return jsonResponse({ data: samplePayloads.segment });
+      }
+
+      throw new Error(`Unexpected request: ${request.method} ${path}`);
+    }) as unknown as typeof fetch);
+
+    const SegmentReader = () => {
+      const { data } = useSegmentInfo();
+      return <div data-testid="segment-keys">{Object.keys(data?.data?.types ?? {}).join(',')}</div>;
+    };
+
+    const queryClient = makeQueryClient();
+    const { getByTestId } = render(
+      <QueryClientProvider client={queryClient}>
+        <MasterDataPreloader />
+        <SegmentReader />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(getByTestId('segment-keys').textContent).toBe('CustomerRelationship'),
+    );
+    expect(calls).toEqual(['POST /api/v1/batch/execute', 'GET /api/v1/segment/info']);
+  });
+
+  it('re-populates cleanly after queryClient.clear() (e.g. logout -> login)', async () => {
+    fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () =>
+      jsonResponse({
+        data: {
+          batch: [
+            [
+              { status: 200, body: { data: samplePayloads.contact } },
+              { status: 200, body: { data: samplePayloads.inquiry } },
+              { status: 200, body: { data: samplePayloads.segment } },
+              { status: 200, body: { data: samplePayloads.webhookSubscription } },
+            ],
+          ],
+          summary: {
+            totalRounds: 1,
+            completedRounds: 1,
+            totalRequests: 4,
+            successfulRequests: 4,
+            failedRequests: 0,
+            strategy: 'allowFailures',
+            status: 'success',
+          },
+        },
+      })) as unknown as typeof fetch);
+
+    const queryClient = makeQueryClient();
+    await preloadMasterData(queryClient, { token: 'jwt-1' });
+    expect(queryClient.getQueryData(contactInfoQueryKey())).toEqual({
+      data: samplePayloads.contact,
+    });
+
+    queryClient.clear();
+    expect(queryClient.getQueryData(contactInfoQueryKey())).toBeUndefined();
+
+    const second = await preloadMasterData(queryClient, { token: 'jwt-2' });
+    expect(second.loaded).toEqual(['contact', 'inquiry', 'segment', 'webhookSubscription']);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('anonymous useContactInfo hits GET /api/v1/contact/info directly without calling batch/execute', async () => {
+    const calls: string[] = [];
+    fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL) => {
+      const request = input instanceof Request ? input : new Request(input);
+      calls.push(`${request.method} ${new URL(request.url).pathname}`);
+      return jsonResponse({ data: samplePayloads.contact });
+    }) as unknown as typeof fetch);
+
+    const queryClient = makeQueryClient();
+    const { result } = renderHook(() => useContactInfo(), {
+      wrapper: wrapperFor(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.data).toEqual(samplePayloads.contact as never);
+    expect(calls).toEqual(['GET /api/v1/contact/info']);
+  });
 });

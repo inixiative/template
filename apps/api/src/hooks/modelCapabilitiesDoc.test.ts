@@ -35,6 +35,8 @@ describe('generateModelCapabilities', () => {
     const entitlement = byModel.get('Entitlement');
     expect(entitlement?.parentEdge).toBe('axis: targetModel');
     expect(entitlement?.polymorphicAxes).toEqual(['sourceModel', 'targetModel']);
+    expect(entitlement?.ruleRefSource).toBe(true);
+    expect(entitlement?.writeRules).toBe(true);
 
     const contact = byModel.get('Contact');
     expect(contact?.orderedList).toBe(true);
@@ -62,6 +64,11 @@ describe('generateModelCapabilities', () => {
       committed,
       renderModelCapabilitiesTable(buildModelCapabilitiesRows()),
     );
+    if (committed !== expected) {
+      throw new Error(
+        'docs/claude/MODEL_CAPABILITIES.md is out of date. Run: bun scripts/docs/generateModelCapabilities.ts',
+      );
+    }
     expect(committed).toBe(expected);
   });
 });

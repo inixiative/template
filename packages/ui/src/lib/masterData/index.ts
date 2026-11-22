@@ -10,6 +10,7 @@ export {
   MASTER_DATA_STALE_TIME,
   type MasterDataEntry,
   type MasterDataKey,
+  masterDataEntryFor,
 } from './registry';
 export {
   MasterDataPreloader,

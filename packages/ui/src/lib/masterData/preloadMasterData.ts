@@ -32,8 +32,11 @@ export const inFlightMasterDataPreload = (
   queryClient: QueryClient,
 ): Promise<PreloadMasterDataResult> | undefined => inFlightByClient.get(queryClient);
 
-const isSeedableInfoBody = (body: unknown): body is { data: unknown } =>
-  Boolean(body && typeof body === 'object' && 'data' in body);
+const isSeedableInfoBody = (body: unknown): body is { data: Record<string, unknown> } => {
+  if (!body || typeof body !== 'object' || !('data' in body)) return false;
+  const inner = (body as { data?: unknown }).data;
+  return inner != null && typeof inner === 'object';
+};
 
 const executePreload = async (
   queryClient: QueryClient,

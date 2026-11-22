@@ -2,11 +2,12 @@
  * @atlas
  * @kind utils
  * @partOf infrastructure:prisma
- * @uses infrastructure:prisma
+ * @uses infrastructure:prisma, primitive:authz
  */
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { encryptedFieldsByModel } from '@template/db/lib/encryption/registry';
 import {
+  INTERNAL_FIELDS,
   isAuditEnabled,
   isHardDeletedOnTombstone,
   isSkippedOnRevive,
@@ -18,11 +19,12 @@ import {
   SENSITIVE_FIELDS,
   webhookEnabledModels,
 } from '@template/db/registries';
-import { INTERNAL_FIELDS } from '@template/db/registries/internalFields';
 import { type ModelName, toAccessor } from '@template/db/utils/modelNames';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { cacheKeysByModel } from '#/hooks/cache/constants/cacheKeysByModel';
 import { ImmutableFieldsOverrides } from '#/hooks/immutableFields/registry';
+import { isRuleReferenceSourceModel } from '#/hooks/ruleReference/surfaces';
+import { RulesRegistry } from '#/hooks/rules/registry';
 import { CASCADE_EXEMPT } from '#/hooks/softDeleteCascade/cascadeExempt';
 import { CLOSE_ON_PARENT_DELETE } from '#/hooks/softDeleteCascade/closeOnParentDelete';
 import { REGENERATE_ON_REVIVE } from '#/hooks/softDeleteCascade/regenerateOnRevive';
@@ -39,6 +41,8 @@ export type ModelCapabilitiesRow = {
   encrypted: boolean;
   orderedList: boolean;
   fieldPolicies: string[];
+  writeRules: boolean;
+  ruleRefSource: boolean;
   cached: boolean;
   webhook: boolean;
   rebac: boolean;
@@ -86,6 +90,8 @@ export const buildModelCapabilitiesRows = (): ModelCapabilitiesRow[] => {
       encrypted: (encrypted[model]?.length ?? 0) > 0,
       orderedList: Object.hasOwn(orderedListRegistry, model),
       fieldPolicies,
+      writeRules: Object.hasOwn(RulesRegistry, model),
+      ruleRefSource: isRuleReferenceSourceModel(model),
       cached: Object.hasOwn(cacheKeysByModel, model),
       webhook: webhookSet.has(model),
       rebac: Object.hasOwn(rebacResources, `db:${toAccessor(model)}`),
@@ -93,27 +99,29 @@ export const buildModelCapabilitiesRows = (): ModelCapabilitiesRow[] => {
   });
 };
 
-const yn = (value: boolean): string => (value ? 'yes' : '-');
+const yesNo = (value: boolean): string => (value ? 'yes' : '-');
 
 export const renderModelCapabilitiesTable = (rows: readonly ModelCapabilitiesRow[]): string => {
   const header = [
-    '| Model | Delete lifecycle | Audit | Polymorphic axes | Parent edge | Encrypted | Ordered list | Field policies | Cached | Webhook | ReBAC |',
-    '|---|---|---|---|---|---|---|---|---|---|---|',
+    '| Model | Delete lifecycle | Audit | Polymorphic axes | Parent edge | Encrypted | Ordered list | Field policies | Write rules | Rule ref source | Cached | Webhook | ReBAC |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|',
   ];
 
   const lines = rows.map((row) =>
     [
       row.model,
       row.deleteLifecycle,
-      yn(row.audit),
+      yesNo(row.audit),
       row.polymorphicAxes.length ? row.polymorphicAxes.join(', ') : '-',
       row.parentEdge,
-      yn(row.encrypted),
-      yn(row.orderedList),
+      yesNo(row.encrypted),
+      yesNo(row.orderedList),
       row.fieldPolicies.length ? row.fieldPolicies.join(', ') : '-',
-      yn(row.cached),
-      yn(row.webhook),
-      yn(row.rebac),
+      yesNo(row.writeRules),
+      yesNo(row.ruleRefSource),
+      yesNo(row.cached),
+      yesNo(row.webhook),
+      yesNo(row.rebac),
     ]
       .map((cell) => ` ${cell} `)
       .join('|')
