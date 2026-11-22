@@ -5,7 +5,7 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { ContactSource } from '@template/db/generated/client/enums';
+import { ContactSource, IntegrationResourceStatus } from '@template/db/generated/client/enums';
 import {
   billingAccountResourcePermission,
   billingResourceResourcePermission,
@@ -113,6 +113,15 @@ export const rebacSchema: RebacSchema = {
       }),
     },
     'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
+    'db:integrationResource': {
+      actions: {
+        manage: { rel: 'integration', action: 'manage' },
+        operate: { any: ['manage', { rel: 'integration', action: 'operate' }] },
+        read: { any: ['operate', { rel: 'integration', action: 'read' }] },
+        create: 'manage',
+        delete: { any: ['manage', { rel: 'integration', action: 'delete' }] },
+      },
+    },
     'db:project': { actions: actionsForRecordOwnedByAnyOwnerModel },
     'db:projectIntegration': {
       actions: {
@@ -131,6 +140,30 @@ export const rebacSchema: RebacSchema = {
             { rel: 'integration', action: 'manage' },
           ],
         },
+      },
+    },
+    'db:projectIntegrationResource': {
+      actions: {
+        create: {
+          all: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integrationResource', action: 'operate' },
+            {
+              rule: {
+                field: 'integrationResource.status',
+                operator: Operator.in,
+                value: [IntegrationResourceStatus.tracked, IntegrationResourceStatus.missing],
+              },
+            },
+          ],
+        },
+        delete: {
+          any: [
+            { rel: 'project', action: 'manage' },
+            { rel: 'integrationResource', action: 'manage' },
+          ],
+        },
+        read: { rel: 'project', action: 'read' },
       },
     },
     'db:setting': settingResourcePermission,

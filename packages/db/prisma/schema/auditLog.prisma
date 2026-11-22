@@ -78,6 +78,12 @@ model AuditLog {
   subjectSegment                Segment?              @relation(fields: [subjectSegmentId], references: [id], onDelete: SetNull)
   subjectEntitlementId          String?               @db.VarChar(36)
   subjectEntitlement            Entitlement?          @relation("AuditLogSubjectEntitlement", fields: [subjectEntitlementId], references: [id], onDelete: SetNull)
+  subjectProjectId              String?               @db.VarChar(36)
+  subjectProject                Project?              @relation("AuditLogSubjectProject", fields: [subjectProjectId], references: [id], onDelete: SetNull)
+  subjectIntegrationResourceId  String?               @db.VarChar(36)
+  subjectIntegrationResource    IntegrationResource?  @relation("AuditLogSubjectIntegrationResource", fields: [subjectIntegrationResourceId], references: [id], onDelete: SetNull)
+  subjectProjectIntegrationResourceId String?                     @db.VarChar(36)
+  subjectProjectIntegrationResource   ProjectIntegrationResource? @relation("AuditLogSubjectProjectIntegrationResource", fields: [subjectProjectIntegrationResourceId], references: [id], onDelete: SetNull)
   subjectSettingId              String?               @db.VarChar(36)
   subjectSetting                Setting?              @relation("AuditLogSubjectSetting", fields: [subjectSettingId], references: [id], onDelete: SetNull)
   subjectProjectIntegrationId   String?               @db.VarChar(36)
@@ -126,6 +132,9 @@ model AuditLog {
   @@index([subjectIntegrationId])
   @@index([subjectSegmentId])
   @@index([subjectEntitlementId])
+  @@index([subjectProjectId])
+  @@index([subjectIntegrationResourceId])
+  @@index([subjectProjectIntegrationResourceId])
   @@index([subjectSettingId])
   @@index([subjectProjectIntegrationId])
   @@index([subjectBillingAccountId])
@@ -157,6 +166,9 @@ enum AuditSubjectModel {
   Integration
   Segment
   Entitlement
+  Project
+  IntegrationResource
+  ProjectIntegrationResource
   Setting
   ProjectIntegration
   BillingAccount

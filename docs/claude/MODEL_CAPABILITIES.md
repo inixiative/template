@@ -76,16 +76,18 @@ Generated from `prismaMap` and the live registries above via `bun docs/scripts/m
 | Flow | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | yes |
 | Inquiry | soft, close-on-parent-delete | yes | sourceModel, targetModel | - | - | - | - | immutable-override | yes | - | - | - | yes |
 | Integration | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | - | yes | - | yes |
-| IntegrationRecord | - | - | recordModel | - | - | - | - | immutable-override | yes | - | - | - | - |
+| IntegrationRecord | soft | - | recordModel | - | - | - | - | immutable-override | yes | - | - | - | - |
+| IntegrationResource | soft | yes | - | - | - | - | - | - | - | - | - | - | yes |
 | JobOutbox | - | - | - | - | - | - | - | - | - | - | - | - | - |
 | Jwks | - | - | - | - | - | yes | - | sensitive | - | - | - | - | - |
 | Organization | soft | yes | - | - | - | - | - | - | - | - | yes | - | yes |
 | OrganizationUser | soft | yes | - | - | - | - | - | - | - | - | yes | - | yes |
-| Project | soft | - | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | yes |
+| Project | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | - | - | - | yes |
 | ProjectIntegration | soft | yes | - | Project (projectId) | - | - | - | immutable-override | - | - | - | - | yes |
+| ProjectIntegrationResource | soft | yes | - | - | - | - | - | - | - | - | - | - | yes |
 | RuleReference | hard-on-tombstone, regen-on-revive, cascade-exempt | - | sourceModel, targetModel | - | - | - | - | immutable-override | yes | - | - | - | - |
 | Segment | soft | yes | ownerModel | - | - | - | - | immutable-override | yes | yes | - | - | yes |
-| SegmentMember | - | - | - | - | - | - | - | - | - | - | - | - | yes |
+| SegmentMember | soft | - | - | - | - | - | - | - | - | - | - | - | yes |
 | Session | hard-on-tombstone | - | - | - | - | - | - | - | - | - | - | - | - |
 | Setting | soft | yes | resourceModel | axis: resourceModel | yes | - | - | immutable-override | yes | - | yes | - | yes |
 | Space | soft | yes | - | - | - | - | - | immutable-override | - | - | yes | - | yes |

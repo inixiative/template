@@ -54,6 +54,8 @@ model RuleReference {
   targetFlowId                String?                  @db.VarChar(36)
   targetAuthProviderId        String?                  @db.VarChar(36)
   targetWebhookSubscriptionId String?                  @db.VarChar(36)
+  targetIntegrationResourceId        String? @db.VarChar(36)
+  targetProjectIntegrationResourceId String? @db.VarChar(36)
   targetSettingId             String?                  @db.VarChar(36)
   targetProjectIntegrationId  String?                  @db.VarChar(36)
   targetBillingAccountId      String?                  @db.VarChar(36)
@@ -86,6 +88,8 @@ model RuleReference {
   targetFlow                Flow?                @relation("RuleReferenceTarget", fields: [targetFlowId], references: [id])
   targetAuthProvider        AuthProvider?        @relation("RuleReferenceTarget", fields: [targetAuthProviderId], references: [id])
   targetWebhookSubscription WebhookSubscription? @relation("RuleReferenceTarget", fields: [targetWebhookSubscriptionId], references: [id])
+  targetIntegrationResource        IntegrationResource?        @relation("RuleReferenceTarget", fields: [targetIntegrationResourceId], references: [id])
+  targetProjectIntegrationResource ProjectIntegrationResource? @relation("RuleReferenceTarget", fields: [targetProjectIntegrationResourceId], references: [id])
   targetSetting             Setting?             @relation("RuleReferenceTarget", fields: [targetSettingId], references: [id])
   targetProjectIntegration  ProjectIntegration?  @relation("RuleReferenceTarget", fields: [targetProjectIntegrationId], references: [id])
   targetBillingAccount      BillingAccount?      @relation("RuleReferenceTarget", fields: [targetBillingAccountId], references: [id])
@@ -115,6 +119,8 @@ model RuleReference {
   @@index([targetFlowId])
   @@index([targetAuthProviderId])
   @@index([targetWebhookSubscriptionId])
+  @@index([targetIntegrationResourceId])
+  @@index([targetProjectIntegrationResourceId])
   @@index([targetSettingId])
   @@index([targetProjectIntegrationId])
   @@index([targetBillingAccountId])
@@ -149,6 +155,8 @@ enum RuleReferenceTargetModel {
   Flow
   AuthProvider
   WebhookSubscription
+  IntegrationResource
+  ProjectIntegrationResource
   Setting
   ProjectIntegration
   BillingAccount

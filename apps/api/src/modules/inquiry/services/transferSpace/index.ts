@@ -9,6 +9,7 @@ import {
 } from '@template/shared/inquiry';
 import { emitAppEvent } from '#/appEvents/emit';
 import { enqueueJob } from '#/jobs/enqueue';
+import { makeError } from '#/lib/errors';
 import { clearSpaceRowCaches } from '#/modules/inquiry/services/transferSpace/clearSpaceRowCaches';
 import type { InquiryService } from '#/modules/inquiry/services/types';
 import { validateSpaceSlugFree } from '#/modules/inquiry/validations/validateSpaceSlugFree';
@@ -30,7 +31,8 @@ export const transferSpaceService: InquiryService<
     const organizationId = inquiry.targetOrganizationId!;
 
     const [space] = await db.findForUpdate<Space>('Space', { id: spaceId }, { changesKey: true });
-    const slug = response.slug ?? content.slug ?? space!.slug;
+    if (!space) throw makeError({ status: 404, message: 'The space being transferred is gone' });
+    const slug = response.slug ?? content.slug ?? space.slug;
     await validateSpaceSlugFree({ organizationId, slug });
 
     const transferredAt = new Date();

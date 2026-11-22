@@ -43,6 +43,8 @@ model Entitlement {
   sourceFlowId                String?                  @db.VarChar(36)
   sourceAuthProviderId        String?                  @db.VarChar(36)
   sourceWebhookSubscriptionId String?                  @db.VarChar(36)
+  sourceIntegrationResourceId        String? @db.VarChar(36)
+  sourceProjectIntegrationResourceId String? @db.VarChar(36)
   sourceSettingId             String?                  @db.VarChar(36)
   sourceProjectIntegrationId  String?                  @db.VarChar(36)
   sourceBillingAccountId      String?                  @db.VarChar(36)
@@ -72,6 +74,8 @@ model Entitlement {
   sourceFlow                Flow?                @relation("EntitlementSource", fields: [sourceFlowId], references: [id], onDelete: SetNull)
   sourceAuthProvider        AuthProvider?        @relation("EntitlementSource", fields: [sourceAuthProviderId], references: [id], onDelete: SetNull)
   sourceWebhookSubscription WebhookSubscription? @relation("EntitlementSource", fields: [sourceWebhookSubscriptionId], references: [id], onDelete: SetNull)
+  sourceIntegrationResource        IntegrationResource?        @relation("EntitlementSource", fields: [sourceIntegrationResourceId], references: [id], onDelete: SetNull)
+  sourceProjectIntegrationResource ProjectIntegrationResource? @relation("EntitlementSource", fields: [sourceProjectIntegrationResourceId], references: [id], onDelete: SetNull)
   sourceSetting             Setting?             @relation("EntitlementSource", fields: [sourceSettingId], references: [id], onDelete: SetNull)
   sourceProjectIntegration  ProjectIntegration?  @relation("EntitlementSource", fields: [sourceProjectIntegrationId], references: [id], onDelete: SetNull)
   sourceBillingAccount      BillingAccount?      @relation("EntitlementSource", fields: [sourceBillingAccountId], references: [id], onDelete: SetNull)
@@ -107,6 +111,8 @@ model Entitlement {
   @@index([sourceFlowId])
   @@index([sourceAuthProviderId])
   @@index([sourceWebhookSubscriptionId])
+  @@index([sourceIntegrationResourceId])
+  @@index([sourceProjectIntegrationResourceId])
   @@index([sourceSettingId])
   @@index([sourceProjectIntegrationId])
   @@index([sourceBillingAccountId])
@@ -133,6 +139,8 @@ enum EntitlementResourceModel {
   Flow
   AuthProvider
   WebhookSubscription
+  IntegrationResource
+  ProjectIntegrationResource
   Setting
   ProjectIntegration
   BillingAccount

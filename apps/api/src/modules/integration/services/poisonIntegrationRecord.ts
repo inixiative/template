@@ -2,11 +2,20 @@
  * @atlas
  * @kind service
  * @partOf feature:integrations, feature:webhooks
- * @uses infrastructure:prisma, infrastructure:redis
+ * @uses infrastructure:prisma
  */
 import { db, polymorphicKeyColumnOrThrow } from '@template/db';
-import type { IntegrationRecord } from '@template/db/generated/client/client';
+import type { IntegrationRecord, Prisma } from '@template/db/generated/client/client';
 import type { WebhookModel } from '@template/db/generated/client/enums';
+
+const recordUniqueKeyForModel: Record<
+  WebhookModel,
+  (integrationId: string, recordId: string) => Prisma.IntegrationRecordWhereUniqueInput
+> = {
+  CustomerRelationship: (integrationId, recordCustomerRelationshipId) => ({
+    integrationId_recordCustomerRelationshipId: { integrationId, recordCustomerRelationshipId },
+  }),
+};
 
 export const poisonIntegrationRecord = (input: {
   integrationId: string;
@@ -21,13 +30,21 @@ export const poisonIntegrationRecord = (input: {
         input.recordId,
     };
     const poison = { poisonedAt: new Date(), poisonedReason: input.reason };
+    if (
+      !(await db.integration.findUnique({
+        where: { id: input.integrationId },
+        select: { id: true },
+      }))
+    )
+      throw new Error(`Integration ${input.integrationId} is gone; its records cannot be poisoned`);
 
-    const [existing] = await db.findForUpdate<IntegrationRecord>('IntegrationRecord', recordKey, {
-      upserting: true,
-    });
-    if (existing?.poisonedAt) return existing;
-    if (existing) return db.integrationRecord.update({ where: { id: existing.id }, data: poison });
-    return db.integrationRecord.create({
-      data: { ...recordKey, recordModel: input.recordModel, ...poison },
-    });
+    const record = await db.withDeleted(() =>
+      db.integrationRecord.upsert({
+        where: recordUniqueKeyForModel[input.recordModel](input.integrationId, input.recordId),
+        create: { ...recordKey, recordModel: input.recordModel, ...poison },
+        update: { deletedAt: null },
+      }),
+    );
+    if (record.poisonedAt) return record;
+    return db.integrationRecord.update({ where: { id: record.id }, data: poison });
   });

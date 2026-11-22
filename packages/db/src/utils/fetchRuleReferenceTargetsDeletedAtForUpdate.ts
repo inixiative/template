@@ -27,9 +27,11 @@ export const fetchRuleReferenceTargetsDeletedAtForUpdate = async (
     Object.entries(groupBy(references, 'model')),
     ([name]) => name,
   )) {
-    const rows = await db.findForUpdate<{ id: string; deletedAt?: Date | null }>(model, {
-      id: { in: [...new Set(map(group, 'id'))] },
-    });
+    const rows = await db.withDeleted(() =>
+      db.findForUpdate<{ id: string; deletedAt?: Date | null }>(model, {
+        id: { in: [...new Set(map(group, 'id'))] },
+      }),
+    );
     for (const row of rows)
       states.set(referenceKey({ model, id: row.id }), { deletedAt: row.deletedAt ?? null });
   }

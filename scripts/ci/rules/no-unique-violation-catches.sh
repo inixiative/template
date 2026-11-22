@@ -4,18 +4,18 @@ set -euo pipefail
 ROOT_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 cd "$ROOT_DIR"
 
-# A SELECT ... FOR UPDATE on a row that does not exist yet locks nothing, so find-then-create
-# races, and the hand-rolled answers — a bare .upsert(, or catching the unique violation (P2002 /
-# isUniqueConstraintError) and re-reading — each paper over it at one call site. The fence is
-# db.findForUpdate(model, where, { upserting: true }), which locks the where-key itself.
+# Catching a unique violation (P2002 / isUniqueConstraintError) and re-reading papers over a
+# create race at one call site. Create-if-missing on a unique key is an upsert, which Prisma runs
+# as one INSERT ... ON CONFLICT; a key no unique holds is fenced with
+# db.findForUpdate(model, where, { upserting: true }).
 #
 # Ratchet, per file: a changed file fails only when it has MORE of these than it had at the merge
 # base, so existing call sites never fail an unrelated PR and the count only goes down.
 #
-# Exempt: test code (hook tests exercise upsert on purpose), factories and seeds, the generated
-# client, and the helper's own definition. Comment lines are not counted.
+# Exempt: test code, factories and seeds, the generated client, and the helper's own definition.
+# Comment lines are not counted.
 EXCLUDE='/generated/|\.test\.tsx?$|/tests?/|/__tests__/|/factories/|/prisma/seed|utils/isUniqueConstraintError\.ts$'
-PATTERN='\.upsert\(|P2002|isUniqueConstraintError\('
+PATTERN='P2002|isUniqueConstraintError\('
 
 count_matches() {
   grep -Ev '^[[:space:]]*(//|\*|/\*)' | grep -Ec "$PATTERN" || true
@@ -70,13 +70,12 @@ else
 fi
 
 if [[ -n "$VIOLATIONS" ]]; then
-  echo "Found new hand-rolled create-race handling (bare .upsert( or unique-violation catches):"
-  echo "Fence the key instead: inside db.txn, call"
-  echo "  db.findForUpdate(model, where, { upserting: true })"
-  echo "then a plain find / create / update on what it returned."
+  echo "Found new unique-violation catches (P2002 or isUniqueConstraintError):"
+  echo "Create-if-missing on a unique key is db.<model>.upsert; a key no unique holds is fenced"
+  echo "inside db.txn with db.findForUpdate(model, where, { upserting: true })."
   echo ""
   printf '%s' "$VIOLATIONS"
   exit 1
 fi
 
-echo "No new hand-rolled create-race handling found."
+echo "No new unique-violation catches found."
