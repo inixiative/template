@@ -8,7 +8,7 @@ import {
   ATTRIBUTE_COLUMN_NAMES,
   type AttributeColumnName,
   type AttributeTypedColumns,
-} from '@template/shared/attributes/typing';
+} from '@template/shared/attributes/typing/columns';
 
 /** Lists every populated typed column name on a row (non-null and non-undefined). */
 export const populatedAttributeColumns = (

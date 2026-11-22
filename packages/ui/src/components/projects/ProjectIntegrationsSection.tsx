@@ -71,6 +71,7 @@ export const ProjectIntegrationsSection = ({
     queries: scopes.map((scope) => ({
       queryKey: scope.queryKey,
       queryFn: scope.queryFn,
+      throwOnError: false,
     })),
   });
 
@@ -106,6 +107,7 @@ export const ProjectIntegrationsSection = ({
   }, [scopes, scopeQueries, connectedIntegrationIds]);
 
   const connectMutation = useMutation({
+    throwOnError: false,
     mutationFn: (integrationId: string) =>
       projectCreateProjectIntegrationMutationFn({
         path: { id: project.id },
@@ -121,6 +123,7 @@ export const ProjectIntegrationsSection = ({
   });
 
   const disconnectMutation = useMutation({
+    throwOnError: false,
     mutationFn: (projectIntegrationId: string) =>
       projectIntegrationDeleteMutationFn({ path: { id: projectIntegrationId } }),
     onSuccess: (_data, disconnectedId) => {

@@ -18,7 +18,13 @@ import {
   buildUser,
 } from '@template/db/test';
 import type { MeReadResponses } from '@template/sdk';
+import { organizationReadManyProjectsQueryKey } from '@template/sdk';
 import type { SettingCatalog } from '@template/shared/settings';
+import {
+  connectableIntegrationScopesForProject,
+  type ProjectRecord,
+  projectReadQueryOptions,
+} from '@template/ui/lib/projectContextQueries';
 import { ProjectDetailPage } from '@template/ui/pages/ProjectDetailPage';
 import { ProjectsPage } from '@template/ui/pages/ProjectsPage';
 import { useAppStore } from '@template/ui/store';
@@ -72,6 +78,7 @@ let client: QueryClient;
 let requests: RecordedRequest[];
 let listResponses: Record<string, unknown[]>;
 let singleResponses: Record<string, unknown>;
+let failRoutes: Record<string, { status: number; message: string }>;
 
 const installRealSession = async (opts: {
   user: ReturnType<Awaited<ReturnType<typeof buildUser>>['entity']['__serialize']>;
@@ -127,6 +134,7 @@ const installRealSession = async (opts: {
 beforeEach(() => {
   listResponses = {};
   singleResponses = {};
+  failRoutes = {};
   requests = [];
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -137,6 +145,15 @@ beforeEach(() => {
     const text = await request.clone().text();
     const body = text ? (JSON.parse(text) as unknown) : null;
     requests.push({ method: request.method, path, body });
+
+    const failKey = `${request.method} ${path}`;
+    if (failKey in failRoutes) {
+      const failure = failRoutes[failKey];
+      return Response.json(
+        { message: failure?.message ?? 'Error' },
+        { status: failure?.status ?? 500 },
+      );
+    }
 
     if (request.method === 'GET' && path === '/api/v1/setting/info') {
       return Response.json({ data: { guide: {}, types: testCatalog } });
@@ -592,5 +609,170 @@ describe('ProjectsPage & ProjectDetailPage (real ReBAC permissions)', () => {
         ),
       ).toBe(true),
     );
+  });
+
+  it('allows Org Owner to delete (but not edit) a member-owned OrganizationUser project, invalidates list cache and removes read cache on delete', async () => {
+    const { entity: owner } = await buildUser();
+    const { entity: memberUser } = await buildUser();
+    const { entity: org } = await buildOrganization({ name: 'Acme' });
+    const { entity: orgOwner } = await buildOrganizationUser(
+      { role: Role.owner },
+      { user: owner, organization: org },
+    );
+    const { entity: memberProject } = await buildProject({
+      name: 'Member Scratchpad',
+      ownerModel: 'OrganizationUser',
+      organizationId: org.id,
+      userId: memberUser.id,
+    });
+    const { entity: orgProject } = await buildProject({
+      name: 'Org Flagship',
+      ownerModel: 'Organization',
+      organizationId: org.id,
+    });
+
+    const serializedOrg = org.__serialize();
+    const orgContext = {
+      type: 'organization',
+      organization: serializedOrg,
+    } as unknown as AuthenticatedContext;
+
+    await installRealSession({
+      user: owner.__serialize(),
+      organizations: [serializedOrg],
+      organizationUsers: [orgOwner.__serialize()],
+      context: orgContext,
+    });
+
+    // 1. Org owner viewing another member's OrganizationUser project: canManage = false, canDelete = true
+    singleResponses[`/api/v1/project/${memberProject.id}`] = memberProject.__serialize();
+    render(
+      <QueryClientProvider client={client}>
+        <ProjectDetailPage projectId={memberProject.id} view="settings" />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByDisplayValue('Member Scratchpad');
+    expect((screen.getByLabelText('Name') as HTMLInputElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Save details' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Delete project' })).toBeDefined();
+    cleanup();
+
+    // 2. With 60s staleTime, updating & deleting invalidates the owner list query and removes projectRead cache
+    const staleClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
+    });
+    const orgListKey = organizationReadManyProjectsQueryKey({
+      path: { id: org.id },
+      query: { pageSize: 100 },
+    });
+    staleClient.setQueryData(orgListKey, { data: [orgProject.__serialize()] });
+    singleResponses[`/api/v1/project/${orgProject.id}`] = orgProject.__serialize();
+
+    const detailView = render(
+      <QueryClientProvider client={staleClient}>
+        <ProjectDetailPage
+          projectId={orgProject.id}
+          view="settings"
+          onNavigateBack={() => {
+            detailView.unmount();
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByDisplayValue('Org Flagship');
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Org Flagship Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
+    await waitFor(() => expect(staleClient.getQueryState(orgListKey)?.isInvalidated).toBe(true));
+
+    // Re-mark fresh, then Delete removes projectRead query and invalidates org list query
+    staleClient.setQueryData(orgListKey, { data: [orgProject.__serialize()] });
+    expect(staleClient.getQueryState(orgListKey)?.isInvalidated).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete project' }));
+    await waitFor(() => expect(staleClient.getQueryState(orgListKey)?.isInvalidated).toBe(true));
+    expect(
+      staleClient.getQueryState(projectReadQueryOptions(orgProject.id).queryKey),
+    ).toBeUndefined();
+    staleClient.clear();
+  });
+
+  it('guards User-project connectable scopes against foreign users and renders inline errors under throwOnError: true', async () => {
+    const { entity: actingUser } = await buildUser();
+    const { entity: otherUser } = await buildUser();
+    const { entity: foreignPersonalProject } = await buildProject({
+      name: 'Other Personal',
+      ownerModel: 'User',
+      userId: otherUser.id,
+    });
+    const { entity: ownPersonalProject } = await buildProject({
+      name: 'My Personal',
+      ownerModel: 'User',
+      userId: actingUser.id,
+    });
+
+    const authStub = {
+      user: actingUser.__serialize() as unknown as ReturnType<
+        typeof useAppStore.getState
+      >['auth']['user'],
+      organizations: null,
+      organizationUsers: null,
+      spaces: null,
+      spaceUsers: null,
+    };
+
+    // Foreign personal project must NOT include acting user's /me/integrations
+    expect(
+      connectableIntegrationScopesForProject(
+        foreignPersonalProject.__serialize() as unknown as ProjectRecord,
+        authStub,
+      ),
+    ).toEqual([]);
+    expect(
+      connectableIntegrationScopesForProject(
+        ownPersonalProject.__serialize() as unknown as ProjectRecord,
+        authStub,
+      ).map((scope) => scope.ownerModel),
+    ).toEqual(['User']);
+
+    // QueryClient matching createAppQueryClient (throwOnError: true globally) renders inline alert + not-found cleanly
+    const throwingClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, throwOnError: true },
+        mutations: { throwOnError: true },
+      },
+    });
+    await installRealSession({
+      user: actingUser.__serialize(),
+      context: { type: 'user' },
+    });
+
+    singleResponses[`/api/v1/project/${ownPersonalProject.id}`] = ownPersonalProject.__serialize();
+    failRoutes[`PATCH /api/v1/project/${ownPersonalProject.id}`] = {
+      status: 422,
+      message: 'Project name invalid',
+    };
+
+    render(
+      <QueryClientProvider client={throwingClient}>
+        <ProjectDetailPage projectId={ownPersonalProject.id} view="settings" />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByDisplayValue('My Personal');
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Bad Name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
+    expect((await screen.findByRole('alert')).textContent).toBeTruthy();
+    cleanup();
+
+    failRoutes['GET /api/v1/project/missing-id'] = { status: 404, message: 'Not found' };
+    render(
+      <QueryClientProvider client={throwingClient}>
+        <ProjectDetailPage projectId="missing-id" view="settings" />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText('Project not found')).toBeDefined();
+    throwingClient.clear();
   });
 });

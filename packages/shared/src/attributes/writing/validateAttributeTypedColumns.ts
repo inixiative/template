@@ -4,7 +4,8 @@
  * @partOf primitive:shared
  * @uses none
  */
-import type { AttributeTypedColumns, AttributeValueType } from '@template/shared/attributes/typing';
+import type { AttributeTypedColumns } from '@template/shared/attributes/typing/columns';
+import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 import { attributeTypedColumnIssues } from '@template/shared/attributes/writing/attributeTypedColumnIssues';
 import type { z } from 'zod';
 

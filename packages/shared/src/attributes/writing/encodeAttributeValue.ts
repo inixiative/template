@@ -4,15 +4,13 @@
  * @partOf primitive:shared
  * @uses none
  */
-import {
-  attributeColumnForValueType,
-  parseAttributeValueOrThrow,
-} from '@template/shared/attributes/parsing';
+import { attributeColumnForValueType } from '@template/shared/attributes/parsing/attributeColumnForValueType';
+import { parseAttributeValueOrThrow } from '@template/shared/attributes/parsing/parseAttributeValue';
 import {
   type AttributeEncodedColumns,
-  type AttributeValueType,
   EMPTY_ATTRIBUTE_COLUMNS,
-} from '@template/shared/attributes/typing';
+} from '@template/shared/attributes/typing/columns';
+import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 
 /** Encodes a runtime value into the 5 typed Attribute columns, clearing sibling columns to null. */
 export const encodeAttributeValue = (

@@ -27,6 +27,7 @@ import { ResourceSettingsSection } from '@template/ui/components/settings/Resour
 import { hydrateSettingTargetForPermissions } from '@template/ui/lib/hydrateRecordForPermissions';
 import {
   projectDeleteMutationFn,
+  projectListQueryKeysForProject,
   projectReadQueryOptions,
   projectUpdateMutationFn,
 } from '@template/ui/lib/projectContextQueries';
@@ -59,7 +60,7 @@ export const ProjectDetailPage = ({
   );
 
   const readOpts = useMemo(() => projectReadQueryOptions(projectId), [projectId]);
-  const projectQuery = useQuery(readOpts);
+  const projectQuery = useQuery({ ...readOpts, throwOnError: false });
   const project = projectQuery.data?.data;
 
   const [name, setName] = useState('');
@@ -86,6 +87,9 @@ export const ProjectDetailPage = ({
   const canManageProject = Boolean(
     hydratedProject && permissions.check('project', hydratedProject, 'manage'),
   );
+  const canDeleteProject = Boolean(
+    hydratedProject && permissions.check('project', hydratedProject, 'delete'),
+  );
 
   const handleBack = () => {
     if (onNavigateBack) {
@@ -103,7 +107,15 @@ export const ProjectDetailPage = ({
     navigateKeepingSearchParams(`/projects/${projectId}/${nextView}`, 'context');
   };
 
+  const invalidateOwnerProjectLists = () => {
+    if (!project) return;
+    for (const queryKey of projectListQueryKeysForProject(project, auth)) {
+      void queryClient.invalidateQueries({ queryKey });
+    }
+  };
+
   const updateMutation = useMutation({
+    throwOnError: false,
     mutationFn: () =>
       projectUpdateMutationFn({
         path: { id: projectId },
@@ -116,6 +128,7 @@ export const ProjectDetailPage = ({
       setErrorMessage(null);
       setStatusMessage('Project updated');
       void queryClient.invalidateQueries({ queryKey: readOpts.queryKey });
+      invalidateOwnerProjectLists();
     },
     onError: (err) => {
       setStatusMessage(null);
@@ -124,9 +137,12 @@ export const ProjectDetailPage = ({
   });
 
   const deleteMutation = useMutation({
+    throwOnError: false,
     mutationFn: () => projectDeleteMutationFn({ path: { id: projectId } }),
     onSuccess: () => {
+      invalidateOwnerProjectLists();
       handleBack();
+      queryClient.removeQueries({ queryKey: readOpts.queryKey });
     },
     onError: (err) => {
       setStatusMessage(null);
@@ -284,7 +300,7 @@ export const ProjectDetailPage = ({
             category="general"
           />
 
-          {canManageProject ? (
+          {canDeleteProject ? (
             <Card className="border-destructive/40">
               <CardHeader>
                 <CardTitle className="text-base text-destructive">Delete project</CardTitle>

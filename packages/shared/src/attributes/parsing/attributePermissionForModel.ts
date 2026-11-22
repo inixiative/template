@@ -4,7 +4,7 @@
  * @partOf primitive:shared
  * @uses none
  */
-import type { AttributePermissionSpec } from '@template/shared/attributes/typing';
+import type { AttributePermissionSpec } from '@template/shared/attributes/typing/permission';
 
 /** Resolves a single action or per-resourceModel permission map for `resourceModel`. */
 export const attributePermissionForModel = <TAction extends string>(

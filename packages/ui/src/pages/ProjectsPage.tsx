@@ -158,6 +158,7 @@ const ProjectOwnerSection = ({
   }, [queries.owner.ownerModel, auth, context, permissions]);
 
   const createMutation = useMutation({
+    throwOnError: false,
     mutationFn: (body: ProjectCreateBody) => queries.create.mutationFn({ body }),
     onSuccess: () => {
       setCreateError(null);

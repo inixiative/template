@@ -7,7 +7,8 @@
 import { deduplicateMultiSelect } from '@template/shared/attributes/parsing/deduplicateMultiSelect';
 import { isStringArray } from '@template/shared/attributes/parsing/isStringArray';
 import { parseAttributeDate } from '@template/shared/attributes/parsing/parseAttributeDate';
-import type { AttributeTypedColumns, AttributeValueType } from '@template/shared/attributes/typing';
+import type { AttributeTypedColumns } from '@template/shared/attributes/typing/columns';
+import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 
 /** Decodes the active typed column for `valueType` back into its runtime JS value (or null when unset). */
 export const decodeAttributeColumnValue = (

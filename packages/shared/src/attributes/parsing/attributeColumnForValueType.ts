@@ -4,7 +4,8 @@
  * @partOf primitive:shared
  * @uses none
  */
-import type { AttributeColumnName, AttributeValueType } from '@template/shared/attributes/typing';
+import type { AttributeColumnName } from '@template/shared/attributes/typing/columns';
+import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 
 const COLUMN_BY_VALUE_TYPE: Record<AttributeValueType, AttributeColumnName> = {
   boolean: 'valueBoolean',

@@ -7,7 +7,7 @@
 import { deduplicateMultiSelect } from '@template/shared/attributes/parsing/deduplicateMultiSelect';
 import { isStringArray } from '@template/shared/attributes/parsing/isStringArray';
 import { parseAttributeDate } from '@template/shared/attributes/parsing/parseAttributeDate';
-import type { AttributeValueType } from '@template/shared/attributes/typing';
+import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 
 export type ParsedAttributeValue = { ok: true; value: unknown } | { ok: false; message: string };
 

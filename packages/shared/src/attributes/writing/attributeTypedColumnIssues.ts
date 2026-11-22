@@ -4,20 +4,18 @@
  * @partOf primitive:shared
  * @uses none
  */
-import {
-  attributeColumnForValueType,
-  deduplicateMultiSelect,
-  isStringArray,
-  parseAttributeDate,
-  parseAttributeValue,
-} from '@template/shared/attributes/parsing';
+import { attributeColumnForValueType } from '@template/shared/attributes/parsing/attributeColumnForValueType';
+import { deduplicateMultiSelect } from '@template/shared/attributes/parsing/deduplicateMultiSelect';
+import { isStringArray } from '@template/shared/attributes/parsing/isStringArray';
+import { parseAttributeDate } from '@template/shared/attributes/parsing/parseAttributeDate';
+import { parseAttributeValue } from '@template/shared/attributes/parsing/parseAttributeValue';
 import {
   ATTRIBUTE_COLUMN_NAMES,
   type AttributeTypedColumns,
   type AttributeValidationIssue,
   type AttributeValidationResult,
-  type AttributeValueType,
-} from '@template/shared/attributes/typing';
+} from '@template/shared/attributes/typing/columns';
+import type { AttributeValueType } from '@template/shared/attributes/typing/valueTypes';
 import { encodeAttributeValue } from '@template/shared/attributes/writing/encodeAttributeValue';
 import type { z } from 'zod';
 

@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import type { QueryKey } from '@tanstack/react-query';
-import type { ProjectOwnerModel } from '@template/db';
+import type { IntegrationOwnerModel, ProjectOwnerModel } from '@template/db';
 import {
   type MeCreateProjectData,
   type MeReadManyIntegrationsResponses,
@@ -72,10 +72,12 @@ type ReadManyIntegrationsOptions = Parameters<typeof meReadManyIntegrations>[0];
 type ProjectUpdateVariables = Pick<ProjectUpdateData, 'path' | 'body'>;
 type ProjectCreateIntegrationVariables = Pick<ProjectCreateProjectIntegrationData, 'path' | 'body'>;
 
+export const projectDeleteMutationFn = apiMutation((opts: Parameters<typeof projectDelete>[0]) =>
+  projectDelete({ ...opts, throwOnError: true }),
+);
+
 const deleteProject = mutation({
-  mutationFn: apiMutation((opts: Parameters<typeof projectDelete>[0]) =>
-    projectDelete({ ...opts, throwOnError: true }),
-  ),
+  mutationFn: projectDeleteMutationFn,
 });
 
 const buildProjectOwnerQueries = (
@@ -154,10 +156,6 @@ export const projectUpdateMutationFn = apiMutation(
     projectUpdate({ ...opts, throwOnError: true }),
 );
 
-export const projectDeleteMutationFn = apiMutation((opts: Parameters<typeof projectDelete>[0]) =>
-  projectDelete({ ...opts, throwOnError: true }),
-);
-
 export const projectReadManyProjectIntegrationsQueryOptions = (projectId: string) => ({
   queryKey: projectReadManyProjectIntegrationsQueryKey({
     path: { id: projectId },
@@ -183,10 +181,47 @@ export const projectIntegrationDeleteMutationFn = apiMutation(
     projectIntegrationDelete({ ...opts, throwOnError: true }),
 );
 
+type IntegrationScopeAuth = Pick<
+  AuthSlice['auth'],
+  'user' | 'organizations' | 'organizationUsers' | 'spaces' | 'spaceUsers'
+>;
+
+/**
+ * Returns the owner's project-list query key prefix(es) for cache invalidation
+ * after updating or deleting a project.
+ */
+export const projectListQueryKeysForProject = (
+  project: ProjectRecord,
+  auth: Pick<IntegrationScopeAuth, 'organizationUsers' | 'spaceUsers'>,
+): QueryKey[] => {
+  switch (project.ownerModel) {
+    case 'User':
+      return [meReadManyProjectsQueryKey()];
+    case 'Organization':
+      return project.organizationId
+        ? [organizationReadManyProjectsQueryKey({ path: { id: project.organizationId } })]
+        : [];
+    case 'OrganizationUser': {
+      const member = project.organizationId
+        ? auth.organizationUsers?.[project.organizationId]
+        : undefined;
+      return member ? [organizationUserReadManyProjectsQueryKey({ path: { id: member.id } })] : [];
+    }
+    case 'Space':
+      return project.spaceId
+        ? [spaceReadManyProjectsQueryKey({ path: { id: project.spaceId } })]
+        : [];
+    case 'SpaceUser': {
+      const member = project.spaceId ? auth.spaceUsers?.[project.spaceId] : undefined;
+      return member ? [spaceUserReadManyProjectsQueryKey({ path: { id: member.id } })] : [];
+    }
+  }
+};
+
 export type ConnectableIntegrationScope = {
   key: string;
   label: string;
-  ownerModel: 'User' | 'Organization' | 'Space' | 'OrganizationUser' | 'SpaceUser';
+  ownerModel: IntegrationOwnerModel;
   queryKey: QueryKey;
   queryFn: ReturnType<
     typeof apiQuery<
@@ -195,15 +230,10 @@ export type ConnectableIntegrationScope = {
   >;
 };
 
-type IntegrationScopeAuth = Pick<
-  AuthSlice['auth'],
-  'user' | 'organizations' | 'organizationUsers' | 'spaces' | 'spaceUsers'
->;
-
 /**
  * Returns the ordered containment scopes whose Integrations are legally connectable to `project`
  * (mirroring `projectIntegrationOwner` DB hook invariants):
- * - User -> [Personal]
+ * - User -> [Personal] (only when the acting user owns the personal project)
  * - Organization -> [Organization]
  * - Space -> [Space, Organization]
  * - OrganizationUser -> [Your integrations in {org} (when self), Organization]
@@ -222,15 +252,17 @@ export const connectableIntegrationScopesForProject = (
   const spaceName = project.spaceId ? (auth.spaces?.[project.spaceId]?.name ?? 'Space') : 'Space';
 
   if (project.ownerModel === 'User') {
-    scopes.push({
-      key: 'user',
-      label: 'Personal integrations',
-      ownerModel: 'User',
-      queryKey: meReadManyIntegrationsQueryKey({ query }),
-      queryFn: apiQuery((opts: ReadManyIntegrationsOptions) =>
-        meReadManyIntegrations({ ...opts, query, throwOnError: true }),
-      ),
-    });
+    if (isOwnMemberProject) {
+      scopes.push({
+        key: 'user',
+        label: 'Personal integrations',
+        ownerModel: 'User',
+        queryKey: meReadManyIntegrationsQueryKey({ query }),
+        queryFn: apiQuery((opts: ReadManyIntegrationsOptions) =>
+          meReadManyIntegrations({ ...opts, query, throwOnError: true }),
+        ),
+      });
+    }
     return scopes;
   }
 

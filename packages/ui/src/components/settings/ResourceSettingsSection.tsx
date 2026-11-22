@@ -204,6 +204,7 @@ export const ResourceSettingsSection = ({
   }, []);
 
   const saveMutation = useMutation({
+    throwOnError: false,
     mutationFn: (items: typeof dirtyItems) => queries.updateMany.mutationFn({ body: items }),
     onSuccess: () => {
       setDrafts({});
@@ -220,6 +221,7 @@ export const ResourceSettingsSection = ({
   });
 
   const resetMutation = useMutation({
+    throwOnError: false,
     mutationFn: ({ id }: { id: string; key: string }) =>
       queries.delete.mutationFn({ path: { id } }),
     onSuccess: (_data, variables) => {
